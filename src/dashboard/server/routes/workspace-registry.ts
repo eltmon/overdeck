@@ -17,10 +17,13 @@ import { getWorkspaceById, listWorkspaces } from '../../../lib/workspaces/resolv
 import {
   archiveWorkspace,
   setWorkspaceFavorite,
+  setWorkspaceRunCommand,
   touchWorkspaceAccessed,
   unarchiveWorkspace,
   updateWorkspaceLayout,
 } from '../../../lib/workspaces/writer.js';
+import { createSession, sessionExists } from '../../../lib/tmux.js';
+import { getProjectSync } from '../../../lib/projects.js';
 import type { WorkspaceGitState, WorkspaceRow } from '../../../lib/workspaces/types.js';
 import { getWorkspaceGitState, pullWorkspaceFastForward } from '../../../lib/workspaces/git-state.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
@@ -125,7 +128,15 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
     // Same rule as the list route: issue rows carry no memoryPhase, even though
     // the detail route reads their full status for the memory panel.
     const memoryPhase = workspace.kind === 'issue' ? null : memoryStatus?.phase ?? null;
-    return jsonResponse({ ...toListRow(workspace, memoryPhase), memoryStatus });
+    // The band's run card needs both what it would run today and what else the
+    // project offers, so it can show a placeholder and a service picker.
+    const runCommandOptions = runCommandOptionsFor(workspace);
+    return jsonResponse({
+      ...toListRow(workspace, memoryPhase),
+      memoryStatus,
+      runCommandDefault: runCommandOptions[0]?.command ?? null,
+      runCommandOptions,
+    });
   })),
 );
 
@@ -233,6 +244,109 @@ const postWorkspaceRegistryPullRoute = HttpRouter.add(
   })),
 );
 
+// ─── Run command: PUT /:id/run-command, POST /:id/run ───────────────────────
+
+/**
+ * The run command lands in a tmux session's argv, not in a shell string we
+ * build — but the async `createSession` (unlike the deprecated sync one) does
+ * no validation of its own, so commands that would break the session are
+ * refused at the door instead.
+ */
+const MAX_RUN_COMMAND_LENGTH = 500;
+
+function invalidRunCommandReason(command: string): string | null {
+  if (command.length === 0) return 'Run command is empty.';
+  if (command.length > MAX_RUN_COMMAND_LENGTH) {
+    return `Run command exceeds ${MAX_RUN_COMMAND_LENGTH} characters.`;
+  }
+  if (/[\n\r`]/.test(command)) return 'Run command cannot contain newlines or backticks.';
+  return null;
+}
+
+/** Every `services[].start_command` the workspace's project configures, in config order. */
+function runCommandOptionsFor(workspace: WorkspaceRow): Array<{ name: string; command: string }> {
+  const services = getProjectSync(workspace.projectId)?.workspace?.services ?? [];
+  return services
+    .filter((service) => typeof service.start_command === 'string' && service.start_command.length > 0)
+    .map((service) => ({ name: service.name, command: service.start_command }));
+}
+
+/** The command the Run button would use: the operator's override, else the first configured service. */
+function resolveRunCommand(workspace: WorkspaceRow): string | null {
+  if (workspace.runCommand) return workspace.runCommand;
+  return runCommandOptionsFor(workspace)[0]?.command ?? null;
+}
+
+/** Deterministic per workspace, so a reload finds the live session instead of spawning a second one. */
+function runSessionName(workspaceId: string): string {
+  return `ws-run-${workspaceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`;
+}
+
+const putWorkspaceRegistryRunCommandRoute = HttpRouter.add(
+  'PUT',
+  '/api/workspace-registry/:id/run-command',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    const body = (yield* readJsonBody) as { command?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    if (body.command !== null && typeof body.command !== 'string') {
+      return jsonResponse({ error: 'command must be a string or null' }, { status: 400 });
+    }
+    // An empty string is the operator clearing the override back to the default.
+    const trimmed = typeof body.command === 'string' ? body.command.trim() : null;
+    const command = trimmed === null || trimmed === '' ? null : trimmed;
+    if (command !== null) {
+      const reason = invalidRunCommandReason(command);
+      if (reason) return jsonResponse({ error: reason }, { status: 400 });
+    }
+    setWorkspaceRunCommand(id, command);
+    const updated = getWorkspaceById(id) ?? { ...workspace, runCommand: command };
+    return jsonResponse({
+      ...toListRow(updated),
+      runCommandDefault: runCommandOptionsFor(updated)[0]?.command ?? null,
+      runCommandOptions: runCommandOptionsFor(updated),
+    });
+  })),
+);
+
+const postWorkspaceRegistryRunRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/:id/run',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    const command = resolveRunCommand(workspace);
+    if (!command) {
+      return jsonResponse({
+        error: 'No run command configured for this workspace.',
+        runCommandOptions: runCommandOptionsFor(workspace),
+      }, { status: 400 });
+    }
+    const reason = invalidRunCommandReason(command);
+    if (reason) return jsonResponse({ error: reason }, { status: 400 });
+
+    // One live run session per workspace: a second Run re-focuses the first
+    // rather than stacking duplicate servers on the same port.
+    const sessionName = runSessionName(id);
+    if (yield* sessionExists(sessionName)) {
+      return jsonResponse({ sessionName, command, alreadyRunning: true }, { status: 409 });
+    }
+    yield* createSession(sessionName, workspace.path, command, {
+      env: { PATH: process.env.PATH || '' },
+    });
+    return jsonResponse({ sessionName, command });
+  })),
+);
+
 // ─── POST /api/workspace-registry/:id/activate|archive|favorite ────────────
 
 const postWorkspaceRegistryActivateRoute = HttpRouter.add(
@@ -311,6 +425,8 @@ export const workspaceRegistryRouteLayer = Layer.mergeAll(
   getWorkspaceRegistryMemoryRoute,
   getWorkspaceRegistryGitRoute,
   postWorkspaceRegistryPullRoute,
+  putWorkspaceRegistryRunCommandRoute,
+  postWorkspaceRegistryRunRoute,
   postWorkspaceRegistryActivateRoute,
   postWorkspaceRegistryArchiveRoute,
   postWorkspaceRegistryFavoriteRoute,

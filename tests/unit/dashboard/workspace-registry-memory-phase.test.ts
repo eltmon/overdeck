@@ -88,6 +88,7 @@ function baseWorkspace(overrides: Partial<WorkspaceRow> = {}): WorkspaceRow {
     isGitRepository: true,
     issueId: 'PAN-9001',
     layoutConfig: null,
+    runCommand: null,
     isFavorite: false,
     isArchived: false,
     title: null,

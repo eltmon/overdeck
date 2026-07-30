@@ -29,6 +29,8 @@ export interface WorkspaceRow {
   isGitRepository: boolean;
   issueId: string | null;
   layoutConfig: string | null;
+  /** Operator-set run command for the quick-action band; null falls back to project service config. */
+  runCommand: string | null;
   isFavorite: boolean;
   isArchived: boolean;
   title: string | null;

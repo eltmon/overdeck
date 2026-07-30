@@ -228,6 +228,7 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
       \`is_git_repository\` integer DEFAULT 1 NOT NULL,
       \`issue_id\` text,
       \`layout_config\` text,
+      \`run_command\` text,
       \`is_favorite\` integer DEFAULT 0,
       \`is_archived\` integer DEFAULT 0,
       \`title\` text,
@@ -269,6 +270,10 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
 
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `workspace_id` text');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `workspace_id` text');
+  // PAN-3331: the quick-action band's per-workspace run command. Its own column
+  // rather than a key inside layout_config, which react-resizable-panels owns
+  // and rewrites wholesale on every panel drag.
+  runSchemaTopUp(db, 'ALTER TABLE `workspaces` ADD COLUMN `run_command` text');
 }
 
 /**
