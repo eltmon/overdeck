@@ -179,10 +179,10 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T23:54:38.776Z",
+  "updated": "2026-07-30T23:56:41.939Z",
   "pipeline": {
     "issueId": "PAN-3330",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -190,13 +190,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-30T23:54:38.633Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3330-review",
+    "updatedAt": "2026-07-30T23:56:41.817Z",
+    "reviewNotes": "Cycle-3 archived-main failure is fixed; the late Unarchive finding is unchanged and not promotable under the convergence gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-4 met. Three existing CLI suites (workspace-commands, workspace-new-target-path, workspace-scratch-isolated) untouched by the commit and all pass alongside the new create-intent suite (41/41, --hookTimeout 60000; the default-5s hook failure also hits untouched relocate.test.ts, so it is machine load, not a regression). Dry-run parity asserted field-for-field and key-order against real CLI output for shared/target-path/isolated. cliMessageFor reproduces all six original message strings verbatim, exit path still exitCli. Findings returned (not thrown) for invalid-name, target-not-a-directory, mode-conflict, plus project-not-found/ambiguous; fail-fast ordering preserved so a rejected name touches neither git nor fs. Resolution writes nothing (worktree list, workspace row count, and projects row all asserted unchanged). grep confirms zero process.cwd() in src/lib/workspaces/create.ts; the test proves it by runtime spy instead of a source grep because scripts/lint-source-introspection.sh forbids source-text assertions - deviation from AC4's literal wording, substantively satisfied. NFR-2: promisify(exec) shell string replaced by execFileAsync argument vector for rev-parse and worktree add; no execSync. Non-blocking: intent.projectId as string cast in workspaceMainCommand relies on findings-empty implying non-null, and kind=main now stats .git before the getMainWorkspace short-circuit (extra stat, no visible change); createWorkspace maps omitted and false parentBranchGuessed to the same 0.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
-    "reviewedAtCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93",
+    "reviewedAtCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
     "lastVerifiedCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
-    "reviewRequestedAt": "2026-07-30T23:36:29.596Z",
     "reviewSpawnedAt": "2026-07-30T23:38:07.583Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -270,6 +270,24 @@
         "tests/unit/lib/workspaces/relocate.test.ts"
       ],
       "recordedAt": "2026-07-30T23:35:42.094Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "15c104c5711d4149293fafa12abe973b59ad210e"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "15c104c5711d4149293fafa12abe973b59ad210e"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "15c104c5711d4149293fafa12abe973b59ad210e"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "15c104c5711d4149293fafa12abe973b59ad210e"
+      }
     }
   },
   "closeOut": {
@@ -285,9 +303,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18445275,
-            "output": 400741,
-            "cacheRead": 105211904,
+            "input": 18514178,
+            "output": 409432,
+            "cacheRead": 109112832,
             "cacheWrite": 0
           }
         },
@@ -332,15 +350,15 @@
           "cacheWrite": 142719
         },
         "openai/gpt-5.6-sol": {
-          "input": 27419083,
-          "output": 653702,
-          "cacheRead": 141905408,
+          "input": 27487986,
+          "output": 662393,
+          "cacheRead": 145806336,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 233.430317,
-        "pricingAsOf": "2026-07-30T23:54:38.768Z"
+        "usd": 235.986026,
+        "pricingAsOf": "2026-07-30T23:56:41.917Z"
       }
     },
     "merges": [
