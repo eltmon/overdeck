@@ -242,21 +242,21 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:57:12.958Z",
+  "updated": "2026-07-30T11:57:15.074Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
-    "mergeStep": "validating-pr",
+    "mergeStatus": "verifying",
+    "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:57:12.923Z",
+    "updatedAt": "2026-07-30T11:57:14.667Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
-    "verificationNotes": "Pre-review verification already covered the reviewed commit",
+    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -369,7 +369,7 @@
       },
       "costAtCloseOut": {
         "usd": 153.580992,
-        "pricingAsOf": "2026-07-30T11:57:12.951Z"
+        "pricingAsOf": "2026-07-30T11:57:14.719Z"
       }
     },
     "merges": [
