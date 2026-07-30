@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:09:53.191Z",
+  "updated": "2026-07-30T05:19:57.726Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "rebuild-archive-terminal": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 172941,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:09:53.190Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -188,6 +180,17 @@
         "outcome": "completed",
         "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
         "releasedAt": "2026-07-30T04:57:23.768Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 172941,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:09:53.190Z",
+        "itemId": "rebuild-archive-terminal",
+        "outcome": "completed",
+        "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
+        "releasedAt": "2026-07-30T05:19:57.726Z"
       }
     ],
     "statusReasons": {
@@ -234,6 +237,10 @@
       "rail-filter": {
         "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
         "updatedAt": "2026-07-30T04:57:23.768Z"
+      },
+      "rebuild-archive-terminal": {
+        "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
+        "updatedAt": "2026-07-30T05:19:57.726Z"
       }
     }
   },
@@ -288,6 +295,9 @@
     "rail-filter.rail-filter.ac2": "completed",
     "rail-filter.rail-filter.ac3": "completed",
     "rail-filter.rail-filter.ac4": "completed",
-    "rebuild-archive-terminal": "running"
+    "rebuild-archive-terminal": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac1": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac2": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac3": "completed"
   }
 }
