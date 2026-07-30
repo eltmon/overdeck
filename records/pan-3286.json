@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:20:01.307Z",
+  "updated": "2026-07-30T05:37:20.834Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "memory-phase-ui": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 507676,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:20:01.307Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -199,6 +191,17 @@
         "outcome": "completed",
         "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
         "releasedAt": "2026-07-30T05:19:57.726Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 507676,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:20:01.307Z",
+        "itemId": "memory-phase-ui",
+        "outcome": "completed",
+        "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
+        "releasedAt": "2026-07-30T05:37:20.834Z"
       }
     ],
     "statusReasons": {
@@ -249,6 +252,10 @@
       "rebuild-archive-terminal": {
         "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
         "updatedAt": "2026-07-30T05:19:57.726Z"
+      },
+      "memory-phase-ui": {
+        "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
+        "updatedAt": "2026-07-30T05:37:20.834Z"
       }
     }
   },
@@ -307,6 +314,9 @@
     "rebuild-archive-terminal.rebuild-archive-terminal.ac1": "completed",
     "rebuild-archive-terminal.rebuild-archive-terminal.ac2": "completed",
     "rebuild-archive-terminal.rebuild-archive-terminal.ac3": "completed",
-    "memory-phase-ui": "running"
+    "memory-phase-ui": "completed",
+    "memory-phase-ui.memory-phase-ui.ac1": "completed",
+    "memory-phase-ui.memory-phase-ui.ac2": "completed",
+    "memory-phase-ui.memory-phase-ui.ac3": "completed"
   }
 }
