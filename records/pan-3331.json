@@ -158,18 +158,18 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:53:05.230Z",
+  "updated": "2026-07-30T23:53:11.171Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:53:04.365Z",
+    "updatedAt": "2026-07-30T23:53:11.162Z",
     "reviewNotes": "cycle 3 fixes resolve both prior blockers; remaining findings are advisory or previously reviewed and not promotable",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
@@ -253,24 +253,6 @@
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
       "recordedAt": "2026-07-30T23:25:58.701Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
-      }
     }
   },
   "closeOut": {
@@ -286,9 +268,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 11343828,
-            "output": 241879,
-            "cacheRead": 67229184,
+            "input": 11353808,
+            "output": 242249,
+            "cacheRead": 67598848,
             "cacheWrite": 0
           }
         },
@@ -333,15 +315,15 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 14206320,
-          "output": 438794,
-          "cacheRead": 96881664,
+          "input": 14216300,
+          "output": 439164,
+          "cacheRead": 97251328,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 141.420897,
-        "pricingAsOf": "2026-07-30T23:53:04.456Z"
+        "usd": 141.666729,
+        "pricingAsOf": "2026-07-30T23:53:11.166Z"
       }
     },
     "merges": [
@@ -350,7 +332,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
