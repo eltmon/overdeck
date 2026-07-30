@@ -2,7 +2,7 @@
   "issueId": "PAN-3320",
   "schemaVersion": 2,
   "created": "2026-07-30T09:28:12.646Z",
-  "updated": "2026-07-30T09:28:12.646Z",
+  "updated": "2026-07-30T09:36:37.065Z",
   "pipeline": {
     "issueId": "PAN-3320",
     "reviewStatus": "pending",
@@ -19,5 +19,12 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5"
+  "model": "claude-opus-5",
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-07-30T09:36:37.065Z"
+    }
+  ]
 }
