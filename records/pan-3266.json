@@ -10,17 +10,17 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:54:30.938Z",
-  "updated": "2026-07-30T09:15:24.003Z",
+  "updated": "2026-07-30T09:16:23.080Z",
   "pipeline": {
     "issueId": "PAN-3266",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "mergeStep": "squash-merging",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T09:15:23.982Z",
+    "updatedAt": "2026-07-30T09:16:20.763Z",
     "mergeNotes": "github merge failed: GitHub PR #3318 has failing required checks",
     "lastVerifiedCommit": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
     "strikeReadyHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
@@ -45,7 +45,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T09:15:24.000Z"
+        "pricingAsOf": "2026-07-30T09:16:20.795Z"
       }
     },
     "merges": [],
