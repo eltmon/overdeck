@@ -76,6 +76,31 @@ const PRE_REBASE_HOOK_PREFIX = [
   '',
 ].join('\n');
 
+/**
+ * Keep a generated hooks directory that lives inside the worktree out of
+ * `git status`. With husky, `core.hooksPath` is `.husky/_` — a tracked-repo
+ * path husky self-ignores by writing a `*` .gitignore into it on install.
+ * `installPreRebaseHook` creates that directory itself in a fresh worktree,
+ * long before `prepare: husky` ever runs, so without this the generated guard
+ * lands as `?? .husky/_/pre-rebase` and every new workspace is born dirty —
+ * which 409s the planning→work auto-handoff (PAN-3266).
+ *
+ * Directories under `.git/` need nothing: git never reports them.
+ */
+function ensureGeneratedHooksDirIsIgnored(targetPath: string, hooksDir: string): void {
+  const relativeDir = relative(targetPath, hooksDir).replace(/\\/g, '/');
+  if (!relativeDir || relativeDir.startsWith('..') || relativeDir === '.git' || relativeDir.startsWith('.git/')) {
+    return;
+  }
+  const ignorePath = join(hooksDir, '.gitignore');
+  if (existsSync(ignorePath)) return;
+  try {
+    writeFileSync(ignorePath, '*\n', 'utf-8');
+  } catch {
+    // Non-fatal: a dirty status is recoverable, a failed worktree create is not.
+  }
+}
+
 /** Install the agent-only rebase guard in Git's configured hooks directory. */
 export async function installPreRebaseHook(targetPath: string): Promise<string> {
   const { stdout } = await execAsync('git rev-parse --git-path hooks', {
@@ -86,6 +111,7 @@ export async function installPreRebaseHook(targetPath: string): Promise<string> 
   const hookPath = join(hooksDir, 'pre-rebase');
 
   mkdirSync(hooksDir, { recursive: true });
+  ensureGeneratedHooksDirIsIgnored(targetPath, hooksDir);
   const originalHookPath = `${hookPath}${PRE_REBASE_ORIGINAL_SUFFIX}`;
   const existingHook = existsSync(hookPath) ? readFileSync(hookPath, 'utf-8') : '';
   if (!existingHook.includes(PRE_REBASE_HOOK_MARKER)) {
