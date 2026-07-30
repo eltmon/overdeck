@@ -21,6 +21,7 @@ import {
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
 import {
+  archiveTerminalIssueWorkspaces,
   backfillIssueWorkspaces,
   migrateMemoryHomesToWorkspaces,
   rebuildMainAndScratchWorkspaces,
@@ -525,13 +526,23 @@ async function rebuildWorkspacesCommand(options: {
     }
 
     const result = await rebuildMainAndScratchWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
+    // PAN-3286 FR-14: hygiene pass — take worktrees for finished issues out of
+    // the user-facing surfaces. Archives, never deletes; the rows keep owning
+    // their memory homes.
+    const archival = await archiveTerminalIssueWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
 
     if (options.dryRun) {
-      spinner.info(`Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}`);
+      spinner.info(
+        `Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}; `
+        + `would archive ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+      );
       return;
     }
 
-    spinner.succeed(`Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}`);
+    spinner.succeed(
+      `Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}; `
+      + `archived ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+    );
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
     process.exitCode = 1;
