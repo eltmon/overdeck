@@ -9084,3 +9084,22 @@ The run is **NOT complete**; the earlier retrospective's quiescence claim is ret
 - **LESSON, and I nearly repeated my own recorded one:** flat cost plus an unchanged diff has at least three causes — finished, wedged, or *blocked on a long-running tool call*. RUN-74 recorded exactly this ("an unchanged cost means 'not spending', which is three different states") and I still reached for "stalled" first. **The pane text, not the cost delta, is what separates them** — one `capture-pane -S -40` settled it in one command.
 - Read door swept for all 12 projects: **28 in-pipeline rows** (the five struck issues now appear as `planned_backlog`, as expected for dispatched strike work). Nothing merge-ready; no new `post_merge_limbo` to drain. The three blocked PAN rows and MIN-908 are unchanged and out of my reach until their strikes land.
 - Watch is event-driven (monitor on strike PRs) with the interval wakeup only as a backstop for a strike that dies without opening a PR.
+
+## RUN-75 tick 15 (2026-07-30 21:15Z) — strikes committed but unpushed; readiness measured by commits, not cost
+
+- Hook **445 / guard=1**; leak **0 procs**; memory **27.1 GB free**, PSI 0 — steady despite five concurrent Opus strikes and a fleet that grew to 23 agents.
+- **Still no remote strike branches and no PRs in any state** (checked `--state all`). Nothing landed at ~36 minutes.
+- All five advancing since tick 14: PAN-3326 `$3.30→$19.89` (+181/-41), PAN-3339 `$8.22→$11.73` (+240/-32), PAN-3327 `$7.93→$9.49` (+607/-16), PAN-3328 `$7.09→$11.42` (+335/-35), PAN-3324 `$6.12→$8.24` (+136/-40). Each has 1–2 shells running; none wedged.
+- **Switched to a better readiness signal than cost — the workspace commit state:**
+
+  | Strike | commits ahead of origin/main | tree |
+  | --- | --- | --- |
+  | PAN-3326 | 4 | clean |
+  | PAN-3328 | 3 | clean |
+  | PAN-3339 | 1 | clean |
+  | PAN-3324 | 1 | clean |
+  | PAN-3327 | 0 | 12 dirty files (still writing) |
+
+  All five sit on their correct `strike/pan-XXXX` branch — **no worktree drift**. Four have committed, gate-passing work and simply have not pushed; one is still mid-implementation.
+- **LESSON: cost answers "is it spending?", the commit graph answers "is it nearly done?"** I spent two ticks inferring progress from cost deltas and diff line counts, which conflated "writing code" with "iterating on test failures" with "finished but unpushed". One `git -C <ws> rev-list --count origin/main..HEAD` plus `status --porcelain` separated the five into *four ready to push* and *one still writing* — a distinction no cost reading could make. **For "how close is it?", read the branch, not the meter.**
+- Nothing for me to do but wait for the push: the strike pushes and signals, then I review, gate, merge and `pan done --strike`. Read door unchanged; nothing merge-ready; PAN-3313 still the only correctly operator-gated item.
