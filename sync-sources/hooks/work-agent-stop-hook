@@ -46,6 +46,14 @@ mkdir -p "$LOG_DIR"
 COMPLETED_FILE="$AGENT_STATE_DIR/completed"
 [ -f "$COMPLETED_FILE" ] && exit 0
 
+STOP_HOOK_LOCK="$AGENT_STATE_DIR/stop-hook.lock.d"
+if ! pan_acquire_singleflight_lock "$STOP_HOOK_LOCK"; then
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID skipped — another instance holds $STOP_HOOK_LOCK" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+fi
+trap 'pan_release_singleflight_lock "$STOP_HOOK_LOCK"' EXIT
+
 # Skip if the issue is actively flowing through the specialist pipeline.
 # Read through the dashboard's SQLite-backed review-status API; review-status.json
 # is legacy and can be empty or stale.
