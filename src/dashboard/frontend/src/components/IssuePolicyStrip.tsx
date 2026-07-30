@@ -1,6 +1,7 @@
 /** Shared per-issue review and staffing policy strip, collapsed to an overrides-only Policies control (PAN-2681). */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 import { HelpTooltip, TooltipBody, TooltipProvider } from './shared/Tooltip';
 import { openRecoveryForStartBlock } from '../lib/resumeRecovery';
@@ -212,6 +213,17 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
         body: JSON.stringify(body),
       });
       if (response.ok) await refresh();
+      else {
+        let description = response.statusText || `Request failed (HTTP ${response.status})`;
+        try {
+          const result = await response.json() as { error?: unknown; message?: unknown };
+          if (typeof result.error === 'string') description = result.error;
+          else if (typeof result.message === 'string') description = result.message;
+        } catch {
+          // Keep the HTTP status fallback when the response has no JSON body.
+        }
+        toast.error('Failed to save issue policy', { description });
+      }
     } finally {
       setSaving(false);
     }
