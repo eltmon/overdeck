@@ -17,7 +17,7 @@ import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
 import { readCurrentStatus } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
-import { getWorkspaceForIssue, listProjects, listWorkspaces, resolveWorkspaceRef } from '../workspaces/resolver.js';
+import { getWorkspaceForIssue, listProjects, listWorkspaces, listWorkspacesForPath, resolveWorkspaceRef } from '../workspaces/resolver.js';
 import { searchMemory as searchMemoryFts, type MemorySearchHit } from './search.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
@@ -33,6 +33,8 @@ export interface MemorySearchOptions {
   global?: boolean;
   limit?: number;
   includeArchived?: boolean;
+  /** All workspaces targeting this directory (PAN-3286 FR-4) — resolved by the caller via listWorkspacesForPath. */
+  targetPath?: string;
 }
 
 export interface MemorySearchResult {
@@ -84,7 +86,72 @@ export interface MemoryDoctorResult {
  * nothing. A name that matches more than one workspace across projects is
  * reported as an ambiguity error rather than guessing.
  */
+/** Search one project (optionally scoped to one workspace/issue within it) and resolve hits back to observations. */
+async function searchProjectScope(input: {
+  query: string;
+  projectId: string;
+  workspaceId?: string;
+  issueId?: string;
+  sibling?: boolean;
+  includeArchived?: boolean;
+  tags?: string[];
+  limit: number;
+}): Promise<MemorySearchResult[]> {
+  const hits = await searchMemoryFts({
+    query: input.query,
+    projectId: input.projectId,
+    workspaceId: input.workspaceId,
+    issueId: input.issueId,
+    sibling: input.sibling,
+    includeArchived: input.includeArchived,
+    tags: input.tags,
+    // The shared FTS index also carries daily-summary hits (doc_type
+    // 'summary'), which this command can't resolve back to a
+    // MemoryObservation — restrict to observations so a summary ranked
+    // above matching observations doesn't consume the limit and vanish.
+    docType: 'observation',
+    limit: input.limit,
+  });
+
+  const fileCache = new Map<string, MemoryObservation[]>();
+  const pairs = await Promise.all(hits.map(async (hit) => ({
+    hit,
+    observation: await resolveObservationFromHit(input.projectId, hit, fileCache),
+  })));
+  return pairs
+    .filter((pair): pair is { hit: MemorySearchHit; observation: MemoryObservation } => pair.observation !== null)
+    .map((pair) => ({ observation: pair.observation, score: pair.hit.rankScore }));
+}
+
+/** Merge per-scope result sets by rank score (ties broken by recency), capped at limit. */
+function mergeRankedResults(perScope: MemorySearchResult[][], limit: number): MemorySearchResult[] {
+  return perScope.flat()
+    .sort((a, b) => b.score - a.score || b.observation.timestamp.localeCompare(a.observation.timestamp))
+    .slice(0, limit);
+}
+
 export async function searchMemory(query: string, options: MemorySearchOptions = {}): Promise<MemorySearchResult[]> {
+  const limit = options.limit ?? 20;
+
+  // --target fans out per matched workspace (which may span several
+  // projects, each with its own FTS shard) instead of per project — the
+  // caller has already resolved targetPath via listWorkspacesForPath, so a
+  // zero-match "no workspaces target <dir>" note can be printed without
+  // ever reaching the FTS index.
+  if (options.targetPath) {
+    const workspaces = listWorkspacesForPath(options.targetPath);
+    const perWorkspace = await Promise.all(workspaces.map((workspace) => searchProjectScope({
+      query,
+      projectId: workspace.projectId,
+      workspaceId: workspace.id,
+      sibling: options.sibling,
+      includeArchived: options.includeArchived,
+      tags: options.tag ? [options.tag] : undefined,
+      limit,
+    })));
+    return mergeRankedResults(perWorkspace, limit);
+  }
+
   let resolvedWorkspaceId: string | undefined;
   let resolvedWorkspaceProjectId: string | undefined;
   if (options.workspace) {
@@ -106,42 +173,23 @@ export async function searchMemory(query: string, options: MemorySearchOptions =
   const projectIds = options.global
     ? listProjects().map((project) => project.id)
     : [resolvedWorkspaceProjectId ?? options.project ?? DEFAULT_PROJECT_ID];
-  const limit = options.limit ?? 20;
   // sibling mode needs a workspaceId to exclude even when the caller only
   // passed --issue (the CLI's usual sibling invocation) — resolve it the same
   // way the pre-FTS implementation did.
   const workspaceIdForIssue = options.issue ? getWorkspaceForIssue(options.issue)?.id : undefined;
 
-  const perProject = await Promise.all(projectIds.map(async (projectId) => {
-    const hits = await searchMemoryFts({
-      query,
-      projectId,
-      workspaceId: resolvedWorkspaceId ?? workspaceIdForIssue,
-      issueId: options.issue,
-      sibling: options.sibling,
-      includeArchived: options.includeArchived,
-      tags: options.tag ? [options.tag] : undefined,
-      // The shared FTS index also carries daily-summary hits (doc_type
-      // 'summary'), which this command can't resolve back to a
-      // MemoryObservation — restrict to observations so a summary ranked
-      // above matching observations doesn't consume the limit and vanish.
-      docType: 'observation',
-      limit,
-    });
+  const perProject = await Promise.all(projectIds.map((projectId) => searchProjectScope({
+    query,
+    projectId,
+    workspaceId: resolvedWorkspaceId ?? workspaceIdForIssue,
+    issueId: options.issue,
+    sibling: options.sibling,
+    includeArchived: options.includeArchived,
+    tags: options.tag ? [options.tag] : undefined,
+    limit,
+  })));
 
-    const fileCache = new Map<string, MemoryObservation[]>();
-    const pairs = await Promise.all(hits.map(async (hit) => ({
-      hit,
-      observation: await resolveObservationFromHit(projectId, hit, fileCache),
-    })));
-    return pairs
-      .filter((pair): pair is { hit: MemorySearchHit; observation: MemoryObservation } => pair.observation !== null)
-      .map((pair) => ({ observation: pair.observation, score: pair.hit.rankScore }));
-  }));
-
-  return perProject.flat()
-    .sort((a, b) => b.score - a.score || b.observation.timestamp.localeCompare(a.observation.timestamp))
-    .slice(0, limit);
+  return mergeRankedResults(perProject, limit);
 }
 
 /** Resolve an FTS hit back to its full MemoryObservation by reading only the one day-file it points at. */

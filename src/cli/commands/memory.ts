@@ -10,10 +10,60 @@ import {
 } from '../../lib/memory/cli.js';
 import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
 import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
-import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
+import { getProjectByKey, getWorkspaceById, listPinnedDocs, listWorkspacesForPath } from '../../lib/workspaces/resolver.js';
 import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
 import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
 import { exitCli } from '../exit.js';
+
+export interface MemorySearchCommandOptions {
+  project?: string;
+  workspace?: string;
+  issue?: string;
+  tag?: string;
+  sibling?: boolean;
+  global?: boolean;
+  /** commander `[path]`-style option: `true` for a bare flag, a string when a value is given. */
+  target?: string | true;
+  includeArchived?: boolean;
+  limit?: number;
+  json?: boolean;
+}
+
+export async function memorySearchCommand(query: string, options: MemorySearchCommandOptions): Promise<void> {
+  let targetPath: string | undefined;
+  if (options.target !== undefined) {
+    if (options.workspace || options.issue || options.global) {
+      console.error(chalk.red('--target cannot be combined with --workspace, --issue, or --global.'));
+      return exitCli(1);
+    }
+    targetPath = options.target === true ? process.cwd() : options.target;
+    if (listWorkspacesForPath(targetPath).length === 0) {
+      console.log(chalk.yellow(`No workspaces target ${targetPath}.`));
+      return;
+    }
+  }
+
+  let results: Awaited<ReturnType<typeof searchMemory>>;
+  try {
+    results = await searchMemory(query, { ...options, targetPath });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    return exitCli(1);
+  }
+  if (options.json) {
+    console.log(JSON.stringify(results, null, 2));
+    return;
+  }
+  if (results.length === 0) {
+    console.log(chalk.yellow('No memory observations matched.'));
+    return;
+  }
+  for (const { observation, score } of results) {
+    console.log(chalk.bold(`${observation.issueId} ${observation.timestamp} score=${score}`));
+    console.log(`  ${observation.actionStatus ?? observation.summary}`);
+    console.log(chalk.dim(`  ${observation.workspaceId} · ${observation.files.join(', ') || 'no files'}`));
+  }
+}
 
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
@@ -28,31 +78,11 @@ export function createMemoryCommand(): Command {
     .option('--tag <tag>', 'Filter by tag')
     .option('--sibling', 'Search same-project sibling issues instead of the selected issue')
     .option('--global', 'Search across all registered projects instead of just one')
+    .option('--target [path]', 'Search all workspaces whose path targets a directory (bare flag = cwd); mutually exclusive with --workspace/--issue/--global')
     .option('--include-archived', 'Include observations hidden by reset markers')
     .option('--limit <n>', 'Maximum results', parseInt)
     .option('--json', 'Output JSON')
-    .action(async (query, options) => {
-      let results: Awaited<ReturnType<typeof searchMemory>>;
-      try {
-        results = await searchMemory(query, options);
-      } catch (err) {
-        console.error(chalk.red(err instanceof Error ? err.message : String(err)));
-        return exitCli(1);
-      }
-      if (options.json) {
-        console.log(JSON.stringify(results, null, 2));
-        return;
-      }
-      if (results.length === 0) {
-        console.log(chalk.yellow('No memory observations matched.'));
-        return;
-      }
-      for (const { observation, score } of results) {
-        console.log(chalk.bold(`${observation.issueId} ${observation.timestamp} score=${score}`));
-        console.log(`  ${observation.actionStatus ?? observation.summary}`);
-        console.log(chalk.dim(`  ${observation.workspaceId} · ${observation.files.join(', ') || 'no files'}`));
-      }
-    });
+    .action(memorySearchCommand);
 
   memory
     .command('status <issue>')
