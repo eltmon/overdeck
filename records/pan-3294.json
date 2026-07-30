@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:35:51.646Z",
+  "updated": "2026-07-30T04:35:55.130Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -212,5 +212,24 @@
     "docs-guardrails.docs-guardrails.ac1": "completed",
     "docs-guardrails.docs-guardrails.ac2": "completed",
     "docs-guardrails.docs-guardrails.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/HOOKS.md",
+      "sync-sources/hooks/pan-hook-lib.sh",
+      "sync-sources/hooks/work-agent-stop-hook*",
+      "tests/scripts/pan-hook-lib-guards.test.ts",
+      "tests/scripts/work-agent-stop-hook.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/HOOKS.md",
+      "sync-sources/hooks/pan-hook-lib.sh",
+      "sync-sources/hooks/work-agent-stop-hook",
+      "tests/scripts/pan-hook-lib-guards.test.ts",
+      "tests/scripts/work-agent-stop-hook.test.ts"
+    ],
+    "recordedAt": "2026-07-30T04:35:55.129Z"
   }
 }
