@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:17:28.285Z",
+  "updated": "2026-07-30T04:17:37.504Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,8 +57,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "injection-cross-workspace": {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2876784,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:17:37.504Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -201,6 +209,7 @@
     "mem-read": "completed",
     "mem-read.mem-read.ac1": "completed",
     "mem-read.mem-read.ac2": "completed",
-    "mem-read.mem-read.ac3": "completed"
+    "mem-read.mem-read.ac3": "completed",
+    "injection-cross-workspace": "running"
   }
 }
