@@ -1,0 +1,400 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T21:10:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3341: Pipeline board shows stale phase (e.g. Planning) for issues that are Done and merged but never close-ceremonied",
+    "updated": "2026-07-30T21:42:20.179Z"
+  },
+  "plan": {
+    "id": "pan-3341",
+    "title": "Pipeline board shows stale phase (e.g. Planning) for issues that are Done and merged but never close-ceremonied",
+    "status": "proposed",
+    "uid": "9db0665d-b8a0-4038-93ca-c934083d7075",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-30T21:10:00.000Z",
+    "updated": "2026-07-30T21:42:20.179Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3341",
+        "label": "PAN-3341",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "pipeline",
+      "pipeline-membership",
+      "frontend",
+      "backend",
+      "close-out"
+    ],
+    "narratives": {
+      "Problem": "The dashboard derives an issue's displayed phase from the tracker-row cache and local resource artifacts. When the tracker row ages out of the issue-service sync window, deriveStateLabel (src/dashboard/server/services/resource-discovery.ts:205-219) falls through to artifact heuristics — hasPrd → 'Planning', workspace/branch → 'Allocated' — and getPipelineIssuePhase (src/dashboard/frontend/src/lib/pipeline-state.ts:127) deliberately ignores the canonical pipeline-membership verdict (a contract locked by pipeline-state.test.ts:38-53 and PipelineView.test.tsx:135-150). Result: an issue merged to main and tracker-Done renders as 'Planning' (observed MIN-852/861/882 on the MYN Command Deck, 2026-07-30), telling the operator the exact opposite of reality.",
+      "Proposal": "Reconcile the displayed phase against the canonical resolvePipelineMembership verdict (tracker + forge + git lenses, already snapshotted and attached to both feeds) at the two derivation points: (1) deriveStateLabel gains a membership parameter — post_merge_limbo → 'Merged — Needs Close-Out', clean_terminal with L3_issueOpen === false → 'Done'/'Closed', checked before readyForMerge; (2) getPipelineIssuePhase returns 'ship' for available post_merge_limbo membership, and the two tests locking the old contract are rewritten to the narrowed contract; (3) useIssueActions.isMerged (useIssueActions.ts:330) also accepts the post_merge_limbo bucket so the existing closeOut registry action (POST /api/issues/:id/close-out) becomes enabled and phase-primary (MERGED) on limbo rows; (4) FeatureItem/ProjectOverview map the new label to the warning tone and the ship bucket; (5) docs/PIPELINE-MEMBERSHIP.md documents the reconciliation contract. No new lane, button, endpoint, or gather machinery.",
+      "NonGoals": "- Changing zombie_pr (closed issue, open PR) rendering or adding a zombie-specific label\n- Changing the resource-discovery tree inclusion filter (resource-discovery.ts:737-744) — tracker-Done merged issues with no live resources correctly drop out of the tree\n- Adding a new pipeline lane/glyph/URL filter for limbo — the ship lane plus row label carries it\n- Speeding up or restructuring the 5-minute membership snapshot refresh cadence\n- Reconciling the WorkspaceStatusCard memory-synthesized phase (exploring/planning/building…) — a different phase vocabulary, not the observed defect\n- Auto-running pan close — the affordance enables the existing operator-initiated closeOut action only"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix at the two existing read-door derivation points (server deriveStateLabel, frontend getPipelineIssuePhase) keyed on the canonical membership verdict already attached to both feeds, instead of introducing a new derived-phase field or new gather machinery.",
+        "rationale": "The membership snapshot is the single source of truth the issue asks the board to defer to; it is already computed every 5 minutes from tracker + forge + git and already reaches both surfaces (pipelineBucket on resource-allocated rows, pipelineMembership on /api/issues DTOs). The defect is that consumers ignore it, not that evidence is missing."
+      },
+      {
+        "summary": "post_merge_limbo maps to the existing 'ship' lane rather than a new 'needs close-out' lane.",
+        "rationale": "The issue body explicitly allows 'done (or explicitly merged — needs close-out)'. A new lane costs glyphs, URL filter params, and PhaseHeader styles for no extra information; the 'Merged — Needs Close-Out' row label plus the close-out action carry the ceremony signal."
+      },
+      {
+        "summary": "Close-out affordance is delivered by extending useIssueActions.isMerged with the membership bucket, reusing the existing closeOut registry action.",
+        "rationale": "The registry (issueActions.ts) is the single action source; isMerged=true both satisfies canCloseOut and routes deriveIssueActionPhase to MERGED, making Close out phase-primary in the existing context menu. No new UI surface to keep in parity."
+      },
+      {
+        "summary": "Membership checks are placed at the top of deriveStateLabel, before the readyForMerge check, and clean_terminal only maps to Done/Closed when lenses.L3_issueOpen === false.",
+        "rationale": "A stale readyForMerge flag must not outrank a merged PR, and clean_terminal also covers open-never-started backlog (pipeline-membership.ts:173), which must never render as Done."
+      },
+      {
+        "summary": "When membership is unavailable for an issue, rendering falls through to today's artifact heuristics.",
+        "rationale": "unavailablePipelineMembership() reports a sentinel bucket of clean_terminal; guessing merged/done without the canonical verdict would reintroduce the same class of lie in the opposite direction."
+      }
+    ],
+    "items": [
+      {
+        "id": "membership-aware-state-label",
+        "title": "Make deriveStateLabel membership-aware: post_merge_limbo → 'Merged — Needs Close-Out', tracker-closed → Done/Closed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3341",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "tree-renders-closeout-state"
+          ],
+          "files_scope": [
+            "src/dashboard/server/services/resource-discovery.ts",
+            "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/server/services/resource-discovery.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resource-discovery test suite passes including the six new membership-reconciliation cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/resource-discovery.ts, add an optional `membership?: PipelineMembership` parameter to deriveStateLabel (line 205) and pass the already-in-scope `membership` at the single call site (line 749). Insert two checks at the TOP of the function, before the readyForMerge check: (1) `if (membership?.bucket === 'post_merge_limbo') return 'Merged — Needs Close-Out';` (2) `if (membership?.bucket === 'clean_terminal' && membership.lenses.L3_issueOpen === false) return hasTmux ? 'Closed' : 'Done';`. The L3 guard is mandatory — clean_terminal also covers open-never-started backlog, which must keep its current label. No new gather work: the memberships map is already populated at lines 700-707. Extend tests/unit/dashboard/server/services/resource-discovery.test.ts with cases: (a) post_merge_limbo + hasPrd → 'Merged — Needs Close-Out'; (b) post_merge_limbo outranks readyForMerge; (c) clean_terminal + L3_issueOpen false + no tmux → 'Done'; (d) same + tmux → 'Closed'; (e) clean_terminal + L3_issueOpen true → NOT 'Done'; (f) no membership → unchanged heuristics. Follow the existing refreshResourceAllocatedProjects fixture pattern (test lines 186-225) for feeding membership verdicts."
+        },
+        "items": [
+          {
+            "id": "membership-aware-state-label.ac1",
+            "title": "Given an issue with membership bucket post_merge_limbo and a stale PRD artifact, when GET /api/issues/resource-allocated is served, then the row's stateLabel renders 'Merged — Needs Close-Out' and never 'Planning' or 'Allocated'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-aware-state-label.ac2",
+            "title": "Given an issue with membership bucket post_merge_limbo and readyForMerge true, when deriveStateLabel runs, then it returns 'Merged — Needs Close-Out' (the merged-PR verdict outranks the stale ready flag)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-aware-state-label.ac3",
+            "title": "Given an issue with membership bucket clean_terminal and lenses.L3_issueOpen === false, when deriveStateLabel runs, then it returns 'Done' (no tmux) or 'Closed' (tmux present); given L3_issueOpen === true it preserves the current non-Done label",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-aware-state-label.ac4",
+            "title": "Given an issue with no membership verdict, when deriveStateLabel runs, then it falls through to the existing artifact heuristics unchanged (hasPrd → 'Planning')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "membership-aware-state-label.ac5",
+            "title": "npx vitest run tests/unit/dashboard/server/services/resource-discovery.test.ts exits 0 with the six new cases green and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "tree-renders-closeout-state",
+        "title": "Render 'Merged — Needs Close-Out' correctly in the Command Deck tree and ProjectOverview pipeline section",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "FeatureItem and ProjectOverview suites pass with the new label cases green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "The label string is pinned by membership-aware-state-label as 'Merged — Needs Close-Out'; frontend matchers MUST use lowercase includes('close-out') rather than equality on the em-dash form. (1) getFeatureStateTone (FeatureItem.tsx:515-523): map the new label to the existing 'review' tone (the warning/needs-attention signal per the dashboard style guide's color-equals-signal rule) so it never falls through to 'todo' or reads as 'planning'. (2) featureState() (ProjectOverview.tsx:64-72): add `if (raw.includes('close-out')) return 'done';` so bucketFeaturePhase lands the row in the ship lane via the existing terminal-state path in getPipelineIssuePhase. (3) Tests: tone mapping for the new label; a feature with stateLabel 'Merged — Needs Close-Out' buckets 'ship', not 'plan'."
+        },
+        "items": [
+          {
+            "id": "tree-renders-closeout-state.ac1",
+            "title": "Given a feature whose stateLabel is 'Merged — Needs Close-Out', when getFeatureStateTone runs, then it returns the 'review' tone and never the 'planning' tone or the default fallthrough tone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-renders-closeout-state.ac2",
+            "title": "Given a feature whose stateLabel is 'Merged — Needs Close-Out', when bucketFeaturePhase runs, then it returns 'ship' (not 'plan')",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tree-renders-closeout-state.ac3",
+            "title": "npx vitest run on the FeatureItem and ProjectOverview suites exits 0 with the new cases green and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-view-lane-reconcile",
+        "title": "getPipelineIssuePhase returns 'ship' for available post_merge_limbo membership; rewrite the two tests locking the old contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/pipeline-state.ts",
+            "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+            "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/lib/pipeline-state.test.ts src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-state and PipelineView suites pass with the narrowed membership contract",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In getPipelineIssuePhase (src/dashboard/frontend/src/lib/pipeline-state.ts:127), after the terminal-state check (lines 133-135) and before the mergeStatus block, add: `if (issue.pipelineMembership?.available === true && issue.pipelineMembership.bucket === 'post_merge_limbo') { return 'ship'; }` with a PAN-3341 comment noting the canonical verdict outranks a stale stored phase. The available === true guard is mandatory — unavailablePipelineMembership() reports a sentinel bucket of clean_terminal. Then rewrite the two tests that lock the old contract (do NOT delete them): (1) pipeline-state.test.ts:38-53 'does not use server membership as a lane-assignment signal' → narrowed contract: post_merge_limbo backlog issue → 'ship'; clean_terminal on a ready-labeled issue → still 'ready'; unavailable membership → unchanged; rename the test to state the exception. (2) PipelineView.test.tsx:135-150 'keeps phase derivation unchanged when server membership is attached' → the post_merge_limbo + state 'in_review' issue now renders in the SHIP lane; rename accordingly."
+        },
+        "items": [
+          {
+            "id": "pipeline-view-lane-reconcile.ac1",
+            "title": "Given an issue with available membership bucket post_merge_limbo and stored state 'in_review' (or 'in_progress', or hasPlan true), when getPipelineIssuePhase runs, then it returns 'ship'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-view-lane-reconcile.ac2",
+            "title": "Given an issue with membership bucket clean_terminal (or in_flight, or unavailable membership), when getPipelineIssuePhase runs, then lane assignment is identical to the same issue without membership attached",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-view-lane-reconcile.ac3",
+            "title": "PipelineView renders a post_merge_limbo issue in the ship lane section (updated integration assertion replaces the old review-lane assertion)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-view-lane-reconcile.ac4",
+            "title": "npx vitest run on the pipeline-state and PipelineView suites exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "closeout-action-on-limbo-rows",
+        "title": "Enable the existing Close out action on post_merge_limbo rows via useIssueActions.isMerged",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T21:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/IssueActionMenu",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueActionMenu suites pass with the new limbo case green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts line 330, extend the isMerged derivation to also accept the canonical membership bucket: `isMerged: reviewStatus?.mergeStatus === 'merged' || issue?.mergeStatus === 'merged' || issue?.pipelineMembership?.bucket === 'post_merge_limbo',`. This satisfies canCloseOut (issueActions.ts:563-566) and routes derivePipelineState to 'merged' → deriveIssueActionPhase MERGED (issuePipelineState.ts:48-55, issueActions.ts:660-710), making the existing closeOut registry action (POST /api/issues/:id/close-out) enabled and phase-primary in the row context menu. No new button, endpoint, or dialog. Test: a store issue with pipelineMembership { available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null }, stale state 'in_progress', and no review-status merge evidence yields the closeOut action enabled and derived phase MERGED."
+        },
+        "items": [
+          {
+            "id": "closeout-action-on-limbo-rows.ac1",
+            "title": "Given a store issue with pipelineMembership bucket post_merge_limbo, stale state 'in_progress', and no review-status merge evidence, when useIssueActions builds state, then isMerged is true and the closeOut action is enabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-action-on-limbo-rows.ac2",
+            "title": "Given the same limbo issue, when deriveIssueActionPhase runs, then it returns MERGED so Close out appears as the phase-primary action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "closeout-action-on-limbo-rows.ac3",
+            "title": "npx vitest run on the IssueActionMenu suites exits 0 and npm run typecheck completes without errors",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-pipeline-membership-reconciliation",
+        "title": "Document the surface reconciliation contract in docs/PIPELINE-MEMBERSHIP.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T21:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3341",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'Merged — Needs Close-Out' docs/PIPELINE-MEMBERSHIP.md",
+            "grep -rn 'stateLabel' configuration/ reference/ 2>/dev/null || true"
+          ],
+          "expected_outputs": [
+            "grep finds the new label and a PAN-3341 reconciliation section in docs/PIPELINE-MEMBERSHIP.md",
+            "the Mintlify sweep result (page updated, or no page enumerates stateLabel values) is stated in the commit message"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Surface reconciliation (PAN-3341)' section to docs/PIPELINE-MEMBERSHIP.md stating: the resource-discovery stateLabel and the frontend lane classifier (getPipelineIssuePhase) both defer to the canonical membership verdict; 'Merged — Needs Close-Out' is the post_merge_limbo display label; post_merge_limbo is the only bucket that overrides a stored phase (mapping to the ship lane); clean_terminal with L3_issueOpen === false renders Done/Closed; unavailable membership never changes rendering; the Close out action enables on limbo rows via the isMerged derivation. Then sweep configuration/ and reference/ (Mintlify) for any page enumerating tree stateLabel values — add the new label if one exists, otherwise state the negative finding in the commit message."
+        },
+        "items": [
+          {
+            "id": "docs-pipeline-membership-reconciliation.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md contains a 'Surface reconciliation (PAN-3341)' section naming the 'Merged — Needs Close-Out' label, the ship-lane mapping, the L3_issueOpen guard, and the unavailable-membership fallback",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-pipeline-membership-reconciliation.ac2",
+            "title": "The commit message records the Mintlify sweep outcome: either the page updated with the new label, or the statement that no configuration/ or reference/ page enumerates stateLabel values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "membership-aware-state-label",
+        "to": "tree-renders-closeout-state",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3341-pipeline-board-shows-stale-phase-e-g-planning-for-issues-that-are-done-and-merged-but-never-close-ceremonied.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
