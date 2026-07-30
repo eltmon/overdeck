@@ -2,7 +2,7 @@
   "issueId": "PAN-3296",
   "schemaVersion": 2,
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T03:42:14.023Z",
+  "updated": "2026-07-30T03:42:15.713Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3296: bug(cli): pan start flips plan status in the state worktree but never commits it — dirty spec blocks pan task claim and the state reconciler for all agents",
       "timestamp": "2026-07-30T03:42:14.022Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
