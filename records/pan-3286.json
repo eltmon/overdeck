@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:17:37.504Z",
+  "updated": "2026-07-30T04:24:58.492Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "injection-cross-workspace": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 2876784,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:17:37.504Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -144,6 +136,17 @@
         "outcome": "completed",
         "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
         "releasedAt": "2026-07-30T04:17:28.284Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2876784,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:17:37.504Z",
+        "itemId": "injection-cross-workspace",
+        "outcome": "completed",
+        "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
+        "releasedAt": "2026-07-30T04:24:58.492Z"
       }
     ],
     "statusReasons": {
@@ -174,6 +177,10 @@
       "mem-read": {
         "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
         "updatedAt": "2026-07-30T04:17:28.284Z"
+      },
+      "injection-cross-workspace": {
+        "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
+        "updatedAt": "2026-07-30T04:24:58.492Z"
       }
     }
   },
@@ -210,6 +217,9 @@
     "mem-read.mem-read.ac1": "completed",
     "mem-read.mem-read.ac2": "completed",
     "mem-read.mem-read.ac3": "completed",
-    "injection-cross-workspace": "running"
+    "injection-cross-workspace": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac1": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac2": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac3": "completed"
   }
 }
