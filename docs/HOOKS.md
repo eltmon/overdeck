@@ -81,9 +81,21 @@ Dashboard UI + Deacon read snapshot
 | `post-compact-hook` | PostCompact | Emits `activity: idle` (clear compact indicator) |
 | `permission-event-hook` | PermissionRequest | Emits permission state changes |
 | `specialist-stop-hook` | Stop (chained) | Detects specialist auto-completion |
-| `work-agent-stop-hook` | Stop (chained) | Detects work agents that forgot `pan done` |
+| `work-agent-stop-hook` | Stop (chained) | Detects work agents that forgot `pan done`, with per-agent single-flight, LLM timeout, and machine-wide rate-limit guards |
 | `tldr-read-enforcer` | PreToolUse (Read only) | Enforces TLDR MCP for Read tool calls |
 | `tldr-post-edit` | PostToolUse (Edit/Write) | TLDR post-edit bookkeeping |
+
+## Hook LLM Guardrails (PAN-3294)
+
+`work-agent-stop-hook` protects its completion-check LLM call at three levels:
+
+- A per-agent single-flight lock at `~/.overdeck/agents/<agent-id>/stop-hook.lock.d` lets only one stop-hook invocation run for an agent at a time. A later invocation exits successfully when the recorded holder is alive, while a dead or unreadable holder is reclaimed.
+- `OVERDECK_HOOK_LLM_TIMEOUT` sets the completion-check deadline in seconds and defaults to `60`. GNU `timeout` or `gtimeout` is used when available; stock macOS uses the shared bash watchdog.
+- `OVERDECK_HOOK_LLM_RATE_LIMIT` sets the machine-wide rolling limit and defaults to `6` admitted calls per minute. Allowed call timestamps live in `~/.overdeck/hook-llm-calls.log`, guarded by a sibling lock directory, and lock contention fails closed without spawning another LLM process.
+
+A timeout or rate-limit drop writes a diagnostic line and emits no resolution event. Emitting `UNCLEAR` for a resource-governance drop would count toward the hook's two-verdict stuck escalation and could turn a crash-loop into a machine-wide wave of falsely stuck agents. Genuine non-timeout Claude failures keep the existing `UNCLEAR` fallback.
+
+These guardrails were added after the 2026-07-29 incident tracked by PAN-3294, where a dashboard crash-loop accumulated 35 concurrent Haiku processes and 70 hook shells.
 
 ## Pi Parity Matrix
 

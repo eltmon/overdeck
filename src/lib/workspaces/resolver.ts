@@ -6,6 +6,8 @@
  * every read of these tables goes through this resolver, never a store
  * directly.
  */
+import { realpathSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import type { PinnedDocRow, PinScope, ProjectRow, ProjectTargetRow, WorkspaceKind, WorkspaceRow } from './types.js';
 
@@ -204,6 +206,30 @@ export function listPinnedDocs(scope: PinScope, scopeId: string): PinnedDocRow[]
 
 function isPathPrefixMatch(cwd: string, candidate: string): boolean {
   return cwd === candidate || cwd.startsWith(candidate.endsWith('/') ? candidate : `${candidate}/`);
+}
+
+/** realpath a path for identity comparison; falls back to a resolved (non-symlink-followed) path if it doesn't exist. */
+function realpathOrResolve(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
+}
+
+/**
+ * All non-archived workspaces (across every project) whose `path` targets
+ * the given directory — Subspace `target-search` parity (PAN-3286 FR-4).
+ * Both sides are realpath'd so a symlinked path and its target resolve to
+ * the same workspace.
+ */
+export function listWorkspacesForPath(path: string): WorkspaceRow[] {
+  const resolvedPath = realpathOrResolve(path);
+  const db = getOverdeckDatabaseSync();
+  const rows = db
+    .prepare(`SELECT ${WORKSPACE_COLUMNS} FROM workspaces WHERE is_archived = 0`)
+    .all() as Record<string, unknown>[];
+  return rows.map(rowToWorkspace).filter((workspace) => realpathOrResolve(workspace.path) === resolvedPath);
 }
 
 /**

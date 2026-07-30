@@ -120,6 +120,11 @@ async function injectWithLog(
   return { result, decision };
 }
 
+/** Round the wall-clock-dependent rank scores so a context render can be snapshotted. */
+function normalizeRankScores(context: string): string {
+  return context.replace(/"score": (\d+\.\d+)/g, (_match, value: string) => `"score": ${Number(value).toFixed(6)}`);
+}
+
 async function readRagEntries() {
   const raw = await readFile(resolveRagRunsFile(identity.projectId, identity.workspaceId, '2026-05-16'), 'utf8');
   return raw.trim().split('\n').map((line) => JSON.parse(line));
@@ -329,7 +334,46 @@ describe('prompt-time memory injection', () => {
     expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
   });
 
-  it('skips sibling-issue summary injection when issueId is null (main/scratch workspace turn, PAN-1990)', async () => {
+  it('renders an issue turn byte-identically (PAN-3286 WI-7 regression lock on the cross-workspace change)', async () => {
+    await writeStatus();
+    await insertRow({ content: 'prompt injection memory retrieval summary observation hit', doc_type: 'observation' });
+    await insertRow({
+      content: 'prompt injection memory retrieval summary sibling hit',
+      workspace_id: 'feature-pan-999',
+      issue_id: 'PAN-999',
+      doc_type: 'observation',
+    });
+
+    const { result } = await injectWithLog({
+      prompt: 'prompt injection memory retrieval summary',
+      identity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'inject-issue-turn-snapshot',
+      expansion: vi.fn(async () => ({
+        status: 'extracted' as const,
+        provider: 'stub',
+        result: {
+          data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      })),
+    });
+
+    expect(result.status).toBe('injected');
+    // Rank scores carry a recency decay computed against wall-clock time —
+    // injectPromptTimeMemory's fixed `now` is not threaded into searchMemory —
+    // so they drift in the 11th decimal between runs. Round them; everything
+    // else in the rendered context must stay byte-identical.
+    expect(normalizeRankScores(result.context)).toMatchSnapshot();
+  });
+
+  // PAN-3286 FR-11 supersedes the PAN-1990 D-6 skip: a turn with no issue used
+  // to get nothing in the sibling slot; it now gets same-project hits from other
+  // workspaces, still bounded by the sibling budget.
+  it('injects same-project cross-workspace hits when issueId is null (main/scratch turn, PAN-3286 FR-11)', async () => {
     await insertRow({
       content: 'prompt injection memory retrieval summary sibling hit',
       workspace_id: 'feature-pan-999',
@@ -349,7 +393,7 @@ describe('prompt-time memory injection', () => {
         provider: 'stub',
       },
     }));
-    const { decision } = await injectWithLog({
+    const { result, decision } = await injectWithLog({
       prompt: 'prompt injection memory retrieval summary',
       identity: nullIssueIdentity,
       now: new Date('2026-05-16T22:30:00.000Z'),
@@ -357,8 +401,42 @@ describe('prompt-time memory injection', () => {
       expansion,
     });
 
+    expect(decision.hitCounts.sibling).toBe(1);
+    expect(decision.sources.map((source: { docType: string }) => source.docType)).toContain('sibling');
+    expect(result.context).toContain('feature-pan-999:PAN-999');
+    expect(result.decision.allocations.sibling).toBeLessThanOrEqual(PROMPT_TIME_MEMORY_BUDGETS.sibling);
+  });
+
+  it('excludes the current workspace from the null-issue cross-workspace arm (PAN-3286 FR-11)', async () => {
+    // Same-workspace rows reach the sameProjectHits arm as observations; the
+    // cross-workspace (sibling-slot) arm must never surface them.
+    await insertRow({
+      content: 'prompt injection memory retrieval summary own-workspace hit',
+      doc_type: 'observation',
+      issue_id: '',
+    });
+
+    const nullIssueIdentity = { ...identity, issueId: null };
+    const { result, decision } = await injectWithLog({
+      prompt: 'prompt injection memory retrieval summary',
+      identity: nullIssueIdentity,
+      now: new Date('2026-05-16T22:30:00.000Z'),
+      id: 'inject-null-issue-exclusion',
+      expansion: vi.fn(async () => ({
+        status: 'extracted' as const,
+        provider: 'stub',
+        result: {
+          data: { terms: ['prompt injection', 'memory retrieval', 'summary'] },
+          usage: { input: 1, output: 1 },
+          cost: { usd: 0 },
+          model: 'stub-model',
+          provider: 'stub',
+        },
+      })),
+    });
+
     expect(decision.hitCounts.sibling).toBe(0);
-    expect(decision.sources.map((source: { docType: string }) => source.docType)).not.toContain('sibling');
+    expect(result.context).not.toContain('Sibling memory hint');
   });
 
   it('escapes retrieved memory text so stored content cannot close prompt delimiters', async () => {

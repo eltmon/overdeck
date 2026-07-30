@@ -8447,3 +8447,208 @@ Chased the Deacon's stray-writer errors and found the warning is three defects, 
 - **Near-miss on my own shell state:** `git rev-parse HEAD` returned `eeb851b1e3` where it had returned `ce95171e5c`, and I started diagnosing backward HEAD movement in the primary worktree. **Bash cwd persists between calls and an earlier `cd` had left me inside the strike worktree** — I was reading `strike/pan-3300`. The primary is intact (`main`, `ce95171e5c`, clean, 1 unpushed docs commit from RUN-74). **A worktree-discipline alarm that was really a cwd bug; verify `git rev-parse --show-toplevel` before believing any HEAD reading.**
 
 - **RUN TOTALS (RUN-75): 4 close-outs, 0 merges, 2 substrate bugs filed, 1 outage recovered, 1 deploy delivered, 3 review convoys re-driven, 1 red-main strike in flight.**
+
+## RUN-75 tick 2 (2026-07-30 08:02-08:20Z) — the fleet was oom-killed as one cgroup; main went green; 3 root-cause strikes dispatched
+
+### The whole fleet died in a single kill, and `ls` nearly hid it
+
+- Opened the tick to **2 tmux sessions where tick 1 had 9**, and `pan flywheel status` claiming 6 active agents. The registry said 9 rows `running`; tmux said 2. That looked exactly like the PAN-1665 phantom-advancing-slot shape.
+- **It wasn't. `overdeck-tmux-server.service: Failed with result 'oom-kill'` at 08:02:12Z, 11.7G memory peak.** Every agent pane is a child of that one unit, so one cgroup kill took the entire fleet: work agents for PAN-3253/3260/3286/3291/3293/3294/3296, strikes for PAN-3259/3264/3266/3300, review/test convoys for PAN-3286/3291/3293/3296. systemd restarted the unit one second later; the two "survivors" were both **respawns**, not survivors.
+- **NEAR-MISS THAT ALMOST COST THE DIAGNOSIS: every log file's mtime read `04:0x` and I began writing off the logs as stale from four hours ago.** Host TZ is **EDT**, my stamps are UTC, so `04:04` local *was* 08:04 UTC — the logs were seconds old, and the tmux sessions I was calling "old" had been created 90 seconds earlier. **`date; date -u` side by side is one command and it inverted the entire read.** I had been about to report a 2.5-hour wedge; the truth was a 2.5-minute-old boot recovery.
+- **LESSON: a timestamp without its timezone is not evidence, and mixed-zone comparison fails in the direction that looks like a stall.** Local-time `ls` against UTC ISO stamps made fresh state look four hours dead. Any cross-source time comparison needs both sides normalised before it means anything.
+- **Registry-vs-tmux drift resolved itself correctly and I verified rather than assumed.** `reconcileAgentLiveness` marked the dead agents `stopped` at 08:03:13 — the backstop worked. Later, `pan start PAN-3260` refused with "already running", which looked like stale-state drift; **checking tmux showed the deacon had genuinely resumed it at 08:05:38.** `pan start` was right and there was no bug. Worth recording because the refusal is indistinguishable from a drift bug without the tmux cross-check.
+
+### PAN-2390 — second occurrence, and the specified fix is weaker than it reads
+
+- Searched before filing and found **PAN-2390 already open** (operator-filed 2026-07-05, same defect class). Appended the recurrence with evidence rather than opening a duplicate.
+- **The original diagnosis needs one correction: it said "the tmux server itself was tiny (~10 MB)" and blamed host pressure picking an innocent victim. This time the unit peaked at 11.7G and was the largest consumer in the user slice.** The agent panes *are* the unit's memory, so with ~9 harnesses this cgroup ranks first among oomd candidates on its own merits.
+- **That changes what the proposed fix buys. `ManagedOOMPreference=avoid` is de-prioritization, not protection** — when the unit is both the biggest consumer and effectively the only meaningful candidate, `avoid` will not save it. It narrows the window; it does not bound the radius. Struck it anyway (cheap, strictly better) and flagged per-agent scopes as the real containment in `openQuestions`.
+- Memory PSI at discovery: `avg300=9.06`, `avg10=0.00`; 12.5G used of 64G afterwards. **The fleet dying was itself the pressure relief**, which is why the host looked healthy at the exact moment the fleet was gone.
+
+### One flaky test was gating two green PRs
+
+- `main` is **GREEN** at `cdc1390290` — the tick-1 PAN-3300 file-size strike landed as #3304. Verified the *jobs*, not just the run conclusion.
+- PAN-3293 (#3310) and PAN-3296 (#3311) were both `UNSTABLE` on a failing required `test` check while being review+test passed. **Both failed on the identical single test:** `kimi-code.test.ts:514` → `AssertionError: expected 3 to be less than 1`.
+- Read the code instead of trusting the message. Observed order was `slow-start, slow-end, fast-start, fast-end`: the assertion compares indices in a shared array, so it depends on how many microtask turns the second lock acquisition takes before `drainFakeTimersUntilSettled` advances past the 30ms fake timer. **The intent (two buckets do not serialize) is real; the assertion's dependence on interleaving order is not guaranteed.**
+- **PAN-3305 already existed for it** with an independently-derived diagnosis matching mine. Struck it, **and re-ran the two failed CI jobs** so the PRs are not held hostage while the fix lands. Doing both is the point — the rerun is throughput, the strike is the fix.
+- **LESSON: two PRs failing "the test check" is one fact, not two problems, and grepping the log tail for the vitest summary is what proves it.** `--log-failed` buried the answer under thousands of lines of expected-error stdout; filtering for `Failed Tests` found a single shared assertion in seconds. Restarting both work agents — my first instinct — would have been wrong twice, since neither PR's *code* was at fault.
+
+### PAN-3202 — a structural close-out blocker that is machinery, not an override
+
+- `pan close PAN-3264 --force` now passes **six of seven** rows. **Row 3 cleared on its own** (`verificationStatus: skipped per issue policy`, was `missing` yesterday) because PAN-3309 — filed by tick 1 — has since been fixed. Only row 6 blocks.
+- Row 6 pins main-verify to **the merge commit's own CI**: `failed checks: test on eefeef296e`. But `git merge-base --is-ancestor eefeef296e origin/main` → **contained**, and main's current `cdc1390290` run is **success**. The commit's own run can never turn green, so row 6 is permanently unsatisfiable for anything merged inside a red-main window.
+- **The tell that this is a defect and not a safety gate: row 7 already reasons by containment** — it passed on `build commit cdc13902 contains merge eefeef29`. The containment relation is computed and trusted one row below.
+- Found **two** open issues for it and collapsed them: kept **PAN-3202** (states the fix), **closed PAN-3272** as superseded (states the same problem). Struck PAN-3202. **This is exactly the "never park a structural blocker as the operator's decision" case — the `--accept-main-verify` override is the operator's lever and I did not touch it; the machinery fix that makes it unnecessary is mine and it is now in flight.**
+
+### Actions taken
+
+- **PAN-3300** — verified merged (`git cherry` marks it upstream), ran `pan done PAN-3300 --strike` → `verifying_on_main`, Docker stack + devnet removed.
+- **PAN-3291** — review+test passed, PR #3302 `CLEAN`; auto-merge scheduled for 08:13:57Z (`require_uat_before_merge=false` this run, so merges are schedulable).
+- **3 strikes dispatched, all mine to merge:** `strike-pan-2390`, `strike-pan-3305`, `strike-pan-3202`.
+- **PAN-3286** review convoy re-dispatched (`pan review restart`); **PAN-3260** confirmed deacon-resumed.
+- Fleet back to **8 sessions, cap 20**, registry and tmux in exact agreement.
+- **Membership read door queried for all 12 projects** (scope is `all-tracked-projects`): 30 `inPipeline` rows across panopticon-cli (11), mind-your-now (18), tindra (1). **4 typed blind spots** — papers-please/puzzdom `tracker_unconfigured`, lexerra/krux `forge_unavailable` — emitted as `investigate` and **never reconstructed** from tracker/tmux/agent state. No merge verbs for MYN (auto_merge hold, plus a GitLab backend needing both-repo verification).
+- `pan flywheel weights --json` returns weight 0 for every row (`0 completed pipeline runs in window, need 3`), so weight ordering is still moot; said so rather than implying a ranking existed. Backlog forecast: 0 ready, 0 released, 0 needsPlanning — **the Planning floor has nothing to plan, so spawning nothing is correct, not an omission.**
+- **PAN-3253** parked for one tick: `stuck=verification_stuck`, `paused+stoppedByUser`, and **`pan answer` reports no pending choice menu** — so it is genuinely inert rather than parked-on-operator. Needs a code-level read of the verification-stuck mechanism next tick, not a resume nudge.
+
+### The flake WAS a flake, and re-running proved it in one step
+
+- Re-ran the two failed CI jobs. **Both came back `test=SUCCESS`**, so PAN-3293 and PAN-3296 both went `ready_for_merge=1`. That is the confirmation that PAN-3305 is a flake and not a real regression — the same code, unchanged, passed on the second run.
+- **PAN-3291 MERGED at 08:14:20Z** via the scheduled auto-merge. **PAN-3293 (#3310) scheduled** for 08:20:43Z once it went `CLEAN`.
+- **PAN-3296 (#3311) went `DIRTY` the moment PAN-3291 landed** — both touch `src/lib/pan-dir/record-update.ts`, which is unsurprising given PAN-3291 *is* the records push-race fix. `pan sync-main PAN-3296` reported 2 conflicts (`docs/AGENT-STATE-PLANES.md`, `src/lib/pan-dir/record-update.ts`) and **rolled itself back cleanly** — I verified the workspace was clean, on `feature/pan-3296`, with no half-merge. Worth recording: a failed sync-main did NOT leave a wounded worktree.
+- **LESSON: unblocking throughput and fixing the root cause are not alternatives, and picking only one is the mistake.** The rerun shipped two PRs in minutes; the strike stops the next PR pair from being blocked at all. Had I only struck PAN-3305, two green PRs would have sat for an hour; had I only re-run CI, the flake would ambush the next branch.
+
+### PAN-3313 (NEW) — GPT agents were alive, retrying, and unable to spend a single token
+
+- PAN-3296's agent had its conflict instruction and could not act. Its pane: `503 auth_unavailable: no auth available (providers=codex, model=gpt-5.6-sol) · Retrying in 12s · attempt 6/10`, with **`cost $0.0000`**.
+- **Doctrine says check whether a codex auth failure is fleet-wide or one stale agent, so I checked, and the answer was neither.** `codex login status` → `Logged in using ChatGPT`; `~/.codex/auth.json` valid, refreshed 15h earlier. **The credentials were fine the whole time.**
+- `providers=codex` is **CLIProxy** phrasing, not codex-CLI phrasing — that single word moved the investigation to the right process. CLIProxy (pid 9598) was alive and **succeeding intermittently**: 14×200 against 35×503 in the last hour.
+- **Mechanism, from the error log rather than the error message.** `~/.overdeck/cliproxy/auth/logs/error-...041743...log` shows the upstream returning `stream error: stream disconnected before completion` → CLIProxy 408. The pool holds **exactly one** auth (`codex-primary.json`). So the stream failure benches the only auth and the pool is empty; the following requests 503 in **3–8ms**, which proves no upstream call is attempted. It recovers to 200 when the cooldown lapses, then the next stream error repeats it. Observed since 01:33Z.
+- **A retryable transport error is being converted into a hard auth failure for every concurrent GPT agent** — and the message says "no auth available", which reads as *credentials gone* and would send an operator to re-authenticate perfectly valid credentials.
+- **Filed PAN-3313 but deliberately did NOT strike it: the code is the third-party `router-for-me` CLIProxy binary, not ours.** Recording the reason explicitly, because "no code fix is available to me" is the only acceptable form of not-dispatching a structural blocker. What we do own — a second auth pool entry, and treating 503 `auth_unavailable` as retryable-with-backoff — is written into the issue.
+- **LESSON: `cost $0.0000` on a live agent with a changed pane is a hard stop signal, and liveness metrics actively conceal it.** The retry counter ticking made the pane look busy; the registry said `running`; tmux said the session was up. Only reading the pane text and then the cost together showed an agent that could not execute anything. This is the "liveness is not correctness" rule applied to inference rather than to review verdicts.
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 2 PRs merged (PAN-3300, PAN-3291), 1 merge scheduled (PAN-3293), 5 substrate bugs driven (PAN-3300 fixed; PAN-2390/3305/3202 struck; PAN-3313 filed), 1 duplicate closed (PAN-3272), 1 fleet-wide OOM root-caused, 1 outage recovered, 1 deploy delivered, 4 review convoys re-driven.**
+
+## RUN-75 tick 3 (2026-07-30 08:37-09:50Z) — main RED from my own merge; a 50GB process leak was starving the host; PAN-3294 is the culprit
+
+### Main is RED, and my tick-2 rerun decision helped put it there
+
+- Two strike agents (PAN-3266, PAN-3305) independently reported red main and **both refused to fix-forward or `--admin-bypass`**. Both were right, and that refusal is the behavior I want — recorded so it is reinforced rather than treated as a stall.
+- Verified at the job level rather than the run level: **tip `5a40cca9ff` is PAN-3293 (#3310) and its own CI concluded `failure`, with `test` the only failing job.** `a6ea5d54df` immediately before it was `success`. `git log --diff-filter=A origin/main -- tests/unit/lib/platform-lifecycle-squatter.test.ts` → `5a40cca9ff`: **PAN-3293's squash added the 140-line test that now reddens main.**
+- Mechanism confirmed by reading the file, not the error: `beforeEach` does `vi.useFakeTimers({ toFake: ['Date','setTimeout','clearTimeout'] })` and the test then does **real** network I/O (`reserveEphemeralPort`, a live `http` server, health probes). Faked `setTimeout` means any timer-based wait inside `restartDashboard` never fires, while vitest's 5s timeout runs on the real clock — green on a fast box, hangs under CI load. Exactly the repo's own fake-timers rule, inverted.
+- **HONEST ACCOUNTING — this traces back to my tick-2 decision.** I re-ran #3310's failed CI to unblock it, it returned `test=SUCCESS`, and I let it merge. That rerun cleared the PAN-3305 flake **and simultaneously gave a pass to a *different*, newly-added load-sensitive test in the same PR.**
+- **LESSON: a green PR CI run is not evidence that a newly-added load-sensitive test will pass on `main`, and re-running to clear one flake can launder a second flake from the same PR.** The rerun was defensible for the PR I was looking at and blind to the file that PR was *adding*. Next time a PR adds tests that touch real I/O, the rerun is not sufficient — check what the diff introduces before treating a second green as confirmation.
+- Struck **PAN-3320** (operator-filed by strike-3305's report), labeled `blocks-main`. It is now actively fixing the right thing — pane shows it removing the `setImmediate` loop and `advanceTimersByTimeAsync(300)`, `cost $2.8827`, `+12/-7`.
+
+### The host was being eaten by 162 leaked one-shot processes — and it is PAN-3294
+
+- `strike-pan-3320` vanished from tmux minutes after I dispatched it. The journal explained why, and it was far worse than a lost strike: **global kernel OOM** (`constraint=CONSTRAINT_NONE ... global_oom` — the kernel out of memory outright, a *different and worse* mechanism than PAN-2390's oomd cgroup selection).
+  - 09:26:36 an agent pane scope OOM-killed; 09:31:05 / 09:34:15 / 09:35:15 **`overdeck-dashboard-*.service` OOM-killed three times** in a restart crash-loop; 09:33:21 `postgres` invoked the OOM killer.
+- Measured: **63,214 MB of 64,122 MB used, 425 MB free, swap 8,191/8,191 = 100% full, PSI `full avg60=49.98`,** vmstat `si` spiking to 327,179 — violent swap-in thrashing. (Doctrine's "swap full is not pressure" caveat correctly did **not** apply: actual kernel OOM kills plus `full avg60≈50` are definitive, not inferred.)
+- **Root cause: 162 × `claude -p --model claude-haiku-4-5` holding 50,916 MB.** Oldest alive **88 minutes**; these are one-shot headless invocations that should exit in seconds. Walking `ps -o ppid=` on a sample showed every parent was `~/.overdeck/bin/work-agent-stop-hook`.
+- **This is PAN-3294, already open and already in review with a CLEAN PR #3299.** Its original incident was 35 processes / 70 shells on an 8-core 8GB Mac; today was **162 processes / 50.9 GB** on a 64GB Linux host. Confirmed against the live 423-line script: the LLM call at line 369 has **no `timeout`**, and the file's only `flock` (lines 99/122/139) guards the *resolution cache file*, not the invocation — gaps 1 and 2 of the issue, verbatim.
+- **The loop is self-feeding exactly as the issue predicted:** each dashboard death fires stop hooks, each hook spawns another haiku process, and those processes are what prevent the dashboard from staying up. Commented the escalation on PAN-3294 and labeled it `blocks-main` — its blast radius is not "the dashboard", it is the whole host.
+- **Relief taken:** killed the leaked helpers → **62,693 MB used → 11,550 MB; available 1,429 MB → 52,571 MB (~51 GB freed); PSI `full avg10` 49.98 → 3.30.** The dashboard's own supervisor restart then succeeded and held (health 200, pid 805248, buildCommit `5a40cca9ff`). **Relief is not the fix and it will rebuild on every agent-stop cycle until #3299 lands.**
+- **LESSON: `pkill -f '<pattern>'` self-matches the shell running it, because the pattern is in that shell's own command line.** It killed my own shell as its last match and returned a failure code, so the recovery *looked* like it failed when it had already freed 51GB. The next command showed 0 remaining. Kill by explicit PID with self-exclusion — and never read a non-zero exit from a `pkill` as "nothing happened".
+
+### PAN-3253 was held by a stale flag with nothing to clear it
+
+- Read the mechanism at the code as instructed. `escalateVerificationStuck` (`verification-runner.ts:125-150`) does three things: `markWorkspaceStuck(issueId,'verification_stuck')`, `setAgentPaused`, `stopAgent` — which matches the observed row exactly (stuck=1, paused=1, agent stopped).
+- The deacon's reconciler then bails: `deacon-review-status.ts:477` — `if (status.stuck && !(status.stuckReason === 'verification_stuck' && status.reviewStatus === 'reviewing')) return actions;`. PAN-3253's `reviewStatus` is **`pending`**, so the one escape hatch built for `verification_stuck` does not apply and **no deacon action is ever produced**.
+- **The blocker was already gone.** `stuck_details` recorded `failedCheck: "sync-target-branch"`, 3/3 cycles, `"Merging is not possible because you have unmerged files"` — but the workspace is now **clean**: no `--diff-filter=U` entries, empty `git status`, on `feature/pan-3253`. The condition resolved on 2026-07-29 and the flag from 18:18Z simply outlived it.
+- **This is the machinery-vs-override split, and it was mine.** Not an `--accept-*` override; a stale counter to reset. `pan review reset PAN-3253` → `stuck=0, stuck_reason=null, verification_cycle_count=0`.
+- **LESSON: a stuck flag is a claim about the past, and the workspace is the claim about the present — check the present before escalating to the operator.** Everything about the row said "needs-you"; one `git status` in the workspace showed there was nothing left to need.
+
+### Two documentation/guard defects found while recovering
+
+- **PAN-3321 (NEW):** `pan unstick <id>` **does not exist** (`error: unknown command 'unstick'`), yet `CLAUDE.md`'s Review Convergence Gate section and two operator-facing escalation strings (`review-status-reconcile.ts:239`, `review-verdict-feedback.ts:177`) all tell the operator to run it. The capability exists in `review-status.ts:891`; only the CLI door is missing. An operator following the escalation verbatim mid-incident gets an error — a direct violation of "operator-facing messages must stand alone".
+- **PAN-3322 (NEW):** the file-size allowlist allows **1018** for `launcher-generator.ts` while the file is **892** — 126 lines of silent regrowth budget. Cause is two individually-reasonable changes in opposite directions: **PAN-3291 (my tick-2 merge) raised 1012→1018** incidentally to get its branch green, then PAN-3300 correctly shrank the file to 892 without touching the allowlist. Nothing re-tightens an entry after the file shrinks, so a temporary unblock became permanent slack.
+
+### Verified, corrected, and still open
+
+- **CLIProxy (PAN-3313) is unchanged and quantified worse:** over 02:54–09:22 UTC, **156×503 / 143×200 / 49×408** — ~45% hard-failing, sustained. Still third-party code; not struck, mitigations named in the issue.
+- **`cost_so_far` in the `agents` table is 0 for every row including `flywheel-orchestrator` itself** — the column is unpopulated, so it is NOT the blocked-agent signal. The **pane footer** is (that is where PAN-3296's `cost $0.0000` and strike-3320's `cost $2.8827` were legible). I nearly reported the whole fleet as blocked off a null column.
+- **Registry-vs-tmux drift runs in BOTH directions, so verify tmux either way.** Tick 2: registry said `running` for 7 dead agents. This tick: registry said `strike-pan-3320` was **`stopped`** while `tmux has-session` returned YES and pid 815898 (`claude --resume … --name strike-pan-3320`) was alive — the deacon had auto-recovered it. `pan strike` refusing with "already running" was **correct**, and my first read of "stale row" was wrong in the opposite direction.
+- Strike-3320's pane footer shows `main`, which looked like worktree drift; `git -C <ws> branch --show-current` confirmed **`strike/pan-3320`**. The footer shows the base, not HEAD — do not treat it as a branch check.
+- **Nothing is merge-ready** (`pan review pending --ready` → none), so no merge ordering decision was needed. All four strikes I own have PRs — #3315 (2390), #3316 (3305), #3318 (3266), #3319 (3202) — and **all four are `UNSTABLE` on the inherited red main**, so PAN-3320 gates every one of them. PRs branched before `5a40cca9ff` (#3312, #3299, #3279, #3268) are still CLEAN.
+- Deferred with reason: **PAN-3264 close-out** still needs PAN-3202; **PAN-3300 close-out** needs main to verify green. Both wait on PAN-3320.
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 2 PRs merged, 8 substrate bugs driven (PAN-3300 fixed; PAN-2390/3305/3202/3320 struck; PAN-3313/3321/3322 filed; PAN-3294 escalated + labeled blocks-main), 1 duplicate closed, 1 stale gate cleared (PAN-3253), 2 host-wide OOM incidents root-caused, ~51 GB reclaimed, 2 outages recovered, 1 deploy delivered, 4 review convoys re-driven.**
+
+## RUN-75 tick 4 (2026-07-30 09:57-10:15Z) — red main GREENED; the leak is now a treadmill; 4 more machinery gaps filed
+
+### Memory first, then act — and the leak rebuilds on a measurable curve
+
+- Checked memory **before** spawning anything, as the tick's own priority list demanded. Healthy at open (20.3 GB used, PSI ≈ 0) but **the PAN-3294 leak had already rebuilt to 29 procs / 11.5 GB in the ~20 minutes since I cleared it.**
+- Tracked the curve across the tick: **29 procs (09:57) → 18 after relief → 46 procs / 19.2 GB (10:11) → 30 after relief.** That is roughly **2–3 processes per minute**, i.e. a fresh path to host exhaustion every 60–90 minutes.
+- Refined the relief to be surgical: killed only processes **older than 300s** (definitively wedged — a one-shot haiku call finishes in seconds) and left the recent ones, which may be legitimately in flight. 22 killed, then 18 killed; ~10 GB reclaimed across the tick.
+- **LESSON: repeating a manual recovery on a timer is not operating, it is being the fix.** Three relief passes in two ticks is the measurement that says the durable fix has to jump the queue — which is why PAN-3294's review got re-driven first this tick rather than being left in the normal queue order.
+
+### Red main is GREEN — P0 closed
+
+- `strike-pan-3320` delivered exactly the right fix, verified independently rather than on its word: **I ran the test myself in its workspace — 2/2 pass in 720 ms.** Its own evidence was stronger still (injected-delay repro 2/2, then 5/5 clean runs with all 24 cores saturated, full gates green at 12,418 tests).
+- Reviewed the diff line by line before landing: **12 insertions / 7 deletions in one test file, no production code.** It removes `vi.useFakeTimers({toFake:['Date','setTimeout','clearTimeout']})` + `vi.setSystemTime(0)`, drops the `while (requests === 0) setImmediate` spin and `advanceTimersByTimeAsync(300)`, and replaces them with a real assertion `expect(requests).toBeGreaterThan(0)`. Confirmed `vi` is still referenced (`vi.fn()`), so the import does not go unused.
+- **The best part of the diff is the comment.** It documents *why* this file deliberately opts out of the repo-wide fake-timers rule, and says "Do not reintroduce fake timers here." Without it the next agent reads the universal rule, "fixes" the file back, and reddens main a third time. Landing a deliberate exception without recording the reasoning is how a fix becomes a loop.
+- PR **#3323 merged as `4fb8ea92ac`** (the auto-merge path took it before I issued the squash — worth noting: with `require_uat_before_merge=false` the scheduler can land a ready PR ahead of my manual step, so check `state` before merging). `pan done PAN-3320 --strike` → verifying-on-main.
+- **Never admin-bypassed.** Both parked strikes (PAN-3266, PAN-3305) refused to fix-forward and both were right; that refusal is what kept a broken base from being papered over four times.
+
+### `git cherry` answers the wrong question — PAN-3326
+
+- `pan done PAN-3259 --strike` refuses: *"strike/pan-3259 has 1 commit(s) missing from origin/main"*. It has been refusing for four ticks.
+- **The missing commit is a false positive.** `git cherry` marks `b3cf0b642f` (a **PAN-3262** fix riding on this branch) as `+`. That commit touches exactly one file, and `git diff --stat b3cf0b642f:<path> origin/main:<path>` is **empty** — byte-identical. PAN-3262 is already CLOSED and main's copy imports the split modules exactly as intended. There is zero unlanded content.
+- Cause: the gate decides landing by **patch-id**, which changes when identical content arrives by another route (squash, re-application on a different base). `strike_ready_head` is itself upstream; the gate fails on an unrelated passenger commit.
+- **LESSON: `git cherry` answers "was this patch applied?", not "is this content present?" — landing gates want the second question.** This is the exact inverse of tick 1, where a two-dot `git diff --stat` lied (349 files / 18,779 deletions) and `git cherry` was right. Neither tool is the answer; the question decides which one is. Filed PAN-3326 with a content-comparison fix and **did not force it closed** — accepting a missed gate is the operator's lever.
+
+### Three more machinery gaps, all found while recovering rather than by looking for them
+
+- **PAN-3324 (NEW) — OOM kills are recorded as `stopped_by_user = 1`.** All three review agents killed in the 09:31–09:35 OOM window carry `sbu=1` with timestamps inside that window and no operator stop issued. That engages the operator-stop gate, which exists to respect deliberate human stops, so **a resource kill permanently suppresses the autonomous re-drive that would recover it.** The irony: one of the two issues left unrecoverable this way was **PAN-3294 itself** — the fix for the leak that caused the OOM, with a CLEAN PR waiting. Distinct from PAN-3282 (which is about reviewers *dying*); this is about the death being *recorded* in a way that latches.
+- **PAN-3325 (NEW) — fresh workspaces ship an EMPTY `node_modules`.** Because the directory exists, resolution walks up to the parent repo instead of failing, so gates can silently run against a different tree's dependencies. Surfaced as "missing `@types/node` in typecheck:evals"; `bun install` fixed it with `bun.lock` untouched, proving the dependency set was fine and simply uninstalled. An absent directory would fail loudly; an empty one produces a false green.
+- **PAN-3282 — appended two occurrences with a cause.** PAN-3294 and PAN-3286 both landed in `review_infrastructure_failure`, and for once the cause is known: they were OOM-killed, not faulty. Suggested checking whether other occurrences in that class correlate with memory-pressure/restart windows before assuming a fault inside the review pipeline.
+
+### PAN-3260 — a stale verdict, and `resync` is not the verb for it
+
+- PAN-3260's agent was **correctly holding**: "Per the session-restore notice, I'm not self-initiating `pan review request` … on an unchanged, already-verified-clean commit." Meanwhile `review_status` read `review=passed / test=failed`.
+- The agent was right and the DB was stale: **PR #3268 is fully green including `test: SUCCESS`** at head `8f081c0646`, while the failed verdict dates from 05:51Z against a *different* commit (`reviewed_at_commit=363ae133`).
+- Tried `pan review resync PAN-3260` — it re-emitted `test=failed` unchanged. **`resync` heals a lost pipeline *event*; it does not reconcile a stale *verdict* against the PR's actual current checks.** Worth knowing precisely, because the name suggests otherwise.
+- Correct path was to **earn** a fresh verdict, not edit one: `pan review request PAN-3260` → *"Tests re-queued for PAN-3260 (review already passed)"*, and `agent-pan-3260-test` is now live. Re-queueing only the failed stage is exactly right.
+
+### State at close of tick
+
+- **Main GREEN-pending:** tip `4fb8ea92ac` contains the fix, CI in progress at close. The four strike PRs I own — **#3315 (2390), #3316 (3305), #3318 (3266), #3319 (3202)** — all still carry the bad test (`vi.useFakeTimers({` present on every branch), so a bare CI re-run will not clear them; each needs main merged in. **Deliberately held until main's CI confirms green** rather than propagate an unverified base to four branches.
+- Fleet 16 sessions, cap 20; PSI 0; ~39 GB available. Reviews live for PAN-3253, PAN-3286, PAN-3294, PAN-3296; test live for PAN-3260.
+- Still deferred with reason: **PAN-3264** close-out (needs PAN-3202), **PAN-3300** close-out (needs main verify), **PAN-3259** (blocked by PAN-3326, not by its own work).
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 3 PRs merged (PAN-3300, PAN-3291, PAN-3320), 12 substrate bugs driven (PAN-3300/3320 fixed; PAN-2390/3305/3202 struck; PAN-3313/3321/3322/3324/3325/3326 filed; PAN-3294/3282 escalated), 1 duplicate closed, 2 stale gates cleared (PAN-3253, PAN-3260), 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~61 GB reclaimed across 3 relief passes, 2 outages recovered, 1 deploy delivered, 6 review convoys re-driven.**
+
+## RUN-75 tick 4 (2026-07-30 09:57-10:20Z) — red main GREENED; the leak is a treadmill; 4 more machinery gaps filed; my own state write was silently discarded
+
+### A durable-memory write vanished from the shared primary worktree
+
+- I wrote this tick's record, then ran `git add docs/FLYWHEEL-STATE.md && git commit`. Git answered **"nothing to commit, working tree clean"** and `grep -c "RUN-75 tick 4"` returned **0**. The Edit had reported success; the content was gone before the commit, and the subsequent `git pull` was not the cause because the tree was already clean when the commit ran.
+- Something else operating in the **shared primary `main` worktree** reverted an uncommitted file underneath me. `CLAUDE.md` warns the primary worktree is shared across all sessions, and the commit-often-on-main rule exists for exactly this: *"Never rely on the working tree as storage between steps. The only durable state is a commit."*
+- **LESSON: I treated the working tree as storage for the length of one tick and lost the tick's memory.** The window was only a few minutes of doing other work between writing and committing, and that was enough. The fix is not "be faster" — it is **write then commit as a single step**, which is what I did on the retry. Recording it because a Flywheel whose durable memory can silently evaporate has no memory at all, and the failure is invisible: the Edit tool said success and only the `grep` disproved it.
+
+### Memory first, then act — and the leak rebuilds on a measurable curve
+
+- Checked memory **before** spawning anything, per this tick's priority list. Healthy at open (20.3 GB used, PSI ≈ 0) but **the PAN-3294 leak had already rebuilt to 29 procs / 11.5 GB in the ~20 minutes since I cleared it.**
+- Curve across the tick: **29 procs (09:57) → 18 after relief → 46 procs / 19.2 GB (10:11) → 30 after relief.** Roughly **2–3 processes per minute**, i.e. a fresh path to host exhaustion every 60–90 minutes.
+- Made the relief surgical: killed only processes **older than 300s** (definitively wedged — a one-shot haiku call finishes in seconds), leaving recent ones that may be legitimately in flight. 22 then 18 killed; ~10 GB reclaimed this tick.
+- **LESSON: repeating a manual recovery on a timer is not operating, it is being the fix.** Three relief passes across two ticks is the measurement that says the durable fix must jump the queue — which is why PAN-3294's review was re-driven first this tick instead of in normal order.
+
+### Red main is GREEN — P0 closed
+
+- `strike-pan-3320` delivered the right fix, and I verified it independently rather than on its word: **ran the test myself in its workspace, 2/2 pass in 720 ms.** Its own evidence was stronger (injected-delay repro 2/2, then 5/5 clean runs with all 24 cores saturated, full gates green at 12,418 tests).
+- Reviewed the diff line by line before landing: **12 insertions / 7 deletions, one test file, no production code.** Removes `vi.useFakeTimers({toFake:['Date','setTimeout','clearTimeout']})` and `vi.setSystemTime(0)`, drops the `while (requests === 0) setImmediate` spin and `advanceTimersByTimeAsync(300)`, replaces them with `expect(requests).toBeGreaterThan(0)`. Confirmed `vi` is still referenced (`vi.fn()`) so the import does not go unused.
+- **The most valuable part of the diff is its comment**, which documents why this file deliberately opts out of the repo-wide fake-timers rule and says "Do not reintroduce fake timers here." Without it the next agent reads the universal rule, "fixes" the file back, and reddens main a third time. A deliberate exception landed without its reasoning is how a fix becomes a loop.
+- PR **#3323 merged as `4fb8ea92ac`** — the auto-merge path took it before I issued the squash. Worth remembering: with `require_uat_before_merge=false` the scheduler can land a ready PR ahead of my manual step, so check `state` before merging. `pan done PAN-3320 --strike` → verifying-on-main.
+- **Never admin-bypassed.** Both parked strikes (PAN-3266, PAN-3305) refused to fix-forward and both were right; that refusal is what stopped a broken base from being papered over four separate times.
+
+### `git cherry` answers the wrong question — PAN-3326
+
+- `pan done PAN-3259 --strike` refuses with *"strike/pan-3259 has 1 commit(s) missing from origin/main"*, and has for four ticks.
+- **That missing commit is a false positive.** `git cherry` marks `b3cf0b642f` (a **PAN-3262** fix riding on this branch) as `+`. It touches exactly one file, and `git diff --stat b3cf0b642f:<path> origin/main:<path>` is **empty** — byte-identical. PAN-3262 is already CLOSED and main's copy imports the split modules exactly as intended. There is zero unlanded content.
+- Cause: the gate decides landing by **patch-id**, which changes when identical content arrives by another route (squash, re-application on a different base). `strike_ready_head` is itself upstream; the gate fails on an unrelated passenger commit.
+- **LESSON: `git cherry` answers "was this patch applied?", not "is this content present?" — landing gates want the second question.** This is the exact inverse of tick 1, where a two-dot `git diff --stat` lied (349 files / 18,779 deletions) and `git cherry` was right. Neither tool is authoritative; the question decides which one to use. Filed PAN-3326 with a content-comparison fix and **did not force it closed** — accepting a missed gate is the operator's lever.
+
+### Three more machinery gaps, all found while recovering rather than by hunting
+
+- **PAN-3324 (NEW) — OOM kills are recorded as `stopped_by_user = 1`.** All three review agents killed in the 09:31–09:35 OOM window carry `sbu=1`, every timestamp inside that window, no operator stop issued. That engages the operator-stop gate — which exists to respect deliberate human stops — so **a resource kill permanently suppresses the autonomous re-drive that would recover it.** The irony: one of the two issues left unrecoverable this way was **PAN-3294 itself**, the fix for the leak that caused the OOM, with a CLEAN PR waiting. Distinct from PAN-3282 (reviewers *dying*); this is the death being *recorded* in a way that latches.
+- **PAN-3325 (NEW) — fresh workspaces ship an EMPTY `node_modules`.** Because the directory exists, resolution walks up to the parent repo instead of failing, so gates can silently run against a different tree's dependencies. Surfaced as "missing `@types/node` in typecheck:evals"; `bun install` fixed it with `bun.lock` untouched, proving the dependency set was fine and merely uninstalled. An absent directory fails loudly; an empty one produces a false green.
+- **PAN-3282 — appended two occurrences with a cause.** PAN-3294 and PAN-3286 both landed in `review_infrastructure_failure`, and for once the cause is known: OOM-killed, not faulty. Suggested checking whether other occurrences correlate with memory-pressure/restart windows before assuming a fault inside the review pipeline.
+
+### PAN-3260 — a stale verdict, and `resync` is not the verb for it
+
+- PAN-3260's agent was **correctly holding**: "Per the session-restore notice, I'm not self-initiating `pan review request` … on an unchanged, already-verified-clean commit." Meanwhile `review_status` read `review=passed / test=failed`.
+- The agent was right and the DB was stale: **PR #3268 is fully green including `test: SUCCESS`** at head `8f081c0646`, while the failed verdict dates from 05:51Z against a *different* commit (`reviewed_at_commit=363ae133`).
+- `pan review resync PAN-3260` re-emitted `test=failed` unchanged. **`resync` heals a lost pipeline *event*; it does not reconcile a stale *verdict* against the PR's current checks.** Worth knowing precisely, because the name suggests otherwise.
+- The correct path was to **earn** a fresh verdict rather than edit one: `pan review request PAN-3260` → *"Tests re-queued for PAN-3260 (review already passed)"*, and `agent-pan-3260-test` went live. Re-queueing only the failed stage is exactly right.
+
+### State at close of tick
+
+- **Main:** tip `4fb8ea92ac` contains the fix; CI still in progress at close, so main is **green-pending, not green** — treated as unverified per doctrine.
+- The four strike PRs I own — **#3315 (2390), #3316 (3305), #3318 (3266), #3319 (3202)** — all still carry the bad test (`vi.useFakeTimers({` present on every branch), so a bare CI re-run will not clear them; each needs main merged in. **Deliberately held until main's CI confirms green** rather than propagate an unverified base to four branches.
+- Fleet 16 sessions, cap 20; PSI 0; ~39 GB available. Reviews live for PAN-3253, PAN-3286, PAN-3294, PAN-3296; test live for PAN-3260.
+- Still deferred with reason: **PAN-3264** close-out (needs PAN-3202), **PAN-3300** close-out (needs main verify), **PAN-3259** (blocked by PAN-3326, not by its own work).
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 3 PRs merged (PAN-3300, PAN-3291, PAN-3320), 12 substrate bugs driven (PAN-3300/3320 fixed; PAN-2390/3305/3202 struck; PAN-3313/3321/3322/3324/3325/3326 filed; PAN-3294/3282 escalated), 1 duplicate closed, 2 stale gates cleared (PAN-3253, PAN-3260), 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~61 GB reclaimed across 3 relief passes, 2 outages recovered, 1 deploy delivered, 6 review convoys re-driven.**

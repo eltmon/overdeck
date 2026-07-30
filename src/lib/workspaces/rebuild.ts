@@ -14,6 +14,10 @@
  * migrateMemoryHomesToWorkspaces() moves legacy issue-keyed memory homes
  * (memory/{projectId}/{issueId}/, from before this item) onto their
  * workspace UUID and re-points memory_fts.workspace_id by issueId.
+ * archiveTerminalIssueWorkspaces() archives (never deletes) issue rows whose
+ * issue reached a terminal stage, so pipeline worktrees stop accumulating in the
+ * user-facing surfaces (PAN-3286 FR-14). Terminality is passed in, resolved by
+ * the caller through IssuesResolver — this module reads no issue state.
  * migrateMemoryHomesToWorkspacesOnce() is the boot-safe wrapper, gated by a
  * marker file so a dashboard restart never re-scans every project's memory
  * home. Wired into the dashboard boot path in main.ts, right after the
@@ -27,8 +31,8 @@ import { readWorkspaceIdentity, resolveWorkspaceIdentityPath, writeWorkspaceIden
 import { runMemoryFtsStatement } from '../memory/fts-db.js';
 import { ensureParentDir, resolveMemoryBase, resolveMemoryRoot } from '../memory/paths.js';
 import { listProjectsSync } from '../projects.js';
-import { getWorkspaceById, getWorkspaceForIssue, listProjects } from './resolver.js';
-import { createWorkspace, upsertProjectFromConfig } from './writer.js';
+import { getWorkspaceById, getWorkspaceForIssue, listProjects, listWorkspaces } from './resolver.js';
+import { archiveWorkspace, createWorkspace, upsertProjectFromConfig } from './writer.js';
 
 const FEATURE_DIR_PATTERN = /^feature-([a-z]+-\d+)$/i;
 
@@ -134,6 +138,62 @@ export async function rebuildMainAndScratchWorkspaces(
       result.created += 1;
       result.createdIds.push(record.id);
     }
+  }
+
+  return result;
+}
+
+export interface ArchiveTerminalIssueWorkspacesOptions {
+  /**
+   * Issue ids the caller resolved as terminal through the canonical issues read
+   * door (`resolveTerminalIssueIds` in src/lib/overdeck/terminal-issues.ts).
+   * Required, so this function cannot silently open a second issue-state read
+   * path — it decides nothing about terminality itself (review fix, FR-14).
+   */
+  terminalIssueIds: ReadonlySet<string>;
+  dryRun?: boolean;
+  verbose?: boolean;
+}
+
+export interface ArchiveTerminalIssueWorkspacesResult {
+  scanned: number;
+  archived: number;
+  skipped: number;
+  archivedIds: string[];
+}
+
+/**
+ * Archive — never delete — every non-archived kind='issue' row whose issue the
+ * caller resolved as terminal (PAN-3286 FR-14, D-13). The rows stay because they
+ * own their memory homes; archiving just takes them out of the user-facing
+ * surfaces, and `unarchiveWorkspace` reverses it.
+ *
+ * Terminality is an *input* here, resolved through `IssuesResolver` by
+ * `resolveTerminalIssueIds()` — this function performs no issue-state read, so
+ * it adds no second read door. Mutation goes through `archiveWorkspace` on the
+ * write door (NFR-1). `--dry-run` performs zero writes.
+ */
+export async function archiveTerminalIssueWorkspaces(
+  options: ArchiveTerminalIssueWorkspacesOptions,
+): Promise<ArchiveTerminalIssueWorkspacesResult> {
+  const result: ArchiveTerminalIssueWorkspacesResult = { scanned: 0, archived: 0, skipped: 0, archivedIds: [] };
+  // The issues table stores ids as the tracker reports them; compare
+  // case-insensitively so a `feature-pan-1` row's `PAN-1` matches either casing.
+  const terminalIds = new Set([...options.terminalIssueIds].map((id) => id.toUpperCase()));
+
+  for (const workspace of listWorkspaces({ kind: 'issue' })) {
+    result.scanned += 1;
+    if (!workspace.issueId || !terminalIds.has(workspace.issueId.toUpperCase())) {
+      result.skipped += 1;
+      continue;
+    }
+
+    if (options.verbose) {
+      console.log(`[rebuild-workspaces] ${options.dryRun ? 'would archive' : 'archiving'} terminal-issue workspace ${workspace.id} (${workspace.name}, ${workspace.issueId})`);
+    }
+    if (!options.dryRun) await archiveWorkspace(workspace.id);
+    result.archived += 1;
+    result.archivedIds.push(workspace.id);
   }
 
   return result;

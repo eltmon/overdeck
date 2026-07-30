@@ -35,6 +35,13 @@ export interface WorkspacePipelineBadge {
 
 export interface WorkspaceListRow extends WorkspaceRow {
   pipeline: WorkspacePipelineBadge | null;
+  /**
+   * Memory-synthesized phase (exploring/planning/building/verifying/cleaning/
+   * shipping) for main and scratch rows, or null when there is no status yet.
+   * Always null for `kind='issue'` rows, which badge the *pipeline* phase
+   * instead (PAN-3286 FR-12, D-12).
+   */
+  memoryPhase: string | null;
 }
 
 function pipelineBadgeForWorkspace(workspace: WorkspaceRow): WorkspacePipelineBadge | null {
@@ -50,8 +57,19 @@ function pipelineBadgeForWorkspace(workspace: WorkspaceRow): WorkspacePipelineBa
   };
 }
 
-function toListRow(workspace: WorkspaceRow): WorkspaceListRow {
-  return { ...workspace, pipeline: pipelineBadgeForWorkspace(workspace) };
+function toListRow(workspace: WorkspaceRow, memoryPhase: string | null = null): WorkspaceListRow {
+  return { ...workspace, pipeline: pipelineBadgeForWorkspace(workspace), memoryPhase };
+}
+
+/**
+ * The memory phase for one row. Issue rows return null WITHOUT touching the
+ * status file — they are badged from the pipeline, so the read would be wasted
+ * (PAN-3286 D-12). A read failure degrades to null rather than failing the list.
+ */
+async function readMemoryPhase(workspace: WorkspaceRow): Promise<string | null> {
+  if (workspace.kind === 'issue') return null;
+  const status = await readCurrentStatus(workspace.projectId, workspace.id).catch(() => undefined);
+  return status?.phase ?? null;
 }
 
 /**
@@ -86,7 +104,10 @@ const listWorkspaceRegistryRoute = HttpRouter.add(
     const kind = kindParam === 'main' || kindParam === 'issue' || kindParam === 'scratch' ? kindParam : undefined;
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const workspaces = listWorkspaces({ projectId, kind, includeArchived });
-    return jsonResponse({ workspaces: workspaces.map(toListRow) });
+    // Server-side so the rail needs no per-row fetch; each read is one small
+    // local JSON file, and issue rows are skipped entirely.
+    const memoryPhases = yield* Effect.promise(() => Promise.all(workspaces.map(readMemoryPhase)));
+    return jsonResponse({ workspaces: workspaces.map((workspace, index) => toListRow(workspace, memoryPhases[index] ?? null)) });
   })),
 );
 
@@ -100,7 +121,10 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
     const memoryStatus = (yield* Effect.promise(() => readCurrentStatus(workspace.projectId, workspace.id).catch(() => undefined))) ?? null;
-    return jsonResponse({ ...toListRow(workspace), memoryStatus });
+    // Same rule as the list route: issue rows carry no memoryPhase, even though
+    // the detail route reads their full status for the memory panel.
+    const memoryPhase = workspace.kind === 'issue' ? null : memoryStatus?.phase ?? null;
+    return jsonResponse({ ...toListRow(workspace, memoryPhase), memoryStatus });
   })),
 );
 

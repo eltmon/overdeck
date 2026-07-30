@@ -26,6 +26,13 @@ export interface SearchMemoryInput {
   workspaceId?: string;
   issueId?: string;
   sibling?: boolean;
+  /**
+   * Same-project search across every OTHER workspace, for turns with no issue
+   * to define siblings by (PAN-3286 FR-11). Requires `excludeWorkspaceId`;
+   * mutually exclusive with `sibling`, which takes precedence.
+   */
+  crossWorkspace?: boolean;
+  excludeWorkspaceId?: string;
   siblingTokenBudget?: number;
   now?: Date;
   limit?: number;
@@ -142,7 +149,11 @@ export async function searchMemory(input: SearchMemoryInput): Promise<MemorySear
     ],
   });
 
-  const tokenBudget = input.sibling ? normalizeSiblingTokenBudget(input.siblingTokenBudget) : null;
+  // Cross-workspace hits share the sibling token budget — they occupy the same
+  // "context from elsewhere in this project" slot at injection time.
+  const tokenBudget = input.sibling || input.crossWorkspace
+    ? normalizeSiblingTokenBudget(input.siblingTokenBudget)
+    : null;
   const queryTerms = extractQueryTerms(input.query);
   const now = input.now ?? new Date();
   return rows
@@ -166,6 +177,14 @@ function buildIdentityPredicate(input: SearchMemoryInput): { sql: string; params
     return {
       sql: 'AND workspace_id != ? AND issue_id != ?',
       params: [input.workspaceId, input.issueId],
+    };
+  }
+
+  if (input.crossWorkspace) {
+    if (!input.excludeWorkspaceId) return null;
+    return {
+      sql: 'AND workspace_id != ?',
+      params: [input.excludeWorkspaceId],
     };
   }
 
