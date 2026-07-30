@@ -3,18 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-30T20:40:20.380Z",
-  "updated": "2026-07-30T22:36:38.467Z",
+  "updated": "2026-07-30T22:46:51.651Z",
   "pipeline": {
     "issueId": "PAN-3324",
     "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
     "mergeStatus": "failed",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:36:38.445Z",
-    "verificationNotes": "Verification FAILED at test (625986ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3324-strike\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3324-strike/src/dashboard/frontend\u001b[39m\n\nNo test files found, exiting with code 0\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2msummary fork transcript resolution\u001b[2m > \u001b[22m\u001b[2msummarizes an ACP conversation without a Claude session ID\n\u001b[22m\u001b[39m[summary-fork] Forking conv=conv-source launchModel=claude-haiku-4-5 summaryModel=claude-haiku-4-5 localOnly=false forkMode=summary\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2msummary fork transcript resolution\u001b[2m > \u001b[22m\u001b[2msummarizes an ACP conversation without a Claude session ID\n\u001b[22m\u001b[39m[claude-invoke] purpose=summary-fork | model=claude-haiku-4-5 | summaryHarness=claude-code | sourceHarness=acp | source=summary-fork.ts:generateSummaryForFork | jsonl=/tmp/pan-summary-fork-acp-1785450441042/agents/conv-acp-source/acp-session.jsonl\n\n\u001b[90mstdout\u001b[2m | src/lib/conversations/__tests__/summary-fork-handoff.test.ts\u001b[2m > \u001b[22m\u001b[2msummary fork transcript resolution\u001b[2m > \u001b[22m\u001b[2msummarizes an ACP conversation without a Claude session ID\n\u001b[22m\u001b[39m[claude-invoke] SUCCESS purpose=summary-fork | model=claude-haiku-4-5 | outputChars=110\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22m\u001b[2mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22m\u001b[2mdecides supervisor eligibility from Docker and harness only\n\u001b[22m\u001b[39m[agent-pan-1405] supervisor:eligible\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:harness-pi\n\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/lib/memory/e2e.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 5387\u001b[2m\n…(401923 chars elided)…\n2m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/issues-rally-children.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/project-specialist-status.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-review-status-completed.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/non-restartable-reason.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/misc-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[\n...(truncated)",
+    "updatedAt": "2026-07-30T22:46:51.613Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
     "mergeNotes": "Post-rebase verification failed at test",
     "strikeReadyHead": "c4ab1b40445d11a2ca3cd62c8d0f665d71901ce5",
     "strikeReadyAt": "2026-07-30T21:55:09.330Z",
@@ -38,7 +39,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T22:36:38.453Z"
+        "pricingAsOf": "2026-07-30T22:46:51.630Z"
       }
     },
     "merges": [],
