@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:28:52.931Z",
+  "updated": "2026-07-30T04:30:01.455Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T04:28:52.910Z",
-    "inspectNotes": "Inspecting item start-cli-flip-through-door"
+    "updatedAt": "2026-07-30T04:30:01.329Z",
+    "inspectNotes": "All four ACs now proven by executed production code; prior blocking finding fully resolved. Seam extracted to src/cli/commands/start-status.ts and both helpers are called from start.ts:1217 and start.ts:1225, so the test invokes real CLI code instead of grepping source. AC1/AC2: state-door-durability.test.ts calls transitionStartedXBrief(projectRoot,'PAN-3296') against a temp migrated state worktree and asserts plan.status='running', porcelain empty, HEAD==origin/overdeck-state, and origin log subject == 'chore(state): start PAN-3296 xBRIEF (status=running)' — the subject is built inside production code from issueId.toUpperCase(), so the format is locked. AC3: workspace draft case asserts updateWorkspaceDraftPlanStatus returns true, draft flips to running, state porcelain empty and HEAD unmoved. AC4: start.ts now contains ZERO updatePlanStatus references (verified by grep); the single call is start-status.ts:19, unreachable except past the startsWith(workspace + sep) early-return at :18. The new negative case is the real fix for the false-pass hole I flagged: for the canonical feature-pan-3296 workspace findPlanSync prefers findSpecByIssueSync (io.ts:183-184) and returns the STATE-worktree spec path, so the assertion updateWorkspaceDraftPlanStatus(canonicalWorkspace)===false plus porcelain empty and unchanged HEAD behaviorally proves a state path can never be written. Verified locally: targeted vitest run passes (1 passed) and 'bash scripts/lint-file-size.sh' passes with start.ts at 1268 lines, 9 under its 1277 allowlist cap. Non-blocking observation: start.ts:1225 now wraps findPlanSync inside the try, so a findPlanSync throw is warned rather than propagated — same shape as before d5baa4ad, no AC impact."
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1246847,
-            "output": 79800,
-            "cacheRead": 30337536,
+            "input": 1247429,
+            "output": 79916,
+            "cacheRead": 30772736,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 178994
         },
         "openai/gpt-5.6-sol": {
-          "input": 1246847,
-          "output": 79800,
-          "cacheRead": 30337536,
+          "input": 1247429,
+          "output": 79916,
+          "cacheRead": 30772736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.968314,
-        "pricingAsOf": "2026-07-30T04:28:52.921Z"
+        "usd": 33.192304,
+        "pricingAsOf": "2026-07-30T04:30:01.422Z"
       }
     },
     "merges": [],
