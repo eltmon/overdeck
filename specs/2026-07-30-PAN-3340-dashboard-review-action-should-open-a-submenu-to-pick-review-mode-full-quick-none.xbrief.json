@@ -1,0 +1,426 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T21:25:08Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3340: Dashboard: Review action should open a submenu to pick review mode (Full / Quick / None)",
+    "updated": "2026-07-30T21:31:21.939Z"
+  },
+  "plan": {
+    "id": "pan-3340",
+    "title": "Dashboard: Review action should open a submenu to pick review mode (Full / Quick / None)",
+    "status": "proposed",
+    "uid": "83cdcdbe-bac4-41ea-a57a-77b27389f779",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-30T21:25:08Z",
+    "updated": "2026-07-30T21:31:21.939Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3340",
+        "label": "PAN-3340",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "review",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Requesting a review and choosing its mode are two disjoint, silent dashboard interactions: the Review action dispatches with the already-resolved mode and shows no feedback, and the Policies mode chip's save swallows non-OK responses. On 2026-07-30 the operator clicked Review and FULL on MIN-908 and neither took effect; the review had to be dispatched from the CLI.",
+      "Proposal": "Give the requestReview registry action a Full / Quick / None submenu on every surface (grouped, context, and — via a new popover on the primary-strip ActionButton — the kanban strip). Selecting a mode POSTs { reviewMode } to the existing trigger route, which persists the mode through the record write door (updateIssueRecord) synchronously before responding, then dispatches; dispatch keeps reading the mode through resolveReviewMode. A success toast names the chosen mode, persist failures fail the HTTP response, and IssuePolicyStrip.save gains an error toast. Full design, before/after snippets, and decisions: .pan/drafts/PAN-3340.md.",
+      "NonGoals": "- No current-mode indicator inside the submenu (would need a per-row GET /api/review/:id/config fetch).\n- No change to background dispatch failure surfacing beyond the existing reviewStatus.reviewNotes + pending-operation machinery.\n- No change to canRequestReview gating, the pan review CLI surface, or POST /api/review/:issueId/config behavior.\n- No issue-action registry keys added, renamed, or removed; the dead 'Review & Test' button in WorkspaceStatusOverview.tsx stays dead."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Single POST: the trigger route accepts an optional reviewMode and persists it via the record write door before responding, instead of the frontend POSTing /api/review/:id/config then /trigger.",
+        "rationale": "Atomic ordering is guaranteed server-side and a mode-persist failure becomes a synchronous non-200 the frontend can surface; a two-POST dance has a partial-failure window."
+      },
+      {
+        "summary": "The primary-strip ActionButton opens a popover when view.submenu exists, rather than click-dispatching with the current mode.",
+        "rationale": "The issue asks for the Review action itself to be a submenu; a strip button that still dispatches silently on click would preserve the exact interaction that bit the operator."
+      },
+      {
+        "summary": "No current-mode checkmark in the submenu.",
+        "rationale": "It would require a GET /api/review/:id/config per rendered row on kanban/board surfaces; the Policies strip remains the mode display."
+      },
+      {
+        "summary": "Background dispatch failures stay on the existing reviewNotes / pending-operation surface.",
+        "rationale": "In scope is making the click verifiably take effect: validation and mode persistence move before the 200 response; spawn health is already visible via the spawned agent row and review status."
+      },
+      {
+        "summary": "Plain invoke() of requestReview still dispatches with the resolved mode (no body); registry key, testid, and gating unchanged.",
+        "rationale": "Keeps programmatic/test paths working and lets the no-loss parity tests pass unmodified."
+      },
+      {
+        "summary": "Submenu labels carry hints: 'Full — 4-reviewer convoy', 'Quick — single pass (default)', 'None — skip AI review'.",
+        "rationale": "The pick must be self-explanatory without opening docs; 'None' especially must state that AI review is skipped."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-trigger-mode",
+        "title": "Trigger route accepts and persists reviewMode before dispatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:25:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+            "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bunx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-pipeline-review-mode.test.ts exits 0 with all parseRequestedReviewMode cases green",
+            "npm run typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspaces/review-pipeline.ts, add an exported pure helper parseRequestedReviewMode(body) that returns { ok: true, mode? } for 'quick'|'full'|'none' (absent/null field → no mode) and { ok: false, error } otherwise. In the trigger route handler, reject invalid modes with 400 right after readJsonBody (line ~131), and — after all existing early-exit guards and immediately before the '// Respond immediately' background IIFE (line ~252) — persist a valid mode synchronously via resolveProjectForIssue + updateIssueRecord (dynamic-import pattern from review-control.ts:713-718), returning 500 without dispatching if persistence throws. Add unit tests for the pure helper in __tests__/review-pipeline-review-mode.test.ts following the review-pipeline-dirty-gate.test.ts style. Exact before/after snippets: .pan/drafts/PAN-3340.md WI-1."
+        },
+        "items": [
+          {
+            "id": "server-trigger-mode.ac1",
+            "title": "parseRequestedReviewMode returns { ok: true, mode } for each of quick/full/none, returns { ok: true } with no mode for absent or null fields, and rejects 'FULL', '', 123, and {} with an error naming the allowed values",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-trigger-mode.ac2",
+            "title": "Given a valid reviewMode body, the route persists record.reviewMode through updateIssueRecord before the 200 response, and returns 500 without dispatching when persistence throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-trigger-mode.ac3",
+            "title": "Given any early-exit guard triggers (invalid id, remote workspace, already-reviewed, already-merged, missing workspace, conflict gate), the route returns the guard response and persists nothing to the issue record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-trigger-mode.ac4",
+            "title": "bunx vitest run src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts exits 0 and npm run typecheck exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "action-submenu-modes",
+        "title": "requestReview gains a Full / Quick / None submenu and a success toast",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:25:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bunx vitest run src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "issueActions.test.ts exits 0 including the three new requestReview submenu cases",
+            "npm run typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts, add a module-level REVIEW_MODE_SUBMENU_OPTIONS constant (full/quick/none with hint labels) and extend the `all` memo (~line 497-517) so the enabled requestReview view carries submenu options invoking submitDialogAction(action, { reviewMode: option.mode }) — the existing postActionMutation POSTs that body to the action's endpoint, no new fetch code. Keep the addToOrderBook submenu branch untouched. In postActionMutation.onSuccess (~line 372) add a requestReview case that calls toast.success naming the issue id and the chosen mode (destructure body from the mutation variables). Extend src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts with the three cases from the PRD. Exact snippets: .pan/drafts/PAN-3340.md WI-2."
+        },
+        "items": [
+          {
+            "id": "action-submenu-modes.ac1",
+            "title": "Given an issue whose requestReview action is enabled, the view exposes a submenu whose options have keys full, quick, none in that order with hint labels",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-submenu-modes.ac2",
+            "title": "Invoking the full submenu option produces a fetch POST to /api/review/<ISSUE>/trigger whose JSON body contains reviewMode: 'full'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-submenu-modes.ac3",
+            "title": "A successful mode-selected mutation renders a sonner success toast containing the issue id and the chosen mode; a no-body invoke renders a mode-less success toast",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-submenu-modes.ac4",
+            "title": "bunx vitest run src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "strip-submenu-popover",
+        "title": "Primary-strip ActionButton opens submenus as a popover",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T21:25:08Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+            "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bunx vitest run src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx src/dashboard/frontend/src/components/KanbanBoard.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssueActionMenu.test.tsx exits 0 including the new strip popover cases",
+            "no-actions-lost, surface-parity, and KanbanBoard suites exit 0 without weakened assertions",
+            "npm run typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx, teach ActionButton (lines 62-77) to open a small popover when view.submenu is present instead of invoking: trigger keeps data-testid issue-action-<key>, gains aria-haspopup='menu' + aria-expanded and a ChevronRight affordance; the popover reuses the OverflowMenu visual pattern (fixed inset backdrop closes on outside click; absolute panel; menuitem buttons with data-testid issue-action-<key>-option-<optionKey>) and invokes option.invoke() on selection. Extend IssueActionMenu.test.tsx with the three PRD cases. Then run the no-loss gates (no-actions-lost, surface-parity, KanbanBoard) — they must pass without weakened assertions; if the KanbanBoard inline snapshot legitimately shifts, update it in the same commit with the reason in the commit message. Exact snippet: .pan/drafts/PAN-3340.md WI-3."
+        },
+        "items": [
+          {
+            "id": "strip-submenu-popover.ac1",
+            "title": "Given a kanban card whose primary strip shows Request review, clicking the trigger renders a popover with three menuitems and produces no fetch call until a mode is picked",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-submenu-popover.ac2",
+            "title": "Selecting Quick in the strip popover produces a POST to /api/review/<ISSUE>/trigger with body {\"reviewMode\":\"quick\"} and closes the popover; clicking the backdrop closes without a POST",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-submenu-popover.ac3",
+            "title": "The trigger renders with aria-haspopup='menu' and aria-expanded reflecting popover state, and the trigger's data-testid remains issue-action-requestReview",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "strip-submenu-popover.ac4",
+            "title": "bunx vitest run src/dashboard/frontend/src/lib/__tests__/issueActions.no-actions-lost.test.ts src/dashboard/frontend/src/lib/__tests__/issue-actions-surface-parity.test.tsx src/dashboard/frontend/src/components/KanbanBoard.test.tsx exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "policy-strip-save-toast",
+        "title": "Policies strip save failures surface an error toast",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T21:25:08Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bunx vitest run src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "IssuePolicyStrip.test.tsx exits 0 including the failed-save toast case",
+            "npm run typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/IssuePolicyStrip.tsx, update the save helper (lines 206-218): on a non-OK response, parse the server's { error }/{ message } (fall back to status text) and call toast.error('Failed to save issue policy', { description }); import toast from sonner. Keep the response.ok → refresh() path byte-identical. Extend IssuePolicyStrip.test.tsx: mock a 500 from /api/review/:id/config, change the Mode segmented control, assert toast.error fired with the server message and the displayed mode did not change."
+        },
+        "items": [
+          {
+            "id": "policy-strip-save-toast.ac1",
+            "title": "Given the Policies panel, when the mode save responds non-OK, a sonner error toast renders containing the server's error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-strip-save-toast.ac2",
+            "title": "After a failed save the displayed review mode preserves its prior value (no optimistic change)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "policy-strip-save-toast.ac3",
+            "title": "bunx vitest run src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-review-submenu",
+        "title": "Document the one-interaction review dispatch in ISSUE-VIEW and REVIEW-AGENT-ARCHITECTURE",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T21:25:08Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3340",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n reviewMode docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds the new reviewMode paragraph in docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "npm run lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/ISSUE-VIEW.md ('Issue action registry contract' section, ~line 46): state that registry actions may expose option submenus via IssueActionView.submenu, that requestReview uses one for review-mode selection, and that primary-strip buttons render submenus as popovers while grouped/context surfaces render expandable sub-lists — both presentations covered by the parity gate. docs/REVIEW-AGENT-ARCHITECTURE.md (where review modes/dispatch are described): document that POST /api/review/:issueId/trigger accepts an optional reviewMode (quick|full|none) persisted through the record write door before dispatch, making dashboard Review → mode a single interaction equivalent to `pan review mode <id> <mode>` + `pan review request <id>`."
+        },
+        "items": [
+          {
+            "id": "docs-review-submenu.ac1",
+            "title": "docs/ISSUE-VIEW.md contains a passage naming requestReview's review-mode submenu and the strip popover vs grouped sub-list presentations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-review-submenu.ac2",
+            "title": "grep -n reviewMode docs/REVIEW-AGENT-ARCHITECTURE.md returns at least one match describing the trigger route's optional reviewMode body and its pre-dispatch persistence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-review-submenu.ac3",
+            "title": "npm run lint exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "server-trigger-mode",
+        "to": "action-submenu-modes",
+        "type": "blocks"
+      },
+      {
+        "from": "action-submenu-modes",
+        "to": "strip-submenu-popover",
+        "type": "blocks"
+      },
+      {
+        "from": "strip-submenu-popover",
+        "to": "docs-review-submenu",
+        "type": "blocks"
+      },
+      {
+        "from": "policy-strip-save-toast",
+        "to": "docs-review-submenu",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3340-dashboard-review-action-should-open-a-submenu-to-pick-review-mode-full-quick-none.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
