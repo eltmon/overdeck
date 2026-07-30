@@ -1,3 +1,7 @@
+import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { Effect } from 'effect';
 /**
  * Tests for src/lib/platform-lifecycle.ts.
@@ -418,5 +422,86 @@ describe('dashboard health ownership', () => {
       () => ({ stop: vi.fn(), pid: async () => null }),
       { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
     ))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+  });
+});
+
+describe('dashboard EADDRINUSE fast failure', () => {
+  const tempDirs: string[] = [];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects before the health deadline when the fresh spawn logs EADDRINUSE', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'overdeck-eaddrinuse-'));
+    tempDirs.push(dir);
+    const logPath = join(dir, 'dashboard.log');
+    appendFileSync(logPath, 'old log content\n');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 8101 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    let caught: StageError | undefined;
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 8202 }),
+      {
+        healthTimeoutMs: 5_000,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        eaddrinuseLogPath: logPath,
+        portOwnerProbe: async () => [8101],
+        pidDescriptor: async () => '8101 node old-dashboard.js',
+      },
+    )).catch((error) => {
+      caught = error as StageError;
+      throw error;
+    });
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringMatching(/port 43991.*PID 8101.*node old-dashboard\.js.*EADDRINUSE/s),
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    appendFileSync(logPath, 'Error: listen EADDRINUSE: address already in use 127.0.0.1:43991\n');
+
+    await vi.advanceTimersByTimeAsync(250);
+    await rejection;
+    expect(caught?.failure.recovery).toBeUndefined();
+    expect(Date.now()).toBeLessThan(5_000);
+  });
+
+  it('treats a missing pre-spawn log as an empty file without blocking startup', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'overdeck-eaddrinuse-missing-'));
+    tempDirs.push(dir);
+    const logPath = join(dir, 'dashboard.log');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 8303 }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 8303 }),
+      {
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        eaddrinuseLogPath: logPath,
+      },
+    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 8303 });
   });
 });

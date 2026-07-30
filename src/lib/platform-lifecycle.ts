@@ -21,6 +21,7 @@
 import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
+import { open as openFile, stat } from 'fs/promises';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
 import { Effect } from 'effect';
@@ -117,6 +118,8 @@ export class StageError extends Error {
     this.name = 'StageError';
   }
 }
+
+class EaddrinuseSpawnError extends StageError {}
 
 export function readPlatformConfigSync(): PlatformConfig {
   const defaults: PlatformConfig = {
@@ -241,7 +244,71 @@ async function describePid(pid: number): Promise<string> {
   } catch {
     return 'unknown';
   }
-}async function stopDashboardPromise(
+}
+
+async function fileSizeOrZero(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size;
+  } catch {
+    return 0;
+  }
+}
+
+async function readAppendedLog(path: string, offset: number): Promise<{ text: string; offset: number }> {
+  let size: number;
+  try {
+    size = (await stat(path)).size;
+  } catch {
+    return { text: '', offset: 0 };
+  }
+  const start = size < offset ? 0 : offset;
+  if (size <= start) return { text: '', offset: size };
+
+  let file: Awaited<ReturnType<typeof openFile>>;
+  try {
+    file = await openFile(path, 'r');
+  } catch {
+    return { text: '', offset: 0 };
+  }
+  try {
+    const buffer = Buffer.alloc(size - start);
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, start);
+    return { text: buffer.subarray(0, bytesRead).toString('utf8'), offset: start + bytesRead };
+  } catch {
+    return { text: '', offset: start };
+  } finally {
+    await file.close().catch(() => {});
+  }
+}
+
+function createEaddrinuseProbe(
+  logPath: string,
+  initialOffset: number,
+  port: number,
+  portOwnerProbe: (port: number) => Promise<number[]>,
+  pidDescriptor: (pid: number) => Promise<string>,
+): () => Promise<StageError | null> {
+  let offset = initialOffset;
+  let carry = '';
+  return async () => {
+    const appended = await readAppendedLog(logPath, offset);
+    offset = appended.offset;
+    const text = carry + appended.text;
+    carry = text.slice(-10);
+    if (!/EADDRINUSE/.test(text)) return null;
+
+    const ownerPid = (await portOwnerProbe(port))[0] ?? null;
+    const owner = ownerPid === null
+      ? 'an unresolved PID'
+      : `PID ${ownerPid} (cmd: ${await pidDescriptor(ownerPid)})`;
+    return new EaddrinuseSpawnError({
+      stage: 'dashboard',
+      reason: `port ${port} is owned by ${owner} — the freshly spawned server crashed with EADDRINUSE`,
+    });
+  };
+}
+
+async function stopDashboardPromise(
   config: PlatformConfig,
   opts: { graceTimeoutMs?: number } = {},
 ): Promise<void> {
@@ -307,6 +374,7 @@ async function describePid(pid: number): Promise<string> {
     pollIntervalMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
     expectedPid?: number;
+    pollFailure?: () => Promise<StageError | null>;
   } = {},
 ): Promise<void> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
@@ -317,6 +385,8 @@ async function describePid(pid: number): Promise<string> {
   let lastError = 'never got a response';
   let lastResponderPid: number | null = null;
   while (Date.now() < deadline) {
+    const pollFailure = await opts.pollFailure?.();
+    if (pollFailure) throw pollFailure;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
@@ -440,18 +510,34 @@ async function restartDashboardPromise(
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    eaddrinuseLogPath?: string;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+    pidDescriptor?: (pid: number) => Promise<string>;
   } = {},
 ): Promise<DashboardRestartResult> {
   await Effect.runPromise(stopDashboard(config));
+  const logPath = opts.eaddrinuseLogPath ?? DASHBOARD_LOG_FILE;
+  const logOffset = await fileSizeOrZero(logPath);
   const handle = await startDashboardFn();
   const spawnedPid = await handle?.pid?.() ?? null;
+  const pollFailure = handle?.pid
+    ? createEaddrinuseProbe(
+        logPath,
+        logOffset,
+        config.dashboardApiPort,
+        opts.portOwnerProbe ?? pidsOnPort,
+        opts.pidDescriptor ?? describePid,
+      )
+    : undefined;
   try {
-    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+    await waitForDashboardHealthPromise(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: opts.expectedIdentity,
       expectedPid: spawnedPid ?? undefined,
-    }));
+      pollFailure,
+    });
   } catch (error) {
+    if (error instanceof EaddrinuseSpawnError) throw error;
     // #3099: NEVER reap the freshly spawned server on a health timeout. The old
     // policy killed the new server after a false-fast health check and exited
     // with zero listeners — a full dashboard outage caused by a slow-but-healthy
@@ -585,6 +671,9 @@ export const restartDashboard = (
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    eaddrinuseLogPath?: string;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+    pidDescriptor?: (pid: number) => Promise<string>;
   } = {},
 ): Effect.Effect<DashboardRestartResult, StageError> =>
   Effect.tryPromise({
