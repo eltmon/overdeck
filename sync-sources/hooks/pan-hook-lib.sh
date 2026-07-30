@@ -14,42 +14,105 @@
 PAN_DASHBOARD_URL="${OVERDECK_DASHBOARD_URL:-http://localhost:3011}"
 PAN_CURL_TIMEOUT="${OVERDECK_HOOK_TIMEOUT:-0.5}"
 
-# Acquire a portable single-flight lock backed by atomic mkdir. The holder PID
-# lets a later invocation distinguish an active owner from a stale lock left by
-# an interrupted hook. Returns 0 when acquired and 1 when another live caller
-# owns the lock.
+# Acquire a portable single-flight lock. A tiny Python helper holds the kernel
+# advisory lock for the caller's lifetime; the directory is ownership metadata,
+# not the synchronization primitive. Publishing the kernel lock before creating
+# the metadata closes the mkdir-to-PID initialization race (PAN-3294).
 pan_acquire_singleflight_lock() {
   local lock_dir="$1"
+  local guard_file="${lock_dir}.flock"
+  local ready_file="${guard_file}.ready.$$.$RANDOM"
+  local lock_parent
+  lock_parent=$(dirname "$lock_dir")
+  mkdir -p "$lock_parent" 2>/dev/null || return 1
 
-  if mkdir "$lock_dir" 2>/dev/null; then
-    printf '%s\n' "$$" > "$lock_dir/pid"
-    return 0
-  fi
+  python3 - "$guard_file" "$ready_file" "$$" >/dev/null 2>&1 <<'PY' &
+import fcntl
+import os
+import sys
+import time
 
-  local holder_pid
-  holder_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
-  if [[ "$holder_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$holder_pid" 2>/dev/null; then
+guard_file, ready_file, parent_pid_text = sys.argv[1:]
+parent_pid = int(parent_pid_text)
+fd = os.open(guard_file, os.O_CREAT | os.O_RDWR, 0o600)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    with open(ready_file, "w", encoding="utf-8") as ready:
+        ready.write("busy\n")
+    raise SystemExit(0)
+
+with open(ready_file, "w", encoding="utf-8") as ready:
+    ready.write("acquired\n")
+
+while True:
+    try:
+        os.kill(parent_pid, 0)
+    except OSError:
+        break
+    if os.getppid() == 1:
+        break
+    time.sleep(0.1)
+PY
+  local helper_pid=$!
+
+  local attempts=0
+  while [ ! -s "$ready_file" ] && kill -0 "$helper_pid" 2>/dev/null && [ "$attempts" -lt 100 ]; do
+    /bin/sleep 0.01
+    attempts=$((attempts + 1))
+  done
+
+  local lock_status
+  lock_status=$(cat "$ready_file" 2>/dev/null || true)
+  rm -f "$ready_file" 2>/dev/null || true
+  if [ "$lock_status" != "acquired" ]; then
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
     return 1
   fi
 
-  # Reclaim once. Moving the stale directory is atomic, so only one contender
-  # can remove it; any caller that loses the move exits instead of racing into
-  # the guarded work.
-  local stale_dir="${lock_dir}.stale.$$"
-  rm -rf "$stale_dir" 2>/dev/null || return 1
-  mv "$lock_dir" "$stale_dir" 2>/dev/null || return 1
-  rm -rf "$stale_dir" 2>/dev/null || return 1
-  if mkdir "$lock_dir" 2>/dev/null; then
-    printf '%s\n' "$$" > "$lock_dir/pid"
-    return 0
-  fi
-
-  return 1
+  # The kernel lock is already held, so stale metadata can be replaced without
+  # exposing an unowned interval to contenders.
+  rm -rf "$lock_dir" 2>/dev/null || {
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  mkdir "$lock_dir" 2>/dev/null || {
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  printf '%s\n' "$$" > "$lock_dir/pid" || {
+    rm -rf "$lock_dir" 2>/dev/null || true
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  printf '%s\n' "$helper_pid" > "$lock_dir/helper-pid" || {
+    rm -rf "$lock_dir" 2>/dev/null || true
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  return 0
 }
 
 pan_release_singleflight_lock() {
   local lock_dir="$1"
-  rm -rf "$lock_dir" 2>/dev/null || true
+  local owner_pid helper_pid
+  owner_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
+  helper_pid=$(cat "$lock_dir/helper-pid" 2>/dev/null || true)
+
+  # A caller may release only metadata it owns. Remove that metadata before
+  # dropping the kernel lock; a successor cannot acquire until the helper exits,
+  # and this owner performs no destructive filesystem action after that point.
+  [ "$owner_pid" = "$$" ] || return 0
+  rm -rf "$lock_dir" 2>/dev/null || return 0
+  if [[ "$helper_pid" =~ ^[1-9][0-9]*$ ]]; then
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+  fi
   return 0
 }
 
