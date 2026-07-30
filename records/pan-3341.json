@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T21:52:10.685Z",
+  "updated": "2026-07-30T21:54:46.279Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T21:52:10.664Z",
-    "inspectNotes": "Inspecting item membership-aware-state-label"
+    "updatedAt": "2026-07-30T21:54:45.656Z",
+    "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 553948,
-            "output": 52729,
-            "cacheRead": 7721984,
+            "input": 614178,
+            "output": 61982,
+            "cacheRead": 11947520,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 553948,
-          "output": 52729,
-          "cacheRead": 7721984,
+          "input": 614178,
+          "output": 61982,
+          "cacheRead": 11947520,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.212602,
-        "pricingAsOf": "2026-07-30T21:52:10.674Z"
+        "usd": 10.90411,
+        "pricingAsOf": "2026-07-30T21:54:46.010Z"
       }
     },
     "merges": [],
