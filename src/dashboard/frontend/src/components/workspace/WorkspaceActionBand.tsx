@@ -50,6 +50,23 @@ export interface WorkspaceActionBandProps {
   onRunSessionChange: (sessionName: string | null) => void;
 }
 
+/**
+ * Which run session belongs to which workspace, for this browser session only.
+ * The command palette can start a run before the workspace view mounts, and a
+ * view remounted by navigation would otherwise show no terminal for a session
+ * that is very much alive.
+ */
+const runSessionsByWorkspace = new Map<string, string>();
+
+export function rememberRunSession(workspaceId: string, sessionName: string | null): void {
+  if (sessionName) runSessionsByWorkspace.set(workspaceId, sessionName);
+  else runSessionsByWorkspace.delete(workspaceId);
+}
+
+export function recallRunSession(workspaceId: string): string | null {
+  return runSessionsByWorkspace.get(workspaceId) ?? null;
+}
+
 const CARD = 'rounded-sm border border-border bg-card px-3 py-2 flex flex-col gap-1.5 min-w-0';
 const LABEL = 'text-[10px] font-medium uppercase tracking-widest text-muted-foreground';
 const ACTION = 'text-[11px] text-muted-foreground hover:text-foreground disabled:opacity-50';

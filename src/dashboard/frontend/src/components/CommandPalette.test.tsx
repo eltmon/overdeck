@@ -315,6 +315,9 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: WORKSPACES });
       if (method === 'POST' && url === '/api/workspace-registry/ws-issue/activate') return Response.json({});
+      if (method === 'POST' && url === '/api/workspace-registry/ws-issue/run') {
+        return Response.json({ sessionName: 'ws-run-wsissue', command: 'npm run dev' });
+      }
       return undefined;
     });
   });
@@ -364,5 +367,30 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       '/api/workspace-registry/ws-issue/activate',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  // PAN-3331 D-10 / FR-8
+  it('offers the run-workspace-command action under both the Actions and Workspaces scopes', async () => {
+    renderPaletteWithWorkspace();
+
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+    expect(getOptionByValue('run-workspace-command-workspaces')).toBeInTheDocument();
+    // Names the workspace it would act on, so the target is never a guess.
+    expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001');
+  });
+
+  it('starts the run command for the most recently used workspace and opens its view', async () => {
+    const { onSelectWorkspace } = renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+
+    fireEvent.click(getOptionByValue('run-workspace-command-actions'));
+
+    await waitFor(() => {
+      expect(fetchControl.fetchMock).toHaveBeenCalledWith(
+        '/api/workspace-registry/ws-issue/run',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    await waitFor(() => expect(onSelectWorkspace).toHaveBeenCalledWith('ws-issue'));
   });
 });

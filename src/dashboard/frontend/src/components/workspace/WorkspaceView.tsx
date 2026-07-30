@@ -20,13 +20,13 @@
  * (ConversationList's `includeIds` prop already supports this — no changes
  * needed to ConversationList or ConversationPanel).
  */
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from 'react-resizable-panels';
 import { ConversationList, fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
-import { WorkspaceActionBand } from './WorkspaceActionBand';
+import { WorkspaceActionBand, recallRunSession, rememberRunSession } from './WorkspaceActionBand';
 import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -144,7 +144,11 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
 
   // Lifted so the band can start/stop the run session while its terminal lives
   // in the panel area below (PAN-3331 D-5).
-  const [runSessionName, setRunSessionName] = useState<string | null>(null);
+  const [runSessionName, setRunSessionNameState] = useState<string | null>(() => recallRunSession(workspaceId));
+  const setRunSessionName = useCallback((sessionName: string | null) => {
+    rememberRunSession(workspaceId, sessionName);
+    setRunSessionNameState(sessionName);
+  }, [workspaceId]);
 
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const selectedConversationObj = conversations.find((c) => c.name === selectedConversation) ?? null;

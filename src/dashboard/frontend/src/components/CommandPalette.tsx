@@ -35,6 +35,7 @@ import {
   MessageCircle,
   Clock,
 } from 'lucide-react';
+import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import {
@@ -600,6 +601,23 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     [workspaceRows, pipelineWorkspacesExpanded],
   );
 
+  // PAN-3331: start the most recently used workspace's run command without
+  // leaving the keyboard. Workspace rows arrive most-recent-first, so [0] is
+  // the one the operator was last in — its name is in the row so the target is
+  // never a guess.
+  const runTargetWorkspace = visibleWorkspaceRows[0] ?? null;
+  const runWorkspaceCommand = useCallback(async (workspaceId: string) => {
+    const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const body = await res.json().catch(() => ({})) as { sessionName?: string; error?: string };
+    if (body.sessionName) rememberRunSession(workspaceId, body.sessionName);
+    // 409 means one was already live — that is a success for "show me the run".
+    else if (!res.ok) toast.error(body.error ?? 'Could not start the run command');
+    onSelectWorkspace?.(workspaceId);
+  }, [onSelectWorkspace]);
+
   const workspaceActions = useMemo<PaletteAction[]>(() => {
     const actions: PaletteAction[] = visibleWorkspaceRows.map((ws) => ({
       id: `workspace-${ws.id}`,
@@ -613,6 +631,24 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         onSelectWorkspace?.(ws.id);
       },
     }));
+
+    // PAN-3331 D-10. Listed under both group headings on purpose: the group is
+    // what maps a row to a scope chip, so one entry each keeps the action
+    // reachable whether the operator has filtered to Actions or to Workspaces.
+    if (runTargetWorkspace) {
+      const runLabel = runTargetWorkspace.title ?? runTargetWorkspace.name;
+      for (const group of ['Actions', 'Workspaces'] as const) {
+        actions.push({
+          id: `run-workspace-command-${group.toLowerCase()}`,
+          label: 'Run workspace command',
+          description: `Start the run command for ${runLabel}`,
+          icon: Play,
+          group,
+          keywords: ['run', 'start', 'dev server', 'command', runTargetWorkspace.name],
+          onSelect: () => void runWorkspaceCommand(runTargetWorkspace.id),
+        });
+      }
+    }
 
     if (!pipelineWorkspacesExpanded && hiddenPipelineWorkspaces.length > 0) {
       actions.push({
@@ -640,7 +676,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     }
 
     return actions;
-  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace]);
+  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand]);
 
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 
