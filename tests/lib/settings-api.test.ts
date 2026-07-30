@@ -555,7 +555,7 @@ describe('settings-api', () => {
       });
 
       expect(result.valid).toBe(false);
-      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, or empty string');
+      expect(result.errors).toContain('models.provider_harnesses.openai must be claude-code, ohmypi, codex, acp, kimi-code, or empty string');
     });
   });
 

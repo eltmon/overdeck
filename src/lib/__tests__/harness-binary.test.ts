@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
+const configMock = vi.hoisted(() => ({ loadConfigSync: vi.fn(() => ({ config: {} })) }));
+vi.mock('../config-yaml.js', () => ({ loadConfigSync: configMock.loadConfigSync }));
+
 import {
+  configuredHarnessBinaryPath,
+  harnessBinaryName,
   harnessPathExport,
   prepareHarnessLaunch,
   resolveExecutable,
@@ -190,5 +195,43 @@ describe('prepareHarnessLaunch', () => {
   it('quotes harness directories in PATH exports', () => {
     expect(harnessPathExport("/home/test/O'Reilly/bin/claude"))
       .toBe("export PATH='/home/test/O'\\''Reilly/bin':\"$PATH\"");
+  });
+
+  it('names the configured Kimi Code CLI executable when missing or not executable', async () => {
+    await expect(prepareHarnessLaunch('kimi-code', {
+      executablePath: '/configured/missing-kimi',
+      accessExecutable: executableAccess([]),
+    })).rejects.toThrow(
+      'Kimi Code CLI configured executable "/configured/missing-kimi" was not found or is not executable',
+    );
+  });
+});
+
+describe('harnessBinaryName', () => {
+  it("maps 'kimi-code' to the 'kimi' binary, same as 'acp'", () => {
+    expect(harnessBinaryName('kimi-code')).toBe('kimi');
+    expect(harnessBinaryName('acp')).toBe('kimi');
+  });
+});
+
+describe('configuredHarnessBinaryPath', () => {
+  it("reads config.kimiCode.binaryPath for 'kimi-code'", () => {
+    configMock.loadConfigSync.mockReturnValueOnce({ config: { kimiCode: { binaryPath: '/opt/kimi-code/bin/kimi' } } });
+    expect(configuredHarnessBinaryPath('kimi-code')).toBe('/opt/kimi-code/bin/kimi');
+  });
+
+  it("returns undefined for 'kimi-code' when unset", () => {
+    configMock.loadConfigSync.mockReturnValueOnce({ config: {} });
+    expect(configuredHarnessBinaryPath('kimi-code')).toBeUndefined();
+  });
+
+  it("still reads config.acp.kimi.binaryPath for 'acp', unaffected by kimiCode", () => {
+    configMock.loadConfigSync.mockReturnValueOnce({ config: { acp: { kimi: { binaryPath: '/opt/acp/bin/kimi' } } } });
+    expect(configuredHarnessBinaryPath('acp')).toBe('/opt/acp/bin/kimi');
+  });
+
+  it('returns undefined for harnesses with no configured binary path', () => {
+    configMock.loadConfigSync.mockReturnValueOnce({ config: {} });
+    expect(configuredHarnessBinaryPath('claude-code')).toBeUndefined();
   });
 });

@@ -29,7 +29,7 @@ import {
 import { createWorkspace } from '../workspace-manager.js';
 import { renderPrompt } from '../cloister/prompts.js';
 import { deliverInitialPromptWithRetry, getAgentRuntimeBaseCommand, getProviderExportsForModel, retrieveSpawnTimeMemoryContext, roleAgentDefinitionPath, saveAgentStateSync, getAgentStateSync } from '../agents.js';
-import { getAcpLauncherFields, getCodexLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
+import { getAcpLauncherFields, getCodexLauncherFields, getKimiCodeLauncherFields, getOhmypiLauncherFields } from '../agents/runtime-command.js';
 import { loadConfigSync, resolveModel } from '../config-yaml.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -401,7 +401,7 @@ If the probe pass changes nothing at all, record one decision: "PROBE: no findin
  * Write workspace `.pan/context.md` for Rally Features so story work agents can
  * reference feature-level context (child stories, description, URL).
  */
-async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): Promise<string[]> {
+async function claudePlanningSystemPromptFiles(workspacePath: string, harness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'): Promise<string[]> {
   const files: string[] = [];
   const contextFile = workspaceContextFile(workspacePath);
   try {
@@ -675,10 +675,16 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
           'plan',
         )
       : {};
+    // PAN-1837 review fix: planning explicitly threads harness but omitted
+    // kimiCodeModel — buildKimiCodeCommand() throws 'kimi-code launcher
+    // requires kimiCodeModel' before a session could be created.
+    const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
+      ? getKimiCodeLauncherFields(planningModel)
+      : {};
 
     const providerExports = behavior.launchCommandKind === 'acp-host'
       ? undefined
-      : await getProviderExportsForModel(planningModel);
+      : await getProviderExportsForModel(planningModel, effectiveHarness);
 
     // ── Write launcher script ──────────────────────────────────────────────
     const recordFilePath = getIssueRecordPath(recordProject, issue.identifier);
@@ -696,7 +702,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         overdeckEnv: { agentId: sessionName, issueId: issue.identifier, sessionType: 'plan' },
         providerExports,
         extraEnvExports: [harnessLaunch.pathExport],
-        promptFile: behavior.launchCommandKind === 'acp-host' ? undefined : promptFile,
+        promptFile: (behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui') ? undefined : promptFile,
         baseCommand: cmdWithArgs,
         appendSystemPromptFiles: await claudePlanningSystemPromptFiles(workspacePath, effectiveHarness),
         trapHup: true,
@@ -705,6 +711,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
         ...piLauncherFields,
         ...codexLauncherFields,
         ...acpLauncherFields,
+        ...kimiCodeLauncherFields,
       }),
       { mode: 0o755 },
     );
@@ -747,7 +754,7 @@ export async function spawnPlanningSession(opts: SpawnPlanningOptions): Promise<
       });
     }
 
-    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host') {
+    if (behavior.usesCodexHome || behavior.launchCommandKind === 'acp-host' || behavior.launchCommandKind === 'kimi-code-tui') {
       const delivery = await deliverInitialPromptWithRetry(
         sessionName,
         initMessage,

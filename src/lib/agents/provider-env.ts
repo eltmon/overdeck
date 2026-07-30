@@ -10,6 +10,7 @@ import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
 import { CLIPROXY_GPT56_CONTEXT_WINDOW, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
+import type { RuntimeName } from '../runtimes/types.js';
 
 /** Map abstract/future model names to CLIProxy-supported names.
  *  The CLIProxy registry has gpt-5.4 but not gpt-5.4-pro. */
@@ -23,9 +24,20 @@ export const CLI_PROXY_MODEL_ALIASES: Record<string, string> = {
  * Reads the current API key from settings so resumed/recovered agents
  * always use the latest key.
  */
-export async function getProviderEnvForModel(model: string): Promise<Record<string, string>> {
+export async function getProviderEnvForModel(model: string, harness?: RuntimeName): Promise<Record<string, string>> {
   const provider = getProviderForModelSync(model);
   if (provider.name === 'anthropic') return {};
+
+  // PAN-1837 review fix: native kimi-code auth is host-owned via `kimi login`
+  // (~/.kimi-code/config.toml) — it does not need config.apiKeys.kimi at all.
+  // Without this short-circuit, a correctly logged-in operator with no
+  // apiKeys.kimi configured hit "No API key configured for Kimi" (line ~81
+  // below) before ever reaching getProviderEnvSync's own isKimiCode gate,
+  // which only skips the Anthropic-compat env — it never bypassed this
+  // upstream API-key requirement.
+  if (provider.name === 'kimi' && harness === 'kimi-code') {
+    return getProviderEnvSync(provider, '', harness);
+  }
 
   const { config } = loadYamlConfig();
 
@@ -33,7 +45,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
   if (provider.name === 'openrouter') {
     const apiKey = config.apiKeys.openrouter;
     if (apiKey) {
-      return getProviderEnvSync(provider, apiKey);
+      return getProviderEnvSync(provider, apiKey, harness);
     }
     throw new Error(`OpenRouter API key not configured. Add your key in Settings → OpenRouter before using model "${model}".`);
   }
@@ -74,7 +86,7 @@ export async function getProviderEnvForModel(model: string): Promise<Record<stri
       await Effect.runPromise(ensureOpenAICompatibleProxyRunning());
     }
     await Effect.runPromise(validateProviderHealth(model, apiKey));
-    return getProviderEnvSync(provider, apiKey);
+    return getProviderEnvSync(provider, apiKey, harness);
   }
 
   throw new Error(`No API key configured for ${provider.displayName}. Configure it in Settings before using model "${model}".`);
@@ -146,8 +158,8 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
   return { autoCompactWindow: contextWindow };
 }
 
-export async function getProviderExportsForModel(model: string): Promise<string> {
-  const envVars = await getProviderEnvForModel(model);
+export async function getProviderExportsForModel(model: string, harness?: RuntimeName): Promise<string> {
+  const envVars = await getProviderEnvForModel(model, harness);
   const unsetLines = PROVIDER_ENV_KEYS.map(key => `unset ${key}`);
   const contextPolicy = getClaudeCodeContextPolicyForModel(model);
   const exportLines = Object.entries(envVars)

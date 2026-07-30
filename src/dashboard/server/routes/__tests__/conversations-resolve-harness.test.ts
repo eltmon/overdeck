@@ -35,6 +35,14 @@ describe('resolveAllowedHarness (PAN-1842)', () => {
     expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'ohmypi' });
   });
 
+  it('routes an explicit kimi-code request through resolveHarness rather than falling through to the default', async () => {
+    resolveHarnessMock.mockImplementation(async ({ explicit }) => explicit ?? 'claude-code');
+
+    const explicitKimiCode = await resolveAllowedHarness('kimi-code', 'kimi-k2.6');
+    expect(explicitKimiCode).toBe('kimi-code');
+    expect(resolveHarnessMock).toHaveBeenCalledWith({ model: 'kimi-k2.6', explicit: 'kimi-code' });
+  });
+
   it('surfaces resolveHarness errors instead of falling back to claude-code', async () => {
     resolveHarnessMock.mockRejectedValue(new Error('model denied'));
 

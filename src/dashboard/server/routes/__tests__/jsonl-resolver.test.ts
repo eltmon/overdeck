@@ -10,9 +10,11 @@ import {
   resolveCodexRolloutPath,
   resolveAcpTranscriptPath,
   resolveJsonlPath,
+  resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../jsonl-resolver.js';
 import { encodeClaudeProjectDir } from '../../../../lib/paths.js';
+import { kimiSessionsRoot } from '../../../../lib/runtimes/kimi-code.js';
 
 const AGENT_ID = 'agent-pan-830';
 const WORKSPACE_PATH = '/home/testuser/Projects/overdeck/workspaces/feature-pan-830';
@@ -446,6 +448,102 @@ describe('resolveJsonlPath — ACP agents', () => {
 
     expect(await resolvePiSessionPath(ACP_AGENT_ID, {
       agentsDirOverride: agentsDir,
+    })).toBeNull();
+  });
+});
+
+describe('resolveJsonlPath — kimi-code agents (PAN-1837 wi8a)', () => {
+  const KIMI_AGENT_ID = 'agent-pan-1837';
+  let kimiHomeDir: string;
+
+  beforeEach(async () => {
+    kimiHomeDir = join(testDir, 'kimi-code');
+  });
+
+  async function setupKimiAgent(options: {
+    harness?: string;
+    sessionId?: string | null;
+    capturedSessionId?: string;
+  } = {}): Promise<string> {
+    const { harness = 'kimi-code', sessionId = 'session_fresh', capturedSessionId = sessionId ?? undefined } = options;
+    const agentDir = join(agentsDir, KIMI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: KIMI_AGENT_ID,
+      harness,
+      workspace: WORKSPACE_PATH,
+    }));
+    if (capturedSessionId) {
+      await writeFile(join(agentDir, 'kimi-session-id'), capturedSessionId);
+    }
+    const wireDir = join(kimiSessionsRoot(kimiHomeDir, WORKSPACE_PATH), sessionId ?? 'session_untracked', 'agents', 'main');
+    await mkdir(wireDir, { recursive: true });
+    const wirePath = join(wireDir, 'wire.jsonl');
+    await writeFile(wirePath, '{"type":"turn.prompt"}\n');
+    return wirePath;
+  }
+
+  it('ac1: resolveJsonlPath returns the native wire.jsonl path for a captured session id', async () => {
+    const wirePath = await setupKimiAgent();
+
+    expect(await resolveKimiWirePath(KIMI_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).toBe(wirePath);
+    expect(await resolveJsonlPath(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).toBe(wirePath);
+  });
+
+  it('ac2: falls back to the newest session dir under the workDirKey bucket when no id is captured', async () => {
+    const wirePath = await setupKimiAgent({ sessionId: 'session_only', capturedSessionId: undefined });
+
+    const path = await resolveKimiWirePath(KIMI_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    });
+
+    expect(path).toBe(wirePath);
+  });
+
+  it('ac3: trusts a recorded kimi-code harness as-is', async () => {
+    await setupKimiAgent();
+
+    expect(await resolveAgentHarness(KIMI_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).toBe('kimi-code');
+  });
+
+  it('ac3: the stale-default correction identifies kimi-code from an on-disk wire.jsonl probe', async () => {
+    const wirePath = await setupKimiAgent({ harness: 'claude-code' });
+
+    expect(await resolveAgentHarness(KIMI_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).toBe('kimi-code');
+    expect(await resolveJsonlPath(KIMI_AGENT_ID, WORKSPACE_PATH, {
+      agentsDirOverride: agentsDir,
+      claudeProjectsDirOverride: claudeProjectsDir,
+      kimiHomeOverride: kimiHomeDir,
+    })).toBe(wirePath);
+  });
+
+  it('returns null when no session bucket exists for the workspace', async () => {
+    const agentDir = join(agentsDir, KIMI_AGENT_ID);
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, 'state.json'), JSON.stringify({
+      id: KIMI_AGENT_ID,
+      harness: 'kimi-code',
+      workspace: WORKSPACE_PATH,
+    }));
+
+    expect(await resolveKimiWirePath(KIMI_AGENT_ID, {
+      agentsDirOverride: agentsDir,
+      kimiHomeOverride: kimiHomeDir,
     })).toBeNull();
   });
 });

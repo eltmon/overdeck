@@ -113,7 +113,7 @@ export function parseArchivedConversationListOptions(params: URLSearchParams): A
   const rawOffset = parseOptionalNumberParam(params, 'offset');
 
   if (workspacePath) options.workspacePath = workspacePath;
-  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex' || harness === 'acp') options.harness = harness;
+  if (harness === 'claude-code' || harness === 'ohmypi' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code') options.harness = harness;
   if (primaryModel) options.primaryModel = primaryModel;
   if (since) options.since = parseRelativeTime(since);
   if (params.get('enriched') === 'true') options.enriched = true;

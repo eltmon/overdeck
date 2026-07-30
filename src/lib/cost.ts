@@ -153,6 +153,14 @@ export const DEFAULT_PRICING: ModelPricing[] = [
   // $0.30/M cache-hit input. Both aliases share pricing; only context differs.
   { provider: 'custom', model: 'k3', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
   { provider: 'custom', model: 'k3[1m]', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
+  // PAN-1837: native kimi-code CLI aliases (bareKimiModel() strips the
+  // 'kimi-code/' prefix before this lookup). k3-256k is the same K3 model at a
+  // smaller context tier — shares k3's per-token pricing (only context
+  // differs, same as k3/k3[1m] above). kimi-for-coding-highspeed has no
+  // published rate yet; reuses kimi-for-coding's until Moonshot publishes one
+  // — flag for correction rather than silently recording $0.
+  { provider: 'custom', model: 'k3-256k', inputPer1k: 0.003, outputPer1k: 0.015, cacheReadPer1k: 0.0003, currency: 'USD' },
+  { provider: 'custom', model: 'kimi-for-coding-highspeed', inputPer1k: 0.0006, outputPer1k: 0.002, cacheReadPer1k: 0.00006, cacheWrite5mPer1k: 0.00075, currency: 'USD' },
   // QuantumLlama (synthetic benchmark provider, PAN-3252; benchmarks/specs/quantumllama.md):
   // ql-reason-70b $8/M in, $24/M out; ql-swift-8b $2/M in, $6/M out; ql-nano-1b $0.40/M in, $1.20/M out.
   { provider: 'custom', model: 'ql-reason-70b', inputPer1k: 0.008, outputPer1k: 0.024, cacheReadPer1k: 0.0008, cacheWrite5mPer1k: 0.010, currency: 'USD' },
