@@ -154,10 +154,10 @@
       "tests/unit/lib/workspaces/create-intent.test.ts",
       "tests/unit/lib/workspaces/relocate.test.ts"
     ],
-    "recordedAt": "2026-07-30T23:14:09.868Z"
+    "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T23:35:38.399Z",
+  "updated": "2026-07-30T23:35:42.096Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "blocked",
