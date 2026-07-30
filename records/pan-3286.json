@@ -159,7 +159,7 @@
     "recordedAt": "2026-07-30T06:50:15.598Z"
   },
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T11:29:34.593Z",
+  "updated": "2026-07-30T11:53:29.954Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "passed",
@@ -170,7 +170,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:50:33.466Z",
-    "updatedAt": "2026-07-30T11:29:34.533Z",
+    "updatedAt": "2026-07-30T11:53:29.936Z",
     "reviewNotes": "All four prior blockers are resolved; correctness, security, requirements, and performance review passed",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -275,7 +275,9 @@
         "tests/unit/lib/workspaces/relocate.test.ts"
       ],
       "recordedAt": "2026-07-30T06:50:15.598Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-30T11:53:29.936Z"
   },
   "closeOut": {
     "usage": {
@@ -305,7 +307,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3312"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-30T11:53:29.954Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a659e49736c39cf22737421da4fdc9aec15ab007",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3312 MERGED at 2026-07-30T10:28:12Z",
+          "status": "pass",
+          "mergedAt": "2026-07-30T10:28:12Z",
+          "mergeCommit": "abee4fde40c9070a5292885500ec8bc2ccd5ab72"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on abee4fde40c9070a5292885500ec8bc2ccd5ab72",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 22b6dfc7 contains merge abee4fde",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 3 agent state directories; No strike branch strike/pan-3286 found; Pruned 416 checkpoint ref(s) for agent-pan-3286, planning-pan-3286, strike-pan-3286; No specialist registry entries for PAN-3286"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-opus-5",
