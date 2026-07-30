@@ -180,6 +180,14 @@ async function abortRebase(gitRoot: string, options: GitOptions = {}): Promise<v
   }
 }
 
+async function abortMerge(gitRoot: string, options: GitOptions = {}): Promise<void> {
+  try {
+    await git(gitRoot, ['merge', '--abort'], { timeoutMs: 5_000, ...options });
+  } catch {
+    // The merge may already have stopped or completed.
+  }
+}
+
 async function replayConflictedRecord(
   project: ProjectConfig,
   issueId: string,
@@ -228,6 +236,7 @@ async function restoreRetryableRecord(
   const gitRoot = stateHome.root;
   const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
   await abortRebase(gitRoot, { signal });
+  await abortMerge(gitRoot, { signal });
 
   let restored = structuredClone(original);
   const branch = stateHome.migrated
@@ -291,6 +300,7 @@ async function reconcileStatePush(
         await replayConflictedRecord(project, issueId, mutator, gitRoot, recordPath, signal);
       } catch (replayError) {
         await abortRebase(gitRoot, { signal });
+        await abortMerge(gitRoot, { signal });
         throw new Error(
           `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(replayError)}`,
           { cause: error },
@@ -365,9 +375,11 @@ export async function updateIssueRecord(
               // nothing it started may rebase/push/write after the lock releases.
               reconcileAbort.abort();
               await reconcilePromise.catch(() => undefined);
-              // Leave the worktree out of a mid-rebase state; bounded local
+              // Leave the worktree out of a mid-reconcile state; bounded local
               // cleanup, not another full git timeout under the lock.
-              await abortRebase(resolveStateReadHomeSync(project).root);
+              const gitRoot = resolveStateReadHomeSync(project).root;
+              await abortRebase(gitRoot);
+              await abortMerge(gitRoot);
             },
           );
         }
