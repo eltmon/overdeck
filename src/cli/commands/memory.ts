@@ -7,6 +7,7 @@ import {
   getMemoryStatusHistory,
   getMemoryTimeline,
   MEMORY_TIMELINE_DEFAULT_DAYS,
+  readMemoryFile,
   readMemorySettingsSummary,
   resolveMemoryWorkspaceTarget,
   runMemoryDoctor,
@@ -164,6 +165,46 @@ export async function memoryTimelineCommand(options: MemoryTimelineCommandOption
   }
 }
 
+export interface MemoryReadCommandOptions {
+  workspace?: string;
+  from?: number;
+  lines?: number;
+}
+
+/**
+ * `pan memory read <path>` — print a file from the resolved workspace's memory
+ * home, refusing anything outside it (PAN-3286 WI-5, FR-9, D-9).
+ */
+export async function memoryReadCommand(path: string, options: MemoryReadCommandOptions): Promise<void> {
+  let target: ReturnType<typeof resolveMemoryWorkspaceTarget>;
+  try {
+    target = resolveMemoryWorkspaceTarget({ workspaceRef: options.workspace });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    return exitCli(1);
+  }
+
+  const result = await readMemoryFile(target.projectId, target.workspaceId, path, {
+    from: options.from,
+    lines: options.lines,
+  });
+
+  if (result.status === 'absolute-path') {
+    console.error(chalk.red(`Refusing '${path}': the path must be relative to the workspace's memory home.`));
+    return exitCli(1);
+  }
+  if (result.status === 'escapes-home') {
+    console.error(chalk.red(`Refusing '${path}': it resolves outside the workspace's memory home.`));
+    return exitCli(1);
+  }
+  if (result.status === 'unreadable') {
+    console.error(chalk.red(`Refusing '${path}': it is not a readable regular file inside the workspace's memory home.`));
+    return exitCli(1);
+  }
+
+  process.stdout.write(result.content);
+}
+
 export interface MemorySummaryCommandOptions {
   project?: string;
   workspace?: string;
@@ -227,6 +268,14 @@ export function createMemoryCommand(): Command {
     .option('--limit <n>', 'Maximum observation rows', parseInt)
     .option('--json', 'Output JSON')
     .action(memoryTimelineCommand);
+
+  memory
+    .command('read <path>')
+    .description("Print a file from a workspace's memory home (path is relative to that home)")
+    .option('--workspace <id|name>', 'Workspace id or name (defaults to the workspace owning the cwd)')
+    .option('--from <n>', 'First line to print, 1-based', parseInt)
+    .option('--lines <n>', 'Maximum number of lines to print', parseInt)
+    .action(memoryReadCommand);
 
   memory
     .command('reset <scope> <scopeId>')

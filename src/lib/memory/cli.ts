@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { readdir, readFile, rename, writeFile } from 'fs/promises';
-import { dirname, join } from 'path';
+import { dirname, isAbsolute, join } from 'path';
 import type { MemoryObservation, MemoryStatus, ResetMarker } from '@overdeck/contracts';
 import { getOverdeckHome } from '../paths.js';
 import { runMemoryFtsTransaction, withMemoryFtsDatabase } from './fts-db.js';
@@ -12,7 +12,9 @@ import {
   resolveObservationsFile,
   resolvePendingDir,
   resolveSummariesDir,
+  resolveWorkspaceMemoryRoot,
 } from './paths.js';
+import { readVerifiedPinFile, resolveContainedPinPath } from './pin-path.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
 import { readArchivedStatusEntries, readCurrentStatus, readObservationsSince, type ArchivedStatusEntry } from './rollup.js';
@@ -327,6 +329,64 @@ export async function getMemoryTimeline(
     limit: options.limit ?? MEMORY_TIMELINE_DEFAULT_LIMIT,
     now: options.now,
   });
+}
+
+export type MemoryReadResult =
+  | { status: 'ok'; relativePath: string; content: string }
+  | { status: 'absolute-path' }
+  | { status: 'escapes-home' }
+  | { status: 'unreadable' };
+
+export interface MemoryReadOptions {
+  /** 1-based first line to print. */
+  from?: number;
+  /** Maximum number of lines to print, counting from `from`. */
+  lines?: number;
+}
+
+/**
+ * Read a file from a workspace's memory home, refusing anything that is not a
+ * regular file genuinely inside it (PAN-3286 FR-9, D-9, NFR-4).
+ *
+ * Containment is delegated to `readVerifiedPinFile`, which realpath-resolves
+ * both the home and the target so an in-home symlink pointing outside is
+ * rejected, and opens with `O_NOFOLLOW` so a final-component swap fails closed.
+ * Absolute inputs are refused outright before that, so no absolute path can
+ * ever be read even if it happens to land inside the home. Claude Code JSONL
+ * session files under `~/.claude` are therefore unreachable by construction —
+ * they live outside every memory home.
+ */
+export async function readMemoryFile(
+  projectId: string,
+  workspaceId: string,
+  requestedPath: string,
+  options: MemoryReadOptions = {},
+): Promise<MemoryReadResult> {
+  if (isAbsolute(requestedPath)) return { status: 'absolute-path' };
+
+  const memoryHome = resolveWorkspaceMemoryRoot(projectId, workspaceId);
+  const relativePath = resolveContainedPinPath(memoryHome, requestedPath);
+  if (relativePath === null) return { status: 'escapes-home' };
+
+  const content = await readVerifiedPinFile(memoryHome, relativePath);
+  if (content === null) return { status: 'unreadable' };
+
+  return { status: 'ok', relativePath, content: sliceLines(content, options) };
+}
+
+function sliceLines(content: string, options: MemoryReadOptions): string {
+  const from = Math.max(1, Math.floor(options.from ?? 1));
+  if (from === 1 && options.lines === undefined) return content;
+
+  const endedWithNewline = content.endsWith('\n');
+  const lines = content.split('\n');
+  if (endedWithNewline) lines.pop();
+
+  const start = from - 1;
+  const selected = options.lines === undefined
+    ? lines.slice(start)
+    : lines.slice(start, start + Math.max(0, Math.floor(options.lines)));
+  return selected.length === 0 ? '' : `${selected.join('\n')}\n`;
 }
 
 /** Current status for an already-resolved workspace (PAN-3286 FR-5). */
