@@ -154,4 +154,75 @@ printf 'rc=%s' "$rc"`,
     const childPid = Number.parseInt(readFileSync(pidFile, 'utf-8').trim(), 10)
     expect(() => process.kill(childPid, 0)).toThrow()
   })
+
+  it('records the first allowed LLM call in an empty bucket', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    const bucketFile = join(overdeckHome, 'hook-llm-calls.log')
+
+    const output = await runBash(
+      'source "$LIB_PATH"; pan_llm_rate_check; printf "rc=%s" "$?"',
+      { ...env(), OVERDECK_HOME: overdeckHome },
+    )
+
+    expect(output).toBe('rc=0')
+    const timestamps = readFileSync(bucketFile, 'utf-8').trim().split('\n')
+    expect(timestamps).toHaveLength(1)
+    expect(timestamps[0]).toMatch(/^\d+$/)
+  })
+
+  it('rejects a call when the bucket already contains the limit', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    const bucketFile = join(overdeckHome, 'hook-llm-calls.log')
+    mkdirSync(overdeckHome)
+    const now = Math.floor(Date.now() / 1000)
+    const original = `${now}\n${now}\n${now}\n`
+    writeFileSync(bucketFile, original, 'utf-8')
+
+    const output = await runBash(
+      'source "$LIB_PATH"; pan_llm_rate_check; printf "rc=%s" "$?"',
+      {
+        ...env(),
+        OVERDECK_HOME: overdeckHome,
+        OVERDECK_HOOK_LLM_RATE_LIMIT: '3',
+      },
+    )
+
+    expect(output).toBe('rc=1')
+    expect(readFileSync(bucketFile, 'utf-8')).toBe(original)
+  })
+
+  it('prunes timestamps older than the rolling window before allowing a call', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    const bucketFile = join(overdeckHome, 'hook-llm-calls.log')
+    mkdirSync(overdeckHome)
+    const staleTimestamp = Math.floor(Date.now() / 1000) - 61
+    writeFileSync(bucketFile, `${staleTimestamp}\n`, 'utf-8')
+
+    const output = await runBash(
+      'source "$LIB_PATH"; pan_llm_rate_check; printf "rc=%s" "$?"',
+      { ...env(), OVERDECK_HOME: overdeckHome },
+    )
+
+    expect(output).toBe('rc=0')
+    const timestamps = readFileSync(bucketFile, 'utf-8').trim().split('\n')
+    expect(timestamps).toHaveLength(1)
+    expect(Number.parseInt(timestamps[0] ?? '0', 10)).toBeGreaterThan(staleTimestamp)
+  })
+
+  it('fails closed without changing the bucket when its live lock cannot be acquired', async () => {
+    const overdeckHome = join(tempRoot, 'overdeck-home')
+    const bucketFile = join(overdeckHome, 'hook-llm-calls.log')
+    const rateLockDir = join(overdeckHome, 'hook-llm-calls.lock.d')
+    mkdirSync(rateLockDir, { recursive: true })
+    writeFileSync(join(rateLockDir, 'pid'), `${process.pid}\n`, 'utf-8')
+    writeFileSync(bucketFile, '12345\n', 'utf-8')
+
+    const output = await runBash(
+      'source "$LIB_PATH"; pan_llm_rate_check; printf "rc=%s" "$?"',
+      { ...env(), OVERDECK_HOME: overdeckHome },
+    )
+
+    expect(output).toBe('rc=1')
+    expect(readFileSync(bucketFile, 'utf-8')).toBe('12345\n')
+  })
 })

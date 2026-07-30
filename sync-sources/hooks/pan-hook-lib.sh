@@ -117,6 +117,66 @@ pan_run_with_timeout() {
   return "$command_rc"
 }
 
+# Admit at most OVERDECK_HOOK_LLM_RATE_LIMIT hook-initiated LLM calls in a
+# rolling 60-second machine-wide window. Returns 0 after recording an allowed
+# call and 1 when the bucket is full or cannot be locked safely.
+pan_llm_rate_check() {
+  local overdeck_home="${OVERDECK_HOME:-$HOME/.overdeck}"
+  local bucket_file="$overdeck_home/hook-llm-calls.log"
+  local lock_dir="$overdeck_home/hook-llm-calls.lock.d"
+  local limit="${OVERDECK_HOOK_LLM_RATE_LIMIT:-6}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=6
+
+  mkdir -p "$overdeck_home" 2>/dev/null || return 1
+
+  local attempt=0
+  local acquired=0
+  while [ "$attempt" -lt 10 ]; do
+    if pan_acquire_singleflight_lock "$lock_dir"; then
+      acquired=1
+      break
+    fi
+    attempt=$((attempt + 1))
+    [ "$attempt" -lt 10 ] && /bin/sleep 0.1
+  done
+  [ "$acquired" = "1" ] || return 1
+
+  local now cutoff timestamp count=0
+  now=$(date +%s 2>/dev/null) || {
+    pan_release_singleflight_lock "$lock_dir"
+    return 1
+  }
+  cutoff=$((now - 60))
+
+  local bucket_tmp="${bucket_file}.tmp.$$"
+  : > "$bucket_tmp" 2>/dev/null || {
+    pan_release_singleflight_lock "$lock_dir"
+    return 1
+  }
+
+  if [ -f "$bucket_file" ]; then
+    while IFS= read -r timestamp; do
+      if [[ "$timestamp" =~ ^[0-9]+$ ]] && [ "$timestamp" -ge "$cutoff" ]; then
+        printf '%s\n' "$timestamp" >> "$bucket_tmp"
+        count=$((count + 1))
+      fi
+    done < "$bucket_file"
+  fi
+
+  local allowed=1
+  if [ "$count" -lt "$limit" ]; then
+    printf '%s\n' "$now" >> "$bucket_tmp"
+    allowed=0
+  fi
+
+  if ! mv "$bucket_tmp" "$bucket_file" 2>/dev/null; then
+    rm -f "$bucket_tmp" 2>/dev/null || true
+    allowed=1
+  fi
+  pan_release_singleflight_lock "$lock_dir"
+  return "$allowed"
+}
+
 # Internal token for authenticated HTTP ingestion (PAN-1596). The
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
