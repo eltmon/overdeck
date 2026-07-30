@@ -11,16 +11,18 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:01:03.698Z",
+  "updated": "2026-07-30T21:01:27.813Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T20:27:42.989Z"
+    "updatedAt": "2026-07-30T21:01:27.776Z",
+    "inspectNotes": "Inspecting item wi1-shared-create-core"
   },
   "closeOut": {
     "usage": {
@@ -44,7 +46,7 @@
       },
       "costAtCloseOut": {
         "usd": 5.771138,
-        "pricingAsOf": "2026-07-30T20:27:43.004Z"
+        "pricingAsOf": "2026-07-30T21:01:27.793Z"
       }
     },
     "merges": [],
