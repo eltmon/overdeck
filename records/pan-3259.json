@@ -10,17 +10,17 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:05:06.073Z",
-  "updated": "2026-07-30T22:44:41.366Z",
+  "updated": "2026-07-30T22:44:43.229Z",
   "pipeline": {
     "issueId": "PAN-3259",
     "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "skipped",
+    "mergeStep": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:44:41.310Z",
+    "updatedAt": "2026-07-30T22:44:41.424Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "lastVerifiedCommit": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyHead": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
@@ -57,7 +57,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T22:44:41.317Z"
+        "pricingAsOf": "2026-07-30T22:44:43.226Z"
       }
     },
     "merges": [],
