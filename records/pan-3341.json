@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:31:14.372Z",
+  "updated": "2026-07-30T23:31:40.372Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -103,7 +103,9 @@
         "tests/unit/dashboard/server/services/resource-discovery.test.ts"
       ],
       "recordedAt": "2026-07-30T23:08:52.027Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-30T23:31:39.966Z",
+    "panDoneRecoveredAt": "2026-07-30T23:31:39.966Z"
   },
   "closeOut": {
     "usage": {
