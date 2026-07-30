@@ -29,6 +29,12 @@ Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness anno
 | `planned_backlog` | An open issue has a convention branch (unmerged work, or a fresh zero-ahead branch with no unique commits yet — PAN-2887) or a durable xBRIEF but no open PR. |
 | `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. |
 
+### Surface reconciliation (PAN-3341)
+
+Resource discovery and frontend lane assignment defer to the canonical membership verdict when stored tracker or record phases are stale. A `post_merge_limbo` issue renders as **Merged — Needs Close-Out** and enters the Ship lane; this is the only membership bucket that overrides a stored phase. The shared issue-action state also treats this bucket as merged, which enables the existing **Close out** action.
+
+A `clean_terminal` verdict renders **Done** when no tmux session remains and **Closed** when a session remains, but only when `L3_issueOpen === false`. The guard preserves the existing state for open, never-started backlog issues, which also use the `clean_terminal` bucket. When membership is unavailable, resource labels, lane assignment, and actions continue to use their existing tracker and artifact signals.
+
 ### Display filtering (PAN-2822)
 
 The dashboard Issues pane has a display-only toggle for rows whose `planned_backlog` membership comes from the L6 durable-spec lens. The preference is visible by default and persists under the localStorage key `overdeck.ui.showPlannedBacklog`; disabling it hides only rows with the derived `specOnlyPlanned` DTO field set to `true`. Rows classified through the unmerged-branch or ready-label reasons remain visible.
