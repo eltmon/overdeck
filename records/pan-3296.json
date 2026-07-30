@@ -69,7 +69,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T11:30:59.299Z",
+  "updated": "2026-07-30T11:31:40.551Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "passed",
@@ -80,8 +80,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z",
-    "updatedAt": "2026-07-30T11:30:50.019Z",
-    "testNotes": "Backend/CLI state-machinery fix (pan start + dashboard spawn.ts routing status flips through the state write door, reconciler adopting orphaned specs/records writes, dead bare-write door removal, cross-door durability gate, docs) with no dashboard UI surface change and no UAT-related wording in AC/PRD, so browser UAT was not required. Gates run from workspace feature-pan-3296: npm run typecheck (root+hooks+evals+dashboard+frontend guards) exit 0; npm run lint (incl. circular-deps, ratchet-audit, quarantine-audit, file-size) exit 0; npx vitest run on the two touched suites state-door-durability.test.ts and lifecycle-io.test.ts = 31/31 passed; full changed-file gate OVERDECK_VERIFICATION=1 npx vitest run --changed main (root) = 683 files/6278 tests passed, 2 skipped (pre-existing, unrelated); frontend changed-file vitest run --changed main found no changed frontend test files (diff touches no frontend code). Working tree clean, diff matches xBRIEF file_scope exactly across all 6 completed items.",
+    "updatedAt": "2026-07-30T11:31:40.522Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-30T11:31:40.521Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3311",
     "reviewedAtCommit": "28290e77020299238c6a5e2d704f8089d5d7f28c",
     "lastVerifiedCommit": "28290e77020299238c6a5e2d704f8089d5d7f28c",
@@ -145,7 +151,7 @@
       },
       "costAtCloseOut": {
         "usd": 96.444554,
-        "pricingAsOf": "2026-07-30T11:30:59.293Z"
+        "pricingAsOf": "2026-07-30T11:31:40.545Z"
       }
     },
     "merges": [
