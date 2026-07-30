@@ -4,17 +4,17 @@
     "created": "2026-07-30T03:45:15.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3291: bug(state): push-race reconciler wedges permanently on records/*.json content conflicts — state pushes fail forever until manual merge",
-    "updated": "2026-07-30T03:51:02.768Z"
+    "updated": "2026-07-30T03:51:04.710Z"
   },
   "plan": {
     "id": "pan-3291",
     "title": "bug(state): push-race reconciler wedges permanently on records/*.json content conflicts — state pushes fail forever until manual merge",
-    "status": "approved",
+    "status": "running",
     "uid": "c8eb161f-1cb7-494a-b66e-ab69a9b2d6ad",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-30T03:45:15.000Z",
-    "updated": "2026-07-30T03:51:02.768Z",
+    "updated": "2026-07-30T03:51:04.710Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3291",
