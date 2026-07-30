@@ -8838,3 +8838,55 @@ logAgentLifecycleSync(state.id, `status changed: … → stopped (markAgentStopp
 - CLIProxy (PAN-3313) not re-measured this tick — no GPT-routed agent was blocked on it and the leak/close-out work took priority; carried forward.
 
 - **RUN TOTALS (RUN-75): 6 close-outs, 9 PRs merged (+1 scheduled), 20 substrate bugs driven (8 fixed and merged: PAN-3300/3320/3294/3286/3202/2390/3266/3305; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes: PAN-3294/3282/2706/3326/3324), 1 duplicate closed, 3 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across an automated sync, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 6 review convoys re-driven.**
+
+## RUN-75 tick 8 (2026-07-30 11:27-11:35Z) — PAN-3253 recovered itself, PAN-3260 closed out, and an accidental experiment settled PAN-3313
+
+### The hook fix has now survived two automated syncs
+
+- Artifact check again, not the symptom: **445 lines, guard=1, timeout=1**, mtime **11:25:07Z** — a second automated `pan sync` re-wrote the file after my stopgap and it stayed correct. Both generations still read 445/guard=1. Leak **0 procs**, ~49 GB available, PSI 0.
+- Two independent automated syncs writing the right file is now enough evidence to call the stopgap holding, rather than a coincidence of timing.
+
+### PAN-3253 recovered on its own once the false gate was cleared
+
+Last tick I cleared a stale machinery pause (`paused=1, sbu=1` set by a verification escalation, no human involved) so the review's feedback had a delivery target. This tick:
+
+```
+PAN-3253  review_status=passed  test_status=testing  stuck=0  stuck_reason=null
+agent-pan-3253: ctx 67%  cost $1.5677  +136/-17
+```
+
+- The agent finished compacting, picked up `.overdeck/feedback/001-review-agent-changes-requested.md`, **fixed the blocking finding** (unbounded canonical bulk hydration), and drove itself to `review=passed` with tests running. The latched `feedback_delivery_needs_you` cleared itself once real progress happened.
+- **LESSON: the highest-leverage action was removing a false gate, not doing any of the work.** One `pan unpause` on a pause whose cause I had already verified resolved, and the agent did the diagnosis, the fix, and the resubmission itself. This is what the machinery-vs-override split buys when you get it right — and it is the same shape as PAN-3202 unblocking two close-outs.
+
+### PAN-3260 merged and closed out
+
+- Merged **11:11:15Z**; post-merge lifecycle ran; `pan close PAN-3260` completed cleanly — xBRIEF marked completed, DoD gate recorded with 8 rows, 5 stopped agent rows pruned.
+- Row 7 read `build commit 22b6dfc7 contains merge 22b6dfc7`, i.e. the **deploy patrol had already redeployed the dashboard** past my tick-6 build without my initiating it — the PAN-3244 behavior the doctrine warns about, observed working correctly rather than as a problem.
+
+### PAN-3313: my restart became a controlled experiment and settled the diagnosis
+
+Found PAN-3296's review agent alive and doing nothing — `gpt-5.6-sol`, `ctx 0% / out 0 / cost $0.0000`, looping on `503 auth_unavailable`. That is what produced its `review_infrastructure_failure` and `reviewRetryCount: 3`, so **at least some of PAN-3282's "reviewers die before writing a verdict" is a CLIProxy auth-bench in disguise.**
+
+I restarted the sidecar as velocity recovery. **It recovered exactly one request**, and the sequence is the best evidence yet:
+
+```
+07:30:29  200 |  1.596s   <- fresh auth, SUCCEEDS
+07:30:30  408 |   1.36s   <- stream disconnect
+07:30:31  503 |     3ms   <- benched; all subsequent requests fail fast
+… 9 more 503s at 2-7ms
+```
+
+- The restart **does** clear the bench (the 200 proves it), and **one 408 re-benches the single auth one second later**. So there is no operational workaround at this layer — that retires "restart the sidecar" as a mitigation, which is worth knowing since a `cliproxy` skill exists that recommends exactly that.
+- Ruled out two alternatives I had entertained: **not quota exhaustion** (no upstream 429 or quota text anywhere in the error logs, and a quota-dead account could not have served the 200), and **not a provider/model lookup miss** (the boot line registers `codex` among `[claude gemini vertex aistudio codex kimi antigravity xai]`).
+- The 503s are generated locally before any upstream call — 2–7ms latency, and the error-log bodies contain only CLIProxy's own message with no upstream response section.
+- Cooldown **exceeds the client's entire retry budget**: the reviewer burned 10 attempts over ~40s and never got through.
+- **LESSON: correct your own recovery claim when the evidence arrives.** I wrote "recovery taken" on the issue before knowing it bought one request; leaving that standing would have told the next reader that restarting helps. The restart was still worth doing — it produced the cleanest causal sequence in the whole investigation — but its value was diagnostic, not operational.
+- Rate over the prior window had *improved* (99×200 / 72×503 / 22×408 = 37%, down from 47% and 45%), which is why measuring a rate was never going to settle this: the average moves while the failure mode is unchanged.
+
+### Close of tick 8
+
+- **7 close-outs, 10 PRs merged.** `main` green; leak 0; hook fix holding; ~49 GB free.
+- **PAN-3296** re-driven (`pan review restart`) but its reviewer is blocked on PAN-3313, not on anything I can clear. Routing is operator-configured, so I did **not** reroute it off the GPT family.
+- Deliberately still blocked, no overrides: **PAN-3259**/**PAN-3305** (PAN-3326 patch-id gate), **PAN-3296** (PAN-3313), **MIN-911** (MYN, out of merge scope).
+
+- **RUN TOTALS (RUN-75): 7 close-outs, 10 PRs merged, 20 substrate bugs driven (8 fixed and merged: PAN-3300/3320/3294/3286/3202/2390/3266/3305; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes: PAN-3294/3282/2706/3326/3324), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across two automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
