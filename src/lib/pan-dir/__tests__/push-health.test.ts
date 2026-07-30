@@ -1,15 +1,18 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ProjectConfig } from '../../projects.js';
 import {
+  markPushEscalationDelivered,
   readPushHealth,
   RECONCILE_FAILURE_NEEDS_YOU_THRESHOLD,
   recordReconcileFailure,
   recordReconcileSuccess,
 } from '../push-health.js';
+
+const ISSUE_ID = 'PUSH-1';
 
 describe('state push reconcile health', () => {
   let sandbox: string;
@@ -38,9 +41,18 @@ describe('state push reconcile health', () => {
     rmSync(sandbox, { recursive: true, force: true });
   });
 
-  it('persists failure increments and resets the streak on success', () => {
-    recordReconcileFailure(project, { reason: 'first failure', conflictedPaths: ['records/a.json'] });
-    recordReconcileFailure(project, { reason: 'second failure', conflictedPaths: ['records/b.json'] });
+  function failure(reason: string, conflictedPaths: string[] = []) {
+    return { issueId: ISSUE_ID, reason, conflictedPaths };
+  }
+
+  function temporaryHealthFiles(): string[] {
+    if (!existsSync(dirname(healthPath))) return [];
+    return readdirSync(dirname(healthPath)).filter((entry) => entry.startsWith('push-health-project.json.') && entry.endsWith('.tmp'));
+  }
+
+  it('persists failure increments and resets the streak on success', async () => {
+    await recordReconcileFailure(project, failure('first failure', ['records/a.json']));
+    await recordReconcileFailure(project, failure('second failure', ['records/b.json']));
 
     expect(readPushHealth(project)).toMatchObject({
       consecutiveReconcileFailures: 2,
@@ -48,19 +60,35 @@ describe('state push reconcile health', () => {
       lastConflictedPaths: ['records/b.json'],
     });
 
-    recordReconcileSuccess(project);
+    await recordReconcileSuccess(project);
     const health = readPushHealth(project);
     expect(health.consecutiveReconcileFailures).toBe(0);
     expect(health.lastSuccessAt).toBeDefined();
   });
 
-  it('reports threshold crossing exactly when the streak reaches three', () => {
-    const crossings = Array.from({ length: RECONCILE_FAILURE_NEEDS_YOU_THRESHOLD + 1 }, (_, index) =>
-      recordReconcileFailure(project, { reason: `failure ${index + 1}`, conflictedPaths: [] }).crossedThreshold,
-    );
+  it('reports threshold crossing once and preserves the pending escalation until delivery', async () => {
+    const crossings: boolean[] = [];
+    for (let index = 0; index < RECONCILE_FAILURE_NEEDS_YOU_THRESHOLD + 1; index += 1) {
+      crossings.push((await recordReconcileFailure(project, failure(`failure ${index + 1}`))).crossedThreshold);
+    }
 
     expect(crossings).toEqual([false, false, true, false]);
-    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(4);
+    const pending = readPushHealth(project).pendingEscalation;
+    expect(pending).toMatchObject({ issueId: ISSUE_ID, failureCount: 3, reason: 'failure 3' });
+
+    await recordReconcileSuccess(project);
+    expect(readPushHealth(project).pendingEscalation?.id).toBe(pending?.id);
+    await markPushEscalationDelivered(project, pending!.id);
+    expect(readPushHealth(project).pendingEscalation).toBeUndefined();
+  });
+
+  it('serializes concurrent failure increments without losing writes or sharing temp files', async () => {
+    await Promise.all(Array.from({ length: 20 }, (_, index) =>
+      recordReconcileFailure(project, failure(`concurrent failure ${index + 1}`, [`records/${index}.json`])),
+    ));
+
+    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(20);
+    expect(temporaryHealthFiles()).toEqual([]);
   });
 
   it('returns a zeroed default for missing, empty, invalid, or malformed files', () => {
@@ -73,15 +101,15 @@ describe('state push reconcile health', () => {
     }
   });
 
-  it('replaces the health file atomically and leaves no temporary file after sequential writes', () => {
-    recordReconcileFailure(project, { reason: 'first failure', conflictedPaths: ['records/a.json'] });
+  it('replaces the health file atomically and removes writer-unique temporary files', async () => {
+    await recordReconcileFailure(project, failure('first failure', ['records/a.json']));
     const first = JSON.parse(readFileSync(healthPath, 'utf8')) as { consecutiveReconcileFailures: number };
     expect(first.consecutiveReconcileFailures).toBe(1);
-    expect(existsSync(`${healthPath}.tmp`)).toBe(false);
+    expect(temporaryHealthFiles()).toEqual([]);
 
-    recordReconcileFailure(project, { reason: 'second failure', conflictedPaths: ['records/b.json'] });
+    await recordReconcileFailure(project, failure('second failure', ['records/b.json']));
     const second = JSON.parse(readFileSync(healthPath, 'utf8')) as { consecutiveReconcileFailures: number };
     expect(second.consecutiveReconcileFailures).toBe(2);
-    expect(existsSync(`${healthPath}.tmp`)).toBe(false);
+    expect(temporaryHealthFiles()).toEqual([]);
   });
 });

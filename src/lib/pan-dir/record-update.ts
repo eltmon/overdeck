@@ -5,12 +5,18 @@ import { relative } from 'node:path';
 import { promisify } from 'node:util';
 import { Effect } from 'effect';
 
-import { emitActivityEntry } from '../activity-logger.js';
+import { emitActivityEntryOncePortable } from '../activity-logger.js';
 import type { ProjectConfig } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
 import { flushAutoCommits } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
-import { recordReconcileFailure, recordReconcileSuccess } from './push-health.js';
+import {
+  markPushEscalationDelivered,
+  recordReconcileFailure,
+  recordReconcileSuccess,
+  type PendingPushEscalation,
+} from './push-health.js';
+import { withStateGitLock } from './state-git-lock.js';
 import {
   ensureIssueRecordSync,
   getIssueRecordPath,
@@ -297,6 +303,26 @@ async function restoreRetryableRecord(
   ], { signal });
 }
 
+async function deliverPendingEscalation(
+  project: ProjectConfig,
+  escalation: PendingPushEscalation | undefined,
+): Promise<void> {
+  if (!escalation) return;
+  const outcome = await emitActivityEntryOncePortable({
+    id: escalation.id,
+    source: 'state-door',
+    level: 'error',
+    issueId: escalation.issueId,
+    message: `State pushes for ${project.name} have failed ${escalation.failureCount} times in a row and automatic reconciliation cannot resolve them.`,
+    details: `Conflicted paths: ${escalation.conflictedPaths.join(', ') || 'unknown'}. The overdeck-state branch is diverging from origin; run "pan doctor" to see ahead/behind counts, then resolve the conflicted files manually (git merge origin/overdeck-state in the state worktree). Until resolved, durable state written on this machine does not reach other machines.`,
+  });
+  if (outcome === 'appended' || outcome === 'duplicate') {
+    await markPushEscalationDelivered(project, escalation.id);
+  } else {
+    console.warn(`[pan-dir/records] State reconcile escalation ${escalation.id} remains pending after activity delivery returned ${outcome}`);
+  }
+}
+
 async function recordReconcileFailureHealth(
   project: ProjectConfig,
   issueId: string,
@@ -305,15 +331,8 @@ async function recordReconcileFailureHealth(
 ): Promise<void> {
   try {
     const reason = gitFailureMessage(error);
-    const { health, crossedThreshold } = recordReconcileFailure(project, { reason, conflictedPaths });
-    if (!crossedThreshold) return;
-    await Effect.runPromise(emitActivityEntry({
-      source: 'state-door',
-      level: 'error',
-      issueId,
-      message: `State pushes for ${project.name} have failed ${health.consecutiveReconcileFailures} times in a row and automatic reconciliation cannot resolve them.`,
-      details: `Conflicted paths: ${conflictedPaths.join(', ') || 'unknown'}. The overdeck-state branch is diverging from origin; run "pan doctor" to see ahead/behind counts, then resolve the conflicted files manually (git merge origin/overdeck-state in the state worktree). Until resolved, durable state written on this machine does not reach other machines.`,
-    }));
+    const { health } = await recordReconcileFailure(project, { issueId, reason, conflictedPaths });
+    await deliverPendingEscalation(project, health.pendingEscalation);
   } catch (healthError) {
     console.warn(`[pan-dir/records] Failed to record reconcile health for ${issueId}: ${gitFailureMessage(healthError)}`);
   }
@@ -360,7 +379,8 @@ async function reconcileStatePush(
         const record = readIssueRecordSync(project, issueId);
         if (!record) throw new Error(`Reconciled ${issueId} state record is unreadable`);
         try {
-          recordReconcileSuccess(project);
+          const health = await recordReconcileSuccess(project);
+          await deliverPendingEscalation(project, health.pendingEscalation);
         } catch (healthError) {
           console.warn(`[pan-dir/records] Failed to reset reconcile health for ${issueId}: ${gitFailureMessage(healthError)}`);
         }
@@ -391,89 +411,96 @@ export async function updateIssueRecord(
   const recordPath = getIssueRecordPath(project, normalizedIssueId);
   const writerId = options.writerId ?? process.env.OVERDECK_AGENT_ID ?? `process-${process.pid}@${hostname()}`;
   return withRecordFsLock(project, normalizedIssueId, { writerId, recordPath }, async () => {
-    const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
-    const original = structuredClone(current);
-    const result = await mutator(current);
-    const next = result ?? current;
-    const path = writeIssueRecordSync(project, normalizedIssueId, next);
-    if (options.autoCommit === false) {
-      return readIssueRecordSync(project, normalizedIssueId) ?? next;
-    }
+    const operation = async (): Promise<PanIssueRecord> => {
+      const current = readIssueRecordSync(project, normalizedIssueId) ?? ensureIssueRecordSync(project, normalizedIssueId);
+      const original = structuredClone(current);
+      const result = await mutator(current);
+      const next = result ?? current;
+      const path = writeIssueRecordSync(project, normalizedIssueId, next);
+      if (options.autoCommit === false) {
+        return readIssueRecordSync(project, normalizedIssueId) ?? next;
+      }
 
-    const budgetMs = recordDurabilityBudgetMs();
-    const deadlineMs = Date.now() + budgetMs;
-    try {
-      const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
-      // Start and await the explicit flush while the issue lock is held. No second
-      // writer may observe the local terminal state before its durability outcome
-      // is known, and the queue's zero-delay timer cannot consume this batch first.
-      // The wait is bounded (PAN-2989): a stalled push must not starve peer writers
-      // for minutes — on timeout the lock releases and the flush continues in the
-      // background.
-      const flushed = await withRecordDurabilityDeadline(
-        normalizedIssueId,
-        Effect.runPromise(flushAutoCommits(commitRoot)),
-        deadlineMs,
-        budgetMs,
-      );
-      if (flushed.pushed === false) {
-        const stateHome = resolveStateReadHomeSync(project);
-        if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
-          const reconcileAbort = new AbortController();
-          const reconcilePromise = reconcileStatePush(project, normalizedIssueId, mutator, path, reconcileAbort.signal);
-          return await withRecordDurabilityDeadline(
+      const budgetMs = recordDurabilityBudgetMs();
+      const deadlineMs = Date.now() + budgetMs;
+      try {
+        const commitRoot = queueIssueRecordCommit(project, normalizedIssueId, path);
+        // Start and await the explicit flush while the issue lock is held. No second
+        // writer may observe the local terminal state before its durability outcome
+        // is known, and the queue's zero-delay timer cannot consume this batch first.
+        // The wait is bounded (PAN-2989): a stalled push must not starve peer writers
+        // for minutes — on timeout the lock releases and the flush continues in the
+        // background.
+        const flushed = await withRecordDurabilityDeadline(
+          normalizedIssueId,
+          Effect.runPromise(flushAutoCommits(commitRoot)),
+          deadlineMs,
+          budgetMs,
+        );
+        if (flushed.pushed === false) {
+          const stateHome = resolveStateReadHomeSync(project);
+          if (stateHome.migrated && isRemoteRefRaceError(flushed.reason ?? '')) {
+            const reconcileAbort = new AbortController();
+            const reconcilePromise = reconcileStatePush(project, normalizedIssueId, mutator, path, reconcileAbort.signal);
+            return await withRecordDurabilityDeadline(
+              normalizedIssueId,
+              reconcilePromise,
+              deadlineMs,
+              budgetMs,
+              async () => {
+                // Stop the reconcile's git subprocesses and wait for them to die —
+                // nothing it started may rebase/push/write after the lock releases.
+                reconcileAbort.abort();
+                await reconcilePromise.catch(() => undefined);
+                // Leave the worktree out of a mid-reconcile state; bounded local
+                // cleanup, not another full git timeout under the lock.
+                const gitRoot = resolveStateReadHomeSync(project).root;
+                await abortRebase(gitRoot);
+                await abortMerge(gitRoot);
+              },
+            );
+          }
+          throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
+        }
+        if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
+          throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
+        }
+
+        return readIssueRecordSync(project, normalizedIssueId) ?? next;
+      } catch (error) {
+        // Never restore on a durability timeout (PAN-2989): the background flush may
+        // still land the commit, so rewinding to the pre-mutation snapshot would race it.
+        if (error instanceof RecordDurabilityTimeoutError) throw error;
+        try {
+          const restoreAbort = new AbortController();
+          const restorePromise = restoreRetryableRecord(project, normalizedIssueId, original, path, restoreAbort.signal);
+          await withRecordDurabilityDeadline(
             normalizedIssueId,
-            reconcilePromise,
+            restorePromise,
             deadlineMs,
             budgetMs,
             async () => {
-              // Stop the reconcile's git subprocesses and wait for them to die —
-              // nothing it started may rebase/push/write after the lock releases.
-              reconcileAbort.abort();
-              await reconcilePromise.catch(() => undefined);
-              // Leave the worktree out of a mid-reconcile state; bounded local
-              // cleanup, not another full git timeout under the lock.
-              const gitRoot = resolveStateReadHomeSync(project).root;
-              await abortRebase(gitRoot);
-              await abortMerge(gitRoot);
+              // Same post-release guarantee as the reconcile path: kill the
+              // restore's git subprocesses and await their settlement so the
+              // pre-mutation snapshot can never overwrite a newer writer.
+              restoreAbort.abort();
+              await restorePromise.catch(() => undefined);
             },
           );
+        } catch (restoreError) {
+          if (restoreError instanceof RecordDurabilityTimeoutError) throw restoreError;
+          throw new Error(
+            `Failed to persist ${normalizedIssueId} state and restore retryability: ${gitFailureMessage(restoreError)}`,
+            { cause: error },
+          );
         }
-        throw new Error(`Failed to push ${normalizedIssueId} state: ${flushed.reason ?? 'unknown push failure'}`);
+        throw error;
       }
-      if (!flushed.committed && !['no diff', 'no pending'].includes(flushed.reason ?? '')) {
-        throw new Error(`Failed to commit ${normalizedIssueId} state: ${flushed.reason ?? 'unknown commit failure'}`);
-      }
+    };
 
-      return readIssueRecordSync(project, normalizedIssueId) ?? next;
-    } catch (error) {
-      // Never restore on a durability timeout (PAN-2989): the background flush may
-      // still land the commit, so rewinding to the pre-mutation snapshot would race it.
-      if (error instanceof RecordDurabilityTimeoutError) throw error;
-      try {
-        const restoreAbort = new AbortController();
-        const restorePromise = restoreRetryableRecord(project, normalizedIssueId, original, path, restoreAbort.signal);
-        await withRecordDurabilityDeadline(
-          normalizedIssueId,
-          restorePromise,
-          deadlineMs,
-          budgetMs,
-          async () => {
-            // Same post-release guarantee as the reconcile path: kill the
-            // restore's git subprocesses and await their settlement so the
-            // pre-mutation snapshot can never overwrite a newer writer.
-            restoreAbort.abort();
-            await restorePromise.catch(() => undefined);
-          },
-        );
-      } catch (restoreError) {
-        if (restoreError instanceof RecordDurabilityTimeoutError) throw restoreError;
-        throw new Error(
-          `Failed to persist ${normalizedIssueId} state and restore retryability: ${gitFailureMessage(restoreError)}`,
-          { cause: error },
-        );
-      }
-      throw error;
-    }
+    const stateHome = resolveStateReadHomeSync(project);
+    return stateHome.migrated
+      ? withStateGitLock(stateHome.root, writerId, recordPath, operation)
+      : operation();
   });
 }

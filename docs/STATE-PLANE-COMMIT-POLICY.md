@@ -24,6 +24,10 @@ the legacy surface.
   `origin` makes commit-and-push part of the canonical write operation.
   A failed origin push is logged and returned as `pushed: false`, never reported
   as fully durable success.
+- Migrated record writes take a cross-process lock keyed by the state worktree
+  before reading or changing a record. The lock covers the file mutation,
+  commit, push, reconciliation, and retryable restore, so writers for different
+  issues cannot mutate the shared Git index or abort each other's merge.
 - After a record push loses a remote-ref race, the record write door fetches and
   merges `origin/overdeck-state` into the local state branch. Conflicts confined
   to `records/` resolve automatically with the origin version as the base; the
@@ -31,11 +35,16 @@ the legacy surface.
   lands on top of current remote state. A conflict outside `records/`, or a
   delete/modify record conflict, aborts the merge and remains operator-owned.
 - Reconcile outcomes are tracked in
-  `${OVERDECK_HOME}/push-health/<stateWorktreeBasename>.json`. The runtime file
-  records the consecutive failure count, last failure time/reason/conflicted
-  paths, and last success time. Crossing three consecutive failures emits one
-  `state-door` error activity entry; later failures remain quiet until a
-  successful reconcile resets the streak and it crosses three again.
+  `${OVERDECK_HOME}/push-health/<stateWorktreeBasename>.json`. A separate
+  cross-process lock protects each read-modify-write, and every writer uses a
+  unique temporary file before atomic rename. The runtime file records the
+  consecutive failure count, last failure time/reason/conflicted paths, last
+  success time, and any escalation awaiting settled delivery.
+- Crossing three consecutive failures creates one pending `state-door` error.
+  The writer submits it idempotently through the canonical event door, using the
+  internal settled endpoint when a short-lived CLI has no local event-store
+  provider. Failed or unconfirmed delivery leaves the escalation pending for
+  the next reconcile outcome; only an appended or duplicate outcome clears it.
 - `pan doctor` reports each migrated state worktree's ahead/behind counts against
   `origin/overdeck-state`, the reconcile-failure streak, and the last failure.
   A streak of three is an error; any nonzero streak or at least ten local-ahead

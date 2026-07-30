@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DomainEvent } from '@overdeck/contracts';
 
 import { setActivityEventStoreProvider } from '../../activity-logger.js';
@@ -68,6 +68,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     mkdirSync(remote, { recursive: true });
     project = { name: 'Reconcile', path: stateRoot };
     activityEvents = [];
+    const appendedActivityKeys = new Set<string>();
     setActivityEventStoreProvider(() => ({
       append(event) {
         activityEvents.push(event);
@@ -76,6 +77,12 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
       async appendAsync(event) {
         activityEvents.push(event);
         return activityEvents.length;
+      },
+      appendOnce(event, idempotencyKey) {
+        if (appendedActivityKeys.has(idempotencyKey)) return { outcome: 'duplicate' as const };
+        appendedActivityKeys.add(idempotencyKey);
+        activityEvents.push(event);
+        return { outcome: 'appended' as const };
       },
     }));
 
@@ -105,6 +112,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     setActivityEventStoreProvider(null);
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
@@ -181,6 +189,42 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     const subjects = git(stateRoot, 'log', `origin/${STATE_BRANCH}`, '--format=%s');
     expect(subjects.match(new RegExp(`restore ${OTHER_ISSUE_ID}`, 'g'))).toHaveLength(1);
     expect(subjects).not.toContain(`restore ${ISSUE_ID}`);
+  });
+
+  it('serializes concurrent writes for different records through one state worktree', async () => {
+    const other = cloneState('concurrent-remote-writer');
+    const remoteTarget = readRecord(other, ISSUE_ID);
+    remoteTarget.decisions = [{ id: 'D1', summary: 'remote target state', recordedAt: '2026-07-30T00:01:00.000Z' }];
+    writeRecord(other, remoteTarget);
+    const remoteOther = readRecord(other, OTHER_ISSUE_ID);
+    remoteOther.decisions = [{ id: 'D1', summary: 'remote other state', recordedAt: '2026-07-30T00:02:00.000Z' }];
+    writeRecord(other, remoteOther);
+    git(other, 'add', 'records');
+    git(other, 'commit', '-q', '-m', 'advance both records on origin');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    const [targetResult, otherResult] = await Promise.all([
+      updateIssueRecord(project, ISSUE_ID, (current) => {
+        current.statusOverrides = { 'local-target': 'completed' };
+      }),
+      updateIssueRecord(project, OTHER_ISSUE_ID, (current) => {
+        current.statusOverrides = { 'local-other': 'completed' };
+      }),
+    ]);
+
+    expect(targetResult).toMatchObject({
+      decisions: remoteTarget.decisions,
+      statusOverrides: { 'local-target': 'completed' },
+    });
+    expect(otherResult).toMatchObject({
+      decisions: remoteOther.decisions,
+      statusOverrides: { 'local-other': 'completed' },
+    });
+    expect(readRecordAtRef(stateRoot, `origin/${STATE_BRANCH}`, ISSUE_ID)).toMatchObject(targetResult);
+    expect(readRecordAtRef(stateRoot, `origin/${STATE_BRANCH}`, OTHER_ISSUE_ID)).toMatchObject(otherResult);
+    expect(git(stateRoot, 'rev-list', '--left-right', '--count', `${STATE_BRANCH}...origin/${STATE_BRANCH}`))
+      .toBe('0\t0');
+    expect(git(stateRoot, 'status', '--porcelain')).toBe('');
   });
 
   it('rejects a non-record conflict, aborts the merge, and permits a later resolved write', async () => {
@@ -260,8 +304,8 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     git(other, 'commit', '-q', '-m', 'origin spec update');
     git(other, 'push', '-q', 'origin', STATE_BRANCH);
 
-    recordReconcileFailure(project, { reason: 'seed failure 1', conflictedPaths: [] });
-    recordReconcileFailure(project, { reason: 'seed failure 2', conflictedPaths: [] });
+    await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 1', conflictedPaths: [] });
+    await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 2', conflictedPaths: [] });
     setActivityEventStoreProvider(() => ({
       append() {
         throw new Error('simulated activity failure');
@@ -274,7 +318,52 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
       current.statusOverrides = { 'wi-1': 'completed' };
     })).rejects.toThrow('specs/shared.json');
-    expect(readPushHealth(project).consecutiveReconcileFailures).toBe(3);
+    expect(readPushHealth(project)).toMatchObject({
+      consecutiveReconcileFailures: 3,
+      pendingEscalation: { issueId: ISSUE_ID, failureCount: 3 },
+    });
+
+    setActivityEventStoreProvider(() => ({
+      append: () => 0,
+      appendAsync: async () => 0,
+      appendOnce(event) {
+        activityEvents.push(event);
+        return { outcome: 'appended' as const };
+      },
+    }));
+    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+      current.statusOverrides = { 'wi-2': 'completed' };
+    })).rejects.toThrow('specs/shared.json');
+    expect(readPushHealth(project).pendingEscalation).toBeUndefined();
+    expect(activityEvents.filter((event) => event.type === 'activity.entry')).toHaveLength(1);
+  });
+
+  it('delivers the threshold escalation through the internal event door without a local store', async () => {
+    const other = cloneState('cli-activity-remote-writer');
+    writeFileSync(join(stateRoot, 'specs', 'shared.json'), JSON.stringify({ value: 'local' }, null, 2));
+    git(stateRoot, 'add', 'specs/shared.json');
+    git(stateRoot, 'commit', '-q', '-m', 'local spec update');
+    writeFileSync(join(other, 'specs', 'shared.json'), JSON.stringify({ value: 'origin' }, null, 2));
+    git(other, 'add', 'specs/shared.json');
+    git(other, 'commit', '-q', '-m', 'origin spec update');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 1', conflictedPaths: [] });
+    await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 2', conflictedPaths: [] });
+    setActivityEventStoreProvider(null);
+    const fetchMock = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ outcome: 'appended' }),
+      { status: 200, headers: { 'content-type': 'application/json' } },
+    ));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+      current.statusOverrides = { 'wi-1': 'completed' };
+    })).rejects.toThrow('specs/shared.json');
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/internal/events/append-once');
+    expect(readPushHealth(project).pendingEscalation).toBeUndefined();
   });
 
   it('rejects a delete-modify record conflict and leaves no merge in progress', async () => {

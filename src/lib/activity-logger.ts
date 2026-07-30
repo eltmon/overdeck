@@ -200,6 +200,22 @@ export async function emitActivityEntryOnce(
 }
 
 /**
+ * Emit an idempotent activity through the in-process store when available, or
+ * through the settled internal event endpoint from short-lived CLI processes.
+ */
+export async function emitActivityEntryOncePortable(
+  options: EmitActivityOptions & { id: string },
+): Promise<ActivityEmitOutcome> {
+  if (getActivityEventStore()) return emitActivityEntryOnce(options);
+  try {
+    const { createDeaconEventClient } = await import('./cloister/deacon-event-client.js');
+    return await createDeaconEventClient().appendOnce(buildActivityEntryEvent(options), options.id);
+  } catch {
+    return 'failed';
+  }
+}
+
+/**
  * Emit an activity.entry domain event without blocking the caller. Failures are
  * non-fatal because this path is also used during early dashboard boot.
  */

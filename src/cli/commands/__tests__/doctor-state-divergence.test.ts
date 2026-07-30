@@ -82,7 +82,8 @@ describe('doctor state divergence check', () => {
 
   it('reports an error at a three-failure streak and includes the last reason', async () => {
     for (let index = 1; index <= 3; index += 1) {
-      recordReconcileFailure(project, {
+      await recordReconcileFailure(project, {
+        issueId: 'DOCTOR-1',
         reason: `state conflict ${index}`,
         conflictedPaths: ['specs/shared.json'],
       });
