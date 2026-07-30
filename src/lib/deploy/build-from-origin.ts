@@ -168,6 +168,32 @@ export function dashboardDeploymentRoots(): readonly [string, string] {
   ];
 }
 
+export interface LiveDeploymentProcess {
+  pid: string;
+  argv0: string;
+  entrypoint: string;
+  /**
+   * Hard occupants make the generation unselectable as a deploy target: the
+   * dashboard server, the deacon, and the generation the invoking CLI itself
+   * executes from (the global `pan` symlink resolves into a generation, so
+   * clobbering it breaks every subsequent pan invocation machine-wide even
+   * when nothing is running from it at scan time). Everything else — stray
+   * pty supervisors from old conversations, the smee forwarder — is a soft
+   * occupant: warned about, but it must not wedge deployments forever, and
+   * empirically such processes survive an in-place rebuild on their in-memory
+   * modules.
+   */
+  hard: boolean;
+}
+
+export interface LiveDeploymentRoot {
+  root: string;
+  processes: LiveDeploymentProcess[];
+  hard: boolean;
+}
+
+const HARD_OCCUPANT_RE = /dist\/(dashboard\/(server|deacon)\.js)$/;
+
 /**
  * Generation roots that currently have live processes executing from them,
  * detected by scanning /proc/<pid>/cmdline for argv entries inside each root.
@@ -181,8 +207,9 @@ export async function liveDashboardDeploymentRoots(
   dependencies: {
     listPids?: () => Promise<string[]>;
     readCmdline?: (pid: string) => Promise<string>;
+    selfEntrypoint?: string;
   } = {},
-): Promise<string[]> {
+): Promise<LiveDeploymentRoot[]> {
   const listPids = dependencies.listPids ?? (async () => {
     try {
       return (await fs.readdir('/proc')).filter((entry) => /^\d+$/.test(entry));
@@ -192,10 +219,12 @@ export async function liveDashboardDeploymentRoots(
   });
   const readCmdline = dependencies.readCmdline
     ?? ((pid: string) => fs.readFile(`/proc/${pid}/cmdline`, 'utf8'));
+  const selfEntrypoint = dependencies.selfEntrypoint ?? process.argv[1];
 
   const roots = dashboardDeploymentRoots();
   const prefixes = roots.map((root) => `${resolve(root)}/`);
-  const live = new Set<string>();
+  const byRoot = new Map<string, LiveDeploymentProcess[]>();
+
   for (const pid of await listPids()) {
     let cmdline: string;
     try {
@@ -203,29 +232,62 @@ export async function liveDashboardDeploymentRoots(
     } catch {
       continue;
     }
-    const args = cmdline.split('\0');
+    const args = cmdline.split('\0').filter(Boolean);
     for (let index = 0; index < roots.length; index += 1) {
-      if (args.some((arg) => arg.startsWith(prefixes[index]))) live.add(roots[index]);
+      const entrypoint = args.find((arg) => arg.startsWith(prefixes[index]));
+      if (!entrypoint) continue;
+      const processes = byRoot.get(roots[index]) ?? [];
+      processes.push({
+        pid,
+        argv0: args[0] ?? '',
+        entrypoint,
+        hard: HARD_OCCUPANT_RE.test(entrypoint),
+      });
+      byRoot.set(roots[index], processes);
     }
-    if (live.size === roots.length) break;
   }
-  return [...live];
+
+  // The invoking CLI's own generation is a hard occupant even with no other
+  // process alive in it: the global pan symlink keeps resolving there.
+  const selfResolved = selfEntrypoint ? resolve(selfEntrypoint) : null;
+  for (let index = 0; index < roots.length; index += 1) {
+    if (!selfResolved || !selfResolved.startsWith(prefixes[index])) continue;
+    const processes = byRoot.get(roots[index]) ?? [];
+    processes.push({
+      pid: String(process.pid),
+      argv0: process.argv[0] ?? '',
+      entrypoint: selfResolved,
+      hard: true,
+    });
+    byRoot.set(roots[index], processes);
+  }
+
+  return [...byRoot.entries()].map(([root, processes]) => ({
+    root,
+    processes,
+    hard: processes.some((proc) => proc.hard),
+  }));
 }
 
 export function selectDashboardDeploymentRoot(
   activeRoot?: string | null,
-  liveRoots: readonly string[] = [],
+  liveRoots: readonly LiveDeploymentRoot[] = [],
 ): string {
   const [first, second] = dashboardDeploymentRoots();
-  const live = new Set(liveRoots.map((path) => resolve(path)));
-  if (live.has(resolve(first)) && live.has(resolve(second))) {
+  const hard = new Set(
+    liveRoots.filter((entry) => entry.hard).map((entry) => resolve(entry.root)),
+  );
+  if (hard.has(resolve(first)) && hard.has(resolve(second))) {
+    const occupants = liveRoots
+      .flatMap((entry) => entry.processes.filter((proc) => proc.hard)
+        .map((proc) => `pid ${proc.pid} (${proc.entrypoint})`))
+      .join(', ');
     throw new Error(
-      'Both dashboard deployment generations have live processes — refusing to build into either. '
-      + 'Stop the stale generation before deploying.',
+      `Both dashboard deployment generations are held by hard occupants — refusing to build into either. Occupants: ${occupants}`,
     );
   }
-  if (live.has(resolve(first))) return second;
-  if (live.has(resolve(second))) return first;
+  if (hard.has(resolve(first))) return second;
+  if (hard.has(resolve(second))) return first;
   return activeRoot && resolve(activeRoot) === resolve(first) ? second : first;
 }
 

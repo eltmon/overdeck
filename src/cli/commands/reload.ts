@@ -175,13 +175,20 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
         ]);
         const liveRoots = await liveDashboardDeploymentRoots();
         const recordedRoot = previousBundle?.deployRoot ?? null;
-        if (recordedRoot && liveRoots.length > 0
-          && !liveRoots.some((root) => resolve(root) === resolve(recordedRoot))) {
+        const hardRoots = liveRoots.filter((entry) => entry.hard);
+        if (recordedRoot && hardRoots.length > 0
+          && !hardRoots.some((entry) => resolve(entry.root) === resolve(recordedRoot))) {
           console.warn(chalk.yellow(
-            `Active-deployment record says ${recordedRoot} but live processes run from ${liveRoots.join(', ')} — trusting the live processes (PAN-3329).`,
+            `Active-deployment record says ${recordedRoot} but the dashboard runs from ${hardRoots.map((entry) => entry.root).join(', ')} — trusting the live processes (PAN-3329).`,
           ));
         }
         const nextDeployRoot = selectDashboardDeploymentRoot(recordedRoot, liveRoots);
+        const targetOccupants = liveRoots.find((entry) => resolve(entry.root) === resolve(nextDeployRoot));
+        if (targetOccupants) {
+          console.warn(chalk.yellow(
+            `Deploy target ${nextDeployRoot} still hosts stray processes (they keep running on in-memory modules): ${targetOccupants.processes.map((proc) => `pid ${proc.pid} ${proc.entrypoint}`).join(', ')}`,
+          ));
+        }
         deployment = await buildDashboardFromOriginMain(repoRoot, {
           deploymentRoot: () => nextDeployRoot,
         });

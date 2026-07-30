@@ -244,7 +244,12 @@ describe('buildDashboardFromOriginMain', () => {
     expect(selectDashboardDeploymentRoot(second)).toBe(first);
   });
 
-  it('never selects a generation with live processes, even when the record disagrees', async () => {
+  const hardRoot = (root: string): { root: string; hard: boolean; processes: [] } =>
+    ({ root, hard: true, processes: [] });
+  const softRoot = (root: string): { root: string; hard: boolean; processes: [] } =>
+    ({ root, hard: false, processes: [] });
+
+  it('never selects a generation with hard occupants, even when the record disagrees', async () => {
     const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-live-'));
     temporaryRoots.push(home);
     process.env.OVERDECK_HOME = home;
@@ -253,22 +258,34 @@ describe('buildDashboardFromOriginMain', () => {
     // PAN-3329: the record claimed `second` was active while the live server
     // ran from `first`; trusting the record rebuilt origin/main inside the
     // live generation. Live processes must win over the record.
-    expect(selectDashboardDeploymentRoot(second, [first])).toBe(second);
-    expect(selectDashboardDeploymentRoot(first, [second])).toBe(first);
-    expect(selectDashboardDeploymentRoot(null, [first])).toBe(second);
+    expect(selectDashboardDeploymentRoot(second, [hardRoot(first)])).toBe(second);
+    expect(selectDashboardDeploymentRoot(first, [hardRoot(second)])).toBe(first);
+    expect(selectDashboardDeploymentRoot(null, [hardRoot(first)])).toBe(second);
   });
 
-  it('refuses to select any generation when both have live processes', async () => {
+  it('lets soft occupants (stray supervisors, smee) warn without wedging deploys', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-soft-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+
+    // A stray Jul-28 smee forwarder pinned generation-a for days; treating it
+    // as a hard occupant would have refused every deploy forever.
+    expect(selectDashboardDeploymentRoot(second, [hardRoot(second), softRoot(first)])).toBe(first);
+    expect(selectDashboardDeploymentRoot(null, [softRoot(first), softRoot(second)])).toBe(first);
+  });
+
+  it('refuses to select any generation when both have hard occupants', async () => {
     const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-both-live-'));
     temporaryRoots.push(home);
     process.env.OVERDECK_HOME = home;
     const [first, second] = dashboardDeploymentRoots();
 
-    expect(() => selectDashboardDeploymentRoot(first, [first, second]))
-      .toThrow(/both dashboard deployment generations have live processes/i);
+    expect(() => selectDashboardDeploymentRoot(first, [hardRoot(first), hardRoot(second)]))
+      .toThrow(/both dashboard deployment generations are held by hard occupants/i);
   });
 
-  it('detects live generations from /proc cmdline scans', async () => {
+  it('detects live generations from /proc cmdline scans and classifies occupants', async () => {
     const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-proc-'));
     temporaryRoots.push(home);
     process.env.OVERDECK_HOME = home;
@@ -277,7 +294,7 @@ describe('buildDashboardFromOriginMain', () => {
     const cmdlines: Record<string, string> = {
       '100': `/usr/bin/node\0${first}/dist/dashboard/server.js\0`,
       '200': '/usr/bin/node\0/somewhere/else/server.js\0',
-      '300': `/usr/bin/node\0${second}/dist/dashboard/deacon.js\0`,
+      '300': `/usr/bin/node\0${second}/node_modules/.bun/smee-client@5.0.0/node_modules/smee-client/bin/smee.js\0`,
     };
     const live = await liveDashboardDeploymentRoots({
       listPids: async () => Object.keys(cmdlines),
@@ -286,15 +303,39 @@ describe('buildDashboardFromOriginMain', () => {
         if (cmdline === undefined) throw new Error('ESRCH');
         return cmdline;
       },
+      selfEntrypoint: '/somewhere/else/cli.js',
     });
 
-    expect(live.sort()).toEqual([first, second].sort());
+    const byRoot = new Map(live.map((entry) => [entry.root, entry]));
+    expect(byRoot.get(first)?.hard).toBe(true);
+    expect(byRoot.get(second)?.hard).toBe(false);
 
     const none = await liveDashboardDeploymentRoots({
       listPids: async () => ['200'],
       readCmdline: async () => cmdlines['200'],
+      selfEntrypoint: '/somewhere/else/cli.js',
     });
     expect(none).toEqual([]);
+  });
+
+  it('hard-pins the generation the invoking CLI itself runs from', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-self-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first] = dashboardDeploymentRoots();
+
+    // The global pan symlink resolves into a fixed generation; rebuilding it
+    // in place breaks every subsequent pan invocation machine-wide even when
+    // no process is running from it at scan time.
+    const live = await liveDashboardDeploymentRoots({
+      listPids: async () => [],
+      readCmdline: async () => { throw new Error('unused'); },
+      selfEntrypoint: `${first}/dist/cli/index.js`,
+    });
+
+    expect(live).toHaveLength(1);
+    expect(live[0].root).toBe(first);
+    expect(live[0].hard).toBe(true);
   });
 
   it('sweeps legacy deployment roots while retaining the two bounded generations', async () => {
