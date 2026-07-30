@@ -3,23 +3,23 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-30T08:08:59.522Z",
-  "updated": "2026-07-30T09:00:35.504Z",
+  "updated": "2026-07-30T09:00:39.514Z",
   "pipeline": {
     "issueId": "PAN-3305",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "failed",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T09:00:33.364Z",
-    "mergeNotes": "github merge failed: GitHub PR #3316 has failing required checks",
+    "updatedAt": "2026-07-30T09:00:35.073Z",
+    "mergeNotes": "GitHub PR #3316 has failing required checks on HEAD 12f4ef98. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3316 for details.",
     "lastVerifiedCommit": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
     "strikeReadyHead": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
     "strikeReadyAt": "2026-07-30T08:46:56.838Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeTransportRetryCount": 1,
     "strikeNextAttemptAt": "2026-07-30T08:53:19.012Z",
     "strikeLandingAttempts": [
@@ -29,6 +29,13 @@
         "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-30T09:00:35.071Z",
+        "strikeHead": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
+        "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
+        "outcome": "failed",
+        "detail": "GitHub PR #3316 has failing required checks on HEAD 12f4ef98. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3316 for details."
       }
     ]
   },
@@ -38,7 +45,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T09:00:33.404Z"
+        "pricingAsOf": "2026-07-30T09:00:37.454Z"
       }
     },
     "merges": [],
