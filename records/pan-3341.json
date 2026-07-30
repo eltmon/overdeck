@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T21:43:32.045Z",
+  "updated": "2026-07-30T21:51:22.909Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -53,18 +53,34 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "membership-aware-state-label": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3341",
         "agentId": "agent-pan-3341",
         "pid": 2529466,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:43:32.045Z"
+        "claimedAt": "2026-07-30T21:43:32.045Z",
+        "itemId": "membership-aware-state-label",
+        "outcome": "completed",
+        "reason": "Derived resource state labels from canonical membership, including close-out limbo precedence and terminal tracker guards, with six regression cases.",
+        "releasedAt": "2026-07-30T21:51:22.909Z"
+      }
+    ],
+    "statusReasons": {
+      "membership-aware-state-label": {
+        "reason": "Derived resource state labels from canonical membership, including close-out limbo precedence and terminal tracker guards, with six regression cases.",
+        "updatedAt": "2026-07-30T21:51:22.909Z"
       }
     }
   },
   "statusOverrides": {
-    "membership-aware-state-label": "running"
+    "membership-aware-state-label": "completed",
+    "membership-aware-state-label.membership-aware-state-label.ac1": "completed",
+    "membership-aware-state-label.membership-aware-state-label.ac2": "completed",
+    "membership-aware-state-label.membership-aware-state-label.ac3": "completed",
+    "membership-aware-state-label.membership-aware-state-label.ac4": "completed",
+    "membership-aware-state-label.membership-aware-state-label.ac5": "completed"
   }
 }
