@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:37:34.571Z",
+  "updated": "2026-07-30T05:46:29.464Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "no-loss-audit": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 1242078,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:37:34.571Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -210,6 +202,17 @@
         "outcome": "completed",
         "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
         "releasedAt": "2026-07-30T05:37:20.834Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 1242078,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:37:34.571Z",
+        "itemId": "no-loss-audit",
+        "outcome": "completed",
+        "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
+        "releasedAt": "2026-07-30T05:46:29.464Z"
       }
     ],
     "statusReasons": {
@@ -264,6 +267,10 @@
       "memory-phase-ui": {
         "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
         "updatedAt": "2026-07-30T05:37:20.834Z"
+      },
+      "no-loss-audit": {
+        "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
+        "updatedAt": "2026-07-30T05:46:29.464Z"
       }
     }
   },
@@ -326,6 +333,9 @@
     "memory-phase-ui.memory-phase-ui.ac1": "completed",
     "memory-phase-ui.memory-phase-ui.ac2": "completed",
     "memory-phase-ui.memory-phase-ui.ac3": "completed",
-    "no-loss-audit": "running"
+    "no-loss-audit": "completed",
+    "no-loss-audit.no-loss-audit.ac1": "completed",
+    "no-loss-audit.no-loss-audit.ac2": "completed",
+    "no-loss-audit.no-loss-audit.ac3": "completed"
   }
 }
