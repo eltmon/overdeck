@@ -8382,3 +8382,68 @@ Substrate bugs filed: 2897 2898 2899 2900 2901 2902 2907 2913 (8; ALL fixed and 
 
 ## RUN-74 tick 44 (2026-07-29 15:13Z) — unchanged; no action
 - Dashboard DOWN (`:3011` no listener, health `000`). Main `ffc4ec7f59`. 7 harness processes alive. Awaiting operator intervention on PAN-3264. No action taken.
+
+## RUN-75 tick 1 (2026-07-30 05:00-05:25Z) — dashboard restored, red main root-caused, 4 close-outs; the outage was never PAN-3264's watchdog
+
+- **RUN-74 ended with the dashboard down and I inherited it.** First read: health `000`, nothing on `:3011`, five `dist/dashboard/server.js` processes alive. **All five were `containerd-shim`-parented workspace container peers, not the host dashboard** — so "server.js is running" was true and irrelevant. `ps -o ppid=` on each, then identifying the parents, was the whole difference between "it's up" and "nothing is serving".
+- **The outage cause was NOT the PAN-3264 watchdog loop RUN-74 spent eight ticks on.** `journalctl --user -u overdeck-supervisor` shows `Main process exited, code=killed, status=9/KILL` at 00:59:22 with **no OOM anywhere in the journal** — a deliberate SIGKILL from yesterday's manual storm-kill, and then *nothing tried to bring it back*. The supervisor now runs from the **primary** worktree (`/home/eltmon/Projects/overdeck/dist/supervisor/server.js`), not `.pan-reload-generation-a`, so RUN-74's "the whole control plane lives in a generation" finding is **half-stale**: the supervisor moved out, the CLI did not (`pan` still resolves into `.pan-reload-generation-b`).
+- **Deployed `pan reload --health-timeout 180000`.** Built from `origin/main eeb851b1e3`, dashboard came back healthy: `200`, `mode: primary`, `buildCommit eeb851b1e3eb`, pid systemd-parented (ppid 1892). **The operator's standing "don't restart unless a deploy is needed" was satisfied, not overridden** — nothing was serving at all, so this was a start, and every blocked item (close-out row 7, status emission, membership reads) unblocked on it.
+- **CAUGHT A LIE IN THE DEPLOY PATH: `pan reload` printed `✓ Dashboard reloaded and healthy` while `:3011` still answered `000`.** It became genuinely healthy ~2s later, so this was a race in my own check, not a false success — but I recorded it before knowing that, and the ordering matters: PAN-3264's landed fix is literally "reject a dashboard deployment that cannot boot", so a reload that declares health before the listener binds is the exact shape that fix exists to prevent. **Worth re-testing deliberately rather than filing on one observation.**
+
+### Red main — root-caused to the file-size ratchet, not tests
+
+- **`main` is RED**: CI run 30514989718 on `eeb851b1e3` (the operator's `uat/pan-falcon-0730` batch merge) concluded **failure**.
+- **Every other job passed** — `test: success`, `build (22): success`, all four `lint:*` sub-steps green. The only failing step is the file-size guard:
+  `✖ src/lib/launcher-generator.ts is 1018 lines (allowed 1012)`.
+- **The mechanism is self-inflicted and precise: PAN-1837 landed a file six lines larger than the exception it wrote for itself.** `scripts/file-size-allowlist.txt:12` reads `1012 src/lib/launcher-generator.ts # PAN-1837`; `git show origin/main:src/lib/launcher-generator.ts | wc -l` → **1018**. `scripts/lint-file-size.sh:55` takes `allowed` from the allowlist and fails at line 68 on `n > allowed`. The guard is right; the change that shipped with it is wrong.
+- **LESSON: "red main" did not mean "tests are broken", and assuming it would have aimed the strike at the wrong file.** RUN-74 recorded `test: failure` on `eefeef296e` and I nearly carried that forward as the live cause. Listing the failing *jobs* first (`gh run view --json jobs`) cost one command and moved the target from the test suite to a six-line lint ratchet.
+- Filed **PAN-3300** (`blocks-main`, criteria 3,4) and struck it. **Specified shrink-by-extraction and explicitly forbade raising the allowlist to 1018** — bumping the number would convert a caught regression into a permanently ratcheted-up god file. The strike is extracting `src/lib/launcher-types.ts`, which is the intended shape. **I own its merge.**
+
+### Review wedge — narrower than reported, and one refusal was correct
+
+Operator reported six review supervisors stopped with `stoppedByUser=1`, blocking all synthesis. Confirmed in `overdeck.db`, but the actionable set is three, not six:
+
+| Issue | What I found | Action |
+| --- | --- | --- |
+| PAN-3291 | supervisor `sbu=1`, no live review, work running | `pan review request` → verification started |
+| PAN-3296 | same | `pan review request` → verification started |
+| PAN-3253 | review agent `sbu=1`, `rev=pending` | `pan review request` → verification started |
+| PAN-3293 | **refused: workspace has uncommitted changes** | left alone — work is mid-implementation, not wedged |
+| PAN-3294 | `agent-pan-3294-review` **running** (04:38Z) | skipped — already has a live convoy |
+| PAN-3260 | review running; blocker is `test=failed` | skipped — not a review problem |
+
+- **PAN-3293's refusal is the entry worth keeping.** A stopped review supervisor looks identical whether the work is finished-and-wedged or still being written. The gate reads the workspace, not the supervisor, and it caught the one case where re-requesting review would have reviewed an incomplete tree. **Three of six "wedged" issues needed nothing; re-driving all six on the report alone would have been wrong twice and harmful once.**
+
+### Close-outs — 4 landed, 2 refused for good reasons
+
+`pan close --force` (confirmation only; **no `--accept-*` override used anywhere** — those are the operator's lever):
+
+- **PAN-1837, PAN-1990, PAN-3232, PAN-3242 — closed out**, all DoD rows green. Row 7 (deploy) passed *because* I had just deployed; it would have blocked otherwise, exactly as it did all through RUN-74.
+- **PAN-3259 — NOT closeable, and the report was wrong about it.** `git cherry -v origin/main origin/strike/pan-3259` marks `b3cf0b642f` (a PAN-3262 test fix) `+` = **not upstream**, and `review_status` reads `merge=failed / merge_step=validating-pr`. One genuinely unlanded commit.
+- **PAN-3264 — content IS upstream** (`git cherry` marks `4c92166964` `-`, equivalent to #3269) but close-out blocked on DoD row 3 `verificationStatus: missing` and row 6 `failed checks: test on eefeef296e`. Row 6 clears when PAN-3300 greens main. **Row 3 is a verdict the system earned and never recorded — machinery, mine to fix; not an override, not mine to accept.**
+- **LESSON: `git cherry` answered in one command what a two-dot diff actively lied about.** `git diff --stat origin/main origin/strike/pan-3264` showed *349 files, 18,779 deletions* — which reads like a huge unlanded change and is really just the branch being far behind main. Two branches, opposite verdicts, indistinguishable by diff size. **For "did this content land?", `git cherry` is the tool; a diff stat is noise shaped like evidence.**
+
+### Deliberate deferral: no `pan sync-main` while main is red
+
+PAN-3260/3286/3291 have branches invalidated by the `eeb851b` merge and the operator asked for `pan sync-main`. **Deferred on purpose**: main is red right now, so syncing would propagate a broken base into three feature branches and hand three agents a failing foundation. Also all three have *running* work agents, which the doctrine's sync-main rule excludes outright. Queued behind PAN-3300.
+
+### PAN-3301 — 68k log lines were hiding one real writer
+
+Chased the Deacon's stray-writer errors and found the warning is three defects, with the scale reframing it:
+
+- **≈68,000 occurrences** across `~/.overdeck/logs/*.log` (overdeck 20,108 / tindra 20,040 / myn 13,578 / lexerra 12,468 / `.beads` 2,959). Dominant contributor to log volume.
+- **One genuinely active legacy writer:** the backlog is *half*-migrated. `sequence.md` correctly reaches `~/.overdeck/state/panopticon-cli/backlog/` (Jul 29 12:50) while **`manifest.json` was still being written to `/home/eltmon/Projects/overdeck/.pan/backlog/` at Jul 30 01:11** — minutes before I looked. Writers: `src/dashboard/server/routes/backlog.ts:475` and `src/lib/backlog/sequencer-agent.ts:148`, plus `sequencer-agent.ts:271` which *instructs the agent in prose* to read the legacy path — repointing only the writers would leave the agent reading a file nothing writes.
+- **The patrol can never self-clear:** `src/lib/cloister/state-recreation-patrol.ts:11` warns on directory **presence**, not recent writes. Flagged mtimes: tindra **2026-06-01** (~2 months), lexerra continues **2026-07-06**, myn drafts **2026-07-18**. Empty abandoned dirs that nothing writes and — per the patrol's own correct advice at `doctor-state-worktree.ts:25` — nothing should delete unexamined. So it fires every 60s forever.
+- **No commit hazard.** `.pan` is gitignored with `git ls-files .pan` = 0 tracked files in overdeck, lexerra, and tindra. I nearly reported this as a state-leak risk; checking `check-ignore` first changed the severity from "canonical state may get committed" to "log noise masking a real defect".
+- **LESSON: the count WAS the finding.** I opened this expecting to name a writer and file it. Counting occurrences first showed 20k identical lines about one checkout — which is precisely why the single live `manifest.json` writer had been invisible for weeks. **A defect that emits 68k identical warnings has already defeated the mechanism meant to surface it.**
+
+### Verified, corrected, and noted
+
+- **Operator item 5 confirmed:** `GET /api/conversations/pending-input` returns `[]`. The dashboard "needs input" badges are stale classifications; nothing awaits the operator.
+- **Read door queried for all 12 projects**: 8 arrays, **4 typed blind spots** (papers-please/puzzdom `tracker_unconfigured`, lexerra/krux `forge_unavailable`) emitted as `investigate`, never reconstructed from tracker/tmux/agent state. `activePipeline` derived only from `inPipeline === true` → 30 rows.
+- **mind-your-now carries 13 `zombie_pr` rows** plus MIN-908 in post-merge limbo. **No merge verbs emitted** — MYN is `auto_merge` hold, and it spans a GitLab backend, so "merged" needs verifying in both repos before any close-out.
+- **`pan flywheel weights --json` returns weight 0 for every row** — `Insufficient telemetry: 0 completed pipeline runs in window (need 3)`. Weight ordering is moot this tick; said so rather than implying a ranking existed.
+- **Backlog forecast fully empty** (`needsPlanning: []`, `waves: []`). The Planning floor has nothing to plan, so spawning nothing is correct, not an omission.
+- **Near-miss on my own shell state:** `git rev-parse HEAD` returned `eeb851b1e3` where it had returned `ce95171e5c`, and I started diagnosing backward HEAD movement in the primary worktree. **Bash cwd persists between calls and an earlier `cd` had left me inside the strike worktree** — I was reading `strike/pan-3300`. The primary is intact (`main`, `ce95171e5c`, clean, 1 unpushed docs commit from RUN-74). **A worktree-discipline alarm that was really a cwd bug; verify `git rev-parse --show-toplevel` before believing any HEAD reading.**
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 0 merges, 2 substrate bugs filed, 1 outage recovered, 1 deploy delivered, 3 review convoys re-driven, 1 red-main strike in flight.**
