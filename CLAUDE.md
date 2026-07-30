@@ -487,6 +487,20 @@ pattern `rebuild-agents` uses for the `agents` table; it also **archives, never
 deletes**, issue rows whose issue reached a terminal stage. Full model,
 cardinalities, and the polyrepo wrapper-repo git posture: [`docs/WORKSPACES-AND-PROJECTS.md`](docs/WORKSPACES-AND-PROJECTS.md).
 
+Workspaces are also created and managed **from the dashboard** (PAN-3330), not
+just the CLI. `src/lib/workspaces/create.ts` holds the shared core —
+`resolveWorkspaceCreateIntent()` (read-only resolution + validation, returning
+`findings` instead of throwing, and never reading an ambient cwd) and
+`performWorkspaceCreate()` (worktree, seeding, row) — and both `pan workspace
+new`/`main` and the routes call it, so the New Workspace dialog's live
+resolve-before-create preview cannot disagree with what confirming does. The
+routes are `POST /api/workspace-registry/resolve` (write-free dry run), `POST
+/api/workspace-registry` (422 with findings, else 201 `{id}`), `POST
+/api/workspace-registry/:id/relocate`, and `GET
+/api/workspace-registry/project-targets`. Entry points: the sidebar WORKSPACES
+`+`, a command-palette action, and a per-project button; `WorkspaceView` adds
+Favorite/Relocate/Archive for non-issue kinds.
+
 A workspace **targets** a repo directory, and several may target the same one:
 `pan workspace new <name> --target-path <dir>` points at any existing directory
 (rejects `--isolated`), `--dry-run` prints the resolved intent as JSON and
