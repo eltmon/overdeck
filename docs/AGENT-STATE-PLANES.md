@@ -38,6 +38,12 @@ record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
 landed journal write for the issue and on unref'd 5s/30s/120s retries after a
 fallback write.
 
+Remote-ref races on record pushes follow the merge-based conflict and escalation
+policy in [State-Plane Commit Policy](STATE-PLANE-COMMIT-POLICY.md#write-policy):
+record mirrors reconcile automatically, non-record conflicts abort, three
+consecutive failures produce an operator-facing error, and `pan doctor` reports
+state-branch divergence.
+
 PAN-3092 hardened that path against verdict loss, because `pipeline.updatedAt`
 is stamped on every status write and so cannot by itself distinguish
 write-recency from verdict-truth:

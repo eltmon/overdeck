@@ -26,6 +26,7 @@ import {
   readPlatformConfigSync,
   restartDashboard,
   StageError,
+  type DashboardRestartResult,
 } from '../../lib/platform-lifecycle.js';
 import { writeRestartStatus } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
@@ -212,8 +213,9 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       }
     }
 
+    let restartResult: DashboardRestartResult;
     try {
-      await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
+      restartResult = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
         deacon: options.deacon,
         serverPath: deployment?.serverPath,
         repoRoot,
@@ -244,7 +246,9 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
       await sweepDashboardDeployments(repoRoot, dashboardDeploymentRoots()).catch(() => undefined);
     }
     await recordReloadStatus(startedAt, true);
-    console.log(chalk.green('✓ Dashboard reloaded and healthy'));
+    console.log(chalk.green(restartResult.ownershipVerified
+      ? '✓ Dashboard reloaded and healthy'
+      : '✓ Dashboard reloaded and healthy — ownership unverified: could not resolve the spawned server pid'));
   } catch (error) {
     const message = error instanceof StageError
       ? `[${error.failure.stage}] ${error.failure.reason}`

@@ -5,6 +5,12 @@ node_modules/
 dist/
 scripts/record-cost-event.js
 
+# Generated git-hook shims. `core.hooksPath` is .husky/_, so husky's install and
+# Overdeck's pre-rebase guard both write here; every file is regenerated. Husky
+# self-ignores the dir with a `*` .gitignore, but a fresh worktree gets the guard
+# before install runs and would otherwise be born dirty (PAN-3266).
+.husky/_/
+
 # IDE
 .idea/
 .vscode/

@@ -7,6 +7,7 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 const SCRIPT_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'work-agent-stop-hook')
+const HOOK_LIB_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'pan-hook-lib.sh')
 const AGENT_ID = 'agent-pan-986'
 
 function writeExecutable(path: string, content: string): void {
@@ -56,22 +57,8 @@ describe('work-agent-stop-hook structured channel replies', () => {
 
     writeFileSync(hookScriptPath, readFileSync(SCRIPT_PATH, 'utf-8'), 'utf-8')
     chmodSync(hookScriptPath, 0o755)
-    writeExecutable(
-      join(tempRoot, 'pan-hook-lib.sh'),
-      `#!/bin/bash
-set +e
-PAN_DASHBOARD_URL="\${OVERDECK_DASHBOARD_URL:-http://127.0.0.1:3000}"
-pan_resolve_agent_id() {
-  AGENT_ID="\${OVERDECK_AGENT_ID:-}"
-  [ -n "$AGENT_ID" ]
-}
-pan_emit_event() {
-  local agent_id="$1"
-  local body="$2"
-  curl -s -m 0.5 -X POST "$PAN_DASHBOARD_URL/api/agents/$agent_id/heartbeat" --data "$body" >/dev/null 2>&1
-}
-`,
-    )
+    writeFileSync(join(tempRoot, 'pan-hook-lib.sh'), readFileSync(HOOK_LIB_PATH, 'utf-8'), 'utf-8')
+    chmodSync(join(tempRoot, 'pan-hook-lib.sh'), 0o755)
 
     writeExecutable(
       join(mockBin, 'curl'),
@@ -111,6 +98,10 @@ exit 1
 set -euo pipefail
 printf '%s\n' "$*" >> "$MOCK_TMUX_LOG"
 if [ "\${1:-}" = "capture-pane" ]; then
+  if [ -n "\${MOCK_TMUX_CAPTURE_OUTPUT:-}" ]; then
+    printf '%s\n' "$MOCK_TMUX_CAPTURE_OUTPUT"
+    exit 0
+  fi
   echo 'capture-pane should not be called for structured channel replies' >&2
   exit 99
 fi
@@ -123,6 +114,11 @@ exit 0
       `#!/bin/bash
 set -euo pipefail
 printf '%s\n' "$*" >> "$MOCK_CLAUDE_LOG"
+[ -n "\${MOCK_CLAUDE_SLEEP:-}" ] && /bin/sleep "$MOCK_CLAUDE_SLEEP"
+if [ -n "\${MOCK_CLAUDE_RESULT:-}" ]; then
+  printf '%s\n' "$MOCK_CLAUDE_RESULT"
+  exit "\${MOCK_CLAUDE_RC:-0}"
+fi
 exit 99
 `,
     )
@@ -136,6 +132,7 @@ exit 99
     return {
       ...process.env,
       HOME: homeDir,
+      OVERDECK_HOME: join(homeDir, '.overdeck'),
       PATH: `${mockBin}:${process.env.PATH ?? ''}`,
       OVERDECK_AGENT_ID: AGENT_ID,
       OVERDECK_DASHBOARD_URL: 'http://mocked-dashboard.local',
@@ -234,5 +231,129 @@ exit 99
     expect(hooksLog).toContain('skipped — actively in specialist pipeline')
     expect(existsSync(heartbeatLog)).toBe(false)
     expect(existsSync(claudeLog)).toBe(false)
+  })
+
+  function writeFallbackRuntime(): void {
+    writeFileSync(
+      runtimeJson,
+      JSON.stringify({
+        success: true,
+        snapshot: {
+          id: AGENT_ID,
+          activity: 'idle',
+          lastActivity: '2026-05-07T14:40:00.000Z',
+          updatedAtSequence: 12,
+        },
+      }),
+      'utf-8',
+    )
+  }
+
+  function fallbackEnv(overrides: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+    return {
+      ...hookEnv(),
+      MOCK_TMUX_CAPTURE_OUTPUT: 'Implementation complete\n❯',
+      MOCK_CLAUDE_RESULT: 'FORGOT_COMPLETION',
+      ...overrides,
+    }
+  }
+
+  it('allows only one concurrent hook instance to reach external work', async () => {
+    writeFallbackRuntime()
+    const env = fallbackEnv({ MOCK_CLAUDE_SLEEP: '1' })
+
+    const results = await Promise.all([
+      execFileAsync('bash', [hookScriptPath], { env, timeout: 10_000 }),
+      execFileAsync('bash', [hookScriptPath], { env, timeout: 10_000 }),
+    ])
+
+    expect(results).toHaveLength(2)
+    expect(readFileSync(claudeLog, 'utf-8').trim().split('\n')).toHaveLength(1)
+    const curlRequests = readFileSync(curlLog, 'utf-8').trim().split('\n')
+    expect(curlRequests.filter(line => line.includes('/api/review/PAN-986/status'))).toHaveLength(1)
+    expect(curlRequests.filter(line => line.includes('/runtime'))).toHaveLength(2)
+    const tmuxRequests = readFileSync(tmuxLog, 'utf-8').trim().split('\n')
+    expect(tmuxRequests.filter(line => line.startsWith('capture-pane'))).toHaveLength(1)
+
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('skipped — another instance holds')
+    expect(existsSync(join(homeDir, '.overdeck', 'agents', AGENT_ID, 'stop-hook.lock.d'))).toBe(false)
+  })
+
+  it('reclaims a dead holder lock before running the completion check', async () => {
+    writeFallbackRuntime()
+    const lockDir = join(homeDir, '.overdeck', 'agents', AGENT_ID, 'stop-hook.lock.d')
+    mkdirSync(lockDir)
+    writeFileSync(join(lockDir, 'pid'), '99999999\n', 'utf-8')
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv(),
+      timeout: 10_000,
+    })
+
+    expect(readFileSync(claudeLog, 'utf-8')).toContain('claude-haiku-4-5')
+    expect(existsSync(lockDir)).toBe(false)
+  })
+
+  it('drops a timed-out completion check without emitting a resolution', async () => {
+    writeFallbackRuntime()
+    const startedAt = Date.now()
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv({
+        MOCK_CLAUDE_SLEEP: '3',
+        OVERDECK_HOOK_LLM_TIMEOUT: '1',
+      }),
+      timeout: 10_000,
+    })
+
+    expect(Date.now() - startedAt).toBeLessThan(2_500)
+    expect(existsSync(heartbeatLog)).toBe(false)
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('completion-check LLM timed out')
+  })
+
+  it('drops a rate-limited completion check before invoking claude', async () => {
+    writeFallbackRuntime()
+    const bucketFile = join(homeDir, '.overdeck', 'hook-llm-calls.log')
+    const now = Math.floor(Date.now() / 1000)
+    writeFileSync(bucketFile, `${now}\n`.repeat(6), 'utf-8')
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv(),
+      timeout: 10_000,
+    })
+
+    expect(existsSync(claudeLog)).toBe(false)
+    expect(existsSync(heartbeatLog)).toBe(false)
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('rate-limited — skipping completion-check LLM')
+  })
+
+  it('records an admitted LLM call and preserves the completion resolution path', async () => {
+    writeFallbackRuntime()
+    const bucketFile = join(homeDir, '.overdeck', 'hook-llm-calls.log')
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv(),
+      timeout: 10_000,
+    })
+
+    expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"done"')
+    expect(readFileSync(bucketFile, 'utf-8').trim().split('\n')).toHaveLength(1)
+  })
+
+  it('preserves the existing UNCLEAR fallback for non-timeout claude failures', async () => {
+    writeFallbackRuntime()
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv({ MOCK_CLAUDE_RC: '1' }),
+      timeout: 10_000,
+    })
+
+    expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"unclear"')
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('claude -p failed rc=1')
+    expect(hooksLog).toContain('fallback to UNCLEAR')
   })
 })

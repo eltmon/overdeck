@@ -2,6 +2,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { archiveWorkspace, touchWorkspaceAccessed } from '../../lib/workspaces/writer.js';
 import { getWorkspaceById } from '../../lib/workspaces/resolver.js';
+import { resolveWorkspaceMemoryRoot } from '../../lib/memory/paths.js';
 
 function resolveOrExit(ws: string) {
   const row = getWorkspaceById(ws);
@@ -26,6 +27,7 @@ export async function workspaceGetCommand(ws: string): Promise<void> {
   console.log(`  archived:    ${row.isArchived}`);
   console.log(`  favorite:    ${row.isFavorite}`);
   console.log(`  lastAccess:  ${new Date(row.lastAccessedAt).toISOString()}`);
+  console.log(`  memoryHome:  ${resolveWorkspaceMemoryRoot(row.projectId, row.id)}`);
 }
 
 export async function workspaceActivateCommand(ws: string): Promise<void> {

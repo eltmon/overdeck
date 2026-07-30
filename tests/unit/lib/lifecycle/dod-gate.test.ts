@@ -642,6 +642,7 @@ describe('Definition-of-Done main-verification row', () => {
   it('misses and names failed and pending check-runs', async () => {
     const row = await checkMainVerifyRow(ctx, 'abc123', {
       readCheckRuns: async () => ({ total: 3, failed: ['unit'], pending: ['browser'] }),
+      readContainingDefaultBranchCommits: async () => [],
     });
     expect(row).toMatchObject({ status: 'miss' });
     expect(row.observed).toContain('failed checks: unit');
@@ -651,9 +652,11 @@ describe('Definition-of-Done main-verification row', () => {
   it('skips when no merge commit or no check-runs can prove verification', async () => {
     const noCommit = await checkMainVerifyRow(ctx, undefined, {
       readCheckRuns: async () => { throw new Error('must not run'); },
+      readContainingDefaultBranchCommits: async () => { throw new Error('must not run'); },
     });
     const noChecks = await checkMainVerifyRow(ctx, 'abc123', {
       readCheckRuns: async () => ({ total: 0, failed: [], pending: [] }),
+      readContainingDefaultBranchCommits: async () => [],
     });
     expect(noCommit).toMatchObject({ status: 'skip', observed: expect.stringContaining('no merge commit resolvable') });
     expect(noChecks).toMatchObject({ status: 'skip', observed: expect.stringContaining('no CI check-runs') });
@@ -662,8 +665,81 @@ describe('Definition-of-Done main-verification row', () => {
   it('turns gh failures into an observed miss', async () => {
     const row = await checkMainVerifyRow(ctx, 'abc123', {
       readCheckRuns: async () => { throw new Error('rate limited'); },
+      readContainingDefaultBranchCommits: async () => [],
     });
     expect(row).toMatchObject({ status: 'miss', observed: expect.stringContaining('rate limited') });
+  });
+
+  // PAN-3202: a merge that lands inside a red-main window can never green its own
+  // check-runs, so a later green default-branch head containing it is accepted.
+  it('passes on a later green default-branch run containing a merge whose own checks failed', async () => {
+    const checkRuns = new Map([
+      ['mergecommit', { total: 3, failed: ['CI'], pending: [] }],
+      ['tip', { total: 3, failed: [], pending: ['CI'] }],
+      ['greenhead', { total: 3, failed: [], pending: [] }],
+    ]);
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) => checkRuns.get(commit) ?? { total: 0, failed: [], pending: [] },
+      readContainingDefaultBranchCommits: async () => ['tip', 'greenhead'],
+    });
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('failed checks: CI on mergecommit');
+    expect(row.observed).toContain('verified on main by later green CI run greenhead containing the merge');
+    expect(row.observed).toContain('3 check-runs concluded successfully');
+  });
+
+  it('accepts a later green run when the merge commit has no check-runs of its own', async () => {
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) =>
+        commit === 'mergecommit' ? { total: 0, failed: [], pending: [] } : { total: 2, failed: [], pending: [] },
+      readContainingDefaultBranchCommits: async () => ['greenhead'],
+    });
+    expect(row).toMatchObject({ status: 'pass' });
+    expect(row.observed).toContain('no CI check-runs on merge commit mergecommit');
+    expect(row.observed).toContain('later green CI run greenhead');
+  });
+
+  it('keeps missing when no default-branch commit containing the merge is green', async () => {
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) =>
+        commit === 'mergecommit' ? { total: 3, failed: ['CI'], pending: [] } : { total: 3, failed: ['CI'], pending: [] },
+      readContainingDefaultBranchCommits: async () => ['red-1', 'red-2'],
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('failed checks: CI on mergecommit');
+    expect(row.observed).toContain('no green CI run among the 2 newest default-branch commit(s)');
+  });
+
+  it('probes at most the five newest containing commits', async () => {
+    const probed: string[] = [];
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async (_ctx, commit) => {
+        if (commit !== 'mergecommit') probed.push(commit);
+        return { total: 1, failed: ['CI'], pending: [] };
+      },
+      readContainingDefaultBranchCommits: async () =>
+        Array.from({ length: 9 }, (_unused, index) => `head-${index}`),
+    });
+    expect(probed).toEqual(['head-0', 'head-1', 'head-2', 'head-3', 'head-4']);
+    expect(row).toMatchObject({ status: 'miss' });
+  });
+
+  it('records why the later-run form could not be evaluated without hiding the primary miss', async () => {
+    const row = await checkMainVerifyRow(ctx, 'mergecommit', {
+      readCheckRuns: async () => ({ total: 3, failed: ['CI'], pending: [] }),
+      readContainingDefaultBranchCommits: async () => { throw new Error('origin/main not fetched'); },
+    });
+    expect(row).toMatchObject({ status: 'miss' });
+    expect(row.observed).toContain('failed checks: CI on mergecommit');
+    expect(row.observed).toContain('later-run evidence unavailable: origin/main not fetched');
+  });
+
+  it('does not consult the later-run form when the merge commit is already green', async () => {
+    const row = await checkMainVerifyRow(ctx, 'abc123', {
+      readCheckRuns: async () => ({ total: 4, failed: [], pending: [] }),
+      readContainingDefaultBranchCommits: async () => { throw new Error('must not run'); },
+    });
+    expect(row).toMatchObject({ status: 'pass', observed: '4 check-runs concluded successfully on abc123' });
   });
 });
 

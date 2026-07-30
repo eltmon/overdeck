@@ -14,12 +14,14 @@
  * Health-gating: each stage reports success only after the component's healthcheck
  * passes, or fails with an explicit `{ stage, reason }` on timeout.
  *
- * CLI-side only. Not used from dashboard server code — ok to use sync I/O here.
+ * Shared with the supervisor sidecar. Keep shell/process I/O asynchronous so
+ * lifecycle checks cannot block its request loop.
  */
 
-import { spawn, exec, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
+import { open as openFile, stat } from 'fs/promises';
 import { join } from 'path';
 import { parse as parseToml } from '@iarna/toml';
 import { Effect } from 'effect';
@@ -117,6 +119,8 @@ export class StageError extends Error {
   }
 }
 
+class EaddrinuseSpawnError extends StageError {}
+
 export function readPlatformConfigSync(): PlatformConfig {
   const defaults: PlatformConfig = {
     dashboardPort: 3010,
@@ -142,16 +146,71 @@ export function readPlatformConfigSync(): PlatformConfig {
 
 // ─── Port / process helpers ───────────────────────────────────────────────────
 
-async function pidsOnPort(port: number): Promise<number[]> {
-  try {
-    const { stdout } = await execAsync(`fuser ${port}/tcp 2>/dev/null || true`);
-    return stdout
-      .split(/\s+/)
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => Number.isFinite(n) && n > 0);
-  } catch {
-    return [];
+export type PortProbeExec = (command: string) => Promise<{ stdout: string | Buffer }>;
+
+const defaultPortProbeExec: PortProbeExec = async (command) => {
+  const { stdout } = await execAsync(command);
+  return { stdout };
+};
+
+function parsePidList(output: string | Buffer): number[] {
+  return [...new Set(String(output)
+    .split(/\s+/)
+    .map(value => Number(value.trim()))
+    .filter(pid => Number.isInteger(pid) && pid > 0))];
+}
+
+function parseSsListenerPids(output: string | Buffer, port: number): number[] {
+  const pids = new Set<number>();
+  const portPattern = new RegExp(`(?:^|\\s)\\S*:${port}(?:\\s|$)`);
+  for (const line of String(output).split('\n')) {
+    if (!portPattern.test(line)) continue;
+    for (const match of line.matchAll(/pid=(\d+)/g)) {
+      pids.add(Number(match[1]));
+    }
   }
+  return [...pids];
+}
+
+function isEmptyExitOne(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const failure = error as { code?: number | string; stdout?: string | Buffer };
+  return Number(failure.code) === 1 && String(failure.stdout ?? '').trim() === '';
+}
+
+export async function pidsOnPort(port: number, run: PortProbeExec = defaultPortProbeExec): Promise<number[]> {
+  const probes = [
+    {
+      tool: 'lsof',
+      command: `lsof -nP -iTCP:${port} -sTCP:LISTEN -t`,
+      parse: parsePidList,
+      emptyExitOne: true,
+    },
+    {
+      tool: 'fuser',
+      command: `fuser ${port}/tcp`,
+      parse: parsePidList,
+      emptyExitOne: true,
+    },
+    {
+      tool: 'ss',
+      command: 'ss -ltnp',
+      parse: (output: string | Buffer) => parseSsListenerPids(output, port),
+      emptyExitOne: false,
+    },
+  ];
+
+  for (const probe of probes) {
+    try {
+      const { stdout } = await run(probe.command);
+      return probe.parse(stdout);
+    } catch (error) {
+      if (probe.emptyExitOne && isEmptyExitOne(error)) return [];
+    }
+  }
+
+  console.warn(`[dashboard] could not inspect port ${port}; lsof, fuser, and ss all failed to execute`);
+  return [];
 }
 
 async function sleep(ms: number): Promise<void> {
@@ -168,10 +227,23 @@ function killPidsSync(pids: number[], signal: NodeJS.Signals | number): void {
   }
 }
 
-async function waitForPortFree(port: number, timeoutMs: number): Promise<boolean> {
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function waitForPortFree(
+  port: number,
+  timeoutMs: number,
+  portOwnerProbe: (port: number) => Promise<number[]> = pidsOnPort,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const pids = await pidsOnPort(port);
+    const pids = await portOwnerProbe(port);
     if (pids.length === 0) return true;
     await sleep(100);
   }
@@ -185,12 +257,80 @@ async function describePid(pid: number): Promise<string> {
   } catch {
     return 'unknown';
   }
-}async function stopDashboardPromise(
+}
+
+async function fileSizeOrZero(path: string): Promise<number> {
+  try {
+    return (await stat(path)).size;
+  } catch {
+    return 0;
+  }
+}
+
+async function readAppendedLog(path: string, offset: number): Promise<{ text: string; offset: number }> {
+  let size: number;
+  try {
+    size = (await stat(path)).size;
+  } catch {
+    return { text: '', offset: 0 };
+  }
+  const start = size < offset ? 0 : offset;
+  if (size <= start) return { text: '', offset: size };
+
+  let file: Awaited<ReturnType<typeof openFile>>;
+  try {
+    file = await openFile(path, 'r');
+  } catch {
+    return { text: '', offset: 0 };
+  }
+  try {
+    const buffer = Buffer.alloc(size - start);
+    const { bytesRead } = await file.read(buffer, 0, buffer.length, start);
+    return { text: buffer.subarray(0, bytesRead).toString('utf8'), offset: start + bytesRead };
+  } catch {
+    return { text: '', offset: start };
+  } finally {
+    await file.close().catch(() => {});
+  }
+}
+
+function createEaddrinuseProbe(
+  logPath: string,
+  initialOffset: number,
+  port: number,
+  portOwnerProbe: (port: number) => Promise<number[]>,
+  pidDescriptor: (pid: number) => Promise<string>,
+): () => Promise<StageError | null> {
+  let offset = initialOffset;
+  let carry = '';
+  return async () => {
+    const appended = await readAppendedLog(logPath, offset);
+    offset = appended.offset;
+    const text = carry + appended.text;
+    carry = text.slice(-10);
+    if (!/EADDRINUSE/.test(text)) return null;
+
+    const ownerPid = (await portOwnerProbe(port))[0] ?? null;
+    const owner = ownerPid === null
+      ? 'an unresolved PID'
+      : `PID ${ownerPid} (cmd: ${await pidDescriptor(ownerPid)})`;
+    return new EaddrinuseSpawnError({
+      stage: 'dashboard',
+      reason: `port ${port} is owned by ${owner} — the freshly spawned server crashed with EADDRINUSE`,
+    });
+  };
+}
+
+async function stopDashboardPromise(
   config: PlatformConfig,
-  opts: { graceTimeoutMs?: number } = {},
+  opts: {
+    graceTimeoutMs?: number;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+  } = {},
 ): Promise<void> {
   const graceMs = opts.graceTimeoutMs ?? 5000;
   const ports = [config.dashboardPort, config.dashboardApiPort];
+  const portOwnerProbe = opts.portOwnerProbe ?? pidsOnPort;
 
   // 0. If an interactive `pan dev` session owns these ports, route the stop to
   //    the supervisor itself rather than port-killing its children. The dev
@@ -201,7 +341,7 @@ async function describePid(pid: number): Promise<string> {
   const dev = readDevSupervisorMarker();
   if (dev && dev.dashboardPort === config.dashboardPort && dev.apiPort === config.dashboardApiPort) {
     killPidsSync([dev.pid], 'SIGTERM');
-    const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs)));
+    const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs, portOwnerProbe)));
     if (freed.every(Boolean)) return;
     // Supervisor failed to release the ports in time — escalate, then fall
     // through to the normal port-based teardown to mop up orphaned children.
@@ -211,38 +351,41 @@ async function describePid(pid: number): Promise<string> {
   // 1. Collect pids across both ports, then SIGTERM.
   const allPids = new Set<number>();
   for (const p of ports) {
-    for (const pid of await pidsOnPort(p)) allPids.add(pid);
+    for (const pid of await portOwnerProbe(p)) allPids.add(pid);
   }
   if (allPids.size === 0) return;
 
   killPidsSync([...allPids], 'SIGTERM');
 
-  // 2. Wait for ports to free. If any remain, escalate to SIGKILL.
-  const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs)));
-  if (freed.every(Boolean)) return;
-
-  const stubbornPids = new Set<number>();
-  for (const p of ports) {
-    for (const pid of await pidsOnPort(p)) stubbornPids.add(pid);
+  // 2. Wait for ports to free. A process that closes its listener but survives
+  // SIGTERM is still part of this teardown, so include it in the SIGKILL set.
+  const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs, portOwnerProbe)));
+  const stubbornPids = new Set([...allPids].filter(isPidAlive));
+  if (!freed.every(Boolean)) {
+    for (const p of ports) {
+      for (const pid of await portOwnerProbe(p)) stubbornPids.add(pid);
+    }
   }
-  if (stubbornPids.size > 0) {
-    killPidsSync([...stubbornPids], 'SIGKILL');
-    const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000)));
-    if (finalFreed.every(Boolean)) return;
+  if (stubbornPids.size > 0) killPidsSync([...stubbornPids], 'SIGKILL');
 
-    const stillHeld: string[] = [];
-    for (const [index, port] of ports.entries()) {
-      if (finalFreed[index]) continue;
-      for (const pid of await pidsOnPort(port)) {
-        stillHeld.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
-      }
+  const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000, portOwnerProbe)));
+  const failures: string[] = [];
+  for (const pid of allPids) {
+    if (isPidAlive(pid)) {
+      failures.push(`PID ${pid} (cmd: ${await describePid(pid)}) survived SIGKILL`);
     }
-    if (stillHeld.length > 0) {
-      throw new StageError({
-        stage: 'dashboard',
-        reason: stillHeld.join('; '),
-      });
+  }
+  for (const [index, port] of ports.entries()) {
+    if (finalFreed[index]) continue;
+    for (const pid of await portOwnerProbe(port)) {
+      failures.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
     }
+  }
+  if (failures.length > 0) {
+    throw new StageError({
+      stage: 'dashboard',
+      reason: failures.join('; '),
+    });
   }
 }async function waitForDashboardHealthPromise(
   apiPort: number,
@@ -250,6 +393,8 @@ async function describePid(pid: number): Promise<string> {
     timeoutMs?: number;
     pollIntervalMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    expectedPid?: number;
+    pollFailure?: () => Promise<StageError | null>;
   } = {},
 ): Promise<void> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
@@ -258,17 +403,39 @@ async function describePid(pid: number): Promise<string> {
   const deadline = Date.now() + timeoutMs;
 
   let lastError = 'never got a response';
+  let lastResponderPid: number | null = null;
   while (Date.now() < deadline) {
+    const pollFailure = await opts.pollFailure?.();
+    if (pollFailure) throw pollFailure;
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
-        if (!opts.expectedIdentity) return;
+        if (!opts.expectedIdentity && opts.expectedPid === undefined) return;
         const body = await res.json().catch(() => null) as unknown;
         const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-        const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
-        const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
-        if (repoRoot === opts.expectedIdentity.repoRoot && mode === opts.expectedIdentity.mode) return;
-        lastError = `port held by non-${opts.expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`;
+        const reportedPid = typeof payload.pid === 'number' && Number.isInteger(payload.pid) && payload.pid > 0
+          ? payload.pid
+          : null;
+        if (reportedPid !== null) lastResponderPid = reportedPid;
+
+        if (opts.expectedIdentity) {
+          const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
+          const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
+          if (repoRoot !== opts.expectedIdentity.repoRoot || mode !== opts.expectedIdentity.mode) {
+            lastError = `port held by non-${opts.expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`;
+            await sleep(pollIntervalMs);
+            continue;
+          }
+        }
+
+        if (opts.expectedPid !== undefined && reportedPid !== opts.expectedPid) {
+          lastError =
+            `port answered by pid ${reportedPid ?? '(unreported)'} — ` +
+            `not the freshly spawned server (pid ${opts.expectedPid})`;
+          await sleep(pollIntervalMs);
+          continue;
+        }
+        return;
       } else {
         lastError = `HTTP ${res.status}`;
       }
@@ -277,9 +444,14 @@ async function describePid(pid: number): Promise<string> {
     }
     await sleep(pollIntervalMs);
   }
+  const responderDetails = lastResponderPid === null
+    ? ''
+    : `; responder PID ${lastResponderPid} command: ${await describePid(lastResponderPid)}`;
   throw new StageError({
     stage: 'dashboard',
-    reason: `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} (last: ${lastError})`,
+    reason:
+      `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} ` +
+      `(last: ${lastError}${responderDetails})`,
   });
 }async function waitForTraefikHealthPromise(
   traefikDomain: string,
@@ -344,6 +516,12 @@ export interface RestartResult {
 
 export interface DashboardSpawnHandle {
   stop: () => Promise<void> | void;
+  pid?: () => Promise<number | null>;
+}
+
+export interface DashboardRestartResult {
+  ownershipVerified: boolean;
+  spawnedPid: number | null;
 }
 
 async function restartDashboardPromise(
@@ -352,16 +530,34 @@ async function restartDashboardPromise(
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    eaddrinuseLogPath?: string;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+    pidDescriptor?: (pid: number) => Promise<string>;
   } = {},
-): Promise<void> {
+): Promise<DashboardRestartResult> {
   await Effect.runPromise(stopDashboard(config));
-  await startDashboardFn();
+  const logPath = opts.eaddrinuseLogPath ?? DASHBOARD_LOG_FILE;
+  const logOffset = await fileSizeOrZero(logPath);
+  const handle = await startDashboardFn();
+  const spawnedPid = await handle?.pid?.() ?? null;
+  const pollFailure = handle?.pid
+    ? createEaddrinuseProbe(
+        logPath,
+        logOffset,
+        config.dashboardApiPort,
+        opts.portOwnerProbe ?? pidsOnPort,
+        opts.pidDescriptor ?? describePid,
+      )
+    : undefined;
   try {
-    await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
+    await waitForDashboardHealthPromise(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: opts.expectedIdentity,
-    }));
+      expectedPid: spawnedPid ?? undefined,
+      pollFailure,
+    });
   } catch (error) {
+    if (error instanceof EaddrinuseSpawnError) throw error;
     // #3099: NEVER reap the freshly spawned server on a health timeout. The old
     // policy killed the new server after a false-fast health check and exited
     // with zero listeners — a full dashboard outage caused by a slow-but-healthy
@@ -377,6 +573,7 @@ async function restartDashboardPromise(
       recovery: 'dashboard-left-running',
     });
   }
+  return { ownershipVerified: spawnedPid !== null, spawnedPid };
 }async function restartCliproxyPromise(
   cliproxy: {
     stopCliproxy: () => void;
@@ -452,7 +649,10 @@ const stageErrorOf = (op: string) => (cause: unknown): StageError => {
 /** Effect variant of {@link stopDashboard}. */
 export const stopDashboard = (
   config: PlatformConfig,
-  opts: { graceTimeoutMs?: number } = {},
+  opts: {
+    graceTimeoutMs?: number;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+  } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => stopDashboardPromise(config, opts), catch: stageErrorOf('stopDashboard') });
 
@@ -463,6 +663,7 @@ export const waitForDashboardHealth = (
     timeoutMs?: number;
     pollIntervalMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    expectedPid?: number;
   } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => waitForDashboardHealthPromise(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
@@ -493,8 +694,11 @@ export const restartDashboard = (
   opts: {
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    eaddrinuseLogPath?: string;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+    pidDescriptor?: (pid: number) => Promise<string>;
   } = {},
-): Effect.Effect<void, StageError> =>
+): Effect.Effect<DashboardRestartResult, StageError> =>
   Effect.tryPromise({
     try: () => restartDashboardPromise(config, startDashboardFn, opts),
     catch: stageErrorOf('restartDashboard'),

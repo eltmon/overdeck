@@ -126,6 +126,8 @@ describe('GET /api/workspace-registry (ac1)', () => {
           verificationStatus: 'passed',
           readyForMerge: true,
         },
+        // PAN-3286 FR-12: null for issue rows, which badge the pipeline phase.
+        memoryPhase: null,
       }],
     });
     expect(routeMocks.getReviewStatusSync).toHaveBeenCalledWith('PAN-9001');
