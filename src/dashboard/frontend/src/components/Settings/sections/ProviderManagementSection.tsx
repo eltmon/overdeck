@@ -81,6 +81,19 @@ function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
   return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
 }
 
+/**
+ * Label for an explicit harness choice. The provider's built-in default is the
+ * harness Overdeck recommends — for Kimi that is the native `kimi-code` CLI,
+ * which reaches Kimi-specific behavior the ACP lowest-common-denominator
+ * surface can't. Say so on the option rather than leaving the operator to infer
+ * it from the unlabeled "Default (…)" row.
+ */
+function harnessOptionLabel(harness: Harness, builtInHarness: Harness): string {
+  return harness === builtInHarness
+    ? `${harnessLabel(harness)} (recommended)`
+    : harnessLabel(harness);
+}
+
 function formatCodexExpiry(expiresAt?: string): string | null {
   if (!expiresAt) return null;
   const date = new Date(expiresAt);
@@ -454,7 +467,7 @@ export function ProviderManagementSection({
                         >
                           <option value="">Default ({harnessLabel(builtInHarness)})</option>
                           {harnessOptionsFor(provider.id).map((option) => (
-                            <option key={option} value={option}>{harnessLabel(option)}</option>
+                            <option key={option} value={option}>{harnessOptionLabel(option, builtInHarness)}</option>
                           ))}
                         </select>
                       </div>
@@ -542,7 +555,9 @@ export function ProviderManagementSection({
                     >
                       <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
                       {harnessOptionsFor('openrouter').map((option) => (
-                        <option key={option} value={option}>{harnessLabel(option)}</option>
+                        <option key={option} value={option}>
+                          {harnessOptionLabel(option, formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')}
+                        </option>
                       ))}
                     </select>
                   </div>
