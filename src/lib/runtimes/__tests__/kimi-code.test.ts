@@ -498,35 +498,50 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     // array. That is a race — acquiring the second bucket's lock is several
     // real fs round-trips (mkdir, writeFile, rename) with no timers of its
     // own, so whether it landed before the 30ms timer fired depended on how
-    // fast the disk was. Hold the first bucket's lock until the test
-    // explicitly releases it instead, so "the second bucket finished while
-    // the first lock was still held" is a fact rather than an interleaving
-    // that usually works out.
+    // fast the disk was. Two changes make it deterministic:
+    //
+    // 1. Real timers. Unlike its sibling tests, nothing on this path is
+    //    delay-based: both buckets are uncontended, so acquire never reaches
+    //    its `delay(KIMI_CAPTURE_LOCK_POLL_MS)` retry and no callback sleeps.
+    //    Under fake timers the only way to let real fs I/O land is
+    //    drainFakeTimersUntilSettled's fixed step budget, and on a loaded
+    //    machine that budget can expire before the I/O completes — which is
+    //    the flake. With no timers to fake, awaiting the real promise is
+    //    both simpler and immune to how busy the box is. The repo's
+    //    fake-timer rule targets delay-based code; there is none here.
+    // 2. The first bucket's lock is held until the test explicitly releases
+    //    it, so "the second bucket finished while the first lock was still
+    //    held" is a fact rather than an interleaving that usually works out.
+    vi.useRealTimers();
+
     const kimiHome = makeHome();
     let releaseSlow!: () => void;
     const slowMayFinish = new Promise<void>((resolve) => { releaseSlow = resolve; });
     let slowFinished = false;
-    let fastFinished = false;
 
     const slow = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-one', async () => {
       await slowMayFinish;
       slowFinished = true;
     });
-    const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => {
-      fastFinished = true;
-    });
+    const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => 'fast-done');
 
-    await drainFakeTimersUntilSettled(fast);
+    // A global lock would park `fast` behind the still-held first lock
+    // forever; bound the wait so that shows up as a clear assertion rather
+    // than a bare test timeout. The timer only ever elapses on failure.
+    let blockedTimer: NodeJS.Timeout | undefined;
+    const outcome = await Promise.race([
+      fast,
+      new Promise<string>((resolve) => { blockedTimer = setTimeout(() => resolve('still-blocked'), 2_000); }),
+    ]);
+    if (blockedTimer) clearTimeout(blockedTimer);
 
     // The unrelated-bucket task ran to completion while the first bucket's
-    // lock was still held — a global lock would have blocked it here.
-    expect(fastFinished).toBe(true);
+    // lock was still held.
+    expect(outcome).toBe('fast-done');
     expect(slowFinished).toBe(false);
 
     releaseSlow();
-    const both = Promise.all([slow, fast]);
-    await drainFakeTimersUntilSettled(both);
-    await both;
+    await Promise.all([slow, fast]);
     expect(slowFinished).toBe(true);
   });
 
