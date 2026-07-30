@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T22:20:52.102Z",
+  "updated": "2026-07-30T22:20:59.490Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -192,5 +192,66 @@
     "wi6-docs.wi6-docs.ac1": "completed",
     "wi6-docs.wi6-docs.ac2": "completed",
     "wi6-docs.wi6-docs.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
+      "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/workspace/__tests__/workspace-view-actions.test.tsx"
+    ],
+    "declaredScope": [
+      "CLAUDE.md",
+      "configuration/workspaces.mdx",
+      "docs/WORKSPACES-AND-PROJECTS.md",
+      "docs/audits/pan-1990-surface-inventory.md",
+      "src/cli/commands/workspace-scratch.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/NewWorkspaceModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+      "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+      "src/dashboard/frontend/src/components/workspace/__tests__/workspace-view-actions.test.tsx",
+      "src/dashboard/server/routes/workspace-registry.ts",
+      "src/lib/workspaces/create.ts",
+      "sync-sources/skills/pan-workspace/SKILL.md",
+      "tests/unit/dashboard/workspace-registry-create.test.ts",
+      "tests/unit/lib/workspaces/create-intent.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "configuration/workspaces.mdx",
+      "docs/WORKSPACES-AND-PROJECTS.md",
+      "docs/audits/pan-1990-surface-inventory.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/workspace-scratch.ts",
+      "src/dashboard/frontend/src/App.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/NewWorkspaceModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+      "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+      "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "src/dashboard/server/routes/workspace-registry.ts",
+      "src/lib/workspaces/create.ts",
+      "sync-sources/skills/pan-workspace/SKILL.md",
+      "tests/unit/dashboard/workspace-registry-create.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/workspaces/create-intent.test.ts"
+    ],
+    "recordedAt": "2026-07-30T22:20:59.488Z"
   }
 }
