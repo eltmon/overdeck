@@ -9074,3 +9074,13 @@ Capacity verified first: **6 running agents against a cap of 20** (the 18 tmux s
 **"I filed it" felt like closure and was not.** Every one of those issues had a located root cause and a specified fix, which is precisely the state where a strike should follow immediately — the filing was the *easy* half and I treated it as the whole. The tell I should have caught: my own status snapshots listed the same `investigate` suggestions tick after tick with nothing in flight against them. **A suggestion that repeats across ticks with no agent behind it is a failed tick, not a status update.**
 
 The run is **NOT complete**; the earlier retrospective's quiescence claim is retracted.
+
+## RUN-75 tick 14 (2026-07-30 20:57Z) — five strikes mid-gate; nothing landable yet
+
+- Hook artifact **445 / guard=1**; leak **0 procs**. Memory **24.9 GB available**, down from 37 GB — five concurrent Opus strikes each running the full suite. Not pressure (PSI 0), but the headroom is worth watching before dispatching anything further.
+- **No strike branches on the remote and no PRs in any state** — verified with `--state all`, not just open, because my PR monitor only watches open PRs and would miss an already-merged one. Nothing has landed.
+- **Four of five advancing strongly** over ~13 minutes: PAN-3339 `$3.79→$8.22` (+217/-31), PAN-3327 `$2.68→$7.93` (+447/-15), PAN-3328 `$3.18→$7.09` (+330/-34), PAN-3324 `$3.85→$6.12` (+128/-32).
+- **I misread PAN-3326 as stalled and was wrong.** Its cost moved only `$3.16→$3.30` with an unchanged `+94/-2` diff — the stall signature. Reading the pane properly showed it running `npm test` as a **9m53s shell command**, having already written its code and merged main via `pan sync-main` (its rebase was correctly refused by the agent git guard). **It is the furthest along, not the most stuck.**
+- **LESSON, and I nearly repeated my own recorded one:** flat cost plus an unchanged diff has at least three causes — finished, wedged, or *blocked on a long-running tool call*. RUN-74 recorded exactly this ("an unchanged cost means 'not spending', which is three different states") and I still reached for "stalled" first. **The pane text, not the cost delta, is what separates them** — one `capture-pane -S -40` settled it in one command.
+- Read door swept for all 12 projects: **28 in-pipeline rows** (the five struck issues now appear as `planned_backlog`, as expected for dispatched strike work). Nothing merge-ready; no new `post_merge_limbo` to drain. The three blocked PAN rows and MIN-908 are unchanged and out of my reach until their strikes land.
+- Watch is event-driven (monitor on strike PRs) with the interval wakeup only as a backstop for a strike that dies without opening a PR.
