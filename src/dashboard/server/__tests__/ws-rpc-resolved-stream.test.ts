@@ -1,5 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Effect, Stream } from 'effect';
+
+// Stub the transcript resolvers so the dispatch can be asserted on the exact
+// arguments each one receives — the kimi case has to forward a workspace.
+const resolverMock = vi.hoisted(() => ({
+  resolveAgentHarness: vi.fn(async () => 'claude-code'),
+  resolvePiSessionPath: vi.fn(async () => null),
+  resolveCodexRolloutPath: vi.fn(async () => null),
+  resolveAcpTranscriptPath: vi.fn(async () => null),
+  resolveKimiWirePath: vi.fn(async () => null),
+  readLauncherPinnedSessionId: vi.fn(async () => null),
+}));
+vi.mock('../routes/jsonl-resolver.js', () => resolverMock);
+
 import {
   streamHarnessFullParseSnapshots,
   streamResolvedFullParseSnapshots,
@@ -54,6 +67,36 @@ describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
     expect(Array.from(first)).toEqual([
       { kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true },
     ]);
+  });
+
+  // resolveKimiWirePath derives the workspace from an AgentState row, which a
+  // conversation does not have — without the forwarded cwd it returned null and
+  // the panel showed the empty "How can I help you?" state over a live session.
+  it('forwards the conversation cwd to the kimi wire resolver', async () => {
+    resolverMock.resolveKimiWirePath.mockClear();
+    const stream = streamHarnessFullParseSnapshots(
+      'conv-20260730-5188',
+      'kimi-code',
+      null,
+      true,
+      '/home/test/Projects/overdeck',
+    );
+
+    await Effect.runPromise(stream!.pipe(Stream.take(1), Stream.runCollect));
+
+    expect(resolverMock.resolveKimiWirePath).toHaveBeenCalledWith(
+      'conv-20260730-5188',
+      { workspaceOverride: '/home/test/Projects/overdeck' },
+    );
+  });
+
+  it('omits the override for a kimi work agent, which resolves its own workspace', async () => {
+    resolverMock.resolveKimiWirePath.mockClear();
+    const stream = streamHarnessFullParseSnapshots('agent-pan-1837', 'kimi-code', null);
+
+    await Effect.runPromise(stream!.pipe(Stream.take(1), Stream.runCollect));
+
+    expect(resolverMock.resolveKimiWirePath).toHaveBeenCalledWith('agent-pan-1837', {});
   });
 });
 
