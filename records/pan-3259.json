@@ -1,19 +1,27 @@
 {
   "issueId": "PAN-3259",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-07-30T08:20:11.934Z"
+    }
+  ],
   "feedback": [],
   "created": "2026-07-29T00:05:06.073Z",
-  "updated": "2026-07-30T08:20:11.935Z",
+  "updated": "2026-07-30T22:44:28.525Z",
   "pipeline": {
     "issueId": "PAN-3259",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
     "verificationStatus": "passed",
     "mergeStatus": "failed",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T01:36:07.811Z",
+    "updatedAt": "2026-07-30T22:44:28.484Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "mergeNotes": "GitHub PR #3263 has failing required checks on HEAD c686bdd6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3263 for details.",
     "lastVerifiedCommit": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyHead": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
@@ -50,19 +58,12 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-29T01:36:07.812Z"
+        "pricingAsOf": "2026-07-30T22:44:28.505Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "claude-opus-5",
-      "timestamp": "2026-07-30T08:20:11.934Z"
-    }
-  ]
+  "model": "claude-opus-5"
 }
