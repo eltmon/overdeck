@@ -253,7 +253,10 @@ describe('KimiCodeRuntimeSync', () => {
     const launcherScript = join(overdeckHome, 'agents', 'agent-kimi-spawn', 'launcher.sh');
     expect(existsSync(launcherScript)).toBe(true);
     const launcherContent = readFileSync(launcherScript, 'utf-8');
-    expect(launcherContent).toMatch(/kimi -m 'k3' --yolo/);
+    // The launcher chokepoint translates the stored model id to what the kimi
+    // CLI's -m flag accepts: KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS maps k3 →
+    // kimi-code/k3-256k. The agent record above keeps the operator's own 'k3'.
+    expect(launcherContent).toMatch(/kimi -m 'kimi-code\/k3-256k' --yolo/);
     expect(launcherContent).toContain('unset ANTHROPIC_BASE_URL');
     expect(launcherContent).toContain("node '/dist/pty-supervisor.js'");
 

@@ -72,6 +72,9 @@ vi.mock('../../../../lib/providers.js', () => ({
   getProviderForModelSync: vi.fn(() => ({ name: resolvedProviderName })),
   piProviderForModel: vi.fn(() => 'anthropic'),
   qualifyPiModel: vi.fn((m: string) => m),
+  // Real implementation maps a legacy Kimi id to its native alias and passes
+  // through anything already prefixed; identity is enough for these spawn tests.
+  resolveKimiCodeModelAlias: vi.fn((m: string) => m),
 }));
 
 vi.mock('../../../../lib/harness-resolve.js', () => ({
@@ -115,6 +118,9 @@ vi.mock('../../../../lib/tmux.js', () => ({
   exactPaneTarget: vi.fn((name: string) => `=${name}:`),
   waitForClaudePrompt: vi.fn(() => Effect.succeed(Promise.resolve(true))),
   listSessionNames: vi.fn(() => Effect.succeed(listedSessionNames)),
+  // Real implementation asks systemd for the managed tmux server's MainPID and
+  // returns undefined when there is none — the shape these tests run under.
+  findManagedServerPidSync: vi.fn(() => undefined),
 }));
 
 // PAN-1837 review fix (cycle 8): waitForNewKimiSessionAsync defaults to the
