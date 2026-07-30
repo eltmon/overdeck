@@ -1,0 +1,797 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Issue detail redesign v2 — MIN-852 live run · Overdeck mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500&display=swap" rel="stylesheet" />
+<style>
+  /* ── Tokens: copied from src/dashboard/frontend/src/index.css (light block) ── */
+  :root {
+    --radius: 0.625rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --background: #ffffff;
+    --foreground: #1f2937;
+    --card: #ffffff;
+    --popover: #ffffff;
+    --primary: oklch(0.488 0.217 264);
+    --primary-foreground: #ffffff;
+    --muted: color-mix(in srgb, black 4%, transparent);
+    --muted-foreground: #6b7280;
+    --border: color-mix(in srgb, black 8%, transparent);
+    --input: color-mix(in srgb, black 10%, transparent);
+    --ring: oklch(0.488 0.217 264);
+    --destructive: #ef4444;
+    --destructive-foreground: #b91c1c;
+    --info: #3b82f6;
+    --info-foreground: #1d4ed8;
+    --success: #10b981;
+    --success-foreground: #047857;
+    --warning: #f59e0b;
+    --warning-foreground: #b45309;
+    --signal-review: #a855f7;
+    --signal-review-foreground: #7e22ce;
+    --signal-cost: #06b6d4;
+    --signal-cost-foreground: #0e7490;
+    --app-bg: #f5f4f2;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.05), 0 4px 16px -8px rgb(0 0 0 / 0.06);
+    --z-dropdown: 30;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--app-bg);
+    color: var(--foreground);
+    font-family: "DM Sans", system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.45;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.92em; }
+  b, strong { font-weight: 500; }
+  button { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+
+  .page { max-width: 1380px; margin: 0 auto; padding: 20px 24px 96px; }
+
+  /* ── Mockup banner ── */
+  .banner {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #1f2937; color: #e5e7eb;
+    border-radius: var(--radius); padding: 8px 14px; margin-bottom: 16px;
+    font-size: 12px;
+  }
+  .banner .tag { background: var(--primary); color: #fff; border-radius: var(--radius-sm); padding: 1px 8px; font-weight: 500; letter-spacing: 0.02em; }
+  .banner .spacer { flex: 1; }
+  .banner button {
+    background: rgb(255 255 255 / 0.1); border: 1px solid rgb(255 255 255 / 0.18);
+    color: #fff; border-radius: var(--radius-sm); padding: 3px 10px; cursor: pointer;
+  }
+  .banner button[aria-pressed="true"] { background: var(--primary); border-color: var(--primary); }
+
+  .legend {
+    display: none; background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow-card); padding: 16px 20px; margin-bottom: 16px;
+    font-size: 12px; color: var(--muted-foreground);
+  }
+  .legend.open { display: block; }
+  .legend h3 { font-size: 12px; font-weight: 500; color: var(--foreground); margin: 14px 0 8px; }
+  .legend h3:first-child { margin-top: 0; }
+  .legend ul { margin: 0; padding: 0; columns: 2; column-gap: 32px; }
+  .legend li { margin: 0 0 6px; break-inside: avoid; list-style: none; display: flex; gap: 8px; }
+  .legend b { color: var(--foreground); }
+  .legend table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .legend th { text-align: left; font-weight: 500; color: var(--foreground); padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); }
+  .legend td { padding: 4px 10px 4px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .legend td:first-child { white-space: nowrap; }
+
+  /* numbered annotation markers */
+  .anno {
+    display: none; position: absolute; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--primary); color: #fff; font-size: 10px; font-weight: 500;
+    place-items: center; z-index: 5; box-shadow: 0 0 0 2px #fff;
+    transform: translate(-50%, -50%);
+  }
+  body.show-anno .anno { display: grid; }
+  .anchor { position: relative; }
+  .anchor > .anno { position: absolute; top: 0; left: 0; }
+
+  /* ── Shared primitives ── */
+  .card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow-card); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 20px; padding: 0 8px; border-radius: var(--radius-sm);
+    font-size: 11px; font-weight: 500; letter-spacing: 0.02em;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .badge.info    { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .badge.success { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+  .badge.warning { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.review  { background: color-mix(in srgb, var(--signal-review) 8%, transparent); border-color: color-mix(in srgb, var(--signal-review) 32%, transparent); color: var(--signal-review-foreground); }
+  .badge.cost    { background: color-mix(in srgb, var(--signal-cost) 8%, transparent); border-color: color-mix(in srgb, var(--signal-cost) 32%, transparent); color: var(--signal-cost-foreground); font-variant-numeric: tabular-nums; }
+  .badge.neutral { background: var(--muted); border-color: var(--border); color: var(--muted-foreground); }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  @media (prefers-reduced-motion: no-preference) {
+    .dot.live { animation: pulse 2s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 45%, transparent); } 70% { box-shadow: 0 0 0 5px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+  }
+
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 10px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--card); color: var(--foreground); font-size: 12px; white-space: nowrap;
+  }
+  .chip .icon-btn {
+    display: grid; place-items: center; width: 22px; height: 22px; border: 0; border-radius: 4px;
+    background: transparent; color: var(--muted-foreground); cursor: pointer;
+  }
+  .chip .icon-btn:hover { background: var(--muted); color: var(--foreground); }
+  .chip a.chip-action { color: var(--primary); text-decoration: none; font-weight: 500; padding-right: 4px; }
+  .chip a.chip-action:hover { text-decoration: underline; }
+
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px;
+    background: var(--primary); color: var(--primary-foreground); border: 0; border-radius: var(--radius-sm);
+    font-weight: 500; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .btn-primary:hover { filter: brightness(1.08); }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px;
+    background: var(--card); color: var(--foreground); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    font-weight: 500; cursor: pointer; font-size: 12px; white-space: nowrap;
+  }
+  .btn-secondary:hover { background: var(--muted); }
+
+  /* split button */
+  .split { display: inline-flex; height: 28px; }
+  .split .main {
+    display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+    background: var(--primary); color: var(--primary-foreground); border: 1px solid var(--primary);
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm); cursor: pointer; font-weight: 500; font-size: 12px;
+  }
+  .split .chev {
+    display: grid; place-items: center; width: 26px;
+    background: var(--primary); color: var(--primary-foreground);
+    border: 1px solid var(--primary); border-left-color: rgb(255 255 255 / 0.3);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0; cursor: pointer;
+  }
+  .split .main:hover, .split .chev:hover { filter: brightness(1.08); }
+
+  .overflow-btn {
+    display: grid; place-items: center; width: 28px; height: 28px;
+    border: 1px solid var(--border); background: var(--card); border-radius: var(--radius-sm); cursor: pointer;
+    color: var(--muted-foreground);
+  }
+  .overflow-btn:hover { background: var(--muted); color: var(--foreground); }
+
+  /* ── Header ── */
+  .header { padding: 16px 20px 14px; }
+  .crumbs { display: flex; align-items: center; gap: 6px; color: var(--muted-foreground); font-size: 12px; margin-bottom: 8px; }
+  .crumbs a { color: inherit; text-decoration: none; }
+  .crumbs a:hover { color: var(--foreground); text-decoration: underline; }
+  .crumbs .sep { opacity: 0.5; }
+  .header-row { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .issue-title { font-size: 17px; font-weight: 500; margin: 2px 0 4px; text-wrap: balance; }
+  .phase-line { color: var(--muted-foreground); font-size: 12.5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .header-meta { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Needs-you slot ── */
+  .needs-you {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-top: 14px; padding: 11px 20px;
+    background: color-mix(in srgb, var(--warning) 8%, var(--card));
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    border-radius: var(--radius);
+  }
+  .needs-you svg { color: var(--warning-foreground); flex: none; }
+  .needs-you .q { font-size: 12.5px; }
+  .needs-you .q b { color: var(--warning-foreground); }
+  .needs-you .actions { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  /* ── Pipeline stepper ── */
+  .pipeline { margin-top: 14px; padding: 14px 20px 16px; }
+  .steps { display: flex; align-items: flex-start; }
+  .step { flex: 1; min-width: 0; position: relative; padding-top: 2px; }
+  .step .rail { position: absolute; top: 9px; left: 22px; right: -2px; height: 2px; background: var(--border); }
+  .step:last-child .rail { display: none; }
+  .step.done .rail { background: var(--success); }
+  .step .node {
+    position: relative; z-index: 1; width: 20px; height: 20px; border-radius: 50%;
+    display: grid; place-items: center; background: var(--card);
+    border: 1.5px solid var(--border); color: var(--muted-foreground);
+  }
+  .step.done .node { border-color: var(--success); background: color-mix(in srgb, var(--success) 10%, #fff); color: var(--success-foreground); }
+  .step.active .node { border-color: var(--info); color: var(--info-foreground); }
+  .step.active .node .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--info); }
+  .step.skipped .node { border-style: dashed; }
+  .step .name { margin-top: 8px; font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--foreground); }
+  .step .sub { font-size: 11.5px; color: var(--muted-foreground); margin-top: 1px; }
+  .step.active .name { color: var(--info-foreground); }
+  .step.pending .name, .step.skipped .name, .step.pending .sub, .step.skipped .sub { color: var(--muted-foreground); }
+  .step .sub a { color: var(--primary); text-decoration: none; }
+  .step .sub a:hover { text-decoration: underline; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 2px; margin-top: 18px; border-bottom: 1px solid var(--border); padding: 0 4px; align-items: center; }
+  .tabs button {
+    border: 0; background: none; padding: 8px 12px; cursor: pointer; font-size: 13px;
+    color: var(--muted-foreground); border-bottom: 2px solid transparent; margin-bottom: -1px;
+    display: inline-flex; align-items: center; gap: 7px;
+  }
+  .tabs button:hover { color: var(--foreground); }
+  .tabs button[aria-selected="true"] { color: var(--foreground); font-weight: 500; border-bottom-color: var(--primary); }
+  .tabs .count {
+    font-size: 11px; background: var(--muted); border-radius: var(--radius-sm);
+    padding: 0 6px; height: 18px; display: inline-grid; place-items: center; font-variant-numeric: tabular-nums;
+  }
+  .tabs .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--info); }
+
+  /* ── Body: spine | main | rail ── */
+  .body { display: grid; grid-template-columns: 224px minmax(0, 1fr) 292px; gap: 16px; margin-top: 16px; align-items: start; }
+  @media (max-width: 1100px) { .body { grid-template-columns: 224px minmax(0, 1fr); } .rail { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; } }
+  @media (max-width: 760px) { .body { grid-template-columns: 1fr; } }
+
+  /* crew spine */
+  .spine { padding: 10px 8px; }
+  .spine h2 { font-size: 11px; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted-foreground); margin: 4px 8px 8px; }
+  .crew-row {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    padding: 7px 8px; border: 0; background: none; border-radius: var(--radius-sm); cursor: pointer;
+  }
+  .crew-row:hover { background: var(--muted); }
+  .crew-row[aria-current="true"] { background: color-mix(in srgb, var(--primary) 7%, transparent); }
+  .crew-row .st { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .crew-row .st.running { background: var(--info); }
+  .crew-row .st.review-live { background: var(--signal-review); }
+  .crew-row .st.done { background: var(--success); }
+  .crew-row .st.idle { background: transparent; border: 1.5px solid var(--border); }
+  .crew-row .who { min-width: 0; flex: 1; }
+  .crew-row .role { font-size: 12.5px; font-weight: 500; }
+  .crew-row .meta { font-size: 11px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .crew-row .cost { font-size: 11px; color: var(--muted-foreground); font-variant-numeric: tabular-nums; }
+  .crew-sub { margin-left: 15px; border-left: 1px solid var(--border); padding-left: 4px; }
+  .crew-sub .crew-row { padding: 5px 8px; }
+  .crew-sub .role { font-size: 12px; font-weight: 400; }
+
+  /* session pane */
+  .session { display: flex; flex-direction: column; min-height: 520px; align-self: stretch; }
+  .transcript { display: flex; flex-direction: column; justify-content: flex-end; }
+  .session-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .session-head .who { font-size: 12.5px; }
+  .session-head .who .mono { color: var(--muted-foreground); }
+  .seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-left: auto; }
+  .seg button { border: 0; background: var(--card); padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--muted-foreground); }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button[aria-pressed="true"] { background: var(--muted); color: var(--foreground); font-weight: 500; }
+  .transcript { flex: 1; padding: 16px 20px 8px; max-width: 860px; width: 100%; margin: 0 auto; }
+  .msg { margin-bottom: 14px; }
+  .msg .from { font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-foreground); margin-bottom: 3px; display: flex; gap: 8px; align-items: baseline; }
+  .msg .from time { font-weight: 400; letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+  .msg .body-text { font-size: 13px; max-width: 68ch; }
+  .msg .tool {
+    font-size: 12px; padding: 6px 10px; background: var(--muted); border-radius: var(--radius-sm);
+    color: var(--muted-foreground); display: flex; gap: 8px; align-items: center; max-width: 68ch;
+  }
+  .auq {
+    border: 1px solid color-mix(in srgb, var(--warning) 32%, transparent);
+    background: color-mix(in srgb, var(--warning) 6%, transparent);
+    border-radius: var(--radius); padding: 12px 14px; max-width: 68ch;
+  }
+  .auq .auq-label { font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warning-foreground); margin-bottom: 6px; }
+  .auq .auq-q { font-size: 13px; margin-bottom: 10px; }
+  .auq .opts { display: flex; gap: 8px; flex-wrap: wrap; }
+  .composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+  .composer input {
+    flex: 1; height: 32px; border: 1px solid var(--input); border-radius: var(--radius-sm);
+    padding: 0 12px; font: inherit; font-size: 12.5px; background: var(--card); color: var(--foreground);
+  }
+  .composer input::placeholder { color: var(--muted-foreground); }
+
+  /* right rail */
+  .rail .card { margin-bottom: 16px; }
+  .rail .card:last-child { margin-bottom: 0; }
+  .rail .section { padding: 13px 16px; }
+  .rail h2 { font-size: 12px; font-weight: 500; margin: 0 0 9px; }
+  .kv { display: grid; grid-template-columns: 86px 1fr; row-gap: 6px; font-size: 12px; margin: 0; }
+  .kv dt { color: var(--muted-foreground); }
+  .kv dd { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gate-list { display: flex; flex-direction: column; gap: 6px; font-size: 12px; }
+  .gate-line { display: flex; align-items: center; gap: 7px; }
+  .gate-line svg { flex: none; }
+  .gate-line.ok svg { color: var(--success-foreground); }
+  .gate-line.pending svg { color: var(--muted-foreground); }
+  .gate-line.skip svg { color: var(--muted-foreground); }
+  .gate-line .why { color: var(--muted-foreground); }
+  .cost-table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cost-table td { padding: 3px 0; }
+  .cost-table td:last-child { text-align: right; }
+  .cost-table tr.total td { border-top: 1px solid var(--border); padding-top: 7px; font-weight: 500; color: var(--signal-cost-foreground); }
+  .env-link { display: flex; align-items: center; gap: 7px; font-size: 12px; padding: 3px 0; }
+  .env-link a { color: var(--primary); text-decoration: none; }
+  .env-link a:hover { text-decoration: underline; }
+  .env-link .svc { color: var(--muted-foreground); width: 64px; flex: none; }
+  .activity-item { display: flex; gap: 10px; padding: 6px 0; border-top: 1px solid var(--border); font-size: 12px; }
+  .activity-item:first-of-type { border-top: 0; }
+  .activity-item time { color: var(--muted-foreground); flex: none; width: 40px; font-variant-numeric: tabular-nums; }
+  .more-link { display: inline-block; margin-top: 7px; font-size: 12px; color: var(--primary); text-decoration: none; font-weight: 500; }
+  .more-link:hover { text-decoration: underline; }
+
+  /* ── Demo sections ── */
+  .demo { margin-top: 28px; }
+  .demo > .label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); margin-bottom: 10px; }
+
+  /* mega menu demo */
+  .mega { padding: 16px 20px; }
+  .mega-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 4px 24px; }
+  .mega .group-h { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted-foreground); padding: 8px 8px 4px; }
+  .mega .item {
+    display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+    padding: 5px 8px; border: 0; background: none; border-radius: var(--radius-sm); cursor: pointer; font-size: 12.5px;
+  }
+  .mega .item:hover { background: var(--muted); }
+  .mega .item .right { margin-left: auto; color: var(--muted-foreground); font-size: 11px; }
+  .mega .item:disabled { color: var(--muted-foreground); opacity: 0.55; cursor: not-allowed; }
+  .mega .item.destructive:not(:disabled) { color: var(--destructive-foreground); }
+  .mega .item.destructive:not(:disabled):hover { background: color-mix(in srgb, var(--destructive) 6%, transparent); }
+  .mega .search {
+    width: 100%; height: 30px; border: 1px solid var(--input); border-radius: var(--radius-sm);
+    padding: 0 12px; font: inherit; font-size: 12.5px; margin-bottom: 10px; background: var(--card); color: var(--foreground);
+  }
+  .mega .search::placeholder { color: var(--muted-foreground); }
+
+  /* done-state header demo */
+  .done-demo .phase-line { margin-top: 2px; }
+  .empty-demo { padding: 26px 20px; border: 1px dashed var(--input); box-shadow: none; background: transparent; border-radius: var(--radius); }
+  .empty-inner { display: flex; gap: 16px; align-items: flex-start; max-width: 640px; }
+  .empty-inner .glyph { width: 36px; height: 36px; border-radius: var(--radius); background: var(--muted); display: grid; place-items: center; color: var(--muted-foreground); flex: none; }
+  .empty-inner h3 { margin: 0 0 4px; font-size: 14px; font-weight: 500; }
+  .empty-inner p { margin: 0 0 12px; color: var(--muted-foreground); font-size: 12.5px; max-width: 52ch; }
+
+  .footnote { margin-top: 28px; color: var(--muted-foreground); font-size: 11.5px; max-width: 90ch; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .tabs button, .chip, .crew-row, .mega .item, .overflow-btn, .seg button { transition: background-color 150ms ease-out, color 150ms ease-out; }
+  }
+</style>
+</head>
+<body class="show-anno">
+
+<div class="page">
+
+  <!-- ── Mockup banner ─────────────────────────────────────────── -->
+  <div class="banner">
+    <span class="tag">MOCKUP · V2</span>
+    <span>Issue detail redesign v2 — designed around the live run, with a no-loss parity map to the current 13-tab page</span>
+    <span class="spacer"></span>
+    <button id="annoToggle" aria-pressed="true">Hide annotations</button>
+    <button id="legendToggle" aria-expanded="false">Parity map + rationale</button>
+  </div>
+
+  <div class="legend" id="legend">
+    <h3>Why v2 — what v1 got wrong</h3>
+    <ul>
+      <li><b class="mono">·</b><span>v1 designed the <b>postmortem</b> (a Done issue) and dropped the page's primary job: watching and steering a live run. v2's hero state is <b>work running + a question waiting</b>.</span></li>
+      <li><b class="mono">·</b><span>v1's overflow menu had 6 hand-picked actions; the real page renders 46 from the action registry, and a parity test (<span class="mono">issue-actions-surface-parity.test.tsx</span>) fails any surface-local list. v2 keeps the full registry: searchable, grouped, disabled-with-reason.</span></li>
+      <li><b class="mono">·</b><span>v1 removed Terminal, Plan map, Discussion, Artifacts, agent sessions, and the Tell composer with no destination. v2 folds instead of drops — see the map below.</span></li>
+      <li><b class="mono">·</b><span>v1 kept: real title as heading, single cost, truthful skip states, emerald Done, tracker split button, Create-PR chip, actionable branch chip. All preserved here.</span></li>
+    </ul>
+    <h3>Parity map — every current surface → its v2 home</h3>
+    <table>
+      <tr><th>Current (13 tabs + chrome)</th><th>v2 home</th></tr>
+      <tr><td>Conversation tab</td><td><b>Session tab</b> → Conversation view (default while an agent runs)</td></tr>
+      <tr><td>Terminal tab</td><td><b>Session tab</b> → Terminal toggle (same session, two views of it)</td></tr>
+      <tr><td>Tell input + resume (ActiveAgentPanel)</td><td>Composer pinned under the Session transcript</td></tr>
+      <tr><td>Agent sessions (AgentsLane / CrewStage / SessionPanel)</td><td><b>Crew spine</b> (left) — one row per session incl. review convoy, drives the Session tab</td></tr>
+      <tr><td>Plan map (DAG) + Tasks tab + Tasks chip + PRD</td><td><b>Plan tab</b> — Tasks ⇄ Map ⇄ PRD segmented views; done/total count lives in the tab</td></tr>
+      <tr><td>Code tab (CI checks) + Files tab (diff) + Artifacts tab</td><td><b>Changes tab</b> — Files ⇄ Checks ⇄ Artifacts views; check-state badge moves onto this tab</td></tr>
+      <tr><td>Activity tab + Timeline tab (status history) + Live Activity rail</td><td><b>Activity tab</b> — Feed ⇄ Status history views; excerpt stays in the right rail</td></tr>
+      <tr><td>Discussion tab (Linear + GitHub comments)</td><td><b>Discussion tab</b> — kept as-is; external content earns its own tab</td></tr>
+      <tr><td>Costs tab</td><td>Right-rail breakdown + header chip; "All costs →" opens the full per-model rollup</td></tr>
+      <tr><td>Ship tab (merge progress + log)</td><td>Pipeline band Ship step expands during a live merge; log in Activity</td></tr>
+      <tr><td>Overview tab (Now, HappenedFeed, blocker, pickup gate)</td><td><b>Overview tab</b> (summary + review results) + <b>Needs-you slot</b> + right-rail Now card</td></tr>
+      <tr><td>Awaiting-input / paused / stuck / stale-review banners</td><td><b>Needs-you slot</b>: one prioritized banner at a time, queue count when several</td></tr>
+      <tr><td>Verification gates grid</td><td>Right-rail <b>Gates</b> card (always visible), truthful skip reasons</td></tr>
+      <tr><td>UAT environment panel + workspace path + open-in picker</td><td>Right-rail <b>Environment</b> card</td></tr>
+      <tr><td>Review policy control · pickup gate controls</td><td>Overflow menu (Lifecycle / Inspect groups) + Needs-you slot when they demand action</td></tr>
+      <tr><td>StartAgentCta (model + harness overrides)</td><td>Pre-work empty state (below) — Start work split button with override picker</td></tr>
+      <tr><td>46-action registry (6 groups)</td><td>Header ⋯ opens the full grouped, searchable menu (rendered flat below)</td></tr>
+    </table>
+  </div>
+
+  <!-- ── Header ────────────────────────────────────────────────── -->
+  <div class="card header">
+    <div class="crumbs">
+      <a href="#">mind-your-now</a><span class="sep">/</span>
+      <a href="#">Issues</a><span class="sep">/</span>
+      <span class="mono" style="color:var(--foreground)">MIN-852</span>
+    </div>
+
+    <div class="header-row">
+      <div class="anchor">
+        <span class="anno" style="left:-16px;top:14px">1</span>
+        <div class="issue-title">Persist workspace drafts across dashboard restarts</div>
+        <div class="phase-line">
+          <span class="badge info"><span class="dot live"></span>Work running</span>
+          <span>34m in · task 14 of 22 · claude-sonnet-4-6 · one question is waiting on you</span>
+        </div>
+      </div>
+
+      <div class="header-meta">
+        <span class="chip" title="Branch — copy, or open the tree">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="4.5" cy="3.5" r="1.8"/><circle cx="4.5" cy="12.5" r="1.8"/><circle cx="11.5" cy="5.5" r="1.8"/><path d="M4.5 5.3v5.4M11.5 7.3c0 2.4-3 2.6-5 3.4"/></svg>
+          <span class="mono">feature/min-852</span>
+          <button class="icon-btn" title="Copy branch name" aria-label="Copy branch name"
+            onclick="navigator.clipboard&&navigator.clipboard.writeText('feature/min-852');this.style.color='var(--success-foreground)';setTimeout(()=>this.style.color='',900)">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8" height="8" rx="1.5"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2H3.5A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"/></svg>
+          </button>
+        </span>
+
+        <span class="chip" title="No pull request yet — created automatically at review, or create one now">
+          <span style="color:var(--muted-foreground)">No PR</span>
+          <a class="chip-action" href="#">Create PR</a>
+        </span>
+
+        <span class="badge cost mono" title="Plan $18.20 · Work $84.11 so far — click for full breakdown">$102.31</span>
+
+        <span class="split">
+          <button class="main">Open in Linear
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3H3.5A1.5 1.5 0 0 0 2 4.5v8A1.5 1.5 0 0 0 3.5 14h8a1.5 1.5 0 0 0 1.5-1.5V10M9.5 2H14v4.5M14 2 7.5 8.5"/></svg>
+          </button>
+          <button class="chev" aria-label="Choose tracker">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg>
+          </button>
+        </span>
+
+        <span class="anchor">
+          <span class="anno" style="left:-4px">2</span>
+          <button class="overflow-btn" aria-haspopup="menu" aria-label="All actions" title="All actions — full grouped menu, rendered flat at the bottom of this mockup">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg>
+          </button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Needs-you slot ────────────────────────────────────────── -->
+  <div class="needs-you anchor">
+    <span class="anno" style="left:6px;top:6px">3</span>
+    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11v.01"/></svg>
+    <span class="q"><b>The work agent is waiting on your answer</b> — “Should draft persistence use the workspace home or the project state branch?”</span>
+    <span class="actions">
+      <button class="btn-primary">Answer</button>
+      <button class="btn-secondary">Open conversation</button>
+    </span>
+  </div>
+
+  <!-- ── Pipeline stepper ──────────────────────────────────────── -->
+  <div class="card pipeline anchor">
+    <span class="anno" style="left:6px;top:6px">4</span>
+    <div class="steps">
+      <div class="step done">
+        <span class="rail"></span>
+        <span class="node"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M3 8.5 6.5 12 13 4.5"/></svg></span>
+        <div class="name">Plan</div>
+        <div class="sub">Jul 22 · 14m · approved by you</div>
+      </div>
+      <div class="step active">
+        <span class="rail"></span>
+        <span class="node"><span class="dot live"></span></span>
+        <div class="name">Work</div>
+        <div class="sub">running 34m · 14/22 tasks</div>
+      </div>
+      <div class="step pending">
+        <span class="rail"></span>
+        <span class="node"></span>
+        <div class="name">Review</div>
+        <div class="sub">4-specialist convoy</div>
+      </div>
+      <div class="step skipped">
+        <span class="rail"></span>
+        <span class="node"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h8"/></svg></span>
+        <div class="name">Test</div>
+        <div class="sub">will skip · <a href="#" title="Open test configuration">no suite configured</a></div>
+      </div>
+      <div class="step pending">
+        <span class="rail"></span>
+        <span class="node"></span>
+        <div class="name">Ship</div>
+        <div class="sub">merge on approval</div>
+      </div>
+      <div class="step pending">
+        <span class="rail"></span>
+        <span class="node"></span>
+        <div class="name">Done</div>
+        <div class="sub">verify on main</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Tabs ──────────────────────────────────────────────────── -->
+  <div class="tabs anchor" role="tablist">
+    <span class="anno" style="left:2%;top:0">5</span>
+    <button role="tab" aria-selected="false">Overview</button>
+    <button role="tab" aria-selected="true">Session <span class="live-dot" title="An agent is streaming"></span></button>
+    <button role="tab" aria-selected="false">Plan <span class="count">14/22</span></button>
+    <button role="tab" aria-selected="false">Changes <span class="count">9</span></button>
+    <button role="tab" aria-selected="false">Activity</button>
+    <button role="tab" aria-selected="false">Discussion <span class="count">3</span></button>
+  </div>
+
+  <!-- ── Body ──────────────────────────────────────────────────── -->
+  <div class="body">
+
+    <!-- Crew spine -->
+    <div class="card spine anchor">
+      <span class="anno" style="left:6px;top:6px">6</span>
+      <h2>Crew</h2>
+      <button class="crew-row">
+        <span class="st done"></span>
+        <span class="who">
+          <span class="role">Planner</span>
+          <span class="meta" style="display:block">opus-4-8 · done 14m</span>
+        </span>
+        <span class="cost mono">$18.20</span>
+      </button>
+      <button class="crew-row" aria-current="true">
+        <span class="st running"></span>
+        <span class="who">
+          <span class="role">Work</span>
+          <span class="meta" style="display:block">sonnet-4-6 · running 34m</span>
+        </span>
+        <span class="cost mono">$84.11</span>
+      </button>
+      <div class="crew-sub" aria-label="Review convoy — queued">
+        <button class="crew-row"><span class="st idle"></span><span class="who"><span class="role">review.security</span></span></button>
+        <button class="crew-row"><span class="st idle"></span><span class="who"><span class="role">review.correctness</span></span></button>
+        <button class="crew-row"><span class="st idle"></span><span class="who"><span class="role">review.performance</span></span></button>
+        <button class="crew-row"><span class="st idle"></span><span class="who"><span class="role">review.requirements</span></span></button>
+      </div>
+      <button class="crew-row">
+        <span class="st idle"></span>
+        <span class="who">
+          <span class="role">Ship</span>
+          <span class="meta" style="display:block">server-side merge</span>
+        </span>
+      </button>
+    </div>
+
+    <!-- Session pane -->
+    <div class="card session anchor">
+      <span class="anno" style="left:6px;top:6px">7</span>
+      <div class="session-head">
+        <span class="who"><b>Work</b> · <span class="mono">claude-sonnet-4-6</span> · <span class="mono">agent-min-852</span></span>
+        <span class="seg" role="group" aria-label="Session view">
+          <button aria-pressed="true">Conversation</button>
+          <button aria-pressed="false" title="Live tmux terminal for this same session">Terminal</button>
+        </span>
+      </div>
+
+      <div class="transcript">
+        <div class="msg">
+          <div class="from">Agent <time>14:02</time></div>
+          <div class="body-text">Task 13 done — the draft store now writes atomically (write-then-rename) with a schema version header. Moving to task 14: rehydration on dashboard boot.</div>
+        </div>
+        <div class="msg">
+          <div class="from">Tool <time>14:04</time></div>
+          <div class="tool">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4.5 7 8l-4 3.5M8.5 12H13"/></svg>
+            <span class="mono">Edit · src/dashboard/frontend/src/lib/draft-store.ts</span>
+          </div>
+        </div>
+        <div class="msg">
+          <div class="from">Agent <time>14:07</time></div>
+          <div class="auq anchor">
+            <span class="anno" style="left:-4px">8</span>
+            <div class="auq-label">Question for you</div>
+            <div class="auq-q">Should draft persistence use the <b>workspace home</b> (survives restarts, dies with the workspace) or the <b>project state branch</b> (survives workspace teardown, adds a commit per draft flush)?</div>
+            <div class="opts">
+              <button class="btn-secondary">Workspace home — drafts are ephemeral</button>
+              <button class="btn-secondary">State branch — drafts must outlive the workspace</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="composer">
+        <input type="text" placeholder="Tell the work agent… (delivers via pan tell)" aria-label="Message the work agent" />
+        <button class="btn-primary">Send</button>
+      </div>
+    </div>
+
+    <!-- Right rail -->
+    <div class="rail anchor">
+      <span class="anno" style="left:6px;top:6px">9</span>
+      <div class="card section">
+        <h2>Now</h2>
+        <p style="margin:0;font-size:12px;color:var(--muted-foreground)">Working through the plan — next gate is the 4-specialist review convoy after task 22. Nothing to do except the question above.</p>
+      </div>
+
+      <div class="card section">
+        <h2>Run details</h2>
+        <dl class="kv">
+          <dt>Agent</dt><dd>work · <span class="mono">sonnet-4-6</span></dd>
+          <dt>Harness</dt><dd>claude-code</dd>
+          <dt>Started</dt><dd>Jul 22, 13:28</dd>
+          <dt>Workspace</dt><dd class="mono" title="workspaces/feature-min-852">feature-min-852</dd>
+          <dt>Open in</dt><dd><a class="more-link" style="margin:0" href="#">VS Code ▾</a></dd>
+        </dl>
+      </div>
+
+      <div class="card section">
+        <h2>Gates</h2>
+        <div class="gate-list">
+          <div class="gate-line ok"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5 6.5 12 13 4.5"/></svg>Typecheck · clean 4m ago</div>
+          <div class="gate-line ok"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8.5 6.5 12 13 4.5"/></svg>Lint · clean</div>
+          <div class="gate-line skip"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h8"/></svg>Tests · <span class="why">no suite configured</span></div>
+          <div class="gate-line pending"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5.5"/></svg>Review · <span class="why">after work completes</span></div>
+        </div>
+      </div>
+
+      <div class="card section">
+        <h2>Cost</h2>
+        <table class="cost-table">
+          <tr><td>Plan</td><td class="mono">$18.20</td></tr>
+          <tr><td>Work (running)</td><td class="mono">$84.11</td></tr>
+          <tr class="total"><td>Total so far</td><td class="mono">$102.31</td></tr>
+        </table>
+        <a class="more-link" href="#">All costs →</a>
+      </div>
+
+      <div class="card section">
+        <h2>Environment</h2>
+        <div class="env-link"><span class="svc">app</span><a href="#" class="mono">min-852.myn.localhost</a></div>
+        <div class="env-link"><span class="svc">api</span><a href="#" class="mono">api-min-852.myn.localhost</a></div>
+        <div class="env-link"><span class="svc">stack</span><span style="color:var(--success-foreground)">3/3 containers up</span></div>
+      </div>
+
+      <div class="card section">
+        <h2>Recent activity</h2>
+        <div class="activity-item"><time>14:07</time><span>Work agent asked a question</span></div>
+        <div class="activity-item"><time>14:04</time><span>Task 13 completed — atomic draft writes</span></div>
+        <div class="activity-item"><time>13:55</time><span>Typecheck passed on <span class="mono">d3b77e0</span></span></div>
+        <a class="more-link" href="#">All activity →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Done-state variant ────────────────────────────────────── -->
+  <div class="demo done-demo anchor">
+    <span class="anno" style="left:6px;top:26px">10</span>
+    <div class="label">Same page after ship — header collapses to the v1 postmortem (kept from v1); crew spine shows final costs, Session tab shows the closed transcript</div>
+    <div class="card header">
+      <div class="header-row">
+        <div>
+          <div class="issue-title">Persist workspace drafts across dashboard restarts</div>
+          <div class="phase-line">
+            <span class="badge success"><span class="dot"></span>Done</span>
+            <span>Shipped Jul 22 · merged <span class="mono">a4f91c2</span> into <span class="mono">main</span> · verified · nothing needs you</span>
+          </div>
+        </div>
+        <div class="header-meta">
+          <span class="badge cost mono" title="Plan $18.20 · Work $371.44 · Review $85.04">$474.68</span>
+          <span class="badge success">4/4 review approved</span>
+          <button class="overflow-btn" aria-label="All actions"><svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><circle cx="3" cy="8" r="1.4"/><circle cx="8" cy="8" r="1.4"/><circle cx="13" cy="8" r="1.4"/></svg></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pre-work empty state (kept from v1) ───────────────────── -->
+  <div class="demo">
+    <div class="label">Same page before work starts — teaches the pipeline and offers the next action, with the model/harness overrides the current StartAgentCta carries</div>
+    <div class="empty-demo">
+      <div class="empty-inner">
+        <div class="glyph">
+          <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5 14 5v6l-6 3.5L2 11V5Z"/><path d="M8 1.5V8m0 0 6-3M8 8 2 5"/></svg>
+        </div>
+        <div>
+          <h3>No run yet for MIN-852</h3>
+          <p>Starting work creates a workspace, writes the plan, and streams the live session here. The plan gate asks for your approval before any code is written.</p>
+          <span class="split" style="vertical-align:middle">
+            <button class="main">Start work</button>
+            <button class="chev" aria-label="Start options — choose model or harness, or skip planning"><svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6l4 4 4-4"/></svg></button>
+          </span>
+          <button class="btn-secondary" style="margin-left:8px">Plan first</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Full action menu, rendered flat ───────────────────────── -->
+  <div class="demo anchor">
+    <span class="anno" style="left:6px;top:26px">11</span>
+    <div class="label">The ⋯ menu, rendered flat — all 46 registry actions, searchable, grouped by GROUP_ORDER, disabled-with-reason; phase-primary actions (Tell agent · Done — mark work complete) also surface inline beside the header ⋯</div>
+    <div class="card mega">
+      <input class="search" type="search" placeholder="Filter actions… (also in ⌘K)" aria-label="Filter actions" />
+      <div class="mega-cols">
+        <div>
+          <div class="group-h">Communicate</div>
+          <button class="item">Tell agent <span class="right">T</span></button>
+          <div class="group-h">Navigate</div>
+          <button class="item">Open</button>
+          <button class="item" disabled title="No pull request exists yet">View PR <span class="right">no PR yet</span></button>
+          <button class="item">Add to order book <span class="right">▸</span></button>
+          <div class="group-h">Inspect</div>
+          <button class="item">Tasks</button>
+          <button class="item">Inference</button>
+          <button class="item">Discussions</button>
+          <button class="item">Transcripts</button>
+          <button class="item">Sync discussions</button>
+          <button class="item">Status review</button>
+        </div>
+        <div>
+          <div class="group-h">Lifecycle</div>
+          <button class="item" disabled title="Planning already completed">Plan <span class="right">already planned</span></button>
+          <button class="item" disabled title="Planning already completed">Auto-plan</button>
+          <button class="item" disabled title="No planning session is running">Watch planning</button>
+          <button class="item" disabled title="No planning session is running">Done planning</button>
+          <button class="item" disabled title="An agent is already running">Start agent <span class="right">running</span></button>
+          <button class="item" disabled title="An agent is already running">Start without planning</button>
+          <button class="item">Done — mark work complete</button>
+          <button class="item" disabled title="Work has not completed">Request review</button>
+          <button class="item" disabled title="No review has run yet">Re-run review on latest commit</button>
+          <button class="item">Inspect task</button>
+          <button class="item" disabled title="Review has not approved">Merge to main</button>
+          <button class="item" disabled title="Issue is not closed">Reopen</button>
+          <button class="item" disabled title="Workspace already exists">Create workspace</button>
+        </div>
+        <div>
+          <div class="group-h">Recover</div>
+          <button class="item" disabled title="Review is not stalled">Reset stalled review state</button>
+          <button class="item">Re-sync pipeline state <span class="right">never gated</span></button>
+          <button class="item" disabled title="Agent is not troubled">Clear troubled gate</button>
+          <button class="item">Recover agent</button>
+          <button class="item" disabled title="Session is running">Resume session</button>
+          <button class="item">Sync main</button>
+          <button class="item">Rebuild &amp; start</button>
+          <button class="item">Copy settings</button>
+        </div>
+        <div class="danger-col">
+          <div class="group-h">Danger</div>
+          <button class="item">Stop agent</button>
+          <button class="item">Pause agent</button>
+          <button class="item" disabled title="Agent is not paused">Unpause agent</button>
+          <button class="item" disabled title="Issue is not merged">Close out</button>
+          <button class="item">Remove review sessions &amp; reset</button>
+          <button class="item">Reset session</button>
+          <button class="item">Complete work reset</button>
+          <button class="item">Restart agent</button>
+          <button class="item">Restart from plan</button>
+          <button class="item destructive">Reset issue</button>
+          <button class="item">Reset to planned</button>
+          <button class="item destructive">Cancel issue</button>
+          <button class="item destructive">Destroy workspace…</button>
+          <button class="item destructive">Wipe…</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="footnote">
+    Mockup uses the production token set from <span class="mono">src/dashboard/frontend/src/index.css</span> (light block), DM Sans at weight ≤500, SF Mono only for identifiers, and the badge tint formula (8% bg / 32% border).
+    Signal semantics per the style guide: blue = machine working (Work badge, live dots), amber = a human must act (Needs-you slot, question card), emerald = outcomes (done steps, Done badge), cyan = money, purple reserved for live specialist activity (review convoy rows would turn purple while running), red only for broken.
+    Tab structure honors the DENSITY_SECTIONS no-loss gate by folding, not dropping: 13 tabs + Tasks chip → 6 tabs with segmented views; the inventory and hardcoded counts in <span class="mono">issue-view-no-loss.test.ts</span> must be updated in the same change, which is the review signal that gate is designed to raise.
+  </p>
+</div>
+
+<script>
+  const annoToggle = document.getElementById('annoToggle');
+  annoToggle.addEventListener('click', () => {
+    const on = document.body.classList.toggle('show-anno');
+    annoToggle.textContent = on ? 'Hide annotations' : 'Show annotations';
+    annoToggle.setAttribute('aria-pressed', String(on));
+  });
+  const legendToggle = document.getElementById('legendToggle');
+  legendToggle.addEventListener('click', () => {
+    const open = document.getElementById('legend').classList.toggle('open');
+    legendToggle.setAttribute('aria-expanded', String(open));
+  });
+</script>
+
+</body>
+</html>
