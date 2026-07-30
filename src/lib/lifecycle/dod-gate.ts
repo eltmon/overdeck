@@ -127,17 +127,30 @@ const defaultPostMergeRowDeps: PostMergeRowDeps = {
 };
 
 interface MainVerifyRowDeps {
-  readCheckRuns: (ctx: LifecycleContext, mergeCommit: string) => Promise<{
+  readCheckRuns: (ctx: LifecycleContext, commit: string) => Promise<{
     total: number;
     failed: string[];
     pending: string[];
   }>;
+  /**
+   * PAN-3202: default-branch commits that contain `mergeCommit`, newest first.
+   * These are the candidate heads for the later-green-run evidence form.
+   */
+  readContainingDefaultBranchCommits?: (ctx: LifecycleContext, mergeCommit: string) => Promise<string[]>;
 }
 
 const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
-  readCheckRuns: async (ctx, mergeCommit) => {
+  readCheckRuns: async (ctx, commit) => {
     if (!ctx.github) return { total: 0, failed: [], pending: [] };
-    return fetchCommitCheckRuns(ctx.github.owner, ctx.github.repo, mergeCommit);
+    return fetchCommitCheckRuns(ctx.github.owner, ctx.github.repo, commit);
+  },
+  readContainingDefaultBranchCommits: async (ctx, mergeCommit) => {
+    const { stdout } = await execFileAsync(
+      'git',
+      ['rev-list', '--ancestry-path', '--first-parent', `${mergeCommit}..origin/main`],
+      { cwd: ctx.projectPath, encoding: 'utf-8', timeout: 10000, maxBuffer: 8 * 1024 * 1024 },
+    );
+    return stdout.split('\n').map(line => line.trim()).filter(Boolean);
   },
 };
 
@@ -525,6 +538,59 @@ export async function checkPostMergeRow(
   }
 }
 
+/**
+ * PAN-3202: how many default-branch heads above the merge commit are probed for
+ * the later-green-run evidence form. The tip of main is often mid-CI, so a single
+ * candidate would usually read as pending; five reaches back far enough to find
+ * the newest concluded green head without turning one row into a check-run storm.
+ */
+const LATER_GREEN_CANDIDATE_LIMIT = 5;
+
+/**
+ * PAN-3202: the fallback evidence form for DoD row 6. When a merge lands inside a
+ * red-main window, the merge commit's own check-runs can never turn green, so the
+ * row was permanently unsatisfiable even after main went green hundreds of times
+ * with the commit included. A later default-branch head whose check-runs all
+ * concluded green, and which contains the merge commit, is strictly stronger
+ * evidence than the original run: it proves main is healthy *with* the merge in it,
+ * which is exactly what "verified on main" means. Row 7 (deploy) already reasons
+ * this way through the same containment relation.
+ */
+async function findLaterGreenDefaultBranchRun(
+  ctx: LifecycleContext,
+  mergeCommit: string,
+  deps: MainVerifyRowDeps,
+): Promise<{ run: { sha: string; total: number } | null; note: string }> {
+  const readCandidates =
+    deps.readContainingDefaultBranchCommits ?? defaultMainVerifyRowDeps.readContainingDefaultBranchCommits!;
+  let candidates: string[];
+  try {
+    candidates = await readCandidates(ctx, mergeCommit);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { run: null, note: `later-run evidence unavailable: ${message}` };
+  }
+
+  const probed = candidates.slice(0, LATER_GREEN_CANDIDATE_LIMIT);
+  for (const sha of probed) {
+    try {
+      const checks = await deps.readCheckRuns(ctx, sha);
+      if (checks.total > 0 && checks.failed.length === 0 && checks.pending.length === 0) {
+        return { run: { sha, total: checks.total }, note: '' };
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return { run: null, note: `later-run evidence unavailable: ${message}` };
+    }
+  }
+  return {
+    run: null,
+    note: probed.length === 0
+      ? 'no later default-branch commit contains the merge'
+      : `no green CI run among the ${probed.length} newest default-branch commit(s) containing the merge`,
+  };
+}
+
 export async function checkMainVerifyRow(
   ctx: LifecycleContext,
   mergeCommit?: string,
@@ -540,17 +606,29 @@ export async function checkMainVerifyRow(
 
   try {
     const checks = await deps.readCheckRuns(ctx, mergeCommit);
-    if (checks.total === 0) {
-      return result('main-verify', 'skip', `no CI check-runs on merge commit ${mergeCommit}`);
+    if (checks.total > 0 && checks.failed.length === 0 && checks.pending.length === 0) {
+      return result('main-verify', 'pass', `${checks.total} check-runs concluded successfully on ${mergeCommit}`);
     }
-    if (checks.failed.length > 0 || checks.pending.length > 0) {
-      const parts = [
-        ...(checks.failed.length > 0 ? [`failed checks: ${checks.failed.join(', ')}`] : []),
-        ...(checks.pending.length > 0 ? [`still running: ${checks.pending.join(', ')}`] : []),
-      ];
-      return result('main-verify', 'miss', `${parts.join('; ')} on ${mergeCommit}`);
+
+    // The merge commit's own run stays the primary evidence, so its outcome is
+    // always recorded first; the later-green-run form only appends to it.
+    const parts = [
+      ...(checks.failed.length > 0 ? [`failed checks: ${checks.failed.join(', ')}`] : []),
+      ...(checks.pending.length > 0 ? [`still running: ${checks.pending.join(', ')}`] : []),
+    ];
+    const primary = checks.total === 0
+      ? `no CI check-runs on merge commit ${mergeCommit}`
+      : `${parts.join('; ')} on ${mergeCommit}`;
+
+    const later = await findLaterGreenDefaultBranchRun(ctx, mergeCommit, deps);
+    if (later.run) {
+      return result(
+        'main-verify',
+        'pass',
+        `${primary}; verified on main by later green CI run ${later.run.sha} containing the merge (${later.run.total} check-runs concluded successfully)`,
+      );
     }
-    return result('main-verify', 'pass', `${checks.total} check-runs concluded successfully on ${mergeCommit}`);
+    return result('main-verify', checks.total === 0 ? 'skip' : 'miss', `${primary}; ${later.note}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     return result('main-verify', 'miss', `could not read merge-commit check-runs: ${message}`);
