@@ -8,7 +8,7 @@
   },
   "items": [
     {
-      "issue": "PAN-3290",
+      "issue": "PAN-3295",
       "lane": "A",
       "order": 1,
       "prereqs": [],
@@ -17,7 +17,7 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3288",
+      "issue": "PAN-3290",
       "lane": "A",
       "order": 2,
       "prereqs": [],
@@ -26,16 +26,16 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3293",
+      "issue": "PAN-3288",
       "lane": "A",
       "order": 3,
       "prereqs": [],
       "reVerify": false,
-      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedAt": "2026-07-30T02:58:45.137Z",
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3294",
+      "issue": "PAN-3293",
       "lane": "A",
       "order": 4,
       "prereqs": [],
@@ -44,7 +44,7 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3296",
+      "issue": "PAN-3294",
       "lane": "A",
       "order": 5,
       "prereqs": [],
@@ -53,7 +53,7 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3291",
+      "issue": "PAN-3296",
       "lane": "A",
       "order": 6,
       "prereqs": [],
@@ -62,7 +62,7 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3297",
+      "issue": "PAN-3291",
       "lane": "A",
       "order": 7,
       "prereqs": [],
@@ -71,15 +71,15 @@
       "addedBy": "operator"
     },
     {
-      "issue": "PAN-3295",
-      "lane": "B",
-      "order": 1,
+      "issue": "PAN-3297",
+      "lane": "A",
+      "order": 8,
       "prereqs": [],
       "reVerify": false,
-      "addedAt": "2026-07-30T02:58:45.137Z",
+      "addedAt": "2026-07-30T02:58:41.679Z",
       "addedBy": "operator"
     }
   ],
   "createdAt": "2026-07-30T02:58:20.266Z",
-  "updatedAt": "2026-07-30T03:00:01.886Z"
+  "updatedAt": "2026-07-30T03:00:05.727Z"
 }
