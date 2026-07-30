@@ -1,0 +1,603 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T14:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3331: feat(dashboard): workspace quick-action band — git sync card, run command, open-in-external — above the memory feed",
+    "updated": "2026-07-30T14:00:20.963Z"
+  },
+  "plan": {
+    "id": "pan-3331",
+    "title": "feat(dashboard): workspace quick-action band — git sync card, run command, open-in-external — above the memory feed",
+    "status": "proposed",
+    "uid": "ab762ab9-0459-4c7f-8a83-8ae810bf4160",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-30T14:05:00.000Z",
+    "updated": "2026-07-30T14:00:20.963Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3331",
+        "label": "PAN-3331",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3331.md",
+        "label": "Canonical PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "workspaces",
+      "git",
+      "terminal",
+      "frontend"
+    ],
+    "narratives": {
+      "Problem": "WorkspaceView jumps from its title bar straight into the terminal/conversations/memory panels and answers none of the three most common operational questions: is my checkout current with its remote (ahead/behind exists only in the issue-workspace route and compares HEAD...origin/HEAD instead of the branch's own upstream, and nothing ever fetches), how do I run this thing (POST /api/terminals discards its command argument), and how do I open it in other tools (no reveal/editor affordance exists). Stale checkouts caused three separate failures on 2026-07-29.",
+      "Proposal": "Insert a full-width quick-action band between WorkspaceView's header and its panel group, for all workspace kinds: (1) a git sync card backed by a new upstream-correct git-state module with rate-limited real fetch and a guarded fast-forward-only Pull (issue kinds delegate to the existing sync-main flow); (2) a run card that launches the per-workspace run command (defaulting from services[].start_command, persisted in a new run_command column) into a tmux session whose terminal attaches in-view; (3) an open-in menu (reveal in file manager always, open-in-editor gated on new ui.open_in_editor_command config). All registry access through the two doors; all spawns async argument vectors.",
+      "NonGoals": "- A 'flagged' workspace marker (favorites already serve the role)\n- Push/publish actions or merge/rebase from the band (Pull is ff-only; everything else stays in existing flows)\n- Global keyboard shortcut registry (palette action only)\n- Scheduled background fetching for workspaces not on screen (cadence is view-scoped by D-8)\n- Any change to issue-workspace sync-main semantics\n- Any change to existing routes, panels, or layout persistence (no-loss, NFR-4)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the canonical PRD on overdeck-state (drafts/pan-3331.md) as authoritative without operator questions.",
+        "rationale": "The PRD is complete (glossary, 10 verified-state claims, D-1..D-10, FR-1..9/NFR-1..6, work items with named tests, 1:1 ACs, non-goals) and every file/line anchor re-verified against the workspace base main@078f1f1a72."
+      },
+      {
+        "summary": "The run route validates the resolved command (400 on newline, backtick, or >500 chars) before spawning.",
+        "rationale": "Async createSession (src/lib/tmux.ts:1053) passes initialCommand through unvalidated, unlike the deprecated sync variant which special-cases those inputs via a temp script; rejecting at the route is the smallest safe behavior and avoids porting temp-script complexity into the async path."
+      },
+      {
+        "summary": "ui.open_in_editor_command lands as a net-new optional `ui` section in src/lib/config-yaml/schema.ts with a getOpenInEditorCommand() accessor in src/lib/config.ts.",
+        "rationale": "No `ui` yaml section exists today and the existing 'UI theme' is a separate file (~/.overdeck/ui-theme.json, src/lib/ui-theme.ts) that must not be overloaded; the accessor follows the existing getConversationsConfigSync + Effect-variant pattern in config.ts."
+      },
+      {
+        "summary": "openPath follows openBrowser's Effect-based shape (Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner>).",
+        "rationale": "openBrowser at src/lib/browser.ts:26 is Effect-based; a sibling helper with the same signature keeps the module consistent and testable with the same spawner mocks."
+      },
+      {
+        "summary": "Only the git-state module item carries requiresInspection: true.",
+        "rationale": "Its exported types and typed refusal reasons are the contract that the routes item and the band UI item both encode; every other item is a leaf whose defects surface at typecheck, tests, or review."
+      }
+    ],
+    "items": [
+      {
+        "id": "git-state-module",
+        "title": "git-state module: upstream-correct state + ff-only pull with typed refusals",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3331",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "git-pull-routes",
+            "action-band-ui"
+          ],
+          "files_scope": [
+            "src/lib/workspaces/git-state.ts",
+            "src/lib/workspaces/types.ts",
+            "tests/unit/lib/workspaces/git-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/lib/workspaces/git-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/lib/workspaces/git-state.test.ts passes with temp-repo fixtures covering ahead/behind, fallback, detached, and every typed pull refusal",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ],
+          "readinessReason": "Creates only new files (git-state.ts and its test); its single shared file (types.ts) gets an additive type export, and after serialization no other item runs in the same wave."
+        },
+        "narrative": {
+          "Action": "Create src/lib/workspaces/git-state.ts exporting getWorkspaceGitState(path, {fetch?: boolean}): Promise<WorkspaceGitState> and pullWorkspaceFastForward(path), with the WorkspaceGitState type ({branch, detached, dirtyFiles, ahead, behind, hasUpstream, upstreamRef, recentRemoteCommits: [{sha, subject, author, date}], fetchedAt}) added in src/lib/workspaces/types.ts. Ahead/behind via `git rev-list --left-right --count HEAD...@{u}`, falling back to origin/HEAD with hasUpstream:false when no upstream is set; recent remote commits via `git log HEAD..@{u} --format=... -n 10`. pullWorkspaceFastForward executes `git pull --ff-only <remote> <branch>` and returns (never throws) typed refusal reasons: 'dirty' (git status --porcelain non-empty), 'operation-in-progress' (reuse ensureSyncGitQuiescent from src/lib/cloister/sync-main-git.ts:139), 'not-fast-forward', 'no-upstream', 'detached'. All git invocations use execFileAsync argument vectors (no shell strings, no execSync). Tests use temp-repo fixtures (real git repos in tmp dirs), per PRD WI-1."
+        },
+        "items": [
+          {
+            "id": "git-state-module.ac1",
+            "title": "Given a feature branch behind its own upstream but even with origin/HEAD, getWorkspaceGitState returns the upstream's ahead/behind counts (not origin/HEAD's) with hasUpstream:true and the upstreamRef named",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-state-module.ac2",
+            "title": "Given a branch with no upstream, getWorkspaceGitState falls back to origin/HEAD for counts and returns hasUpstream:false; given a detached HEAD it returns detached:true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-state-module.ac3",
+            "title": "pullWorkspaceFastForward returns typed refusal values (not thrown strings) for each of: dirty tree, in-flight git operation, non-fast-forwardable divergence, no upstream, detached HEAD",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-state-module.ac4",
+            "title": "Given a clean behind-only checkout, pullWorkspaceFastForward advances the branch to its upstream and a subsequent getWorkspaceGitState returns behind:0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-state-module.ac5",
+            "title": "recentRemoteCommits returns {sha, subject, author, date} entries capped at 10, and every git invocation in the module spawns via execFileAsync argument vectors (no shell-interpolated strings)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "git-pull-routes",
+        "title": "GET git-state + POST pull routes on workspace-registry with rate-limited fetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-registry-git.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/workspace-registry-git.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/workspace-registry-git.test.ts passes including fake-timer rate-limit cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-3",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspace-registry.ts add GET /api/workspace-registry/:id/git?fetch=0|1 and POST /api/workspace-registry/:id/pull, following the file's existing guard/readJsonBody patterns (:83-92, :159-161). GET resolves the workspace via the resolver, returns 404 for unknown ids, returns {git: null} with 200 for isGitRepository=false rows, otherwise returns WorkspaceGitState from the git-state module. fetch=1 triggers `git fetch <remote> <branch>` first, rate-limited by an in-memory per-path last-fetch map: fetches within 30s of the previous are skipped while state is still recomputed. POST pull is mutation-guarded (rejectUnsafeDashboardMutationRequest), returns 409 for kind='issue' directing to sync-main, otherwise runs pullWorkspaceFastForward and returns the new state or the typed refusal verbatim. Rate-limit tests use vi.useFakeTimers() + advanceTimersByTimeAsync — never real waits."
+        },
+        "items": [
+          {
+            "id": "git-pull-routes.ac1",
+            "title": "GET with fetch=1 fetches then returns fresh state; a second fetch=1 within 30s skips the fetch but still returns recomputed state (proven with fake timers advancing past the window)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-pull-routes.ac2",
+            "title": "GET returns 404 for an unknown workspace id and 200 {git: null} for a row with isGitRepository=false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-pull-routes.ac3",
+            "title": "POST pull rejects unguarded/unsafe requests via rejectUnsafeDashboardMutationRequest and returns 409 for kind='issue' workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "git-pull-routes.ac4",
+            "title": "POST pull passes typed refusal reasons from pullWorkspaceFastForward through to the response body unchanged, and returns the refreshed WorkspaceGitState on success",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "run-command-storage",
+        "title": "run_command column, writer/resolver support, and run-command + run routes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "src/lib/workspaces/writer.ts",
+            "src/lib/workspaces/resolver.ts",
+            "src/lib/workspaces/types.ts",
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-run.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/workspace-run.test.ts",
+            "npm run typecheck",
+            "bash scripts/guard-workspace-doors.sh"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/workspace-run.test.ts passes including single-live-session and default-resolution cases",
+            "typecheck completes without errors",
+            "workspace-doors guard exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add nullable `run_command` text column to the workspaces table in ensureWorkspaceTablesSync (src/lib/overdeck/infra.ts:230 area — the idempotent top-up; NEVER store it in layout_config, which react-resizable-panels round-trips and clobbers). Add setWorkspaceRunCommand(id, command: string | null) in src/lib/workspaces/writer.ts beside updateWorkspaceLayout (:122); surface runCommand on WorkspaceRow via resolver.ts/types.ts. Add PUT /api/workspace-registry/:id/run-command (guarded) to set/clear it, and POST /api/workspace-registry/:id/run (guarded) that resolves runCommand ?? first services[].start_command from project config (src/lib/workspace-config.ts:75-81), validates the command (400 on newline, backtick, or >500 chars — async createSession has no initialCommand validation), spawns createSession('ws-run-<8charid>', workspace.path, command, {env}) from src/lib/tmux.ts:1053 (async Effect variant only), and returns {sessionName, command}. Enforce one live run session per workspace: when one is alive, respond 409 {sessionName} with a distinct code so the UI re-focuses instead of duplicating. Stop uses the existing DELETE /api/terminals/:name."
+        },
+        "items": [
+          {
+            "id": "run-command-storage.ac1",
+            "title": "PUT run-command persists an override through setWorkspaceRunCommand and the resolver returns it on subsequent reads; PUT with null clears it back to default resolution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-command-storage.ac2",
+            "title": "POST run with no stored override resolves the command from the project's first services[].start_command and spawns createSession with (sessionName, workspace.path, exact command)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-command-storage.ac3",
+            "title": "POST run while a run session is alive returns 409 with the live sessionName and spawns nothing (single-live-session semantics)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-command-storage.ac4",
+            "title": "POST run rejects commands containing a newline or backtick or exceeding 500 characters with 400 before any tmux spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "run-command-storage.ac5",
+            "title": "All registry reads/writes go through resolver.ts/writer.ts and the new column lands only in ensureWorkspaceTablesSync — scripts/guard-workspace-doors.sh exits green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "open-in-external",
+        "title": "openPath helper, ui.open_in_editor_command config, and open route",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/browser.ts",
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config.ts",
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-open.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run --configLoader runner tests/unit/dashboard/workspace-open.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "tests/unit/dashboard/workspace-open.test.ts passes including the no-shell-execution-path assertion",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add openPath(path) beside openBrowser in src/lib/browser.ts with the same Effect-based shape (Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner>) and platform branching (darwin `open`, linux `xdg-open` with fallback, win32 `explorer`). Add a net-new optional `ui` section to the config-yaml schema (src/lib/config-yaml/schema.ts): ui?: { open_in_editor_command?: string } — no `ui` yaml section exists today, and ~/.overdeck/ui-theme.json (src/lib/ui-theme.ts) is a separate file that must NOT be overloaded. Add a getOpenInEditorCommand() accessor in src/lib/config.ts following the getConversationsConfigSync/Effect-variant pattern (:496+). Add POST /api/workspace-registry/:id/open with body {target: 'file-manager' | 'editor'}, mutation-guarded (it spawns processes): file-manager always available via openPath; editor available only when ui.open_in_editor_command is set (409 when unset) — the template is split into tokens, {path} substituted per-token, and spawned as an argument vector, never a shell string."
+        },
+        "items": [
+          {
+            "id": "open-in-external.ac1",
+            "title": "POST open {target:'editor'} returns 409 when ui.open_in_editor_command is unset, and spawns the configured command with {path} substituted when set",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-in-external.ac2",
+            "title": "Editor template execution spawns an argument vector with {path} substituted per token; a test rejects any code path that passes the template through a shell string",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-in-external.ac3",
+            "title": "POST open {target:'file-manager'} spawns the platform file-manager opener via openPath (darwin open, linux xdg-open, win32 explorer) with the spawner mocked in tests",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "open-in-external.ac4",
+            "title": "The open route rejects unguarded requests via rejectUnsafeDashboardMutationRequest and rejects unknown target values with 400",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "action-band-ui",
+        "title": "WorkspaceActionBand component wired into WorkspaceView for all kinds",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/WorkspaceActionBand.tsx",
+            "src/dashboard/frontend/src/components/workspace/WorkspaceActionBand.test.tsx",
+            "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/workspace/WorkspaceActionBand.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "WorkspaceActionBand.test.tsx passes covering all git-card states, run flow, open-in gating, and fake-timer poll cadence",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "NFR-4",
+            "NFR-5",
+            "D-7",
+            "D-8",
+            "D-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/workspace/WorkspaceActionBand.tsx and insert it in WorkspaceView.tsx immediately after the header bar (after :186, before the conditional issue-panels block), shrink-0, rendered for every workspace kind. Git card: branch (mono), dirty-file count, ahead/behind vs upstream, expandable recent-remote-commits list, manual refresh affordance, and a Pull action that calls POST /api/workspace-registry/:id/pull for main/scratch kinds but POST /api/issues/:issueId/sync-main for issue kind (the UI never calls pull for issue kind). Data via one useQuery ['workspace-registry', id, 'git'] with refetchInterval 30000, staleTime 25000, initial request fetch=1. Honest degradations: non-git hides the card; detached HEAD shows a warning chip instead of Pull; no-upstream labels the fallback comparison. Run card: command display with edit→PUT run-command, Run→POST run→mount <XTerminal sessionName> in the terminal panel area (for main/scratch the run session becomes the panel content replacing 'No active agent terminal'; for issue kind it renders alongside), Stop→DELETE /api/terminals/:name, Restart=kill+spawn, 409 re-focuses the live session. Open-in menu: reveal always, editor entry only when config-gated endpoint reports availability. Style guide binds: mono for branch/sha/path, one colored signal per card (behind-count dot may use amber), Pull is the git card's single primary action. Implementer verifies rendering with Playwright screenshots at narrow + wide widths in an isolated browser instance — never asks the operator to eyeball."
+        },
+        "items": [
+          {
+            "id": "action-band-ui.ac1",
+            "title": "The band renders after the header for issue, main, and scratch kinds; the git card renders clean/ahead/behind/dirty/detached/no-upstream states and stays hidden for non-git workspaces",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-band-ui.ac2",
+            "title": "Pull calls the kind-correct endpoint (sync-main for issue kind, registry pull otherwise) and the card re-renders the refreshed state; the expander lists recent remote commits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-band-ui.ac3",
+            "title": "Run card edit persists via PUT run-command; Run POSTs and mounts XTerminal with the returned sessionName in the terminal panel area; Stop calls DELETE /api/terminals/:name; a 409 re-focuses the existing session",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-band-ui.ac4",
+            "title": "The git query polls at 30s with staleTime 25s and stops when the view unmounts (proven with fake timers); the open-in menu shows the editor entry only when the config gate reports it available",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "action-band-ui.ac5",
+            "title": "The change preserves existing panels, layout persistence, and the issue-panels block unchanged (no-loss), and Playwright screenshots at narrow and wide widths from an isolated browser session render the band per the style guide",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-run-action",
+        "title": "Command palette 'Run workspace command' action",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandPalette.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "palette suite passes asserting the action's presence in both scopes and its callback wiring",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "D-10"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Run workspace command' action to CommandPalette.tsx via the staticActions pattern (:437-455), registered in both the workspaces and actions scopes, that triggers the run flow (POST /api/workspace-registry/:id/run) for the active workspace. No global keybinding — the dashboard has no keybinding registry and that is explicitly out of scope. Extend the existing palette test suite; if the palette suite lives under a different filename than CommandPalette.test.tsx, extend the file that already asserts staticActions entries."
+        },
+        "items": [
+          {
+            "id": "palette-run-action.ac1",
+            "title": "The palette shows 'Run workspace command' in both the workspaces and actions scopes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-run-action.ac2",
+            "title": "Selecting the action sends POST /api/workspace-registry/:id/run for the active workspace (wiring asserted in the palette test suite)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-band",
+        "title": "Documentation: workspaces docs, config page, CLAUDE.md, skill, surface inventory",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T14:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3331",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/workspaces.mdx",
+            "CLAUDE.md",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "docs/audits/pan-1990-surface-inventory.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) exits green with the updated skill file"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Same-PR doc updates, each naming the new routes/config: docs/WORKSPACES-AND-PROJECTS.md gains a quick-action band section (git card semantics incl. upstream-vs-origin/HEAD distinction and ff-only pull guards, run_command storage/default resolution, open-in config); configuration/workspaces.mdx documents the operator flow including ui.open_in_editor_command with an example (`cursor {path}`); the CLAUDE.md workspaces paragraph mentions the band and the new /api/workspace-registry/:id/{git,pull,run-command,run,open} routes; sync-sources/skills/pan-workspace/SKILL.md reflects any surfaced behavior; docs/audits/pan-1990-surface-inventory.md appends the new surfaces (no-loss audit trail)."
+        },
+        "items": [
+          {
+            "id": "docs-band.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md and configuration/workspaces.mdx each name the new routes and the ui.open_in_editor_command config with its template semantics",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-band.ac2",
+            "title": "CLAUDE.md, the pan-workspace skill, and docs/audits/pan-1990-surface-inventory.md reflect the band's surfaces, and npm run lint (including lint-skills) exits green",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "git-state-module",
+        "to": "git-pull-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "git-pull-routes",
+        "to": "run-command-storage",
+        "type": "blocks"
+      },
+      {
+        "from": "run-command-storage",
+        "to": "open-in-external",
+        "type": "blocks"
+      },
+      {
+        "from": "open-in-external",
+        "to": "action-band-ui",
+        "type": "blocks"
+      },
+      {
+        "from": "run-command-storage",
+        "to": "palette-run-action",
+        "type": "blocks"
+      },
+      {
+        "from": "action-band-ui",
+        "to": "docs-band",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "22 files is under the 25-file limit; the 8-subsystem count is an artifact of the mandated FR-9 documentation files each registering as a distinct subsystem under the first-two-segment heuristic (docs/WORKSPACES-AND-PROJECTS.md, docs/audits, configuration/workspaces.mdx, CLAUDE.md, sync-sources/skills). The code surface spans only three subsystems (src/lib, src/dashboard, tests/unit). The three band capabilities share one component, one route file, and one registry schema, and the doc files are required same-PR updates per the canonical PRD's FR-9 (PAN-3290 lesson) — splitting into sibling issues would ship a band with missing cards or docs that describe unshipped surfaces.",
+      "canonicalFilename": "2026-07-30-PAN-3331-feat-dashboard-workspace-quick-action-band-git-sync-card-run-command-open-in-external-above-the-memory-feed.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
