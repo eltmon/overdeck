@@ -1,4 +1,4 @@
-import { cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, renameSync, rmSync, unlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
@@ -121,7 +121,27 @@ const copyExtensionBundles = () => {
   }
 };
 
+// PAN-3336: pan reload's activation symlinks dist/node_modules into the live
+// deployment generation so the activated bundle resolves its externals. tsdown's
+// `clean: true` enumerates dist/ THROUGH that symlink, and intermediate-symlink
+// path resolution lands the deletions on the generation's real files — the
+// node_modules/.bun store and, through the nested workspace links, the
+// generation's packages/* sources (the PAN-3264 outage). Unlink the symlink
+// before the clean so a primary-repo build can never reach into a generation.
+// A real dist/node_modules directory is never touched; the next activation
+// recreates the symlink.
+const unlinkDistNodeModulesSymlink = () => {
+  const nm = join(distDir, 'node_modules');
+  try {
+    if (lstatSync(nm).isSymbolicLink()) {
+      unlinkSync(nm);
+      console.log('[build-cli] removed dist/node_modules deployment symlink before clean (PAN-3336)');
+    }
+  } catch { /* absent — nothing to unlink */ }
+};
+
 try {
+  unlinkDistNodeModulesSymlink();
   if (existsSync(dashboardDir)) {
     mkdirSync(preservedRoot, { recursive: true });
     moveDirSync(dashboardDir, preservedDashboardDir);
