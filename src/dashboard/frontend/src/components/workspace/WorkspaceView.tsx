@@ -26,6 +26,7 @@ import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from 'r
 import { ConversationList, fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
+import { WorkspaceActionBand } from './WorkspaceActionBand';
 import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -50,6 +51,12 @@ interface WorkspaceRegistryDetail {
   layoutConfig: string | null;
   title: string | null;
   pipeline: WorkspacePipelineBadge | null;
+  /** PAN-3331 quick-action band inputs. */
+  isGitRepository?: boolean;
+  runCommand?: string | null;
+  runCommandDefault?: string | null;
+  runCommandOptions?: Array<{ name: string; command: string }>;
+  openInEditorConfigured?: boolean;
 }
 
 interface WorkspaceMemoryStatus {
@@ -135,6 +142,10 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
     return ids;
   }, [showAllConversations, workspace, workspaceId, conversations]);
 
+  // Lifted so the band can start/stop the run session while its terminal lives
+  // in the panel area below (PAN-3331 D-5).
+  const [runSessionName, setRunSessionName] = useState<string | null>(null);
+
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const selectedConversationObj = conversations.find((c) => c.name === selectedConversation) ?? null;
 
@@ -185,6 +196,19 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         <span className="text-xs text-muted-foreground uppercase tracking-wide">{workspace.kind}</span>
       </div>
 
+      <WorkspaceActionBand
+        workspaceId={workspaceId}
+        kind={workspace.kind}
+        issueId={workspace.issueId}
+        isGitRepository={workspace.isGitRepository !== false}
+        runCommand={workspace.runCommand ?? null}
+        runCommandDefault={workspace.runCommandDefault ?? null}
+        runCommandOptions={workspace.runCommandOptions ?? []}
+        openInEditorConfigured={workspace.openInEditorConfigured === true}
+        runSessionName={runSessionName}
+        onRunSessionChange={setRunSessionName}
+      />
+
       {workspace.kind === 'issue' && workspace.issueId && (
         <div className="border-b border-border p-3 space-y-3 shrink-0 max-h-64 overflow-y-auto" data-testid="workspace-view-issue-panels">
           <VerificationGates issueId={workspace.issueId} />
@@ -199,12 +223,27 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         className="flex-1 min-h-0"
         id={`workspace-${workspaceId}`}
       >
-        <Panel id="terminal" defaultSize={34} minSize={15} className="min-w-0 h-full overflow-hidden">
+        <Panel id="terminal" defaultSize={34} minSize={15} className="min-w-0 h-full overflow-hidden flex flex-col">
+          {/* The run session (PAN-3331) shares this panel with the agent
+              terminal rather than displacing it: main/scratch workspaces have
+              no agent terminal, so the run session simply fills the panel. */}
           {workspaceAgent ? (
-            <XTerminal sessionName={workspaceAgent.id} embedded />
-          ) : (
+            <div className="flex-1 min-h-0">
+              <XTerminal sessionName={workspaceAgent.id} embedded />
+            </div>
+          ) : !runSessionName ? (
             <div className="p-4 text-xs text-muted-foreground" data-testid="workspace-view-no-terminal">
               No active agent terminal for this workspace.
+            </div>
+          ) : null}
+          {runSessionName && (
+            <div className="flex-1 min-h-0 flex flex-col border-t border-border first:border-t-0" data-testid="workspace-view-run-terminal">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground px-3 py-1 shrink-0">
+                Run
+              </span>
+              <div className="flex-1 min-h-0">
+                <XTerminal sessionName={runSessionName} embedded />
+              </div>
             </div>
           )}
         </Panel>
