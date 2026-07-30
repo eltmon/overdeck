@@ -51,20 +51,21 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:05:50.193Z",
+  "updated": "2026-07-30T06:07:11.399Z",
   "pipeline": {
     "issueId": "PAN-3293",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:05:48.388Z",
+    "updatedAt": "2026-07-30T06:07:11.338Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 1982884 exited before writing a result",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
+    "reviewSpawnedAt": "2026-07-30T06:07:11.337Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/index.ts",
@@ -137,7 +138,7 @@
       },
       "costAtCloseOut": {
         "usd": 67.09201,
-        "pricingAsOf": "2026-07-30T06:05:50.189Z"
+        "pricingAsOf": "2026-07-30T06:07:11.375Z"
       }
     },
     "merges": [
