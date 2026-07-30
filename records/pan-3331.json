@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T20:53:26.052Z",
+  "updated": "2026-07-30T20:53:35.783Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,8 +70,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "run-command-storage": {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 1553098,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T20:53:35.783Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -118,6 +126,7 @@
     "git-pull-routes.git-pull-routes.ac1": "completed",
     "git-pull-routes.git-pull-routes.ac2": "completed",
     "git-pull-routes.git-pull-routes.ac3": "completed",
-    "git-pull-routes.git-pull-routes.ac4": "completed"
+    "git-pull-routes.git-pull-routes.ac4": "completed",
+    "run-command-storage": "running"
   }
 }
