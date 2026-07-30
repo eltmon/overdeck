@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents.js';
+import { getDashboardApiUrlSync } from './config.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivityStatus = 'accepted' | 'running' | 'completed' | 'failed';
@@ -33,7 +34,8 @@ export type ActivitySource =
   | 'deploy-script'
   | 'plan-finalize'
   | 'complete-planning'
-  | 'start-agent';
+  | 'start-agent'
+  | 'state-door';
 
 export interface EmitActivityOptions {
   id?: string;
@@ -193,6 +195,23 @@ export async function emitActivityEntryOnce(
   try {
     const result = await store.appendOnce(event, options.id);
     return typeof result === 'string' ? result : result.outcome;
+  } catch {
+    return 'failed';
+  }
+}
+
+/**
+ * Emit an idempotent activity through the in-process store when available, or
+ * through the settled internal event endpoint from short-lived CLI processes.
+ */
+export async function emitActivityEntryOncePortable(
+  options: EmitActivityOptions & { id: string },
+): Promise<ActivityEmitOutcome> {
+  if (getActivityEventStore()) return emitActivityEntryOnce(options);
+  try {
+    const { createDeaconEventClient } = await import('./cloister/deacon-event-client.js');
+    return await createDeaconEventClient({ dashboardUrl: getDashboardApiUrlSync() })
+      .appendOnce(buildActivityEntryEvent(options), options.id);
   } catch {
     return 'failed';
   }
