@@ -1,30 +1,41 @@
 {
   "issueId": "PAN-3266",
   "schemaVersion": 2,
-  "created": "2026-07-29T00:54:30.938Z",
-  "updated": "2026-07-30T08:20:18.267Z",
-  "pipeline": {
-    "issueId": "PAN-3266",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-29T00:54:30.938Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
-  "harness": "claude-code",
-  "model": "claude-opus-5",
   "sessionHistory": [
     {
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-07-30T08:20:18.267Z"
     }
-  ]
+  ],
+  "feedback": [],
+  "created": "2026-07-29T00:54:30.938Z",
+  "updated": "2026-07-30T08:50:20.043Z",
+  "pipeline": {
+    "issueId": "PAN-3266",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-30T08:50:20.013Z",
+    "strikeReadyHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
+    "strikeReadyAt": "2026-07-30T08:50:20.011Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-07-30T08:50:20.034Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "claude-opus-5"
 }
