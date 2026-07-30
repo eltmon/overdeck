@@ -1,3 +1,7 @@
+import { appendFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { Effect } from 'effect';
 /**
  * Tests for src/lib/platform-lifecycle.ts.
@@ -13,9 +17,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   restartCliproxy,
   restartDashboard,
+  stopDashboard,
   waitForDashboardHealth,
   StageError,
   parseHealthTimeoutMs,
+  pidsOnPort,
 } from '../../../src/lib/platform-lifecycle.js';
 
 // Use ephemeral ports so stopDashboard's lsof scan never hits a real
@@ -27,6 +33,118 @@ const baseConfig = {
   traefikDomain: 'overdeck.localhost',
   traefikDir: '/tmp/does-not-exist/traefik',
 };
+
+describe('pidsOnPort', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('uses lsof first so IPv4 and IPv6 TCP listeners are covered', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: '4123\n' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([4123]);
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith('lsof -nP -iTCP:3011 -sTCP:LISTEN -t');
+  });
+
+  it('treats lsof exit code 1 with empty stdout as a free port', async () => {
+    const run = vi.fn().mockRejectedValue({ code: 1, stdout: '' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([]);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('falls back from unavailable lsof to fuser and stops on its result', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('lsof not found'), { code: 127 }))
+      .mockResolvedValueOnce({ stdout: '5234 5235\n' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([5234, 5235]);
+    expect(run.mock.calls.map(([command]) => command)).toEqual([
+      'lsof -nP -iTCP:3011 -sTCP:LISTEN -t',
+      'fuser 3011/tcp',
+    ]);
+  });
+
+  it('falls back to ss and returns only pids from lines matching the exact port', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('lsof not found'), { code: 127 }))
+      .mockRejectedValueOnce(Object.assign(new Error('fuser not found'), { code: 127 }))
+      .mockResolvedValueOnce({
+        stdout:
+          'LISTEN 0 511 127.0.0.1:13011 0.0.0.0:* users:(("node",pid=6000,fd=1))\n' +
+          'LISTEN 0 511 [::]:3011 [::]:* users:(("node",pid=6234,fd=2))\n',
+      });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([6234]);
+    expect(run.mock.calls.map(([command]) => command)).toEqual([
+      'lsof -nP -iTCP:3011 -sTCP:LISTEN -t',
+      'fuser 3011/tcp',
+      'ss -ltnp',
+    ]);
+  });
+
+  it('warns once with every attempted tool when no port probe executes', async () => {
+    const run = vi.fn().mockRejectedValue(Object.assign(new Error('not found'), { code: 127 }));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([]);
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning).toHaveBeenCalledWith(expect.stringMatching(/lsof.*fuser.*ss/));
+  });
+});
+
+describe('stopDashboard pid death verification', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects when an originally targeted pid survives SIGKILL after releasing its port', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9101])
+      .mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      graceTimeoutMs: 100,
+      portOwnerProbe,
+    }))).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringContaining('PID 9101 (cmd: unknown) survived SIGKILL'),
+      },
+    });
+    expect(kill).toHaveBeenCalledWith(9101, 'SIGKILL');
+    expect(kill).toHaveBeenCalledWith(9101, 0);
+  });
+
+  it('resolves when every targeted pid is ESRCH-dead and the ports are free', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9202])
+      .mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill').mockImplementation(((pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error(`process ${pid} not found`), { code: 'ESRCH' });
+      return true;
+    }) as typeof process.kill);
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      graceTimeoutMs: 100,
+      portOwnerProbe,
+    }))).resolves.toBeUndefined();
+    expect(kill).toHaveBeenCalledWith(9202, 'SIGTERM');
+    expect(kill).not.toHaveBeenCalledWith(9202, 'SIGKILL');
+  });
+
+  it('returns without checking pid death when no listener pids are found', async () => {
+    const portOwnerProbe = vi.fn().mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill');
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      portOwnerProbe,
+    }))).resolves.toBeUndefined();
+    expect(kill).not.toHaveBeenCalled();
+  });
+});
 
 describe('restartDashboard — scope contract', () => {
   beforeEach(() => {
@@ -249,5 +367,194 @@ describe('waitForDashboardHealth', () => {
       expect(err).toBeInstanceOf(StageError);
       expect((err as StageError).failure.stage).toBe('dashboard');
     }
+  });
+});
+
+describe('dashboard health ownership', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('rejects a healthy responder whose pid differs from the freshly spawned server', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7101 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7202 }),
+      {
+        healthTimeoutMs: 200,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+    ));
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringMatching(/pid 7101.*pid 7202.*LEFT RUNNING/s),
+        recovery: 'dashboard-left-running',
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    await vi.advanceTimersByTimeAsync(300);
+    await rejection;
+  });
+
+  it('accepts a healthy responder whose pid matches the freshly spawned server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7303 }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7303 }),
+      { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 7303 });
+  });
+
+  it('rejects a pre-fix health payload that omits pid when ownership is expected', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7404 }),
+      {
+        healthTimeoutMs: 200,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+    ));
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        reason: expect.stringMatching(/pid \(unreported\).*pid 7404.*LEFT RUNNING/s),
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    await vi.advanceTimersByTimeAsync(300);
+    await rejection;
+  });
+
+  it('preserves legacy 200 behavior when no expected pid or identity is provided', async () => {
+    const response = { ok: true, status: 200 };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 }),
+    )).resolves.toBeUndefined();
+  });
+
+  it('reports unverified ownership when a spawn handle cannot resolve its pid', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => null }),
+      { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+    ))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+  });
+});
+
+describe('dashboard EADDRINUSE fast failure', () => {
+  const tempDirs: string[] = [];
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects before the health deadline when the fresh spawn logs EADDRINUSE', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'overdeck-eaddrinuse-'));
+    tempDirs.push(dir);
+    const logPath = join(dir, 'dashboard.log');
+    appendFileSync(logPath, 'old log content\n');
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 8101 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    let caught: StageError | undefined;
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 8202 }),
+      {
+        healthTimeoutMs: 5_000,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        eaddrinuseLogPath: logPath,
+        portOwnerProbe: async () => [8101],
+        pidDescriptor: async () => '8101 node old-dashboard.js',
+      },
+    )).catch((error) => {
+      caught = error as StageError;
+      throw error;
+    });
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringMatching(/port 43991.*PID 8101.*node old-dashboard\.js.*EADDRINUSE/s),
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+    appendFileSync(logPath, 'Error: listen EADDRINUSE: address already in use 127.0.0.1:43991\n');
+
+    await vi.advanceTimersByTimeAsync(250);
+    await rejection;
+    expect(caught?.failure.recovery).toBeUndefined();
+    expect(Date.now()).toBeLessThan(5_000);
+  });
+
+  it('treats a missing pre-spawn log as an empty file without blocking startup', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'overdeck-eaddrinuse-missing-'));
+    tempDirs.push(dir);
+    const logPath = join(dir, 'dashboard.log');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 8303 }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 8303 }),
+      {
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+        eaddrinuseLogPath: logPath,
+      },
+    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 8303 });
   });
 });

@@ -75,6 +75,10 @@ The latest restart outcome is written to `${OVERDECK_HOME}/restart-status.json`.
 
 `pan up`, `pan reload`, and dashboard-starting `pan restart` scopes refuse to run from a non-primary checkout, including workspace and handoff worktrees. They exit with code 2 and name the primary checkout to use. Their post-boot health gates also require `/api/health` to report the expected `repoRoot` and `mode`; a 200 response from a different server fails as `port held by non-primary server (cwd=…, mode=…)`. This prevents the workspace-peer port-squatting incident class tracked by [PAN-2252](https://github.com/eltmon/overdeck/issues/2252).
 
+Dashboard health also reports the serving process PID. A restart reports verified success only when that PID equals the process it just spawned, so an old listener returning HTTP 200 cannot impersonate the replacement. A mismatch fails as `port answered by pid X — not the freshly spawned server (pid Y)` and leaves the processes available for inspection; if the spawn PID cannot be resolved, the success line explicitly says `ownership unverified` instead of claiming verified replacement. Teardown separately checks that every targeted PID is dead after signal escalation — a later HTTP 200 is never evidence that the old process stopped.
+
+During the post-spawn health window, restart reads only bytes newly appended to `~/.overdeck/logs/dashboard.log`. A fresh `EADDRINUSE` fails immediately instead of waiting for the full health deadline, and the error names the current port owner and command when resolvable. The failed child has already exited in this case, so restart leaves the existing owner running for inspection rather than killing an unidentified process.
+
 ## Automatic deployment after merges
 
 Production builds embed their Git commit and build time. Deacon compares that commit with
