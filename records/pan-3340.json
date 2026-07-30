@@ -63,7 +63,7 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T23:03:00.300Z",
+  "updated": "2026-07-30T23:04:50.430Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "blocked",
@@ -73,10 +73,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T23:03:00.274Z",
+    "updatedAt": "2026-07-30T23:04:40.097Z",
     "reviewNotes": "Unauthenticated trigger can persist reviewMode=none; nullable project also breaks typecheck; requirements reviewer timed out",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
-    "reviewedAtCommit": "a9baf2101b45b187eff69d96b8e39f694fa02454",
+    "reviewedAtCommit": "40b669c4ae26b284d559dba80cbfc497246b48e0",
     "reviewSpawnedAt": "2026-07-30T22:37:43.027Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -113,9 +113,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 612178,
-            "output": 16346,
-            "cacheRead": 4304896,
+            "input": 615698,
+            "output": 16742,
+            "cacheRead": 4572160,
             "cacheWrite": 0
           }
         },
@@ -153,24 +153,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1646974,
-            "output": 100609,
-            "cacheRead": 49289216,
+            "input": 2173120,
+            "output": 105040,
+            "cacheRead": 53917696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7635441,
-          "output": 198725,
-          "cacheRead": 64957440,
+          "input": 8165107,
+          "output": 203552,
+          "cacheRead": 69853184,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 76.617675,
-        "pricingAsOf": "2026-07-30T23:03:00.288Z"
+        "usd": 81.858687,
+        "pricingAsOf": "2026-07-30T23:04:40.106Z"
       }
     },
     "merges": [
