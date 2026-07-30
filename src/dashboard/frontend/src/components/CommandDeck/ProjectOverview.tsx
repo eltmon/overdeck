@@ -14,6 +14,7 @@ import {
 } from './pipeline-helpers';
 import { PipelineSection } from './PipelineSection';
 import { ProjectSettingsDisclosure } from './ProjectSettingsDisclosure';
+import { useOpenNewWorkspace } from './useNewWorkspaceModal';
 
 export type { IssueCostBreakdown };
 
@@ -27,6 +28,8 @@ interface ProjectOverviewProps {
   onSelectFeature: (feature: ProjectFeature) => void;
   onOpenCosts?: () => void;
   onOpenAgents?: () => void;
+  /** PAN-3330 FR-6c: open the New Workspace dialog with this project preselected. */
+  onNewWorkspace?: (projectKey: string) => void;
 }
 
 interface ProjectCiHealth {
@@ -227,7 +230,12 @@ export function ProjectOverview({
   onSelectFeature,
   onOpenCosts,
   onOpenAgents,
+  onNewWorkspace,
 }: ProjectOverviewProps) {
+  // Falls back to the dialog store so this button needs no prop drilled
+  // through CommandDeck and ProjectHome; the prop stays for direct testing.
+  const openFromStore = useOpenNewWorkspace();
+  const openNewWorkspace = onNewWorkspace ?? openFromStore;
   const reviewStatusByIssueId = useDashboardStore(state => state.reviewStatusByIssueId);
   const pipelineRef = useRef<HTMLDivElement>(null);
 
@@ -322,6 +330,27 @@ export function ProjectOverview({
       <HeroBillboard metrics={metrics} />
 
       <ProjectCiHealthSection health={ciHealth} />
+
+      {projectKey && (
+        <div style={{ display: 'flex' }}>
+          <button
+            data-testid="project-overview-new-workspace"
+            onClick={() => openNewWorkspace(projectKey)}
+            title={`New workspace in ${projectName}`}
+            style={{
+              background: 'none',
+              border: '1px solid var(--border)',
+              borderRadius: 2,
+              cursor: 'pointer',
+              padding: '4px 10px',
+              fontSize: 12,
+              color: 'var(--muted-foreground)',
+            }}
+          >
+            New workspace
+          </button>
+        </div>
+      )}
 
       {projectKey && <ProjectSettingsDisclosure projectKey={projectKey} />}
 

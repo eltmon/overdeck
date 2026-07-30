@@ -68,6 +68,14 @@ interface PaletteAction {
    * pipeline-worktrees row (PAN-3286 FR-13).
    */
   keepOpen?: boolean;
+  /**
+   * Scope chips this action appears under in addition to the one its `group`
+   * implies. "New workspace…" belongs in Actions but is also what an operator
+   * filtered to Workspaces is looking for (PAN-3330 FR-6b); listing it twice
+   * in All would read as a duplicate, so it stays one row that answers to two
+   * chips.
+   */
+  alsoScopes?: Array<Exclude<PaletteScope, 'all'>>;
 }
 
 export interface ConversationPaletteOpenRequest {
@@ -90,6 +98,8 @@ interface CommandPaletteProps {
   initialScope?: PaletteScope;
   /** PAN-1990: activate a workspace-registry row and open its Workspace view. */
   onSelectWorkspace?: (workspaceId: string) => void;
+  /** PAN-3330 FR-6b: open the New Workspace dialog. */
+  onNewWorkspace?: () => void;
 }
 
 interface PanCommandEntry {
@@ -356,7 +366,7 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit, initialScope = 'all', onSelectWorkspace }: CommandPaletteProps) {
+export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversationHit, initialScope = 'all', onSelectWorkspace, onNewWorkspace }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const debouncedQuery = useDebouncedValue(query, 120);
   const agents = useDashboardStore((state) => isOpen ? selectAgents(state) : EMPTY_AGENTS) as unknown as Agent[];
@@ -444,6 +454,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       keywords: ['flywheel', 'all-up', 'orchestrator', 'fixall', 'autonomous'],
       onSelect: () => onNavigate('flywheel'),
     },
+    ...(onNewWorkspace ? [{
+      id: 'new-workspace',
+      label: 'New workspace…',
+      description: 'Create a workspace by intent — name, project, target directory',
+      icon: FolderOpen,
+      group: 'Actions',
+      keywords: ['workspace', 'create', 'scratch', 'worktree', 'new'],
+      alsoScopes: ['workspaces' as const],
+      onSelect: onNewWorkspace,
+    }] : []),
     {
       id: 'start-cloister',
       label: 'Start Cloister',
@@ -535,7 +555,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       keywords: ['agents', 'workers'],
       onSelect: () => onNavigate('agents'),
     },
-  ], [onNavigate]);
+  ], [onNavigate, onNewWorkspace]);
 
   // ─── Dynamic: issues + agents ─────────────────────────────────────────────
 
@@ -794,18 +814,30 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
   const availableScopes = useMemo<PaletteScope[]>(() => {
     const present = new Set<PaletteScope>();
     for (const g of groupOrder) present.add(groupScope(g));
+    // An action may answer to a chip its group does not imply, so the chip has
+    // to be offered even when nothing else of that type is listed.
+    for (const action of filtered) for (const s of action.alsoScopes ?? []) present.add(s);
     const ordered = (['actions', 'commands', 'workspaces', 'issues', 'conversations', 'memory'] as const).filter((s) => present.has(s));
     return ordered.length > 1 ? ['all', ...ordered] : [];
-  }, [groupOrder]);
+  }, [groupOrder, filtered]);
 
   // If the active scope drops out of the results (e.g. the query changed), reset.
   useEffect(() => {
     if (scope !== 'all' && !availableScopes.includes(scope)) setScope('all');
   }, [scope, availableScopes]);
 
+  /** True when this action belongs under the active chip. */
+  const inScope = useCallback(
+    (action: PaletteAction) =>
+      scope === 'all' || groupScope(action.group) === scope || (action.alsoScopes?.includes(scope) ?? false),
+    [scope],
+  );
+
   const visibleGroups = useMemo(
-    () => (scope === 'all' ? groupOrder : groupOrder.filter((g) => groupScope(g) === scope)),
-    [groupOrder, scope],
+    () => (scope === 'all'
+      ? groupOrder
+      : groupOrder.filter((g) => filtered.some((a) => a.group === g && inScope(a)))),
+    [groupOrder, filtered, scope, inScope],
   );
 
   if (!isOpen) return null;
@@ -885,7 +917,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                   className="[&_[cmdk-group-heading]]:px-3 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[10px] [&_[cmdk-group-heading]]:font-semibold [&_[cmdk-group-heading]]:uppercase [&_[cmdk-group-heading]]:tracking-wider [&_[cmdk-group-heading]]:text-muted-foreground"
                 >
                   {filtered
-                    .filter((a) => a.group === group)
+                    .filter((a) => a.group === group && inScope(a))
                     .sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))
                     .map((action) => {
                       const accent = accentForGroup(action.group);

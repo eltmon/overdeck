@@ -55,7 +55,7 @@ function issue(overrides: Partial<Issue>): Issue {
   };
 }
 
-function renderSidebar(options: { workspaces?: WorkspaceFixture[]; activeTab?: Tab } = {}) {
+function renderSidebar(options: { workspaces?: WorkspaceFixture[]; activeTab?: Tab; onNewWorkspace?: () => void } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
   const onTabChange = vi.fn();
   const onSearchOpen = vi.fn();
@@ -72,7 +72,12 @@ function renderSidebar(options: { workspaces?: WorkspaceFixture[]; activeTab?: T
 
   const { container } = render(
     <QueryClientProvider client={client}>
-      <Sidebar activeTab={options.activeTab ?? 'pipeline'} onTabChange={onTabChange} onSearchOpen={onSearchOpen} />
+      <Sidebar
+        activeTab={options.activeTab ?? 'pipeline'}
+        onTabChange={onTabChange}
+        onSearchOpen={onSearchOpen}
+        onNewWorkspace={options.onNewWorkspace}
+      />
     </QueryClientProvider>,
   );
   return { container };
@@ -187,5 +192,32 @@ describe('Sidebar Workspaces flat/grouped toggle (ac4)', () => {
 
     const toggle = await screen.findByTestId('sidebar-workspaces-toggle-grouped');
     expect(toggle.textContent).toBe('Flat');
+  });
+});
+
+
+describe('Sidebar Workspaces "+" entry point (PAN-3330 FR-6a)', () => {
+  it('renders the new-workspace button in the rail header and fires the callback on click', async () => {
+    const onNewWorkspace = vi.fn();
+    renderSidebar({ workspaces: [ws({ id: 'ws-1', name: 'lens' })], onNewWorkspace });
+
+    const button = await screen.findByTestId('sidebar-new-workspace');
+    fireEvent.click(button);
+
+    expect(onNewWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the button even when the project has no workspaces yet', async () => {
+    const onNewWorkspace = vi.fn();
+    renderSidebar({ workspaces: [], onNewWorkspace });
+
+    expect(await screen.findByTestId('sidebar-new-workspace')).toBeDefined();
+  });
+
+  it('omits the button when no handler is supplied, leaving the group toggle intact', async () => {
+    renderSidebar({ workspaces: [ws({ id: 'ws-1', name: 'lens' })] });
+
+    expect(await screen.findByTestId('sidebar-workspaces-toggle-grouped')).toBeDefined();
+    expect(screen.queryByTestId('sidebar-new-workspace')).toBeNull();
   });
 });

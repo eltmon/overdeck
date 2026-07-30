@@ -850,6 +850,7 @@ export default function App() {
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
+        onNewWorkspace={newWorkspace.open}
         onOpenUpdater={() => setIsUpdateDialogOpen(true)}
         onSelectWorkspace={onSelectWorkspace}
       />
@@ -996,6 +997,7 @@ export default function App() {
         }}
         onOpenConversationHit={handleOpenConversationHit}
         onSelectWorkspace={onSelectWorkspace}
+        onNewWorkspace={newWorkspace.open}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}

@@ -1,19 +1,41 @@
 /**
- * New Workspace dialog wiring (PAN-3330 WI-3).
+ * New Workspace dialog state and wiring (PAN-3330 WI-3/WI-4).
  *
- * Lives outside App.tsx deliberately: App.tsx is a god file the size ratchet
- * holds at its origin/main line count, and the post-create aftermath — cache
- * invalidation, activation, navigation — is self-contained enough to own its
- * own seam.
+ * Open/close state lives in a small zustand store rather than in App.tsx for
+ * two reasons: App.tsx is a god file the size ratchet pins at its origin/main
+ * line count, and one of the entry points — the project-overview button — sits
+ * behind CommandDeck (1.5k lines) and ProjectHome, so a prop would have to be
+ * drilled through two more ratcheted files to reach it. The rail and the
+ * palette are already prop-wired from App and keep taking a callback.
  */
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
+import { create } from 'zustand';
 import { useQueryClient } from '@tanstack/react-query';
 import { fetchWithTimeout } from '../../lib/apiFetch.js';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport.js';
 
+interface NewWorkspaceDialogStore {
+  isOpen: boolean;
+  /** Set when a per-project entry point opened the dialog. */
+  presetProjectKey: string | null;
+  open: (projectKey?: string) => void;
+  close: () => void;
+}
+
+export const useNewWorkspaceStore = create<NewWorkspaceDialogStore>((set) => ({
+  isOpen: false,
+  presetProjectKey: null,
+  open: (projectKey?: string) => set({ isOpen: true, presetProjectKey: projectKey ?? null }),
+  close: () => set({ isOpen: false }),
+}));
+
+/** Opener for surfaces too deep in the tree to take a prop. */
+export function useOpenNewWorkspace(): (projectKey?: string) => void {
+  return useNewWorkspaceStore((state) => state.open);
+}
+
 export interface NewWorkspaceModalController {
   isOpen: boolean;
-  /** Opens the dialog, optionally preselecting a project (per-project entry point). */
   open: (projectKey?: string) => void;
   close: () => void;
   presetProjectKey: string | null;
@@ -24,15 +46,10 @@ export function useNewWorkspaceModal(
   onSelectWorkspace: (workspaceId: string) => void,
 ): NewWorkspaceModalController {
   const queryClient = useQueryClient();
-  const [isOpen, setIsOpen] = useState(false);
-  const [presetProjectKey, setPresetProjectKey] = useState<string | null>(null);
-
-  const open = useCallback((projectKey?: string) => {
-    setPresetProjectKey(projectKey ?? null);
-    setIsOpen(true);
-  }, []);
-
-  const close = useCallback(() => setIsOpen(false), []);
+  const isOpen = useNewWorkspaceStore((state) => state.isOpen);
+  const presetProjectKey = useNewWorkspaceStore((state) => state.presetProjectKey);
+  const open = useNewWorkspaceStore((state) => state.open);
+  const close = useNewWorkspaceStore((state) => state.close);
 
   // D-5/FR-8: invalidate rather than waiting out the rail's 10s poll, so the
   // new row is visible the moment the dialog closes; then activate (a recency
