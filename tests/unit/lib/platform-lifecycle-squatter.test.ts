@@ -37,18 +37,26 @@ async function reserveEphemeralPort(): Promise<number> {
   return address.port;
 }
 
+// These tests deliberately run on REAL timers, against the project-wide rule that
+// delay-based tests use `vi.useFakeTimers()`. Everything under test here is real
+// I/O — a real `createServer()` on a real port, a real loopback `fetch`, real
+// `lsof`/`ps` subprocesses — and `waitForDashboardHealthPromise` bounds that I/O
+// with `Date.now()` and paces it with `sleep(pollIntervalMs)`. Faking the clock
+// makes the poll loop advance only when the test advances it, so the test races
+// the real HTTP round-trip it is waiting on: on a contended runner the body read
+// lands after the last `advanceTimersByTimeAsync`, the next `sleep` is scheduled
+// past a clock nobody will move again, and the test parks until vitest's timeout.
+// That is PAN-3320 — it turned main red. Do not reintroduce fake timers here; the
+// whole run costs one real 250ms poll interval.
 describe('dashboard restart with a live port squatter', () => {
   let server: Server | null = null;
   let tempDir: string;
 
   beforeEach(() => {
-    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
-    vi.setSystemTime(0);
     tempDir = mkdtempSync(join(tmpdir(), 'overdeck-squatter-'));
   });
 
   afterEach(async () => {
-    vi.useRealTimers();
     if (server?.listening) await close(server);
     server = null;
     rmSync(tempDir, { recursive: true, force: true });
@@ -93,12 +101,9 @@ describe('dashboard restart with a live port squatter', () => {
       error.failure.reason.includes(`pid ${process.pid}`) &&
       error.failure.reason.includes(`pid ${expectedPid}`) &&
       error.failure.recovery === 'dashboard-left-running');
-    while (requests === 0) {
-      await new Promise<void>(resolve => setImmediate(resolve));
-    }
 
-    await vi.advanceTimersByTimeAsync(300);
     await rejection;
+    expect(requests).toBeGreaterThan(0);
     expect(stop).not.toHaveBeenCalled();
 
     const response = await fetch(`http://127.0.0.1:${port}/api/health`);
