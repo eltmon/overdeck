@@ -224,16 +224,18 @@ describe('LinearTracker', () => {
         labels: () => Promise.resolve({ nodes: [] }),
       };
 
-      (mockClient.searchIssues as any).mockResolvedValue({
-        nodes: [mockIssue],
-      });
+      (mockClient.issue as any).mockResolvedValue(mockIssue);
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
 
       const issue = await tracker.getIssue('MIN-630');
 
-      expect(mockClient.searchIssues).toHaveBeenCalledWith('MIN-630', { first: 1 });
+      // Identifiers resolve through client.issue(id), not searchIssues — the
+      // search result nodes lack the labels() relation normalizeIssue needs
+      // (PAN-3337).
+      expect(mockClient.issue).toHaveBeenCalledWith('MIN-630');
+      expect(mockClient.searchIssues).not.toHaveBeenCalled();
       expect(issue.ref).toBe('MIN-630');
       expect(issue.state).toBe('closed');
     });
@@ -242,7 +244,7 @@ describe('LinearTracker', () => {
       const { LinearClient } = await import('@linear/sdk');
       const mockClient = new LinearClient({ apiKey: 'test' });
 
-      (mockClient.searchIssues as any).mockResolvedValue({ nodes: [] });
+      (mockClient.issue as any).mockResolvedValue(null);
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
       (tracker as any).client = mockClient;
@@ -374,7 +376,7 @@ describe('LinearTracker', () => {
         labels: () => Promise.resolve({ nodes: [] }),
       };
 
-      (mockClient.searchIssues as any).mockResolvedValue({ nodes: [mockIssue] });
+      (mockClient.issue as any).mockResolvedValue(mockIssue);
       (mockClient.createAttachment as any).mockResolvedValue({ success: true });
 
       const tracker: any = wrap(new LinearTracker('test-api-key'));
