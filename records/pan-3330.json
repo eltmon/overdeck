@@ -74,15 +74,7 @@
       "timestamp": "2026-07-30T23:28:48.630Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-30T23:28:48Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3330\n\n# Review Synthesis — PAN-3330 — 2026-07-30T23:27:19Z\n\n## Verdict: CHANGES REQUESTED — archiving the main workspace makes the creation modal offer a replacement that is guaranteed to fail\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/context.json\n- Branch: feature/pan-3330\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330\n- HEAD reviewed: 86bf24d3c6ca415e2e88a4a61c66d257c871da93\n- Cycle number: 3\n- Prior cycle SHA: 7211c1eaed6a2102576619102d78af47aba9ce33\n- PR commits: 11\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Archiving main makes the modal offer an impossible replacement main — `src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx:278`\n\nCycle 3 restores the requirements-mandated Archive action for `main`, and the preserved archive route hides that row from default registry lists. `NewWorkspaceModal` checks for a main row with `GET /api/workspace-registry?project=…&kind=main` without `includeArchived=true`, so after the operator archives main the modal displays **Register main workspace**. Confirming that action reaches the writer's singleton check, which still sees the archived row, and fails with `Project … already has a main workspace`; the create route does not map that exception, so this normal dashboard sequence ends in HTTP 500.\n\nThis blocker survives the cycle-3 convergence gate because the reachable behavior comes from the cycle diff: `WorkspaceView.tsx:278-285` restores Archive for main and the cycle also restores the writer/route's pre-existing main-archive contract. The specific archive-preserving lifecycle could not be evaluated in cycle 2 because that revision hid and refused main archive; cycle 1's review incorrectly prescribed that suppression, and the requirements review corrected the conflict only in cycle 2. The minimum fix is to make the bootstrap existence check include archived main rows and add a composed archive-then-open-modal test. Recovering an archived main through the dashboard can remain a separate advisory unless the chosen fix introduces that surface.\n\n## Non-blocking Findings\n\n### Correctness\n\n- `~` Switching projects does not synchronously clear the previous project's target list and missing-main state, so stale project-A choices can remain visible while project B loads or after its request fails.\n- `~` The create route refreshes an inferred parent branch after preview without checking whether it still matches the value the operator reviewed.\n- `~` The modal can be dismissed while creation is in flight, but the mutation can later complete and navigate despite the apparent cancellation.\n- `≉` Relocation still resolves relative API paths against the dashboard process working directory. The integration test explicitly preserves this behavior; it is outside the cycle-3 blocker set and should be resolved through an explicit HTTP-versus-CLI path contract.\n- The lack of an Unarchive affordance for an archived main is a recovery usability gap, but FR-7 requires Archive rather than Unarchive; do not expand this blocker beyond the guaranteed replacement-main failure unless the implementation chooses to add recovery UI.\n\n### Requirements\n\n- `~` [pre-existing, out of PR scope] `docs/WORKSPACES-AND-PROJECTS.md:49-53` says `archiveWorkspace()` refuses main, while the preserved route/writer behavior and the new feature section correctly allow it.\n- `~` CodeRabbit's Escape/`aria-modal`, disclosure/live-region, pending-action, explicit-button-type, CSRF-sentinel, and timer-cleanup notes are advisory quality items rather than missing acceptance criteria.\n\n## Clean Sub-roles\n\n- security\n- performance\n- requirements (all 49 in-PR requirements classified complete; notes above are non-blocking)\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/.pan/review/agent-pan-3330-review-86bf24d3/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3330 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -157,10 +149,10 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T23:37:37.429Z",
+  "updated": "2026-07-30T23:37:39.915Z",
   "pipeline": {
     "issueId": "PAN-3330",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -168,14 +160,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-30T23:37:37.375Z",
+    "updatedAt": "2026-07-30T23:37:39.843Z",
     "reviewNotes": "Archiving main makes the creation modal offer a replacement that is guaranteed to fail",
     "inspectNotes": "AC1-4 met. Three existing CLI suites (workspace-commands, workspace-new-target-path, workspace-scratch-isolated) untouched by the commit and all pass alongside the new create-intent suite (41/41, --hookTimeout 60000; the default-5s hook failure also hits untouched relocate.test.ts, so it is machine load, not a regression). Dry-run parity asserted field-for-field and key-order against real CLI output for shared/target-path/isolated. cliMessageFor reproduces all six original message strings verbatim, exit path still exitCli. Findings returned (not thrown) for invalid-name, target-not-a-directory, mode-conflict, plus project-not-found/ambiguous; fail-fast ordering preserved so a rejected name touches neither git nor fs. Resolution writes nothing (worktree list, workspace row count, and projects row all asserted unchanged). grep confirms zero process.cwd() in src/lib/workspaces/create.ts; the test proves it by runtime spy instead of a source grep because scripts/lint-source-introspection.sh forbids source-text assertions - deviation from AC4's literal wording, substantively satisfied. NFR-2: promisify(exec) shell string replaced by execFileAsync argument vector for rev-parse and worktree add; no execSync. Non-blocking: intent.projectId as string cast in workspaceMainCommand relies on findings-empty implying non-null, and kind=main now stats .git before the getMainWorkspace short-circuit (extra stat, no visible change); createWorkspace maps omitted and false parentBranchGuessed to the same 0.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
     "reviewedAtCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93",
     "lastVerifiedCommit": "7211c1eaed6a2102576619102d78af47aba9ce33",
     "reviewRequestedAt": "2026-07-30T23:36:29.596Z",
-    "reviewSpawnedAt": "2026-07-30T23:20:46.560Z",
+    "reviewSpawnedAt": "2026-07-30T23:37:39.842Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -318,7 +310,7 @@
       },
       "costAtCloseOut": {
         "usd": 191.99849,
-        "pricingAsOf": "2026-07-30T23:37:37.423Z"
+        "pricingAsOf": "2026-07-30T23:37:39.878Z"
       }
     },
     "merges": [
