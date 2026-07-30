@@ -46,8 +46,19 @@ fi
 # Classify the notification. The message strings come from Claude Code's own
 # notification payloads; we're pattern-matching the keywords that indicate the
 # agent is stalled waiting for the human.
+#
+# Exact-match exclusion first: "Claude is waiting for your input" is Claude
+# Code's idle-timeout heartbeat, fired for ANY agent idle >60s — after a
+# completed turn, between items, or when work is done. It carries no question,
+# and classifying it as user_question surfaced every long-idle agent as a
+# blocking "Question for you" decision with no content (seen on PAN-3253).
+# Real questions are detected by the JSONL AskUserQuestion scan and the pane
+# detector; this heartbeat must stay a non-event. Anchored exactly so a future
+# message that appends actual question text still classifies below.
 REASON=""
-if echo "$NOTIF_MSG" | grep -qiE '(permission|approval|allow.*tool|confirm.*tool)'; then
+if echo "$NOTIF_MSG" | grep -qixE 'claude is waiting for your input'; then
+  REASON=""
+elif echo "$NOTIF_MSG" | grep -qiE '(permission|approval|allow.*tool|confirm.*tool)'; then
   REASON="tool_permission"
 elif echo "$NOTIF_MSG" | grep -qiE '(question|needs.*input|waiting.*for|needs your)'; then
   REASON="user_question"
