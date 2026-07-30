@@ -92,18 +92,18 @@
     "recordedAt": "2026-07-30T05:20:21.210Z"
   },
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T07:06:12.736Z",
+  "updated": "2026-07-30T07:06:19.706Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T05:21:06.307Z",
-    "updatedAt": "2026-07-30T07:06:11.766Z",
+    "updatedAt": "2026-07-30T07:06:19.694Z",
     "reviewNotes": "Cycle-three fixes resolve configured escalation routing and keep activity delivery outside state durability locks; no blockers remain.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: single 3-way merge replaces per-commit rebase (record-update.ts:301) so a poisoned intermediate commit no longer aborts reconcile; records/-only conflicts resolve via checkout --theirs with the active record re-derived by replaying the mutator on origin's version (record-update.ts:212-225); non-records/ conflicts throw naming every path and abort merge+rebase leaving a clean retryable worktree (record-update.ts:207-210, 306-312); delete/modify records/ conflict fails checkout --theirs and aborts rather than auto-resolving, with git stderr naming the path. NFR-1 honored (all git via promisified git() helper with signal + throwIfDurabilityAborted between sync steps, no execSync in server-reachable code); NFR-2 honored (no sleeps added). Tests genuinely exercise the migrated reconcile path — the marker they write satisfies validMarker in state-read-home.ts. Non-blocking observation: entry-point abortMerge/abortRebase (record-update.ts:294-295) discards any in-progress merge in the shared state worktree, intentional per the prior stranded-merge commit and safe under the record fs-lock.",
@@ -161,9 +161,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4477987,
-            "output": 238810,
-            "cacheRead": 39209984,
+            "input": 4482049,
+            "output": 240492,
+            "cacheRead": 39977472,
             "cacheWrite": 0
           }
         },
@@ -184,15 +184,15 @@
           "cacheWrite": 175110
         },
         "openai/gpt-5.6-sol": {
-          "input": 10476237,
-          "output": 746667,
-          "cacheRead": 190700032,
+          "input": 10480299,
+          "output": 748349,
+          "cacheRead": 191467520,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 177.612205,
-        "pricingAsOf": "2026-07-30T07:06:11.824Z"
+        "usd": 178.066719,
+        "pricingAsOf": "2026-07-30T07:06:19.702Z"
       }
     },
     "merges": [
@@ -201,7 +201,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3291",
