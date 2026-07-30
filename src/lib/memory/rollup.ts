@@ -182,12 +182,43 @@ export function buildStatusRollupPrompt(input: {
 }
 
 export async function readRecentObservations(projectId: string, workspaceId: string, limit = 20): Promise<MemoryObservation[]> {
-  const observationsDir = dirname(resolveObservationsFile(projectId, workspaceId, new Date()));
+  return readObservationsSince(projectId, workspaceId, { limit });
+}
+
+export interface ReadObservationsSinceOptions {
+  /** Most recent N calendar days (UTC), counting today as day 1. Omit for no window. */
+  days?: number;
+  limit?: number;
+  now?: Date;
+}
+
+/**
+ * The `limit` most recent observations within an optional day window, returned
+ * oldest-first — the reader behind `pan memory timeline` (PAN-3286 FR-8).
+ * Observation files are one JSONL per UTC day, so the window prunes whole
+ * files by name before any read.
+ */
+export async function readObservationsSince(
+  projectId: string,
+  workspaceId: string,
+  options: ReadObservationsSinceOptions = {},
+): Promise<MemoryObservation[]> {
+  const limit = options.limit ?? 20;
+  const now = options.now ?? new Date();
+  // Same UTC yyyy-mm-dd key the observation filenames use.
+  const cutoffDate = options.days === undefined
+    ? null
+    : new Date(now.getTime() - (Math.max(1, Math.floor(options.days)) - 1) * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+
+  const observationsDir = dirname(resolveObservationsFile(projectId, workspaceId, now));
   const files = (await readdir(observationsDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
     throw error;
   }))
     .filter((file) => file.endsWith('.jsonl'))
+    .filter((file) => cutoffDate === null || file.slice(0, 10) >= cutoffDate)
     .sort()
     .reverse();
 
@@ -198,7 +229,11 @@ export async function readRecentObservations(projectId: string, workspaceId: str
     for (let index = lines.length - 1; index >= 0 && observations.length < limit; index -= 1) {
       const line = lines[index];
       if (!line || line.trim().length === 0) continue;
-      observations.push(JSON.parse(line) as MemoryObservation);
+      const observation = JSON.parse(line) as MemoryObservation;
+      // A day file can hold entries stamped outside its own date; the window
+      // is authoritative, not the filename.
+      if (cutoffDate !== null && observation.timestamp.slice(0, 10) < cutoffDate) continue;
+      observations.push(observation);
     }
     if (observations.length >= limit) break;
   }

@@ -15,7 +15,7 @@ import {
 } from './paths.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
-import { readArchivedStatusEntries, readCurrentStatus, type ArchivedStatusEntry } from './rollup.js';
+import { readArchivedStatusEntries, readCurrentStatus, readObservationsSince, type ArchivedStatusEntry } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
 import {
   getWorkspaceForIssue,
@@ -300,6 +300,33 @@ export function resolveMemoryWorkspaceTarget(input: MemoryWorkspaceTargetInput):
     issueId: workspace.issueId,
     label: workspace.issueId ?? workspace.name,
   };
+}
+
+export interface MemoryTimelineOptions {
+  /** Most recent N calendar days, counting today as day 1. */
+  days?: number;
+  limit?: number;
+  now?: Date;
+}
+
+/** Default day window and row cap for `pan memory timeline` (PAN-3286 FR-8). */
+export const MEMORY_TIMELINE_DEFAULT_DAYS = 7;
+export const MEMORY_TIMELINE_DEFAULT_LIMIT = 50;
+
+/**
+ * Chronological observations for a resolved workspace, oldest-first
+ * (PAN-3286 FR-8). The window and cap default to the last 7 days and 50 rows.
+ */
+export async function getMemoryTimeline(
+  projectId: string,
+  workspaceId: string,
+  options: MemoryTimelineOptions = {},
+): Promise<MemoryObservation[]> {
+  return readObservationsSince(projectId, workspaceId, {
+    days: options.days ?? MEMORY_TIMELINE_DEFAULT_DAYS,
+    limit: options.limit ?? MEMORY_TIMELINE_DEFAULT_LIMIT,
+    now: options.now,
+  });
 }
 
 /** Current status for an already-resolved workspace (PAN-3286 FR-5). */

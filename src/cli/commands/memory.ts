@@ -5,6 +5,8 @@ import {
   generateDailySummary,
   getMemoryStatusForWorkspace,
   getMemoryStatusHistory,
+  getMemoryTimeline,
+  MEMORY_TIMELINE_DEFAULT_DAYS,
   readMemorySettingsSummary,
   resolveMemoryWorkspaceTarget,
   runMemoryDoctor,
@@ -122,6 +124,46 @@ export async function memoryStatusCommand(issue: string | undefined, options: Me
   }
 }
 
+export interface MemoryTimelineCommandOptions {
+  workspace?: string;
+  days?: number;
+  limit?: number;
+  json?: boolean;
+}
+
+/**
+ * `pan memory timeline` — chronological observations for a workspace addressed
+ * by `--workspace <id|name>` or by the current directory (PAN-3286 WI-5, FR-8).
+ */
+export async function memoryTimelineCommand(options: MemoryTimelineCommandOptions): Promise<void> {
+  let target: ReturnType<typeof resolveMemoryWorkspaceTarget>;
+  try {
+    target = resolveMemoryWorkspaceTarget({ workspaceRef: options.workspace });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    return exitCli(1);
+  }
+
+  const observations = await getMemoryTimeline(target.projectId, target.workspaceId, {
+    days: options.days,
+    limit: options.limit,
+  });
+
+  if (options.json) {
+    console.log(JSON.stringify(observations, null, 2));
+    return;
+  }
+  if (observations.length === 0) {
+    console.log(chalk.yellow(`No observations in the last ${options.days ?? MEMORY_TIMELINE_DEFAULT_DAYS} days for ${target.label}.`));
+    return;
+  }
+  console.log(chalk.bold(`${target.label} — ${observations.length} observations, oldest first`));
+  for (const observation of observations) {
+    console.log(`${observation.timestamp}  ${observation.actionStatus ?? observation.summary}`);
+    console.log(chalk.dim(`  files: ${observation.files.join(', ') || 'none'}`));
+  }
+}
+
 export interface MemorySummaryCommandOptions {
   project?: string;
   workspace?: string;
@@ -176,6 +218,15 @@ export function createMemoryCommand(): Command {
     .option('--history <n>', 'Also print up to N archived statuses, newest first (max 50)', parseInt)
     .option('--json', 'Output JSON')
     .action(memoryStatusCommand);
+
+  memory
+    .command('timeline')
+    .description('Print chronological observations for a workspace or the current directory')
+    .option('--workspace <id|name>', 'Workspace id or name (defaults to the workspace owning the cwd)')
+    .option('--days <n>', `Most recent N days, today counting as day 1 (default ${MEMORY_TIMELINE_DEFAULT_DAYS})`, parseInt)
+    .option('--limit <n>', 'Maximum observation rows', parseInt)
+    .option('--json', 'Output JSON')
+    .action(memoryTimelineCommand);
 
   memory
     .command('reset <scope> <scopeId>')
