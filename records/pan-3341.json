@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T22:01:19.860Z",
+  "updated": "2026-07-30T22:01:37.317Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "pipeline-view-lane-reconcile": {
+        "writerId": "agent-pan-3341",
+        "agentId": "agent-pan-3341",
+        "pid": 3613250,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T22:01:37.317Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3341",
@@ -118,6 +126,7 @@
     "tree-renders-closeout-state": "completed",
     "tree-renders-closeout-state.tree-renders-closeout-state.ac1": "completed",
     "tree-renders-closeout-state.tree-renders-closeout-state.ac2": "completed",
-    "tree-renders-closeout-state.tree-renders-closeout-state.ac3": "completed"
+    "tree-renders-closeout-state.tree-renders-closeout-state.ac3": "completed",
+    "pipeline-view-lane-reconcile": "running"
   }
 }
