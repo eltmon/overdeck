@@ -134,21 +134,21 @@
     "recordedAt": "2026-07-30T06:50:15.598Z"
   },
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T07:40:24.870Z",
+  "updated": "2026-07-30T07:49:40.003Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:50:33.466Z",
-    "updatedAt": "2026-07-30T07:40:23.166Z",
+    "updatedAt": "2026-07-30T07:49:39.957Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all four blocking findings: (1) SessionStart briefing now composes before the transcript stat so the ENOENT race no longer skips it — ENOENT only skips poller registration and the briefing rides back on transcript-missing; (2) --dry-run no longer seeds the projects row (ensureProjectSeeded moved to just before createWorkspace); (3) Cmd-K now carries the 'N pipeline worktrees' count row with reveal, sharing the rail's persisted key, plus the two doc contradictions fixed; (4) terminal archival resolves through IssuesResolver via new src/lib/overdeck/terminal-issues.ts and takes terminalIssueIds as a required input, so it performs no issue-state read. Non-blocking relocate real-timer replaced with fake timers. 15 new tests; full lint + 12466 root and 2655 frontend tests pass; new Cmd-K affordance driven in the real UI on a throwaway instance.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3312",
     "reviewedAtCommit": "eca8cb975e687469b97b055f05d1ffaf3bd92f4b",
-    "lastVerifiedCommit": "eca8cb975e687469b97b055f05d1ffaf3bd92f4b",
+    "lastVerifiedCommit": "a659e49736c39cf22737421da4fdc9aec15ab007",
     "reviewSpawnedAt": "2026-07-30T07:38:27.517Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -271,7 +271,7 @@
       },
       "costAtCloseOut": {
         "usd": 17.056955,
-        "pricingAsOf": "2026-07-30T07:40:24.866Z"
+        "pricingAsOf": "2026-07-30T07:49:39.996Z"
       }
     },
     "merges": [
