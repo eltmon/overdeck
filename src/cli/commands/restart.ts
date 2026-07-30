@@ -232,9 +232,12 @@ export function scrubAgentIdentityFromDashboardEnv(env: NodeJS.ProcessEnv): void
   }
 }
 
+export type SystemctlRunner = (args: readonly string[]) => string;
+
 export interface DashboardSpawnOptions extends BootGateOptions {
   readonly serverPath?: string;
   readonly repoRoot?: string;
+  readonly runSystemctl?: SystemctlRunner;
 }
 
 export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardSpawnOptions): DashboardSpawnHandle {
@@ -272,7 +275,7 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
   // and a conversation/flywheel-spawned one dies with that tmux pane's scope.
   // Run the server in its own transient systemd unit (same isolation the
   // shared tmux server gets, PAN-1798) so its lifecycle belongs to nobody.
-  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot);
+  const systemdHandle = spawnDashboardSystemdUnit(serverPath, fullEnv, identity.repoRoot, opts?.runSystemctl);
   if (systemdHandle) return systemdHandle;
 
   const child = spawn(resolveNode22(), [serverPath], {
@@ -295,21 +298,46 @@ export function spawnDashboardDetached(config: PlatformConfig, opts?: DashboardS
         if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
       }
     },
+    pid: async () => child.pid ?? null,
   };
 }
 
 /** Valid systemd --setenv names; skips exported bash functions etc. */
 const ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const SYSTEMD_MAIN_PID_POLL_MS = 100;
+const SYSTEMD_MAIN_PID_TIMEOUT_MS = 5_000;
+
+async function resolveSystemdMainPid(unit: string, runSystemctl: SystemctlRunner): Promise<number | null> {
+  const deadline = Date.now() + SYSTEMD_MAIN_PID_TIMEOUT_MS;
+  while (true) {
+    let output: string;
+    try {
+      output = runSystemctl(['--user', 'show', '-p', 'MainPID', '--value', unit]);
+    } catch {
+      return null;
+    }
+
+    const value = output.trim();
+    if (value === '') return null;
+    const pid = Number(value);
+    if (Number.isInteger(pid) && pid > 0) return pid;
+    if (Date.now() >= deadline) return null;
+    await new Promise(resolve => setTimeout(resolve, SYSTEMD_MAIN_PID_POLL_MS));
+  }
+}
 
 function spawnDashboardSystemdUnit(
   serverPath: string,
   fullEnv: Record<string, string | undefined>,
   repoRoot: string,
+  systemctlRunner?: SystemctlRunner,
 ): DashboardSpawnHandle | null {
   if (process.platform !== 'linux') return null;
   try {
     mkdirSync(dirname(DASHBOARD_LOG_FILE), { recursive: true });
     const unitName = `overdeck-dashboard-${Date.now()}`;
+    const runSystemctl = systemctlRunner ?? ((args: readonly string[]) =>
+      execFileSync('systemctl', [...args], { encoding: 'utf8' }));
     const setenvArgs = Object.entries(fullEnv)
       .filter(([k, v]) => v !== undefined && ENV_NAME_RE.test(k))
       .flatMap(([k, v]) => ['--setenv', `${k}=${v}`]);
@@ -343,6 +371,7 @@ function spawnDashboardSystemdUnit(
           throw stopError;
         }
       },
+      pid: () => resolveSystemdMainPid(`${unitName}.service`, runSystemctl),
     };
   } catch {
     return null;

@@ -344,6 +344,7 @@ export interface RestartResult {
 
 export interface DashboardSpawnHandle {
   stop: () => Promise<void> | void;
+  pid?: () => Promise<number | null>;
 }
 
 async function restartDashboardPromise(
