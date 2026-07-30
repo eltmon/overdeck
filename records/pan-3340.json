@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T21:45:32.459Z",
+  "updated": "2026-07-30T21:57:55.921Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "action-submenu-modes": {
-        "writerId": "agent-pan-3340",
-        "agentId": "agent-pan-3340",
-        "pid": 2682188,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:45:32.459Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3340",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added reviewMode parsing and durable persistence before dispatch; targeted tests pass. Full typecheck remains red at the unchanged pre-existing 59/58 dashboard baseline.",
         "releasedAt": "2026-07-30T21:44:59.107Z"
+      },
+      {
+        "writerId": "agent-pan-3340",
+        "agentId": "agent-pan-3340",
+        "pid": 2682188,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:45:32.459Z",
+        "itemId": "action-submenu-modes",
+        "outcome": "completed",
+        "reason": "Added Full/Quick/None requestReview submenu options, mode-specific POST bodies, and success toasts. Frontend test file passes 31/31 with the frontend Vitest config; frontend typecheck and targeted ESLint pass.",
+        "releasedAt": "2026-07-30T21:57:55.921Z"
       }
     ],
     "statusReasons": {
       "server-trigger-mode": {
         "reason": "Added reviewMode parsing and durable persistence before dispatch; targeted tests pass. Full typecheck remains red at the unchanged pre-existing 59/58 dashboard baseline.",
         "updatedAt": "2026-07-30T21:44:59.107Z"
+      },
+      "action-submenu-modes": {
+        "reason": "Added Full/Quick/None requestReview submenu options, mode-specific POST bodies, and success toasts. Frontend test file passes 31/31 with the frontend Vitest config; frontend typecheck and targeted ESLint pass.",
+        "updatedAt": "2026-07-30T21:57:55.921Z"
       }
     }
   },
@@ -89,6 +96,10 @@
     "server-trigger-mode.server-trigger-mode.ac2": "completed",
     "server-trigger-mode.server-trigger-mode.ac3": "completed",
     "server-trigger-mode.server-trigger-mode.ac4": "completed",
-    "action-submenu-modes": "running"
+    "action-submenu-modes": "completed",
+    "action-submenu-modes.action-submenu-modes.ac1": "completed",
+    "action-submenu-modes.action-submenu-modes.ac2": "completed",
+    "action-submenu-modes.action-submenu-modes.ac3": "completed",
+    "action-submenu-modes.action-submenu-modes.ac4": "completed"
   }
 }
