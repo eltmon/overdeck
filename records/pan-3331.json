@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T21:42:14.356Z",
+  "updated": "2026-07-30T21:47:51.264Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "docs-band": {
-        "writerId": "agent-pan-3331",
-        "agentId": "agent-pan-3331",
-        "pid": 2420423,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:42:14.356Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -146,6 +138,17 @@
         "outcome": "completed",
         "reason": "'Run workspace command' palette action in both Actions and Workspaces groups (=both scope chips), targeting the most recently used workspace and naming it; starts the run and opens the view. Added a browser-session run-session map so a palette-started run has a terminal when the view mounts. 12 palette tests pass. Also added an audited file-size allowlist row for CommandPalette.tsx (1000->1006).",
         "releasedAt": "2026-07-30T21:42:04.958Z"
+      },
+      {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 2420423,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:42:14.356Z",
+        "itemId": "docs-band",
+        "outcome": "completed",
+        "reason": "Documented the band in all five named files: WORKSPACES-AND-PROJECTS.md (routes/semantics), configuration/workspaces.mdx (operator flow + ui.open_in_editor_command yaml), CLAUDE.md (route summary), pan-workspace SKILL.md (run session naming, pull refusals), and a no-loss table appended to the pan-1990 surface inventory. Skills lint green.",
+        "releasedAt": "2026-07-30T21:47:51.263Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "palette-run-action": {
         "reason": "'Run workspace command' palette action in both Actions and Workspaces groups (=both scope chips), targeting the most recently used workspace and naming it; starts the run and opens the view. Added a browser-session run-session map so a palette-started run has a terminal when the view mounts. 12 palette tests pass. Also added an audited file-size allowlist row for CommandPalette.tsx (1000->1006).",
         "updatedAt": "2026-07-30T21:42:04.958Z"
+      },
+      "docs-band": {
+        "reason": "Documented the band in all five named files: WORKSPACES-AND-PROJECTS.md (routes/semantics), configuration/workspaces.mdx (operator flow + ui.open_in_editor_command yaml), CLAUDE.md (route summary), pan-workspace SKILL.md (run session naming, pull refusals), and a no-loss table appended to the pan-1990 surface inventory. Skills lint green.",
+        "updatedAt": "2026-07-30T21:47:51.263Z"
       }
     }
   },
@@ -207,6 +214,8 @@
     "palette-run-action": "completed",
     "palette-run-action.palette-run-action.ac1": "completed",
     "palette-run-action.palette-run-action.ac2": "completed",
-    "docs-band": "running"
+    "docs-band": "completed",
+    "docs-band.docs-band.ac1": "completed",
+    "docs-band.docs-band.ac2": "completed"
   }
 }
