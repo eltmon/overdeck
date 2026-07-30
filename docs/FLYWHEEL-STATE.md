@@ -9130,13 +9130,3 @@ PR **#3343** opened (my PR monitor fired on it). Reviewed the diff myself: **2 f
 **Not merged**: main is red, so #3343 inherits the `linear.test.ts` failure. It merges the moment PAN-3342 lands — review is already done, so that step is immediate.
 
 - Other four strikes still in gates; PAN-3327 was still writing at last check.
-
-## RUN-75 tick 17 (2026-07-30 21:32Z) — P0 fix verified passing but unpushed; my own parallelism is now the bottleneck
-
-- Hook **445 / guard=1**; leak **0 procs**; memory **22.5 GB free**, PSI 0. **Load average 44.4** — six concurrent Opus strikes each running full suites.
-- **Main still RED**: `4362f4810d` and `3f88522ad5` both failure; `56d96eafab` in progress.
-- **PAN-3342 (the P0) is done and verified — but unpushed.** 2 commits, clean tree, cost only `$3.10`. Reviewed its diff locally without waiting for a PR: **1 file, +8/-6**, switching three mocks from `searchIssues` to `client.issue` to match what PAN-3337 changed, plus `expect(mockClient.searchIssues).not.toHaveBeenCalled()` which locks the new behaviour against regression, and a comment naming why (search nodes lack the `labels()` relation `normalizeIssue` needs). Test-only, no production code.
-- **Ran it myself: 15/15 pass in 866 ms.** So the red-main fix is confirmed correct before its PR even exists — the moment it pushes, the merge is immediate.
-- **Did not push it under the agent.** Its pane shows `npm test` running at 2m47s; it is mid-gate and will push itself. Doctrine lets me `gh pr create` when needed, but taking the branch out from under a live agent mid-flow is a different thing from creating a PR for a pushed branch.
-- Other strikes: PAN-3328 **4 commits, clean** (`$34.01` — heavy iteration), PAN-3324 **1 commit, clean**, PAN-3339 1 commit + 2 dirty, PAN-3327 still writing (0 ahead, 12 dirty). PAN-3326's PR **#3343** open and already reviewed/approved, gated only on main.
-- **LESSON: my parallel dispatch became the bottleneck it was meant to relieve.** Five simultaneous strikes drove load to ~44-55, and at that load every full-suite gate run produces ~64 contention-only failures (5s timeouts) that each agent must then investigate and dismiss. PAN-3342's fix took `$3.10` to write and is now spending far longer proving itself against a machine I overloaded. **Dispatching N strikes at once does not get N fixes N times faster when they all gate on the same host** — stagger them, or accept that the gate phase serialises anyway and costs more in false-positive triage than it saves in wall-clock.
