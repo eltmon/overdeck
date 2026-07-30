@@ -1,0 +1,478 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T04:05:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3296: bug(cli): pan start flips plan status in the state worktree but never commits it — dirty spec blocks pan task claim and the state reconciler for all agents",
+    "updated": "2026-07-30T03:52:31.135Z"
+  },
+  "plan": {
+    "id": "pan-3296",
+    "title": "pan start flips plan status in the state worktree but never commits it — dirty spec blocks pan task claim and the state reconciler",
+    "status": "proposed",
+    "uid": "aac25dc0-6518-4136-a4d0-167e9dfc578f",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-30T04:05:00.000Z",
+    "updated": "2026-07-30T03:52:31.135Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3296",
+        "label": "PAN-3296",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3291",
+        "label": "PAN-3291",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2541",
+        "label": "PAN-2541",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "cli",
+      "reconciler",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "pan start (CLI start.ts:1233) and the dashboard start path (spawn.ts:620) flip the canonical spec's plan.status to 'running' via bare updatePlanStatus() — a filesystem write into the shared state worktree with no commit/push. The dirty spec then blocks git rebase in reconcileStatePush (record-update.ts:274), which wedges pan task claim for the work agent and every records push-race reconciliation machine-wide (observed 5 ahead / 21 behind in the PAN-3286 incident).",
+      "Proposal": "Collapse the two-step flip into a single committed+pushed transitionXBriefOnMain(..., 'active', 'running') at both call sites, keeping the workspace-draft fallback for pre-promotion plans. Remove the two remaining exported bare-write doors (moveXBriefFilesOnly, deleteXBrief — test-only callers). Teach reconcileStatePush to adopt uncommitted changes confined to specs/ and records/ with a loud 'chore(state): adopt orphaned write' commit instead of wedging, failing closed for unowned paths. Add a cross-door durability test gate asserting git status --porcelain is empty after every exported spec-mutation door. Full design in .pan/drafts/PAN-3296.md.",
+      "NonGoals": "- No adoption of dirty paths outside specs/ and records/ (continues/, drafts/, operator files stay fail-closed)\n- No rebase/replay added to pushStateBranch in auto-commit.ts (PAN-2541 D10 no-replay stance is by design)\n- No auto-commit behavior added inside updatePlanStatus itself (double-queue hazard)\n- No changes to the PAN-2516 drift patrol cadence or scope\n- No fix for PAN-3291 content-conflict wedges beyond the adoption path specified here\n- No changes to legacy unmigrated (.pan/) project paths beyond what the shared code paths already cover"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Collapse approve+running two-step into one transitionXBriefOnMain(..., 'active', 'running') committed transition",
+        "rationale": "transitionXBriefOnMainPromise already handles move+status+commit+push and fails loudly; planning-time grep found zero consumers of the intermediate plan.status === 'approved', so the end state is identical minus the dirty file."
+      },
+      {
+        "summary": "Guard at call sites (path startsWith workspace) instead of making updatePlanStatus commit",
+        "rationale": "Queueing inside the primitive would double-queue with transitionXBriefOnMainPromise's batch and degrade its explicit commit subjects to generic batch messages."
+      },
+      {
+        "summary": "Adoption scope limited to specs/ and records/",
+        "rationale": "Matches the PAN-2516 drift patrol's ownedPaths; wider adoption risks silently committing operator or mid-migration files the door does not own."
+      },
+      {
+        "summary": "Delete moveXBriefFilesOnly and deleteXBrief rather than adding commit steps",
+        "rationale": "Zero production callers (verified by grep); keeping exported bare-write doors invites recurrence of this exact bug class."
+      },
+      {
+        "summary": "Guard implemented as a durability test gate, not a runtime CLI exit hook",
+        "rationale": "The issue's fix sketch asks for a guard/test; a test iterating every exported door mechanically blocks future bare-write regressions without adding runtime complexity to CLI shutdown."
+      }
+    ],
+    "items": [
+      {
+        "id": "start-cli-flip-through-door",
+        "title": "Route the pan start CLI status flip through the state write door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3296",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "spawn-route-flip-through-door",
+            "cross-door-clean-tree-gate"
+          ],
+          "files_scope": [
+            "src/cli/commands/start.ts",
+            "src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "durability suite passes including the new CLI start-flip case"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/start.ts (~lines 1214-1238), replace the transitionXBriefOnMain(projectRoot, id, 'active', 'approved', ...) call plus the bare updatePlanStatus(spawnedPlanPath, 'running') with a single transitionXBriefOnMain(projectRoot, id, 'active', 'running', `chore(state): start ${id.toUpperCase()} xBRIEF (status=running)`). Keep updatePlanStatus(spawnedPlanPath, 'running') only when spawnedPlanPath.startsWith(workspace + sep) (workspace-draft fallback, gitignored). Add a test in the durability suite: temp migrated state worktree with bare origin and a proposed spec → run the flip → plan.status === 'running', porcelain empty, commit on origin/overdeck-state. See PRD WI-1 and decisions D1/D2 in .pan/drafts/PAN-3296.md."
+        },
+        "items": [
+          {
+            "id": "start-cli-flip-through-door.ac1",
+            "title": "Given a temp migrated state worktree with an origin and a proposed spec, when the CLI start flip runs, the canonical spec's plan.status becomes 'running' and git status --porcelain in the state worktree returns empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-cli-flip-through-door.ac2",
+            "title": "The flip commit reaches origin/overdeck-state — the test resolves the origin ref and finds the chore(state) start commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-cli-flip-through-door.ac3",
+            "title": "When findPlanSync resolves to a workspace-local draft (pre-promotion), the code still writes plan.status='running' into that workspace file and creates no state-worktree modification",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "start-cli-flip-through-door.ac4",
+            "title": "start.ts contains no updatePlanStatus call reachable with a state-worktree path — the only remaining call is guarded by the startsWith(workspace) check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-route-flip-through-door",
+        "title": "Route the dashboard start path status flip through the state write door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/spawn.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the same transformation as start-cli-flip-through-door to markWorkStartAccepted in src/dashboard/server/routes/agents/spawn.ts (~lines 594-625): single transitionXBriefOnMain(projectPath, issueId, 'active', 'running', ...) call; keep updatePlanStatus(planPath, 'running') only when planPath.startsWith(workspacePath + sep); preserve the [start-agent] log lines, deriving them from the transition result's statusUpdated/committed fields. See PRD WI-2."
+        },
+        "items": [
+          {
+            "id": "spawn-route-flip-through-door.ac1",
+            "title": "When markWorkStartAccepted runs against a promoted spec, it creates exactly one state-worktree commit that persists plan.status='running', and the [start-agent] log lines derive from the transition result's statusUpdated/committed fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-route-flip-through-door.ac2",
+            "title": "spawn.ts contains no updatePlanStatus call reachable with a state-worktree path — the remaining call is guarded by the startsWith(workspacePath) check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-route-flip-through-door.ac3",
+            "title": "npm run typecheck exits 0 for the dashboard server half after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "remove-bare-write-doors",
+        "title": "Remove exported bare-write doors moveXBriefFilesOnly and deleteXBrief",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/xbrief/lifecycle-io.ts",
+            "src/lib/xbrief/__tests__/lifecycle-io.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -rn \"moveXBriefFilesOnly\\|deleteXBrief\" src/ --include=*.ts; true",
+            "npm run typecheck",
+            "npx vitest run src/lib/xbrief/__tests__/lifecycle-io.test.ts"
+          ],
+          "expected_outputs": [
+            "grep returns no matches anywhere in src/",
+            "typecheck completes without errors",
+            "remaining lifecycle-io tests pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete moveXBriefFilesOnly (lifecycle-io.ts:276-298) and deleteXBrief (lifecycle-io.ts:300-313) plus their imports and describe-blocks in src/lib/xbrief/__tests__/lifecycle-io.test.ts. No-loss audit (re-run in the diff, already verified at planning time): grep for both names across src/ must show only these two files before deletion and zero matches after; typecheck proves no hidden consumer. See PRD WI-3 and decision D4."
+        },
+        "items": [
+          {
+            "id": "remove-bare-write-doors.ac1",
+            "title": "grep -rn for moveXBriefFilesOnly and deleteXBrief across src/ produces no matches after the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-bare-write-doors.ac2",
+            "title": "npm run typecheck exits 0, proving no production consumer existed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "remove-bare-write-doors.ac3",
+            "title": "The remaining lifecycle-io test suite passes with the deleted describe-blocks removed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconciler-adopts-orphaned-writes",
+        "title": "reconcileStatePush adopts orphaned specs/records writes instead of wedging",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3296",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cross-door-clean-tree-gate",
+            "docs-state-door-invariant"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new adoption and fail-closed test cases pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In reconcileStatePush (src/lib/pan-dir/record-update.ts:274), before EACH rebase attempt in the loop (hazard H3: git refuses rebase on any unstaged tracked change): run git status --porcelain=v1 --untracked-files=all via the module's existing git() helper. If dirty and every path (strip 3-char prefix, resolve '->' renames like reconcileStatePlaneDrift does) is under specs/ or records/, run git add -- specs records and git commit -m 'chore(state): adopt orphaned write before state rebase (PAN-3296)' -- specs records, with console.warn('[record-update] adopted orphaned state write(s): <paths>'), then proceed. If any dirty path is outside those dirs, throw an Error naming the offending paths (fail closed). Tests: (a) push-race with a dirty tracked spec → adoption commit created, record mutation lands on origin, porcelain empty; (b) dirty unowned file at worktree root → reconcile throws naming the file. See PRD WI-4, decisions D3/D5, hazards H2/H3."
+        },
+        "items": [
+          {
+            "id": "reconciler-adopts-orphaned-writes.ac1",
+            "title": "Given a push race and an uncommitted change to a tracked spec file, updateIssueRecord creates a commit with subject containing 'adopt orphaned write', completes the rebase, and pushes the record mutation to origin/overdeck-state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-adopts-orphaned-writes.ac2",
+            "title": "After adoption-path reconciliation, git status --porcelain in the state worktree returns empty output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-adopts-orphaned-writes.ac3",
+            "title": "Given a dirty file outside specs/ and records/, reconciliation rejects with an error message naming that path and creates no adoption commit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconciler-adopts-orphaned-writes.ac4",
+            "title": "The adoption path emits a console.warn line listing the adopted paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cross-door-clean-tree-gate",
+        "title": "Cross-door clean-tree durability gate over every exported spec-mutation door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/state-door-durability.test.ts"
+          ],
+          "expected_outputs": [
+            "gate suite passes: each of the five doors leaves porcelain empty and its commit on origin"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/lib/pan-dir/__tests__/state-door-durability.test.ts with a suite iterating the five exported spec-mutation doors — writeSpecForIssue, updateSpecStatus, writeSpecDocument, transitionXBriefOnMain, moveXBrief — each run against a temp MIGRATED state worktree with a bare origin (hazard H1: reuse the file's existing harness). After each door call, assert git status --porcelain is empty and the commit exists on the origin ref. This is the mechanical 'no bare writes left behind' guard from the issue's fix sketch; a future bare-write door added to the list fails the gate. No fake timers — real git subprocesses, no retry delays (hazard H4). See PRD WI-5."
+        },
+        "items": [
+          {
+            "id": "cross-door-clean-tree-gate.ac1",
+            "title": "For each of the five exported doors, the gate suite runs the door and the subsequent git status --porcelain invocation returns empty output in the state worktree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cross-door-clean-tree-gate.ac2",
+            "title": "Each door's commit is resolvable on the bare origin's overdeck-state ref after the call returns",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-state-door-invariant",
+        "title": "Document the committed start flip and the reconciler adoption behavior",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-07-30T04:05:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3296",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/XBRIEF.md",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'adopt orphaned write' docs/AGENT-STATE-PLANES.md",
+            "grep -ni 'running' docs/XBRIEF.md"
+          ],
+          "expected_outputs": [
+            "docs/AGENT-STATE-PLANES.md contains the adoption-behavior paragraph",
+            "docs/XBRIEF.md Auto-Behaviors section states the start flip is a single committed transition"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/XBRIEF.md Auto-Behaviors: rewrite the 'start-agent flips the main-side status field' bullet to state the flip is a single committed+pushed transitionXBriefOnMain(..., 'active', 'running') through the state write door, with the workspace-draft fallback touching only gitignored workspace files. docs/AGENT-STATE-PLANES.md: add a paragraph documenting reconcileStatePush's adoption behavior — owned dirs specs/ and records/, 'chore(state): adopt orphaned write' commit with a warn log, fail-closed error for unowned paths. See PRD WI-6."
+        },
+        "items": [
+          {
+            "id": "docs-state-door-invariant.ac1",
+            "title": "docs/XBRIEF.md describes the start-agent status flip as a single transition that commits and pushes through the state write door, and grep -ni 'running' docs/XBRIEF.md returns the updated bullet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-state-door-invariant.ac2",
+            "title": "docs/AGENT-STATE-PLANES.md describes the adoption commit subject, the owned-path scope (specs/, records/), and the fail-closed behavior for unowned paths",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "start-cli-flip-through-door",
+        "to": "spawn-route-flip-through-door",
+        "type": "blocks"
+      },
+      {
+        "from": "start-cli-flip-through-door",
+        "to": "reconciler-adopts-orphaned-writes",
+        "type": "blocks"
+      },
+      {
+        "from": "start-cli-flip-through-door",
+        "to": "cross-door-clean-tree-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-adopts-orphaned-writes",
+        "to": "cross-door-clean-tree-gate",
+        "type": "blocks"
+      },
+      {
+        "from": "reconciler-adopts-orphaned-writes",
+        "to": "docs-state-door-invariant",
+        "type": "blocks"
+      },
+      {
+        "from": "start-cli-flip-through-door",
+        "to": "docs-state-door-invariant",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3296-pan-start-flips-plan-status-in-the-state-worktree-but-never-commits-it-dirty-spec-blocks-pan-task-claim-and-the-state-reconciler.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
