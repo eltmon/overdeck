@@ -361,10 +361,17 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
 
   const historyRows = db
     .prepare(
-      `SELECT issue_id, type, status, timestamp, notes FROM status_history
+      `WITH bounded AS (
+        SELECT issue_id, type, status, timestamp, notes,
+               ROW_NUMBER() OVER (PARTITION BY issue_id ORDER BY timestamp DESC, id DESC) as rn
+        FROM status_history
+       )
+       SELECT issue_id, type, status, timestamp, notes
+       FROM bounded
+       WHERE rn <= ?
        ORDER BY issue_id, timestamp ASC`,
     )
-    .all() as Array<{
+    .all(REVIEW_STATUS_HISTORY_LIMIT) as Array<{
     issue_id: string;
     type: string;
     status: string;
@@ -379,7 +386,7 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
       type: row.type as StatusHistoryEntry['type'],
       status: row.status,
       timestamp: row.timestamp,
-      ...(row.notes ? { notes: row.notes } : {}),
+      ...(row.notes ? { notes: truncateHistoryNote(row.notes) } : {}),
     });
     historyByIssue.set(row.issue_id, bucket);
   }
@@ -406,10 +413,18 @@ export function getReviewStatusesFromDb(issueIds: string[]): Record<string, Revi
 
   const historyRows = db
     .prepare(
-      `SELECT issue_id, type, status, timestamp, notes FROM status_history
-       WHERE issue_id IN (${placeholders}) ORDER BY issue_id, timestamp ASC`,
+      `WITH bounded AS (
+        SELECT issue_id, type, status, timestamp, notes,
+               ROW_NUMBER() OVER (PARTITION BY issue_id ORDER BY timestamp DESC, id DESC) as rn
+        FROM status_history
+        WHERE issue_id IN (${placeholders})
+       )
+       SELECT issue_id, type, status, timestamp, notes
+       FROM bounded
+       WHERE rn <= ?
+       ORDER BY issue_id, timestamp ASC`,
     )
-    .all(...normalizedIds) as Array<{
+    .all(...normalizedIds, REVIEW_STATUS_HISTORY_LIMIT) as Array<{
     issue_id: string;
     type: string;
     status: string;
@@ -424,7 +439,7 @@ export function getReviewStatusesFromDb(issueIds: string[]): Record<string, Revi
       type: row.type as StatusHistoryEntry['type'],
       status: row.status,
       timestamp: row.timestamp,
-      ...(row.notes ? { notes: row.notes } : {}),
+      ...(row.notes ? { notes: truncateHistoryNote(row.notes) } : {}),
     });
     historyByIssue.set(row.issue_id, bucket);
   }

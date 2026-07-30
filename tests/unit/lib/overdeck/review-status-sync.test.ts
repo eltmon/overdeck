@@ -4,6 +4,8 @@ import { setReviewStatusSync } from '../../../../src/lib/review-status.js';
 import {
   getReviewStatusFromDbSync,
   upsertReviewStatusSync,
+  getAllReviewStatusesFromDb,
+  getReviewStatusesFromDb,
 } from '../../../../src/lib/overdeck/review-status-sync.js';
 import {
   setupOverdeckTestDb,
@@ -299,5 +301,107 @@ describe('overdeck review status sync', () => {
     // The testNotes field in the raw row should have the complete 10,000-char note
     expect(rawRows[0]!.notes!.length).toBe(10000);
     expect(rawRows[0]!.notes!).toBe(longTestNote);
+  });
+
+  describe('bulk hydration bounds (PAN-3253 notes-cap.ac2)', () => {
+    it('getAllReviewStatusesFromDb applies history and note bounds', () => {
+      const now = Date.now();
+
+      // Create 3 issues with 30 history entries each (exceeds 20-entry limit per issue)
+      const longNote = 'x'.repeat(600);
+      const createIssueWithHistory = (issueId: string) => {
+        const historyEntries = Array.from({ length: 30 }, (_, i) => ({
+          type: 'review' as const,
+          status: i % 2 === 0 ? 'pending' : 'passed',
+          timestamp: new Date(now + i * 1000).toISOString(),
+          notes: longNote,
+        }));
+        upsertReviewStatusSync({
+          issueId,
+          reviewStatus: 'passed',
+          testStatus: 'pending',
+          history: historyEntries,
+          updatedAt: new Date().toISOString(),
+          readyForMerge: false,
+        });
+      };
+
+      createIssueWithHistory('PAN-BULK-TEST-1');
+      createIssueWithHistory('PAN-BULK-TEST-2');
+      createIssueWithHistory('PAN-BULK-TEST-3');
+
+      const allStatuses = getAllReviewStatusesFromDb();
+
+      // Each issue should have exactly 20 history entries
+      expect(allStatuses['PAN-BULK-TEST-1']?.history).toHaveLength(20);
+      expect(allStatuses['PAN-BULK-TEST-2']?.history).toHaveLength(20);
+      expect(allStatuses['PAN-BULK-TEST-3']?.history).toHaveLength(20);
+
+      // All notes should be truncated to ≤ 500 chars
+      for (const status of [
+        allStatuses['PAN-BULK-TEST-1'],
+        allStatuses['PAN-BULK-TEST-2'],
+        allStatuses['PAN-BULK-TEST-3'],
+      ]) {
+        for (const entry of status?.history || []) {
+          if (entry.notes) {
+            expect(entry.notes.length).toBeLessThanOrEqual(500);
+          }
+        }
+      }
+    });
+
+    it('getReviewStatusesFromDb applies history and note bounds per issue', () => {
+      const now = Date.now();
+
+      // Create 2 issues with 30 history entries each
+      const longNote = 'y'.repeat(600);
+      const createIssueWithHistory = (issueId: string) => {
+        const historyEntries = Array.from({ length: 30 }, (_, i) => ({
+          type: 'review' as const,
+          status: 'pending',
+          timestamp: new Date(now + i * 1000).toISOString(),
+          notes: longNote,
+        }));
+        upsertReviewStatusSync({
+          issueId,
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          history: historyEntries,
+          updatedAt: new Date().toISOString(),
+          readyForMerge: false,
+        });
+      };
+
+      createIssueWithHistory('PAN-SELECTIVE-1');
+      createIssueWithHistory('PAN-SELECTIVE-2');
+      // Also create one more that won't be queried
+      createIssueWithHistory('PAN-SELECTIVE-3');
+
+      // Query only 2 of the 3 issues
+      const selectedStatuses = getReviewStatusesFromDb([
+        'PAN-SELECTIVE-1',
+        'PAN-SELECTIVE-2',
+      ]);
+
+      // Should have exactly 2 issues returned
+      expect(Object.keys(selectedStatuses)).toHaveLength(2);
+
+      // Each should have exactly 20 history entries
+      expect(selectedStatuses['PAN-SELECTIVE-1']?.history).toHaveLength(20);
+      expect(selectedStatuses['PAN-SELECTIVE-2']?.history).toHaveLength(20);
+
+      // Notes should all be truncated
+      for (const status of Object.values(selectedStatuses)) {
+        for (const entry of status?.history || []) {
+          if (entry.notes) {
+            expect(entry.notes.length).toBeLessThanOrEqual(500);
+          }
+        }
+      }
+
+      // The unqueried issue should not be in the result
+      expect(selectedStatuses['PAN-SELECTIVE-3']).toBeUndefined();
+    });
   });
 });
