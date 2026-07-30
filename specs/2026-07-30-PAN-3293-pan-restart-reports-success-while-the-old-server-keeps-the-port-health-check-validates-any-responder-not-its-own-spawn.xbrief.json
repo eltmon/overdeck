@@ -4,17 +4,17 @@
     "created": "2026-07-30T03:46:53Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3293: bug(cli): pan restart reports success while the OLD server keeps the port — health check validates any responder, not its own spawn",
-    "updated": "2026-07-30T03:53:54.156Z"
+    "updated": "2026-07-30T03:53:56.277Z"
   },
   "plan": {
     "id": "pan-3293",
     "title": "pan restart reports success while the OLD server keeps the port — health check validates any responder, not its own spawn",
-    "status": "approved",
+    "status": "running",
     "uid": "c3809f8f-08ea-4969-aa5a-23aa5141848c",
     "author": "agent:claude-fable-5",
-    "sequence": 5,
+    "sequence": 6,
     "created": "2026-07-30T03:46:53Z",
-    "updated": "2026-07-30T03:53:54.156Z",
+    "updated": "2026-07-30T03:53:56.277Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3293",
