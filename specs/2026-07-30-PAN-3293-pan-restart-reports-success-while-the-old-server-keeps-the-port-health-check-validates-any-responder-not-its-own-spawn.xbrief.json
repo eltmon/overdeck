@@ -1,0 +1,645 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T03:46:53Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3293: bug(cli): pan restart reports success while the OLD server keeps the port — health check validates any responder, not its own spawn",
+    "updated": "2026-07-30T11:54:16.132Z"
+  },
+  "plan": {
+    "id": "pan-3293",
+    "title": "pan restart reports success while the OLD server keeps the port — health check validates any responder, not its own spawn",
+    "status": "completed",
+    "uid": "c3809f8f-08ea-4969-aa5a-23aa5141848c",
+    "author": "agent:claude-fable-5",
+    "sequence": 7,
+    "created": "2026-07-30T03:46:53Z",
+    "updated": "2026-07-30T11:54:16.132Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3293",
+        "label": "PAN-3293",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3264",
+        "label": "PAN-3264",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3099",
+        "label": "PAN-3099",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "cli",
+      "restart",
+      "lifecycle",
+      "supervisor",
+      "reliability"
+    ],
+    "narratives": {
+      "Problem": "pan restart (and pan up, and every supervisor/watchdog/browser restart, which all shell out to `pan restart --dashboard`) declares success when ANY process answers 200 on /api/health. The health payload carries only { status, repoRoot, mode }, which an old surviving server reports identically to its replacement, and teardown's port probe is a single silently-failing `fuser <port>/tcp` (returns [] on any miss, and always on macOS), so the old server can survive stop, keep the port, answer the probe, and earn a '✓ Dashboard restarted and healthy' while the fresh spawn crash-loops on EADDRINUSE (2026-07-29 incident: pid 56538 squatted 3011 for ~25 minutes; hook fan-out drove load to 91).",
+      "Proposal": "Make success mean 'the port's listener is the process this restart spawned'. Add pid to /api/health (FR-1); expose the spawned server's pid from both spawn paths — child.pid, and systemd MainPID polling (FR-2); require responder pid == spawned pid in waitForDashboardHealth, failing at deadline with the actual owner named (FR-3); fast-fail on EADDRINUSE appearing in the dashboard log after the spawn offset (FR-4); replace the fuser-only probe with an async lsof-first multi-probe covering IPv4+IPv6 on Linux and macOS (FR-5); verify teardown by pid death, never by a subsequent 200 (FR-6). Failures exit non-zero, name pids, and leave both processes running (#3099 preserved). The supervisor needs no separate reconciliation: restart-spawn.ts already rejects on non-zero `pan restart` exit, so the CLI's truthfulness propagates to the watchdog.",
+      "NonGoals": "- Hunting or stopping the process that deleted generation-a's node_modules and 62 tracked files (operator comment item (a)) — needs its own investigation issue.\n- Integrity check / fallback on the global pan CLI symlink resolution path (operator comment item (b), PAN-3264 sibling) — separable slice, sibling issue recommended.\n- Fixing the work-agent-stop-hook fan-out that amplified the crash-loop (filed separately per the issue body).\n- Auto-killing a squatter at health-check time — teardown is the only phase that kills; health-phase failures only report.\n- Changing the supervisor sidecar's 202-accepted async response contract for POST /restart-dashboard.\n- macOS systemd-equivalent process supervision (plain detached spawn remains the macOS path).\n- PAN-2804 systemd-run warning noise on macOS."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Ownership gate = pid echoed by /api/health and compared against the spawned pid, rather than parsing lsof/ss output as the primary success gate.",
+        "rationale": "Cross-platform, race-free, no output parsing, and it identifies the actual responder for the error message; port probes still back up teardown and squatter naming. A pre-fix survivor lacks the pid field and correctly fails the gate."
+      },
+      {
+        "summary": "Probe-tool total unavailability degrades to a warning plus identity-only wait with an explicit 'ownership unverified' caveat instead of a hard refusal to restart.",
+        "rationale": "A machine missing lsof, fuser AND ss should not be unable to restart; the pid gate still guarantees a truthful verdict whenever the spawn pid is resolvable."
+      },
+      {
+        "summary": "Operator comment scope items (deleter hunt, CLI symlink integrity guard) recorded as NonGoals for a sibling issue rather than folded into this plan.",
+        "rationale": "They live in the pan-reload deployment plane, are independently shippable/reviewable, and folding them in would breach the >6-subsystem finalize lint; the comment 'suggests' coverage rather than mandating single-issue delivery."
+      },
+      {
+        "summary": "No supervisor-side port-owner reconciliation loop is added.",
+        "rationale": "src/supervisor/restart-spawn.ts:127-139 already rejects its done promise on non-zero `pan restart` exit, and stopDashboardPromise (hardened by FR-5/FR-6) is the component that detects and kills orphans on every restart path."
+      },
+      {
+        "summary": "EADDRINUSE detection reads DASHBOARD_LOG_FILE from a pre-spawn byte offset during the health poll.",
+        "rationale": "All spawn paths already append child output there (openDashboardLogStdio / systemd StandardOutput=append), so the log is the one uniform place the child's death is visible, including under systemd where the CLI has no stdio pipe."
+      }
+    ],
+    "items": [
+      {
+        "id": "health-pid",
+        "title": "Add serving pid to /api/health identity payload",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/identity.ts",
+            "src/dashboard/server/server.ts",
+            "tests/unit/dashboard/health-identity.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/health-identity.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "health-identity.test.ts passes asserting pid === process.pid",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/identity.ts:13-22, add `readonly pid: number` to DashboardIdentity and `pid: process.pid` to getDashboardIdentity()'s return. The /api/health route (src/dashboard/server/server.ts:134-138) spreads getDashboardIdentity(), so the field flows through without route changes. Add tests/unit/dashboard/health-identity.test.ts asserting the identity object carries the current process pid alongside repoRoot and mode."
+        },
+        "items": [
+          {
+            "id": "health-pid.ac1",
+            "title": "Given a running dashboard, when GET /api/health is fetched, then the JSON payload returns a numeric pid equal to the serving process's process.pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-pid.ac2",
+            "title": "getDashboardIdentity() returns { repoRoot, mode, pid } and the new unit test asserts pid === process.pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "health-pid.ac3",
+            "title": "npm run typecheck exits 0 with the widened DashboardIdentity type — every existing consumer of the type still compiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "spawn-pid-handle",
+        "title": "Expose the spawned server's pid from both dashboard spawn paths",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "owner-verified-health"
+          ],
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "src/cli/commands/restart.ts",
+            "tests/unit/cli/restart-spawn-pid.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/restart-spawn-pid.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "restart-spawn-pid.test.ts passes for child-pid, MainPID-poll, and vanished-unit cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend DashboardSpawnHandle (src/lib/platform-lifecycle.ts:345-347) with optional `pid?: () => Promise<number | null>`. In src/cli/commands/restart.ts: the plain detached spawn path (:278-299) returns `pid: async () => child.pid ?? null`; the systemd path (spawnDashboardSystemdUnit, :304-350) resolves pid via `systemctl --user show -p MainPID --value <unit>.service`, polling until the output parses as a positive integer or ~5s elapses, returning null on timeout or when the unit was already collected. Keep execFileSync style in restart.ts (CLI-only); expose the systemctl runner as an injectable parameter so tests use fakes. Add tests/unit/cli/restart-spawn-pid.test.ts with fake timers and injected exec fakes covering: immediate MainPID, MainPID=0 then positive, unit vanished (returns null)."
+        },
+        "items": [
+          {
+            "id": "spawn-pid-handle.ac1",
+            "title": "Given the plain detached spawn path, when the handle's pid() is awaited, then it resolves to the spawned child's pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-pid-handle.ac2",
+            "title": "Given the systemd path with MainPID reading 0 then a positive integer, when pid() is awaited under fake timers, then it resolves to that integer without real-clock waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-pid-handle.ac3",
+            "title": "Given a systemd unit that vanished (systemctl fails or returns empty), when pid() is awaited, then it resolves to null within the ~5s bound instead of hanging or throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "spawn-pid-handle.ac4",
+            "title": "npm run typecheck exits 0 without edits to existing DashboardSpawnHandle consumers or test fakes — the optional pid field preserves the handle's current shape",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pids-on-port-multiprobe",
+        "title": "Replace fuser-only pidsOnPort with async lsof-first multi-probe (IPv4+IPv6, Linux+macOS)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "platform-lifecycle.test.ts passes including new probe-fallback and ss-parser cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite pidsOnPort() (src/lib/platform-lifecycle.ts:145-155): try `lsof -nP -iTCP:${port} -sTCP:LISTEN -t` first (treat exit code 1 with empty stdout as 'no listeners', not failure), then `fuser ${port}/tcp`, then parse `ss -ltnp` lines matching the port for pid=(\\d+). Return the first successfully executed probe's result; a working probe returning empty means the port is free. If every tool fails to execute, emit one console.warn naming the tools tried and return []. All probes via execAsync — no execSync (this module is imported by the supervisor sidecar). waitForPortFree and stopDashboardPromise pick the change up automatically. Unit-test fallback order and the ss parser with injected exec fakes (export a seam or use vi.mock on child_process)."
+        },
+        "items": [
+          {
+            "id": "pids-on-port-multiprobe.ac1",
+            "title": "Given lsof is available, when pidsOnPort runs against a port with an IPv6-bound listener, then it returns that listener's pid (lsof -iTCP covers both address families)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pids-on-port-multiprobe.ac2",
+            "title": "Given lsof fails to execute, when pidsOnPort runs, then it falls back to fuser and then ss, returning the first successful probe's pids",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pids-on-port-multiprobe.ac3",
+            "title": "Given no probe tool executes, when pidsOnPort runs, then it emits exactly one warning naming the tools tried and returns [] instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pids-on-port-multiprobe.ac4",
+            "title": "grep -c 'execSync' src/lib/platform-lifecycle.ts returns 0 matches — all new probes run through execAsync",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "owner-verified-health",
+        "title": "Health gate requires responder pid == spawned pid; timeout names the actual owner",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "src/cli/commands/restart.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "fake-timer tests pass for wrong-pid, matching-pid, missing-pid, and no-expectedPid cases",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In waitForDashboardHealthPromise (src/lib/platform-lifecycle.ts:247-284) add optional opts.expectedPid: number. In the res.ok branch after the identity check (:264-271), read payload.pid; when expectedPid is set and payload.pid is not a number or differs, set lastError to `port answered by pid <reported|'(unreported)'> — not the freshly spawned server (pid <expectedPid>)` and keep polling; enrich the deadline StageError (:280-283) with describePid() of the last responder pid seen. In restartDashboardPromise (:349-379) capture the DashboardSpawnHandle returned by startDashboardFn (currently discarded at :358), resolve spawnedPid = await handle?.pid?.() ?? null, and pass expectedPid when non-null; when null, keep the identity-only wait but print/append an explicit 'ownership unverified — could not resolve the spawned server pid' caveat on success. Preserve the #3099 catch block and recovery: 'dashboard-left-running' verbatim. Callers restart.ts:459-462 and up.ts:216-222 keep their signatures (pid threading happens inside restartDashboardPromise). Fake-timer tests: wrong pid → rejects at deadline naming both pids; matching pid → resolves; payload missing pid (pre-fix survivor) → rejects; expectedPid undefined → legacy behavior unchanged."
+        },
+        "items": [
+          {
+            "id": "owner-verified-health.ac1",
+            "title": "Given a responder whose health payload pid differs from expectedPid, when the health timeout elapses under fake timers, then restartDashboard rejects with a StageError naming both the responder pid and the expected pid",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-verified-health.ac2",
+            "title": "Given a responder whose payload pid equals expectedPid, when polled, then restartDashboard resolves successfully",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-verified-health.ac3",
+            "title": "Given a responder that omits pid entirely (pre-fix server), when expectedPid is set, then the gate rejects at deadline instead of accepting the 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-verified-health.ac4",
+            "title": "Given expectedPid is not provided (watchdog/peer callers), when waitForDashboardHealth runs, then it preserves today's behavior and existing platform-lifecycle tests still pass",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "owner-verified-health.ac5",
+            "title": "Given pid resolution returned null, when the restart succeeds on identity alone, then the success output includes an 'ownership unverified' caveat rather than a plain success line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "eaddrinuse-fastfail",
+        "title": "Fail restart fast when EADDRINUSE appears in the dashboard log after spawn",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fake-timer test passes: EADDRINUSE in watched log → rejection before health deadline naming the squatter pid",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In restartDashboardPromise (src/lib/platform-lifecycle.ts:349-379): before invoking startDashboardFn, stat DASHBOARD_LOG_FILE (:75) and record its byte size (0 if absent). During the health-poll window, on each tick read bytes appended past the offset with async fs APIs (open/read or createReadStream with start offset); if /EADDRINUSE/ matches, abort the wait and throw StageError{ stage: 'dashboard', reason: `port <apiPort> is owned by PID <pid> (cmd: …) — the freshly spawned server crashed with EADDRINUSE` } using pidsOnPort + describePid, WITHOUT recovery: 'dashboard-left-running' (the child is already dead). Make the watched log path injectable via an option defaulting to DASHBOARD_LOG_FILE so tests point at a temp file. Fake-timer test: append an EADDRINUSE listenInCluster stack to the temp log after the fake spawn, advance timers, assert rejection occurs before the configured healthTimeoutMs and the message contains the squatter pid from the injected probe fake."
+        },
+        "items": [
+          {
+            "id": "eaddrinuse-fastfail.ac1",
+            "title": "Given EADDRINUSE is appended to the watched log after spawn, when health polling ticks under fake timers, then restartDashboard rejects before the health deadline",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eaddrinuse-fastfail.ac2",
+            "title": "The EADDRINUSE rejection message names the port and the owning pid (with command when resolvable) and omits the dashboard-left-running recovery marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "eaddrinuse-fastfail.ac3",
+            "title": "Given the log file does not exist before spawn, when the restart runs, then offset tracking treats it as 0 and the flow neither throws nor blocks on the missing file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "stop-verifies-pid-death",
+        "title": "stopDashboard verifies targeted pids are dead, naming survivors",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/platform-lifecycle.ts",
+            "tests/unit/lib/platform-lifecycle.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "test passes: a pid surviving SIGKILL causes stopDashboard to reject naming that pid",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In stopDashboardPromise (src/lib/platform-lifecycle.ts:188-247), after the SIGKILL escalation and final port wait (:228-245), check every pid originally targeted with process.kill(pid, 0): ESRCH means dead; success or EPERM means alive. Append each survivor to the failure reason as `PID <pid> (cmd: <describePid>) survived SIGKILL` and throw StageError when any survive, even if the port probes read free (catches a survivor that closed its listener but kept running). Do not restructure the pan-dev supervisor-marker fast path (:201-209). Unit test with vi.spyOn(process, 'kill') simulating a survivor."
+        },
+        "items": [
+          {
+            "id": "stop-verifies-pid-death.ac1",
+            "title": "Given a targeted pid still alive after SIGKILL escalation, when stopDashboard completes its waits, then it rejects with a StageError naming that pid as a survivor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-verifies-pid-death.ac2",
+            "title": "Given all targeted pids are ESRCH-dead and ports are free, when stopDashboard runs, then it resolves exactly as before (no new failure on the happy path)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "stop-verifies-pid-death.ac3",
+            "title": "Given no pids were found on the ports, when stopDashboard runs, then it returns early without invoking the pid-death check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "squatter-integration-test",
+        "title": "Integration test: a real squatter on the port makes restart fail loudly, naming the pid",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/platform-lifecycle-squatter.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/platform-lifecycle-squatter.test.ts"
+          ],
+          "expected_outputs": [
+            "squatter test passes: restartDashboard rejects naming the responder, and the squatter server is still listening afterwards"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "New tests/unit/lib/platform-lifecycle-squatter.test.ts. Start a real node:http server on an ephemeral port answering /api/health with { status: 'ok', repoRoot: <expected>, mode: 'primary' } and either no pid (pre-fix survivor stand-in) or a wrong pid. Call restartDashboard with a start fn returning a handle whose pid() resolves to a different pid, a short healthTimeoutMs, and vi.useFakeTimers() with advanceTimersByTimeAsync so real socket I/O interleaves with the poll loop. Assert: (1) the Effect rejects with a StageError message reporting the responder pid or unreported-pid ownership mismatch; (2) the squatter's server object still accepts connections afterwards (nothing auto-killed it); (3) with the squatter answering the matching pid, the same flow resolves. Use ephemeral ports per the existing platform-lifecycle.test.ts convention (43990+)."
+        },
+        "items": [
+          {
+            "id": "squatter-integration-test.ac1",
+            "title": "Given a live squatter answering health without the expected pid, when restartDashboard runs with a short deadline, then it rejects with a message reporting the ownership mismatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "squatter-integration-test.ac2",
+            "title": "After the failed restart, the squatter server still accepts connections — the test proves restart preserves both processes (#3099)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "squatter-integration-test.ac3",
+            "title": "Given the responder reports the expected pid, when the same flow runs, then restartDashboard resolves — the gate accepts its own spawn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-owner-verified-restart",
+        "title": "Document the owner-verified restart contract in DEV SOP and pan-restart skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:46:53Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3293",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/OVERDECK_DEV_SOP.md",
+            "sync-sources/skills/pan-restart/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) completes without errors with the updated SKILL.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/OVERDECK_DEV_SOP.md (restart/triage section): state that restart success now means the port's LISTEN owner is the process this restart spawned, pid-verified through /api/health; that EADDRINUSE in the fresh server's log fails the restart immediately; that failures name the owning pid and leave both processes running for inspection; and that teardown is verified by pid death — a 200 from the port is never treated as proof of restart success. sync-sources/skills/pan-restart/SKILL.md: add a troubleshooting note explaining the 'port answered by pid X — not the freshly spawned server' failure and its manual recovery (inspect/kill the named pid, rerun pan restart). No flags change, so scripts/lint-skills.sh stays green."
+        },
+        "items": [
+          {
+            "id": "docs-owner-verified-restart.ac1",
+            "title": "docs/OVERDECK_DEV_SOP.md contains the pid-verified success contract, the EADDRINUSE fast-fail behavior, and the rule that teardown is verified by pid death rather than an HTTP 200",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-owner-verified-restart.ac2",
+            "title": "sync-sources/skills/pan-restart/SKILL.md now shows the ownership-mismatch failure message and the manual recovery steps for it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-owner-verified-restart.ac3",
+            "title": "npm run lint (skill drift check included) exits 0 after the SKILL.md edit",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "health-pid",
+        "to": "owner-verified-health",
+        "type": "blocks"
+      },
+      {
+        "from": "spawn-pid-handle",
+        "to": "owner-verified-health",
+        "type": "blocks"
+      },
+      {
+        "from": "pids-on-port-multiprobe",
+        "to": "owner-verified-health",
+        "type": "blocks"
+      },
+      {
+        "from": "pids-on-port-multiprobe",
+        "to": "stop-verifies-pid-death",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-verified-health",
+        "to": "eaddrinuse-fastfail",
+        "type": "blocks"
+      },
+      {
+        "from": "owner-verified-health",
+        "to": "squatter-integration-test",
+        "type": "blocks"
+      },
+      {
+        "from": "eaddrinuse-fastfail",
+        "to": "squatter-integration-test",
+        "type": "informs"
+      },
+      {
+        "from": "owner-verified-health",
+        "to": "docs-owner-verified-restart",
+        "type": "informs"
+      },
+      {
+        "from": "pids-on-port-multiprobe",
+        "to": "eaddrinuse-fastfail",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3293-pan-restart-reports-success-while-the-old-server-keeps-the-port-health-check-validates-any-responder-not-its-own-spawn.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "completed"
+}

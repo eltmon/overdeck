@@ -94,7 +94,7 @@
     "recordedAt": "2026-07-28T20:52:11.749Z"
   },
   "created": "2026-07-28T19:57:10.246Z",
-  "updated": "2026-07-30T02:35:41.905Z",
+  "updated": "2026-07-30T05:08:56.045Z",
   "pipeline": {
     "issueId": "PAN-3242",
     "reviewStatus": "passed",
@@ -105,7 +105,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T20:52:32.420Z",
-    "updatedAt": "2026-07-30T02:35:41.898Z",
+    "updatedAt": "2026-07-30T05:08:56.012Z",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "conflictsSince": {
@@ -120,7 +120,9 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3249",
     "reviewedAtCommit": "a9bc5c2daf170c16e32e2cfa54344fa958b97162",
     "lastVerifiedCommit": "a9bc5c2daf170c16e32e2cfa54344fa958b97162",
-    "reviewSpawnedAt": "2026-07-29T08:52:26.595Z"
+    "reviewSpawnedAt": "2026-07-29T08:52:26.595Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-30T05:08:56.012Z"
   },
   "closeOut": {
     "usage": {
@@ -172,13 +174,86 @@
       },
       "costAtCloseOut": {
         "usd": 64.475846,
-        "pricingAsOf": "2026-07-30T02:35:41.902Z"
+        "pricingAsOf": "2026-07-30T04:37:11.286Z"
       }
     },
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3249"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-30T05:08:56.038Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a9bc5c2daf170c16e32e2cfa54344fa958b97162",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3249 MERGED at 2026-07-29T11:39:03Z",
+          "status": "pass",
+          "mergedAt": "2026-07-29T11:39:03Z",
+          "mergeCommit": "32c0ec15711addb45d497ee40976c296b717d5b5"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 32c0ec15711addb45d497ee40976c296b717d5b5",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit eeb851b1 contains merge 32c0ec15",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3242 found; Pruned 163 checkpoint ref(s) for agent-pan-3242, planning-pan-3242, strike-pan-3242; No specialist registry entries for PAN-3242"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",

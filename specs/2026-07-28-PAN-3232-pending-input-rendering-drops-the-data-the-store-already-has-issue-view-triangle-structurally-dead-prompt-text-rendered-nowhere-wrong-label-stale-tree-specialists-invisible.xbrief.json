@@ -4,17 +4,17 @@
     "created": "2026-07-28T18:24:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3232: Pending-input rendering drops the data the store already has: issue-view triangle structurally dead, prompt text rendered nowhere, wrong label, stale tree, specialists invisible",
-    "updated": "2026-07-28T18:30:07.172Z"
+    "updated": "2026-07-30T05:07:55.821Z"
   },
   "plan": {
     "id": "pan-3232",
     "title": "Pending-input rendering drops the data the store already has: issue-view triangle structurally dead, prompt text rendered nowhere, wrong label, stale tree, specialists invisible",
-    "status": "proposed",
+    "status": "completed",
     "uid": "ff697a7b-bc00-4640-8420-22fe989857f7",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T18:24:12Z",
-    "updated": "2026-07-28T18:30:07.172Z",
+    "updated": "2026-07-30T05:07:55.821Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3232",
@@ -603,5 +603,5 @@
       "canonicalFilename": "2026-07-28-PAN-3232-pending-input-rendering-drops-the-data-the-store-already-has-issue-view-triangle-structurally-dead-prompt-text-rendered-nowhere-wrong-label-stale-tree-specialists-invisible.xbrief.json"
     }
   },
-  "status": "proposed"
+  "status": "completed"
 }

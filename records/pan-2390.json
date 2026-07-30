@@ -1,18 +1,18 @@
 {
-  "issueId": "PAN-3266",
+  "issueId": "PAN-2390",
   "schemaVersion": 2,
   "sessionHistory": [
     {
       "reason": "resume",
       "agentModel": "claude-opus-5",
-      "timestamp": "2026-07-30T08:20:18.267Z"
+      "timestamp": "2026-07-30T09:36:29.701Z"
     }
   ],
   "feedback": [],
-  "created": "2026-07-29T00:54:30.938Z",
-  "updated": "2026-07-30T11:53:01.741Z",
+  "created": "2026-07-30T08:09:22.409Z",
+  "updated": "2026-07-30T11:52:24.049Z",
   "pipeline": {
-    "issueId": "PAN-3266",
+    "issueId": "PAN-2390",
     "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "passed",
@@ -20,33 +20,38 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T11:53:01.722Z",
+    "updatedAt": "2026-07-30T11:52:24.037Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
-    "lastVerifiedCommit": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
-    "strikeReadyHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
-    "strikeReadyAt": "2026-07-30T08:50:20.011Z",
+    "lastVerifiedCommit": "2559c02e929622ac80b7877a51d4289ba8ef7bf0",
+    "strikeReadyHead": "2559c02e929622ac80b7877a51d4289ba8ef7bf0",
+    "strikeReadyAt": "2026-07-30T09:46:01.938Z",
     "strikeLandingState": "recovering",
     "strikeRecoveryCount": 1,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-07-30T09:07:30.487Z",
     "strikeLandingAttempts": [
       {
-        "timestamp": "2026-07-30T09:06:30.487Z",
-        "strikeHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
+        "timestamp": "2026-07-30T08:37:35.693Z",
+        "strikeHead": "f86194f8257c77dfb939108b5eafdccc01058509",
         "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
       },
       {
-        "timestamp": "2026-07-30T09:16:22.491Z",
-        "strikeHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
+        "timestamp": "2026-07-30T08:47:17.966Z",
+        "strikeHead": "f86194f8257c77dfb939108b5eafdccc01058509",
         "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
         "outcome": "failed",
-        "detail": "GitHub PR #3318 has failing required checks on HEAD b6b1049e. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3318 for details."
+        "detail": "Stale strike signal: recorded HEAD f86194f8257c77dfb939108b5eafdccc01058509 differs from origin/strike/pan-2390 at 2559c02e929622ac80b7877a51d4289ba8ef7bf0"
+      },
+      {
+        "timestamp": "2026-07-30T09:46:25.149Z",
+        "strikeHead": "2559c02e929622ac80b7877a51d4289ba8ef7bf0",
+        "mainHead": "6d29712f122568e67889cd59419647ba868ad317",
+        "outcome": "failed",
+        "detail": "GitHub PR #3315 has failing required checks on HEAD 2559c02e. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3315 for details."
       }
     ],
     "closedOut": true,
-    "closedOutAt": "2026-07-30T11:53:01.722Z"
+    "closedOutAt": "2026-07-30T11:52:24.037Z"
   },
   "closeOut": {
     "usage": {
@@ -54,13 +59,13 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T11:41:15.945Z"
+        "pricingAsOf": "2026-07-30T11:41:15.635Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-30T11:53:01.741Z",
+      "evaluatedAt": "2026-07-30T11:52:24.049Z",
       "rows": [
         {
           "id": "review",
@@ -83,7 +88,7 @@
           "num": 3,
           "title": "Verification green on the branch",
           "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
+          "observed": "verificationStatus: passed at 2559c02e929622ac80b7877a51d4289ba8ef7bf0",
           "status": "pass"
         },
         {
@@ -91,10 +96,10 @@
           "num": 4,
           "title": "Merged to main",
           "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3318 MERGED at 2026-07-30T10:39:08Z",
+          "observed": "Merge specialist confirmed merge completed; PR #3315 MERGED at 2026-07-30T10:38:47Z",
           "status": "pass",
-          "mergedAt": "2026-07-30T10:39:08Z",
-          "mergeCommit": "5fc369d92bebdf785ad03797e04c911c8b8519c0"
+          "mergedAt": "2026-07-30T10:38:47Z",
+          "mergeCommit": "33bb6efd4addda2a8761535457ebe30846a3c16b"
         },
         {
           "id": "post-merge",
@@ -109,7 +114,7 @@
           "num": 6,
           "title": "Verified on main",
           "expected": "merged commit verified on main",
-          "observed": "9 check-runs concluded successfully on 5fc369d92bebdf785ad03797e04c911c8b8519c0",
+          "observed": "8 check-runs concluded successfully on 33bb6efd4addda2a8761535457ebe30846a3c16b",
           "status": "pass"
         },
         {
@@ -117,7 +122,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit 22b6dfc7 contains merge 5fc369d9",
+          "observed": "build commit 22b6dfc7 contains merge 33bb6efd",
           "status": "pass"
         },
         {
@@ -127,7 +132,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3266 — not merged to main; Pruned 40 checkpoint ref(s) for agent-pan-3266, planning-pan-3266, strike-pan-3266; No specialist registry entries for PAN-3266"
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-2390 — not merged to main; Pruned 35 checkpoint ref(s) for agent-pan-2390, planning-pan-2390, strike-pan-2390; No specialist registry entries for PAN-2390"
         }
       ],
       "accepted": []

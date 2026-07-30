@@ -1,26 +1,38 @@
 {
-  "issueId": "PAN-3264",
+  "issueId": "PAN-3202",
   "schemaVersion": 2,
   "feedback": [],
-  "created": "2026-07-29T00:50:49.621Z",
-  "updated": "2026-07-30T11:04:41.566Z",
+  "created": "2026-07-30T08:11:20.548Z",
+  "updated": "2026-07-30T11:52:45.059Z",
   "pipeline": {
-    "issueId": "PAN-3264",
+    "issueId": "PAN-3202",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "skipped",
     "verificationStatus": "skipped",
     "mergeStatus": "merged",
     "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T11:04:41.547Z",
-    "testNotes": "Skipped: issue is already merged",
+    "updatedAt": "2026-07-30T11:52:45.017Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
-    "strikeLandingState": "landed",
+    "strikeReadyHead": "f3f28d2b4470015623dfd8fbafc1dd93dc948c47",
+    "strikeReadyAt": "2026-07-30T08:43:35.727Z",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [],
+    "strikeTransportRetryCount": 1,
+    "strikeNextAttemptAt": "2026-07-30T09:23:37.376Z",
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-07-30T09:22:37.376Z",
+        "strikeHead": "f3f28d2b4470015623dfd8fbafc1dd93dc948c47",
+        "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
+        "outcome": "transport-failed",
+        "detail": "Strike merge request failed: fetch failed"
+      }
+    ],
     "closedOut": true,
-    "closedOutAt": "2026-07-30T11:04:41.547Z"
+    "closedOutAt": "2026-07-30T11:52:45.017Z"
   },
   "closeOut": {
     "usage": {
@@ -28,13 +40,13 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T10:51:24.689Z"
+        "pricingAsOf": "2026-07-30T10:37:56.432Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790",
     "dodGate": {
-      "evaluatedAt": "2026-07-30T11:04:41.566Z",
+      "evaluatedAt": "2026-07-30T11:52:45.055Z",
       "rows": [
         {
           "id": "review",
@@ -49,7 +61,7 @@
           "num": 2,
           "title": "Tests passed",
           "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
+          "observed": "testStatus: skipped (skipped per issue policy)",
           "status": "pass"
         },
         {
@@ -65,10 +77,10 @@
           "num": 4,
           "title": "Merged to main",
           "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3269 MERGED at 2026-07-29T01:18:57Z",
+          "observed": "Merge specialist confirmed merge completed; PR #3319 MERGED at 2026-07-30T10:37:21Z",
           "status": "pass",
-          "mergedAt": "2026-07-29T01:18:57Z",
-          "mergeCommit": "eefeef296e6398bc13f63ba8eebe9a3682be98f7"
+          "mergedAt": "2026-07-30T10:37:21Z",
+          "mergeCommit": "e6caccb8d5af65c6373d59c70cc40a5dae630824"
         },
         {
           "id": "post-merge",
@@ -83,7 +95,7 @@
           "num": 6,
           "title": "Verified on main",
           "expected": "merged commit verified on main",
-          "observed": "failed checks: test on eefeef296e6398bc13f63ba8eebe9a3682be98f7; verified on main by later green CI run fbb2dc8a696959142bdc8dcc0aeb7582fc10b103 containing the merge (8 check-runs concluded successfully)",
+          "observed": "8 check-runs concluded successfully on e6caccb8d5af65c6373d59c70cc40a5dae630824",
           "status": "pass"
         },
         {
@@ -91,7 +103,7 @@
           "num": 7,
           "title": "Deployed",
           "expected": "live server build includes the merged commit",
-          "observed": "build commit e90c2647 contains merge eefeef29",
+          "observed": "build commit 22b6dfc7 contains merge e6caccb8",
           "status": "pass"
         },
         {
@@ -101,7 +113,7 @@
           "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
           "overridable": false,
           "status": "pass",
-          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3264 — not merged to main; Preserved remote branch strike/pan-3264 — not merged to main; Pruned 37 checkpoint ref(s) for agent-pan-3264, planning-pan-3264, strike-pan-3264; No specialist registry entries for PAN-3264"
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 3 agent state directories; Preserved local branch strike/pan-3202 — not merged to main; Pruned 32 checkpoint ref(s) for agent-pan-3202, planning-pan-3202, strike-pan-3202; No specialist registry entries for PAN-3202"
         }
       ],
       "accepted": []

@@ -4,17 +4,17 @@
     "created": "2026-07-28T18:12:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1990: First-class workspaces and projects with per-workspace memory",
-    "updated": "2026-07-28T18:17:55.977Z"
+    "updated": "2026-07-30T05:06:35.899Z"
   },
   "plan": {
     "id": "pan-1990",
     "title": "First-class workspaces and projects with per-workspace memory",
-    "status": "proposed",
+    "status": "completed",
     "uid": "893feb1c-e8d0-4aee-b31b-310d37cab69f",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-28T18:12:08Z",
-    "updated": "2026-07-28T18:17:55.977Z",
+    "updated": "2026-07-30T05:06:35.899Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1990",
@@ -1978,5 +1978,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "completed"
 }

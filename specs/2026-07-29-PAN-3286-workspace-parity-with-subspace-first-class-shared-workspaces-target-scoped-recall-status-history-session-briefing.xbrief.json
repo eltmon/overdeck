@@ -4,17 +4,17 @@
     "created": "2026-07-29T21:14:12Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3286: Workspace parity with Subspace: first-class shared workspaces, target-scoped recall, status history, session briefing",
-    "updated": "2026-07-29T23:48:17.753Z"
+    "updated": "2026-07-30T11:53:07.763Z"
   },
   "plan": {
     "id": "pan-3286",
     "title": "Workspace parity with Subspace: first-class shared workspaces, target-scoped recall, status history, session briefing",
-    "status": "running",
+    "status": "completed",
     "uid": "cadb6784-f0e2-4fd4-bf95-86ac0849f37e",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 7,
     "created": "2026-07-29T21:14:12Z",
-    "updated": "2026-07-29T23:48:17.753Z",
+    "updated": "2026-07-30T11:53:07.763Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3286",
@@ -1174,5 +1174,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }

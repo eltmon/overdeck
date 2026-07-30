@@ -4,17 +4,17 @@
     "created": "2026-07-29T06:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3253: review.status_changed embeds the unbounded review history array — one event type is 80% of a 1.3 GB overdeck.db",
-    "updated": "2026-07-29T06:03:13.155Z"
+    "updated": "2026-07-30T12:15:48.851Z"
   },
   "plan": {
     "id": "pan-3253",
     "title": "Bound review.status_changed payloads at every door (residual hardening after 4b9b740129)",
-    "status": "running",
+    "status": "completed",
     "uid": "ec9e837b-74f1-4046-bb72-b5874d7c1f83",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-29T06:05:00.000Z",
-    "updated": "2026-07-29T06:03:13.155Z",
+    "updated": "2026-07-30T12:15:48.851Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3253",
@@ -317,5 +317,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }

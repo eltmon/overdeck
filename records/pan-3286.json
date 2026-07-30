@@ -17,35 +17,373 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-07-30T02:40:44.598Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-30T07:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-30T07:06:42.751Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-30T07:12Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-07-30T07:12:12.547Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T07:38:28.608Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T07:49:45.598Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T08:04:28.979Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T08:09:45.442Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T08:56:31.708Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T10:00:21.865Z"
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/cli/commands/workspace-lifecycle.ts",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+      "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "src/lib/memory/__tests__/workspace-capture.test.ts",
+      "src/lib/memory/search.ts",
+      "sync-sources/hooks/session-start-hook",
+      "tests/lib/memory/__snapshots__/injection.test.ts.snap",
+      "tests/unit/dashboard/no-loss-audit-cli.test.ts",
+      "tests/unit/dashboard/routes/workspaces-routes.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "configuration/workspaces.mdx",
+      "docs/WORKSPACES-AND-PROJECTS.md",
+      "docs/audits/pan-1990-surface-inventory.md",
+      "src/cli/commands/db.ts",
+      "src/cli/commands/memory.ts",
+      "src/cli/commands/workspace-scratch.ts",
+      "src/cli/commands/workspace.ts",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx",
+      "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/dashboard/server/routes/workspace-registry.ts",
+      "src/lib/memory/cli.ts",
+      "src/lib/memory/injection.ts",
+      "src/lib/memory/rollup.ts",
+      "src/lib/memory/session-briefing.ts",
+      "src/lib/workspaces/rebuild.ts",
+      "src/lib/workspaces/resolver.ts",
+      "src/lib/workspaces/writer.ts",
+      "sync-sources/skills/pan-memory/SKILL.md",
+      "sync-sources/skills/pan-workspace/SKILL.md",
+      "tests/lib/memory/injection.test.ts",
+      "tests/unit/cli/memory-status-workspace.test.ts",
+      "tests/unit/cli/workspace-new-target-path.test.ts",
+      "tests/unit/dashboard/no-loss-audit.test.ts",
+      "tests/unit/dashboard/session-briefing.test.ts",
+      "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
+      "tests/unit/lib/memory/target-search.test.ts",
+      "tests/unit/lib/memory/timeline-read.test.ts",
+      "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts",
+      "tests/unit/lib/workspaces/relocate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "configuration/workspaces.mdx",
+      "docs/WORKSPACES-AND-PROJECTS.md",
+      "docs/audits/pan-1990-surface-inventory.md",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/cli/commands/db.ts",
+      "src/cli/commands/memory.ts",
+      "src/cli/commands/workspace-lifecycle.ts",
+      "src/cli/commands/workspace-scratch.ts",
+      "src/cli/commands/workspace.ts",
+      "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+      "src/dashboard/frontend/src/components/CommandPalette.tsx",
+      "src/dashboard/frontend/src/components/Sidebar.tsx",
+      "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+      "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx",
+      "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+      "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "src/dashboard/server/routes/hooks.ts",
+      "src/dashboard/server/routes/workspace-registry.ts",
+      "src/lib/memory/__tests__/workspace-capture.test.ts",
+      "src/lib/memory/cli.ts",
+      "src/lib/memory/injection.ts",
+      "src/lib/memory/rollup.ts",
+      "src/lib/memory/search.ts",
+      "src/lib/memory/session-briefing.ts",
+      "src/lib/workspaces/rebuild.ts",
+      "src/lib/workspaces/resolver.ts",
+      "src/lib/workspaces/writer.ts",
+      "sync-sources/hooks/session-start-hook",
+      "sync-sources/skills/pan-memory/SKILL.md",
+      "sync-sources/skills/pan-workspace/SKILL.md",
+      "tests/lib/memory/__snapshots__/injection.test.ts.snap",
+      "tests/lib/memory/injection.test.ts",
+      "tests/unit/cli/memory-status-workspace.test.ts",
+      "tests/unit/cli/workspace-new-target-path.test.ts",
+      "tests/unit/dashboard/no-loss-audit-cli.test.ts",
+      "tests/unit/dashboard/no-loss-audit.test.ts",
+      "tests/unit/dashboard/routes/workspaces-routes.test.ts",
+      "tests/unit/dashboard/session-briefing.test.ts",
+      "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
+      "tests/unit/lib/memory/target-search.test.ts",
+      "tests/unit/lib/memory/timeline-read.test.ts",
+      "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts",
+      "tests/unit/lib/workspaces/relocate.test.ts"
+    ],
+    "recordedAt": "2026-07-30T06:50:15.598Z"
+  },
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:39:41.647Z",
+  "updated": "2026-07-30T11:53:29.954Z",
   "pipeline": {
     "issueId": "PAN-3286",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "pending",
-    "mergeStatus": "pending",
-    "releaseStatus": "pending",
+    "reviewStatus": "passed",
+    "testStatus": "passed",
+    "verificationStatus": "passed",
+    "mergeStatus": "merged",
+    "mergeStep": "merged",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T23:10:31.797Z"
+    "panDoneRecoveredAt": "2026-07-30T06:50:33.466Z",
+    "updatedAt": "2026-07-30T11:53:29.936Z",
+    "reviewNotes": "All four prior blockers are resolved; correctness, security, requirements, and performance review passed",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3312",
+    "reviewedAtCommit": "a659e49736c39cf22737421da4fdc9aec15ab007",
+    "lastVerifiedCommit": "a659e49736c39cf22737421da4fdc9aec15ab007",
+    "reviewSpawnedAt": "2026-07-30T09:59:53.835Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "packages/contracts/src/composer-commands.generated.ts",
+        "src/cli/commands/workspace-lifecycle.ts",
+        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+        "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+        "src/lib/memory/__tests__/workspace-capture.test.ts",
+        "src/lib/memory/search.ts",
+        "sync-sources/hooks/session-start-hook",
+        "tests/lib/memory/__snapshots__/injection.test.ts.snap",
+        "tests/unit/dashboard/no-loss-audit-cli.test.ts",
+        "tests/unit/dashboard/routes/workspaces-routes.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "CLAUDE.md",
+        "configuration/workspaces.mdx",
+        "docs/WORKSPACES-AND-PROJECTS.md",
+        "docs/audits/pan-1990-surface-inventory.md",
+        "src/cli/commands/db.ts",
+        "src/cli/commands/memory.ts",
+        "src/cli/commands/workspace-scratch.ts",
+        "src/cli/commands/workspace.ts",
+        "src/dashboard/frontend/src/components/CommandPalette.tsx",
+        "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx",
+        "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/dashboard/server/routes/workspace-registry.ts",
+        "src/lib/memory/cli.ts",
+        "src/lib/memory/injection.ts",
+        "src/lib/memory/rollup.ts",
+        "src/lib/memory/session-briefing.ts",
+        "src/lib/workspaces/rebuild.ts",
+        "src/lib/workspaces/resolver.ts",
+        "src/lib/workspaces/writer.ts",
+        "sync-sources/skills/pan-memory/SKILL.md",
+        "sync-sources/skills/pan-workspace/SKILL.md",
+        "tests/lib/memory/injection.test.ts",
+        "tests/unit/cli/memory-status-workspace.test.ts",
+        "tests/unit/cli/workspace-new-target-path.test.ts",
+        "tests/unit/dashboard/no-loss-audit.test.ts",
+        "tests/unit/dashboard/session-briefing.test.ts",
+        "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
+        "tests/unit/lib/memory/target-search.test.ts",
+        "tests/unit/lib/memory/timeline-read.test.ts",
+        "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts",
+        "tests/unit/lib/workspaces/relocate.test.ts"
+      ],
+      "actualChangedFiles": [
+        "CLAUDE.md",
+        "configuration/workspaces.mdx",
+        "docs/WORKSPACES-AND-PROJECTS.md",
+        "docs/audits/pan-1990-surface-inventory.md",
+        "packages/contracts/src/composer-commands.generated.ts",
+        "src/cli/commands/db.ts",
+        "src/cli/commands/memory.ts",
+        "src/cli/commands/workspace-lifecycle.ts",
+        "src/cli/commands/workspace-scratch.ts",
+        "src/cli/commands/workspace.ts",
+        "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+        "src/dashboard/frontend/src/components/CommandPalette.tsx",
+        "src/dashboard/frontend/src/components/Sidebar.tsx",
+        "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+        "src/dashboard/frontend/src/components/workspace-rail-filter.test.tsx",
+        "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+        "src/dashboard/server/routes/hooks.ts",
+        "src/dashboard/server/routes/workspace-registry.ts",
+        "src/lib/memory/__tests__/workspace-capture.test.ts",
+        "src/lib/memory/cli.ts",
+        "src/lib/memory/injection.ts",
+        "src/lib/memory/rollup.ts",
+        "src/lib/memory/search.ts",
+        "src/lib/memory/session-briefing.ts",
+        "src/lib/workspaces/rebuild.ts",
+        "src/lib/workspaces/resolver.ts",
+        "src/lib/workspaces/writer.ts",
+        "sync-sources/hooks/session-start-hook",
+        "sync-sources/skills/pan-memory/SKILL.md",
+        "sync-sources/skills/pan-workspace/SKILL.md",
+        "tests/lib/memory/__snapshots__/injection.test.ts.snap",
+        "tests/lib/memory/injection.test.ts",
+        "tests/unit/cli/memory-status-workspace.test.ts",
+        "tests/unit/cli/workspace-new-target-path.test.ts",
+        "tests/unit/dashboard/no-loss-audit-cli.test.ts",
+        "tests/unit/dashboard/no-loss-audit.test.ts",
+        "tests/unit/dashboard/routes/workspaces-routes.test.ts",
+        "tests/unit/dashboard/session-briefing.test.ts",
+        "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
+        "tests/unit/lib/memory/target-search.test.ts",
+        "tests/unit/lib/memory/timeline-read.test.ts",
+        "tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts",
+        "tests/unit/lib/workspaces/relocate.test.ts"
+      ],
+      "recordedAt": "2026-07-30T06:50:15.598Z"
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-07-30T11:53:29.936Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 1680213,
+            "output": 104438,
+            "cacheRead": 33164800,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 1680213,
+          "output": 104438,
+          "cacheRead": 33164800,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-07-29T23:10:31.856Z"
+        "usd": 28.116605,
+        "pricingAsOf": "2026-07-30T11:29:34.588Z"
       }
     },
-    "merges": [],
-    "ranOn": "Edwards-MacBook-Air.local"
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3312"
+    ],
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-30T11:53:29.954Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at a659e49736c39cf22737421da4fdc9aec15ab007",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3312 MERGED at 2026-07-30T10:28:12Z",
+          "status": "pass",
+          "mergedAt": "2026-07-30T10:28:12Z",
+          "mergeCommit": "abee4fde40c9070a5292885500ec8bc2ccd5ab72"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on abee4fde40c9070a5292885500ec8bc2ccd5ab72",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 22b6dfc7 contains merge abee4fde",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 3 agent state directories; No strike branch strike/pan-3286 found; Pruned 416 checkpoint ref(s) for agent-pan-3286, planning-pan-3286, strike-pan-3286; No specialist registry entries for PAN-3286"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3286",
@@ -57,16 +395,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "mem-status-history": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 39115,
-        "host": "Edwards-MacBook-Air.local",
-        "claimedAt": "2026-07-30T03:04:55.455Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -111,6 +441,127 @@
         "outcome": "completed",
         "reason": "Added listWorkspacesForPath (resolver), target fan-out in searchMemory (cli.ts), and --target [path] on pan memory search (memory.ts) with mutual-exclusivity/bare-cwd-default/zero-match-note behavior. Refactored the search action into exported memorySearchCommand for testability. 8 new tests in target-search.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
         "releasedAt": "2026-07-30T03:04:40.118Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 39115,
+        "host": "Edwards-MacBook-Air.local",
+        "claimedAt": "2026-07-30T03:04:55.455Z",
+        "itemId": "mem-status-history",
+        "outcome": "completed",
+        "reason": "Workspace-addressed pan memory status/summary via resolveMemoryWorkspaceTarget (--workspace / issue positional / cwd), status --history N with archived statuses newest-first from readArchivedStatusEntries, capped at 50; 10 new tests in tests/unit/cli/memory-status-workspace.test.ts including issue-positional regression locks. Also regenerated the drifted composer-command manifest.",
+        "releasedAt": "2026-07-30T03:58:50.411Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2199287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T03:59:05.256Z",
+        "itemId": "mem-timeline",
+        "outcome": "completed",
+        "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
+        "releasedAt": "2026-07-30T04:09:36.640Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2647542,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:09:44.246Z",
+        "itemId": "mem-read",
+        "outcome": "completed",
+        "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
+        "releasedAt": "2026-07-30T04:17:28.284Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2876784,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:17:37.504Z",
+        "itemId": "injection-cross-workspace",
+        "outcome": "completed",
+        "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
+        "releasedAt": "2026-07-30T04:24:58.492Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3010019,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:25:56.144Z",
+        "itemId": "session-start-briefing",
+        "outcome": "completed",
+        "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
+        "releasedAt": "2026-07-30T04:36:55.569Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3357833,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:37:07.117Z",
+        "itemId": "memory-phase-api",
+        "outcome": "completed",
+        "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
+        "releasedAt": "2026-07-30T04:43:26.725Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3600717,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:43:36.792Z",
+        "itemId": "rail-filter",
+        "outcome": "completed",
+        "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
+        "releasedAt": "2026-07-30T04:57:23.768Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 172941,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:09:53.190Z",
+        "itemId": "rebuild-archive-terminal",
+        "outcome": "completed",
+        "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
+        "releasedAt": "2026-07-30T05:19:57.726Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 507676,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:20:01.307Z",
+        "itemId": "memory-phase-ui",
+        "outcome": "completed",
+        "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
+        "releasedAt": "2026-07-30T05:37:20.834Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 1242078,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:37:34.571Z",
+        "itemId": "no-loss-audit",
+        "outcome": "completed",
+        "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
+        "releasedAt": "2026-07-30T05:46:29.464Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 1429700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:46:32.756Z",
+        "itemId": "docs-updates",
+        "outcome": "completed",
+        "reason": "docs/WORKSPACES-AND-PROJECTS.md, CLAUDE.md, and configuration/workspaces.mdx all updated naming every new flag exactly; reflowed the CLAUDE.md memory paragraph into a list so 'status --workspace' is greppable on one line.",
+        "releasedAt": "2026-07-30T06:34:08.388Z"
       }
     ],
     "statusReasons": {
@@ -129,6 +580,50 @@
       "mem-target-search": {
         "reason": "Added listWorkspacesForPath (resolver), target fan-out in searchMemory (cli.ts), and --target [path] on pan memory search (memory.ts) with mutual-exclusivity/bare-cwd-default/zero-match-note behavior. Refactored the search action into exported memorySearchCommand for testability. 8 new tests in target-search.test.ts, all passing; typecheck and guard-workspace-doors.sh clean.",
         "updatedAt": "2026-07-30T03:04:40.118Z"
+      },
+      "mem-status-history": {
+        "reason": "Workspace-addressed pan memory status/summary via resolveMemoryWorkspaceTarget (--workspace / issue positional / cwd), status --history N with archived statuses newest-first from readArchivedStatusEntries, capped at 50; 10 new tests in tests/unit/cli/memory-status-workspace.test.ts including issue-positional regression locks. Also regenerated the drifted composer-command manifest.",
+        "updatedAt": "2026-07-30T03:58:50.411Z"
+      },
+      "mem-timeline": {
+        "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
+        "updatedAt": "2026-07-30T04:09:36.640Z"
+      },
+      "mem-read": {
+        "reason": "pan memory read <path> with --workspace/cwd addressing and --from/--lines slicing; containment delegated to pin-path.ts (lexical + realpath + O_NOFOLLOW), absolute paths refused outright. 9 read tests added to tests/unit/lib/memory/timeline-read.test.ts including the ~/.claude JSONL unreachability matrix.",
+        "updatedAt": "2026-07-30T04:17:28.284Z"
+      },
+      "injection-cross-workspace": {
+        "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
+        "updatedAt": "2026-07-30T04:24:58.492Z"
+      },
+      "session-start-briefing": {
+        "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
+        "updatedAt": "2026-07-30T04:36:55.569Z"
+      },
+      "memory-phase-api": {
+        "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
+        "updatedAt": "2026-07-30T04:43:26.725Z"
+      },
+      "rail-filter": {
+        "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
+        "updatedAt": "2026-07-30T04:57:23.768Z"
+      },
+      "rebuild-archive-terminal": {
+        "reason": "rebuild-workspaces archives (never deletes) issue rows for terminal issues via archiveWorkspace, terminality from the shared isTerminalIssueStage/getIssueStageSync helper gc-agents uses; --dry-run writes nothing. 6 tests in tests/unit/lib/workspaces/rebuild-archive-terminal.test.ts.",
+        "updatedAt": "2026-07-30T05:19:57.726Z"
+      },
+      "memory-phase-ui": {
+        "reason": "Memory-phase text badge for main/scratch rows in the Sidebar (no dot/color, distinct from the pipeline badge) and phase+confidence in the WorkspaceView Memory header; issue rows unchanged. Also fixed a second test asserting the superseded D-6 behavior (workspace-capture.test.ts). Playwright-verified at both widths by me. ANOMALY: kimi-code.test.ts flaky from the PAN-1837 merge, filed as PAN-3305.",
+        "updatedAt": "2026-07-30T05:37:20.834Z"
+      },
+      "no-loss-audit": {
+        "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
+        "updatedAt": "2026-07-30T05:46:29.464Z"
+      },
+      "docs-updates": {
+        "reason": "docs/WORKSPACES-AND-PROJECTS.md, CLAUDE.md, and configuration/workspaces.mdx all updated naming every new flag exactly; reflowed the CLAUDE.md memory paragraph into a list so 'status --workspace' is greppable on one line.",
+        "updatedAt": "2026-07-30T06:34:08.388Z"
       }
     }
   },
@@ -152,6 +647,52 @@
     "mem-target-search.mem-target-search.ac2": "completed",
     "mem-target-search.mem-target-search.ac3": "completed",
     "mem-target-search.mem-target-search.ac4": "completed",
-    "mem-status-history": "running"
+    "mem-status-history": "completed",
+    "mem-status-history.mem-status-history.ac1": "completed",
+    "mem-status-history.mem-status-history.ac2": "completed",
+    "mem-status-history.mem-status-history.ac3": "completed",
+    "mem-status-history.mem-status-history.ac4": "completed",
+    "mem-timeline": "completed",
+    "mem-timeline.mem-timeline.ac1": "completed",
+    "mem-timeline.mem-timeline.ac2": "completed",
+    "mem-timeline.mem-timeline.ac3": "completed",
+    "mem-read": "completed",
+    "mem-read.mem-read.ac1": "completed",
+    "mem-read.mem-read.ac2": "completed",
+    "mem-read.mem-read.ac3": "completed",
+    "injection-cross-workspace": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac1": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac2": "completed",
+    "injection-cross-workspace.injection-cross-workspace.ac3": "completed",
+    "session-start-briefing": "completed",
+    "session-start-briefing.session-start-briefing.ac1": "completed",
+    "session-start-briefing.session-start-briefing.ac2": "completed",
+    "session-start-briefing.session-start-briefing.ac3": "completed",
+    "session-start-briefing.session-start-briefing.ac4": "completed",
+    "memory-phase-api": "completed",
+    "memory-phase-api.memory-phase-api.ac1": "completed",
+    "memory-phase-api.memory-phase-api.ac2": "completed",
+    "memory-phase-api.memory-phase-api.ac3": "completed",
+    "rail-filter": "completed",
+    "rail-filter.rail-filter.ac1": "completed",
+    "rail-filter.rail-filter.ac2": "completed",
+    "rail-filter.rail-filter.ac3": "completed",
+    "rail-filter.rail-filter.ac4": "completed",
+    "rebuild-archive-terminal": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac1": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac2": "completed",
+    "rebuild-archive-terminal.rebuild-archive-terminal.ac3": "completed",
+    "memory-phase-ui": "completed",
+    "memory-phase-ui.memory-phase-ui.ac1": "completed",
+    "memory-phase-ui.memory-phase-ui.ac2": "completed",
+    "memory-phase-ui.memory-phase-ui.ac3": "completed",
+    "no-loss-audit": "completed",
+    "no-loss-audit.no-loss-audit.ac1": "completed",
+    "no-loss-audit.no-loss-audit.ac2": "completed",
+    "no-loss-audit.no-loss-audit.ac3": "completed",
+    "docs-updates": "completed",
+    "docs-updates.docs-updates.ac1": "completed",
+    "docs-updates.docs-updates.ac2": "completed",
+    "docs-updates.docs-updates.ac3": "completed"
   }
 }
