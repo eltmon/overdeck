@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:54:07.300Z",
+  "updated": "2026-07-30T04:54:28.244Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-state-door-invariant": {
+        "writerId": "agent-pan-3296",
+        "agentId": "agent-pan-3296",
+        "pid": 3924404,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:54:28.244Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3296",
@@ -188,6 +196,7 @@
     "reconciler-adopts-orphaned-writes.reconciler-adopts-orphaned-writes.ac4": "completed",
     "cross-door-clean-tree-gate": "completed",
     "cross-door-clean-tree-gate.cross-door-clean-tree-gate.ac1": "completed",
-    "cross-door-clean-tree-gate.cross-door-clean-tree-gate.ac2": "completed"
+    "cross-door-clean-tree-gate.cross-door-clean-tree-gate.ac2": "completed",
+    "docs-state-door-invariant": "running"
   }
 }
