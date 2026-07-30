@@ -96,9 +96,15 @@ export async function resolveExecutable(
   const pathMatch = await firstExecutable(pathDirectories, binary, accessExecutable);
   if (pathMatch) return pathMatch;
 
+  // Well-known per-harness install directories. Each of these installers drops
+  // its binary somewhere the server's inherited PATH does not reach: Claude
+  // Code uses ~/.claude/local, and the Kimi Code CLI installs to
+  // ~/.kimi-code/bin while only exporting it from the interactive section of
+  // the user's shell rc — so a non-interactive login shell can't see it either.
   const fixedCandidates = [
     join(home, '.local', 'bin'),
     join(home, '.claude', 'local'),
+    join(home, '.kimi-code', 'bin'),
     join(home, '.npm-global', 'bin'),
   ];
   const fixedMatch = await firstExecutable(fixedCandidates, binary, accessExecutable);

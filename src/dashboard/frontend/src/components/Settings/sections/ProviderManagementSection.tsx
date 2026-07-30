@@ -71,6 +71,16 @@ function harnessLabel(harness: Harness): string {
   return HARNESS_LABELS[harness];
 }
 
+/**
+ * Harness choices offered for a provider. `acp` and `kimi-code` are Kimi-only
+ * at the policy gate (src/lib/harness-policy.ts), so offering them on another
+ * provider would write a config that fails at every spawn.
+ */
+function harnessOptionsFor(provider: Provider | 'openrouter'): Harness[] {
+  const shared: Harness[] = ['claude-code', 'ohmypi', 'codex'];
+  return provider === 'kimi' ? [...shared, 'acp', 'kimi-code'] : shared;
+}
+
 function formatCodexExpiry(expiresAt?: string): string | null {
   if (!expiresAt) return null;
   const date = new Date(expiresAt);
@@ -443,9 +453,9 @@ export function ProviderManagementSection({
                           className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
                         >
                           <option value="">Default ({harnessLabel(builtInHarness)})</option>
-                          <option value="claude-code">Claude Code</option>
-                          <option value="pi">Pi</option>
-                          <option value="codex">Codex</option>
+                          {harnessOptionsFor(provider.id).map((option) => (
+                            <option key={option} value={option}>{harnessLabel(option)}</option>
+                          ))}
                         </select>
                       </div>
                     </label>
@@ -531,9 +541,9 @@ export function ProviderManagementSection({
                       className="w-full bg-background border border-border rounded-md px-3 py-1.5 text-xs text-foreground focus:ring-1 focus:ring-primary focus:border-primary"
                     >
                       <option value="">Default ({harnessLabel(formData.models.provider_default_harnesses?.openrouter ?? 'claude-code')})</option>
-                      <option value="claude-code">Claude Code</option>
-                      <option value="pi">Pi</option>
-                      <option value="codex">Codex</option>
+                      {harnessOptionsFor('openrouter').map((option) => (
+                        <option key={option} value={option}>{harnessLabel(option)}</option>
+                      ))}
                     </select>
                   </div>
                 </label>

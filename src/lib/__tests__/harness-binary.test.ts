@@ -36,6 +36,7 @@ describe('resolveExecutable', () => {
   it.each([
     ['~/.local/bin', '/home/test/.local/bin/claude'],
     ['~/.claude/local', '/home/test/.claude/local/claude'],
+    ['~/.kimi-code/bin', '/home/test/.kimi-code/bin/claude'],
     ['~/.npm-global/bin', '/home/test/.npm-global/bin/claude'],
     ['~/.bun/bin', '/home/test/.bun/bin/claude'],
   ])('finds an executable in %s when the server PATH omits it', async (_label, candidate) => {
@@ -70,6 +71,7 @@ describe('resolveExecutable', () => {
       '/usr/bin/claude',
       '/home/test/.local/bin/claude',
       '/home/test/.claude/local/claude',
+      '/home/test/.kimi-code/bin/claude',
       '/home/test/.npm-global/bin/claude',
       '/opt/npm-prefix/bin/claude',
     ]);
@@ -147,6 +149,24 @@ describe('resolveExecutable', () => {
       accessExecutable: executableAccess(['/opt/default/bin/kimi']),
       allowLoginShell: false,
     })).resolves.toBe('/opt/default/bin/kimi');
+  });
+
+  it('finds the Kimi Code CLI in its installer directory when no PATH or login shell exposes it', async () => {
+    // The installer writes ~/.kimi-code/bin/kimi and exports it only from the
+    // interactive section of the shell rc, so neither the server's inherited
+    // PATH nor a non-interactive login shell can see it.
+    const runCommand = vi.fn(async (command: string) => {
+      if (command === 'npm') return '/opt/npm-prefix\n';
+      return '';
+    });
+
+    await expect(resolveExecutable('kimi', {
+      pathValue: '/usr/bin',
+      home: '/home/test',
+      shell: '/bin/bash',
+      accessExecutable: executableAccess(['/home/test/.kimi-code/bin/kimi']),
+      runCommand,
+    })).resolves.toBe('/home/test/.kimi-code/bin/kimi');
   });
 });
 

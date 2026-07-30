@@ -155,7 +155,9 @@ rather than silently switching harnesses. `pan doctor` probes whether the
 optional `kimi` prerequisite is available on `PATH`.
 
 Kimi's built-in default is the native `kimi-code` harness (below); opt its
-provider into ACP instead in `~/.overdeck/config.yaml`:
+provider into ACP instead from **Settings → Providers → Kimi (Moonshot) →
+Default harness**, which offers `ACP` and `Kimi Code` alongside the shared
+harnesses. The same choice can be written directly in `~/.overdeck/config.yaml`:
 
 ```yaml
 providers:
@@ -165,7 +167,7 @@ providers:
 acp:
   permissionMode: auto
   kimi:
-    # Optional when `kimi` is already on PATH.
+    # Optional — Overdeck already searches PATH and `~/.kimi-code/bin`.
     binaryPath: /opt/kimi/bin/kimi
 ```
 
@@ -209,13 +211,18 @@ own server-side context cache accounting that `kimi-code` and `acp` both keep.
 
 Install Kimi Code CLI using its
 [getting-started guide](https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html).
-The binary installs to `~/.kimi-code/bin/kimi` — it is **not** added to your
-shell `PATH` by the installer, so configure the path explicitly if `pan doctor`
-can't resolve it from a login shell:
+The binary installs to `~/.kimi-code/bin/kimi`. The installer does **not** put
+that directory on the `PATH` Overdeck inherits — on Linux it appends the export
+to the interactive section of `~/.bashrc`, which a non-interactive login shell
+skips, so neither the dashboard's own `PATH` nor its `bash -lc command -v kimi`
+fallback can see the binary. Overdeck therefore searches `~/.kimi-code/bin`
+directly, alongside `~/.local/bin` and `~/.claude/local`, and a stock install
+needs no configuration. Set the path explicitly only when the binary lives
+somewhere else:
 
 ```yaml
 kimiCode:
-  binaryPath: /home/you/.kimi-code/bin/kimi
+  binaryPath: /opt/kimi-code/bin/kimi
 ```
 
 Then complete the one-time interactive login before starting a `kimi-code`
