@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T22:33:26.326Z",
+  "updated": "2026-07-30T22:33:38.652Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -159,5 +159,34 @@
     "docs-review-submenu.docs-review-submenu.ac1": "completed",
     "docs-review-submenu.docs-review-submenu.ac2": "completed",
     "docs-review-submenu.docs-review-submenu.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ISSUE-VIEW.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts",
+      "src/dashboard/server/routes/workspaces/review-pipeline.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ISSUE-VIEW.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
+      "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+      "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts",
+      "src/dashboard/server/routes/workspaces/review-pipeline.ts"
+    ],
+    "recordedAt": "2026-07-30T22:33:38.650Z"
   }
 }
