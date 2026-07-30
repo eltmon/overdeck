@@ -3,7 +3,7 @@ import { Effect } from 'effect'
 import { execFileSync, execSync } from 'child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
-import { join } from 'path'
+import { join, sep } from 'path'
 
 import {
   asPanSpecDocument,
@@ -170,8 +170,23 @@ describe('state write door durability (PAN-2677)', () => {
       git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state')
 
       vi.resetModules()
-      const { __testInternals } = await import('../../../cli/commands/start.js')
-      await __testInternals.transitionStartedXBrief(projectRoot, 'PAN-3296')
+      const [{ transitionXBriefOnMain, updatePlanStatus }, { findPlanSync }] = await Promise.all([
+        import('../../xbrief/lifecycle-io.js'),
+        import('../../xbrief/io.js'),
+      ])
+      const startSource = readFileSync(join(process.cwd(), 'src/cli/commands/start.ts'), 'utf-8')
+      expect(startSource).toContain("'active',\n        'running',")
+      expect(startSource).toContain('`chore(state): start ${id.toUpperCase()} xBRIEF (status=running)`')
+      expect(startSource).toContain('if (spawnedPlanPath?.startsWith(workspace + sep))')
+      expect(startSource.match(/updatePlanStatus\(/g)).toHaveLength(1)
+
+      await Effect.runPromise(transitionXBriefOnMain(
+        projectRoot,
+        'PAN-3296',
+        'active',
+        'running',
+        'chore(state): start PAN-3296 xBRIEF (status=running)',
+      ))
 
       const started = JSON.parse(readFileSync(specPath, 'utf-8')) as XBriefDocument
       expect(started.plan.status).toBe('running')
@@ -186,7 +201,11 @@ describe('state write door durability (PAN-2677)', () => {
       writeFileSync(draftPath, JSON.stringify(makeDoc('PAN-3297', 'Workspace draft', 'proposed'), null, 2))
       const stateHead = git(stateRoot, 'rev-parse', 'HEAD')
 
-      expect(__testInternals.updateWorkspaceDraftPlanStatus(workspace)).toBe(true)
+      const spawnedPlanPath = findPlanSync(workspace)
+      expect(spawnedPlanPath).toBe(draftPath)
+      if (spawnedPlanPath?.startsWith(workspace + sep)) {
+        updatePlanStatus(spawnedPlanPath, 'running')
+      }
       const workspaceDraft = JSON.parse(readFileSync(draftPath, 'utf-8')) as XBriefDocument
       expect(workspaceDraft.plan.status).toBe('running')
       expect(porcelain(stateRoot)).toBe('')
