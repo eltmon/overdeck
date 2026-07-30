@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T03:56:25.501Z",
+  "updated": "2026-07-30T03:56:37.123Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -56,7 +56,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3294",
