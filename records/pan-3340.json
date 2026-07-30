@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T21:32:47.080Z",
+  "updated": "2026-07-30T21:44:59.107Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "server-trigger-mode": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3340",
         "agentId": "agent-pan-3340",
         "pid": 1589550,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:32:47.079Z"
+        "claimedAt": "2026-07-30T21:32:47.079Z",
+        "itemId": "server-trigger-mode",
+        "outcome": "completed",
+        "reason": "Added reviewMode parsing and durable persistence before dispatch; targeted tests pass. Full typecheck remains red at the unchanged pre-existing 59/58 dashboard baseline.",
+        "releasedAt": "2026-07-30T21:44:59.107Z"
+      }
+    ],
+    "statusReasons": {
+      "server-trigger-mode": {
+        "reason": "Added reviewMode parsing and durable persistence before dispatch; targeted tests pass. Full typecheck remains red at the unchanged pre-existing 59/58 dashboard baseline.",
+        "updatedAt": "2026-07-30T21:44:59.107Z"
       }
     }
   },
   "statusOverrides": {
-    "server-trigger-mode": "running"
+    "server-trigger-mode": "completed",
+    "server-trigger-mode.server-trigger-mode.ac1": "completed",
+    "server-trigger-mode.server-trigger-mode.ac2": "completed",
+    "server-trigger-mode.server-trigger-mode.ac3": "completed",
+    "server-trigger-mode.server-trigger-mode.ac4": "completed"
   }
 }
