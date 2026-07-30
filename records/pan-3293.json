@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T05:04:10.661Z",
+  "updated": "2026-07-30T05:08:04.808Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-owner-verified-restart": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 12634,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:04:10.661Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -172,6 +164,17 @@
         "outcome": "completed",
         "reason": "Added a real node:http squatter test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds",
         "releasedAt": "2026-07-30T05:03:47.306Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 12634,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:04:10.661Z",
+        "itemId": "docs-owner-verified-restart",
+        "outcome": "completed",
+        "reason": "Documented pid-verified health success, EADDRINUSE fast failure, pid-death teardown, and targeted ownership-mismatch recovery",
+        "releasedAt": "2026-07-30T05:08:04.808Z"
       }
     ],
     "statusReasons": {
@@ -202,6 +205,10 @@
       "squatter-integration-test": {
         "reason": "Added a real node:http squatter test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds",
         "updatedAt": "2026-07-30T05:03:47.306Z"
+      },
+      "docs-owner-verified-restart": {
+        "reason": "Documented pid-verified health success, EADDRINUSE fast failure, pid-death teardown, and targeted ownership-mismatch recovery",
+        "updatedAt": "2026-07-30T05:08:04.808Z"
       }
     }
   },
@@ -238,6 +245,9 @@
     "squatter-integration-test.squatter-integration-test.ac1": "completed",
     "squatter-integration-test.squatter-integration-test.ac2": "completed",
     "squatter-integration-test.squatter-integration-test.ac3": "completed",
-    "docs-owner-verified-restart": "running"
+    "docs-owner-verified-restart": "completed",
+    "docs-owner-verified-restart.docs-owner-verified-restart.ac1": "completed",
+    "docs-owner-verified-restart.docs-owner-verified-restart.ac2": "completed",
+    "docs-owner-verified-restart.docs-owner-verified-restart.ac3": "completed"
   }
 }
