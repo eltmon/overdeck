@@ -21,18 +21,19 @@
   ],
   "feedback": [],
   "created": "2026-06-29T04:13:04.890Z",
-  "updated": "2026-07-27T08:24:33.969Z",
+  "updated": "2026-07-30T22:39:29.541Z",
   "pipeline": {
     "issueId": "PAN-2152",
     "reviewStatus": "passed",
     "testStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-27T08:24:32.226Z",
+    "updatedAt": "2026-07-30T22:39:26.396Z",
     "reviewNotes": "No blocking findings; workspace command extraction is behavior-preserving",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Merge already landed; verify-on-main owns post-merge validation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2161"
   },
   "closeOut": {
@@ -79,7 +80,7 @@
       },
       "costAtCloseOut": {
         "usd": 10.080641,
-        "pricingAsOf": "2026-07-27T08:24:33.967Z"
+        "pricingAsOf": "2026-07-30T22:39:26.514Z"
       }
     },
     "merges": [
