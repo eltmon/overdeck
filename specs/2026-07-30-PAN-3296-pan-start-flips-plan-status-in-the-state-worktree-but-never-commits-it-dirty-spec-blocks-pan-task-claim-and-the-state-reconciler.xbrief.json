@@ -4,7 +4,7 @@
     "created": "2026-07-30T04:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3296: bug(cli): pan start flips plan status in the state worktree but never commits it — dirty spec blocks pan task claim and the state reconciler for all agents",
-    "updated": "2026-07-30T03:53:20.597Z"
+    "updated": "2026-07-30T03:53:22.874Z"
   },
   "plan": {
     "id": "pan-3296",
@@ -12,9 +12,9 @@
     "status": "approved",
     "uid": "aac25dc0-6518-4136-a4d0-167e9dfc578f",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 5,
     "created": "2026-07-30T04:05:00.000Z",
-    "updated": "2026-07-30T03:53:20.597Z",
+    "updated": "2026-07-30T03:53:22.874Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3296",
