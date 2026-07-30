@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T22:08:53.924Z",
+  "updated": "2026-07-30T22:09:05.344Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "docs-review-submenu": {
+        "writerId": "agent-pan-3340",
+        "agentId": "agent-pan-3340",
+        "pid": 4193315,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T22:09:05.344Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3340",
@@ -139,6 +147,7 @@
     "policy-strip-save-toast": "completed",
     "policy-strip-save-toast.policy-strip-save-toast.ac1": "completed",
     "policy-strip-save-toast.policy-strip-save-toast.ac2": "completed",
-    "policy-strip-save-toast.policy-strip-save-toast.ac3": "completed"
+    "policy-strip-save-toast.policy-strip-save-toast.ac3": "completed",
+    "docs-review-submenu": "running"
   }
 }
