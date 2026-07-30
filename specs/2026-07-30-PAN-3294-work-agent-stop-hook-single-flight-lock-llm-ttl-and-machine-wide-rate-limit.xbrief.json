@@ -1,0 +1,512 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T03:52:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3294: bug(infra): work-agent-stop-hook has no concurrency guard — dashboard crash-loop fanned out 35 concurrent haiku LLM calls and froze the machine",
+    "updated": "2026-07-30T03:52:15.554Z"
+  },
+  "plan": {
+    "id": "pan-3294",
+    "title": "work-agent-stop-hook: single-flight lock, LLM TTL, and machine-wide rate limit",
+    "status": "proposed",
+    "uid": "3e09323a-79b1-4ada-8ce4-4a86df7fa7d4",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-30T03:52:00.000Z",
+    "updated": "2026-07-30T03:52:15.554Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3294",
+        "label": "PAN-3294",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3294.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "hooks",
+      "infra",
+      "resource-governance",
+      "bash"
+    ],
+    "narratives": {
+      "Problem": "A dashboard crash-loop fired the Stop hook chain every ~20s for ~25 min; work-agent-stop-hook has no concurrency cap, no TTL on its `claude -p` completion-check call, and no machine-wide rate limit, so 35 concurrent haiku processes and 70 hook shells accumulated and froze an 8-core/8GB Mac (load 91.81).",
+      "Proposal": "Add three portable (macOS+Linux, mkdir-lock, no flock/GNU-timeout dependency) guard primitives to sync-sources/hooks/pan-hook-lib.sh — a per-agent single-flight lock, a pan_run_with_timeout watchdog, and a machine-wide sliding-window token bucket — and wire them into sync-sources/hooks/work-agent-stop-hook: whole-body single-flight per agent, 60s default TTL on the LLM child (env OVERDECK_HOOK_LLM_TIMEOUT), and a 6-per-minute default machine-wide cap on hook LLM spawns (env OVERDECK_HOOK_LLM_RATE_LIMIT). Timeout and rate-limit drops log and exit 0 WITHOUT emitting a resolution so storms cannot ratchet agents to 'stuck'. Full design with verified line references and before/after snippets: .pan/drafts/PAN-3294.md.",
+      "NonGoals": "- No changes to other hook scripts (verified audit: work-agent-stop-hook:369 is the only hook LLM spawn today)\n- No PAN-2500 memory-governor / server-side integration — guards are pure hook-side bash\n- No fix for the dashboard EADDRINUSE crash-loop trigger (separate issue)\n- No behavior change for genuine non-timeout claude failures (rc!=0 still falls back to UNCLEAR)\n- No migration of existing flock uses (resolution cache, pending-events buffer)\n- No config.yaml plumbing for the new knobs (env-only)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Single-flight lock guards the whole hook body per agent, acquired right after the COMPLETED_FILE early-exit, not just the LLM call.",
+        "rationale": "The incident accumulated 70 hook shells beyond the 35 LLM calls; every phase does curl/tmux work, and the issue asks for exit-0-on-live-holder semantics."
+      },
+      {
+        "summary": "mkdir-based lock directories with pid files instead of flock for all new locking.",
+        "rationale": "flock(1) is absent on stock macOS and the incident machine was a Mac; mkdir is atomic on POSIX and works identically on both platforms."
+      },
+      {
+        "summary": "Timeout default 60s (OVERDECK_HOOK_LLM_TIMEOUT), rate limit default 6 LLM calls/min machine-wide (OVERDECK_HOOK_LLM_RATE_LIMIT), env-only config.",
+        "rationale": "Issue sketch suggests ~60s and 'max K per minute'; env-with-hardcoded-default matches the existing OVERDECK_HOOK_TIMEOUT / OVERDECK_COMPLETION_CHECK_MODEL pattern."
+      },
+      {
+        "summary": "Timeout and rate-limit paths emit NO resolution (exit 0 silently) instead of UNCLEAR.",
+        "rationale": "Two consecutive UNCLEAR verdicts escalate to 'stuck'; a storm would mass-flip healthy agents to stuck, creating a second incident. Genuine claude failures keep existing UNCLEAR behavior."
+      },
+      {
+        "summary": "Guard primitives live in pan-hook-lib.sh; wiring only in work-agent-stop-hook.",
+        "rationale": "The requested audit found exactly one LLM-spawning hook; shared-lib placement gives future LLM-calling hooks the same guards without speculative wiring."
+      },
+      {
+        "summary": "Token bucket fails closed (skips the LLM call) when its lock cannot be acquired.",
+        "rationale": "Under contention the machine is by definition busy; spawning fewer LLM processes is the safe direction for a storm breaker."
+      }
+    ],
+    "items": [
+      {
+        "id": "lock-primitive",
+        "title": "Add pan_acquire_singleflight_lock / pan_release_singleflight_lock to pan-hook-lib.sh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3294",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wire-singleflight"
+          ],
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n sync-sources/hooks/pan-hook-lib.sh",
+            "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "lock-primitive test cases in pan-hook-lib-guards.test.ts pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the mkdir-based single-flight lock exactly as specified in PRD WI-1 (.pan/drafts/PAN-3294.md): atomic mkdir of a lock directory, pid file with $$, live-holder check via kill -0, one-shot stale reclaim on dead/unreadable holder, and a release helper. Create tests/scripts/pan-hook-lib-guards.test.ts running the real lib via bash -c, following the mock/temp-dir style of tests/scripts/work-agent-stop-hook.test.ts."
+        },
+        "items": [
+          {
+            "id": "lock-primitive.ac1",
+            "title": "Given no lock dir, pan_acquire_singleflight_lock creates it, writes the caller PID to <dir>/pid, and returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-primitive.ac2",
+            "title": "Given a lock dir whose pid file names a live process, a second acquire returns 1 and preserves the holder's pid file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-primitive.ac3",
+            "title": "Given a lock dir whose pid file names a dead PID (or is missing), acquire removes the stale dir, re-creates it, and returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lock-primitive.ac4",
+            "title": "pan_release_singleflight_lock removes the lock directory and returns 0 even when the dir is already gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "timeout-primitive",
+        "title": "Add portable pan_run_with_timeout to pan-hook-lib.sh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n sync-sources/hooks/pan-hook-lib.sh",
+            "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "timeout-primitive test cases pass with each test's real wait under 2.5s"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement pan_run_with_timeout <secs> <cmd...> per PRD WI-2 / design decision 3: prefer `timeout -k 5`, then `gtimeout -k 5`, else a pure-bash background+watchdog fallback; pass stdin/stdout through (callers use RESULT=$(echo x | pan_run_with_timeout N claude ...)); normalize expiry to rc 124. Subprocess tests use a 1s TTL — vitest fake timers cannot reach a child bash process, so keep real waits ≤2.5s per the hazard H1 note in continue.json."
+        },
+        "items": [
+          {
+            "id": "timeout-primitive.ac1",
+            "title": "A command finishing under the limit returns its own exit code and produces its full stdout through command substitution",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeout-primitive.ac2",
+            "title": "pan_run_with_timeout 1 sleep 3 returns 124 within 2.5s of wall clock and leaves no surviving child process",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeout-primitive.ac3",
+            "title": "Piped stdin reaches the wrapped command (echo hi | pan_run_with_timeout 5 cat emits hi)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "timeout-primitive.ac4",
+            "title": "With timeout and gtimeout absent from PATH, the pure-bash fallback still returns 124 on expiry and kills the child",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rate-limit-primitive",
+        "title": "Add machine-wide pan_llm_rate_check token bucket to pan-hook-lib.sh",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/pan-hook-lib.sh",
+            "tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n sync-sources/hooks/pan-hook-lib.sh",
+            "npx vitest run tests/scripts/pan-hook-lib-guards.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "rate-limit test cases pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement pan_llm_rate_check per PRD WI-3 / design decision 5: bucket file ${OVERDECK_HOME:-$HOME/.overdeck}/hook-llm-calls.log with one epoch-seconds line per allowed spawn; under a sibling mkdir lock (hook-llm-calls.lock.d, 10x0.1s bounded acquisition) prune lines older than 60s, return 1 at/over ${OVERDECK_HOOK_LLM_RATE_LIMIT:-6}, else append now and return 0; return 1 (fail closed) when the bucket lock cannot be acquired. Tests point OVERDECK_HOME at a temp dir."
+        },
+        "items": [
+          {
+            "id": "rate-limit-primitive.ac1",
+            "title": "First call with an empty bucket returns 0 and appends exactly one epoch-seconds line to hook-llm-calls.log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-primitive.ac2",
+            "title": "Given the bucket pre-filled with limit fresh timestamps, the next call returns 1 and appends nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-primitive.ac3",
+            "title": "Timestamps older than 60s are pruned from the bucket file and a call after pruning returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rate-limit-primitive.ac4",
+            "title": "With the bucket lock dir held by a live PID, the call returns 1 without modifying the bucket file (fails closed)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-singleflight",
+        "title": "Wire the per-agent single-flight guard into work-agent-stop-hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/work-agent-stop-hook*",
+            "tests/scripts/work-agent-stop-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n sync-sources/hooks/work-agent-stop-hook",
+            "npx vitest run tests/scripts/work-agent-stop-hook.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "concurrency test proves exactly one mock claude spawn for two concurrent invocations"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Insert the PRD WI-4 snippet immediately after the COMPLETED_FILE check (work-agent-stop-hook:47): acquire $AGENT_STATE_DIR/stop-hook.lock.d via pan_acquire_singleflight_lock, exit 0 with a hooks.log skip line when a live holder exists, and trap-release on EXIT. Tests MUST copy the REAL sync-sources/hooks/pan-hook-lib.sh into the temp harness (the existing stub lib would bypass the guard — hazard H6)."
+        },
+        "items": [
+          {
+            "id": "wire-singleflight.ac1",
+            "title": "Given two concurrent invocations for one agent with a ~1s mock claude, exactly one claude invocation is logged and both hook processes exit 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-singleflight.ac2",
+            "title": "The skipped invocation logs a 'skipped — another instance holds' line to hooks.log and makes no curl or tmux calls after the lock check",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-singleflight.ac3",
+            "title": "Given a leftover lock dir whose pid file names a dead PID, the next invocation reclaims it and spawns the LLM check (mock claude log gains a line)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-singleflight.ac4",
+            "title": "A normal completed run exits with the lock directory removed (trap released it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-llm-guards",
+        "title": "Wrap the claude call with TTL and machine-wide rate check in work-agent-stop-hook",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "infra",
+          "issueLabel": "pan-3294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/hooks/work-agent-stop-hook*",
+            "tests/scripts/work-agent-stop-hook.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash -n sync-sources/hooks/work-agent-stop-hook",
+            "npx vitest run tests/scripts/work-agent-stop-hook.test.ts"
+          ],
+          "expected_outputs": [
+            "bash -n exits 0",
+            "timeout and rate-limit tests pass with zero resolution events in the mock heartbeat log"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD WI-5 before/after replacement at work-agent-stop-hook:368-375: pan_llm_rate_check gate (log 'rate-limited' and exit 0 on refusal), then RESULT=$(echo \"$ANALYSIS_PROMPT\" | pan_run_with_timeout \"${OVERDECK_HOOK_LLM_TIMEOUT:-60}\" claude -p --model \"$COMPLETION_MODEL\" 2>>\"$CLAUDE_STDERR\"); rc 124/137/143 logs 'timed out' and exits 0 with no resolution emitted. Keep the existing non-timeout rc!=0 -> UNCLEAR fallback byte-for-byte. Tests use OVERDECK_HOOK_LLM_TIMEOUT=1 with a 3s-sleeping mock claude and a pre-filled bucket."
+        },
+        "items": [
+          {
+            "id": "wire-llm-guards.ac1",
+            "title": "With OVERDECK_HOOK_LLM_TIMEOUT=1 and a mock claude sleeping 3s, the hook exits 0 in under 2.5s, emits zero heartbeat resolution events, and logs 'timed out' to hooks.log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-llm-guards.ac2",
+            "title": "With the token bucket pre-filled to the limit, the hook exits 0 without invoking mock claude and logs 'rate-limited' to hooks.log",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-llm-guards.ac3",
+            "title": "Under the limit with a fast mock claude answering FORGOT_COMPLETION, the hook still emits resolution done and the bucket file gains one line",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-llm-guards.ac4",
+            "title": "A non-timeout claude failure (rc=1) still falls back to the UNCLEAR verdict path exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-guardrails",
+        "title": "Document the hook LLM guardrails in docs/HOOKS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:52:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3294",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/HOOKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'OVERDECK_HOOK_LLM_TIMEOUT\\|OVERDECK_HOOK_LLM_RATE_LIMIT' docs/HOOKS.md"
+          ],
+          "expected_outputs": [
+            "grep count is at least 2 (both env vars documented)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a '## Hook LLM Guardrails (PAN-3294)' section to docs/HOOKS.md after '## Hook Scripts Inventory' per PRD WI-6: the three guards, env vars OVERDECK_HOOK_LLM_TIMEOUT (default 60) and OVERDECK_HOOK_LLM_RATE_LIMIT (default 6/min), the no-resolution-on-timeout/drop rule and its unclear->stuck rationale, on-disk paths (<agent dir>/stop-hook.lock.d, ~/.overdeck/hook-llm-calls.log), and the incident reference. Update the work-agent-stop-hook row in the inventory table to mention the guards."
+        },
+        "items": [
+          {
+            "id": "docs-guardrails.ac1",
+            "title": "docs/HOOKS.md contains a Hook LLM Guardrails section naming OVERDECK_HOOK_LLM_TIMEOUT with default 60 and OVERDECK_HOOK_LLM_RATE_LIMIT with default 6 per minute",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-guardrails.ac2",
+            "title": "The section contains the no-resolution-on-timeout/drop rule and shows both on-disk paths (stop-hook.lock.d and hook-llm-calls.log)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-guardrails.ac3",
+            "title": "The Hook Scripts Inventory row for work-agent-stop-hook shows the single-flight, TTL, and rate-limit guards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "lock-primitive",
+        "to": "wire-singleflight",
+        "type": "blocks"
+      },
+      {
+        "from": "timeout-primitive",
+        "to": "wire-llm-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "rate-limit-primitive",
+        "to": "wire-llm-guards",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-singleflight",
+        "to": "docs-guardrails",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-llm-guards",
+        "to": "docs-guardrails",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3294-work-agent-stop-hook-single-flight-lock-llm-ttl-and-machine-wide-rate-limit.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
