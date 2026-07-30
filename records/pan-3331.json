@@ -136,23 +136,23 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:37:34.647Z",
+  "updated": "2026-07-30T23:43:10.329Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:34:53.909Z",
+    "updatedAt": "2026-07-30T23:43:10.286Z",
     "reviewNotes": "Workspace-scoped band state can mutate the wrong workspace after navigation",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "0bb888875a9c4ecda8df66fab29ebca611b765aa",
-    "lastVerifiedCommit": "58b44843760db716c0755cd9a54480eadbf6e4c9",
+    "lastVerifiedCommit": "0bb888875a9c4ecda8df66fab29ebca611b765aa",
     "reviewSpawnedAt": "2026-07-30T23:30:02.243Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -245,9 +245,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5623008,
-            "output": 133263,
-            "cacheRead": 42515968,
+            "input": 5626822,
+            "output": 133511,
+            "cacheRead": 43102720,
             "cacheWrite": 0
           }
         },
@@ -292,15 +292,15 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 8485500,
-          "output": 330178,
-          "cacheRead": 72168448,
+          "input": 8489314,
+          "output": 330426,
+          "cacheRead": 72755200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 97.201709,
-        "pricingAsOf": "2026-07-30T23:34:53.914Z"
+        "usd": 97.521595,
+        "pricingAsOf": "2026-07-30T23:43:10.315Z"
       }
     },
     "merges": [
@@ -309,7 +309,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
