@@ -35,6 +35,7 @@ import {
   getAcpLauncherFields,
   getAgentRuntimeBaseCommand,
   getCodexLauncherFields,
+  getKimiCodeLauncherFields,
   getOhmypiLauncherFields,
   inferMemoryProjectId,
   roleAgentDefinitionPath,
@@ -469,7 +470,7 @@ export async function buildAgentLaunchConfig(opts: {
 
   const behavior = getHarnessBehavior(opts.harness);
   const isAcp = behavior.launchCommandKind === 'acp-host';
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model);
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(model, opts.harness);
 
   if (!isAcp) {
     const provider = getProviderForModelSync(model as ModelId);
@@ -480,7 +481,7 @@ export async function buildAgentLaunchConfig(opts: {
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(model, opts.harness);
 
   // PAN-1048: resume/restart launchers must respect the agent's role.
   // A resumed review/test/ship run loads the wrong frontmatter (and wrong
@@ -496,6 +497,11 @@ export async function buildAgentLaunchConfig(opts: {
     : {};
   const codexLauncherFields = behavior.usesCodexHome
     ? getCodexLauncherFields(opts.agentId, model, opts.workspace, launchRole)
+    : {};
+  // PAN-1837: kimi-code needs kimiCodeModel/kimiCodeYolo threaded into the
+  // launcher — buildKimiCodeCommand() throws without kimiCodeModel set.
+  const kimiCodeLauncherFields = behavior.launchCommandKind === 'kimi-code-tui'
+    ? getKimiCodeLauncherFields(model)
     : {};
   if (isAcp && !opts.harnessBinaryPath) {
     throw new Error('ACP launch requires the executable path resolved by preflight');
@@ -560,6 +566,7 @@ export async function buildAgentLaunchConfig(opts: {
       ...piLauncherFields,
       ...codexLauncherFields,
       ...acpLauncherFields,
+      ...kimiCodeLauncherFields,
     });
     return { launcherContent, providerEnv };
   }
@@ -598,6 +605,7 @@ export async function buildAgentLaunchConfig(opts: {
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
+    ...kimiCodeLauncherFields,
     ...(opts.channelsBridgeMcpConfig
       ? {
           channelsBridgeMcpConfig: opts.channelsBridgeMcpConfig,

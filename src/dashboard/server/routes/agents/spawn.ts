@@ -762,14 +762,22 @@ export const postAgentsRoute = HttpRouter.add(
     // canUseHarness() so we can fail fast on a model+harness incompatibility
     // before spawning the subprocess.
     const bodyHarness = (body as any).harness;
-    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null =
-      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' ? bodyHarness : null;
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null = null;
+    const userPickedHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null =
+      bodyHarness === 'ohmypi' || bodyHarness === 'claude-code' || bodyHarness === 'codex' || bodyHarness === 'acp' || bodyHarness === 'kimi-code' ? bodyHarness : null;
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
     if (userPickedHarness !== null) {
       const harnessDecision = yield* Effect.promise(async () =>
         canUseHarnessSync(userPickedHarness, spawnModel, await getProviderAuthMode(spawnModel))
       );
-      effectiveHarness = harnessDecision.allowed ? userPickedHarness : 'claude-code';
+      // PAN-1837 review fix (NFR-2): an explicitly requested harness that
+      // policy denies must fail loudly, not silently substitute claude-code —
+      // {harness: 'kimi-code', model: 'claude-sonnet-5'} was previously
+      // accepted and spawned claude-code instead of returning the policy
+      // reason.
+      if (!harnessDecision.allowed) {
+        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${userPickedHarness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
+      }
+      effectiveHarness = userPickedHarness;
     }
 
     // Spawn pan start command

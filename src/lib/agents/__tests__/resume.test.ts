@@ -58,6 +58,24 @@ describe('resolveRecoveryResumeSessionId', () => {
     expect(resolveRecoveryResumeSessionId(agentId, 'acp')).toBe('acp-session-123');
   });
 
+  it('returns the persisted kimi-session-id for recovery launchers (PAN-1837)', () => {
+    const agentId = 'agent-kimi-resume';
+    mkdirSync(agentDir(agentId), { recursive: true });
+    writeFileSync(join(agentDir(agentId), 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-1837',
+      workspace: '/tmp/workspace',
+      harness: 'kimi-code',
+      role: 'work',
+      model: 'kimi-code/k3',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    }));
+    writeFileSync(join(agentDir(agentId), 'kimi-session-id'), 'kimi-session-123\n');
+
+    expect(resolveRecoveryResumeSessionId(agentId, 'kimi-code')).toBe('kimi-session-123');
+  });
+
   it('does not apply Codex thread ids to other harnesses', () => {
     const agentId = 'agent-claude-resume';
     mkdirSync(agentDir(agentId), { recursive: true });

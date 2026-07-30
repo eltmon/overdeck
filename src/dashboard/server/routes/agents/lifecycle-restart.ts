@@ -263,7 +263,7 @@ export const postAgentRestartRoute = HttpRouter.add(
 
     const { model, harness, graceful = true, message, force = false } = body as {
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
       graceful?: boolean;
       message?: string;
       force?: boolean;
@@ -452,7 +452,7 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     const { spawn: spawnFlag, model: rawModel, harness, force = false } = body as {
       spawn?: boolean;
       model?: string;
-      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+      harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
       force?: boolean;
     };
     const wantsSpawn = spawnFlag !== false; // default to spawn when omitted (picker path)
@@ -478,6 +478,25 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
         issueStage,
       }, { status: 409 });
     }
+
+    // PAN-1837 review fix: validate the explicit harness/model pair BEFORE any
+    // mutation. This route used to kill the session and wipe the agent's
+    // state directory first, then reject an invalid {harness, model} pair
+    // afterward — an invalid selection destroyed the work agent's session
+    // pointers and runtime files without spawning a replacement. Resolve
+    // spawnModel and check policy here, before killSession/wipeAgentStateDirs.
+    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
+    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null = null;
+    if (wantsSpawn && harness) {
+      const harnessDecision = yield* Effect.promise(async () =>
+        canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
+      );
+      if (!harnessDecision.allowed) {
+        return jsonResponse({ error: harnessDecision.reason ?? `Harness "${harness}" is not allowed for model "${spawnModel}".` }, { status: 400 });
+      }
+      effectiveHarness = harness;
+    }
+
     if (!force) {
       const pendingDecision = yield* Effect.promise(() => detectPendingOperatorDecision(id));
       if (pendingDecision) {
@@ -531,15 +550,8 @@ export const postAgentRestartFreshRoute = HttpRouter.add(
     // Auto-spawn path: dispatch to the existing /api/agents spawn flow.
     // We don't go through HTTP — we call the spawn primitives directly so
     // the caller gets a single 200 with both wipe and spawn confirmed.
-    const spawnModel = newModel ?? agentState.model ?? 'claude-sonnet-5';
-    let effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null = null;
-    if (harness) {
-      const harnessDecision = yield* Effect.promise(async () =>
-        canUseHarnessSync(harness, spawnModel, await getProviderAuthMode(spawnModel)),
-      );
-      effectiveHarness = harnessDecision.allowed ? harness : 'claude-code';
-    }
-
+    // (spawnModel/effectiveHarness were already resolved and validated above,
+    // before the kill/wipe mutations.)
     const agentSessionName = `agent-${issueId.toLowerCase()}`;
     const projectPath = agentState.workspace
       ? dirname(agentState.workspace)

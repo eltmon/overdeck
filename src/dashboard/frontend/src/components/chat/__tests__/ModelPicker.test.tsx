@@ -112,11 +112,13 @@ describe('chat ModelPicker live harness labels', () => {
     expect(within(screen.getByRole('button', { name: /^oh-my-pi/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^Codex/i })).getByText('Experimental')).toBeInTheDocument();
     expect(within(screen.getByRole('button', { name: /^ACP/i })).getByText('Experimental')).toBeInTheDocument();
+    expect(within(screen.getByRole('button', { name: /^Kimi Code/i })).getByText('Experimental')).toBeInTheDocument();
     expect(screen.getByLabelText('Claude Code logo')).toBeInTheDocument();
     expect(screen.getByLabelText('oh-my-pi logo')).toBeInTheDocument();
     expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
     expect(screen.getByLabelText('ACP logo')).toBeInTheDocument();
-    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(3);
+    expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
+    expect(screen.getAllByText(/May lose fidelity/)).toHaveLength(4);
     expect(screen.getByRole('button', { name: /^oh-my-pi/i })).toHaveAttribute('title', expect.stringContaining('May lose fidelity'));
   });
 
@@ -304,5 +306,31 @@ describe('chat ModelPicker blocked harness (PAN-2528)', () => {
     expect(onHarnessChange).toHaveBeenCalledWith('codex');
     expect(onComboChange).not.toHaveBeenCalled();
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it('disables kimi-code for a non-Kimi model with the wi4 policy reason visible (PAN-1837 wi11.ac3)', async () => {
+    const KIMI_ONLY_REASON = 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model\'s supported harness.';
+    installFetchMock({
+      harnessPolicyDecisions: {
+        'claude-sonnet-4-6': {
+          'kimi-code': { allowed: false, reason: KIMI_ONLY_REASON },
+        },
+      },
+    });
+    const user = userEvent.setup();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        harness="claude-code"
+        onHarnessChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    const kimiCode = screen.getByRole('button', { name: /^Kimi Code/i });
+    expect(kimiCode).toBeDisabled();
+    expect(within(kimiCode).getByText(KIMI_ONLY_REASON)).toBeInTheDocument();
   });
 });
