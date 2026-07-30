@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:27:52.563Z",
+  "updated": "2026-07-30T21:42:19.497Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "wi4-entry-points": {
-        "writerId": "agent-pan-3330",
-        "agentId": "agent-pan-3330",
-        "pid": 1091500,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:27:52.563Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3330",
@@ -108,6 +100,17 @@
         "outcome": "completed",
         "reason": "NewWorkspaceModal with debounced resolve-before-create preview, inline resolver findings, isolated-mode target lockout; wiring extracted to useNewWorkspaceModal to hold App.tsx under the size ratchet. 14 fake-timer tests green.",
         "releasedAt": "2026-07-30T21:27:41.955Z"
+      },
+      {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 1091500,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:27:52.563Z",
+        "itemId": "wi4-entry-points",
+        "outcome": "completed",
+        "reason": "Sidebar WORKSPACES '+', palette 'New workspace…' action (visible under both Actions and Workspaces chips via alsoScopes), and ProjectOverview button wired through a zustand store to avoid drilling a prop through two god files. Sidebar/palette/overview suites green.",
+        "releasedAt": "2026-07-30T21:42:19.497Z"
       }
     ],
     "statusReasons": {
@@ -122,6 +125,10 @@
       "wi3-new-workspace-modal": {
         "reason": "NewWorkspaceModal with debounced resolve-before-create preview, inline resolver findings, isolated-mode target lockout; wiring extracted to useNewWorkspaceModal to hold App.tsx under the size ratchet. 14 fake-timer tests green.",
         "updatedAt": "2026-07-30T21:27:41.955Z"
+      },
+      "wi4-entry-points": {
+        "reason": "Sidebar WORKSPACES '+', palette 'New workspace…' action (visible under both Actions and Workspaces chips via alsoScopes), and ProjectOverview button wired through a zustand store to avoid drilling a prop through two god files. Sidebar/palette/overview suites green.",
+        "updatedAt": "2026-07-30T21:42:19.497Z"
       }
     }
   },
@@ -142,6 +149,9 @@
     "wi3-new-workspace-modal.wi3-new-workspace-modal.ac2": "completed",
     "wi3-new-workspace-modal.wi3-new-workspace-modal.ac3": "completed",
     "wi3-new-workspace-modal.wi3-new-workspace-modal.ac4": "completed",
-    "wi4-entry-points": "running"
+    "wi4-entry-points": "completed",
+    "wi4-entry-points.wi4-entry-points.ac1": "completed",
+    "wi4-entry-points.wi4-entry-points.ac2": "completed",
+    "wi4-entry-points.wi4-entry-points.ac3": "completed"
   }
 }
