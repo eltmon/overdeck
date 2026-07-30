@@ -66,7 +66,7 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:44:36.883Z",
+  "updated": "2026-07-30T06:44:39.222Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "passed",
@@ -76,7 +76,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:44:33.227Z",
+    "updatedAt": "2026-07-30T06:44:38.417Z",
     "reviewNotes": "Approved: prior reload ownership caveat blocker is fixed; correctness, security, requirements, and performance review is clean",
     "testNotes": "HEAD 6b235ae9 (matches reviewedAtCommit), tree clean. Gates: npm run typecheck (root+hooks+evals+dashboard+frontend ratchets) exit 0; npm run lint (eslint+effect+permissions+state-writes+state-paths+overdeck-boundaries+pipeline-membership+workspace-doors+skills+slash-commands+prompts+file-size+source-introspection+circular+ratchet-audit+quarantine-audit) exit 0. Scoped tests: npx vitest run tests/unit/cli/restart-spawn-pid.test.ts tests/unit/dashboard/health-identity.test.ts tests/unit/lib/platform-lifecycle-squatter.test.ts tests/unit/lib/platform-lifecycle.test.ts -> 4 files, 36/36 passed, incl. real node:http squatter integration test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds. Full changed-file gate: OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main -> 130 passed | 1 skipped (131 files), 1170 passed | 14 skipped (1191 tests), no failures. UAT: not required — this is a pure CLI/backend restart-lifecycle fix (dashboard health payload pid, spawn pid handles, port-owner probing, teardown pid-death verification); no acceptance criterion, issue body, or PR body references dashboard UI/browser behavior, and the squatter integration test already covers the end-to-end restart-ownership scenario. No browser session opened.",
     "blockerReasons": [
@@ -149,7 +149,7 @@
       },
       "costAtCloseOut": {
         "usd": 94.488936,
-        "pricingAsOf": "2026-07-30T06:44:36.878Z"
+        "pricingAsOf": "2026-07-30T06:44:38.480Z"
       }
     },
     "merges": [
