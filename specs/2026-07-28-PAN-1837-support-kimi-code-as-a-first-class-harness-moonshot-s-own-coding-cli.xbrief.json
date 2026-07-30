@@ -4,17 +4,17 @@
     "created": "2026-07-28T15:57:26Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-1837: Support Kimi Code as a first-class harness (Moonshot's own coding CLI)",
-    "updated": "2026-07-28T18:15:04.380Z"
+    "updated": "2026-07-30T05:05:33.894Z"
   },
   "plan": {
     "id": "pan-1837",
     "title": "Support Kimi Code as a first-class harness (Moonshot's own coding CLI)",
-    "status": "running",
+    "status": "completed",
     "uid": "61643a96-a494-45d9-b2cd-a6a11b1d5d32",
     "author": "agent:claude-fable-5",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-07-28T15:57:26Z",
-    "updated": "2026-07-28T18:15:04.380Z",
+    "updated": "2026-07-30T05:05:33.894Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/1837",
@@ -1246,5 +1246,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
