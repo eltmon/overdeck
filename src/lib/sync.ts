@@ -17,6 +17,7 @@ import {
   compareFileToManifest,
 } from './manifest.js';
 import { listProjectsSync } from './projects.js';
+import { planHooksSyncSync, syncHooksSync, type HookItem, type HooksSyncResult } from './sync-hooks.js';
 import {
   ensureGlobalLayer,
   renderGlobalLayer,
@@ -654,73 +655,10 @@ export function syncContextLayersSync(): ContextLayerSyncResult {
   return result;
 }
 
-/**
- * Hook item for sync planning
- */
-export interface HookItem {
-  name: string;
-  sourcePath: string;
-  targetPath: string;
-  status: 'new' | 'updated' | 'current';
-}
-
-/**
- * Plan hooks sync (checks what would be updated)
- */
-export function planHooksSyncSync(): HookItem[] {
-  const hooks: HookItem[] = [];
-
-  if (!existsSync(SYNC_SOURCES.hooks)) {
-    return hooks;
-  }
-
-  // Sync hook scripts (no extension) and bundled JS scripts (.js)
-  // Skip source files (.ts), shell helpers (.sh), and other non-hook files (.mjs)
-  const scripts = readdirSync(SYNC_SOURCES.hooks, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && !entry.name.startsWith('.')
-      && (!entry.name.includes('.') || entry.name.endsWith('.js')));
-
-  for (const script of scripts) {
-    const sourcePath = join(SYNC_SOURCES.hooks, script.name);
-    const targetPath = join(BIN_DIR, script.name);
-
-    let status: HookItem['status'] = 'new';
-
-    if (existsSync(targetPath)) {
-      // Could compare file contents/timestamps here for 'current' vs 'updated'
-      // For now, always update to ensure latest version
-      status = 'updated';
-    }
-
-    hooks.push({ name: script.name, sourcePath, targetPath, status });
-  }
-
-  return hooks;
-}
-
-/**
- * Sync hooks (copy scripts to ~/.overdeck/bin/)
- */
-export function syncHooksSync(): { synced: string[]; errors: string[] } {
-  const result = { synced: [] as string[], errors: [] as string[] };
-
-  // Ensure bin directory exists
-  mkdirSync(BIN_DIR, { recursive: true });
-
-  const hooks = planHooksSyncSync();
-
-  for (const hook of hooks) {
-    try {
-      copyFileSync(hook.sourcePath, hook.targetPath);
-      chmodSync(hook.targetPath, 0o755); // Make executable
-      result.synced.push(hook.name);
-    } catch (error) {
-      result.errors.push(`${hook.name}: ${error}`);
-    }
-  }
-
-  return result;
-}
+// Hook distribution lives in sync-hooks.ts; re-exported so the CLI and the
+// startup gate keep a single sync entry point.
+export { planHooksSyncSync, syncHooksSync };
+export type { HookItem, HooksSyncResult };
 
 /**
  * Runtime-specific statusline configurations
@@ -1180,7 +1118,7 @@ export const planHooksSync = (): Effect.Effect<readonly HookItem[], FsError> =>
   });
 
 /** Apply the hook sync plan to ~/.claude/. */
-export const syncHooks = (): Effect.Effect<{ synced: string[]; errors: string[] }, FsError> =>
+export const syncHooks = (): Effect.Effect<HooksSyncResult, FsError> =>
   Effect.try({
     try: () => syncHooksSync(),
     catch: (cause) => toSyncFsError('syncHooks', cause),
