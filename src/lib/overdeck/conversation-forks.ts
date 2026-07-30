@@ -65,6 +65,7 @@ import { capturePaneText, deliveryVerifyLine, isHarnessProcessAlive, sendKeysAsy
 import {
   readLauncherPinnedSessionId,
   resolveCodexRolloutPath,
+  resolveKimiWirePath,
   resolvePiSessionPath,
 } from '../../dashboard/server/routes/jsonl-resolver.js';
 import * as self from './conversation-forks.js';
@@ -125,6 +126,11 @@ async function resolveForkSourceSessionFile(conv: Conversation): Promise<string 
   if (getHarnessBehavior(conv.harness).transcriptKind === 'codex-rollout-jsonl') {
     const codexPath = await resolveCodexRolloutPath(conv.tmuxSession);
     if (codexPath) return codexPath;
+  }
+  if (getHarnessBehavior(conv.harness).transcriptKind === 'kimi-wire-jsonl') {
+    // workspaceOverride because a conversation has no AgentState row to derive it from.
+    const kimiPath = await resolveKimiWirePath(conv.tmuxSession, { workspaceOverride: conv.cwd });
+    if (kimiPath) return kimiPath;
   }
   const pinned = await readLauncherPinnedSessionId(conv.tmuxSession);
   const sessionId = pinned ?? conv.claudeSessionId;

@@ -5,7 +5,7 @@ import { getConversationById, getConversationByName } from '../../lib/overdeck/c
 import { resolveCurrentConversation } from '../../lib/conversations/current.js';
 import { parseIssueIdSync } from '../../lib/issue-id.js';
 import { forkConversationViaServer, ForkServerError, isForkResultInProgress } from './fork-client.js';
-import { sessionFilePath } from '../../lib/paths.js';
+import { resolveSessionFile } from '../../lib/overdeck/conversation-reads.js';
 
 interface HandoffOptions {
   model?: string;
@@ -61,7 +61,10 @@ export async function handoffCommand(
     return exitCli(1);
   }
 
-  const sessionFile = conv.claudeSessionId ? sessionFilePath(conv.cwd, conv.claudeSessionId) : null;
+  // Every harness, not just claude-code: a kimi-code/codex/pi conversation has no
+  // claudeSessionId, so the old claude-only sessionFilePath() lookup refused to
+  // hand off from one. resolveSessionFile is the shared per-harness resolver.
+  const sessionFile = await resolveSessionFile(conv);
   if (!sessionFile || !existsSync(sessionFile)) {
     console.log(chalk.yellow(`No session file found for conversation ${conv.name}`));
     return exitCli(1);

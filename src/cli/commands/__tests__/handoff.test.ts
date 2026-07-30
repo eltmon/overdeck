@@ -22,9 +22,12 @@ vi.mock('../fork-client.js', () => ({
   isForkResultInProgress: forkMocks.isForkResultInProgress,
 }));
 
-vi.mock('../../../lib/paths.js', () => ({
-  sessionFilePath: vi.fn(() => '/tmp/session.jsonl'),
+// The shared per-harness resolver, not the claude-only sessionFilePath(): a
+// kimi-code/codex/pi conversation has no claudeSessionId to build a path from.
+const readsMocks = vi.hoisted(() => ({
+  resolveSessionFile: vi.fn(async () => '/tmp/session.jsonl' as string | null),
 }));
+vi.mock('../../../lib/overdeck/conversation-reads.js', () => readsMocks);
 
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
@@ -61,6 +64,29 @@ describe('handoffCommand', () => {
     expect(output).toContain('If that was focus text for the current conversation');
     expect(output).toContain('pan handoff self "Implement PAN-1790"');
     expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
+  it('hands off a kimi-code conversation, which has no claudeSessionId', async () => {
+    readsMocks.resolveSessionFile.mockResolvedValue('/home/u/.kimi-code/sessions/wd_x/session_y/agents/main/wire.jsonl');
+    const conv = {
+      id: 1706,
+      name: 'source-kimi',
+      title: 'Kimi conversation',
+      cwd: '/workspace',
+      harness: 'kimi-code',
+      claudeSessionId: null,
+    };
+    conversationMocks.getConversationById.mockReturnValue(conv);
+    forkMocks.forkConversationViaServer.mockResolvedValue({
+      id: 1712, name: 'new-conv', tmuxSession: 'conv-new', model: 'k3[1m]',
+      harness: 'kimi-code', forkStatus: null, sessionAlive: true,
+    });
+    const { handoffCommand } = await import('../handoff.js');
+
+    await handoffCommand('1706', ['carry', 'on'], {});
+
+    expect(readsMocks.resolveSessionFile).toHaveBeenCalledWith(conv);
+    expect(forkMocks.forkConversationViaServer).toHaveBeenCalled();
   });
 
   it('prints an ignored notice for --harness and does not forward it to the fork server', async () => {
