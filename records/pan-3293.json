@@ -64,18 +64,18 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:14:16.654Z",
+  "updated": "2026-07-30T06:26:30.131Z",
   "pipeline": {
     "issueId": "PAN-3293",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:14:16.639Z",
-    "reviewNotes": "pan reload discards ownershipVerified=false and still prints an unqualified healthy success",
+    "updatedAt": "2026-07-30T06:26:29.706Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
     "reviewedAtCommit": "93980806c0b2c089b4aec71763bbd3f797039744",
@@ -129,17 +129,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 769309,
-            "output": 108253,
-            "cacheRead": 14188032,
+            "input": 775245,
+            "output": 108433,
+            "cacheRead": 14516736,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1801170,
-            "output": 217866,
-            "cacheRead": 84168704,
+            "input": 1853224,
+            "output": 224538,
+            "cacheRead": 94206464,
             "cacheWrite": 0
           }
         }
@@ -152,15 +152,15 @@
           "cacheWrite": 186978
         },
         "openai/gpt-5.6-sol": {
-          "input": 2570479,
-          "output": 326119,
-          "cacheRead": 98356736,
+          "input": 2628469,
+          "output": 332971,
+          "cacheRead": 108723200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 81.280161,
-        "pricingAsOf": "2026-07-30T06:14:16.648Z"
+        "usd": 86.958903,
+        "pricingAsOf": "2026-07-30T06:26:29.761Z"
       }
     },
     "merges": [
