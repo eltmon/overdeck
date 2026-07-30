@@ -204,6 +204,138 @@ describe('state write door durability (PAN-2677)', () => {
     }
   })
 
+  it('adopts owned orphaned writes before rebase and fails closed on unowned paths', async () => {
+    const originalHome = process.env.OVERDECK_HOME
+    const home = join(tmp, 'reconcile-home')
+    const projectRoot = join(tmp, 'reconcile-project')
+    const stateRoot = join(home, 'state', 'durability')
+    const remote = join(tmp, 'reconcile-origin.git')
+    const specPath = join(stateRoot, 'specs', '2026-07-30-PAN-3298-reconcile.xbrief.json')
+    const recordPath = join(stateRoot, 'records', 'pan-3298.json')
+    const rejectFlag = join(remote, 'reject-next-push')
+    const preReceiveHook = join(remote, 'hooks', 'pre-receive')
+
+    try {
+      process.env.OVERDECK_HOME = home
+      mkdirSync(projectRoot, { recursive: true })
+      mkdirSync(join(home, 'state'), { recursive: true })
+      mkdirSync(join(stateRoot, 'specs'), { recursive: true })
+      mkdirSync(join(stateRoot, 'records'), { recursive: true })
+      writeFileSync(join(home, 'projects.yaml'), JSON.stringify({
+        projects: {
+          durability: {
+            name: 'Durability',
+            path: projectRoot,
+            issue_prefix: 'PAN',
+          },
+        },
+      }))
+
+      git(projectRoot, 'init', '-q', '-b', 'main')
+      configureGit(projectRoot)
+      writeFileSync(join(projectRoot, 'README.md'), 'project\n')
+      git(projectRoot, 'add', 'README.md')
+      git(projectRoot, 'commit', '-q', '-m', 'seed project')
+
+      git(tmp, 'init', '--bare', '-q', remote)
+      git(stateRoot, 'init', '-q')
+      configureGit(stateRoot)
+      git(stateRoot, 'branch', '-M', 'overdeck-state')
+      git(stateRoot, 'remote', 'add', 'origin', remote)
+      writeFileSync(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+        sourceMainSha: '0'.repeat(40),
+        stateBranchSha: '0'.repeat(40),
+        completedAt: '2026-07-30T00:00:00.000Z',
+        version: 1,
+      }))
+      writeFileSync(specPath, JSON.stringify(
+        asPanSpecDocument(makeDoc('PAN-3298', 'Reconcile adoption', 'proposed'), 'proposed'),
+        null,
+        2,
+      ))
+      writeFileSync(recordPath, JSON.stringify({
+        issueId: 'PAN-3298',
+        schemaVersion: 2,
+        statusOverrides: {},
+        pipeline: {
+          issueId: 'PAN-3298',
+          reviewStatus: 'pending',
+          testStatus: 'pending',
+          readyForMerge: false,
+          updatedAt: '2026-07-30T00:00:00.000Z',
+        },
+        closeOut: { usage: { byStage: {}, totals: {} }, merges: [], ranOn: 'main' },
+      }, null, 2))
+      git(stateRoot, 'add', '.')
+      git(stateRoot, 'commit', '-q', '-m', 'seed state')
+      git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state')
+
+      writeFileSync(preReceiveHook, `#!/bin/sh\nif [ -f '${rejectFlag}' ]; then\n  rm -f '${rejectFlag}'\n  echo "error: cannot lock ref 'refs/heads/overdeck-state': is at ${'a'.repeat(40)} but expected ${'b'.repeat(40)}" >&2\n  exit 1\nfi\n`)
+      chmodSync(preReceiveHook, 0o755)
+      writeFileSync(specPath, JSON.stringify(
+        asPanSpecDocument(makeDoc('PAN-3298', 'Orphaned spec write', 'proposed'), 'proposed'),
+        null,
+        2,
+      ))
+      writeFileSync(rejectFlag, 'reject')
+
+      vi.resetModules()
+      const { updateIssueRecord } = await import('../record-update.js')
+      const project = { name: 'Durability', path: projectRoot, issue_prefix: 'PAN' }
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+      try {
+        await updateIssueRecord(project, 'PAN-3298', (record) => {
+          record.statusOverrides = { 'owned-write': 'completed' }
+        })
+
+        const remoteRecord = JSON.parse(
+          git(stateRoot, 'show', 'origin/overdeck-state:records/pan-3298.json'),
+        ) as { statusOverrides: Record<string, string> }
+        expect(remoteRecord.statusOverrides).toEqual({ 'owned-write': 'completed' })
+        expect(git(stateRoot, 'log', '--format=%s', 'origin/overdeck-state'))
+          .toContain('chore(state): adopt orphaned write before state rebase (PAN-3296)')
+        expect(warnSpy).toHaveBeenCalledWith(
+          expect.stringContaining('[record-update] adopted orphaned state write(s): specs/'),
+        )
+        expect(porcelain(stateRoot)).toBe('')
+
+        const adoptionCount = git(
+          stateRoot,
+          'rev-list',
+          '--count',
+          '--grep=adopt orphaned write',
+          'origin/overdeck-state',
+        )
+        writeFileSync(join(stateRoot, 'operator-note.txt'), 'unowned\n')
+        writeFileSync(rejectFlag, 'reject')
+
+        await expect(updateIssueRecord(project, 'PAN-3298', (record) => {
+          record.statusOverrides = { ...record.statusOverrides, 'unowned-write': 'completed' }
+        })).rejects.toThrow('operator-note.txt')
+        expect(git(
+          stateRoot,
+          'rev-list',
+          '--count',
+          '--grep=adopt orphaned write',
+          'origin/overdeck-state',
+        )).toBe(adoptionCount)
+        expect(git(
+          stateRoot,
+          'rev-list',
+          '--count',
+          '--grep=adopt orphaned write',
+          'HEAD',
+        )).toBe(adoptionCount)
+      } finally {
+        warnSpy.mockRestore()
+      }
+    } finally {
+      if (originalHome === undefined) delete process.env.OVERDECK_HOME
+      else process.env.OVERDECK_HOME = originalHome
+      vi.resetModules()
+    }
+  })
+
   it('commits through a husky-style core.hooksPath (HUSKY=0 reaches git)', async () => {
     // A migrated state worktree shares core.hooksPath with the code repo. The
     // husky wrapper exits 127 unless HUSKY=0; the door must pass HUSKY=0 so the

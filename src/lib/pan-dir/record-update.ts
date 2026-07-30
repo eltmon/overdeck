@@ -170,6 +170,44 @@ function isRemoteRefRaceError(message: string): boolean {
   return /non-fast-forward|fetch first|stale info|cannot lock ref.*expected|failed to update ref/i.test(message);
 }
 
+function porcelainPaths(status: string): string[] {
+  return status
+    .split('\n')
+    .map((line) => line.trimEnd())
+    .filter(Boolean)
+    .map((line) => line[2] === ' ' ? line.slice(3) : line[1] === ' ' ? line.slice(2) : line)
+    .map((path) => path.includes(' -> ') ? path.split(' -> ').at(-1)! : path)
+    .map((path) => path.replace(/\\/g, '/'));
+}
+
+function isOwnedStatePath(path: string): boolean {
+  return path.startsWith('specs/') || path.startsWith('records/');
+}
+
+async function adoptOrphanedStateWrites(gitRoot: string, signal?: AbortSignal): Promise<void> {
+  const status = await git(gitRoot, ['status', '--porcelain=v1', '--untracked-files=all'], { signal });
+  const paths = porcelainPaths(status);
+  if (paths.length === 0) return;
+
+  const unowned = paths.filter((path) => !isOwnedStatePath(path));
+  if (unowned.length > 0) {
+    throw new Error(`State rebase blocked by unowned changes: ${unowned.join(', ')}`);
+  }
+
+  throwIfDurabilityAborted(signal);
+  await git(gitRoot, ['add', '--', 'specs', 'records'], { signal });
+  throwIfDurabilityAborted(signal);
+  await git(gitRoot, [
+    'commit',
+    '-m',
+    'chore(state): adopt orphaned write before state rebase (PAN-3296)',
+    '--',
+    'specs',
+    'records',
+  ], { signal });
+  console.warn(`[record-update] adopted orphaned state write(s): ${paths.join(', ')}`);
+}
+
 async function abortRebase(gitRoot: string, options: GitOptions = {}): Promise<void> {
   try {
     // Bounded local cleanup: a deadline abort must not extend the lock hold by
@@ -283,6 +321,7 @@ async function reconcileStatePush(
   for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
     throwIfDurabilityAborted(signal);
     await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
+    await adoptOrphanedStateWrites(gitRoot, signal);
     try {
       await git(gitRoot, ['rebase', `origin/${STATE_BRANCH}`], { signal });
     } catch (error) {
