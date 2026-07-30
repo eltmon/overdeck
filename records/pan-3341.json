@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:08:59.781Z",
+  "updated": "2026-07-30T23:09:03.651Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -64,7 +64,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T23:08:58.466Z",
+    "updatedAt": "2026-07-30T23:09:03.634Z",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3353",
     "reviewRequestedAt": "2026-07-30T23:08:55.001Z",
@@ -107,24 +107,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 899733,
-            "output": 97038,
-            "cacheRead": 37300736,
+            "input": 901836,
+            "output": 98241,
+            "cacheRead": 37959680,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 899733,
-          "output": 97038,
-          "cacheRead": 37300736,
+          "input": 901836,
+          "output": 98241,
+          "cacheRead": 37959680,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.060173,
-        "pricingAsOf": "2026-07-30T23:08:59.775Z"
+        "usd": 26.43625,
+        "pricingAsOf": "2026-07-30T23:09:03.646Z"
       }
     },
     "merges": [
