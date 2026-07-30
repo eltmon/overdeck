@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T03:08:33.515Z",
+  "updated": "2026-07-30T03:39:11.141Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -30,7 +30,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-29T23:10:31.797Z"
+    "updatedAt": "2026-07-30T03:39:11.113Z"
   },
   "closeOut": {
     "usage": {
@@ -38,14 +38,14 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-29T23:10:31.856Z"
+        "pricingAsOf": "2026-07-30T03:39:11.136Z"
       }
     },
     "merges": [],
-    "ranOn": "Edwards-MacBook-Air.local"
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3286",
