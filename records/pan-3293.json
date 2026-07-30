@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T04:06:40.578Z",
+  "updated": "2026-07-30T04:07:39.468Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "pids-on-port-multiprobe": {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 2582731,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:07:39.468Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -131,6 +139,7 @@
     "spawn-pid-handle.spawn-pid-handle.ac1": "completed",
     "spawn-pid-handle.spawn-pid-handle.ac2": "completed",
     "spawn-pid-handle.spawn-pid-handle.ac3": "completed",
-    "spawn-pid-handle.spawn-pid-handle.ac4": "completed"
+    "spawn-pid-handle.spawn-pid-handle.ac4": "completed",
+    "pids-on-port-multiprobe": "running"
   }
 }
