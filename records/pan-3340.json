@@ -63,17 +63,17 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T23:20:02.650Z",
+  "updated": "2026-07-30T23:20:04.799Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T23:20:02.618Z",
+    "updatedAt": "2026-07-30T23:20:03.217Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added dashboard mutation auth, validated project resolution before pending state, added route-level ordering tests, and replaced false success toasts with semantic rejection feedback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "40b669c4ae26b284d559dba80cbfc497246b48e0",
@@ -170,7 +170,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.462295,
-        "pricingAsOf": "2026-07-30T23:20:02.645Z"
+        "pricingAsOf": "2026-07-30T23:20:04.796Z"
       }
     },
     "merges": [
