@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:04:14.508Z",
+  "updated": "2026-07-30T21:04:37.177Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "wi2-registry-routes": {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 2805492,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:04:37.177Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3330",
@@ -92,6 +100,7 @@
     "wi1-shared-create-core.wi1-shared-create-core.ac1": "completed",
     "wi1-shared-create-core.wi1-shared-create-core.ac2": "completed",
     "wi1-shared-create-core.wi1-shared-create-core.ac3": "completed",
-    "wi1-shared-create-core.wi1-shared-create-core.ac4": "completed"
+    "wi1-shared-create-core.wi1-shared-create-core.ac4": "completed",
+    "wi2-registry-routes": "running"
   }
 }
