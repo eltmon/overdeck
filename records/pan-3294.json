@@ -70,10 +70,10 @@
       "tests/scripts/pan-hook-lib-guards.test.ts",
       "tests/scripts/work-agent-stop-hook.test.ts"
     ],
-    "recordedAt": "2026-07-30T04:35:55.129Z"
+    "recordedAt": "2026-07-30T06:34:43.205Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T06:34:39.956Z",
+  "updated": "2026-07-30T06:34:43.206Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
