@@ -157,7 +157,7 @@
     "recordedAt": "2026-07-30T23:14:09.868Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T23:28:48.630Z",
+  "updated": "2026-07-30T23:28:54.213Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "blocked",
@@ -168,11 +168,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:15:39.603Z",
-    "updatedAt": "2026-07-30T23:28:47.987Z",
+    "updatedAt": "2026-07-30T23:28:54.204Z",
     "reviewNotes": "Archiving main makes the creation modal offer a replacement that is guaranteed to fail",
     "inspectNotes": "AC1-4 met. Three existing CLI suites (workspace-commands, workspace-new-target-path, workspace-scratch-isolated) untouched by the commit and all pass alongside the new create-intent suite (41/41, --hookTimeout 60000; the default-5s hook failure also hits untouched relocate.test.ts, so it is machine load, not a regression). Dry-run parity asserted field-for-field and key-order against real CLI output for shared/target-path/isolated. cliMessageFor reproduces all six original message strings verbatim, exit path still exitCli. Findings returned (not thrown) for invalid-name, target-not-a-directory, mode-conflict, plus project-not-found/ambiguous; fail-fast ordering preserved so a rejected name touches neither git nor fs. Resolution writes nothing (worktree list, workspace row count, and projects row all asserted unchanged). grep confirms zero process.cwd() in src/lib/workspaces/create.ts; the test proves it by runtime spy instead of a source grep because scripts/lint-source-introspection.sh forbids source-text assertions - deviation from AC4's literal wording, substantively satisfied. NFR-2: promisify(exec) shell string replaced by execFileAsync argument vector for rev-parse and worktree add; no execSync. Non-blocking: intent.projectId as string cast in workspaceMainCommand relies on findings-empty implying non-null, and kind=main now stats .git before the getMainWorkspace short-circuit (extra stat, no visible change); createWorkspace maps omitted and false parentBranchGuessed to the same 0.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
-    "reviewedAtCommit": "7211c1eaed6a2102576619102d78af47aba9ce33",
+    "reviewedAtCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93",
     "lastVerifiedCommit": "7211c1eaed6a2102576619102d78af47aba9ce33",
     "reviewSpawnedAt": "2026-07-30T23:20:46.560Z",
     "scopeDrift": {
@@ -247,24 +247,6 @@
         "tests/unit/lib/workspaces/relocate.test.ts"
       ],
       "recordedAt": "2026-07-30T23:14:09.868Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "86bf24d3c6ca415e2e88a4a61c66d257c871da93"
-      }
     }
   },
   "closeOut": {
@@ -335,7 +317,7 @@
       },
       "costAtCloseOut": {
         "usd": 191.504222,
-        "pricingAsOf": "2026-07-30T23:28:48.004Z"
+        "pricingAsOf": "2026-07-30T23:28:54.209Z"
       }
     },
     "merges": [
