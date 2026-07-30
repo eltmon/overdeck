@@ -110,19 +110,18 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-30T05:05:34.571Z",
+  "updated": "2026-07-30T05:41:08.277Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-30T05:05:34.533Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3260-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-30T05:41:07.848Z",
     "conflictsSince": {
       "sha": "eeb851b1e3eb24f1cfd1ab0d224d3633f5d9b6eb",
       "detectedAt": "2026-07-30T04:53:29.358Z",
@@ -162,10 +161,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1374,
-            "output": 226817,
-            "cacheRead": 255592830,
-            "cacheWrite": 1791985
+            "input": 1400,
+            "output": 230434,
+            "cacheRead": 260395223,
+            "cacheWrite": 1804653
           }
         }
       },
@@ -183,15 +182,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1684,
-          "output": 292614,
-          "cacheRead": 293615291,
-          "cacheWrite": 2089501
+          "input": 1710,
+          "output": 296231,
+          "cacheRead": 298417684,
+          "cacheWrite": 2102169
         }
       },
       "costAtCloseOut": {
-        "usd": 118.93359,
-        "pricingAsOf": "2026-07-30T05:05:34.567Z"
+        "usd": 119.961963,
+        "pricingAsOf": "2026-07-30T05:41:07.897Z"
       }
     },
     "merges": [
