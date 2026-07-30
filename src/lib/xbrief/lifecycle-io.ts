@@ -273,45 +273,6 @@ async function moveXBriefPromise(
   };
 }
 
-export function moveXBriefFilesOnly(
-  projectRoot: string,
-  issueId: string,
-  targetDir: XBriefLifecycleDir,
-): { from: FoundXBrief; toPath: string } {
-  const found = findXBriefByIssueSync(projectRoot, issueId);
-  if (!found) {
-    throw new Error(`No xBRIEF found for issue ${issueId} under ${projectRoot}`);
-  }
-
-  ensureXBriefDirsSync(projectRoot);
-  ensurePanSpecForIssue(projectRoot, found);
-  const updatedSpec = updateSpecStatusSync(projectRoot, issueId, targetDir);
-  if (!updatedSpec) {
-    throw new Error(`Failed to update pan spec status for ${issueId}`);
-  }
-
-  invalidateXBriefIndex(projectRoot);
-  return {
-    from: found,
-    toPath: updatedSpec.path,
-  };
-}
-
-export function deleteXBrief(projectRoot: string, issueId: string): boolean {
-  const found = findXBriefByIssueSync(projectRoot, issueId);
-  if (!found) return false;
-
-  const spec = findSpecByIssueSync(projectRoot, issueId);
-  if (spec) {
-    unlinkSync(spec.path);
-  } else {
-    unlinkSync(found.path);
-  }
-
-  invalidateXBriefIndex(projectRoot);
-  return true;
-}
-
 export interface XBriefTransitionResult {
   fromDir: XBriefLifecycleDir;
   toDir: XBriefLifecycleDir;

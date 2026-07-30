@@ -6,10 +6,8 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 
 import {
-  deleteXBrief,
   findXBriefByIssueSync,
   moveXBrief,
-  moveXBriefFilesOnly,
   promoteXBriefToProposed,
   transitionXBriefOnMain,
   updatePlanStatus,
@@ -170,54 +168,6 @@ describe('updatePlanStatus', () => {
   });
 });
 
-describe('moveXBriefFilesOnly', () => {
-  it('moves scope xBRIEF and continue file together', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    const oldPath = writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
-    expect(existsSync(oldPath)).toBe(false);
-    expect(existsSync(result.toPath)).toBe(true);
-    expect(result.toPath).toBe(join(TEST_DIR, '.pan', 'specs', filename));
-
-    const movedDoc = JSON.parse(readFileSync(result.toPath, 'utf-8')) as XBriefDocument & { status: string };
-    expect(movedDoc.status).toBe('active');
-  });
-
-  it('handles missing continue file (no-op for continue)', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'active');
-    expect(existsSync(result.toPath)).toBe(true);
-  });
-
-  it('throws when the issue has no xBRIEF', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    expect(() => moveXBriefFilesOnly(TEST_DIR, 'PAN-999', 'active')).toThrow();
-  });
-
-  it('handles same source and target lifecycle dir as a no-op', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    const result = moveXBriefFilesOnly(TEST_DIR, 'PAN-1', 'proposed');
-    expect(existsSync(result.toPath)).toBe(true);
-  });
-});
-
 describe('moveXBrief (with durable git write-through)', () => {
   it('moves and commits through the canonical state writer', async () => {
     initGitRepo(TEST_DIR);
@@ -246,25 +196,6 @@ describe('moveXBrief (with durable git write-through)', () => {
     initGitRepo(TEST_DIR);
     ensureXBriefDirsSync(TEST_DIR);
     await expect(Effect.runPromise(moveXBrief(TEST_DIR, 'PAN-999', 'active'))).rejects.toThrow();
-  });
-});
-
-describe('deleteXBrief', () => {
-  it('deletes the scope xBRIEF file', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    const filename = generateXBriefFilename('PAN-1', 'foo', '2026-05-03');
-    const path = writePlan(
-      resolveXBriefDir(TEST_DIR, 'proposed'),
-      filename,
-      makePlan('PAN-1', 'foo', 'proposed'),
-    );
-    expect(deleteXBrief(TEST_DIR, 'PAN-1')).toBe(true);
-    expect(existsSync(path)).toBe(false);
-  });
-
-  it('returns false when issue has no xBRIEF', () => {
-    ensureXBriefDirsSync(TEST_DIR);
-    expect(deleteXBrief(TEST_DIR, 'PAN-999')).toBe(false);
   });
 });
 
