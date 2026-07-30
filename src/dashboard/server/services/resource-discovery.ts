@@ -30,6 +30,7 @@ import {
 import { listOpenPullRequestsSnapshot } from '../../../lib/pipeline-membership-gather.js';
 import { loadReadyForMergeFlags } from '../review-status.js';
 import { resolveAgentGitInfo } from './git-info.js';
+import { resolveMissingIssueTitles } from './issue-title-fallback.js';
 import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
 import {
   readPipelineMembershipSnapshotsForProjects,
@@ -714,6 +715,21 @@ async function computeResourceAllocatedIssues(
     issue.resourceDetails.prdPath = draft.path;
     issue.hasPrd = true;
   }));
+
+  // Issues that aged out of the tracker sync window (closed long ago) still
+  // surface here through their surviving local resources, but carry no tracker
+  // row — their title fell back to the bare identifier. Resolve those titles
+  // through the tracker's per-issue door, memoized across passes (PAN-3337).
+  const untitledIssueIds = [...issueMap.values()]
+    .filter((issue) => issue.resourceSources.size > 0 && issue.title === issue.issueId)
+    .map((issue) => issue.issueId);
+  if (untitledIssueIds.length > 0) {
+    const fallbackTitles = await resolveMissingIssueTitles(untitledIssueIds).catch(() => new Map<string, string>());
+    for (const issue of issueMap.values()) {
+      const title = fallbackTitles.get(issue.issueId);
+      if (title && issue.title === issue.issueId) issue.title = title;
+    }
+  }
 
   // The canonical resolver owns pipeline inclusion whenever it returns a verdict.
   // While a project's membership is unavailable, retain only rows backed by a live
