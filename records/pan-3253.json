@@ -232,17 +232,17 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:25:07.559Z",
+  "updated": "2026-07-30T11:25:13.388Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:25:06.427Z",
+    "updatedAt": "2026-07-30T11:25:13.380Z",
     "reviewNotes": "Bulk hydration bounds are complete across all canonical readers; no blocking findings",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
@@ -306,9 +306,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 12309667,
-            "output": 437429,
-            "cacheRead": 88699904,
+            "input": 12314185,
+            "output": 437605,
+            "cacheRead": 89120768,
             "cacheWrite": 0
           }
         },
@@ -329,9 +329,9 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 12309667,
-          "output": 437429,
-          "cacheRead": 88699904,
+          "input": 12314185,
+          "output": 437605,
+          "cacheRead": 89120768,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -342,8 +342,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 144.96564,
-        "pricingAsOf": "2026-07-30T11:25:06.501Z"
+        "usd": 145.203942,
+        "pricingAsOf": "2026-07-30T11:25:13.384Z"
       }
     },
     "merges": [
@@ -352,7 +352,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3253",
