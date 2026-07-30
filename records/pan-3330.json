@@ -14,9 +14,16 @@
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/useNewWorkspaceModal.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
-      "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      "src/lib/projects.ts",
+      "src/lib/workspaces/writer.ts",
+      "tests/unit/cli/workspace-commands.test.ts",
+      "tests/unit/dashboard/workspace-registry-integration.test.ts",
+      "tests/unit/lib/overdeck/no-loss-matrix.ts",
+      "tests/unit/lib/workspaces/relocate.test.ts",
+      "tests/unit/lib/workspaces/writer.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/components/workspace/__tests__/workspace-view-actions.test.tsx"
@@ -55,6 +62,7 @@
       "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/useNewWorkspaceModal.test.tsx",
       "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
       "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
       "src/dashboard/frontend/src/components/CommandPalette.tsx",
@@ -63,16 +71,22 @@
       "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
       "src/dashboard/server/routes/workspace-registry.ts",
+      "src/lib/projects.ts",
       "src/lib/workspaces/create.ts",
+      "src/lib/workspaces/writer.ts",
       "sync-sources/skills/pan-workspace/SKILL.md",
+      "tests/unit/cli/workspace-commands.test.ts",
       "tests/unit/dashboard/workspace-registry-create.test.ts",
+      "tests/unit/dashboard/workspace-registry-integration.test.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
-      "tests/unit/lib/workspaces/create-intent.test.ts"
+      "tests/unit/lib/workspaces/create-intent.test.ts",
+      "tests/unit/lib/workspaces/relocate.test.ts",
+      "tests/unit/lib/workspaces/writer.test.ts"
     ],
-    "recordedAt": "2026-07-30T22:20:59.488Z"
+    "recordedAt": "2026-07-30T22:50:55.493Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T22:50:48.087Z",
+  "updated": "2026-07-30T22:50:55.496Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "failed",
