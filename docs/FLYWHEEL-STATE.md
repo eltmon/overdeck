@@ -9194,3 +9194,12 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **PAN-3327's fix is the one that closes a loop on my own operating problem**: it adds `isDeploymentGenerationRoot()` and resolves `SYNC_SOURCES` to the checkout when the CLI runs from a `.pan-reload-generation-*` directory — the exact defect that silently reverted my hook deploy twice and forced me to hand-rsync both generations. Its comment explaining why it cannot import the validated door (`paths.ts` is the most widely imported module; that edge would put a cycle in every bundle) is the kind of note that stops a future cleanup from reintroducing the cycle.
 - **LESSON: batching the cascade was worth more than merging one PR at a time.** Holding the four unpushed/unPR'd strikes while main was red meant zero wasted CI runs on an inherited failure, and the moment main went green I could start all five remaining runs in parallel rather than serially. **The right time to open a PR is when its base can actually validate it** — #3343 and #3346, opened earlier against red main, each burned a run proving only that main was broken.
 - Load down to ~21; hook 445/guard=1; leak 0.
+
+## RUN-75 tick 21 (2026-07-30 22:20Z) — five strikes in CI; two new backlog items appeared
+
+- `cwd-guard: main`. Hook **445 / guard=1**; leak **0**; memory 25 GB; load 24.
+- **All five remaining strike PRs are in CI simultaneously** — #3343 (PAN-3326), #3346 (PAN-3324), #3347 (PAN-3339), #3348 (PAN-3328), #3349 (PAN-3327). None green yet; every one is pre-reviewed and pre-approved, so each merges the moment its checks clear.
+- **Read-door sweep, all 12 projects — 30 in-pipeline rows.** panopticon-cli now shows the five strikes as `in_flight` and **PAN-3342 as `post_merge_limbo`** (its close-out follows verify-on-main). Four typed blind spots unchanged (papers-please/puzzdom `tracker_unconfigured`, lexerra/krux `forge_unavailable`), never reconstructed from other state.
+- **Two new backlog items appeared while I was driving the cascade: PAN-3340 and PAN-3341** (alongside PAN-3330/3331, all `planned_backlog`). Not startable — `auto_pickup_backlog=false` and none is operator-released. Noted rather than touched.
+- Still blocked and deliberately unforced: **PAN-3259**, **PAN-3305**, **PAN-3296** (all three unblock as their strikes land), **MIN-908** and 13 MYN `zombie_pr` rows (out of merge scope, `auto_merge` hold), **PAN-3313** (operator-gated CLIProxy auth).
+- Watch is event-driven on all five PRs reaching `nongreen=0`; interval wakeup is only the backstop.
