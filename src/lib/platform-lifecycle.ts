@@ -227,10 +227,23 @@ function killPidsSync(pids: number[], signal: NodeJS.Signals | number): void {
   }
 }
 
-async function waitForPortFree(port: number, timeoutMs: number): Promise<boolean> {
+function isPidAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+  }
+}
+
+async function waitForPortFree(
+  port: number,
+  timeoutMs: number,
+  portOwnerProbe: (port: number) => Promise<number[]> = pidsOnPort,
+): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const pids = await pidsOnPort(port);
+    const pids = await portOwnerProbe(port);
     if (pids.length === 0) return true;
     await sleep(100);
   }
@@ -310,10 +323,14 @@ function createEaddrinuseProbe(
 
 async function stopDashboardPromise(
   config: PlatformConfig,
-  opts: { graceTimeoutMs?: number } = {},
+  opts: {
+    graceTimeoutMs?: number;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+  } = {},
 ): Promise<void> {
   const graceMs = opts.graceTimeoutMs ?? 5000;
   const ports = [config.dashboardPort, config.dashboardApiPort];
+  const portOwnerProbe = opts.portOwnerProbe ?? pidsOnPort;
 
   // 0. If an interactive `pan dev` session owns these ports, route the stop to
   //    the supervisor itself rather than port-killing its children. The dev
@@ -324,7 +341,7 @@ async function stopDashboardPromise(
   const dev = readDevSupervisorMarker();
   if (dev && dev.dashboardPort === config.dashboardPort && dev.apiPort === config.dashboardApiPort) {
     killPidsSync([dev.pid], 'SIGTERM');
-    const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs)));
+    const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs, portOwnerProbe)));
     if (freed.every(Boolean)) return;
     // Supervisor failed to release the ports in time — escalate, then fall
     // through to the normal port-based teardown to mop up orphaned children.
@@ -334,38 +351,41 @@ async function stopDashboardPromise(
   // 1. Collect pids across both ports, then SIGTERM.
   const allPids = new Set<number>();
   for (const p of ports) {
-    for (const pid of await pidsOnPort(p)) allPids.add(pid);
+    for (const pid of await portOwnerProbe(p)) allPids.add(pid);
   }
   if (allPids.size === 0) return;
 
   killPidsSync([...allPids], 'SIGTERM');
 
-  // 2. Wait for ports to free. If any remain, escalate to SIGKILL.
-  const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs)));
-  if (freed.every(Boolean)) return;
-
-  const stubbornPids = new Set<number>();
-  for (const p of ports) {
-    for (const pid of await pidsOnPort(p)) stubbornPids.add(pid);
+  // 2. Wait for ports to free. A process that closes its listener but survives
+  // SIGTERM is still part of this teardown, so include it in the SIGKILL set.
+  const freed = await Promise.all(ports.map((p) => waitForPortFree(p, graceMs, portOwnerProbe)));
+  const stubbornPids = new Set([...allPids].filter(isPidAlive));
+  if (!freed.every(Boolean)) {
+    for (const p of ports) {
+      for (const pid of await portOwnerProbe(p)) stubbornPids.add(pid);
+    }
   }
-  if (stubbornPids.size > 0) {
-    killPidsSync([...stubbornPids], 'SIGKILL');
-    const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000)));
-    if (finalFreed.every(Boolean)) return;
+  if (stubbornPids.size > 0) killPidsSync([...stubbornPids], 'SIGKILL');
 
-    const stillHeld: string[] = [];
-    for (const [index, port] of ports.entries()) {
-      if (finalFreed[index]) continue;
-      for (const pid of await pidsOnPort(port)) {
-        stillHeld.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
-      }
+  const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000, portOwnerProbe)));
+  const failures: string[] = [];
+  for (const pid of allPids) {
+    if (isPidAlive(pid)) {
+      failures.push(`PID ${pid} (cmd: ${await describePid(pid)}) survived SIGKILL`);
     }
-    if (stillHeld.length > 0) {
-      throw new StageError({
-        stage: 'dashboard',
-        reason: stillHeld.join('; '),
-      });
+  }
+  for (const [index, port] of ports.entries()) {
+    if (finalFreed[index]) continue;
+    for (const pid of await portOwnerProbe(port)) {
+      failures.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
     }
+  }
+  if (failures.length > 0) {
+    throw new StageError({
+      stage: 'dashboard',
+      reason: failures.join('; '),
+    });
   }
 }async function waitForDashboardHealthPromise(
   apiPort: number,
@@ -629,7 +649,10 @@ const stageErrorOf = (op: string) => (cause: unknown): StageError => {
 /** Effect variant of {@link stopDashboard}. */
 export const stopDashboard = (
   config: PlatformConfig,
-  opts: { graceTimeoutMs?: number } = {},
+  opts: {
+    graceTimeoutMs?: number;
+    portOwnerProbe?: (port: number) => Promise<number[]>;
+  } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => stopDashboardPromise(config, opts), catch: stageErrorOf('stopDashboard') });
 

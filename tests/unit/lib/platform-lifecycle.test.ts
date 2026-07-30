@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   restartCliproxy,
   restartDashboard,
+  stopDashboard,
   waitForDashboardHealth,
   StageError,
   parseHealthTimeoutMs,
@@ -90,6 +91,58 @@ describe('pidsOnPort', () => {
     await expect(pidsOnPort(3011, run)).resolves.toEqual([]);
     expect(warning).toHaveBeenCalledOnce();
     expect(warning).toHaveBeenCalledWith(expect.stringMatching(/lsof.*fuser.*ss/));
+  });
+});
+
+describe('stopDashboard pid death verification', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejects when an originally targeted pid survives SIGKILL after releasing its port', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9101])
+      .mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      graceTimeoutMs: 100,
+      portOwnerProbe,
+    }))).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringContaining('PID 9101 (cmd: unknown) survived SIGKILL'),
+      },
+    });
+    expect(kill).toHaveBeenCalledWith(9101, 'SIGKILL');
+    expect(kill).toHaveBeenCalledWith(9101, 0);
+  });
+
+  it('resolves when every targeted pid is ESRCH-dead and the ports are free', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9202])
+      .mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill').mockImplementation(((pid, signal) => {
+      if (signal === 0) throw Object.assign(new Error(`process ${pid} not found`), { code: 'ESRCH' });
+      return true;
+    }) as typeof process.kill);
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      graceTimeoutMs: 100,
+      portOwnerProbe,
+    }))).resolves.toBeUndefined();
+    expect(kill).toHaveBeenCalledWith(9202, 'SIGTERM');
+    expect(kill).not.toHaveBeenCalledWith(9202, 'SIGKILL');
+  });
+
+  it('returns without checking pid death when no listener pids are found', async () => {
+    const portOwnerProbe = vi.fn().mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill');
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      portOwnerProbe,
+    }))).resolves.toBeUndefined();
+    expect(kill).not.toHaveBeenCalled();
   });
 });
 
