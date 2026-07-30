@@ -133,18 +133,19 @@
     "recordedAt": "2026-07-30T10:30:11.532Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-30T10:47:05.751Z",
+  "updated": "2026-07-30T11:11:08.629Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T10:31:10.683Z",
-    "updatedAt": "2026-07-30T10:47:01.679Z",
+    "updatedAt": "2026-07-30T11:11:08.607Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3260-review already running. Use 'pan tell' to message it.",
     "testNotes": "Gates: typecheck clean (root+hooks+evals+dashboard+frontend guards), lint clean (npm run lint exit 0), contracts build clean. Root suite `OVERDECK_VERIFICATION=1 npx vitest run --no-file-parallelism`: 1275/1279 files passed, 11965/12023 tests passed, but exit 1 due to 1 failed suite: src/lib/__tests__/compute-agent-enrichment.test.ts (ReferenceError: agents is not defined). Root-caused: this file is IDENTICAL to origin/main (git diff origin/main -- <file> is empty against local main ref, but local `main` ref is 2 commits stale vs origin/main); origin/main commit ec2a83a667 'fix(test): point compute-agent-enrichment refs at the split agent modules (PAN-3265)' already fixes this exact bug and has not been picked up by this branch yet (git merge-base --is-ancestor ec2a83a667 HEAD -> not an ancestor). Not caused by PAN-3260's own diff (no changes to that file on this branch). Frontend suite (cd src/dashboard/frontend && npx vitest run): 278/278 files, 2585/2585 tests passed clean, covering EditorPane.tsx and MarkdownFileLink.tsx directly. UAT: built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance on port 3211 (OVERDECK_DISABLE_DEACON=1), never touching the host dashboard on 3011. Verified live via Playwright against the real WebSocket RPC and real filesystem: AC1 (Edit textarea loads real file via readFileAtPath, Preview renders via MarkdownTab/ChatMarkdown), AC2 (edit enables Save+dirty indicator, Save persists via writeFileAtPath and clears dirty), AC3 (stale mtime save produces WRITE_CONFLICT banner with working Reload-from-disk and Overwrite actions; conflicting write is rejected and on-disk content is preserved), AC4 (a pane with no editorFilePath renders a clean 'No file to edit' error state; a nonexistent path renders 'File not found' — neither crashes). AC5 (self-heal survival) covered by the existing passing EditorPane.test.tsx test plus repeated real page reloads during this session not stripping the issueId-less editor pane. Chip left-click/right-click behavior (chip-internal-default, chip-context-menu xBRIEF items) verified via the full passing MarkdownFileLink.test.tsx suite (mocked-transport unit tests) since no live chip could be safely exercised in the running dashboard without composing a real chat message that would spawn a new live agent/conversation on the shared host, which is out of test-role scope. IMPORTANT DISCLOSURE: while the isolated peer dashboard (port 3211) was running, it unexpectedly picked up and executed a live durable-review verification retry (quality gates: install/typecheck/lint/build) for an unrelated issue, PAN-3232, against PAN-3232's own workspace, from shared state in ~/.overdeck/verification-workers/ -- despite OVERDECK_DISABLE_DEACON=1. This was killed immediately on discovery (~4 min in); no result file was written by the killed attempt and the host dashboard's own worker (running from its real deployment path) has since correctly picked up a fresh retry for PAN-3232 with no observed corruption. This reveals that 'peer/OVERDECK_DISABLE_DEACON=1' mode does not fully suppress durable-review verification-worker dispatch and should be filed as a follow-up gap for the operator. Net verdict: FAILED because the configured root test-suite gate does not currently pass on this branch (stale-base issue, fix already on origin/main) -- rebase/sync-main onto origin/main (picking up commit ec2a83a667) and re-run tests. All work covered by this issue's own xBRIEF items (contracts, server file door, editor pane, stage deck context, chip default, chip context menu, docs) is otherwise fully verified and working, both via unit/component tests and live UAT.",
     "conflictsSince": {
@@ -215,9 +216,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4180489,
-            "output": 308096,
-            "cacheRead": 54651904,
+            "input": 4187589,
+            "output": 308482,
+            "cacheRead": 55309312,
             "cacheWrite": 0
           }
         },
@@ -246,9 +247,9 @@
           "cacheWrite": 184960
         },
         "openai/gpt-5.6-sol": {
-          "input": 4180489,
-          "output": 308096,
-          "cacheRead": 54651904,
+          "input": 4187589,
+          "output": 308482,
+          "cacheRead": 55309312,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -259,8 +260,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 139.009693,
-        "pricingAsOf": "2026-07-30T10:47:04.749Z"
+        "usd": 139.385477,
+        "pricingAsOf": "2026-07-30T11:11:08.625Z"
       }
     },
     "merges": [
