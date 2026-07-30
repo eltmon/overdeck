@@ -1,57 +1,38 @@
-import { exec, execFile } from 'child_process';
 import { existsSync, statSync } from 'fs';
-import { join, resolve } from 'path';
-import { promisify } from 'util';
+import { resolve } from 'path';
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
-import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
-import { getDefaultWorkspaceConfigSync } from '../../lib/workspace-config.js';
-import { getMainWorkspace, listProjectTargets, resolveWorkspaceForCwd, resolveWorkspaceRef } from '../../lib/workspaces/resolver.js';
-import { createWorkspace, relocateWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
-import { validateFeatureName } from '../../lib/workspace-manager/worktree-ops.js';
+import { getMainWorkspace, resolveWorkspaceRef } from '../../lib/workspaces/resolver.js';
+import { relocateWorkspace, touchWorkspaceAccessed } from '../../lib/workspaces/writer.js';
+import {
+  ensureProjectSeeded,
+  performWorkspaceCreate,
+  resolveWorkspaceCreateIntent,
+  toDryRunPayload,
+  type WorkspaceIntentFinding,
+} from '../../lib/workspaces/create.js';
 
-/** True when `path` equals, or is nested under, `candidate`. */
-function isPathUnder(path: string, candidate: string): boolean {
-  return path === candidate || path.startsWith(candidate.endsWith('/') ? candidate : `${candidate}/`);
-}
-
-const execAsync = promisify(exec);
-const execFileAsync = promisify(execFile);
-
-interface ResolvedProjectRef {
-  key: string;
-  config: ProjectConfig;
-}
-
-/** Resolve --project <key>, or the sole registered project, or the cwd's project. */
-function resolveProjectByKey(key?: string): ResolvedProjectRef {
-  const all = listProjectsSync();
-  if (key) {
-    const found = all.find((p) => p.key === key);
-    if (!found) throw new Error(`No project registered with key '${key}'. Run 'pan projects list' to see registered keys.`);
-    return found;
-  }
-  if (all.length === 1) return all[0];
-  const ws = resolveWorkspaceForCwd(process.cwd());
-  if (ws) {
-    const fromCwd = all.find((p) => p.key === ws.projectId);
-    if (fromCwd) return fromCwd;
-  }
-  throw new Error(`Multiple projects are registered; specify --project <key>. Run 'pan projects list' to see registered keys.`);
-}
-
-/** Ensure the project row exists (idempotent) before creating a workspace under it. */
-function ensureProjectSeeded(project: ResolvedProjectRef): void {
-  upsertProjectFromConfig(project.key, project.config);
-}
-
-async function inferParentBranch(cwd: string): Promise<string | null> {
-  try {
-    const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd });
-    const branch = stdout.trim();
-    return branch && branch !== 'HEAD' ? branch : null;
-  } catch {
-    return null;
+/**
+ * Render a resolver finding in the CLI's own phrasing. The shared core keeps
+ * its messages surface-neutral (a dialog renders them beside a field), so the
+ * flag-flavored wording every existing CLI test asserts lives here.
+ */
+function cliMessageFor(finding: WorkspaceIntentFinding): string {
+  switch (finding.code) {
+    case 'invalid-name':
+      return `Invalid workspace name '${finding.detail}'. Use alphanumeric and hyphens only.`;
+    case 'mode-conflict':
+      return `--target-path cannot be combined with --isolated.`;
+    case 'project-not-found':
+      return `No project registered with key '${finding.detail}'. Run 'pan projects list' to see registered keys.`;
+    case 'project-ambiguous':
+      return `Multiple projects are registered; specify --project <key>. Run 'pan projects list' to see registered keys.`;
+    case 'target-not-a-directory':
+      return `--target-path must be an existing directory: ${finding.detail}`;
+    case 'path-exists':
+      return `Path already exists: ${finding.detail}`;
+    default:
+      return finding.message;
   }
 }
 
@@ -65,106 +46,35 @@ export interface WorkspaceNewOptions {
 
 export async function workspaceNewCommand(name: string, options: WorkspaceNewOptions): Promise<void> {
   try {
-    // Non-blocking review fix: name becomes a literal path segment
-    // (`scratch-<name>`) and git ref fragment (`scratch/<name>`) for an
-    // isolated workspace — reject separators, `..`, spaces, and other
-    // ref-invalid characters up front instead of letting them create a
-    // nested/unexpected target path or fail late inside git.
-    if (!validateFeatureName(name)) {
-      throw new Error(`Invalid workspace name '${name}'. Use alphanumeric and hyphens only.`);
-    }
-    if (options.targetPath && options.isolated) {
-      throw new Error(`--target-path cannot be combined with --isolated.`);
-    }
-    const project = resolveProjectByKey(options.project);
-    // NOTE: project seeding is deliberately NOT done here. It writes a `projects`
-    // row, and `--dry-run` must write nothing at all (FR-2/AC-1) — it also has to
-    // stay out of the way of the validation below, so a rejected `--target-path`
-    // leaves no trace either. Seeding happens just before createWorkspace, which
-    // is the only caller that needs the row to exist (review fix).
-    const parentBranch = options.parentBranch ?? await inferParentBranch(project.config.path);
-    const parentBranchGuessed = !options.parentBranch && parentBranch !== null;
-
-    let path = project.config.path;
-    let scratchBranch: string | undefined;
-    let unregisteredTargetPath = false;
-    let isGitRepository: boolean;
-    let wouldCreateWorktree = false;
-    if (options.targetPath) {
-      const resolvedTarget = resolve(options.targetPath);
-      if (!existsSync(resolvedTarget) || !statSync(resolvedTarget).isDirectory()) {
-        throw new Error(`--target-path must be an existing directory: ${options.targetPath}`);
-      }
-      path = resolvedTarget;
-      const registeredPaths = [project.config.path, ...listProjectTargets(project.key).map((t) => t.path)];
-      unregisteredTargetPath = !registeredPaths.some((candidate) => isPathUnder(path, candidate));
-      isGitRepository = existsSync(join(path, '.git'));
-    } else if (options.isolated) {
-      const workspaceConfig = project.config.workspace || getDefaultWorkspaceConfigSync();
-      const workspacesDir = join(project.config.path, workspaceConfig.workspaces_dir || 'workspaces');
-      path = join(workspacesDir, `scratch-${name}`);
-      if (existsSync(path)) {
-        throw new Error(`Path already exists: ${path}`);
-      }
-      scratchBranch = `scratch/${name}`;
-      wouldCreateWorktree = true;
-      isGitRepository = true;
-      if (!options.dryRun) {
-        // A new worktree cannot check out `parentBranch` directly — it's
-        // normally the project's currently-checked-out branch, and git refuses
-        // to have the same branch checked out in two worktrees at once. Create
-        // a distinct scratch branch off of it instead. Argument-vector spawn
-        // (execFile, not a shell string) so `name`/`path`/`--parent-branch`
-        // can't inject shell metacharacters.
-        const worktreeArgs = parentBranch
-          ? ['worktree', 'add', '-b', scratchBranch, path, parentBranch]
-          : ['worktree', 'add', '-b', scratchBranch, path];
-        await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
-      }
-    } else {
-      isGitRepository = existsSync(join(path, '.git'));
-    }
+    // Resolution writes nothing, so `--dry-run` leaves no `projects` row, no
+    // worktree and no memory home behind — and a rejected `--target-path`
+    // leaves no trace either. Seeding happens inside performWorkspaceCreate,
+    // the only path that needs the row to exist.
+    const intent = await resolveWorkspaceCreateIntent({
+      name,
+      kind: 'scratch',
+      projectKey: options.project,
+      cwd: process.cwd(),
+      isolated: options.isolated,
+      targetPath: options.targetPath,
+      parentBranch: options.parentBranch,
+    });
+    if (intent.findings.length > 0) throw new Error(cliMessageFor(intent.findings[0]));
 
     if (options.dryRun) {
-      console.log(
-        JSON.stringify(
-          {
-            projectId: project.key,
-            kind: 'scratch',
-            name,
-            path,
-            branchName: scratchBranch ?? null,
-            parentBranch: parentBranch ?? null,
-            parentBranchGuessed,
-            isGitRepository,
-            wouldCreateWorktree,
-          },
-          null,
-          2,
-        ),
-      );
+      console.log(JSON.stringify(toDryRunPayload(intent), null, 2));
       return;
     }
 
-    ensureProjectSeeded(project);
-    const id = await createWorkspace({
-      projectId: project.key,
-      kind: 'scratch',
-      name,
-      path,
-      branchName: scratchBranch,
-      parentBranch: parentBranch ?? undefined,
-      parentBranchGuessed,
-      isGitRepository,
-    });
+    const { id } = await performWorkspaceCreate(intent);
 
     console.log(chalk.green(`✓ Created scratch workspace '${name}' (${id})`));
-    console.log(chalk.dim(`  path: ${path}`));
-    if (options.isolated) console.log(chalk.dim(`  isolated worktree, parent branch: ${parentBranch ?? '(none)'}`));
-    if (unregisteredTargetPath) {
+    console.log(chalk.dim(`  path: ${intent.path}`));
+    if (options.isolated) console.log(chalk.dim(`  isolated worktree, parent branch: ${intent.parentBranch ?? '(none)'}`));
+    if (intent.unregisteredTargetPath) {
       console.log(
         chalk.yellow(
-          `ℹ '${path}' is not a registered target for project '${project.key}'. Run 'pan project add-target ${project.key} --path ${path}' to register it.`,
+          `ℹ '${intent.path}' is not a registered target for project '${intent.projectId}'. Run 'pan project add-target ${intent.projectId} --path ${intent.path}' to register it.`,
         ),
       );
     }
@@ -181,27 +91,26 @@ export interface WorkspaceMainOptions {
 
 export async function workspaceMainCommand(options: WorkspaceMainOptions): Promise<void> {
   try {
-    const project = resolveProjectByKey(options.project);
-    ensureProjectSeeded(project);
+    const intent = await resolveWorkspaceCreateIntent({
+      kind: 'main',
+      projectKey: options.project,
+      cwd: process.cwd(),
+    });
+    if (intent.findings.length > 0) throw new Error(cliMessageFor(intent.findings[0]));
+    const projectKey = intent.projectId as string;
+    ensureProjectSeeded(projectKey);
 
-    let row = getMainWorkspace(project.key);
+    const row = getMainWorkspace(projectKey);
     if (row) {
       touchWorkspaceAccessed(row.id);
-      console.log(chalk.green(`✓ Main workspace for '${project.key}': ${row.path}`));
+      console.log(chalk.green(`✓ Main workspace for '${projectKey}': ${row.path}`));
       return;
     }
 
-    const isGitRepository = existsSync(join(project.config.path, '.git'));
-    const id = await createWorkspace({
-      projectId: project.key,
-      kind: 'main',
-      name: 'main',
-      path: project.config.path,
-      isGitRepository,
-    });
+    const { id } = await performWorkspaceCreate(intent);
     touchWorkspaceAccessed(id);
-    console.log(chalk.green(`✓ Created main workspace for '${project.key}' (${id})`));
-    console.log(chalk.dim(`  path: ${project.config.path}${isGitRepository ? '' : ' (not a git repository)'}`));
+    console.log(chalk.green(`✓ Created main workspace for '${projectKey}' (${id})`));
+    console.log(chalk.dim(`  path: ${intent.path}${intent.isGitRepository ? '' : ' (not a git repository)'}`));
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`✗ ${message}`));
