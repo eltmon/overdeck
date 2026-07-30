@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T21:09:48.517Z",
+  "updated": "2026-07-30T21:17:46.832Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "open-in-external": {
-        "writerId": "agent-pan-3331",
-        "agentId": "agent-pan-3331",
-        "pid": 3254863,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:09:48.517Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -113,6 +105,17 @@
         "outcome": "completed",
         "reason": "run_command column (CREATE TABLE + idempotent top-up), resolver field, setWorkspaceRunCommand writer, PUT /:id/run-command and POST /:id/run (default from workspace.services[].start_command, single-live-session 409 re-focus, newline/backtick/500-char validation). 18 tests pass.",
         "releasedAt": "2026-07-30T21:09:36.105Z"
+      },
+      {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 3254863,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:09:48.517Z",
+        "itemId": "open-in-external",
+        "outcome": "completed",
+        "reason": "openPath + openInEditor in browser.ts (argv split before {path} substitution; no shell path), new optional ui.open_in_editor_command config.yaml section (schema/default/merge/getOpenInEditorCommandSync), POST /:id/open guarded with 409 gate + openInEditorConfigured on detail. 11 tests pass. Deviation: accessor lives in config-yaml/load.ts (yaml) not config.ts (toml). Also added an audited file-size allowlist row for schema.ts (1025->1040).",
+        "releasedAt": "2026-07-30T21:17:46.832Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "run-command-storage": {
         "reason": "run_command column (CREATE TABLE + idempotent top-up), resolver field, setWorkspaceRunCommand writer, PUT /:id/run-command and POST /:id/run (default from workspace.services[].start_command, single-live-session 409 re-focus, newline/backtick/500-char validation). 18 tests pass.",
         "updatedAt": "2026-07-30T21:09:36.105Z"
+      },
+      "open-in-external": {
+        "reason": "openPath + openInEditor in browser.ts (argv split before {path} substitution; no shell path), new optional ui.open_in_editor_command config.yaml section (schema/default/merge/getOpenInEditorCommandSync), POST /:id/open guarded with 409 gate + openInEditorConfigured on detail. 11 tests pass. Deviation: accessor lives in config-yaml/load.ts (yaml) not config.ts (toml). Also added an audited file-size allowlist row for schema.ts (1025->1040).",
+        "updatedAt": "2026-07-30T21:17:46.832Z"
       }
     }
   },
@@ -148,6 +155,10 @@
     "run-command-storage.run-command-storage.ac3": "completed",
     "run-command-storage.run-command-storage.ac4": "completed",
     "run-command-storage.run-command-storage.ac5": "completed",
-    "open-in-external": "running"
+    "open-in-external": "completed",
+    "open-in-external.open-in-external.ac1": "completed",
+    "open-in-external.open-in-external.ac2": "completed",
+    "open-in-external.open-in-external.ac3": "completed",
+    "open-in-external.open-in-external.ac4": "completed"
   }
 }
