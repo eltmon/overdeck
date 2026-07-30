@@ -25,7 +25,7 @@ model.
 ## Commands
 
 ```bash
-pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>] [--target-path <dir>]
+pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>] [--target-path <dir>] [--dry-run]
 pan workspace main [--project <key>]
 pan workspace get <ws>
 pan workspace activate <ws>
@@ -47,6 +47,10 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
   resolved directory isn't the project's primary path or a path registered via
   `pan project add-target`, the command still creates the row but prints an
   informational note suggesting `pan project add-target`.
+- `--dry-run` prints the resolved intent (`projectId`, `kind`, `name`, `path`,
+  `branchName`, `parentBranch`, `parentBranchGuessed`, `isGitRepository`,
+  `wouldCreateWorktree`) as JSON and returns before any worktree is created or
+  workspace row is written — no DB row, no worktree, no memory home.
 - `main [--project <key>]` resolves the project's singleton main workspace, creating
   it if it doesn't exist yet. There is exactly one `main` workspace per project —
   `archive` refuses to touch it.

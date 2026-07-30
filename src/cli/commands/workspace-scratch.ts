@@ -60,6 +60,7 @@ export interface WorkspaceNewOptions {
   isolated?: boolean;
   parentBranch?: string;
   targetPath?: string;
+  dryRun?: boolean;
 }
 
 export async function workspaceNewCommand(name: string, options: WorkspaceNewOptions): Promise<void> {
@@ -84,6 +85,8 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
     let path = project.config.path;
     let scratchBranch: string | undefined;
     let unregisteredTargetPath = false;
+    let isGitRepository: boolean;
+    let wouldCreateWorktree = false;
     if (options.targetPath) {
       const resolvedTarget = resolve(options.targetPath);
       if (!existsSync(resolvedTarget) || !statSync(resolvedTarget).isDirectory()) {
@@ -92,6 +95,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       path = resolvedTarget;
       const registeredPaths = [project.config.path, ...listProjectTargets(project.key).map((t) => t.path)];
       unregisteredTargetPath = !registeredPaths.some((candidate) => isPathUnder(path, candidate));
+      isGitRepository = existsSync(join(path, '.git'));
     } else if (options.isolated) {
       const workspaceConfig = project.config.workspace || getDefaultWorkspaceConfigSync();
       const workspacesDir = join(project.config.path, workspaceConfig.workspaces_dir || 'workspaces');
@@ -99,17 +103,44 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       if (existsSync(path)) {
         throw new Error(`Path already exists: ${path}`);
       }
-      // A new worktree cannot check out `parentBranch` directly — it's
-      // normally the project's currently-checked-out branch, and git refuses
-      // to have the same branch checked out in two worktrees at once. Create
-      // a distinct scratch branch off of it instead. Argument-vector spawn
-      // (execFile, not a shell string) so `name`/`path`/`--parent-branch`
-      // can't inject shell metacharacters.
       scratchBranch = `scratch/${name}`;
-      const worktreeArgs = parentBranch
-        ? ['worktree', 'add', '-b', scratchBranch, path, parentBranch]
-        : ['worktree', 'add', '-b', scratchBranch, path];
-      await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
+      wouldCreateWorktree = true;
+      isGitRepository = true;
+      if (!options.dryRun) {
+        // A new worktree cannot check out `parentBranch` directly — it's
+        // normally the project's currently-checked-out branch, and git refuses
+        // to have the same branch checked out in two worktrees at once. Create
+        // a distinct scratch branch off of it instead. Argument-vector spawn
+        // (execFile, not a shell string) so `name`/`path`/`--parent-branch`
+        // can't inject shell metacharacters.
+        const worktreeArgs = parentBranch
+          ? ['worktree', 'add', '-b', scratchBranch, path, parentBranch]
+          : ['worktree', 'add', '-b', scratchBranch, path];
+        await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
+      }
+    } else {
+      isGitRepository = existsSync(join(path, '.git'));
+    }
+
+    if (options.dryRun) {
+      console.log(
+        JSON.stringify(
+          {
+            projectId: project.key,
+            kind: 'scratch',
+            name,
+            path,
+            branchName: scratchBranch ?? null,
+            parentBranch: parentBranch ?? null,
+            parentBranchGuessed,
+            isGitRepository,
+            wouldCreateWorktree,
+          },
+          null,
+          2,
+        ),
+      );
+      return;
     }
 
     const id = await createWorkspace({
@@ -120,7 +151,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       branchName: scratchBranch,
       parentBranch: parentBranch ?? undefined,
       parentBranchGuessed,
-      isGitRepository: options.isolated ? true : existsSync(join(path, '.git')),
+      isGitRepository,
     });
 
     console.log(chalk.green(`✓ Created scratch workspace '${name}' (${id})`));

@@ -3,10 +3,12 @@
  * workspace target any existing directory instead of the project's primary
  * path — happy path, the two rejection cases (nonexistent/non-directory,
  * combined with --isolated), and the informational note when the target
- * isn't a registered project target.
+ * isn't a registered project target. Also covers WI-1's --dry-run intent
+ * resolution: it must print the resolved intent as JSON and create no DB
+ * row, worktree, or memory home.
  */
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -125,5 +127,67 @@ describe('workspaceNewCommand --target-path (PAN-3286 WI-1)', () => {
     expect(exitSpy).not.toHaveBeenCalled();
     const printed = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
     expect(printed).not.toMatch(/not a registered target/);
+  });
+});
+
+describe('workspaceNewCommand --dry-run (PAN-3286 WI-1)', () => {
+  it('prints the resolved intent as JSON for the shared (default) variant and creates no row', async () => {
+    const exitSpy = mockExit();
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await workspaceNewCommand('theta', { project: PROJECT_KEY, dryRun: true });
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+    const intent = JSON.parse(printed);
+    expect(intent).toMatchObject({
+      projectId: PROJECT_KEY,
+      kind: 'scratch',
+      name: 'theta',
+      path: projectRoot,
+      isGitRepository: false,
+      wouldCreateWorktree: false,
+    });
+    expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'scratch' })).toHaveLength(0);
+  });
+
+  it('prints wouldCreateWorktree=true and creates no worktree directory for the --isolated variant', async () => {
+    const exitSpy = mockExit();
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await workspaceNewCommand('iota', { project: PROJECT_KEY, isolated: true, dryRun: true });
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+    const intent = JSON.parse(printed);
+    const worktreePath = join(projectRoot, 'workspaces', 'scratch-iota');
+    expect(intent).toMatchObject({
+      kind: 'scratch',
+      name: 'iota',
+      path: worktreePath,
+      branchName: 'scratch/iota',
+      isGitRepository: true,
+      wouldCreateWorktree: true,
+    });
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'scratch' })).toHaveLength(0);
+  });
+
+  it('prints the resolved target directory as path and wouldCreateWorktree=false when combined with --target-path', async () => {
+    const exitSpy = mockExit();
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await workspaceNewCommand('kappa', { project: PROJECT_KEY, targetPath: targetDir, dryRun: true });
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    const printed = logSpy.mock.calls.map((call) => String(call[0])).join('\n');
+    const intent = JSON.parse(printed);
+    expect(intent).toMatchObject({
+      kind: 'scratch',
+      name: 'kappa',
+      path: targetDir,
+      wouldCreateWorktree: false,
+    });
+    expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'scratch' })).toHaveLength(0);
   });
 });
