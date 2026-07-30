@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T05:20:17.604Z",
+  "updated": "2026-07-30T05:20:21.211Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "pending",
@@ -210,5 +210,41 @@
     "docs-state-reconcile": "completed",
     "docs-state-reconcile.docs-state-reconcile.ac1": "completed",
     "docs-state-reconcile.docs-state-reconcile.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-state-writes.sh"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/STATE-PLANE-COMMIT-POLICY.md",
+      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
+      "src/cli/commands/doctor-state-divergence.ts",
+      "src/cli/commands/doctor.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/pan-dir/__tests__/push-health.test.ts",
+      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
+      "src/lib/pan-dir/__tests__/record-update.test.ts",
+      "src/lib/pan-dir/push-health.ts",
+      "src/lib/pan-dir/record-update.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/STATE-PLANE-COMMIT-POLICY.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-state-writes.sh",
+      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
+      "src/cli/commands/doctor-state-divergence.ts",
+      "src/cli/commands/doctor.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/pan-dir/__tests__/push-health.test.ts",
+      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
+      "src/lib/pan-dir/__tests__/record-update.test.ts",
+      "src/lib/pan-dir/push-health.ts",
+      "src/lib/pan-dir/record-update.ts"
+    ],
+    "recordedAt": "2026-07-30T05:20:21.210Z"
   }
 }
