@@ -245,6 +245,21 @@ Effect over `loadConfigWithoutMigration`. The sync loader stats and parses
 config files on the event loop, which server-reachable request code must never
 do — a slow filesystem would stall HTTP and terminal traffic.
 
+**Band state is workspace-scoped, so the band is keyed by workspace id.**
+`WorkspaceView` is not remounted when the route changes workspace, and with both
+workspaces' detail data cached there is no loading gap either — so `key={workspaceId}`
+on `WorkspaceActionBand` is what resets the first-fetch ref, the expander, error
+text, and above all the run-command edit draft. Without it a draft typed in
+workspace A stays on screen in B and Save writes A's text into B's `run_command`.
+
+**Stopping a run is idempotent.** `DELETE /api/terminals/:name` returns
+`{ok: true, alreadyStopped: true}` when the session is already gone rather than
+failing, because tmux `kill-session` errors on a missing session. The band
+remembers a session name for the browser session, and the process can exit on
+its own; without idempotency a crashed dev server left Stop *and* Restart
+permanently failing at their stop step. A genuine failure (tmux unreachable)
+still surfaces.
+
 The two open routes await the opener's exit rather than returning at spawn, so
 "editor not found" reaches the operator instead of a silent 200. `Effect.timeout`
 is the wrong tool for bounding that: it interrupts the effect and would kill the

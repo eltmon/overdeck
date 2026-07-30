@@ -266,3 +266,90 @@ describe('WorkspaceView run terminal (PAN-3331)', () => {
     expect(terminal).toBeInTheDocument();
   });
 });
+
+// PAN-3331 review cycle 2: the band holds workspace-scoped state (the
+// first-fetch ref, expander, error text, and the run-command edit draft) and
+// this view is NOT remounted when the route changes workspace id. With both
+// workspaces' detail data cached there is no loading gap to reset it, so the
+// band must be keyed by workspace id.
+describe('WorkspaceView band state across cached navigation (PAN-3331)', () => {
+  const WORKSPACES: Record<string, Record<string, unknown>> = {
+    'ws-a': {
+      id: 'ws-a', projectId: 'overdeck', kind: 'scratch', name: 'alpha', path: '/repo/alpha',
+      issueId: null, layoutConfig: null, title: null, pipeline: null,
+      isGitRepository: true, runCommand: 'alpha-command', runCommandDefault: null,
+      runCommandOptions: [], openInEditorConfigured: false,
+    },
+    'ws-b': {
+      id: 'ws-b', projectId: 'overdeck', kind: 'scratch', name: 'bravo', path: '/repo/bravo',
+      issueId: null, layoutConfig: null, title: null, pipeline: null,
+      isGitRepository: true, runCommand: 'bravo-command', runCommandDefault: null,
+      runCommandOptions: [], openInEditorConfigured: false,
+    },
+  };
+
+  function renderCachedPair() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    // Seed BOTH details so navigation never passes through a loading state —
+    // the exact condition under which stale band state would survive.
+    for (const [id, data] of Object.entries(WORKSPACES)) client.setQueryData(['workspace-registry', id], data);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/git')) {
+        return Response.json({
+          git: {
+            branch: 'main', detached: false, dirtyFiles: 0, ahead: 0, behind: 0,
+            hasUpstream: true, upstreamRef: 'origin/main', recentRemoteCommits: [], fetchedAt: 1,
+          },
+        });
+      }
+      if (url.endsWith('/memory')) return Response.json({ headline: null, status: null, observations: [] });
+      if (url === '/api/conversations') return Response.json([]);
+      const detail = Object.entries(WORKSPACES).find(([id]) => url === `/api/workspace-registry/${id}`);
+      if (detail) return Response.json(detail[1]);
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = render(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId="ws-a" />
+      </QueryClientProvider>,
+    );
+    const toBravo = () => view.rerender(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId="ws-b" />
+      </QueryClientProvider>,
+    );
+    return { fetchMock, toBravo };
+  }
+
+  it('drops an edit draft opened in one workspace instead of carrying it into the next', async () => {
+    const { toBravo } = renderCachedPair();
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-edit'));
+    fireEvent.change(screen.getByTestId('workspace-band-run-input'), { target: { value: 'DRAFT-FROM-ALPHA' } });
+    expect(screen.getByTestId('workspace-band-run-input')).toHaveValue('DRAFT-FROM-ALPHA');
+
+    toBravo();
+
+    // No open editor, and the command shown is bravo's own — a carried draft
+    // would have been saved onto bravo's run_command.
+    await waitFor(() => expect(screen.queryByTestId('workspace-band-run-input')).toBeNull());
+    expect(screen.getByTestId('workspace-band-run-command')).toHaveTextContent('bravo-command');
+  });
+
+  it('performs the initial fetching read for the workspace navigated to', async () => {
+    const { fetchMock, toBravo } = renderCachedPair();
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map(String)).toContainEqual(expect.stringContaining('/ws-a/git?fetch=1')));
+
+    toBravo();
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map((call) => String(call[0])))
+        .toContainEqual('/api/workspace-registry/ws-b/git?fetch=1'));
+  });
+});

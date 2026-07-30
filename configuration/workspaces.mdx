@@ -117,7 +117,9 @@ defaults to the first `services[].start_command` in your project config; press
 **Edit** to override it for this workspace (saving an empty command restores the
 default). Once a session is live the button becomes **Restart**, which stops the
 process and starts a fresh one — it does not silently re-attach to the old one —
-and **Stop** ends it. `Cmd-K → "Run workspace command"` does the same thing from
+and **Stop** ends it. If the process already exited on its own (a crashed dev
+server, say), Restart still works: stopping something that is already stopped is
+treated as done rather than an error. `Cmd-K → "Run workspace command"` does the same thing from
 the keyboard for the workspace you used last.
 
 Your run command is treated as sensitive: it is served only over authenticated

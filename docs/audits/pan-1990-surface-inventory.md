@@ -217,3 +217,23 @@ neither drops an affordance:
 | --- | --- | --- |
 | `GET /api/workspace-registry` fields | all preserved plus additions | all preserved **except `runCommand`**, which is executable text and is served only over authenticated reads. Every other field, including the PAN-3286 `memoryPhase`, is unchanged and locked by the no-loss assertion in `workspace-registry-memory-phase.test.ts`. |
 | `GET /api/workspace-registry/:id` and `/:id/git` | unguarded like sibling reads | `rejectUnauthorizedDashboardRequest` — the detail read returns command text, and `?fetch=1` reaches the network and rewrites remote-tracking refs. Same-origin dashboard requests carry the session cookie, so no UI affordance is lost. |
+
+### 9.9 Review-cycle amendment (PAN-3331 cycle 2)
+
+One shared surface outside the PAN-3331 routes changed. It is a widening, not a
+removal:
+
+| Surface | Before | Now |
+| --- | --- | --- |
+| `DELETE /api/terminals/:name` (PAN-1545 terminal drawer) | `killSession` unconditionally; a session that had already exited produced a 500 | returns `{ok: true, alreadyStopped: true}` when the session is gone, and kills it otherwise. A real kill failure still 500s. |
+
+No caller depended on the old error: the terminal drawer only deletes sessions
+it is currently showing, and the workspace band — which remembers a session name
+across a process that may exit on its own — was the surface the old behavior
+stranded. DELETE being idempotent is the standard HTTP contract, and the
+behavior is locked by `tests/unit/dashboard/terminals-delete-idempotent.test.ts`.
+
+`WorkspaceActionBand` is now mounted with `key={workspaceId}`. That is a
+lifecycle change with no surface change: every control, prop, and route is
+identical, but the band's workspace-scoped state resets on navigation instead of
+following the component instance.

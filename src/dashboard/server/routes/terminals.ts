@@ -20,7 +20,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { createSession, killSession } from '../../../lib/tmux.js';
+import { createSession, killSession, sessionExists } from '../../../lib/tmux.js';
 import { getDefaultCwd } from '../../../lib/default-cwd.js';
 import { validateOrigin } from './origin-validation.js';
 import { rejectUnauthorizedDashboardRequest } from './dashboard-auth.js';
@@ -90,6 +90,14 @@ const deleteTerminalRoute = HttpRouter.add(
       const name = params.name;
       if (!name) return jsonResponse({ error: 'session name required' }, { status: 400 });
 
+      // Idempotent, as DELETE should be: tmux `kill-session` errors on a
+      // session that is already gone, which used to strand any client holding a
+      // remembered name. A run process that crashed on its own left the
+      // workspace band unable to stop OR restart it, because its stop step
+      // failed forever (PAN-3331 review cycle 2).
+      if (!(yield* sessionExists(name))) {
+        return jsonResponse({ ok: true, alreadyStopped: true });
+      }
       yield* killSession(name);
       return jsonResponse({ ok: true });
     }),

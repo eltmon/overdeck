@@ -201,7 +201,15 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         <span className="text-xs text-muted-foreground uppercase tracking-wide">{workspace.kind}</span>
       </div>
 
+      {/* Keyed so the band remounts when the route changes workspace: it holds
+          workspace-scoped state (the first-fetch ref, the expanded commit list,
+          error text, and above all the run-command edit draft) and this view is
+          NOT remounted on an id change. With both workspaces' detail data
+          cached there is no loading gap to reset it, so an edit draft opened in
+          A would otherwise still be on screen in B — and Save would write A's
+          draft into B's run command (PAN-3331 review cycle 2). */}
       <WorkspaceActionBand
+        key={workspaceId}
         workspaceId={workspaceId}
         kind={workspace.kind}
         issueId={workspace.issueId}

@@ -208,16 +208,28 @@ export function WorkspaceActionBand({
   });
 
   /**
+   * Stop the session, treating "already gone" as done. The store remembers a
+   * session name for the browser session, but the process can exit on its own —
+   * a crashed dev server leaves a name pointing at nothing. DELETE is
+   * idempotent server-side, so this succeeds either way; a genuine failure
+   * (tmux unreachable) still surfaces.
+   */
+  const stopSession = useCallback(async (sessionName: string) => {
+    const res = await fetch(`/api/terminals/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(`Could not stop the run session (${res.status})`);
+  }, []);
+
+  /**
    * A real restart, not a re-focus. The run session name is derived from the
    * workspace id, so a plain Run against a live session only ever comes back
-   * 409 — the process would never be replaced. Kill first, drop the session so
+   * 409 — the process would never be replaced. Stop first, drop the session so
    * the terminal unmounts rather than staying attached to a dead pane, then
-   * start the fresh one under the same name.
+   * start the fresh one under the same name. A session that already exited
+   * restarts cleanly, because the stop step no longer fails on it.
    */
   const restartRun = useMutation({
     mutationFn: async (sessionName: string) => {
-      const killed = await fetch(`/api/terminals/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
-      if (!killed.ok) throw new Error(`Could not stop the run session (${killed.status})`);
+      await stopSession(sessionName);
       onRunSessionChange(null);
       const body = await postRun();
       if (body.alreadyRunning) throw new Error('The previous run session is still shutting down — try again.');
@@ -231,10 +243,7 @@ export function WorkspaceActionBand({
   });
 
   const stopRun = useMutation({
-    mutationFn: async (sessionName: string) => {
-      const res = await fetch(`/api/terminals/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`Could not stop the run session (${res.status})`);
-    },
+    mutationFn: stopSession,
     onSuccess: () => {
       setRunMessage(null);
       onRunSessionChange(null);

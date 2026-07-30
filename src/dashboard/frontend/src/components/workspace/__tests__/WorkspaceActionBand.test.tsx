@@ -348,12 +348,12 @@ describe('run card (ac3)', () => {
     expect(await screen.findByTestId('workspace-band-run-message')).toHaveTextContent('still shutting down');
   });
 
-  it('does not start a new session when the kill fails', async () => {
+  it('does not start a new session when the stop genuinely fails', async () => {
     const { fetchMock } = renderBand({
       runCommand: 'npm run dev',
       runSessionName: 'ws-run-abc12345',
       responses: {
-        'DELETE /api/terminals/ws-run-abc12345': { status: 500, body: { error: 'nope' } },
+        'DELETE /api/terminals/ws-run-abc12345': { status: 500, body: { error: 'tmux unreachable' } },
       },
     });
 
@@ -362,6 +362,40 @@ describe('run card (ac3)', () => {
     await screen.findByTestId('workspace-band-run-message');
     const ran = fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/run'));
     expect(ran).toBe(false);
+  });
+
+  // Review cycle 2: a run process that exits on its own leaves a remembered
+  // session name behind. Stop is idempotent server-side, so Restart recovers.
+  it('restarts a remembered session whose process already exited', async () => {
+    const { fetchMock, onRunSessionChange } = renderBand({
+      runCommand: 'npm run dev',
+      runSessionName: 'ws-run-abc12345',
+      responses: {
+        'DELETE /api/terminals/ws-run-abc12345': { status: 200, body: { ok: true, alreadyStopped: true } },
+        'POST /api/workspace-registry/ws-1/run': { status: 200, body: { sessionName: 'ws-run-abc12345', command: 'npm run dev' } },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-start'));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith('/api/workspace-registry/ws-1/run', expect.objectContaining({ method: 'POST' }));
+    });
+    expect(onRunSessionChange.mock.calls.map((c) => c[0])).toEqual([null, 'ws-run-abc12345']);
+  });
+
+  it('clears a remembered session that had already exited when Stop is pressed', async () => {
+    const { onRunSessionChange } = renderBand({
+      runCommand: 'npm run dev',
+      runSessionName: 'ws-run-abc12345',
+      responses: {
+        'DELETE /api/terminals/ws-run-abc12345': { status: 200, body: { ok: true, alreadyStopped: true } },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-stop'));
+
+    await waitFor(() => expect(onRunSessionChange).toHaveBeenCalledWith(null));
   });
 
   it('disables Run when nothing is configured', async () => {
