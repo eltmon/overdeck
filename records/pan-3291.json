@@ -70,10 +70,10 @@
     "recordedAt": "2026-07-30T05:20:21.210Z"
   },
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T05:55:10.468Z",
+  "updated": "2026-07-30T05:55:29.840Z",
   "pipeline": {
     "issueId": "PAN-3291",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -81,7 +81,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T05:21:06.307Z",
-    "updatedAt": "2026-07-30T05:55:10.398Z",
+    "updatedAt": "2026-07-30T05:55:29.782Z",
+    "reviewNotes": "concurrent local record writes still break reconciliation and leave `overdeck-state` diverged",
     "inspectNotes": "All 5 ACs met: single 3-way merge replaces per-commit rebase (record-update.ts:301) so a poisoned intermediate commit no longer aborts reconcile; records/-only conflicts resolve via checkout --theirs with the active record re-derived by replaying the mutator on origin's version (record-update.ts:212-225); non-records/ conflicts throw naming every path and abort merge+rebase leaving a clean retryable worktree (record-update.ts:207-210, 306-312); delete/modify records/ conflict fails checkout --theirs and aborts rather than auto-resolving, with git stderr naming the path. NFR-1 honored (all git via promisified git() helper with signal + throwIfDurabilityAborted between sync steps, no execSync in server-reachable code); NFR-2 honored (no sleeps added). Tests genuinely exercise the migrated reconcile path — the marker they write satisfies validMarker in state-read-home.ts. Non-blocking observation: entry-point abortMerge/abortRebase (record-update.ts:294-295) discards any in-progress merge in the shared state worktree, intentional per the prior stranded-merge commit and safe under the record fs-lock.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3302",
     "reviewedAtCommit": "bd4125692165b27dc8ee92cdc825fdf7d82a675a",
@@ -145,9 +146,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5006695,
-            "output": 282415,
-            "cacheRead": 100817920,
+            "input": 5015664,
+            "output": 283249,
+            "cacheRead": 102409728,
             "cacheWrite": 0
           }
         }
@@ -160,15 +161,15 @@
           "cacheWrite": 175110
         },
         "openai/gpt-5.6-sol": {
-          "input": 6950755,
-          "output": 410037,
-          "cacheRead": 112144896,
+          "input": 6959724,
+          "output": 410871,
+          "cacheRead": 113736704,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 110.608327,
-        "pricingAsOf": "2026-07-30T05:55:10.465Z"
+        "usd": 111.474096,
+        "pricingAsOf": "2026-07-30T05:55:29.806Z"
       }
     },
     "merges": [
