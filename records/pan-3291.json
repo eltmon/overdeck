@@ -15,8 +15,44 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-state-writes.sh"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/STATE-PLANE-COMMIT-POLICY.md",
+      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
+      "src/cli/commands/doctor-state-divergence.ts",
+      "src/cli/commands/doctor.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/pan-dir/__tests__/push-health.test.ts",
+      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
+      "src/lib/pan-dir/__tests__/record-update.test.ts",
+      "src/lib/pan-dir/push-health.ts",
+      "src/lib/pan-dir/record-update.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/STATE-PLANE-COMMIT-POLICY.md",
+      "scripts/file-size-allowlist.txt",
+      "scripts/lint-state-writes.sh",
+      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
+      "src/cli/commands/doctor-state-divergence.ts",
+      "src/cli/commands/doctor.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/pan-dir/__tests__/push-health.test.ts",
+      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
+      "src/lib/pan-dir/__tests__/record-update.test.ts",
+      "src/lib/pan-dir/push-health.ts",
+      "src/lib/pan-dir/record-update.ts"
+    ],
+    "recordedAt": "2026-07-30T05:20:21.210Z"
+  },
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T05:20:24.148Z",
+  "updated": "2026-07-30T05:20:27.803Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "pending",
@@ -26,8 +62,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T05:20:24.145Z",
+    "updatedAt": "2026-07-30T05:20:27.757Z",
     "inspectNotes": "All 5 ACs met: single 3-way merge replaces per-commit rebase (record-update.ts:301) so a poisoned intermediate commit no longer aborts reconcile; records/-only conflicts resolve via checkout --theirs with the active record re-derived by replaying the mutator on origin's version (record-update.ts:212-225); non-records/ conflicts throw naming every path and abort merge+rebase leaving a clean retryable worktree (record-update.ts:207-210, 306-312); delete/modify records/ conflict fails checkout --theirs and aborts rather than auto-resolving, with git stderr naming the path. NFR-1 honored (all git via promisified git() helper with signal + throwIfDurabilityAborted between sync steps, no execSync in server-reachable code); NFR-2 honored (no sleeps added). Tests genuinely exercise the migrated reconcile path — the marker they write satisfies validMarker in state-read-home.ts. Non-blocking observation: entry-point abortMerge/abortRebase (record-update.ts:294-295) discards any in-progress merge in the shared state worktree, intentional per the prior stranded-merge commit and safe under the record fs-lock.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3302",
     "reviewRequestedAt": "2026-07-30T05:20:24.145Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -64,8 +101,7 @@
         "src/lib/pan-dir/record-update.ts"
       ],
       "recordedAt": "2026-07-30T05:20:21.210Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3302"
+    }
   },
   "closeOut": {
     "usage": {
@@ -80,9 +116,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3359050,
-            "output": 158175,
-            "cacheRead": 68847104,
+            "input": 3374885,
+            "output": 159047,
+            "cacheRead": 70745088,
             "cacheWrite": 0
           }
         }
@@ -95,18 +131,20 @@
           "cacheWrite": 175110
         },
         "openai/gpt-5.6-sol": {
-          "input": 3359050,
-          "output": 158175,
-          "cacheRead": 68847104,
+          "input": 3374885,
+          "output": 159047,
+          "cacheRead": 70745088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 63.445046,
-        "pricingAsOf": "2026-07-30T05:06:15.010Z"
+        "usd": 64.499373,
+        "pricingAsOf": "2026-07-30T05:20:27.793Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3302"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -248,41 +286,5 @@
     "docs-state-reconcile": "completed",
     "docs-state-reconcile.docs-state-reconcile.ac1": "completed",
     "docs-state-reconcile.docs-state-reconcile.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/file-size-allowlist.txt",
-      "scripts/lint-state-writes.sh"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/AGENT-STATE-PLANES.md",
-      "docs/STATE-PLANE-COMMIT-POLICY.md",
-      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
-      "src/cli/commands/doctor-state-divergence.ts",
-      "src/cli/commands/doctor.ts",
-      "src/lib/activity-logger.ts",
-      "src/lib/pan-dir/__tests__/push-health.test.ts",
-      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
-      "src/lib/pan-dir/__tests__/record-update.test.ts",
-      "src/lib/pan-dir/push-health.ts",
-      "src/lib/pan-dir/record-update.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/AGENT-STATE-PLANES.md",
-      "docs/STATE-PLANE-COMMIT-POLICY.md",
-      "scripts/file-size-allowlist.txt",
-      "scripts/lint-state-writes.sh",
-      "src/cli/commands/__tests__/doctor-state-divergence.test.ts",
-      "src/cli/commands/doctor-state-divergence.ts",
-      "src/cli/commands/doctor.ts",
-      "src/lib/activity-logger.ts",
-      "src/lib/pan-dir/__tests__/push-health.test.ts",
-      "src/lib/pan-dir/__tests__/record-reconcile.test.ts",
-      "src/lib/pan-dir/__tests__/record-update.test.ts",
-      "src/lib/pan-dir/push-health.ts",
-      "src/lib/pan-dir/record-update.ts"
-    ],
-    "recordedAt": "2026-07-30T05:20:21.210Z"
   }
 }
