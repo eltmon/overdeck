@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:08:02.276Z",
+  "updated": "2026-07-30T04:28:52.931Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T04:08:01.436Z",
-    "inspectNotes": "Production wiring in start.ts is correct and unchanged in behavior (state door at start.ts:1217, single guarded updatePlanStatus at start.ts:1231-1236) — do NOT rewrite it. Blocking on evidence quality: this commit deleted the test seam and replaced it with source-text grep, so AC1/AC3 no longer execute any start.ts code and AC4's lock is false-passable. [state-door-durability.test.ts:173] imports transitionXBriefOnMain/updatePlanStatus/findPlanSync directly and [:186,:204-207] calls the library, so nothing in the suite invokes CLI code; the only CLI evidence is four string matches. [state-door-durability.test.ts:180-181] asserts the guard substring exists and that updatePlanStatus( appears once, but never that the call is INSIDE the guard — leaving an empty guard block and moving the single updatePlanStatus onto a state-worktree path passes both assertions while violating AC4 exactly. [state-door-durability.test.ts:178] toContain(\"'active',\\n        'running',\") depends on exact 8-space indentation and does not bind those args to transitionXBriefOnMain, so a reindent reds it with no behavior change. [state-door-durability.test.ts:177] reads via process.cwd() + a CLI source path from a lib test. REQUIRED FIX: extract transitionStartedXBrief and updateWorkspaceDraftPlanStatus into a sibling module (e.g. src/cli/commands/start-status.ts), import and call them from start.ts, and have the test import and INVOKE that module instead of grepping source. This also satisfies the size guard with headroom: start.ts is 1277 lines, exactly its allowlist cap (scripts/file-size-allowlist.txt:7, 1277 ... # PAN-3151), and the extraction collapses ~13 inlined lines into two calls plus one import, so the file shrinks rather than needing a new allowlist bump."
+    "updatedAt": "2026-07-30T04:28:52.910Z",
+    "inspectNotes": "Inspecting item start-cli-flip-through-door"
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1003310,
-            "output": 69833,
-            "cacheRead": 23801344,
+            "input": 1246847,
+            "output": 79800,
+            "cacheRead": 30337536,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 178994
         },
         "openai/gpt-5.6-sol": {
-          "input": 1003310,
-          "output": 69833,
-          "cacheRead": 23801344,
+          "input": 1246847,
+          "output": 79800,
+          "cacheRead": 30337536,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 28.183523,
-        "pricingAsOf": "2026-07-30T04:08:01.897Z"
+        "usd": 32.968314,
+        "pricingAsOf": "2026-07-30T04:28:52.921Z"
       }
     },
     "merges": [],
