@@ -42,6 +42,15 @@ export interface ResolveJsonlPathOptions {
   agentsDirOverride?: string;
   /** Override the ~/.claude/projects directory (test hook). */
   claudeProjectsDirOverride?: string;
+  /** Override the ~/.kimi-code directory (test hook). */
+  kimiHomeOverride?: string;
+  /**
+   * Explicit workspace path for resolveKimiWirePath. Conversation rows have
+   * no AgentState (readRecordedState/getAgentStateSync return nothing), so
+   * dashboard conversation callers must supply conv.cwd directly instead of
+   * relying on the agent-state lookup (PAN-1837 review fix).
+   */
+  workspaceOverride?: string;
   /** Override the runtime-state lookup (test hook). */
   getRuntimeStateAsync?: (agentId: string) => Promise<{ claudeSessionId?: string } | null>;
   /** Override forensic logging (test hook). */
@@ -277,7 +286,7 @@ export async function resolveAgentHarness(
   opts: ResolveJsonlPathOptions = {},
 ): Promise<string | null> {
   const recorded = (await readRecordedState(agentId, opts)).harness;
-  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp') {
+  if (recorded === 'codex' || recorded === 'pi' || recorded === 'ohmypi' || recorded === 'acp' || recorded === 'kimi-code') {
     return recorded;
   }
   // 'claude-code' (or null) is the default that can go stale. Correct it from
@@ -288,6 +297,7 @@ export async function resolveAgentHarness(
   if (await resolveAcpTranscriptPath(agentId, opts)) return 'acp';
   if (await resolveCodexRolloutPath(agentId, opts)) return 'codex';
   if (await resolvePiSessionPath(agentId, opts)) return 'ohmypi';
+  if (await resolveKimiWirePath(agentId, opts)) return 'kimi-code';
   return recorded;
 }
 
@@ -344,6 +354,35 @@ export async function resolveAcpTranscriptPath(
   const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
   const transcriptPath = join(agentsRoot, agentId, 'acp-session.jsonl');
   return await pathExists(transcriptPath) ? transcriptPath : null;
+}
+
+/**
+ * Resolve the native Kimi Code CLI wire.jsonl for a kimi-code-harness agent
+ * (PAN-1837 wi8a). Fast path: the per-agent kimi-session-id (persisted by
+ * wi5's spawnAgent) maps directly to
+ * `<kimiHome>/sessions/<workDirKey>/<sessionId>/agents/main/wire.jsonl`.
+ * Fallback (no captured id): the newest session directory by wire.jsonl mtime
+ * under the workspace's workDirKey bucket — same shape as the codex/pi lazy
+ * fallbacks above, since Kimi may not have finished writing its first turn
+ * when the id was captured.
+ */
+export async function resolveKimiWirePath(
+  agentId: string,
+  opts: ResolveJsonlPathOptions = {},
+): Promise<string | null> {
+  const workspace = opts.workspaceOverride ?? (await readRecordedState(agentId, opts)).workspace;
+  if (!workspace) return null;
+
+  const agentsRoot = opts.agentsDirOverride ?? join(getOverdeckHome(), 'agents');
+  const sessionId = (await readOptional(join(agentsRoot, agentId, 'kimi-session-id')))?.trim() || null;
+  const kimiHome = opts.kimiHomeOverride ?? join(homedir(), '.kimi-code');
+
+  // PAN-1837 review fix (P2): use the async twin here — this resolver runs on
+  // the dashboard event loop and Command Deck polling re-resolves the same
+  // session repeatedly, so a sync readdirSync/statSync walk would block the
+  // loop on every poll as a session's history grows.
+  const { findKimiWirePathAsync } = await import('../../../lib/runtimes/kimi-code.js');
+  return findKimiWirePathAsync(kimiHome, workspace, sessionId);
 }
 
 /**
@@ -409,6 +448,9 @@ export async function resolveJsonlPath(
   }
   if (behavior.transcriptKind === 'acp-jsonl') {
     return resolveAcpTranscriptPath(agentId, opts);
+  }
+  if (behavior.transcriptKind === 'kimi-wire-jsonl') {
+    return resolveKimiWirePath(agentId, opts);
   }
 
   const claudeSessionId = await resolveClaudeSessionId(agentId, opts);

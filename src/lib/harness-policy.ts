@@ -51,6 +51,13 @@ const ACP_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
 
 export const ACP_KIMI_ONLY_BLOCK_REASON = ACP_KIMI_ONLY_BLOCK.reason!
 
+const KIMI_CODE_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason: 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model\'s supported harness.',
+}
+
+export const KIMI_CODE_KIMI_ONLY_BLOCK_REASON = KIMI_CODE_KIMI_ONLY_BLOCK.reason!
+
 const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
@@ -95,6 +102,10 @@ export function canUseHarnessSync(
 
   if (harness === 'acp') {
     return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : ACP_KIMI_ONLY_BLOCK
+  }
+
+  if (harness === 'kimi-code') {
+    return getProviderForModelSync(model).name === 'kimi' ? ALLOWED : KIMI_CODE_KIMI_ONLY_BLOCK
   }
 
   if (harness === 'ohmypi') {

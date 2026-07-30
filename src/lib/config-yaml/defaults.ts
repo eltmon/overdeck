@@ -240,6 +240,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   acp: {
     permissionMode: 'auto',
   },
+  kimiCode: {},
 };
 
 /**

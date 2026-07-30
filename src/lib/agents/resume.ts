@@ -498,6 +498,35 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       if (!delivery.ok) {
         console.error(`[resumeAgent] Codex continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`);
       }
+    } else if (effectiveHarness === 'kimi-code') {
+      // PAN-1837 review fix: native Kimi never fires the Claude SessionStart
+      // hook and never writes Claude JSONL, so the final Claude branch below
+      // (waitForReadySignal + deliverResumeMessageWithTranscriptConfirmation)
+      // always times out for it — the continue message never lands, but the
+      // pre-fix code still fell through to reporting success. deliverInitialPromptWithRetry
+      // waits for readiness through the native kimi-session-signal path
+      // (waitForKimiCodeTuiReady) and delivers via the PTY supervisor, the
+      // same shape as the acp/codex branches above; this covers both a true
+      // -S resume and a fresh relaunch since the launcher config already
+      // resolved which one applies.
+      //
+      // PAN-1837 review fix (cycle 6): mirror ACP's strict contract — a failed
+      // delivery must not be reported as a successfully resumed agent. Kimi
+      // has no fallback signal (no hook, no JSONL) to confirm the message
+      // landed any other way, so a failure here means the operator's
+      // continue/rework prompt is genuinely lost; killing the session and
+      // failing the resume surfaces that instead of leaving Kimi sitting idle
+      // at its prompt while the caller believes the resume succeeded.
+      const delivery = await deliverInitialPromptWithRetry(normalizedId, effectiveMessage, 'resumeAgent:kimi-code-continue');
+      messageDelivered = delivery.ok;
+      if (delivery.ok && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
+      if (!delivery.ok) {
+        await Effect.runPromise(killSession(normalizedId));
+        return {
+          success: false,
+          error: `Kimi Code continue prompt did not land: ${delivery.failure ?? 'unknown failure'}`,
+        };
+      }
     } else if (!shouldResumeSavedSession) {
       // Fresh session fallback — deliver like a kickoff. Transcript
       // confirmation is impossible here: the new session's id is unknown until

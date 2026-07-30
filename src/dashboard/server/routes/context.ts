@@ -13,6 +13,7 @@ import {
   type ContextLayerTarget,
   type ContextLayersResponse,
   type ContextPreviewDiagnostic,
+  type ContextPreviewHarness,
   type ContextPreviewResponse,
   type ContextProjectSummary,
   type ContextSyncResponse,
@@ -71,7 +72,7 @@ type DashboardContextSyncResponse = ContextSyncResponse & {
 
 type RuleScope = 'universal' | 'dev';
 
-const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp'];
+const PREVIEW_HARNESSES: readonly Harness[] = ['claude-code', 'ohmypi', 'codex', 'acp', 'kimi-code'];
 const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
 const execFileAsync = promisify(execFile);
 const decodePreviewRequest = Schema.decodeUnknownSync(ContextPreviewRequest);
@@ -237,7 +238,7 @@ async function layerRecord(
  * managed region lands and whether their own content is preserved there.
  */
 async function describeSyncTarget(
-  harness: Harness,
+  harness: ContextPreviewHarness,
   layerKind: 'global' | 'project',
   projectKey: string | undefined,
   label: string,
@@ -428,6 +429,10 @@ function fullPromptPreview(previews: Record<Harness, string>): string {
     '',
     previews.acp || '(no rendered context)',
     '',
+    '## Overdeck-controlled Kimi Code bundle',
+    '',
+    previews['kimi-code'] || '(no rendered context)',
+    '',
     '## Runtime-only sections',
     '',
     '- Memory retrieval: injected at agent spawn when enabled; unavailable in this layer editor preview.',
@@ -493,6 +498,7 @@ export async function previewContextLayers(
       ohmypi: previews.ohmypi,
       codex: previews.codex,
       acp: previews.acp,
+      'kimi-code': previews['kimi-code'],
       fullPrompt: fullPromptPreview(previews),
     },
     diagnostics: diagnosticsForLayers(layers, drafts),

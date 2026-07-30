@@ -52,6 +52,7 @@ const HARNESS_LABELS: Record<Harness, string> = {
   ohmypi: 'oh-my-pi',
   codex: 'Codex',
   acp: 'ACP',
+  'kimi-code': 'Kimi Code',
 };
 
 const PROVIDERS: { id: Provider; name: string; placeholder: string }[] = [

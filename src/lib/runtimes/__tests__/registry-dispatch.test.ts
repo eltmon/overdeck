@@ -30,6 +30,7 @@ vi.mock('../../paths.js', async (importOriginal) => ({
 
 import {
   AcpRuntimeSync,
+  KimiCodeRuntimeSync,
   RuntimeRegistry,
   setGlobalRegistry,
   getGlobalRegistry,
@@ -37,7 +38,7 @@ import {
 } from '../index.js'
 import type { AgentRuntimeSync, HarnessBehavior } from '../types.js'
 
-function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp'): AgentRuntimeSync {
+function stubRuntime(name: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code'): AgentRuntimeSync {
   const behavior = getHarnessBehavior(name)
   return {
     name,
@@ -77,6 +78,10 @@ describe('global runtime registry', () => {
   it('registers the real ACP runtime by default', () => {
     expect(getGlobalRegistry().get('acp')).toBeInstanceOf(AcpRuntimeSync)
   })
+
+  it('registers the real Kimi Code runtime by default (PAN-1837)', () => {
+    expect(getGlobalRegistry().get('kimi-code')).toBeInstanceOf(KimiCodeRuntimeSync)
+  })
 })
 
 describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-636)', () => {
@@ -89,6 +94,7 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
     fresh.register(stubRuntime('ohmypi'))
     fresh.register(stubRuntime('codex'))
     fresh.register(stubRuntime('acp'))
+    fresh.register(stubRuntime('kimi-code'))
     setGlobalRegistry(fresh)
   })
   afterEach(() => {
@@ -113,6 +119,11 @@ describe('RuntimeRegistry.getRuntimeForAgent dispatches by state.harness (PAN-63
   it('returns the acp runtime when state.harness === "acp"', () => {
     writeAgentState('agent-acp-1', { harness: 'acp' })
     expect(getGlobalRegistry().getRuntimeForAgent('agent-acp-1')?.name).toBe('acp')
+  })
+
+  it('returns the kimi-code runtime when state.harness === "kimi-code" (PAN-1837 ac1)', () => {
+    writeAgentState('agent-kimi-code-1', { harness: 'kimi-code' })
+    expect(getGlobalRegistry().getRuntimeForAgent('agent-kimi-code-1')?.name).toBe('kimi-code')
   })
 
   it('returns the claude-code runtime when state.harness === "claude-code" (AC1)', () => {
