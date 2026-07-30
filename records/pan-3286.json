@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:55:38.205Z",
+  "updated": "2026-07-30T04:57:23.768Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
     }
   ],
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "rail-filter": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 3600717,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:43:36.792Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -191,6 +183,17 @@
         "outcome": "completed",
         "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
         "releasedAt": "2026-07-30T04:43:26.725Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3600717,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:43:36.792Z",
+        "itemId": "rail-filter",
+        "outcome": "completed",
+        "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
+        "releasedAt": "2026-07-30T04:57:23.768Z"
       }
     ],
     "statusReasons": {
@@ -233,6 +236,10 @@
       "memory-phase-api": {
         "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
         "updatedAt": "2026-07-30T04:43:26.725Z"
+      },
+      "rail-filter": {
+        "reason": "Rail + Cmd-K default to main/scratch/favorited via shared isUserFacingWorkspace; non-favorited issue rows collapse behind an expandable 'N pipeline worktrees' count row persisted in localStorage. 7 new tests; two pre-existing tests' incidental non-favorited issue fixtures were favorited (intent preserved, not dropped). Playwright screenshots at 1600x1000 and 820x900 inspected by me.",
+        "updatedAt": "2026-07-30T04:57:23.768Z"
       }
     }
   },
@@ -282,6 +289,10 @@
     "memory-phase-api.memory-phase-api.ac1": "completed",
     "memory-phase-api.memory-phase-api.ac2": "completed",
     "memory-phase-api.memory-phase-api.ac3": "completed",
-    "rail-filter": "running"
+    "rail-filter": "completed",
+    "rail-filter.rail-filter.ac1": "completed",
+    "rail-filter.rail-filter.ac2": "completed",
+    "rail-filter.rail-filter.ac3": "completed",
+    "rail-filter.rail-filter.ac4": "completed"
   }
 }
