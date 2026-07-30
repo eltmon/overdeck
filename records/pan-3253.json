@@ -232,7 +232,7 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:25:13.388Z",
+  "updated": "2026-07-30T11:29:09.318Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "passed",
@@ -242,9 +242,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:25:13.380Z",
+    "updatedAt": "2026-07-30T11:29:08.788Z",
     "reviewNotes": "Bulk hydration bounds are complete across all canonical readers; no blocking findings",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -254,7 +253,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
-    "lastVerifiedCommit": "09d9a69b337d7007077fcfa03672a9a88692a288",
+    "lastVerifiedCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
     "reviewRequestedAt": "2026-07-30T11:23:03.129Z",
     "reviewSpawnedAt": "2026-07-30T11:22:01.653Z",
     "scopeDrift": {
@@ -312,12 +311,20 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 28,
+            "output": 4706,
+            "cacheRead": 1818715,
+            "cacheWrite": 123516
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 4075,
-            "output": 188003,
-            "cacheRead": 91560222,
-            "cacheWrite": 4927315
+            "input": 4122,
+            "output": 189563,
+            "cacheRead": 92324093,
+            "cacheWrite": 4941795
           }
         }
       },
@@ -334,16 +341,22 @@
           "cacheRead": 89120768,
           "cacheWrite": 0
         },
+        "anthropic/claude-sonnet-5": {
+          "input": 28,
+          "output": 4706,
+          "cacheRead": 1818715,
+          "cacheWrite": 123516
+        },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 4075,
-          "output": 188003,
-          "cacheRead": 91560222,
-          "cacheWrite": 4927315
+          "input": 4122,
+          "output": 189563,
+          "cacheRead": 92324093,
+          "cacheWrite": 4941795
         }
       },
       "costAtCloseOut": {
-        "usd": 145.203942,
-        "pricingAsOf": "2026-07-30T11:25:13.384Z"
+        "usd": 146.025924,
+        "pricingAsOf": "2026-07-30T11:29:08.819Z"
       }
     },
     "merges": [
