@@ -16,6 +16,7 @@ import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
 import type { DomainEvent } from '@overdeck/contracts';
 import type { Role } from './agents.js';
+import { getDashboardApiUrlSync } from './config.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';
 export type ActivityStatus = 'accepted' | 'running' | 'completed' | 'failed';
@@ -209,7 +210,8 @@ export async function emitActivityEntryOncePortable(
   if (getActivityEventStore()) return emitActivityEntryOnce(options);
   try {
     const { createDeaconEventClient } = await import('./cloister/deacon-event-client.js');
-    return await createDeaconEventClient().appendOnce(buildActivityEntryEvent(options), options.id);
+    return await createDeaconEventClient({ dashboardUrl: getDashboardApiUrlSync() })
+      .appendOnce(buildActivityEntryEvent(options), options.id);
   } catch {
     return 'failed';
   }

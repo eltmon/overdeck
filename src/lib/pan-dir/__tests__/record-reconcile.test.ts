@@ -11,6 +11,7 @@ import { STATE_BRANCH } from '../../state-read-home.js';
 import type { PanIssueRecord } from '../record.js';
 import { readPushHealth, recordReconcileFailure } from '../push-health.js';
 import { updateIssueRecord } from '../record-update.js';
+import { stateGitLockPath } from '../state-git-lock.js';
 
 const ISSUE_ID = 'DURABLE-1';
 const OTHER_ISSUE_ID = 'OTHER-1';
@@ -113,6 +114,8 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+    vi.useRealTimers();
     setActivityEventStoreProvider(null);
     if (originalHome === undefined) delete process.env.OVERDECK_HOME;
     else process.env.OVERDECK_HOME = originalHome;
@@ -306,18 +309,36 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
 
     await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 1', conflictedPaths: [] });
     await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 2', conflictedPaths: [] });
+    let markDeliveryStarted!: () => void;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      markDeliveryStarted = resolve;
+    });
+    let settleDelivery!: (outcome: 'failed') => void;
+    const stalledDelivery = new Promise<'failed'>((resolve) => {
+      settleDelivery = resolve;
+    });
     setActivityEventStoreProvider(() => ({
-      append() {
-        throw new Error('simulated activity failure');
-      },
-      async appendAsync() {
-        throw new Error('simulated activity failure');
+      append: () => 0,
+      appendAsync: async () => 0,
+      appendOnce() {
+        markDeliveryStarted();
+        return stalledDelivery;
       },
     }));
+    vi.stubEnv('OVERDECK_RECORD_DURABILITY_BUDGET_MS', '50');
+    vi.useFakeTimers();
 
-    await expect(updateIssueRecord(project, ISSUE_ID, (current) => {
+    const failedUpdate = updateIssueRecord(project, ISSUE_ID, (current) => {
       current.statusOverrides = { 'wi-1': 'completed' };
-    })).rejects.toThrow('specs/shared.json');
+    });
+    const failedUpdateAssertion = expect(failedUpdate).rejects.toThrow('specs/shared.json');
+    await deliveryStarted;
+    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    settleDelivery('failed');
+    await failedUpdateAssertion;
+    vi.useRealTimers();
+    vi.unstubAllEnvs();
     expect(readPushHealth(project)).toMatchObject({
       consecutiveReconcileFailures: 3,
       pendingEscalation: { issueId: ISSUE_ID, failureCount: 3 },
@@ -351,6 +372,7 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 1', conflictedPaths: [] });
     await recordReconcileFailure(project, { issueId: ISSUE_ID, reason: 'seed failure 2', conflictedPaths: [] });
     setActivityEventStoreProvider(null);
+    vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://127.0.0.1:4777');
     const fetchMock = vi.fn().mockResolvedValue(new Response(
       JSON.stringify({ outcome: 'appended' }),
       { status: 200, headers: { 'content-type': 'application/json' } },
@@ -362,8 +384,66 @@ describe('record push-race merge reconciliation (PAN-3291)', () => {
     })).rejects.toThrow('specs/shared.json');
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/api/internal/events/append-once');
+    expect(String(fetchMock.mock.calls[0]?.[0]))
+      .toBe('http://127.0.0.1:4777/api/internal/events/append-once');
     expect(readPushHealth(project).pendingEscalation).toBeUndefined();
+  });
+
+  it('keeps slow activity delivery outside the durability deadline and state Git lock', async () => {
+    const other = cloneState('slow-activity-remote-writer');
+    const remoteSpare = readRecord(other, 'SPARE-1');
+    remoteSpare.decisions = [{
+      id: 'D1',
+      summary: 'force reconciliation before slow delivery',
+      recordedAt: '2026-07-30T00:06:00.000Z',
+    }];
+    writeRecord(other, remoteSpare);
+    git(other, 'add', 'records/spare-1.json');
+    git(other, 'commit', '-q', '-m', 'advance origin before slow activity delivery');
+    git(other, 'push', '-q', 'origin', STATE_BRANCH);
+
+    for (let index = 1; index <= 3; index += 1) {
+      await recordReconcileFailure(project, {
+        issueId: ISSUE_ID,
+        reason: `seed slow-delivery failure ${index}`,
+        conflictedPaths: ['specs/shared.json'],
+      });
+    }
+
+    let markDeliveryStarted!: () => void;
+    const deliveryStarted = new Promise<void>((resolve) => {
+      markDeliveryStarted = resolve;
+    });
+    let settleDelivery!: (outcome: 'failed') => void;
+    const stalledDelivery = new Promise<'failed'>((resolve) => {
+      settleDelivery = resolve;
+    });
+    setActivityEventStoreProvider(() => ({
+      append: () => 0,
+      appendAsync: async () => 0,
+      appendOnce() {
+        markDeliveryStarted();
+        return stalledDelivery;
+      },
+    }));
+    vi.stubEnv('OVERDECK_RECORD_DURABILITY_BUDGET_MS', '50');
+    vi.useFakeTimers();
+
+    const updatePromise = updateIssueRecord(project, ISSUE_ID, (current) => {
+      current.statusOverrides = { 'wi-slow-delivery': 'completed' };
+    });
+    await deliveryStarted;
+
+    expect(existsSync(stateGitLockPath(stateRoot))).toBe(false);
+    await vi.advanceTimersByTimeAsync(10_000);
+    settleDelivery('failed');
+
+    await expect(updatePromise).resolves.toMatchObject({
+      statusOverrides: { 'wi-slow-delivery': 'completed' },
+    });
+    expect(readRecordAtRef(stateRoot, `origin/${STATE_BRANCH}`, ISSUE_ID).statusOverrides)
+      .toEqual({ 'wi-slow-delivery': 'completed' });
+    expect(readPushHealth(project).pendingEscalation).toBeDefined();
   });
 
   it('rejects a delete-modify record conflict and leaves no merge in progress', async () => {

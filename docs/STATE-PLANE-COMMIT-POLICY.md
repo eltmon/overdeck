@@ -41,9 +41,12 @@ the legacy surface.
   consecutive failure count, last failure time/reason/conflicted paths, last
   success time, and any escalation awaiting settled delivery.
 - Crossing three consecutive failures creates one pending `state-door` error.
-  The writer submits it idempotently through the canonical event door, using the
-  internal settled endpoint when a short-lived CLI has no local event-store
-  provider. Failed or unconfirmed delivery leaves the escalation pending for
+  After the record and state-worktree locks release, the writer submits it
+  idempotently through the canonical event door, using the configured internal
+  dashboard URL when a short-lived CLI has no local event-store provider.
+  Delivery has its own bound outside the record durability deadline, so a slow
+  endpoint cannot change the record result or block another state writer.
+  Failed, unconfirmed, or timed-out delivery leaves the escalation pending for
   the next reconcile outcome; only an appended or duplicate outcome clears it.
 - `pan doctor` reports each migrated state worktree's ahead/behind counts against
   `origin/overdeck-state`, the reconcile-failure streak, and the last failure.
