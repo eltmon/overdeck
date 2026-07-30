@@ -187,7 +187,7 @@ describe('flywheel lifecycle', () => {
 
     expect(mocks.paused).toBe(true);
     expect(mocks.activeRunId).toBe('RUN-9');
-    expect(mocks.stopAgentProgram).toHaveBeenCalledWith(FLYWHEEL_ORCHESTRATOR_AGENT_ID);
+    expect(mocks.stopAgentProgram).toHaveBeenCalledWith(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator');
 
     const resumed = await resumeFlywheel({ workspace: '/repo', env: cleanEnv });
 

@@ -133,7 +133,7 @@ describe('concurrency governor — config + counting', () => {
     expect(tryReserveAdvancingSlot(counts, limits)).toBe(true);  // budget cleared for the next patrol
   });
 
-  it('emergency brake stops excess work agents idle-first and clears stoppedByUser', async () => {
+  it('emergency brake stops excess work agents idle-first without claiming an operator stop', async () => {
     vi.resetModules();
     vi.doMock('../../../src/lib/cloister/config.js', () => ({
       loadCloisterConfigSync: () => ({ concurrency: { max_work_agents: 2, reserved_advancing_slots: 1, exempt_operator_started: false } }),
@@ -142,7 +142,7 @@ describe('concurrency governor — config + counting', () => {
       'agent-a': { id: 'agent-a' }, 'agent-b': { id: 'agent-b' },
       'agent-c': { id: 'agent-c' }, 'agent-d': { id: 'agent-d' },
     };
-    const saved: Record<string, { id: string; stoppedByUser?: boolean }> = {};
+    const stopCalls: Array<[string, string | undefined]> = [];
     const idle = new Set(['agent-c', 'agent-d']);
     vi.doMock('../../../src/lib/agents.js', () => ({
       listRunningAgentsSync: () => [
@@ -151,9 +151,9 @@ describe('concurrency governor — config + counting', () => {
         { id: 'agent-c', role: 'work', tmuxActive: true, lastActivity: '2026-01-02T00:00:00Z' }, // idle
         { id: 'agent-d', role: 'work', tmuxActive: true, lastActivity: '2026-01-04T00:00:00Z' }, // idle
       ],
-      stopAgentSync: (id: string) => { states[id].stoppedByUser = true; },
+      stopAgentSync: (id: string, cause?: string) => { stopCalls.push([id, cause]); },
       getAgentStateSync: (id: string) => states[id],
-      saveAgentStateSync: (s: { id: string }) => { saved[s.id] = states[s.id]; },
+      saveAgentStateSync: () => {},
       getAgentRuntimeStateSync: (id: string) => ({ state: idle.has(id) ? 'idle' : 'active' }),
     }));
     const { emergencyBrake } = await import('../../../src/lib/cloister/concurrency.js');
@@ -165,9 +165,9 @@ describe('concurrency governor — config + counting', () => {
     expect(result.cap).toBe(2);
     expect(result.remaining).toBe(2);
     expect(result.stopped).toEqual(['agent-c', 'agent-d']);
-    // stoppedByUser cleared so the deacon re-admits them as slots free.
-    expect(saved['agent-c'].stoppedByUser).toBeUndefined();
-    expect(saved['agent-d'].stoppedByUser).toBeUndefined();
+    // PAN-3324: the brake trims to the cap, it does not retire the work — so it
+    // stops with the 'system' cause and the deacon re-admits as slots free.
+    expect(stopCalls).toEqual([['agent-c', 'system'], ['agent-d', 'system']]);
   });
 
   it('emergency brake is a no-op when within the cap', async () => {

@@ -171,6 +171,26 @@ export function requeueToPending(id: number, nextScheduledMergeAt: string): bool
   return result.changes === 1;
 }
 
+/**
+ * Startup recovery for auto-merge rows orphaned in 'merging' (PAN-3328).
+ *
+ * The executor holds a row in 'merging' only across an in-process `await` on
+ * triggerMerge(). If the server dies inside that window the row is stranded there
+ * forever: `/api/flywheel/auto-merge/problems` reports only 'blocked' and 'failed',
+ * the deacon reconciler skips active rows that are not 'pending', and nothing else
+ * ever revisits it — so a permanently wedged merge reads as in-progress to every
+ * surface. Requeue to 'pending' so the next executor tick re-evaluates eligibility;
+ * a PR that did merge before the crash is caught there and blocked with a reason
+ * rather than merged twice.
+ */
+export function requeueOrphanedMergingAutoMerges(): number {
+  const db = getOverdeckDatabaseSync();
+  const result = db.prepare(
+    "UPDATE pending_auto_merges SET status = 'pending' WHERE status = 'merging'",
+  ).run();
+  return Number(result.changes);
+}
+
 /** Drop-in for markBlocked() from pending-auto-merges-db.ts. */
 export function markBlocked(id: number, reason: string): boolean {
   const db = getOverdeckDatabaseSync();

@@ -124,11 +124,16 @@ vi.mock('../../../src/lib/claude-hooks-provision.js', () => ({
 
 vi.mock('../../../src/lib/paths.js', () => ({
   SYNC_TARGET: { skills: '/tmp/skills', commands: '/tmp/commands', agents: '/tmp/agents' },
-  SYNC_SOURCES: { gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
+  SYNC_SOURCES: { root: '/tmp/sync-sources', gitHooks: '/tmp/git-hooks', hooks: '/tmp/hooks', skills: '/tmp/src-skills' },
   SKILLS_DIR: '/tmp/pan-skills',
   AGENT_SKILLS_DIR: '/tmp/agent-skills',
   isDevMode: vi.fn().mockReturnValue(false),
   AGENTS_DIR: '/tmp/agents',
+  // PAN-3327: sync reports which tree it distributes from, so it asks whether
+  // the CLI is running from a frozen `pan reload` generation. A normal package
+  // root is not one.
+  packageRoot: '/tmp/package-root',
+  isDeploymentGenerationRoot: vi.fn().mockReturnValue(false),
 }));
 
 vi.mock('ora', () => ({

@@ -125,7 +125,7 @@ describe('createAgentStopHandler lifecycle events', () => {
     await runAgentStopHandler('agent.stop_requested', 'agent-pan-999');
 
     expect(mockGetAgentState).toHaveBeenCalledWith('agent-pan-999');
-    expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-999');
+    expect(mockStopAgent).toHaveBeenCalledWith('agent-pan-999', 'operator');
   });
 
   it('routes agent.stopped through the transactional projection boundary', async () => {

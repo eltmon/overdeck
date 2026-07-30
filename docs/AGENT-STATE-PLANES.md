@@ -303,6 +303,26 @@ only policy function; autonomous recovery additionally passes through
 | stopped-by-user, completed handoff owing rework | clear the historical flag and re-drive | clear and start | delivery allowed |
 | failure backoff | defer | override with a logged warning | delivery allowed |
 
+### Who may set `stoppedByUser` (PAN-3324)
+
+The `stopped-by-user` gate exists to stop autonomous machinery from overriding a
+deliberate human stop, so only a human stop may arm it. `stopAgent()`,
+`stopAgentSync()`, and `markAgentStoppedState()` each take an `AgentStopCause`:
+
+- `'operator'` sets `stoppedByUser`. Passed by `pan kill`, `pan pause`, the
+  dashboard stop/delete and pause routes, and `pan flywheel stop|pause|abort`
+  (plus their dashboard equivalents). Nothing else passes it.
+- `'system'` — the default — clears `stoppedByUser`. Every machinery-initiated
+  stop uses it: memory-governor shedding, the concurrency-ceiling brake,
+  scheduler preemption, health force-kills, stalled-review-parent reaping,
+  signature-corruption recovery, close-out, and reconciling a process the OOM
+  killer already took.
+
+The default is `'system'` on purpose: a caller that omits the cause produces a
+recoverable stop, never a permanent stall. Before this, an OOM-killed review
+agent was recorded as `stopped_by_user = 1`, which latched the gate and left the
+issue waiting on a human — the failure that motivated the split.
+
 Durable breaker identity is `{ issue, recoveryPath, obligationGeneration,
 tripCount }`. Restart cannot duplicate an open trip; acknowledgement or a
 successful explicit recovery resets it, and a later obligation generation may

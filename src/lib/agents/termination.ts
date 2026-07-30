@@ -13,6 +13,7 @@ import {
   markAgentStoppedState,
   saveAgentRuntimeState,
   normalizeAgentId,
+  type AgentStopCause,
 } from '../agents.js';
 import { emitAgentEvent } from '../agent-runtime.js';
 import { AGENTS_DIR } from '../paths.js';
@@ -141,7 +142,12 @@ async function killLauncherProcessAsync(agentId: string): Promise<void> {
   }
 }
 
-export function stopAgentSync(agentId: string): void {
+/**
+ * Stop an agent. `cause` records whether an operator asked for the stop; it
+ * defaults to `'system'` so machinery-initiated stops never latch the
+ * operator-stop gate (PAN-3324). See `AgentStopCause`.
+ */
+export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system'): void {
   const normalizedId = normalizeAgentId(agentId);
 
   if (sessionExistsSync(normalizedId)) {
@@ -176,7 +182,7 @@ export function stopAgentSync(agentId: string): void {
     // Ensure id is set — runtime state files may lack it (PAN-150)
     if (!state.id) state.id = normalizedId;
 
-    markAgentStoppedState(state);
+    markAgentStoppedState(state, cause);
     saveAgentStateSync(state);
   }
 
@@ -190,7 +196,11 @@ export function stopAgentSync(agentId: string): void {
   });
 }
 
-export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxError> => {
+/** Async twin of `stopAgentSync`. Same `cause` semantics — see `AgentStopCause`. */
+export const stopAgent = (
+  agentId: string,
+  cause: AgentStopCause = 'system',
+): Effect.Effect<void, FsError | TmuxError> => {
   const normalizedId = normalizeAgentId(agentId);
 
   return Effect.gen(function* () {
@@ -234,7 +244,7 @@ export const stopAgent = (agentId: string): Effect.Effect<void, FsError | TmuxEr
     if (state) {
       if (!state.id) state.id = normalizedId;
 
-      markAgentStoppedState(state);
+      markAgentStoppedState(state, cause);
       yield* saveAgentState(state);
     }
 

@@ -420,7 +420,7 @@ export async function spawnFlywheel(options: FlywheelLifecycleOptions = {}): Pro
 
 export async function abortSpawnedFlywheel(runId: string): Promise<void> {
   try {
-    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
   } finally {
     await abortFlywheelRun(runId);
   }
@@ -435,7 +435,7 @@ export async function pauseFlywheel(): Promise<FlywheelPauseResult> {
     } catch { /* non-fatal: resume falls back to fresh if session.id is missing */ }
   }
   setFlywheelGloballyPaused(true);
-  await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
   return { activeRunId };
 }
 

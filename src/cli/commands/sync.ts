@@ -25,7 +25,7 @@ import {
   writeSyncManifestSync,
 } from '../../lib/sync.js';
 import { executeAgentSkillsSync, planAgentSkillsSync } from '../../lib/harness-skill-sync.js';
-import { SYNC_TARGET, SYNC_SOURCES, isDevMode } from '../../lib/paths.js';
+import { SYNC_TARGET, SYNC_SOURCES, isDevMode, isDeploymentGenerationRoot, packageRoot } from '../../lib/paths.js';
 import { checkDevrootDeprecation } from '../../lib/config.js';
 import { listProjectsSync } from '../../lib/projects.js';
 import { cleanupLegacyRuntimeSymlinksSync, migrateSyncTargetsSync } from '../../lib/config-migration.js';
@@ -83,6 +83,28 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     console.log(chalk.dim(`[sync-timing] ${summary}`));
   }
 
+  // PAN-3327: the global `pan` symlink resolves into a `pan reload` deployment
+  // generation, which is a detached worktree frozen at the commit it was built
+  // from. Every path resolved relative to the CLI bundle inherits that freeze,
+  // so say plainly which tree sync is about to distribute.
+  if (isDeploymentGenerationRoot(packageRoot)) {
+    console.log(chalk.yellow(
+      'This `pan` is running from a `pan reload` deployment generation, which is frozen at the '
+      + 'commit it was built from:',
+    ));
+    console.log(chalk.dim(`  ${packageRoot}`));
+    console.log(
+      SYNC_SOURCES.root === join(packageRoot, 'sync-sources')
+        ? chalk.yellow(
+          '  No checkout was recorded to sync from, so sync will distribute that frozen copy of '
+          + 'sync-sources/. Merged hook, rule, and skill fixes will NOT be deployed. Run '
+          + '`pan reload` to rebuild the generation from origin/main first.',
+        )
+        : chalk.dim(`  Syncing from the checkout it was built from: ${SYNC_SOURCES.root}`),
+    );
+    console.log('');
+  }
+
   // PAN-1201: warn once if the deprecated sync.devroot is still configured.
   const devrootWarning = checkDevrootDeprecation();
   if (devrootWarning) {
@@ -111,11 +133,15 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
     // Show hooks plan
     const hooksPlan = planHooksSyncSync();
     if (hooksPlan.length > 0) {
-      console.log(chalk.cyan('hooks (bin scripts):'));
+      console.log(chalk.cyan(`hooks (bin scripts) from ${SYNC_SOURCES.hooks}:`));
       for (const hook of hooksPlan) {
-        const icon = hook.status === 'new' ? chalk.green('+') : chalk.blue('↻');
-        const status = hook.status === 'new' ? '' : chalk.dim('[update]');
-        console.log(`  ${icon} ${hook.name} ${status}`);
+        const icon = hook.status === 'new'
+          ? chalk.green('+')
+          : hook.status === 'updated' ? chalk.blue('↻') : chalk.dim('=');
+        const label = hook.status === 'new'
+          ? ''
+          : hook.status === 'updated' ? chalk.dim('[update]') : chalk.dim('[unchanged]');
+        console.log(`  ${icon} ${hook.name} ${label}`);
       }
       console.log('');
     }
@@ -384,7 +410,16 @@ export async function syncCommand(options: SyncOptions): Promise<void> {
       console.log(chalk.red(`  ✗ ${error}`));
     }
   } else if (hooksResult.synced.length > 0) {
-    hooksSpinner.succeed(`Synced ${hooksResult.synced.length} hooks to ~/.overdeck/bin/`);
+    // Name the tree the hooks came from and how many bytes actually moved. A
+    // sync that changed nothing must read as such: PAN-3327 shipped a frozen
+    // snapshot over itself for hours behind an unqualified success message.
+    const changed = hooksResult.changed.length;
+    const unchanged = hooksResult.unchanged.length;
+    hooksSpinner.succeed(
+      `Synced ${hooksResult.synced.length} hooks to ~/.overdeck/bin/ `
+      + `(${changed} updated, ${unchanged} unchanged)`,
+    );
+    console.log(chalk.dim(`  from ${hooksResult.sourceRoot}`));
   } else {
     hooksSpinner.info('No hooks to sync');
   }

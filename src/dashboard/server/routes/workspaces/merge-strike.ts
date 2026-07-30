@@ -143,6 +143,75 @@ export interface MergeEligibilityResult {
   success: false; statusCode: number; error: string; reviewStatus?: string; testStatus?: string; mergeStatus?: string;
 }
 
+export interface MergeQueueAdvanceDeps {
+  dequeue: (projectKey: string, completedIssueId?: string) => string | null;
+  getReviewStatus: (issueId: string) => ReviewStatus | null;
+  getProjectPath: (issueId: string) => string;
+  triggerMerge: (issueId: string, request?: StrikeMergeRequest) => Promise<unknown>;
+  log: (message: string) => void;
+  warn: (message: string) => void;
+}
+
+/** Rebuild the strike merge request a queued strike entry needs, or undefined for a normal merge. */
+export function strikeRequestForQueueEntry(
+  issueId: string,
+  status: ReviewStatus | null,
+  projectPath: string,
+): StrikeMergeRequest | undefined {
+  if (!status?.strikeReadyHead) return undefined;
+  if (status.strikeLandingState !== 'ready' && status.strikeLandingState !== 'landing') return undefined;
+  const issueLower = issueId.toLowerCase();
+  return {
+    kind: 'strike',
+    markerHead: status.strikeReadyHead,
+    workspacePath: `${projectPath}/workspaces/feature-${issueLower}-strike`,
+    branchName: `strike/${issueLower}`,
+    recoveryTarget: `strike-${issueLower}`,
+  };
+}
+
+/**
+ * Advance a project's merge queue: drop entries that cannot start, then trigger
+ * the first one that can.
+ *
+ * PAN-3328: the queue used to advance by handing its single head entry to
+ * `triggerMerge()` and stopping. `triggerMerge()` rejects an issue that is not
+ * `readyForMerge` — closed, or with its review-status record gone — *before* it
+ * ever claims the queue, so a dead head bounced on every advance and was never
+ * removed. One such row wedged the whole queue permanently: 12 entries stacked up
+ * behind it over 26 days with every `started_at` still NULL, and live work parked
+ * silently forever. Walking past unstartable heads is what makes the queue
+ * self-draining; a dropped issue re-enqueues itself if it becomes mergeable later.
+ */
+export function advanceMergeQueue(
+  deps: MergeQueueAdvanceDeps,
+  projectKey: string,
+  completedIssueId?: string,
+): void {
+  const strikeRequestFor = (issueId: string): StrikeMergeRequest | undefined =>
+    strikeRequestForQueueEntry(issueId, deps.getReviewStatus(issueId), deps.getProjectPath(issueId));
+
+  // `dropped` guarantees termination even if a dequeue keeps handing back the
+  // same entry — the queue must never be able to spin this loop.
+  const dropped = new Set<string>();
+  let nextIssueId = deps.dequeue(projectKey, completedIssueId);
+  while (nextIssueId && !dropped.has(nextIssueId)) {
+    const strikeRequest = strikeRequestFor(nextIssueId);
+    const unstartable = strikeRequest ? null : normalMergeEligibility(deps.getReviewStatus(nextIssueId));
+    if (!unstartable) {
+      deps.log(`[merge] Dequeuing next merge: ${nextIssueId}`);
+      const issueId = nextIssueId;
+      void deps.triggerMerge(issueId, strikeRequest).catch((err: unknown) =>
+        deps.warn(`[merge] Queue error for ${issueId}: ${err}`),
+      );
+      return;
+    }
+    deps.warn(`[merge] Dropped ${nextIssueId} from the ${projectKey} merge queue: ${unstartable.error}`);
+    dropped.add(nextIssueId);
+    nextIssueId = deps.dequeue(projectKey, nextIssueId);
+  }
+}
+
 export function normalMergeEligibility(status: ReviewStatus | null, activelyMerging = false): MergeEligibilityResult | null {
   if (!status?.readyForMerge) return { success: false, statusCode: 400, error: 'Cannot merge: review and tests have not passed yet', reviewStatus: status?.reviewStatus || 'pending', testStatus: status?.testStatus || 'pending' };
   if (status.mergeStatus === 'merging' && activelyMerging) return { success: false, statusCode: 400, error: 'Merge already in progress', mergeStatus: 'merging' };
