@@ -113,8 +113,10 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
       issueId: issueId ?? undefined,
       limit: 12,
     }).catch(() => []),
-    // Sibling-issue summary injection is inherently issue-scoped — skip it
-    // entirely for a null issueId (main/scratch workspace turn, PRD D-6).
+    // An issue turn gets sibling-ISSUE hits. A turn with no issue (main/scratch
+    // workspace) has no siblings to define that way, so it gets same-project
+    // hits from every OTHER workspace instead — same budget, same slot
+    // (PAN-3286 FR-11, superseding the PAN-1990 D-6 skip).
     issueId !== null
       ? search({
           query: expansion.query,
@@ -125,7 +127,14 @@ export async function injectPromptTimeMemory(input: PromptTimeMemoryInjectionInp
           siblingTokenBudget: budgets.sibling,
           limit: 6,
         }).catch(() => [])
-      : Promise.resolve([]),
+      : search({
+          query: expansion.query,
+          projectId: input.identity.projectId,
+          crossWorkspace: true,
+          excludeWorkspaceId: input.identity.workspaceId,
+          siblingTokenBudget: budgets.sibling,
+          limit: 6,
+        }).catch(() => []),
   ]);
 
   const candidates = [

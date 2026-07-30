@@ -9,7 +9,7 @@ import {
   stopCommand,
   syncAuthCommand,
 } from './workspace-remote.js';
-import { workspaceMainCommand, workspaceNewCommand } from './workspace-scratch.js';
+import { workspaceMainCommand, workspaceNewCommand, workspaceRelocateCommand } from './workspace-scratch.js';
 import { workspaceActivateCommand, workspaceArchiveCommand, workspaceGetCommand } from './workspace-lifecycle.js';
 
 export { destroyCommand } from './workspace-list.js';
@@ -80,6 +80,8 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--project <key>', 'Registered project key (defaults to the sole project, or the one resolved from cwd)')
     .option('--isolated', 'Create an isolated git worktree instead of sharing the project directory')
     .option('--parent-branch <branch>', 'Parent branch for the isolated worktree (default: inferred from the project\'s current branch)')
+    .option('--target-path <dir>', 'Target an existing directory as the workspace path (rejects --isolated)')
+    .option('--dry-run', 'Print the resolved intent as JSON and create nothing')
     .action(workspaceNewCommand);
 
   workspace
@@ -102,6 +104,13 @@ export function registerWorkspaceCommands(program: Command): void {
     .command('archive <ws>')
     .description('Archive a workspace (reversible; refuses kind=main)')
     .action(workspaceArchiveCommand);
+
+  workspace
+    .command('relocate <ws>')
+    .description('Point a workspace at a new path (refuses kind=issue; kind=main requires --force)')
+    .option('--path <dir>', 'New path (must be an existing directory)')
+    .option('--force', 'Allow relocating the main workspace, diverging it from projects.yaml')
+    .action(workspaceRelocateCommand);
 
   // Re-render `<workspace>/.devcontainer/` from the project's compose
   // template. Idempotent. The single source of truth for how the

@@ -7,6 +7,11 @@
  * genuinely-relocated affordance, predating PAN-1990) a `relocated` marker
  * pointing at its living successor, which is itself checked. Deleting an
  * export without updating its row to `relocated` fails this test.
+ *
+ * The CLI half of this audit — every pre-existing `pan workspace` / `pan memory`
+ * verb and flag, plus the surfaces PAN-3286 adds — lives in the sibling
+ * no-loss-audit-cli.test.ts. It cannot be merged into this file because the jsdom
+ * environment above breaks the CLI import chain (PAN-3286 WI-9).
  */
 import { describe, expect, it } from 'vitest';
 import { TAB_PATHS } from '../../../src/dashboard/frontend/src/App/routes.js';

@@ -474,8 +474,22 @@ one per project — `issue`, or `scratch`). Reads go through
 directly (`scripts/guard-workspace-doors.sh` enforces this in `npm run lint`).
 `pan admin db rebuild-workspaces` reconstructs them from `projects.yaml`, a
 worktree scan, and memory-home identity records, the same disposable-cache
-pattern `rebuild-agents` uses for the `agents` table. Full model, cardinalities,
-and the polyrepo wrapper-repo git posture: [`docs/WORKSPACES-AND-PROJECTS.md`](docs/WORKSPACES-AND-PROJECTS.md).
+pattern `rebuild-agents` uses for the `agents` table; it also **archives, never
+deletes**, issue rows whose issue reached a terminal stage. Full model,
+cardinalities, and the polyrepo wrapper-repo git posture: [`docs/WORKSPACES-AND-PROJECTS.md`](docs/WORKSPACES-AND-PROJECTS.md).
+
+A workspace **targets** a repo directory, and several may target the same one:
+`pan workspace new <name> --target-path <dir>` points at any existing directory
+(rejects `--isolated`), `--dry-run` prints the resolved intent as JSON and
+creates nothing, and `pan workspace relocate <ref> --path <dir>` re-points an
+existing workspace (refuses `kind=issue`; `kind=main` needs `--force`). Because
+memory homes are keyed by workspace UUID, relocating never moves memory on disk.
+
+The sidebar rail and Cmd-K `workspaces` scope list only main/scratch/favorited
+rows, collapsing the rest into an expandable "N pipeline worktrees" count row —
+presentation only, the API still returns every kind. Main/scratch rows badge the
+memory-synthesized phase from the list DTO's `memoryPhase`; issue rows keep the
+pipeline phase.
 
 **Memory is keyed by workspace UUID, not issue id**: observations, pending
 turns, status, and summaries live under
@@ -487,6 +501,18 @@ observations. `pan memory search --global` and `pan memory pin/unpin/pins`
 read/write through the same two doors; `pan memory backfill` retroactively
 extracts observations from historical Claude Code JSONL transcripts, matching
 each session's cwd to a workspace via `resolveWorkspaceForCwd()`.
+
+Recall is workspace-addressable, not issue-only:
+
+- `pan memory search --target [path]` — every workspace targeting a directory.
+- `pan memory status --workspace <id|name>` and `pan memory status --history <n>` — current status and its archive.
+- `pan memory summary --workspace <id|name>` — same addressing as `status`.
+- `pan memory timeline` — observations in chronological order.
+- `pan memory read <path>` — a file from the workspace's memory home, containment-checked so `~/.claude` JSONL is unreachable.
+
+`status`/`summary` fall back to the cwd's workspace when given neither a
+positional nor `--workspace`. SessionStart additionally injects a
+local-files-only standing briefing, once per session id.
 
 ## Project Resolution from Issue IDs
 

@@ -21,11 +21,13 @@ import {
   type DatabaseProvisionerLogger,
 } from '../../lib/db-provisioners/index.js';
 import {
+  archiveTerminalIssueWorkspaces,
   backfillIssueWorkspaces,
   migrateMemoryHomesToWorkspaces,
   rebuildMainAndScratchWorkspaces,
   seedProjectsFromYaml,
 } from '../../lib/workspaces/rebuild.js';
+import { resolveTerminalIssueIds } from '../../lib/overdeck/terminal-issues.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 
@@ -525,13 +527,29 @@ async function rebuildWorkspacesCommand(options: {
     }
 
     const result = await rebuildMainAndScratchWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
+    // PAN-3286 FR-14: hygiene pass — take worktrees for finished issues out of
+    // the user-facing surfaces. Archives, never deletes; the rows keep owning
+    // their memory homes.
+    const archival = await archiveTerminalIssueWorkspaces({
+      // Terminality is resolved through IssuesResolver, the canonical issues
+      // read door — the archival pass performs no issue-state read of its own.
+      terminalIssueIds: await resolveTerminalIssueIds(),
+      dryRun: options.dryRun,
+      verbose: options.verbose,
+    });
 
     if (options.dryRun) {
-      spinner.info(`Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}`);
+      spinner.info(
+        `Dry run: scanned ${result.scanned}, would create ${result.created}, skip ${result.skipped}; `
+        + `would archive ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+      );
       return;
     }
 
-    spinner.succeed(`Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}`);
+    spinner.succeed(
+      `Rebuilt workspaces: scanned ${result.scanned}, created ${result.created}, skipped ${result.skipped}; `
+      + `archived ${archival.archived} of ${archival.scanned} issue workspaces for terminal issues`,
+    );
   } catch (error: any) {
     spinner.fail(`Rebuild failed: ${error.message}`);
     process.exitCode = 1;

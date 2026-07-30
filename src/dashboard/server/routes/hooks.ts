@@ -30,6 +30,11 @@ import { derivePromptTitle } from '../../../lib/conversations/transcript-summary
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
 import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
+import {
+  claimSessionBriefing,
+  composeSessionStartBriefing,
+  recordSessionBriefingSize,
+} from '../../../lib/memory/session-briefing.js';
 import { resolveComplianceAdvisoryWarning } from '../../../lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
@@ -87,6 +92,9 @@ export interface HandleMemorySessionStartBodyOptions {
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  claimSessionBriefing?: typeof claimSessionBriefing;
+  composeSessionStartBriefing?: typeof composeSessionStartBriefing;
+  recordSessionBriefingSize?: typeof recordSessionBriefingSize;
   now?: Date;
 }
 
@@ -99,8 +107,10 @@ export type HandleMemoryTurnBodyResult =
 export type HandleMemorySessionStartBodyResult =
   | { status: 'subagent' }
   | { status: 'disabled' }
-  | { status: 'accepted'; sessionId: string }
-  | { status: 'transcript-missing'; sessionId: string }
+  /** `briefing` is the rendered SessionStart briefing when this session id has not been briefed yet (PAN-3286 FR-10). */
+  | { status: 'accepted'; sessionId: string; briefing?: string }
+  /** Poller registration was skipped (transcript not written yet), but a briefing may still be owed. */
+  | { status: 'transcript-missing'; sessionId: string; briefing?: string }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
 export function memoryTurnHookResponse(body: unknown): typeof HttpServerResponse.Type | null {
@@ -204,16 +214,31 @@ export async function handleMemorySessionStartBody(
     return { status: 'error', statusCode: 422, error: 'memory identity could not be resolved' };
   }
 
+  // PAN-3286 FR-10: hand the hook a rendered standing briefing to emit as
+  // SessionStart additionalContext. Claim-then-compose so a second (or
+  // concurrent) SessionStart for the same session id gets nothing, and so any
+  // composition failure degrades to the briefing-less response.
+  //
+  // This runs BEFORE the transcript stat on purpose. The briefing describes
+  // workspace memory, not the transcript, and SessionStart legitimately fires
+  // before the harness writes the transcript's first line (see below) — a
+  // genuinely fresh session is exactly the case that most needs the briefing,
+  // and there is no guaranteed later SessionStart request to carry it.
+  const briefing = await composeBriefingForSessionStart(identity, sessionId, options);
+
   // The SessionStart hook can fire before the harness writes the transcript's
   // first line (and stale hooks can name a deleted transcript). A missing file
   // is a skip, not a 500 — the memory-reconciliation sweep registers the
-  // transcript once it exists.
+  // transcript once it exists. ENOENT only skips poller registration; the
+  // briefing composed above still rides back on the response.
   let fileStat: { size: number; mtimeMs: number };
   try {
     fileStat = await (options.statTranscript ?? getTranscriptStat)(trustedTranscriptPath);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { status: 'transcript-missing', sessionId };
+      return briefing
+        ? { status: 'transcript-missing', sessionId, briefing }
+        : { status: 'transcript-missing', sessionId };
     }
     throw error;
   }
@@ -227,7 +252,39 @@ export async function handleMemorySessionStartBody(
     mtimeMs: fileStat.mtimeMs,
   });
 
-  return { status: 'accepted', sessionId };
+  return briefing ? { status: 'accepted', sessionId, briefing } : { status: 'accepted', sessionId };
+}
+
+/**
+ * Claim the session, compose the briefing, then record its size. Returns null
+ * whenever the briefing must not be delivered: already claimed, nothing to say,
+ * or any failure — never throws, so the SessionStart hook keeps its current
+ * behavior (PAN-3286 FR-10).
+ */
+async function composeBriefingForSessionStart(
+  identity: MemoryIdentity,
+  sessionId: string,
+  options: HandleMemorySessionStartBodyOptions,
+): Promise<string | null> {
+  try {
+    const claim = options.claimSessionBriefing ?? claimSessionBriefing;
+    if (!await claim({ identity, sessionId, now: options.now })) return null;
+
+    const compose = options.composeSessionStartBriefing ?? composeSessionStartBriefing;
+    const briefing = await compose({ identity, sessionId, now: options.now });
+    if (!briefing) return null;
+
+    await (options.recordSessionBriefingSize ?? recordSessionBriefingSize)({
+      identity,
+      sessionId,
+      byteSize: briefing.byteSize,
+      now: options.now,
+    }).catch(() => {});
+    return briefing.context;
+  } catch (error) {
+    console.error('[memory] SessionStart briefing composition failed:', error);
+    return null;
+  }
 }
 
 export interface HandleMemoryInjectBodyOptions {
@@ -390,12 +447,25 @@ const postMemorySessionStartRoute = HttpRouter.add(
     const result = yield* Effect.promise(() => handleMemorySessionStartBody(body, {
       resolveAgentIdBySessionId: async (sessionId) => Effect.runPromise(readModel.getAgentIdBySessionId(sessionId)),
     }));
-    if (result.status === 'subagent' || result.status === 'disabled' || result.status === 'transcript-missing') {
+    if (result.status === 'subagent' || result.status === 'disabled') {
       return HttpServerResponse.text('', { status: 204 });
     }
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
+    // A transcript that is not written yet stays a 204 no-op UNLESS a briefing
+    // was composed for it — a fresh session is precisely when the transcript is
+    // most likely missing, so dropping the body here would lose the briefing
+    // entirely (PAN-3286 FR-10).
+    if (result.status === 'transcript-missing' && !result.briefing) {
+      return HttpServerResponse.text('', { status: 204 });
+    }
 
-    return jsonResponse({ ok: true }, { status: 202 });
+    // `briefing` is what the local SessionStart hook script emits as
+    // hookSpecificOutput.additionalContext (PAN-3286 FR-10). Absent when this
+    // session id was already briefed or there was nothing to say.
+    return jsonResponse(
+      result.briefing ? { ok: true, briefing: result.briefing } : { ok: true },
+      { status: 202 },
+    );
   })),
 );
 

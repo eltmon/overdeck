@@ -37,7 +37,12 @@ import {
 } from 'lucide-react';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
-import { sortWorkspaces, type WorkspaceRegistryRow } from './Sidebar';
+import {
+  isUserFacingWorkspace,
+  sortWorkspaces,
+  WORKSPACES_PIPELINE_EXPANDED_KEY,
+  type WorkspaceRegistryRow,
+} from './Sidebar';
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -57,6 +62,12 @@ interface PaletteAction {
   meta?: Array<{ icon?: React.ElementType; text: string; pill?: boolean }>;
   // Sort hint within group: lower = earlier.
   rank?: number;
+  /**
+   * Run the action without closing the palette. For in-palette affordances that
+   * change what is listed rather than navigating away — e.g. expanding the
+   * pipeline-worktrees row (PAN-3286 FR-13).
+   */
+  keepOpen?: boolean;
 }
 
 export interface ConversationPaletteOpenRequest {
@@ -354,6 +365,11 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   const [panCommands, setPanCommands] = useState<PanCommandEntry[]>([]);
   const [workspaceRows, setWorkspaceRows] = useState<WorkspaceRegistryRow[]>([]);
+  // Shares the sidebar rail's persisted flag (PAN-3286 FR-13); re-read on open
+  // so expanding in the rail is reflected here without a reload.
+  const [pipelineWorkspacesExpanded, setPipelineWorkspacesExpanded] = useState(
+    () => localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true',
+  );
   const [searchResults, setSearchResults] = useState<PaletteSearchResponse>(EMPTY_SEARCH);
   const [isSearchLoading, setIsSearchLoading] = useState(false);
   const [scope, setScope] = useState<PaletteScope>(initialScope);
@@ -366,6 +382,8 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     setQuery('');
     setSearchResults(EMPTY_SEARCH);
     setScope(initialScope);
+    // Re-read the shared expansion flag so a rail toggle is picked up here.
+    setPipelineWorkspacesExpanded(localStorage.getItem(WORKSPACES_PIPELINE_EXPANDED_KEY) === 'true');
     if (panCommands.length === 0) {
       void fetchPanCommands().then(setPanCommands);
     }
@@ -402,10 +420,16 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     return () => document.removeEventListener('keydown', handler);
   }, [isOpen, onClose]);
 
-  const handleSelect = useCallback((action: () => void) => {
+  const handleSelect = useCallback((action: PaletteAction) => {
+    // keepOpen actions re-list the palette instead of navigating, so closing
+    // would defeat them (PAN-3286 FR-13).
+    if (action.keepOpen) {
+      action.onSelect();
+      return;
+    }
     onClose();
     // Small delay so modal closes before action side effects
-    setTimeout(action, 50);
+    setTimeout(action.onSelect, 50);
   }, [onClose]);
 
   // ─── Action builders (stable wrt query — filtered later) ────────────────────
@@ -559,19 +583,64 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   // ─── Dynamic: workspaces (PAN-1990) ─────────────────────────────────────────
   // Favorites first, then most-recent-first (same ordering as the Sidebar rail).
+  // PAN-3286 FR-13: and the same default filter — non-favorited pipeline
+  // worktrees collapse behind a count row that expands them, mirroring the rail
+  // rather than hiding them outright (review fix). Expansion shares the rail's
+  // localStorage key, so it is one operator preference across both surfaces.
 
-  const workspaceActions = useMemo<PaletteAction[]>(() => sortWorkspaces(workspaceRows).map((ws) => ({
-    id: `workspace-${ws.id}`,
-    label: ws.title ?? ws.name,
-    description: ws.issueId ?? ws.kind,
-    icon: Clock,
-    group: 'Workspaces',
-    keywords: [ws.name, ws.issueId ?? '', ws.title ?? '', ws.kind],
-    onSelect: () => {
-      void fetch(`/api/workspace-registry/${ws.id}/activate`, { method: 'POST' });
-      onSelectWorkspace?.(ws.id);
-    },
-  })), [workspaceRows, onSelectWorkspace]);
+  const hiddenPipelineWorkspaces = useMemo(
+    () => sortWorkspaces(workspaceRows.filter((ws) => !isUserFacingWorkspace(ws))),
+    [workspaceRows],
+  );
+
+  const visibleWorkspaceRows = useMemo(
+    () => sortWorkspaces(
+      pipelineWorkspacesExpanded ? workspaceRows : workspaceRows.filter(isUserFacingWorkspace),
+    ),
+    [workspaceRows, pipelineWorkspacesExpanded],
+  );
+
+  const workspaceActions = useMemo<PaletteAction[]>(() => {
+    const actions: PaletteAction[] = visibleWorkspaceRows.map((ws) => ({
+      id: `workspace-${ws.id}`,
+      label: ws.title ?? ws.name,
+      description: ws.issueId ?? ws.kind,
+      icon: Clock,
+      group: 'Workspaces',
+      keywords: [ws.name, ws.issueId ?? '', ws.title ?? '', ws.kind],
+      onSelect: () => {
+        void fetch(`/api/workspace-registry/${ws.id}/activate`, { method: 'POST' });
+        onSelectWorkspace?.(ws.id);
+      },
+    }));
+
+    if (!pipelineWorkspacesExpanded && hiddenPipelineWorkspaces.length > 0) {
+      actions.push({
+        id: 'workspace-pipeline-expand',
+        label: `${hiddenPipelineWorkspaces.length} pipeline ${hiddenPipelineWorkspaces.length === 1 ? 'worktree' : 'worktrees'}`,
+        description: 'Show worktrees Overdeck created for issues',
+        icon: ChevronRight,
+        group: 'Workspaces',
+        // The hidden rows' own names are keywords, so typing one surfaces this
+        // row — otherwise a hidden workspace would be undiscoverable by search.
+        keywords: [
+          'pipeline',
+          'worktrees',
+          'issue workspaces',
+          ...hiddenPipelineWorkspaces.flatMap((ws) => [ws.name, ws.issueId ?? '']),
+        ].filter(Boolean),
+        onSelect: () => {
+          setPipelineWorkspacesExpanded(true);
+          try { localStorage.setItem(WORKSPACES_PIPELINE_EXPANDED_KEY, 'true'); } catch { /* ignore */ }
+        },
+        // Expanding is not a navigation — keep the palette open so the revealed
+        // rows can be picked immediately.
+        keepOpen: true,
+      });
+    }
+
+    return actions;
+  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace]);
 
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 
@@ -824,7 +893,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
                       <Command.Item
                         key={action.id}
                         value={action.id}
-                        onSelect={() => handleSelect(action.onSelect)}
+                        onSelect={() => handleSelect(action)}
                         className="flex items-start gap-3 px-3 py-2.5 mx-1 rounded-lg cursor-pointer data-[selected=true]:bg-popover transition-colors group"
                       >
                         <div className={`size-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
