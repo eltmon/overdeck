@@ -225,6 +225,60 @@ describe('SimpleIssuePage (C-SIMPLE)', () => {
     expect(screen.getByPlaceholderText(/Type your answer/)).toBeInTheDocument();
   });
 
+  it('a question with no written-out choices shows the terminal tail so the decision is visible', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/output')) {
+        return Response.json({ output: 'Do you want to proceed with the migration?\n❯ 1. Yes\n  2. No\n\n' });
+      }
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    seed({
+      issues: [makeIssue()],
+      agents: {
+        // A pane-detected question: pending input with no structured payload.
+        'agent-pan-1': makeAgent({ pendingInputCount: 1, pendingInputKinds: ['paneQuestion'] }),
+      },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    // The generic card (nothing structured to quote)…
+    expect(screen.getByText('The agent needs one decision from you before it can continue.')).toBeInTheDocument();
+    // …plus the actual decision, straight from the agent's screen.
+    expect(await screen.findByText(/Do you want to proceed with the migration/)).toBeInTheDocument();
+    expect(screen.getByText(/showing on its screen/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith('/api/agents/agent-pan-1/output?lines=40');
+  });
+
+  it('the rich question card never fetches the terminal tail', () => {
+    const fetchMock = vi.fn(async () => Response.json({ success: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    seed({
+      issues: [makeIssue()],
+      agents: {
+        'agent-pan-1': makeAgent({
+          pendingInputCount: 1,
+          pendingAskUserQuestion: {
+            toolUseId: 'tu-1',
+            askedAt: new Date().toISOString(),
+            questions: [{ question: 'Which color should the button be?', options: [] }],
+          },
+        }),
+      },
+    });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    expect(screen.getByText(/Which color should the button be/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/output'));
+  });
+
+  it('a working agent with no question fetches no terminal tail', () => {
+    const fetchMock = vi.fn(async () => Response.json({}));
+    vi.stubGlobal('fetch', fetchMock);
+    seed({ issues: [makeIssue()], agents: { 'agent-pan-1': makeAgent() } });
+    renderWithProviders(<SimpleIssuePage issueId="PAN-1" />);
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining('/output'));
+  });
+
   it('Get help routes to a new tracker issue pointing back at this task', () => {
     seed({
       issues: [makeIssue({ url: 'https://github.com/eltmon/overdeck/issues/42' })],

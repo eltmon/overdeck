@@ -72,6 +72,10 @@ export const SIMPLE_STRINGS = {
     pausedToStart: 'Paused — waiting for you to start the work',
     sentToAgent: 'Sent to the agent',
     questionTitle: 'It has a question for you',
+    // PAN-3090 follow-up — a question with no written-out choices (detected
+    // from the agent's screen rather than asked through a form) shows the
+    // terminal tail so the operator can see what the decision actually is.
+    screenExcerptLabel: "Here's what it's showing on its screen:",
     questionAskedPrefix: 'Asked ',
     questionPauseSuffix: 'work pauses until you answer — everything else keeps going',
     questionAnswerPlaceholder: 'Or type your own answer…',

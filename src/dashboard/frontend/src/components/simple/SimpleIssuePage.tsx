@@ -22,6 +22,7 @@ import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 import { useUiMode, syncSimpleIssueUrl } from '../../lib/simple/uiMode';
 import { SimpleActivityFeed } from './SimpleActivityFeed';
 import { isRichQuestion, SimpleQuestionCard } from './SimpleQuestionCard';
+import { SimpleTerminalExcerpt } from './SimpleTerminalExcerpt';
 import { ModeToggle, PrimaryButton, QuietButton, StatusCard, StepsTrack } from './parts';
 
 const S = SIMPLE_STRINGS.issue;
@@ -148,6 +149,10 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
           />
         ) : (
           <StatusCard display={d.display}>
+            {/* A question the rich card can't quote (pane-detected, or a payload
+                shape it declines) still sits on the agent's screen — show that
+                screen so the decision is visible next to the answer box. */}
+            {questionAgent && <SimpleTerminalExcerpt agentId={questionAgent.id} />}
             {d.expectation && <span className="w-full text-xs text-muted-foreground">{d.expectation}</span>}
             {primary()}
             {d.display.secondaryActions.map((label) =>
