@@ -44,15 +44,7 @@
       "timestamp": "2026-07-30T06:06:18.784Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-30T06:06:18Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3294\n\n# Code Review — PAN-3294 — Cycle 3\n\n## Verdict: CHANGES REQUESTED\n\nThe previous mkdir-to-PID initialization race was addressed in code changed since cycle 2, but the replacement lock architecture introduces a new at-most-one failure mode and violates the issue's explicit portability requirement. The reviewed fix is also still local-only: the GitHub PR remains at the pre-fix SHA.\n\n## Context\n\n- Branch: `feature/pan-3294`\n- HEAD reviewed: `d872af6cd80efdb90f2eb0c98e040cb8d6075ec0`\n- Prior reviewed HEAD: `07eef06fb59284a2f517822254356ce5a0e8776a`\n- PR: `#3299`\n- GitHub PR head: `bf9282426e145a107b1cbdc1c32f1388bd9dc89f`\n- Cycle diff in issue files: `sync-sources/hooks/pan-hook-lib.sh` and `tests/scripts/pan-hook-lib-guards.test.ts`\n- Review dimensions: correctness, security, requirements, performance\n\n## Blocking Findings\n\n### P1 — [correctness / requirements] The lock is released if its helper dies while the guarded hook body remains alive — `sync-sources/hooks/pan-hook-lib.sh:29`\n\nThe Python child, rather than the hook shell executing the guarded body, owns the kernel lock. After `pan_acquire_singleflight_lock` returns, the shell does not monitor that child. If the helper is killed or crashes, the kernel releases its advisory lock immediately even though the original hook shell and its LLM call can still be running. A second invocation then acquires the guard, removes the first caller's metadata at lines 74-81, and also enters the guarded body.\n\nI reproduced this at the current HEAD: caller A acquired the lock and remained alive, I terminated only its recorded helper PID, and caller B returned success. The probe output was `contender_rc=0 original_holder_alive=yes`.\n\nThis still violates FR-1's at-most-one-hook-body guarantee. It also affects FR-4 because the same helper-owned primitive serializes the token-bucket read/modify/write section. The failure is relevant to the reported incident: the guard is specifically intended to remain correct under process and memory pressure, where an auxiliary process can die independently of the much larger hook/LLM process it protects.\n\nCouple lock ownership to the guarded process itself, or make helper death synchronously terminate/abort that guarded process before another caller can enter. Add a deterministic test that kills the helper after acquisition, keeps the original shell alive, and proves a contender cannot acquire.\n\n### P1 — [requirements / portability] The replacement uses the exact flock-based architecture NFR-1 forbids — `sync-sources/hooks/pan-hook-lib.sh:30`\n\nNFR-1 requires all new locking to use portable atomic `mkdir` locks and explicitly says \"no new `flock`\" so the primitive works on stock macOS and Linux without a GNU-only lock dependency. The new helper imports `fcntl` and calls `fcntl.flock`; the directory is now only metadata, as the source comment states. It also makes `python3` mandatory for the lock itself. When `python3` is unavailable, `pan_acquire_singleflight_lock` returns 1 and `work-agent-stop-hook` skips its entire body as if another instance held the lock.\n\nPython's `fcntl.flock` may be available on configured development machines, but it is neither the specified mkdir-only primitive nor a stock-macOS shell primitive. This is a deliberate requirements substitution rather than an implementation of NFR-1, and `docs/HOOKS.md` does not disclose the new persistent Python helper or `.flock` synchronization file.\n\nReplace the auxiliary `fcntl.flock` protocol with a race-safe mkdir-based ownership protocol that satisfies NFR-1. If the requirement itself is to be changed, revise and approve the PRD/xBRIEF first rather than silently changing the portability contract in implementation.\n\n## Delivery Blocker\n\nThe local branch is 53 commits ahead of `origin/feature/pan-3294`, while both `gh pr view` and `git ls-remote` report the PR head as `bf9282426e145a107b1cbdc1c32f1388bd9dc89f`. None of the cycle-3 lock fix is currently present in the GitHub PR, so the remote CI results are for the old implementation and cannot validate the reviewed HEAD. The corrected next revision must be pushed before review is requested again.\n\n## Non-blocking Review Results\n\n- **Previous finding:** The original directory-publication/PID-publication race was structurally removed by acquiring the kernel lock before replacing metadata, and the new deterministic test covers that earlier interleaving.\n- **Security:** No new command-injection, authorization, secret-exposure, or cross-user access path was found. The helper-PID lifecycle increases same-user process-management risk, but the correctness blocker above already requires replacing or redesigning that ownership mechanism.\n- **Performance:** Each held lock now adds a persistent Python process polling at 10 Hz, and every contender spawns another Python process. This works against the issue's process-storm objective, though the configured LLM admission cap still bounds the largest child processes. A mkdir-only fix removes this extra footprint.\n- **Other requirements:** FR-2, FR-3, FR-5, FR-6, NFR-2, and NFR-3 remain implemented. FR-1 and FR-4 remain blocked by helper death; NFR-1 is directly violated.\n- **CodeRabbit advisory:** The parent-directory concern is now addressed by `mkdir -p \"$lock_parent\"` before acquisition.\n\n## Verification Performed\n\n- `git diff --check $(git merge-base origin/main HEAD)..HEAD` — passed.\n- `bash -n sync-sources/hooks/pan-hook-lib.sh sync-sources/hooks/work-agent-stop-hook` — passed.\n- `npx vitest run tests/scripts/pan-hook-lib-guards.test.ts tests/scripts/work-agent-stop-hook.test.ts` — 26 tests passed.\n- Helper-death concurrency probe — reproduced the new double-acquisition failure.\n- Missing-Python probe — acquisition returned 1 and created no lock.\n- `shellcheck` was unavailable in this workspace.\n- Remote branch audit — GitHub PR remains at the pre-fix SHA; existing CI is stale for this local HEAD.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3294/.pan/review/agent-pan-3294-review-d872af6c/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3294 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -73,10 +65,10 @@
     "recordedAt": "2026-07-30T06:34:43.205Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T06:35:30.490Z",
+  "updated": "2026-07-30T06:36:31.329Z",
   "pipeline": {
     "issueId": "PAN-3294",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -84,14 +76,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:35:04.907Z",
-    "updatedAt": "2026-07-30T06:35:30.439Z",
+    "updatedAt": "2026-07-30T06:36:31.301Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 2066591 exited before writing a result",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewedAtCommit": "d872af6cd80efdb90f2eb0c98e040cb8d6075ec0",
     "lastVerifiedCommit": "bf9282426e145a107b1cbdc1c32f1388bd9dc89f",
     "reviewRequestedAt": "2026-07-30T06:35:04.907Z",
-    "reviewSpawnedAt": "2026-07-30T06:02:06.922Z",
+    "reviewSpawnedAt": "2026-07-30T06:36:31.300Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -156,7 +148,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.201314,
-        "pricingAsOf": "2026-07-30T06:35:30.485Z"
+        "pricingAsOf": "2026-07-30T06:36:31.312Z"
       }
     },
     "merges": [
