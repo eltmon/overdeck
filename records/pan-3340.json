@@ -2,7 +2,7 @@
   "issueId": "PAN-3340",
   "schemaVersion": 2,
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T21:02:35.588Z",
+  "updated": "2026-07-30T21:02:43.690Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3340: Dashboard: Review action should open a submenu to pick review mode (Full / Quick / None)",
       "timestamp": "2026-07-30T21:02:35.588Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
