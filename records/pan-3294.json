@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-30T06:34:43.205Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T06:34:53.502Z",
+  "updated": "2026-07-30T06:35:05.281Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -89,7 +89,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewedAtCommit": "d872af6cd80efdb90f2eb0c98e040cb8d6075ec0",
     "lastVerifiedCommit": "bf9282426e145a107b1cbdc1c32f1388bd9dc89f",
-    "reviewRequestedAt": "2026-07-30T06:34:44.204Z",
+    "reviewRequestedAt": "2026-07-30T06:35:04.907Z",
     "reviewSpawnedAt": "2026-07-30T06:02:06.922Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -109,7 +109,8 @@
         "tests/scripts/work-agent-stop-hook.test.ts"
       ],
       "recordedAt": "2026-07-30T06:34:43.205Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-30T06:35:04.907Z"
   },
   "closeOut": {
     "usage": {
