@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T04:56:30.222Z",
+  "updated": "2026-07-30T05:01:50.121Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "stop-verifies-pid-death": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 3997006,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:56:30.222Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -150,6 +142,17 @@
         "outcome": "completed",
         "reason": "Restart now watches only post-spawn dashboard log bytes and rejects immediately on EADDRINUSE with the current port owner, without the left-running marker",
         "releasedAt": "2026-07-30T04:56:13.499Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 3997006,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:56:30.222Z",
+        "itemId": "stop-verifies-pid-death",
+        "outcome": "completed",
+        "reason": "Teardown now escalates any originally targeted process that survives SIGTERM and rejects if it remains alive after SIGKILL, even after releasing its listener",
+        "releasedAt": "2026-07-30T05:01:50.121Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "eaddrinuse-fastfail": {
         "reason": "Restart now watches only post-spawn dashboard log bytes and rejects immediately on EADDRINUSE with the current port owner, without the left-running marker",
         "updatedAt": "2026-07-30T04:56:13.499Z"
+      },
+      "stop-verifies-pid-death": {
+        "reason": "Teardown now escalates any originally targeted process that survives SIGTERM and rejects if it remains alive after SIGKILL, even after releasing its listener",
+        "updatedAt": "2026-07-30T05:01:50.121Z"
       }
     }
   },
@@ -200,6 +207,9 @@
     "eaddrinuse-fastfail.eaddrinuse-fastfail.ac1": "completed",
     "eaddrinuse-fastfail.eaddrinuse-fastfail.ac2": "completed",
     "eaddrinuse-fastfail.eaddrinuse-fastfail.ac3": "completed",
-    "stop-verifies-pid-death": "running"
+    "stop-verifies-pid-death": "completed",
+    "stop-verifies-pid-death.stop-verifies-pid-death.ac1": "completed",
+    "stop-verifies-pid-death.stop-verifies-pid-death.ac2": "completed",
+    "stop-verifies-pid-death.stop-verifies-pid-death.ac3": "completed"
   }
 }
