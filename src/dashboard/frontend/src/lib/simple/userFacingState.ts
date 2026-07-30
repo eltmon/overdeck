@@ -17,9 +17,18 @@ export interface UserFacingInput {
   pipelineState: PipelineState;
   /** An agent is waiting on an AskUserQuestion / operator message. */
   pendingInput?: boolean;
+  /**
+   * The pending input is a bare turn-end — the agent simply stopped talking —
+   * rather than an actual open decision (a question, a plan approval, a
+   * permission prompt). See `isBareTurnEnd` in ./derive.ts.
+   */
+  bareTurnEnd?: boolean;
   /** An agent is past the stuck threshold or gated troubled. */
   stuck?: boolean;
 }
+
+/** Why the task needs a human, when it does. Drives copy and home grouping. */
+export type NeedsYouReason = 'question' | 'start-work' | 'problems' | 'stuck';
 
 export interface UserFacingDisplay {
   state: UserFacingState;
@@ -32,19 +41,31 @@ export interface UserFacingDisplay {
   primaryAction: string | null;
   /** Secondary, quiet actions. */
   secondaryActions: string[];
+  /** Set exactly when `state` is 'needs-you'; null otherwise. */
+  needsYouReason: NeedsYouReason | null;
 }
 
-const BASE_BY_PIPELINE_STATE: Record<PipelineState, { state: UserFacingState; title: string; sentence: string; primaryAction: string | null }> = {
+interface BaseDisplay {
+  state: UserFacingState;
+  title: string;
+  sentence: string;
+  primaryAction: string | null;
+  needsYouReason?: NeedsYouReason;
+}
+
+const BASE_BY_PIPELINE_STATE: Record<PipelineState, BaseDisplay> = {
   planning_active:            { state: 'working', title: 'Planning', sentence: 'The agent is breaking this down into tasks.', primaryAction: null },
-  planning_done_awaiting_work:{ state: 'working', title: 'Starting up', sentence: 'The plan is ready — work starts next.', primaryAction: null },
+  // The plan exists and nothing is running: work does NOT start by itself, so
+  // this is a decision, not a transition. Naming the button is the whole point.
+  planning_done_awaiting_work:{ state: 'needs-you', title: 'The plan is ready', sentence: 'The plan is written and nothing is running. Nothing starts until you say go.', primaryAction: 'Start work', needsYouReason: 'start-work' },
   in_progress_work_running:   { state: 'working', title: 'Writing code', sentence: 'The agent is writing the code.', primaryAction: null },
   in_progress_work_idle:      { state: 'working', title: 'Paused mid-work', sentence: 'Work started but is idle right now.', primaryAction: null },
   in_review_reviewers_running:{ state: 'working', title: 'Being checked', sentence: 'The work is done and being checked over.', primaryAction: null },
-  in_review_changes_requested:{ state: 'needs-you', title: 'Problems found', sentence: 'The check found problems that need fixing before this can merge.', primaryAction: 'Tell the agent to fix them' },
+  in_review_changes_requested:{ state: 'needs-you', title: 'Problems found', sentence: 'The check found problems that need fixing before this can merge.', primaryAction: 'Tell the agent to fix them', needsYouReason: 'problems' },
   in_review_approved:         { state: 'working', title: 'Almost there', sentence: 'Checks passed — finishing the last automated steps.', primaryAction: null },
   testing_running:            { state: 'working', title: 'Being tested', sentence: 'The finished work is being tested.', primaryAction: null },
-  testing_failures:           { state: 'needs-you', title: 'Tests failing', sentence: 'Some tests are failing and need a look.', primaryAction: 'Tell the agent to fix them' },
-  verification_failing:       { state: 'needs-you', title: 'Checks failing', sentence: 'Some checks are failing and need a look.', primaryAction: 'Tell the agent to fix them' },
+  testing_failures:           { state: 'needs-you', title: 'Tests failing', sentence: 'Some tests are failing and need a look.', primaryAction: 'Tell the agent to fix them', needsYouReason: 'problems' },
+  verification_failing:       { state: 'needs-you', title: 'Checks failing', sentence: 'Some checks are failing and need a look.', primaryAction: 'Tell the agent to fix them', needsYouReason: 'problems' },
   ready_to_merge:             { state: 'ready', title: 'Ready to merge', sentence: 'Done and checked — ready to merge. Nothing merges by itself.', primaryAction: 'Merge to main' },
   merging:                    { state: 'working', title: 'Merging', sentence: 'Being merged to main now.', primaryAction: null },
   verifying:                  { state: 'working', title: 'Verifying on main', sentence: 'Merged — making sure it works on main.', primaryAction: null },
@@ -54,21 +75,34 @@ const BASE_BY_PIPELINE_STATE: Record<PipelineState, { state: UserFacingState; ti
   generic:                    { state: 'not-started', title: 'Not started', sentence: 'No one has started this yet.', primaryAction: 'Start work' },
 };
 
+/**
+ * A finished plan's agent goes idle, which reads as pending input even though
+ * it asked nothing. When that bare turn-end is the ONLY pending signal and the
+ * plan is done, the base state already says the true thing ("the plan is ready,
+ * press start") — a generic question card would replace it with a lie and an
+ * answer box that goes nowhere.
+ */
+function showsQuestion(input: UserFacingInput): boolean {
+  if (!input.pendingInput) return false;
+  return !(input.bareTurnEnd === true && input.pipelineState === 'planning_done_awaiting_work');
+}
+
 /** Signals that override the base projection: questions and stuck agents always win. */
 export function userFacingState(input: UserFacingInput): UserFacingState {
-  if (input.pendingInput) return 'needs-you';
+  if (showsQuestion(input)) return 'needs-you';
   if (input.stuck) return 'needs-you';
   return BASE_BY_PIPELINE_STATE[input.pipelineState].state;
 }
 
 export function userFacingDisplay(input: UserFacingInput): UserFacingDisplay {
-  if (input.pendingInput) {
+  if (showsQuestion(input)) {
     return {
       state: 'needs-you',
       title: 'Question for you',
       sentence: 'The agent needs one decision from you before it can continue.',
       primaryAction: 'Answer',
       secondaryActions: [],
+      needsYouReason: 'question',
     };
   }
   if (input.stuck) {
@@ -78,11 +112,12 @@ export function userFacingDisplay(input: UserFacingInput): UserFacingDisplay {
       sentence: 'The agent got stuck and is not making progress.',
       primaryAction: 'Get it unstuck',
       secondaryActions: [],
+      needsYouReason: 'stuck',
     };
   }
   const base = BASE_BY_PIPELINE_STATE[input.pipelineState];
   const secondaryActions: string[] = [];
   if (base.state === 'working') secondaryActions.push('Tell the agent something');
   if (base.state === 'ready') secondaryActions.push('See what changed');
-  return { ...base, secondaryActions };
+  return { ...base, secondaryActions, needsYouReason: base.needsYouReason ?? null };
 }

@@ -60,7 +60,10 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
 
   const d = derivation;
   const agent = d.primaryAgent;
-  const questionAgent = d.pendingInputAgent;
+  // Only a real open decision turns the composer into an answer box. A plan
+  // agent that merely ended its turn has nothing to answer, and its session is
+  // gone — routing an "answer" there sends into the void.
+  const questionAgent = d.display.needsYouReason === 'question' ? d.pendingInputAgent : undefined;
   // The feed's switcher owns this selection; the composer below always talks
   // to the agent you're looking at.
   const selectedAgent = d.agents.find((a) => a.id === selectedAgentId) ?? agent;
@@ -135,7 +138,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
           <h1 className="mt-1 text-[21px] font-medium leading-snug">{d.issue.title}</h1>
         </div>
 
-        <StepsTrack state={d.display.state} />
+        <StepsTrack state={d.display.state} pipelineState={d.pipelineState} />
 
         {richQuestion ? (
           <SimpleQuestionCard
@@ -167,6 +170,7 @@ export function SimpleIssuePage({ issueId }: { issueId: string }) {
                 agent={selectedAgent!}
                 onSelectAgent={setSelectedAgentId}
                 state={d.display.state}
+                needsYouReason={d.display.needsYouReason}
               />
             ) : (
               <div className="rounded-xl border border-dashed border-border p-4 text-center text-xs text-muted-foreground">

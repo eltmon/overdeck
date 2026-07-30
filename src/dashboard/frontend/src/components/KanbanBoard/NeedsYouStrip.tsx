@@ -16,6 +16,7 @@ import { useSimpleActions } from '../../lib/simple/useSimpleActions';
 
 const KIND_META: Record<NeedsYouKind, { label: string; tone: string }> = {
   question: { label: 'Question', tone: 'border-warning/40' },
+  'start-work': { label: 'Plan ready', tone: 'border-warning/40' },
   problems: { label: 'Problems found', tone: 'border-warning/40' },
   stuck: { label: 'Stuck', tone: 'border-destructive/40' },
 };
@@ -40,7 +41,7 @@ function NeedsYouRow({
   const agent = item.primaryAgent;
   const questionAgent = isConversation ? undefined : item.pendingInputAgent;
   const answerTarget = conversationName || questionAgent?.id;
-  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.answer.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.answer.isPending || actions.startWork.isPending;
   const meta = KIND_META[kind];
 
   return (
@@ -73,6 +74,15 @@ function NeedsYouRow({
               Answer
             </button>
           </>
+        )}
+        {kind === 'start-work' && (
+          <button
+            disabled={busy}
+            onClick={() => actions.startWork.mutate({ issueId: item.issue.identifier })}
+            className="h-7 rounded-md bg-primary px-2.5 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+          >
+            Start work
+          </button>
         )}
         {kind === 'problems' && (
           <button

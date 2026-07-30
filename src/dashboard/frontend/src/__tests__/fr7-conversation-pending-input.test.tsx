@@ -107,6 +107,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
       recover: { mutate: vi.fn(), isPending: false },
       unstick: { mutate: vi.fn(), isPending: false },
       answer: { mutate: vi.fn(), isPending: false },
+      startWork: { mutate: vi.fn(), isPending: false },
     } as any);
 
     // Default: no agent-backed needs-you items, just an empty derivation
@@ -176,6 +177,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         recover: { mutate: vi.fn(), isPending: false },
         unstick: { mutate: vi.fn(), isPending: false },
         answer: { mutate: answerMutate, isPending: false },
+        startWork: { mutate: vi.fn(), isPending: false },
       } as any);
 
       vi.mocked(decisions.usePendingInputSubjects).mockReturnValue([
@@ -212,6 +214,7 @@ describe('FR-7: Conversation-only pending input surfaces', () => {
         recover: { mutate: vi.fn(), isPending: false },
         unstick: { mutate: vi.fn(), isPending: false },
         answer: { mutate: answerMutate, isPending: false },
+        startWork: { mutate: vi.fn(), isPending: false },
       } as any);
 
       // Mock bucketSimpleHome to return agent-backed needs-you item

@@ -67,6 +67,40 @@ export function phaseRailState(pipelineState: PipelineState): PhaseRailState {
   return RAIL_BY_PIPELINE_STATE[pipelineState];
 }
 
+/**
+ * Simple mode's four-step track (Started · Writing code · Checking · Ready)
+ * projected from the same machine state. Index 4 means every step is behind us.
+ *
+ * This is deliberately NOT derived from `currentPhase` + the six-phase rail:
+ * the rail marks `work` current the moment a plan exists, which on the
+ * four-step track would read as "Writing code" before any code was written.
+ * A finished plan that nobody has started sits on step 0 — it started, and it
+ * is waiting on you before it writes anything.
+ */
+const SIMPLE_STEP_BY_PIPELINE_STATE: Record<PipelineState, number> = {
+  planning_active:             0,
+  planning_done_awaiting_work: 0,
+  in_progress_work_running:    1,
+  in_progress_work_idle:       1,
+  in_review_reviewers_running: 2,
+  in_review_changes_requested: 2,
+  in_review_approved:          2,
+  testing_running:             2,
+  testing_failures:            2,
+  verification_failing:        2,
+  ready_to_merge:              3,
+  merging:                     3,
+  verifying:                   3,
+  merged:                      4,
+  done:                        4,
+  canceled:                    0,
+  generic:                     0,
+};
+
+export function simpleStepIndex(pipelineState: PipelineState): number {
+  return SIMPLE_STEP_BY_PIPELINE_STATE[pipelineState];
+}
+
 /** The phase an issue is "at" (its current or attention step, else null). */
 export function currentPhase(pipelineState: PipelineState): Phase | null {
   const rail = RAIL_BY_PIPELINE_STATE[pipelineState];

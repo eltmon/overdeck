@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { PHASES, phaseLabel, phaseRailState, currentPhase, type PhaseRailState } from '../simple/phases';
+import { PHASES, phaseLabel, phaseRailState, currentPhase, simpleStepIndex, type PhaseRailState } from '../simple/phases';
 import { USER_FACING_STATES, userFacingState, userFacingDisplay } from '../simple/userFacingState';
 import type { PipelineState } from '../issuePipelineState';
 import { BANNED_WORDS, findBannedWords, SIMPLE_STRINGS } from '../simple/strings';
@@ -48,6 +48,28 @@ describe('PHASES vocabulary (C-VOCAB)', () => {
       for (const phase of PHASES) {
         expect(['done', 'current', 'pending', 'attention']).toContain(rail[phase]);
       }
+    }
+  });
+
+  it('every PipelineState projects onto a four-step index (exhaustive)', () => {
+    for (const ps of ALL_PIPELINE_STATES) {
+      const i = simpleStepIndex(ps);
+      expect(Number.isInteger(i)).toBe(true);
+      expect(i).toBeGreaterThanOrEqual(0);
+      expect(i).toBeLessThanOrEqual(4);
+    }
+  });
+
+  /**
+   * PAN-3330 — the track used to be indexed by user-facing state, which pinned
+   * every needs-you to step 1 ("Writing code"). Nothing before the work phase
+   * may claim code is being written.
+   */
+  it('no pre-work state lands on the "Writing code" step', () => {
+    const steps = SIMPLE_STRINGS.issue.steps;
+    expect(steps[1]).toBe('Writing code');
+    for (const ps of ['planning_active', 'planning_done_awaiting_work'] as PipelineState[]) {
+      expect(simpleStepIndex(ps)).toBe(0);
     }
   });
 

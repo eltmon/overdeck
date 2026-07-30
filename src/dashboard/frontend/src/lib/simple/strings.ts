@@ -69,6 +69,7 @@ export const SIMPLE_STRINGS = {
     readMore: 'Read more',
     showLess: 'Show less',
     pausedWaiting: 'Paused — waiting for your answer',
+    pausedToStart: 'Paused — waiting for you to start the work',
     sentToAgent: 'Sent to the agent',
     questionTitle: 'It has a question for you',
     questionAskedPrefix: 'Asked ',

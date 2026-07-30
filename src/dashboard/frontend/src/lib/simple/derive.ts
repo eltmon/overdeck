@@ -11,7 +11,7 @@ import type { Issue } from '../../types';
 import { derivePipelineState, type PipelineState } from '../issuePipelineState';
 import { isAgentProblemStatus } from '../pipeline-state';
 import { phaseRailState, type PhaseRailState } from './phases';
-import { userFacingDisplay, type UserFacingDisplay } from './userFacingState';
+import { userFacingDisplay, type NeedsYouReason, type UserFacingDisplay } from './userFacingState';
 
 export interface SimpleIssueDerivation {
   issue: Issue;
@@ -89,6 +89,19 @@ export function hasPendingInput(agent: AgentSnapshot): boolean {
   );
 }
 
+/**
+ * True when the agent's only pending signal is `agentTurnEnded` — it stopped
+ * talking, it did not ask anything. An idle plan agent always trips this once
+ * planning finishes (agent-enrichment.ts adds the kind for interactive roles),
+ * so simple mode must not read it as an open question. Unknown/absent kinds
+ * stay conservative and report false.
+ */
+export function isBareTurnEnd(agent: AgentSnapshot): boolean {
+  if (agent.pendingAskUserQuestion || agent.pendingProposedPlan) return false;
+  const kinds = agent.pendingInputKinds ?? [];
+  return kinds.length > 0 && kinds.every((k) => k === 'agentTurnEnded');
+}
+
 export function deriveSimpleIssue(
   issue: Issue,
   agents: AgentSnapshot[],
@@ -120,7 +133,12 @@ export function deriveSimpleIssue(
     issue,
     pipelineState,
     rail: phaseRailState(pipelineState),
-    display: userFacingDisplay({ pipelineState, pendingInput: !!pendingInputAgent, stuck }),
+    display: userFacingDisplay({
+      pipelineState,
+      pendingInput: !!pendingInputAgent,
+      bareTurnEnd: !!pendingInputAgent && isBareTurnEnd(pendingInputAgent),
+      stuck,
+    }),
     primaryAgent,
     pendingInputAgent,
     agentStuck,
@@ -136,7 +154,8 @@ export function deriveSimpleIssue(
   };
 }
 
-export type NeedsYouKind = 'question' | 'problems' | 'stuck';
+/** Why a needs-you card is on home — owned by userFacingDisplay, not re-derived. */
+export type NeedsYouKind = NeedsYouReason;
 
 export interface SimpleHomeBuckets {
   needsYou: { derivation: SimpleIssueDerivation; kind: NeedsYouKind }[];
@@ -160,7 +179,7 @@ export function bucketSimpleHome(
   for (const d of derivations) {
     switch (d.display.state) {
       case 'needs-you': {
-        const kind: NeedsYouKind = d.pendingInputAgent ? 'question' : d.agentStuck || d.reviewStuck ? 'stuck' : 'problems';
+        const kind: NeedsYouKind = d.display.needsYouReason ?? 'problems';
         buckets.needsYou.push({ derivation: d, kind });
         break;
       }

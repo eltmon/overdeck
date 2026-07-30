@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentSnapshot, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { bucketSimpleHome, deriveExpectation, deriveSimpleIssue } from '../simple/derive';
+import { simpleStepIndex } from '../simple/phases';
 import type { Issue } from '../../types';
 
 function makeIssue(overrides: Partial<Issue> = {}): Issue {
@@ -64,6 +65,51 @@ describe('deriveSimpleIssue', () => {
     expect(d.display.state).toBe('needs-you');
     expect(d.display.title).toBe('Question for you');
     expect(d.display.sentence).not.toBe('The agent is writing the code.');
+  });
+
+  /**
+   * PAN-3330 shape — planning finished, the plan agent went idle and stopped.
+   * `computeAgentEnrichment` flags an idle interactive role with the
+   * `agentTurnEnded` kind, which used to render as "Question for you" with an
+   * answer box pointed at a dead session. Nothing was asked: what this needs
+   * is the start button, and the four-step track must not claim "Writing code"
+   * before a single line has been written.
+   */
+  it('finished plan + bare turn-end → the plan is ready, not a question', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({ role: 'plan', status: 'stopped', pendingInputKinds: ['agentTurnEnded'], pendingInputCount: 1 })],
+    );
+    expect(d.pipelineState).toBe('planning_done_awaiting_work');
+    expect(d.display.state).toBe('needs-you');
+    expect(d.display.needsYouReason).toBe('start-work');
+    expect(d.display.title).toBe('The plan is ready');
+    expect(d.display.primaryAction).toBe('Start work');
+    expect(simpleStepIndex(d.pipelineState)).toBe(0);
+  });
+
+  it('finished plan + a real question still shows the question', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({
+        role: 'plan',
+        status: 'stopped',
+        pendingAskUserQuestion: { toolUseId: 't', askedAt: '', questions: [] },
+        pendingInputKinds: ['askUserQuestion'],
+        pendingInputCount: 1,
+      })],
+    );
+    expect(d.display.needsYouReason).toBe('question');
+    expect(d.display.primaryAction).toBe('Answer');
+  });
+
+  it('a still-planning agent that ends its turn keeps asking for you', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo' }),
+      [agent({ role: 'plan', status: 'running', pendingInputKinds: ['agentTurnEnded'], pendingInputCount: 1 })],
+    );
+    expect(d.pipelineState).toBe('planning_active');
+    expect(d.display.needsYouReason).toBe('question');
   });
 
   it('troubled agent → needs-you / stuck', () => {

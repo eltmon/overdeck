@@ -105,17 +105,22 @@ function QuestionCard({ item, subject, onOpen }: { item: SimpleIssueDerivation; 
 function ProblemsCard({ item, kind, onOpen }: { item: SimpleIssueDerivation; kind: NeedsYouKind; onOpen: () => void }) {
   const actions = useSimpleActions();
   const agent = item.primaryAgent;
-  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending;
+  const busy = actions.tell.isPending || actions.recover.isPending || actions.unstick.isPending || actions.startWork.isPending;
   const isStuck = kind === 'stuck';
+  const isStartWork = kind === 'start-work';
   return (
     <div className="mt-3 rounded-2xl border border-warning/40 bg-card p-4 shadow-sm">
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{isStuck ? 'Stuck' : 'Problems found'} · {item.issue.identifier}</span>
+        <span>{isStuck ? 'Stuck' : isStartWork ? item.display.title : 'Problems found'} · {item.issue.identifier}</span>
       </div>
       <button onClick={onOpen} className="mt-1 text-left text-[15px] font-medium hover:underline">{item.issue.title}</button>
       <p className="mt-2 text-[13.5px] leading-relaxed">{item.display.sentence}</p>
       <div className="mt-3 flex items-center gap-2">
-        {isStuck ? (
+        {isStartWork ? (
+          <PrimaryButton disabled={busy} onClick={() => actions.startWork.mutate({ issueId: item.issue.identifier })}>
+            {item.display.primaryAction}
+          </PrimaryButton>
+        ) : isStuck ? (
           <PrimaryButton
             disabled={busy || (!item.reviewStuck && !agent)}
             onClick={() => {

@@ -28,7 +28,7 @@ import { buildSimpleFeedEntries, type SimpleFeedEntry } from '../../lib/simple/f
 import { getPendingToolEntry, getPhaseLabel, getWorkingPhase } from '../../lib/workingPhase';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
-import type { UserFacingState } from '../../lib/simple/userFacingState';
+import type { NeedsYouReason, UserFacingState } from '../../lib/simple/userFacingState';
 import { cn } from '../../lib/utils';
 
 const S = SIMPLE_STRINGS.issue;
@@ -40,9 +40,11 @@ interface SimpleActivityFeedProps {
   agent: AgentSnapshot;
   onSelectAgent: (agentId: string) => void;
   state: UserFacingState;
+  /** Why it needs you — decides what the paused live row says. */
+  needsYouReason?: NeedsYouReason | null;
 }
 
-export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state }: SimpleActivityFeedProps) {
+export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state, needsYouReason }: SimpleActivityFeedProps) {
   const conversation = useMemo(() => agentToConversation(agent), [agent]);
   const streamEnabled = useConversationMessagesStream(conversation);
   const queryClient = useQueryClient();
@@ -128,7 +130,7 @@ export function SimpleActivityFeed({ issue, agents, agent, onSelectAgent, state 
         {entries.map((entry) => (
           <FeedRow key={entry.id} entry={entry} />
         ))}
-        <LiveRow state={state} running={running} messages={messages} workLog={workLog} />
+        <LiveRow state={state} needsYouReason={needsYouReason} running={running} messages={messages} workLog={workLog} />
       </div>
     </div>
   );
@@ -216,8 +218,9 @@ function FeedRow({ entry }: { entry: SimpleFeedEntry }) {
   );
 }
 
-function LiveRow({ state, running, messages, workLog }: {
+function LiveRow({ state, needsYouReason, running, messages, workLog }: {
   state: UserFacingState;
+  needsYouReason?: NeedsYouReason | null;
   running: boolean;
   messages: Parameters<typeof getWorkingPhase>[0];
   workLog: Parameters<typeof getWorkingPhase>[1];
@@ -226,7 +229,9 @@ function LiveRow({ state, running, messages, workLog }: {
     return (
       <div className="flex gap-2.5 px-0.5 py-2.5">
         <span className="mt-1.5 w-4 flex-none text-center text-[10px] text-warning">●</span>
-        <div className="flex-1 text-[13px] text-warning-foreground">{S.pausedWaiting}</div>
+        <div className="flex-1 text-[13px] text-warning-foreground">
+          {needsYouReason === 'start-work' ? S.pausedToStart : S.pausedWaiting}
+        </div>
         <span className="mt-0.5 flex-none text-[11px] text-muted-foreground">now</span>
       </div>
     );

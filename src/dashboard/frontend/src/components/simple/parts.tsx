@@ -5,8 +5,9 @@
  */
 import type { ReactNode } from 'react';
 import { Check, CircleHelp, LoaderCircle, PauseCircle } from 'lucide-react';
+import type { PipelineState } from '../../lib/issuePipelineState';
 import type { PhaseRailState } from '../../lib/simple/phases';
-import { PHASES } from '../../lib/simple/phases';
+import { PHASES, simpleStepIndex } from '../../lib/simple/phases';
 import type { UserFacingDisplay, UserFacingState } from '../../lib/simple/userFacingState';
 import { SIMPLE_STRINGS } from '../../lib/simple/strings';
 import { useUiMode, type UiMode } from '../../lib/simple/uiMode';
@@ -39,17 +40,13 @@ export function ModeToggle() {
 }
 
 /* ── Progress steps: Started → Writing code → Checking → Ready ───────── */
-const STEP_INDEX_BY_STATE: Record<UserFacingState, number> = {
-  'not-started': 0,
-  working: 1,
-  'needs-you': 1,
-  ready: 3,
-  done: 4,
-};
-
-export function StepsTrack({ state }: { state: UserFacingState }) {
+export function StepsTrack({ state, pipelineState }: { state: UserFacingState; pipelineState: PipelineState }) {
   const steps = SIMPLE_STRINGS.issue.steps;
-  const current = STEP_INDEX_BY_STATE[state];
+  // The step comes from where the machine actually is; the user-facing state
+  // only picks the tone. Deriving it from `state` pinned every needs-you to
+  // "Writing code", so a finished plan and a blocked review both claimed the
+  // agent was mid-code (PAN-3090 follow-up).
+  const current = simpleStepIndex(pipelineState);
   // PAN-3090: a blocked agent is not working — the current node turns amber
   // and says so, instead of pulsing blue "Writing code" (FR-4).
   const waiting = state === 'needs-you';
