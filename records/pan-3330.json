@@ -86,7 +86,7 @@
     "recordedAt": "2026-07-30T22:50:55.493Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T22:51:40.368Z",
+  "updated": "2026-07-30T22:51:46.900Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -96,7 +96,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:51:04.171Z",
+    "panDoneRecoveredAt": "2026-07-30T22:51:39.967Z",
+    "updatedAt": "2026-07-30T22:51:40.358Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (272295ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\nℹ tsdown v0.21.10 powered by rolldown v1.0.0-rc.17\nℹ config file: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3330/packages/contracts/tsdown.config.ts \nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ entry: src/index.ts\nℹ tsconfig: tsconfig.json\nℹ Build start\nℹ [CJS] dist/index.cjs  378.71 kB │ gzip: 60.99 kB\nℹ [CJS] 1 files, total: 378.71 kB\n✔ Build complete in 2945ms\nℹ [ESM] dist/index.mjs       347.54 kB │ gzip: 58.71 kB\nℹ [ESM] dist/index.mjs.map   569.20 kB │ gzip: 90.82 kB\nℹ [ESM] dist/index.d.ts.map   47.35 kB │ gzip:  5.74 kB\nℹ [ESM] dist/index.d.ts      796.65 kB │ gzip: 78.05 kB\nℹ [ESM] 4 files, total: 1.76 MB\n✔ Build complete in 3274ms\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/lib/workspaces/create.ts(287,19): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'WorkspaceIntentFinding'.\nsrc/lib/workspaces/create.ts(290,35): error TS2339: Property 'ref' does not exist on type 'Promise<ProjectRefResult>'.\nsrc/lib/workspaces/create.ts(301,30): error TS2304: Cannot find name 'existsSync'.\nsrc/lib/workspaces/create.ts(304,10): error TS2304: Cannot find name 'existsSync'.\nsrc/lib/workspaces/create.ts(304,41): error TS2304: Cannot find name 'statSync'.\nsrc/lib/workspaces/create.ts(315,32): error TS2304: Cannot find name 'existsSync'.\nsrc/lib/workspaces/create.ts(321,9): error TS2304: Cannot find name 'existsSync'.\nsrc/lib/workspaces/create.ts(336,30): error TS2304: Cannot find name 'existsSync'.\nsrc/lib/workspaces/create.ts(355,19): error TS2552: Cannot find name 'listProjectsSync'. Did you mean 'listProjectsAsync'?\nsrc/lib/workspaces/create.ts(355,44): error TS7006: Parameter 'p' implicitly has an 'any' type.\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (82%)\n  - rolldown-plugin-dts:fake-js (15%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "inspectNotes": "AC1-4 met. Three existing CLI suites (workspace-commands, workspace-new-target-path, workspace-scratch-isolated) untouched by the commit and all pass alongside the new create-intent suite (41/41, --hookTimeout 60000; the default-5s hook failure also hits untouched relocate.test.ts, so it is machine load, not a regression). Dry-run parity asserted field-for-field and key-order against real CLI output for shared/target-path/isolated. cliMessageFor reproduces all six original message strings verbatim, exit path still exitCli. Findings returned (not thrown) for invalid-name, target-not-a-directory, mode-conflict, plus project-not-found/ambiguous; fail-fast ordering preserved so a rejected name touches neither git nor fs. Resolution writes nothing (worktree list, workspace row count, and projects row all asserted unchanged). grep confirms zero process.cwd() in src/lib/workspaces/create.ts; the test proves it by runtime spy instead of a source grep because scripts/lint-source-introspection.sh forbids source-text assertions - deviation from AC4's literal wording, substantively satisfied. NFR-2: promisify(exec) shell string replaced by execFileAsync argument vector for rev-parse and worktree add; no execSync. Non-blocking: intent.projectId as string cast in workspaceMainCommand relies on findings-empty implying non-null, and kind=main now stats .git before the getMainWorkspace short-circuit (extra stat, no visible change); createWorkspace maps omitted and false parentBranchGuessed to the same 0.",
@@ -178,8 +179,7 @@
         "tests/unit/lib/workspaces/writer.test.ts"
       ],
       "recordedAt": "2026-07-30T22:50:55.493Z"
-    },
-    "panDoneRecoveredAt": "2026-07-30T22:51:39.967Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -249,7 +249,7 @@
       },
       "costAtCloseOut": {
         "usd": 84.601857,
-        "pricingAsOf": "2026-07-30T22:51:07.109Z"
+        "pricingAsOf": "2026-07-30T22:51:46.392Z"
       }
     },
     "merges": [
