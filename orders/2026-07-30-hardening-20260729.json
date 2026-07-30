@@ -51,8 +51,35 @@
       "reVerify": false,
       "addedAt": "2026-07-30T02:58:41.679Z",
       "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3288",
+      "lane": "B",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:45.137Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3290",
+      "lane": "B",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:45.137Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3295",
+      "lane": "B",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:45.137Z",
+      "addedBy": "operator"
     }
   ],
   "createdAt": "2026-07-30T02:58:20.266Z",
-  "updatedAt": "2026-07-30T02:58:41.679Z"
+  "updatedAt": "2026-07-30T02:58:45.138Z"
 }
