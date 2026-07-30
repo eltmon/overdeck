@@ -110,10 +110,10 @@
     "recordedAt": "2026-07-29T01:09:34.738Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-30T05:05:29.707Z",
+  "updated": "2026-07-30T05:05:34.571Z",
   "pipeline": {
     "issueId": "PAN-3260",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -121,7 +121,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T01:11:05.562Z",
-    "updatedAt": "2026-07-30T05:05:27.861Z",
+    "updatedAt": "2026-07-30T05:05:34.533Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3260-review already running. Use 'pan tell' to message it.",
     "conflictsSince": {
       "sha": "eeb851b1e3eb24f1cfd1ab0d224d3633f5d9b6eb",
       "detectedAt": "2026-07-30T04:53:29.358Z",
@@ -190,7 +191,7 @@
       },
       "costAtCloseOut": {
         "usd": 118.93359,
-        "pricingAsOf": "2026-07-30T05:05:29.699Z"
+        "pricingAsOf": "2026-07-30T05:05:34.567Z"
       }
     },
     "merges": [
