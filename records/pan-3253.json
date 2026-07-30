@@ -232,7 +232,7 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:22:31.198Z",
+  "updated": "2026-07-30T11:22:35.239Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "pending",
@@ -241,7 +241,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T11:22:31.196Z",
+    "updatedAt": "2026-07-30T11:22:35.173Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
@@ -253,8 +253,8 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "80f12ca60cd20f82d4e060b1e1f6492a1a56e7bd",
     "lastVerifiedCommit": "09d9a69b337d7007077fcfa03672a9a88692a288",
-    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z",
     "reviewRequestedAt": "2026-07-30T11:22:31.196Z",
+    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -304,9 +304,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 11116558,
-            "output": 416572,
-            "cacheRead": 84350976,
+            "input": 12197826,
+            "output": 419974,
+            "cacheRead": 84874752,
             "cacheWrite": 0
           }
         },
@@ -327,9 +327,9 @@
           "cacheWrite": 269290
         },
         "openai/gpt-5.6-sol": {
-          "input": 11116558,
-          "output": 416572,
-          "cacheRead": 84350976,
+          "input": 12197826,
+          "output": 419974,
+          "cacheRead": 84874752,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -340,8 +340,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 135.967523,
-        "pricingAsOf": "2026-07-30T11:22:01.678Z"
+        "usd": 141.737811,
+        "pricingAsOf": "2026-07-30T11:22:35.224Z"
       }
     },
     "merges": [
@@ -350,7 +350,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3253",
