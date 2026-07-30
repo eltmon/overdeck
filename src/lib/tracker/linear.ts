@@ -150,18 +150,16 @@ export class LinearTracker implements IssueTracker {
   ): Effect.Effect<Issue, IssueNotFoundError | LinearApiError> {
     const self = this;
     return linearCall('getIssue', async () => {
-      if (UUID_RE.test(id)) {
+      // Linear's issue(id) accepts both UUIDs and identifiers ("MIN-852") and
+      // returns a full Issue with lazy relations. The identifier form used to
+      // go through searchIssues, whose IssueSearchResult nodes lack the
+      // labels() relation — normalizeIssue then threw, and the catchTag below
+      // masked it as IssueNotFoundError for EVERY identifier lookup, open or
+      // closed (PAN-3337).
+      if (UUID_RE.test(id) || /^([A-Z]+)-(\d+)$/i.test(id)) {
         const issue = await self.client.issue(id);
         if (issue) {
           return await self.normalizeIssue(issue);
-        }
-        return null;
-      }
-
-      if (/^([A-Z]+)-(\d+)$/i.test(id)) {
-        const results = await self.client.searchIssues(id, { first: 1 });
-        if (results.nodes.length > 0) {
-          return await self.normalizeIssue(results.nodes[0]);
         }
       }
 
