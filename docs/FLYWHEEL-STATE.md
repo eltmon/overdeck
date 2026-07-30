@@ -9203,3 +9203,16 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **Two new backlog items appeared while I was driving the cascade: PAN-3340 and PAN-3341** (alongside PAN-3330/3331, all `planned_backlog`). Not startable — `auto_pickup_backlog=false` and none is operator-released. Noted rather than touched.
 - Still blocked and deliberately unforced: **PAN-3259**, **PAN-3305**, **PAN-3296** (all three unblock as their strikes land), **MIN-908** and 13 MYN `zombie_pr` rows (out of merge scope, `auto_merge` hold), **PAN-3313** (operator-gated CLIProxy auth).
 - Watch is event-driven on all five PRs reaching `nongreen=0`; interval wakeup is only the backstop.
+
+## RUN-75 tick 22 (2026-07-30 22:32Z) — two more strikes merged; every remaining blocker converges on one deploy
+
+- **#3347 (PAN-3339) merged 22:31:58Z** by the auto-merge scheduler, all seven real checks SUCCESS. `pan done PAN-3339 --strike` → verifying-on-main.
+- **#3343 (PAN-3326) merged** — CLEAN, all real checks green. **4 of 6 strikes now landed** (PAN-3342, PAN-3339, PAN-3326, plus PAN-3300/3320 earlier in the run).
+- **A monitor false alarm worth recording:** my watch reported `#3347 MERGED nongreen=3`, which read like a merge with failing checks. It was my own filter — `CodeRabbit`, `overdeck/review` and `overdeck/test` report `undefined` status, which is neither SUCCESS nor SKIPPED, so my jq counted them as failures. **A green-check filter must whitelist SUCCESS/SKIPPED *and* treat `undefined` contexts as not-yet-reporting**, or it manufactures alarms on every PR.
+- **The convergence: `pan done PAN-3326 --strike` was refused by the exact bug PAN-3326 fixes** — *"strike/pan-3326 has 2 commit(s) missing from origin/main"*. The content-comparison gate is merged to `main`, but the CLI I invoke is the **generation-a build from before that merge**, so it still runs the old patch-id check. PAN-3296's close-out failed the same way: PAN-3339's reconcile fix is on main but the deployed dashboard predates it.
+- **So every remaining blocker now unblocks on one action — a deploy:**
+  - PAN-3326's own strike handoff (needs its own fix live)
+  - **PAN-3259** and **PAN-3305** close-outs (need PAN-3326's gate live)
+  - **PAN-3296** close-out (needs PAN-3339's reconcile sweep live)
+- **LESSON: "merged" and "in force" are different states, and this run has now demonstrated it three separate ways** — the hook that needed `pan sync` (PAN-3327), the DoD row-6 fix that needed a rebuild before it could close anything, and now a strike gate refusing its own author because the binary predates the fix. **Mission #5 exists precisely because a merge changes the repo, not the running system.**
+- Deliberately batching: #3346, #3348, #3349 are still in CI (each `test` only). One deploy after they land beats three outages.
