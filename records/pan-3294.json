@@ -27,9 +27,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-30T05:43:11.129Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-30T05:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-30T05:45:21.428Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-30T05:45:21Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3294\n\n# Code Review — PAN-3294 — Cycle 2\n\n## Verdict: CHANGES REQUESTED\n\nThe branch merged current `origin/main` after the prior review, but none of the five PAN-3294 files changed. The previously reported single-flight initialization race is therefore still present and still blocks the concurrency guarantees that motivated the issue.\n\n## Context\n\n- Branch: `feature/pan-3294`\n- HEAD reviewed: `07eef06fb59284a2f517822254356ce5a0e8776a`\n- Prior reviewed HEAD: `bf9282426e145a107b1cbdc1c32f1388bd9dc89f`\n- PR: `#3299`\n- Cycle change: merge of `origin/main`; no changes to the PAN-3294 implementation, tests, or documentation\n- Review dimensions: correctness, security, requirements, performance\n\n## Blocking Findings\n\n### P1 — [correctness / requirements] A newly created lock can be reclaimed before its owner writes the PID — `sync-sources/hooks/pan-hook-lib.sh:24`\n\n`pan_acquire_singleflight_lock` publishes the lock directory with `mkdir` and publishes its owner PID in a separate operation. A concurrent caller can execute between those two operations:\n\n1. Caller A creates `lock_dir` at line 24 and is descheduled before line 25.\n2. Caller B's `mkdir` fails, then line 30 reads no PID.\n3. Caller B treats the live, initializing lock as stale, moves and removes it at lines 39-41, recreates it at line 42, and returns success.\n4. Caller A resumes, writes its PID into B's replacement directory, and also returns success.\n\nBoth callers now execute the guarded body. Caller A's unconditional release can also remove Caller B's replacement lock while B is still running. The deterministic interleaving probe still returns `contender_rc=0 creator_alive=yes` at the current HEAD.\n\nThis violates FR-1 and AC-4's at-most-one-hook-body guarantee. Because `pan_llm_rate_check` uses the same primitive, the race can also admit concurrent token-bucket read/modify/write operations and exceed FR-4's machine-wide LLM cap during the crash-loop scenario this issue exists to contain.\n\nThe test gap is unchanged. `tests/scripts/pan-hook-lib-guards.test.ts:62` classifies every missing PID as stale, while the concurrent hook test does not suspend the first acquirer between directory creation and owner publication.\n\nFix the protocol so an initializing lock cannot be mistaken for a stale lock, make release ownership-safe so an old holder cannot delete a successor's lock, and add a deterministic test for this exact interleaving.\n\n## Non-blocking Review Results\n\n- **Security:** No new injection, authorization, secret-exposure, or unsafe external-input path was found in the PR diff.\n- **Performance:** The timestamp bucket remains bounded by the configured admission limit, and lock-contention waiting remains bounded to approximately one second. The race above prevents relying on those limits under contention.\n- **Requirements:** FR-2, FR-3, FR-5, FR-6, NFR-1, NFR-2, and NFR-3 remain implemented as specified. FR-1 and FR-4 remain blocked by the unchanged lock race.\n- **CodeRabbit advisory:** The missing `mkdir -p \"$AGENT_STATE_DIR\"` comment remains non-blocking because managed spawn/runtime paths create the per-agent state directory before this hook runs. The blocking race occurs with an existing parent directory.\n\n## Verification Performed\n\n- Compared `bf9282426e145a107b1cbdc1c32f1388bd9dc89f..07eef06fb59284a2f517822254356ce5a0e8776a`; the PAN-3294 files are unchanged.\n- `git diff --check $(git merge-base origin/main HEAD)..HEAD` — passed.\n- `bash -n sync-sources/hooks/pan-hook-lib.sh sync-sources/hooks/work-agent-stop-hook` — passed.\n- `npx vitest run tests/scripts/pan-hook-lib-guards.test.ts tests/scripts/work-agent-stop-hook.test.ts` — 24 tests passed.\n- Deterministic initialization-race probe — reproduced at current HEAD.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3294/.pan/review/agent-pan-3294-review-07eef06f/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3294 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -50,7 +63,7 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T05:45:20.802Z",
+  "updated": "2026-07-30T05:45:21.429Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "blocked",
