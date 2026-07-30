@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, sep } from 'node:path';
 
 import { Effect } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
@@ -597,25 +597,28 @@ export const postAgentsRoute = HttpRouter.add(
         projectPath,
         issueId,
         'active',
-        'approved',
-        `scope: approve ${issueId.toUpperCase()} xBRIEF`,
+        'running',
+        `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
       ).pipe(
         Effect.match({
           onSuccess: (result) => {
             if (result.moved) {
               console.log(`[start-agent] xBRIEF moved ${result.fromDir} → active for ${issueId}`);
             }
+            if (result.statusUpdated) {
+              console.log(`[start-agent] Set plan.status=running for ${issueId}`);
+            }
             if (result.committed) {
-              console.log(`[start-agent] Committed approval transition for ${issueId}`);
+              console.log(`[start-agent] Committed running transition for ${issueId}`);
             }
           },
           onFailure: (err) => {
-            console.warn(`[start-agent] xBRIEF approval transition failed (non-fatal): ${err?.message ?? err}`);
+            console.warn(`[start-agent] xBRIEF running transition failed (non-fatal): ${err?.message ?? err}`);
           },
         }),
       ));
 
-      if (existsSync(planPath)) {
+      if (planPath.startsWith(workspacePath + sep)) {
         try {
           updatePlanStatus(planPath, 'running');
           console.log(`[start-agent] Set plan.status=running for ${issueId}`);
