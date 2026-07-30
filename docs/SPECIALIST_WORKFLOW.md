@@ -306,6 +306,10 @@ The merge agent uses a **SQLite-backed per-project queue** (`merge_queue` table)
 6. **Pushes to remote**
 7. **Reports results, advances queue** to next issue
 
+**Advancing skips entries that can no longer merge (PAN-3328).** `triggerMerge()` rejects an issue that is not `readyForMerge` — closed, reopened, or with its review-status record gone — before it ever claims the queue. Advancing therefore drops such heads and keeps walking until it finds an entry that can actually start, rather than handing the head off and stopping. Without that drain a single dead entry wedges the whole queue permanently, and everything behind it parks silently with `started_at` still NULL. `advanceMergeQueue()` in `src/dashboard/server/routes/workspaces/merge-strike.ts` owns this walk, and both queue owners use it: the advance that runs when a merge finishes, and `resumeQueuedMerges()` at dashboard boot. A dropped issue re-enqueues itself the next time it becomes mergeable.
+
+Boot also requeues any `pending_auto_merges` row stranded in `merging` back to `pending`. The auto-merge executor holds that status only across an in-process `await`, so a row still in `merging` at boot was orphaned by a crash — and `GET /api/flywheel/auto-merge/problems` reports only `blocked` and `failed`, so nothing would otherwise surface it. The next executor tick re-checks eligibility; a PR that did merge before the crash is blocked there with a reason instead of merged twice.
+
 ### Strike Landing and Recovery
 
 A strike agent commits and pushes only `strike/<id>`, then runs `pan strike-ready <id>`. That command authenticates the strike workspace and pushed remote HEAD and records a durable handoff. On its next patrol, Deacon claims the marker and sends the branch through the same serialized merge queue, rebase checks, configured quality gates, forge merge, and post-merge lifecycle used by the verified merge door. Flywheel does not own or need to observe this handoff.

@@ -35,13 +35,13 @@ import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../
 import { sessionExists } from '../../../../lib/tmux.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
-import { setMergeQueueTriggerHandler } from '../../services/merge-queue-service.js';
+import { setMergeQueueAdvanceHandler } from '../../services/merge-queue-service.js';
 import { httpHandler } from '../http-handler.js';
 import { _serverManagedMerges } from '../specialists.js';
 import { completePendingOperation, getPendingOperation, getProjectPath, getWorkspaceInfoForIssue, readJsonBody, setPendingOperation, setReviewStatus } from '../workspaces.js';
 import { buildLocalMainRecoveryError } from './git-recovery-advice.js';
 import { internalStrikeMergeRoute } from './internal-strike-merge.js';
-import { activeStrikeMerge, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type StrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
+import { activeStrikeMerge, advanceMergeQueue, mergeCompletionStatus, mergeVerificationOptions, normalMergeEligibility, prepareWorkAgentForRebase, rebaseWithAgentFallback, recordCiGreenVerificationVerdict, validateStrikeMergeRequest, type TriggerMergeRequest, type TriggerMergeResult } from './merge-strike.js';
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
 export const shouldBlockApproveForDirtyStatus = (status: string): boolean =>
@@ -309,19 +309,14 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
 /** Dequeue the next merge after current completes (success or failure). */
 function dequeueNextMerge(projectKey: string, completedIssueId?: string): void {
-  const nextIssueId = dequeueMerge(projectKey, completedIssueId);
-  if (nextIssueId) {
-    console.log(`[merge] Dequeuing next merge: ${nextIssueId}`);
-    const status = getReviewStatusSync(nextIssueId);
-    const strikeRequest: StrikeMergeRequest | undefined = status?.strikeReadyHead && (status.strikeLandingState === 'ready' || status.strikeLandingState === 'landing') ? {
-      kind: 'strike', markerHead: status.strikeReadyHead,
-      workspacePath: join(getProjectPath(undefined, extractPrefixSync(nextIssueId) ?? nextIssueId.split('-')[0]), 'workspaces', `feature-${nextIssueId.toLowerCase()}-strike`),
-      branchName: `strike/${nextIssueId.toLowerCase()}`, recoveryTarget: `strike-${nextIssueId.toLowerCase()}`,
-    } : undefined;
-    triggerMerge(nextIssueId, strikeRequest).catch(err =>
-      console.error(`[merge] Queue error for ${nextIssueId}: ${err}`)
-    );
-  }
+  advanceMergeQueue({
+    dequeue: dequeueMerge,
+    getReviewStatus: getReviewStatusSync,
+    getProjectPath: (issueId) => getProjectPath(undefined, extractPrefixSync(issueId) ?? issueId.split('-')[0]),
+    triggerMerge,
+    log: (message) => console.log(message),
+    warn: (message) => console.warn(message),
+  }, projectKey, completedIssueId);
 }
 
 export async function triggerMerge(issueId: string, request: TriggerMergeRequest = { kind: 'normal' }): Promise<TriggerMergeResult> {
@@ -1202,7 +1197,7 @@ export async function triggerMerge(issueId: string, request: TriggerMergeRequest
   }
 }
 
-setMergeQueueTriggerHandler(triggerMerge);
+setMergeQueueAdvanceHandler((projectKey) => dequeueNextMerge(projectKey));
 
 const postInternalStrikeMergeRoute = internalStrikeMergeRoute(triggerMerge);
 

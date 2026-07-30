@@ -756,11 +756,18 @@ void reconcileStaleGitHubBlockers()
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.
 try {
-  const { resetProcessingToQueued } = await import('../../lib/overdeck/merge-sync.js');
+  const { resetProcessingToQueued, requeueOrphanedMergingAutoMerges } = await import('../../lib/overdeck/merge-sync.js');
   const resetCount = resetProcessingToQueued();
   if (resetCount > 0) {
     console.log(`[overdeck] Reset ${resetCount} stuck merge queue entries to queued`);
     emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Reset ${resetCount} stuck merge queue entries to queued on startup` });
+  }
+  // PAN-3328: an auto-merge row left in 'merging' by a crash is invisible to the
+  // problems endpoint and to the deacon reconciler — requeue it so it is retried.
+  const requeuedAutoMerges = requeueOrphanedMergingAutoMerges();
+  if (requeuedAutoMerges > 0) {
+    console.log(`[overdeck] Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) from merging to pending`);
+    emitActivityEntrySync({ source: 'dashboard', level: 'warn', message: `Requeued ${requeuedAutoMerges} orphaned auto-merge row(s) stuck in merging on startup` });
   }
   await resumeQueuedMerges();
 } catch (err: any) {
