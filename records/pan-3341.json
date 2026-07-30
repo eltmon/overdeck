@@ -54,7 +54,7 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:31:59.562Z",
+  "updated": "2026-07-30T23:50:21.281Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "passed",
@@ -65,9 +65,8 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-30T23:31:39.966Z",
-    "updatedAt": "2026-07-30T23:31:59.469Z",
+    "updatedAt": "2026-07-30T23:50:21.229Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3341-review",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3353",
     "reviewedAtCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f",
@@ -113,9 +112,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 165466,
-            "output": 5629,
-            "cacheRead": 2138112,
+            "input": 172909,
+            "output": 6388,
+            "cacheRead": 2588160,
             "cacheWrite": 0
           }
         },
@@ -170,9 +169,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2758905,
-          "output": 134680,
-          "cacheRead": 45809664,
+          "input": 2766348,
+          "output": 135439,
+          "cacheRead": 46259712,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -183,8 +182,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 41.72596,
-        "pricingAsOf": "2026-07-30T23:31:59.542Z"
+        "usd": 42.010969,
+        "pricingAsOf": "2026-07-30T23:50:21.271Z"
       }
     },
     "merges": [
