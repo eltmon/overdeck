@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T08:16:15.368Z",
+  "updated": "2026-07-30T08:16:23.314Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "passed",
@@ -55,14 +55,22 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z",
-    "updatedAt": "2026-07-30T08:16:15.255Z",
+    "updatedAt": "2026-07-30T08:16:23.190Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-30T08:16:15.251Z"
+        "summary": "Conflicts with main since 8c8518d (2 paths): docs/AGENT-STATE-PLANES.md, src/lib/pan-dir/record-update.ts",
+        "detectedAt": "2026-07-30T08:16:09.807Z"
       }
     ],
+    "conflictsSince": {
+      "sha": "8c8518de9ec13d3f8a73e1b069e15afc981605f1",
+      "detectedAt": "2026-07-30T08:16:09.807Z",
+      "paths": [
+        "docs/AGENT-STATE-PLANES.md",
+        "src/lib/pan-dir/record-update.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3311",
     "reviewedAtCommit": "6458678c860d5d9309a0440031784d00f1e49eb3",
     "reviewSpawnedAt": "2026-07-30T06:11:09.532Z"
@@ -125,7 +133,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.227828,
-        "pricingAsOf": "2026-07-30T08:16:15.360Z"
+        "pricingAsOf": "2026-07-30T08:16:23.248Z"
       }
     },
     "merges": [
