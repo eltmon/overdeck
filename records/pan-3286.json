@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T02:41:38.327Z",
+  "updated": "2026-07-30T02:46:59.390Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,18 +57,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "ws-new-target-path": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3286",
         "agentId": "agent-pan-3286",
         "pid": 22801,
         "host": "Edwards-MacBook-Air.local",
-        "claimedAt": "2026-07-30T02:41:38.327Z"
+        "claimedAt": "2026-07-30T02:41:38.327Z",
+        "itemId": "ws-new-target-path",
+        "outcome": "completed",
+        "reason": "Added --target-path option to workspace-scratch.ts/workspace.ts with validation, rejection of --isolated combo, informational note for unregistered targets, SKILL.md docs, and 7 passing tests in workspace-new-target-path.test.ts",
+        "releasedAt": "2026-07-30T02:46:59.389Z"
+      }
+    ],
+    "statusReasons": {
+      "ws-new-target-path": {
+        "reason": "Added --target-path option to workspace-scratch.ts/workspace.ts with validation, rejection of --isolated combo, informational note for unregistered targets, SKILL.md docs, and 7 passing tests in workspace-new-target-path.test.ts",
+        "updatedAt": "2026-07-30T02:46:59.389Z"
       }
     }
   },
   "statusOverrides": {
-    "ws-new-target-path": "running"
+    "ws-new-target-path": "completed",
+    "ws-new-target-path.ws-new-target-path.ac1": "completed",
+    "ws-new-target-path.ws-new-target-path.ac2": "completed",
+    "ws-new-target-path.ws-new-target-path.ac3": "completed",
+    "ws-new-target-path.ws-new-target-path.ac4": "completed"
   }
 }
