@@ -143,7 +143,7 @@
     "recordedAt": "2026-07-30T10:30:11.532Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-30T10:30:20.895Z",
+  "updated": "2026-07-30T10:31:11.088Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "pending",
@@ -164,7 +164,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3268",
     "reviewedAtCommit": "363ae13349f382a027e61865ad05c5b8ea1cd0fd",
-    "reviewRequestedAt": "2026-07-30T10:30:12.398Z",
+    "reviewRequestedAt": "2026-07-30T10:31:10.683Z",
     "reviewSpawnedAt": "2026-07-30T05:41:11.504Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -207,7 +207,8 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
       "recordedAt": "2026-07-30T10:30:11.532Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-30T10:31:10.683Z"
   },
   "closeOut": {
     "usage": {
