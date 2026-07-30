@@ -1558,7 +1558,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         supervisorScriptPath: '/dist/pty-supervisor.js',
       });
 
-      expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' kimi -m 'k3' --yolo$/m);
+      expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' kimi -m 'kimi-code\/k3-256k' --yolo$/m);
       expect(script).toContain('unset ANTHROPIC_API_KEY');
       expect(script).toContain('unset ANTHROPIC_BASE_URL');
       expect(script).toContain('unset ANTHROPIC_AUTH_TOKEN');
@@ -1589,7 +1589,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         kimiCodeYolo: true,
         resumeSessionId: 'session-abc-123',
       });
-      expect(script).toMatch(/^exec kimi -m 'k3' -S 'session-abc-123' --yolo$/m);
+      expect(script).toMatch(/^exec kimi -m 'kimi-code\/k3-256k' -S 'session-abc-123' --yolo$/m);
     });
 
     it('omits -S when no resumeSessionId is set (fresh launch)', () => {
@@ -1612,7 +1612,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         kimiCodeYolo: true,
         kimiCodeAddDirs: ['/workspace/other-repo', '/workspace/third'],
       });
-      expect(script).toMatch(/^exec kimi -m 'k3' --yolo --add-dir '\/workspace\/other-repo' --add-dir '\/workspace\/third'$/m);
+      expect(script).toMatch(/^exec kimi -m 'kimi-code\/k3-256k' --yolo --add-dir '\/workspace\/other-repo' --add-dir '\/workspace\/third'$/m);
     });
 
     it('omits --yolo when kimiCodeYolo is not set', () => {
@@ -1622,7 +1622,7 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         harness: 'kimi-code',
         kimiCodeModel: 'k3',
       });
-      expect(script).toMatch(/^exec kimi -m 'k3'$/m);
+      expect(script).toMatch(/^exec kimi -m 'kimi-code\/k3-256k'$/m);
       expect(script).not.toMatch(/--yolo/);
     });
 
@@ -1645,8 +1645,37 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
         useSupervisor: true,
         supervisorScriptPath: '/dist/pty-supervisor.js',
       });
-      expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' kimi -m 'k3' --yolo$/m);
+      expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' kimi -m 'kimi-code\/k3-256k' --yolo$/m);
       expect(script).not.toMatch(/^exec /m);
+    });
+
+    // The CLI only accepts ids from its own config.toml catalog. Translating at
+    // this chokepoint — not at each caller — is what makes an untranslated id
+    // impossible: the conversation and runtime spawn paths both passed raw
+    // Overdeck ids, and `kimi -m 'k3[1m]'` died with `[config.invalid]`.
+    it.each([
+      ['k3', "kimi-code/k3-256k"],
+      ['k3[1m]', "kimi-code/k3"],
+      ['kimi-k2.7-code', "kimi-code/kimi-for-coding"],
+      ['kimi-code/k3', "kimi-code/k3"],
+      ['kimi-code/kimi-for-coding-highspeed', "kimi-code/kimi-for-coding-highspeed"],
+    ])('translates the Overdeck model id %s to the CLI catalog id %s', (given, expected) => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: given,
+      });
+      expect(script).toContain(`kimi -m '${expected}'`);
+    });
+
+    it('refuses to launch a retired id the CLI catalog never carried', () => {
+      expect(() => generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'kimi-k2.6',
+      })).toThrow(/has no native kimi-code CLI equivalent/);
     });
   });
 });

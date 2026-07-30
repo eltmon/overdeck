@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { dirname, join } from 'node:path';
 import type { Role } from './agents.js';
 import { getHarnessBehavior } from './runtimes/behavior.js';
-import { qualifyPiModel } from './providers.js';
+import { qualifyPiModel, resolveKimiCodeModelAlias } from './providers.js';
 import { shellQuoteModelIdSync } from './model-validation.js';
 import { colorFgBgForTheme, getUiThemeSync } from './ui-theme.js';
 import { packageRoot } from './paths.js';
@@ -791,7 +791,15 @@ function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[
     throw new Error('kimi-code launcher requires kimiCodeModel');
   }
 
-  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(config.kimiCodeModel)];
+  // Translate here, at the single chokepoint every kimi-code launch passes
+  // through, rather than at each caller. Only the work-agent path translated;
+  // conversations and KimiCodeRuntime.spawnAgent passed the raw Overdeck id, so
+  // `kimi -m 'k3[1m]'` died with `[config.invalid] Model "k3[1m]" is not
+  // configured in config.toml` → `No model selected`. The call is idempotent —
+  // an already-native `kimi-code/<alias>` passes through unchanged.
+  const kimiCodeModel = resolveKimiCodeModelAlias(config.kimiCodeModel);
+
+  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(kimiCodeModel)];
   if (config.resumeSessionId) {
     // `-S <id>` resumes that specific session; `kimi`'s own `-c` continue flag
     // picks "most recent for this cwd" and can't target a captured id (PAN-1837).
