@@ -8700,3 +8700,29 @@ Chased the Deacon's stray-writer errors and found the warning is three defects, 
 
 - **CLIProxy (PAN-3313):** 85×503 / 69×200 / 28×408 over the last ~90 minutes — ~47% hard-failing, statistically identical to tick 3's 45%. Still third-party code; not struck.
 - Fleet 15 sessions, cap 20. **PAN-3259** still blocked by PAN-3326 (patch-id false positive) and deliberately not force-closed.
+
+### The leak fix merged, and `pan sync` silently refused to deploy it — PAN-3327
+
+- **PR #3299 (PAN-3294) MERGED at 10:27:37Z**, and **#3312 (PAN-3286) MERGED** shortly after. Both read `merge_status=merged / merge_step=merged`.
+- Verified the merged hook actually carries both fixes before deploying: `sync-sources/hooks/work-agent-stop-hook` is now 445 lines with **`pan_acquire_singleflight_lock` at line 50** (gap 1, concurrency — exits 0 if another holder is live) and **`pan_run_with_timeout "${OVERDECK_HOOK_LLM_TIMEOUT:-60}"` at line 383** (gap 2, timeout), with both primitives in a new `pan-hook-lib.sh`.
+- Ran `pan sync`. It printed `✔ Synced 23 hooks to ~/.overdeck/bin/` and **deployed nothing**: the on-disk hook was still 423 lines with `guard=0`.
+- **Root cause: `pan` resolves to `.pan-reload-generation-b/dist/cli/index.js`, and `pan sync` reads `sync-sources/` relative to that bundle.** Both generations hold a stale 423-line snapshot, so the command copied the broken hook over the identical broken hook and reported success:
+  ```
+  445 lines guard=1  /home/eltmon/Projects/overdeck/sync-sources/hooks/work-agent-stop-hook
+  423 lines guard=0  ~/.overdeck/deployments/dashboard/.pan-reload-generation-a/sync-sources/hooks/…
+  423 lines guard=0  ~/.overdeck/deployments/dashboard/.pan-reload-generation-b/sync-sources/hooks/…
+  ```
+- **Deployed it correctly with the repository's own CLI build** — same sanctioned command, right source tree: `node dist/cli/index.js sync` → on-disk hook **445 lines, guard=1, timeout=1**, lib functions present. First try.
+- **Verified the fix by outcome, not by assertion: the leak went to 0 procs and stayed there** (0 procs / 51.4 GB avail at 10:29:55Z, still 0 / 49.6 GB at 10:30:41Z), after a tick that opened at 130 procs / 53.7 GB consumed. The treadmill is over.
+- Filed **PAN-3327**. This is the worst class of bug in the set: `sync-sources/` is how *agent behavior* is corrected, so the failure mode is "a behavioral fix merges, the operator deploys it the documented way, and the old behavior continues indefinitely behind a green confirmation."
+- **LESSON: a success message is a claim about a command, not about the world — verify the artifact.** `pan sync` was truthful about what it did (it synced 23 hooks) and wrong about what mattered (which 23). Six relief passes across two ticks would have continued forever after a "successful" deploy, and nothing in the output would have hinted why. **The check that caught it — `wc -l` and `grep -c` on the deployed file — took two seconds and should be the default after any deploy.**
+- This is the third component found pinned into a `pan reload` generation, after PAN-3264 (dashboard) and PAN-3285 (supervisor). Named the shared shape on the issue: **components pinned into a generation keep working while silently diverging from `main`.**
+
+### Close of tick 5
+
+- **5 PRs merged this run:** PAN-3300, PAN-3291, PAN-3320, PAN-3294, PAN-3286.
+- Four strike PRs (#3315 PAN-2390, #3316 PAN-3305, #3318 PAN-3266, #3319 PAN-3202) have the fix merged in and are mid-CI; a background watch is armed on all four test jobs.
+- **PAN-3202 gates two close-outs** (PAN-3264 and PAN-3300, both failing only DoD row 6), so #3319 is the highest-value of the four.
+- Memory healthy: ~50 GB available, PSI ≈ 0, leak at 0 with the guard live.
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 5 PRs merged, 16 substrate bugs driven (PAN-3300/3320/3294/3286 fixed; PAN-2390/3305/3202 struck; PAN-3313/3321/3322/3324/3325/3326/3327 filed; PAN-3294/3282/2706/3202 escalated), 1 duplicate closed, 2 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed across 6 relief passes, 1 process leak permanently fixed and verified, 2 outages recovered, 2 deploys delivered, 6 review convoys re-driven.**
