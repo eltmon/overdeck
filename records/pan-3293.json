@@ -51,18 +51,18 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:07:11.399Z",
+  "updated": "2026-07-30T06:14:10.267Z",
   "pipeline": {
     "issueId": "PAN-3293",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:07:11.338Z",
-    "reviewNotes": "Verification infrastructure error: Verification worker 1982884 exited before writing a result",
+    "updatedAt": "2026-07-30T06:14:10.221Z",
+    "reviewNotes": "pan reload discards ownershipVerified=false and still prints an unqualified healthy success",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
     "reviewSpawnedAt": "2026-07-30T06:07:11.337Z",
@@ -113,6 +113,14 @@
             "cacheWrite": 186978
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 769309,
+            "output": 108253,
+            "cacheRead": 14188032,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1801170,
@@ -130,15 +138,15 @@
           "cacheWrite": 186978
         },
         "openai/gpt-5.6-sol": {
-          "input": 1801170,
-          "output": 217866,
-          "cacheRead": 84168704,
+          "input": 2570479,
+          "output": 326119,
+          "cacheRead": 98356736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.09201,
-        "pricingAsOf": "2026-07-30T06:07:11.375Z"
+        "usd": 81.280161,
+        "pricingAsOf": "2026-07-30T06:14:10.246Z"
       }
     },
     "merges": [
