@@ -773,14 +773,24 @@ export function getSpecialistPromptOverride(
  */
 export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseError | FsError> =>
   Effect.gen(function* () {
-    const exists = yield* Effect.sync(() => existsSync(PROJECTS_CONFIG_FILE));
-    if (!exists) return { projects: {} } as ProjectsConfig;
-
+    // The single `stat` doubles as the existence check. An `existsSync`
+    // preflight here would put a synchronous syscall on the dashboard's event
+    // loop for every live resolve, which is exactly what this loader exists to
+    // avoid — and it ran ahead of the mtime cache, so nothing short-circuited
+    // it (PAN-3330 review).
     const mtime = yield* Effect.tryPromise({
-      try: async () => (await stat(PROJECTS_CONFIG_FILE)).mtimeMs,
+      try: async (): Promise<number | null> => {
+        try {
+          return (await stat(PROJECTS_CONFIG_FILE)).mtimeMs;
+        } catch (cause) {
+          if ((cause as NodeJS.ErrnoException)?.code === 'ENOENT') return null;
+          throw cause;
+        }
+      },
       catch: (cause) =>
         new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'stat', cause }),
     });
+    if (mtime === null) return { projects: {} } as ProjectsConfig;
     if (_projectsCache && _projectsCache.mtime === mtime) {
       return _projectsCache.config;
     }

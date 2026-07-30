@@ -88,8 +88,7 @@ Open a workspace's view (`/workspace/:id`) and its header carries:
   the **main** workspace additionally asks you to type its name, because that
   diverges the row from `projects.yaml`.
 - **Archive** — removes it from the rail. Files, branch, and memory are left
-  untouched, and it is reversible. Not offered for the **main** workspace: it
-  is the project's singleton anchor, so archiving it is refused.
+  untouched, and it is reversible.
 
 Issue workspaces show none of these: Overdeck's pipeline owns their worktree.
 Deleting a workspace and purging its memory stay CLI-only

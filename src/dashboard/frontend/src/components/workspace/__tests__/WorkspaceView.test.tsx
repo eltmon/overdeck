@@ -372,13 +372,14 @@ describe('WorkspaceView main-workspace and cache invariants (PAN-3330 review)', 
     };
   }
 
-  it('offers no Archive for the main workspace, which the writer refuses to archive', async () => {
+  // FR-7 / WI-5 AC-1: all three actions for every non-issue kind, main included.
+  it('offers Favorite, Relocate and Archive for the main workspace', async () => {
     renderWorkspaceView({ workspace: main() });
 
     expect(await screen.findByTestId('workspace-view-actions')).toBeInTheDocument();
-    expect(screen.getByTestId('workspace-view-relocate')).toBeInTheDocument();
     expect(screen.getByTestId('workspace-view-favorite')).toBeInTheDocument();
-    expect(screen.queryByTestId('workspace-view-archive')).toBeNull();
+    expect(screen.getByTestId('workspace-view-relocate')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-archive')).toBeInTheDocument();
   });
 
   it('invalidates both the registry list and this workspace detail after a relocate', async () => {

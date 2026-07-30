@@ -275,18 +275,14 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
             >
               Relocate
             </button>
-            {/* Main is the project's singleton anchor — the writer refuses to
-                archive it, and there is no unarchive affordance here. */}
-            {workspace.kind !== 'main' && (
-              <button
-                type="button"
-                data-testid="workspace-view-archive"
-                onClick={() => void onArchive()}
-                className="text-xs text-destructive hover:brightness-110"
-              >
-                Archive
-              </button>
-            )}
+            <button
+              type="button"
+              data-testid="workspace-view-archive"
+              onClick={() => void onArchive()}
+              className="text-xs text-destructive hover:brightness-110"
+            >
+              Archive
+            </button>
           </div>
         )}
       </div>

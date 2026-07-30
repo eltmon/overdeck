@@ -202,21 +202,22 @@ describe('POST /api/workspace-registry/:id/relocate moves the stored path (AC-4)
   });
 });
 
-describe('POST /api/workspace-registry/:id/archive refuses the main workspace', () => {
-  it('returns 409 and leaves main unarchived', async () => {
+describe('POST /api/workspace-registry/:id/archive keeps its pre-existing contract', () => {
+  it('archives a scratch workspace', async () => {
     upsertProjectFromConfig(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
-    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'main', name: 'main', path: projectRoot });
+    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'scratch', name: 'lens', path: projectRoot });
 
     const result = await call('POST', `/api/workspace-registry/${id}/archive`, { archived: true });
 
-    expect(result.status).toBe(409);
-    expect(String(result.body.error)).toMatch(/Cannot archive the main workspace/);
-    expect(getWorkspaceById(id)?.isArchived).toBe(false);
+    expect(result.status).toBe(200);
+    expect(getWorkspaceById(id)?.isArchived).toBe(true);
   });
 
-  it('still archives a scratch workspace', async () => {
+  // No-loss (NFR-4 / NonGoal 5): this route's behavior for every kind predates
+  // the PR and must survive it unchanged, so main stays archivable here.
+  it('still archives a main workspace, as it did before this feature', async () => {
     upsertProjectFromConfig(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
-    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'scratch', name: 'lens', path: projectRoot });
+    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'main', name: 'main', path: projectRoot });
 
     const result = await call('POST', `/api/workspace-registry/${id}/archive`, { archived: true });
 

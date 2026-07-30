@@ -302,7 +302,14 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
     intent.path = config.path;
     intent.isGitRepository = await looksLikeGitRepository(config.path);
   } else if (input.targetPath) {
-    const resolvedTarget = resolve(input.targetPath);
+    // A single relative argument to resolve() is anchored to the *process*
+    // working directory, so the same intent would land on different host paths
+    // depending on where the dashboard was launched. Anchor it explicitly:
+    // the caller's cwd when it gave one (the CLI passes its own), otherwise
+    // the project root. An absolute targetPath is unaffected — resolve()
+    // returns it unchanged (PAN-3330 review).
+    const targetBase = input.cwd ?? config.path;
+    const resolvedTarget = resolve(targetBase, input.targetPath);
     if (!(await isDirectory(resolvedTarget))) {
       findings.push({
         field: 'targetPath',

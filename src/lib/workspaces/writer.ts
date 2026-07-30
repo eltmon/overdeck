@@ -128,17 +128,7 @@ export function setWorkspaceFavorite(id: string, isFavorite: boolean): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
 }
 
-/**
- * Archive a workspace. Refuses `kind='main'`: it is the project's singleton
- * anchor, the CLI destroy path has always refused it, and archiving it would
- * hide the row from every surface that lists workspaces (PAN-3330 review).
- */
 export async function archiveWorkspace(id: string): Promise<void> {
-  const existing = getWorkspaceById(id);
-  if (!existing) throw new Error(`No workspace found with id '${id}'`);
-  if (existing.kind === 'main') {
-    throw new Error(`Cannot archive the main workspace for project '${existing.projectId}'`);
-  }
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(id);
   const workspace = getWorkspaceById(id);
   if (workspace) {

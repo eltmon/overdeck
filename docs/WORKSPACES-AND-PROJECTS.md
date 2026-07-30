@@ -162,12 +162,12 @@ through `PaletteAction.alsoScopes`, so it is not listed twice under All.
 
 **Management actions.** `WorkspaceView`'s header carries Favorite, Relocate and
 Archive for `main` and `scratch` only — `issue` workspaces are pipeline-owned
-and the writer refuses to relocate them anyway. Archive is additionally hidden
-for `main`, and `archiveWorkspace()` refuses it at the door so every caller
-agrees. Relocating `main` diverges the row from `projects.yaml`, so the UI
-requires a typed confirmation and only then passes `force: true`;
-`relocateWorkspace()` normalizes the path and rejects anything that is not an
-existing directory, since the stored path is canonical state. Writer refusals surface as the 409 message rather than a
+and the writer refuses to relocate them anyway. Relocating `main` diverges the
+row from `projects.yaml`, so the UI requires a typed confirmation and only then
+passes `force: true`; `relocateWorkspace()` normalizes the path and rejects
+anything that is not an existing directory, since the stored path is canonical
+state. Archive keeps its pre-existing route contract for every kind — this
+feature adds the button, it does not narrow what the route allows. Writer refusals surface as the 409 message rather than a
 click that appears to do nothing. Successful mutations invalidate both
 `['workspace-registry']` and `['workspace-registry', workspaceId]` rather than
 waiting out the rail's 10s poll.

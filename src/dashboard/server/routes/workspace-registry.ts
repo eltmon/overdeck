@@ -298,15 +298,8 @@ const postWorkspaceRegistryArchiveRoute = HttpRouter.add(
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
     const body = (yield* readJsonBody) as { archived?: unknown } | undefined;
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
-    if (body.archived === false) {
-      unarchiveWorkspace(id);
-    } else {
-      // The writer refuses to archive a main workspace; surface its message
-      // rather than reporting a success that did not happen.
-      const failure = yield* Effect.promise(() =>
-        archiveWorkspace(id).then(() => null).catch((err: unknown) => (err instanceof Error ? err.message : String(err))));
-      if (failure) return jsonResponse({ error: failure }, { status: 409 });
-    }
+    if (body.archived === false) unarchiveWorkspace(id);
+    else yield* Effect.promise(() => archiveWorkspace(id));
     return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
   })),
 );

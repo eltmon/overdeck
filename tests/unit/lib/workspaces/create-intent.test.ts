@@ -259,6 +259,45 @@ describe('resolveWorkspaceCreateIntent — no ambient working directory (AC-4)',
     ]);
   });
 
+  it('anchors a relative target path to the caller cwd, not the ambient one', async () => {
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/definitely/not/here');
+
+    const intent = await resolveWorkspaceCreateIntent({
+      name: 'relative-target',
+      projectKey: PROJECT_KEY,
+      cwd: targetDir,
+      targetPath: '.',
+    });
+
+    expect(cwdSpy).not.toHaveBeenCalled();
+    expect(intent.findings).toEqual([]);
+    expect(intent.path).toBe(targetDir);
+  });
+
+  it('anchors a relative target path to the project root when no cwd is given', async () => {
+    const cwdSpy = vi.spyOn(process, 'cwd').mockReturnValue('/definitely/not/here');
+
+    const intent = await resolveWorkspaceCreateIntent({
+      name: 'relative-target',
+      projectKey: PROJECT_KEY,
+      targetPath: '.',
+    });
+
+    expect(cwdSpy).not.toHaveBeenCalled();
+    expect(intent.path).toBe(projectRoot);
+  });
+
+  it('leaves an absolute target path untouched', async () => {
+    const intent = await resolveWorkspaceCreateIntent({
+      name: 'absolute-target',
+      projectKey: PROJECT_KEY,
+      cwd: projectRoot,
+      targetPath: targetDir,
+    });
+
+    expect(intent.path).toBe(targetDir);
+  });
+
   it('resolves that same project once the working directory is passed explicitly', async () => {
     const intent = await resolveWorkspaceCreateIntent({ name: 'explicit-cwd', cwd: projectRoot });
 
