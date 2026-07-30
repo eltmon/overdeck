@@ -14,6 +14,45 @@
 PAN_DASHBOARD_URL="${OVERDECK_DASHBOARD_URL:-http://localhost:3011}"
 PAN_CURL_TIMEOUT="${OVERDECK_HOOK_TIMEOUT:-0.5}"
 
+# Acquire a portable single-flight lock backed by atomic mkdir. The holder PID
+# lets a later invocation distinguish an active owner from a stale lock left by
+# an interrupted hook. Returns 0 when acquired and 1 when another live caller
+# owns the lock.
+pan_acquire_singleflight_lock() {
+  local lock_dir="$1"
+
+  if mkdir "$lock_dir" 2>/dev/null; then
+    printf '%s\n' "$$" > "$lock_dir/pid"
+    return 0
+  fi
+
+  local holder_pid
+  holder_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
+  if [[ "$holder_pid" =~ ^[1-9][0-9]*$ ]] && kill -0 "$holder_pid" 2>/dev/null; then
+    return 1
+  fi
+
+  # Reclaim once. Moving the stale directory is atomic, so only one contender
+  # can remove it; any caller that loses the move exits instead of racing into
+  # the guarded work.
+  local stale_dir="${lock_dir}.stale.$$"
+  rm -rf "$stale_dir" 2>/dev/null || return 1
+  mv "$lock_dir" "$stale_dir" 2>/dev/null || return 1
+  rm -rf "$stale_dir" 2>/dev/null || return 1
+  if mkdir "$lock_dir" 2>/dev/null; then
+    printf '%s\n' "$$" > "$lock_dir/pid"
+    return 0
+  fi
+
+  return 1
+}
+
+pan_release_singleflight_lock() {
+  local lock_dir="$1"
+  rm -rf "$lock_dir" 2>/dev/null || true
+  return 0
+}
+
 # Internal token for authenticated HTTP ingestion (PAN-1596). The
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
