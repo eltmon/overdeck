@@ -148,19 +148,19 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:44:00.953Z",
+  "updated": "2026-07-30T23:45:20.006Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:44:00.944Z",
-    "reviewNotes": "workspace-scoped band state can mutate the wrong workspace after navigation",
+    "updatedAt": "2026-07-30T23:45:19.926Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed both cycle-2 blocking findings. (1) WorkspaceActionBand is mounted with key={workspaceId}, so the first-fetch ref, expander, error text, and run-command edit draft reset on navigation instead of following the component instance — two regression tests drive cached A-to-B navigation and both fail without the key (verified by reverting it). (2) DELETE /api/terminals/:name is idempotent: a session that already exited returns {ok:true, alreadyStopped:true} instead of 500, so Restart and Stop recover from a run process that died on its own; a real kill failure still 500s. Non-blocking open-await left as-is with the reasoning recorded at the call site and in docs. 2081 frontend + 726 dashboard tests pass; typecheck, lint, and all guards green.",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "0bb888875a9c4ecda8df66fab29ebca611b765aa",
@@ -257,9 +257,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5626822,
-            "output": 133511,
-            "cacheRead": 43102720,
+            "input": 5631149,
+            "output": 133837,
+            "cacheRead": 43987968,
             "cacheWrite": 0
           }
         },
@@ -304,15 +304,15 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 8489314,
-          "output": 330426,
-          "cacheRead": 72755200,
+          "input": 8493641,
+          "output": 330752,
+          "cacheRead": 73640448,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 97.521595,
-        "pricingAsOf": "2026-07-30T23:44:00.948Z"
+        "usd": 97.995634,
+        "pricingAsOf": "2026-07-30T23:45:20.001Z"
       }
     },
     "merges": [
