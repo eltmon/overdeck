@@ -24,15 +24,7 @@
       "timestamp": "2026-07-30T23:02:52.428Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-30T23:02:52Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3340\n\n# Review Synthesis — PAN-3340 — 2026-07-30T23:01:33Z\n\n## Verdict: CHANGES REQUESTED — the review trigger can persist `reviewMode: none` without dashboard mutation authorization\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340/.pan/review/agent-pan-3340-review-a9baf210/context.json\n- Branch: feature/pan-3340\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340\n- HEAD reviewed: a9baf2101b45b187eff69d96b8e39f694fa02454\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR base: 3b59a2fad242fe67b074a9cf706f3eca00d9d5aa\n- PR commits: 5\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340/.pan/review/agent-pan-3340-review-a9baf210/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340/.pan/review/agent-pan-3340-review-a9baf210/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340/.pan/review/agent-pan-3340-review-a9baf210/performance.md | 0 |\n| requirements | timeout | — | 1 infrastructure failure |\n\n## Blocking Findings\n\n### [security] Unauthenticated callers can persist `reviewMode: none` and skip AI review — `src/dashboard/server/routes/workspaces/review-pipeline.ts:272`\nThe new PR-scoped persistence block turns the existing trigger route into a durable policy-write surface, but the route does not enforce the dashboard's unsafe-mutation authentication and CSRF boundary. A network caller able to reach the dashboard can post `{\"reviewMode\":\"none\"}` for an eligible issue, persist the override, and cause the existing review resolver to skip AI review. Guard the entire trigger operation with `rejectUnsafeDashboardMutationRequest(request)` before parsing or mutating state, and add route-level rejection and authenticated-success tests.\n\n### [correctness] The trigger route passes a nullable project into the record writer — `src/dashboard/server/routes/workspaces/review-pipeline.ts:277`\n`resolveProjectForIssue()` returns `ProjectConfig | null`, while `updateIssueRecord()` requires `ProjectConfig`. The changed line introduces TS2345 and raises the dashboard-server type-error count from the baseline, so the required typecheck gate cannot pass. Resolve and validate the project before resetting review state or opening the pending operation, return a clear error when no project resolves, and test both unresolved-project handling and persistence-before-dispatch ordering.\n\n### [requirements] Reviewer timed out before producing a usable report\nThe requirements reviewer remained running past its lifecycle deadline and did not produce a ready signal. Review policy forbids approval when any reviewer fails or times out, so requirements coverage must run successfully in the next cycle.\n\n## Non-blocking Findings\n\n### [correctness] Semantic API rejections still produce a success toast — `src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts:378`\nThe new request-review success toast runs for every HTTP-success response, including existing HTTP 200 payloads with `success: false` for already-blocked or already-passed states. Require the response payload to represent an accepted request before showing success; otherwise surface the server message. This is advisory because the refreshed state corrects the controls and the failure does not dispatch or mutate incorrectly.\n\n## Clean Sub-roles\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3340/.pan/review/agent-pan-3340-review-a9baf210/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3340 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -63,21 +55,21 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T23:20:04.799Z",
+  "updated": "2026-07-30T23:20:39.331Z",
   "pipeline": {
     "issueId": "PAN-3340",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T23:20:03.217Z",
+    "updatedAt": "2026-07-30T23:20:39.276Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added dashboard mutation auth, validated project resolution before pending state, added route-level ordering tests, and replaced false success toasts with semantic rejection feedback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "40b669c4ae26b284d559dba80cbfc497246b48e0",
-    "reviewSpawnedAt": "2026-07-30T22:37:43.027Z",
+    "reviewSpawnedAt": "2026-07-30T23:20:39.275Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -170,7 +162,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.462295,
-        "pricingAsOf": "2026-07-30T23:20:04.796Z"
+        "pricingAsOf": "2026-07-30T23:20:39.306Z"
       }
     },
     "merges": [
