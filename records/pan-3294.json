@@ -73,7 +73,7 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T06:10:19.654Z",
+  "updated": "2026-07-30T06:10:23.196Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -84,8 +84,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T04:36:45.444Z",
-    "updatedAt": "2026-07-30T06:10:19.420Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: replaced the racy mkdir/PID protocol with a kernel-held cross-platform ownership lock, made release owner-only, and added deterministic paused-initialization and non-owner-release regressions. Typecheck, lint, 12,397 root tests, and 59 frontend tests pass.",
+    "updatedAt": "2026-07-30T06:10:19.712Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 2066591 exited before writing a result",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewedAtCommit": "d872af6cd80efdb90f2eb0c98e040cb8d6075ec0",
@@ -132,9 +132,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2118450,
-            "output": 368190,
-            "cacheRead": 56431616,
+            "input": 2119926,
+            "output": 368484,
+            "cacheRead": 56911872,
             "cacheWrite": 0
           }
         }
@@ -147,15 +147,15 @@
           "cacheWrite": 165672
         },
         "openai/gpt-5.6-sol": {
-          "input": 4697825,
-          "output": 712650,
-          "cacheRead": 84461568,
+          "input": 4699301,
+          "output": 712944,
+          "cacheRead": 84941824,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 94.206002,
-        "pricingAsOf": "2026-07-30T06:10:19.541Z"
+        "usd": 94.46233,
+        "pricingAsOf": "2026-07-30T06:10:23.029Z"
       }
     },
     "merges": [
