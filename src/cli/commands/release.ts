@@ -2,9 +2,10 @@ import { exitCli } from '../exit.js';
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { execFileSync, execSync, spawn } from 'child_process';
-import { mkdirSync, readFileSync, writeFileSync, type Dirent } from 'fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync, type Dirent } from 'fs';
 import { readdir, unlink } from 'fs/promises';
 import { dirname, join } from 'path';
+import { resolveBunBinary } from '../../lib/deploy/build-from-origin.js';
 
 type ReleaseChannel = 'stable' | 'canary';
 
@@ -575,53 +576,77 @@ async function releaseCreateCommand(
     return exitCli(1);
   }
 
-  pkg.version = resolvedVersion;
-  writePackageJson(repoRoot, pkg);
+  // Resolve bun before any file is mutated: the create phase shells out to it
+  // for the lockfile refresh, and a missing binary after the bumps strands a
+  // half-applied release that then trips ensureCleanTree on the retry.
+  const bunBinary = await resolveBunBinary(repoRoot);
 
-  const desktopPkg = readDesktopPackageJson(repoRoot);
-  desktopPkg.version = resolvedVersion;
-  writeDesktopPackageJson(repoRoot, desktopPkg);
+  let committed = false;
+  try {
+    pkg.version = resolvedVersion;
+    writePackageJson(repoRoot, pkg);
 
-  const contractsPkg = readContractsPackageJson(repoRoot);
-  contractsPkg.version = resolvedVersion;
-  writeContractsPackageJson(repoRoot, contractsPkg);
+    const desktopPkg = readDesktopPackageJson(repoRoot);
+    desktopPkg.version = resolvedVersion;
+    writeDesktopPackageJson(repoRoot, desktopPkg);
 
-  const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
-  const releaseNotes = buildReleaseNotesMarkdown({
-    channel,
-    version: resolvedVersion,
-    from: previousTag,
-    to: tagName,
-    entries,
-    packageName: pkg.name ?? '@overdeck/core',
-    stateBranchSha: channel === 'stable' ? getRemoteStateBranchSha(repoRoot) : undefined,
-  });
+    const contractsPkg = readContractsPackageJson(repoRoot);
+    contractsPkg.version = resolvedVersion;
+    writeContractsPackageJson(repoRoot, contractsPkg);
 
-  writeTextFile(releaseNotesPath, releaseNotes);
+    const entries = getCommitSubjects(repoRoot, previousTag ? `${previousTag}..HEAD` : 'HEAD');
+    const releaseNotes = buildReleaseNotesMarkdown({
+      channel,
+      version: resolvedVersion,
+      from: previousTag,
+      to: tagName,
+      entries,
+      packageName: pkg.name ?? '@overdeck/core',
+      stateBranchSha: channel === 'stable' ? getRemoteStateBranchSha(repoRoot) : undefined,
+    });
 
-  run('bun install', repoRoot);
+    writeTextFile(releaseNotesPath, releaseNotes);
 
-  run(
-    `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
-    repoRoot
-  );
-  // Idempotent: when retagging the same version after a CI failure, the package
-  // bumps and release notes are already on HEAD. Skip the commit if nothing
-  // staged. Tagging is still meaningful because the tag may have been deleted.
-  const hasStagedChanges = (() => {
-    try {
-      execSync('git diff --cached --quiet', { cwd: repoRoot });
-      return false;
-    } catch {
-      return true;
+    execFileSync(bunBinary, ['install'], { cwd: repoRoot, stdio: ['pipe', 'pipe', 'pipe'] });
+
+    run(
+      `git add package.json apps/desktop/package.json packages/contracts/package.json bun.lock ${releaseNotesPath}`,
+      repoRoot
+    );
+    // Idempotent: when retagging the same version after a CI failure, the package
+    // bumps and release notes are already on HEAD. Skip the commit if nothing
+    // staged. Tagging is still meaningful because the tag may have been deleted.
+    const hasStagedChanges = (() => {
+      try {
+        execSync('git diff --cached --quiet', { cwd: repoRoot });
+        return false;
+      } catch {
+        return true;
+      }
+    })();
+    if (hasStagedChanges) {
+      run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
+    } else {
+      console.log(chalk.dim('No version-bump changes to commit — tagging current HEAD.'));
     }
-  })();
-  if (hasStagedChanges) {
-    run(`git commit -m "chore: release ${resolvedVersion}"`, repoRoot);
-  } else {
-    console.log(chalk.dim('No version-bump changes to commit — tagging current HEAD.'));
+    committed = true;
+    run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
+  } catch (error) {
+    // Before the release commit exists, the bumps and notes file are this
+    // command's own uncommitted writes — roll them back so a retry starts from
+    // a clean tree instead of failing ensureCleanTree. After the commit they
+    // are history and must stay.
+    if (!committed) {
+      try {
+        run('git restore --source=HEAD --staged --worktree package.json apps/desktop/package.json packages/contracts/package.json bun.lock', repoRoot);
+      } catch {
+        // The restore is best-effort; the original error matters more.
+      }
+      rmSync(releaseNotesPath, { force: true });
+      console.error(chalk.red('Release creation failed — rolled back the version bumps and release notes.'));
+    }
+    throw error;
   }
-  run(`git tag -a ${tagName} -m "Release ${resolvedVersion}"`, repoRoot);
 
   console.log(chalk.green('\n✓ Release commit and tag created'));
   console.log(`Commit: ${chalk.cyan(run('git rev-parse --short HEAD', repoRoot))}`);
