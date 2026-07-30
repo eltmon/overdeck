@@ -232,16 +232,16 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:22:30.286Z",
+  "updated": "2026-07-30T11:22:31.198Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T11:22:01.656Z",
+    "updatedAt": "2026-07-30T11:22:31.196Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
@@ -253,7 +253,43 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "80f12ca60cd20f82d4e060b1e1f6492a1a56e7bd",
     "lastVerifiedCommit": "09d9a69b337d7007077fcfa03672a9a88692a288",
-    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z"
+    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z",
+    "reviewRequestedAt": "2026-07-30T11:22:31.196Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "scripts/file-size-allowlist.txt",
+        "src/lib/overdeck/review-status-sync.ts",
+        "src/lib/review-status-limits.ts",
+        "tests/dashboard/event-store.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "tests/unit/lib/database/review-status-history-cap.test.ts"
+      ],
+      "declaredScope": [
+        "docs/AGENT-STATE-PLANES.md",
+        "src/dashboard/server/event-store.ts",
+        "src/lib/database/review-status-db.ts",
+        "src/lib/review-status-reconcile.ts",
+        "src/lib/review-status.ts",
+        "tests/unit/event-store.test.ts",
+        "tests/unit/lib/database/review-status-history-cap.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/AGENT-STATE-PLANES.md",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/server/event-store.ts",
+        "src/lib/database/review-status-db.ts",
+        "src/lib/overdeck/review-status-sync.ts",
+        "src/lib/review-status-limits.ts",
+        "src/lib/review-status-reconcile.ts",
+        "src/lib/review-status.ts",
+        "tests/dashboard/event-store.test.ts",
+        "tests/unit/event-store.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts"
+      ],
+      "recordedAt": "2026-07-30T11:22:30.284Z"
+    }
   },
   "closeOut": {
     "usage": {
