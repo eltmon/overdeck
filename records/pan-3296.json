@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T05:59:46.697Z",
+  "updated": "2026-07-30T05:59:49.888Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -209,5 +209,33 @@
     "docs-state-door-invariant": "completed",
     "docs-state-door-invariant.docs-state-door-invariant.ac1": "completed",
     "docs-state-door-invariant.docs-state-door-invariant.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/start-status.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/XBRIEF.md",
+      "src/cli/commands/start.ts",
+      "src/dashboard/server/routes/agents/spawn.ts",
+      "src/lib/pan-dir/__tests__/state-door-durability.test.ts",
+      "src/lib/pan-dir/record-update.ts",
+      "src/lib/xbrief/__tests__/lifecycle-io.test.ts",
+      "src/lib/xbrief/lifecycle-io.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "docs/XBRIEF.md",
+      "src/cli/commands/start-status.ts",
+      "src/cli/commands/start.ts",
+      "src/dashboard/server/routes/agents/spawn.ts",
+      "src/lib/pan-dir/__tests__/state-door-durability.test.ts",
+      "src/lib/pan-dir/record-update.ts",
+      "src/lib/xbrief/__tests__/lifecycle-io.test.ts",
+      "src/lib/xbrief/lifecycle-io.ts"
+    ],
+    "recordedAt": "2026-07-30T05:59:49.887Z"
   }
 }
