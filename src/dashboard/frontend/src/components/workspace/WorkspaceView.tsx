@@ -56,6 +56,8 @@ interface WorkspaceMemoryStatus {
   headline: string;
   summary: string;
   phase: string;
+  /** Synthesis confidence, surfaced beside the phase in the Memory header (PAN-3286 FR-12). */
+  confidence?: number;
   nextSteps: string[];
 }
 
@@ -245,7 +247,18 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         </Panel>
         <Separator className="w-px bg-border" />
         <Panel id="memory" defaultSize={33} minSize={15} className="min-w-0 h-full overflow-y-auto p-3">
-          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-2">Memory</p>
+          {/* PAN-3286 FR-12: the memory-synthesized phase and its confidence sit
+              in the section header, so the panel says what this workspace is
+              doing before you read the headline. */}
+          <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mb-2">
+            Memory
+            {memory?.status && (
+              <span className="ml-2 normal-case tracking-normal text-muted-foreground/70" data-testid="workspace-view-memory-phase">
+                {memory.status.phase}
+                {typeof memory.status.confidence === 'number' && ` · confidence ${memory.status.confidence}`}
+              </span>
+            )}
+          </p>
           {memory?.status ? (
             <div className="space-y-2" data-testid="workspace-view-memory-status">
               <p className="text-sm text-foreground">{memory.status.headline}</p>
