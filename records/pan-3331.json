@@ -16,16 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T20:45:39.729Z",
+  "updated": "2026-07-30T20:46:00.371Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T20:36:50.158Z"
+    "updatedAt": "2026-07-30T20:46:00.352Z",
+    "inspectNotes": "Inspecting item git-state-module"
   },
   "closeOut": {
     "usage": {
@@ -49,7 +51,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.784645,
-        "pricingAsOf": "2026-07-30T20:36:50.176Z"
+        "pricingAsOf": "2026-07-30T20:46:00.359Z"
       }
     },
     "merges": [],
