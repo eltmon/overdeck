@@ -132,6 +132,7 @@ exit 99
     return {
       ...process.env,
       HOME: homeDir,
+      OVERDECK_HOME: join(homeDir, '.overdeck'),
       PATH: `${mockBin}:${process.env.PATH ?? ''}`,
       OVERDECK_AGENT_ID: AGENT_ID,
       OVERDECK_DASHBOARD_URL: 'http://mocked-dashboard.local',
@@ -292,5 +293,67 @@ exit 99
 
     expect(readFileSync(claudeLog, 'utf-8')).toContain('claude-haiku-4-5')
     expect(existsSync(lockDir)).toBe(false)
+  })
+
+  it('drops a timed-out completion check without emitting a resolution', async () => {
+    writeFallbackRuntime()
+    const startedAt = Date.now()
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv({
+        MOCK_CLAUDE_SLEEP: '3',
+        OVERDECK_HOOK_LLM_TIMEOUT: '1',
+      }),
+      timeout: 10_000,
+    })
+
+    expect(Date.now() - startedAt).toBeLessThan(2_500)
+    expect(existsSync(heartbeatLog)).toBe(false)
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('completion-check LLM timed out')
+  })
+
+  it('drops a rate-limited completion check before invoking claude', async () => {
+    writeFallbackRuntime()
+    const bucketFile = join(homeDir, '.overdeck', 'hook-llm-calls.log')
+    const now = Math.floor(Date.now() / 1000)
+    writeFileSync(bucketFile, `${now}\n`.repeat(6), 'utf-8')
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv(),
+      timeout: 10_000,
+    })
+
+    expect(existsSync(claudeLog)).toBe(false)
+    expect(existsSync(heartbeatLog)).toBe(false)
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('rate-limited — skipping completion-check LLM')
+  })
+
+  it('records an admitted LLM call and preserves the completion resolution path', async () => {
+    writeFallbackRuntime()
+    const bucketFile = join(homeDir, '.overdeck', 'hook-llm-calls.log')
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv(),
+      timeout: 10_000,
+    })
+
+    expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"done"')
+    expect(readFileSync(bucketFile, 'utf-8').trim().split('\n')).toHaveLength(1)
+  })
+
+  it('preserves the existing UNCLEAR fallback for non-timeout claude failures', async () => {
+    writeFallbackRuntime()
+
+    await execFileAsync('bash', [hookScriptPath], {
+      env: fallbackEnv({ MOCK_CLAUDE_RC: '1' }),
+      timeout: 10_000,
+    })
+
+    expect(readFileSync(heartbeatLog, 'utf-8')).toContain('"resolution":"unclear"')
+    const hooksLog = readFileSync(join(homeDir, '.overdeck', 'logs', 'hooks.log'), 'utf-8')
+    expect(hooksLog).toContain('claude -p failed rc=1')
+    expect(hooksLog).toContain('fallback to UNCLEAR')
   })
 })

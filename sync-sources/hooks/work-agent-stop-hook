@@ -374,8 +374,22 @@ Use UNCLEAR only as a last resort when the tail is genuinely ambiguous (e.g. no 
 Respond with EXACTLY one word, nothing else: FORGOT_COMPLETION | STILL_WORKING | STOPPED_FOR_INPUT | UNCLEAR"
 
 CLAUDE_STDERR="$LOG_DIR/work-agent-stop-hook.claude-stderr.log"
-RESULT=$(echo "$ANALYSIS_PROMPT" | claude -p --model "$COMPLETION_MODEL" 2>>"$CLAUDE_STDERR")
+if ! pan_llm_rate_check; then
+  echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID rate-limited — skipping completion-check LLM" \
+    >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+  exit 0
+fi
+
+RESULT=$(echo "$ANALYSIS_PROMPT" | pan_run_with_timeout "${OVERDECK_HOOK_LLM_TIMEOUT:-60}" \
+  claude -p --model "$COMPLETION_MODEL" 2>>"$CLAUDE_STDERR")
 CLAUDE_RC=$?
+case "$CLAUDE_RC" in
+  124|137|143)
+    echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID completion-check LLM timed out rc=$CLAUDE_RC — no resolution emitted" \
+      >> "$LOG_DIR/hooks.log" 2>/dev/null || true
+    exit 0
+    ;;
+esac
 if [ $CLAUDE_RC -ne 0 ] || [ -z "$RESULT" ]; then
   echo "[$(date -Iseconds)] work-agent-stop-hook: $AGENT_ID claude -p failed rc=$CLAUDE_RC (see $CLAUDE_STDERR), fallback to UNCLEAR" \
     >> "$LOG_DIR/hooks.log" 2>/dev/null || true
