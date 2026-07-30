@@ -15,19 +15,39 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/HOOKS.md",
+      "sync-sources/hooks/pan-hook-lib.sh",
+      "sync-sources/hooks/work-agent-stop-hook*",
+      "tests/scripts/pan-hook-lib-guards.test.ts",
+      "tests/scripts/work-agent-stop-hook.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/HOOKS.md",
+      "sync-sources/hooks/pan-hook-lib.sh",
+      "sync-sources/hooks/work-agent-stop-hook",
+      "tests/scripts/pan-hook-lib-guards.test.ts",
+      "tests/scripts/work-agent-stop-hook.test.ts"
+    ],
+    "recordedAt": "2026-07-30T04:35:55.129Z"
+  },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:35:58.129Z",
+  "updated": "2026-07-30T04:36:00.489Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T04:35:58.127Z",
+    "updatedAt": "2026-07-30T04:35:59.792Z",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewRequestedAt": "2026-07-30T04:35:58.127Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -47,8 +67,7 @@
         "tests/scripts/work-agent-stop-hook.test.ts"
       ],
       "recordedAt": "2026-07-30T04:35:55.129Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3299"
+    }
   },
   "closeOut": {
     "usage": {
@@ -63,9 +82,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 855088,
-            "output": 18211,
-            "cacheRead": 5837824,
+            "input": 1257991,
+            "output": 101417,
+            "cacheRead": 29502464,
             "cacheWrite": 0
           }
         }
@@ -78,18 +97,20 @@
           "cacheWrite": 165672
         },
         "openai/gpt-5.6-sol": {
-          "input": 855088,
-          "output": 18211,
-          "cacheRead": 5837824,
+          "input": 1257991,
+          "output": 101417,
+          "cacheRead": 29502464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.847275,
-        "pricingAsOf": "2026-07-30T03:57:49.631Z"
+        "usd": 31.19029,
+        "pricingAsOf": "2026-07-30T04:35:59.840Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3299"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -233,24 +254,5 @@
     "docs-guardrails.docs-guardrails.ac1": "completed",
     "docs-guardrails.docs-guardrails.ac2": "completed",
     "docs-guardrails.docs-guardrails.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/HOOKS.md",
-      "sync-sources/hooks/pan-hook-lib.sh",
-      "sync-sources/hooks/work-agent-stop-hook*",
-      "tests/scripts/pan-hook-lib-guards.test.ts",
-      "tests/scripts/work-agent-stop-hook.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/HOOKS.md",
-      "sync-sources/hooks/pan-hook-lib.sh",
-      "sync-sources/hooks/work-agent-stop-hook",
-      "tests/scripts/pan-hook-lib-guards.test.ts",
-      "tests/scripts/work-agent-stop-hook.test.ts"
-    ],
-    "recordedAt": "2026-07-30T04:35:55.129Z"
   }
 }
