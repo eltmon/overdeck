@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:43:04.262Z",
+  "updated": "2026-07-30T04:48:59.971Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "reconciler-adopts-orphaned-writes": {
-        "writerId": "agent-pan-3296",
-        "agentId": "agent-pan-3296",
-        "pid": 3587545,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:43:04.262Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3296",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Removed the two unused exported lifecycle helpers that wrote or deleted specs outside the durable state door; no source consumers remain and lifecycle tests/typecheck pass.",
         "releasedAt": "2026-07-30T04:42:53.366Z"
+      },
+      {
+        "writerId": "agent-pan-3296",
+        "agentId": "agent-pan-3296",
+        "pid": 3587545,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:43:04.262Z",
+        "itemId": "reconciler-adopts-orphaned-writes",
+        "outcome": "completed",
+        "reason": "Before each state rebase, reconciliation now adopts dirty specs/records into a named commit, warns with paths, and rejects dirty unowned paths; push-race tests cover adoption, remote durability, cleanliness, and fail-closed behavior.",
+        "releasedAt": "2026-07-30T04:48:59.971Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "remove-bare-write-doors": {
         "reason": "Removed the two unused exported lifecycle helpers that wrote or deleted specs outside the durable state door; no source consumers remain and lifecycle tests/typecheck pass.",
         "updatedAt": "2026-07-30T04:42:53.366Z"
+      },
+      "reconciler-adopts-orphaned-writes": {
+        "reason": "Before each state rebase, reconciliation now adopts dirty specs/records into a named commit, warns with paths, and rejects dirty unowned paths; push-race tests cover adoption, remote durability, cleanliness, and fail-closed behavior.",
+        "updatedAt": "2026-07-30T04:48:59.971Z"
       }
     }
   },
@@ -159,6 +166,10 @@
     "remove-bare-write-doors.remove-bare-write-doors.ac1": "completed",
     "remove-bare-write-doors.remove-bare-write-doors.ac2": "completed",
     "remove-bare-write-doors.remove-bare-write-doors.ac3": "completed",
-    "reconciler-adopts-orphaned-writes": "running"
+    "reconciler-adopts-orphaned-writes": "completed",
+    "reconciler-adopts-orphaned-writes.reconciler-adopts-orphaned-writes.ac1": "completed",
+    "reconciler-adopts-orphaned-writes.reconciler-adopts-orphaned-writes.ac2": "completed",
+    "reconciler-adopts-orphaned-writes.reconciler-adopts-orphaned-writes.ac3": "completed",
+    "reconciler-adopts-orphaned-writes.reconciler-adopts-orphaned-writes.ac4": "completed"
   }
 }
