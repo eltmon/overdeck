@@ -64,6 +64,22 @@ registerDashboardDurableReviewPipeline({
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
 
+export function parseRequestedReviewMode(body: unknown):
+  | { ok: true; mode?: 'quick' | 'full' | 'none' }
+  | { ok: false; error: string } {
+  const reviewMode = typeof body === 'object' && body !== null
+    ? (body as { reviewMode?: unknown }).reviewMode
+    : undefined;
+
+  if (reviewMode === undefined || reviewMode === null) {
+    return { ok: true };
+  }
+  if (reviewMode === 'quick' || reviewMode === 'full' || reviewMode === 'none') {
+    return { ok: true, mode: reviewMode };
+  }
+  return { ok: false, error: 'reviewMode must be quick, full, or none' };
+}
+
 /**
  * Push the feature branch of every repo in the workspace (PAN-2948).
  *
@@ -129,6 +145,10 @@ const postWorkspaceReviewRoute = HttpRouter.add(
     }
     const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
+    const requestedReviewMode = parseRequestedReviewMode(body);
+    if (!requestedReviewMode.ok) {
+      return jsonResponse({ error: requestedReviewMode.error }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
@@ -247,6 +267,27 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         message,
         pipeline: 'deferred',
       }, { status: 409 });
+    }
+
+    if (requestedReviewMode.mode !== undefined) {
+      const persistenceError = yield* Effect.promise(async () => {
+        const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
+        const { updateIssueRecord } = await import('../../../../lib/pan-dir/record-update.js');
+        const project = resolveProjectForIssue(issueId);
+        await updateIssueRecord(project, issueId, (record) => {
+          record.reviewMode = requestedReviewMode.mode;
+        });
+      }).pipe(Effect.match({
+        onFailure: (error) => errorMessage(error) ?? String(error),
+        onSuccess: () => null,
+      }));
+
+      if (persistenceError !== null) {
+        const message = `Failed to persist review mode: ${persistenceError}`;
+        completePendingOperation(issueId, message);
+        setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
+        return jsonResponse({ error: message }, { status: 500 });
+      }
     }
 
     // Respond immediately
