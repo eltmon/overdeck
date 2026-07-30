@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:42:29.061Z",
+  "updated": "2026-07-30T21:52:04.854Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "wi5-workspaceview-actions": {
-        "writerId": "agent-pan-3330",
-        "agentId": "agent-pan-3330",
-        "pid": 2449497,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:42:29.060Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3330",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Sidebar WORKSPACES '+', palette 'New workspace…' action (visible under both Actions and Workspaces chips via alsoScopes), and ProjectOverview button wired through a zustand store to avoid drilling a prop through two god files. Sidebar/palette/overview suites green.",
         "releasedAt": "2026-07-30T21:42:19.497Z"
+      },
+      {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 2449497,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:42:29.060Z",
+        "itemId": "wi5-workspaceview-actions",
+        "outcome": "completed",
+        "reason": "WorkspaceView header gains Favorite/Relocate/Archive for main+scratch only; main relocate requires typed confirm and forces; writer refusals surface as 409 messages; both cache keys invalidated. 17 tests green (8 pre-existing restored via DialogProvider wrap).",
+        "releasedAt": "2026-07-30T21:52:04.854Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "wi4-entry-points": {
         "reason": "Sidebar WORKSPACES '+', palette 'New workspace…' action (visible under both Actions and Workspaces chips via alsoScopes), and ProjectOverview button wired through a zustand store to avoid drilling a prop through two god files. Sidebar/palette/overview suites green.",
         "updatedAt": "2026-07-30T21:42:19.497Z"
+      },
+      "wi5-workspaceview-actions": {
+        "reason": "WorkspaceView header gains Favorite/Relocate/Archive for main+scratch only; main relocate requires typed confirm and forces; writer refusals surface as 409 messages; both cache keys invalidated. 17 tests green (8 pre-existing restored via DialogProvider wrap).",
+        "updatedAt": "2026-07-30T21:52:04.854Z"
       }
     }
   },
@@ -161,6 +168,10 @@
     "wi4-entry-points.wi4-entry-points.ac1": "completed",
     "wi4-entry-points.wi4-entry-points.ac2": "completed",
     "wi4-entry-points.wi4-entry-points.ac3": "completed",
-    "wi5-workspaceview-actions": "running"
+    "wi5-workspaceview-actions": "completed",
+    "wi5-workspaceview-actions.wi5-workspaceview-actions.ac1": "completed",
+    "wi5-workspaceview-actions.wi5-workspaceview-actions.ac2": "completed",
+    "wi5-workspaceview-actions.wi5-workspaceview-actions.ac3": "completed",
+    "wi5-workspaceview-actions.wi5-workspaceview-actions.ac4": "completed"
   }
 }
