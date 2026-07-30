@@ -54,20 +54,22 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:09:42.253Z",
+  "updated": "2026-07-30T23:13:23.597Z",
   "pipeline": {
     "issueId": "PAN-3341",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T23:09:42.220Z",
+    "updatedAt": "2026-07-30T23:13:23.511Z",
+    "reviewNotes": "All four reviewers passed with no blocking or advisory findings.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3353",
-    "reviewRequestedAt": "2026-07-30T23:08:55.001Z",
+    "reviewedAtCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f",
     "reviewSpawnedAt": "2026-07-30T23:09:39.366Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -101,11 +103,69 @@
         "tests/unit/dashboard/server/services/resource-discovery.test.ts"
       ],
       "recordedAt": "2026-07-30T23:08:52.027Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 162364,
+            "output": 3329,
+            "cacheRead": 1690112,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 461277,
+            "output": 12946,
+            "cacheRead": 4237312,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 338465,
+            "output": 2321,
+            "cacheRead": 176128,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 597353,
+            "output": 13589,
+            "cacheRead": 664576,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 294508,
+            "output": 1954,
+            "cacheRead": 633856,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 901836,
@@ -117,15 +177,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 901836,
-          "output": 98241,
-          "cacheRead": 37959680,
+          "input": 2755803,
+          "output": 132380,
+          "cacheRead": 45361664,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 26.43625,
-        "pricingAsOf": "2026-07-30T23:09:42.239Z"
+        "usd": 40.431247,
+        "pricingAsOf": "2026-07-30T23:13:23.584Z"
       }
     },
     "merges": [
