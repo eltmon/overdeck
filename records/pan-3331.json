@@ -19,15 +19,7 @@
       "timestamp": "2026-07-30T23:03:49.289Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-30T23:03:49Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3331\n\n# Review Synthesis — PAN-3331 — 2026-07-30T23:02:34Z\n\n## Verdict: CHANGES REQUESTED — unauthenticated workspace reads disclose stored and configured run commands\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/context.json\n- Branch: feature/pan-3331\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331\n- Manifest HEAD reviewed by convoy: e3a12d06a0fc59148aa3d4179ae39a680fe6e5ca\n- Current HEAD recorded for the next cycle: 58b44843760db716c0755cd9a54480eadbf6e4c9\n- Cycle number: 1\n- Prior cycle SHA: none\n- Head note: the branch advanced after discovery only by merging `origin/main`; the PAN-3331 feature diff is unchanged from the manifest head.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/performance.md | 2 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] Unauthenticated registry reads disclose executable command text — `src/lib/workspaces/resolver.ts:16`\nThe changed resolver now selects and maps `run_command`, while `toListRow()` spreads the full workspace row into the unauthenticated list and detail responses. The detail response also adds every configured `services[].start_command`. A network client that can reach the API can retrieve operational command strings, including credentials or tokens operators may have embedded in them. Remove `runCommand` from the public list DTO and require dashboard authentication on every read that returns stored or configured command text, with tests proving unauthenticated requests receive no command data.\n\n### [correctness] Run-session state crosses workspace boundaries and misses palette starts — `src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx:147`\n`WorkspaceView` initializes local state from a module-level map only once, and the unkeyed component instance is preserved when the route changes workspace IDs. Navigating from workspace A to B can therefore show A's terminal and Stop control in B, while a palette start for the already-mounted workspace updates only the map and never updates the view. Use one reactive source keyed by workspace ID and update it from both the band and palette so navigation selects the correct entry and same-workspace starts render immediately.\n\n### [correctness] The visible Restart action never restarts the process — `src/dashboard/frontend/src/components/workspace/WorkspaceActionBand.tsx:340`\nWhen a run session exists, the button says `Restart`, but it calls the ordinary run route. The server detects the existing deterministic session and returns 409, which the client treats as a successful re-focus. The live process is never stopped or recreated, so the UI promises behavior it does not perform. Implement an actual stop-then-start lifecycle with terminal reconnection/remount semantics, or remove the restart claim and present the action as showing the existing run.\n\n### [performance] Workspace HTTP handlers synchronously load filesystem-backed configuration — `src/dashboard/server/routes/workspace-registry.ts:145`\nThe detail and editor-open request paths call `getOpenInEditorCommandSync()`, which calls `loadConfigSync()`. Even a cache hit synchronously resolves config paths and checks mtimes, and a miss performs synchronous reads and YAML parsing on the dashboard's Node event loop. A slow filesystem can stall HTTP, WebSocket terminal traffic, and orchestration. Resolve the value through the async config path or an asynchronously maintained in-memory service; server-reachable request code must not use this synchronous getter.\n\n### [performance] The fetch throttle admits concurrent fetches for one checkout — `src/dashboard/server/routes/workspace-registry.ts:193`\n`readGitState()` checks `lastFetchByPath` before awaiting the fetch and records freshness only after the fetch completes. Overlapping `fetch=1` requests all see the stale timestamp and each launch a `git fetch`, violating the once-per-30-seconds-per-path requirement and creating redundant processes, network traffic, and ref-lock contention. Coalesce callers behind a per-path in-flight promise or lock, record the attempt atomically, clear it in `finally`, and add an overlapping-request regression test.\n\n### [requirements] Cmd-K Run targets the favorite-first visible row instead of the workspace used last — `src/dashboard/frontend/src/components/CommandPalette.tsx:608`\n**Scope: in_pr_scope.** FR-8/D-10 requires the palette action to run the most recently used workspace. The implementation chooses `visibleWorkspaceRows[0]`, but that collection sorts favorites first and excludes collapsed non-favorited issue worktrees. An older favorite can win over a newer workspace, and the action can disappear when all rows are collapsed issue worktrees. Derive the target independently from all non-archived rows by maximum `lastAccessedAt`, then test an older favorite against a newer non-favorite and a newest collapsed issue workspace.\n\n## Non-blocking Findings\n\n### Security\n- `~` `GET /api/workspace-registry/:id/git?fetch=1` performs an outbound, ref-mutating fetch without dashboard authentication. Authenticate this side-effectful read and consider modeling explicit refresh as a protected mutation.\n- `?` The Windows file-manager path uses `cmd /c start`; `cmd.exe` reparses metacharacters even when the path begins as an argv element. Prefer a direct non-shell opener such as `explorer.exe` with explicit handling for its exit behavior.\n\n### Correctness\n- `~` Palette Run does not catch a rejected `fetch()`, so a transport failure becomes an unhandled promise rejection with no toast or navigation.\n- `~` Editor templates are split only on whitespace. Quoted paths or executable names with spaces become invalid argv; either support shell-style quoting without invoking a shell or reject unsupported quoting with a clear config error.\n\n### Performance\n- `~` Editor and file-manager launches await process exit before completing the HTTP request. A non-daemonizing editor can retain request fibers and sockets for its full lifetime; return after successful spawn while preserving normal child reaping and error reporting.\n\n### Requirements\n- The manifest's `commitsOpen` stub heuristic is a false positive: the Incoming/Hide incoming control writes the state and reveals populated commit data.\n\n## Clean Sub-roles\nNone. Every sub-role reported at least one finding.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-e3a12d06/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3331 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -106,10 +98,10 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:29:42.145Z",
+  "updated": "2026-07-30T23:30:02.314Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -117,14 +109,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:29:42.131Z",
+    "updatedAt": "2026-07-30T23:30:02.244Z",
     "reviewNotes": "Review pipeline error: Command failed: git push origin feature/pan-3331\nerror: failed to push some refs to 'https://github.com/eltmon/overdeck.git'\n",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "58b44843760db716c0755cd9a54480eadbf6e4c9",
     "lastVerifiedCommit": "58b44843760db716c0755cd9a54480eadbf6e4c9",
     "reviewRequestedAt": "2026-07-30T23:26:45.850Z",
-    "reviewSpawnedAt": "2026-07-30T22:43:49.339Z",
+    "reviewSpawnedAt": "2026-07-30T23:30:02.243Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -271,7 +263,7 @@
       },
       "costAtCloseOut": {
         "usd": 56.150478,
-        "pricingAsOf": "2026-07-30T23:29:42.141Z"
+        "pricingAsOf": "2026-07-30T23:30:02.281Z"
       }
     },
     "merges": [
