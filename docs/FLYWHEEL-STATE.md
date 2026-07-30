@@ -9222,3 +9222,31 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **Merged this cascade, all squash on green checks, no admin bypass, every diff pre-reviewed:** PAN-3342 (red main), PAN-3339, PAN-3326, PAN-3324, **PAN-3328** (the 26-day `merge_queue` wedge). Only **#3349 (PAN-3327)** remains, `test` still running.
 - **One deploy is the single remaining unblock**, and it now covers four things at once: PAN-3326's own strike handoff (currently refused by the pre-fix binary running its own bug), the **PAN-3259** and **PAN-3305** close-outs (need PAN-3326's gate live), the **PAN-3296** close-out (needs PAN-3339's sweep live), and the proof of PAN-3327 itself — a bare `pan sync` should deploy the hook without my hand-rsync of both generations.
 - Load back to 41 from parallel CI; memory 24.7 GB. Will confirm capacity immediately before deploying rather than firing into a spike.
+
+## RUN-75 tick 24 (2026-07-30 22:36-22:50Z) — ALL SIX STRIKES MERGED AND DEPLOYED; three close-outs
+
+- **#3349 (PAN-3327) merged** — all six strikes now landed: PAN-3342, PAN-3339, PAN-3326, PAN-3324, PAN-3328, PAN-3327. Every one squash-merged on genuinely green checks, no admin bypass, every diff reviewed by me first.
+- **The cwd guard caught me a second time, and this time a *product* guard did it.** `pan reload` refused: *"Refusing to reload the host dashboard from non-primary checkout .../feature-pan-3342-strike"*. My shell cwd had still been in that workspace since the tick-17 `cd` — all my `git -C` calls worked because they name paths explicitly, so the drift stayed invisible. **`git -C` protects git commands; it does not move the process.** Re-ran via the subshell form from my own rules and it deployed clean.
+- **Deploy verified**: built from `origin/main 2a17c95e9e1d`, health 200, pid 1229300 binding `:3011`, parent **systemd**.
+- **Then the deploy itself demonstrated PAN-3327's bug one last time.** `pan done PAN-3326 --strike` still refused after deploying — because `pan reload` built into **generation-b** while the `pan` shim still resolves to **generation-a** (cli built 22:32 vs 22:41; only generation-b's dist contained the fix). Invoking generation-b's CLI directly worked immediately. **Reload alternates generations and the shim does not follow** — exactly what PAN-3327 fixes, observed one final time before its fix is in force.
+- **PAN-3326's fix proved itself on its own author:** `✓ has no unlanded content on origin/main (2 commit(s) differ by patch-id, but every path they touch is already identical on main)`. PAN-3259 got the same verdict for its 1 commit.
+- **Three close-outs: PAN-3296** (PAN-3339's reconcile sweep), **PAN-3259** (PAN-3326's gate — stuck the entire run), and PAN-3326/PAN-3339/PAN-3342 handed to verifying-on-main.
+- **PAN-3305 still refuses, and it is a genuine residual case, not the old bug.** Its PR #3316 merged at 10:39Z, but `kimi-code.test.ts` was evolved by later work, so branch tip and main now differ 85/-22 on that path. The gate correctly answers "is this content on main?" — but a landing gate wants "did this work land?", and the branch is merely **behind**. Reported on PAN-3326 with the suggestion that the merged-PR check (which `pan done PAN-3320 --strike` already uses) should be preferred, falling back to content comparison only when no merged PR exists. **Not force-closed.**
+- **LESSON: a fix landing is not the end of its story — watch it work, and watch what it still misses.** Three of this tick's most useful facts came from *using* the merged fixes: PAN-3326 clearing its own author, PAN-3327's bug appearing once more between merge and deploy, and PAN-3305's residual case that only a working gate could surface. Filing and merging would have looked like completion; running it is what produced the follow-up.
+
+## RUN-75 tick 25 (2026-07-30 22:50Z) — all six strikes handed off; PAN-3327 verified in production
+
+- **All six strike handoffs complete**: PAN-3342, PAN-3326, PAN-3339, PAN-3324, PAN-3328, PAN-3327 → verifying-on-main.
+- **The merged-PR verification path exists and works** — PAN-3328 and PAN-3327 both verified via `✓ Verified strike merge: … was merged by PR at <sha>`, which is precisely the check I recommended on PAN-3326 for the PAN-3305 residual case. It is already implemented; it just is not preferred over the content comparison.
+- **PAN-3327 verified in production, including the diagnostic I asked for:**
+  ```
+  ✔ Synced 23 hooks to ~/.overdeck/bin/ (0 updated, 23 unchanged)
+  ```
+  The `(0 updated, 23 unchanged)` counter is the exact observability item from the issue's fix list. **The silent no-op that cost ~20 minutes to diagnose is now a one-line read.** Generation-b's dist carries 5 generation-aware files; hook stays 445/guard=1.
+- **LESSON: the cheapest part of a fix is often the part that pays back most.** PAN-3327's substantive change was resolving `SYNC_SOURCES` correctly; the throwaway line printing updated/unchanged counts is what makes the *next* occurrence self-diagnosing. When filing a machinery bug, asking for the observability alongside the fix costs nothing and converts a future investigation into a glance.
+
+### RUN-75 standing state
+
+- **19 close-outs, 18 PRs merged**, 22 substrate bugs driven (14 fixed and merged, 9 filed).
+- Six issues at verifying-on-main awaiting their close-out gate.
+- **Genuinely blocked, none forced:** PAN-3305 (residual gate case, reported), PAN-3313 (operator — CLIProxy second auth entry), 4 new backlog items awaiting release (PAN-3330/3331/3340/3341), 17 MYN rows out of merge scope, TIN-1, and 4 typed blind spots.
