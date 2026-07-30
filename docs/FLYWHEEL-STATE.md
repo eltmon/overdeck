@@ -8785,3 +8785,56 @@ Reviewed every diff before landing rather than trusting the green CI:
 - Blocked, deliberately not forced: **PAN-3259** and **PAN-3305** (both PAN-3326), **PAN-3260** (PAN-2706 ghost test session), **PAN-3264** and **PAN-3300** (row 6 pending CI).
 
 - **RUN TOTALS (RUN-75): 4 close-outs, 9 PRs merged, 20 substrate bugs driven (PAN-3300/3320/3294/3286/3202/2390/3266/3305 fixed and merged; PAN-3313/3321/3322/3324/3325/3326/3327 filed; PAN-3294/3282/2706/3202/3326 escalated with evidence), 1 duplicate closed, 2 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified twice, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 6 review convoys re-driven.**
+
+## RUN-75 tick 7 (2026-07-30 11:04-11:12Z) — the loop closed: PAN-3202 unblocked the two close-outs it was filed for, with no override
+
+### The stopgap held, and the leak is gone
+
+- Re-checked the **artifact**, per last tick's lesson, not just the leak count: deployed hook **445 lines, guard=1, timeout=1**, and its mtime is **10:45:19Z** — meaning an automated `pan sync` re-wrote the file *after* my stopgap and it stayed correct. Both generations read 445/guard=1.
+- **Leak: 0 procs, 0 MB.** ~51.5 GB available, PSI 0. Six manual relief passes across ticks 3–5, and now none needed.
+- **LESSON: fixing the source the automated path reads beats fighting the automated path.** Ticks 3–5 I killed processes on a timer; tick 6 I made both generations correct; this tick the patrol itself deployed the right file. The intervention that ends a treadmill is the one that changes what the machine reads, not the one that repeatedly undoes its output.
+
+### PAN-3264 and PAN-3300 CLOSED OUT — the row-6 fix worked exactly as designed
+
+`main` verified green first at the job level: run 30535981458 on `fbb2dc8a69`, **6 jobs, 0 non-green**, after all nine merges.
+
+Both close-outs then passed on their own evidence:
+
+```
+✓ dod:main-verify — failed checks: test on eefeef296e…; verified on main by later green CI run
+  fbb2dc8a696959142bdc8dcc0aeb7582fc10b103 containing the merge (8 check-runs concluded successfully)
+```
+
+- **No `--accept-main-verify`, no override of any kind.** The gate found the evidence itself.
+- Note the message keeps the primary failure *and* the fallback evidence side by side, which is what makes it auditable rather than a silent pass — the shape I flagged as correct when reviewing the diff.
+- **This is the metabolism completing end to end in one run:** diagnosed the row-6 defect (tick 2) → found two open issues and collapsed the duplicate (tick 2) → struck it (tick 2) → merged it (tick 6) → deployed it (tick 6) → and it closed the two issues it was filed for (tick 7). Filing was recordkeeping; the close-outs are the point.
+
+### PAN-3324's root cause found, and it is much broader than OOM
+
+Chasing PAN-3253's new state led to the actual line. `markAgentStopped()` — `src/lib/agents/agent-state.ts:870-876`:
+
+```ts
+state.stoppedByUser = true;
+logAgentLifecycleSync(state.id, `status changed: … → stopped (markAgentStopped, user-initiated)`);
+```
+
+- **Unconditional, with no cause parameter.** Every stop routed through it is recorded as operator intent, and the gate at `:779` then tells the operator `'agent was stopped by the operator'` — false in every machinery case.
+- So my original PAN-3324 filing ("OOM kills are misattributed") understated it: OOM was merely how I noticed. A second trigger confirmed today — `escalateVerificationStuck()` calls `setAgentPaused` **and** `stopAgent`, leaving `paused=1, sbu=1` with no human involved.
+- **LESSON: an inferred root cause and a located one are different artifacts, and the located one changes the fix.** Tick 4 I filed from timestamp correlation, which supports "handle OOM specially". The line itself supports "the stop primitive needs a cause parameter" — a different, much smaller, much more general fix. Worth going to the code even when the inference is already convincing enough to file.
+
+### The compounding failure this produced on PAN-3253
+
+- Review concluded **CHANGES REQUESTED with 1 blocking finding** (unbounded canonical bulk hydration, `src/lib/overdeck/review-status-sync.ts:162`) plus 2 non-blocking. Read the verdict before describing it, per doctrine — this issue is *blocked, 1 finding*, not "healthy".
+- It could not deliver that feedback: `stuck_reason=feedback_delivery_needs_you`, with `"resurrection of 1 candidate agent(s) failed"`. The resurrection failed because the `stopped-by-user` gate was doing its job — refusing to override a human stop **that never happened**.
+- **A stale verification-stuck pause, whose cause I had already verified resolved, blocked feedback delivery for an unrelated later stage.** That is the compounding shape worth remembering: these gates are individually correct and collectively able to strand an issue.
+- Cleared it as machinery, not override: `pan answer` confirmed no pending operator decision, then `pan unpause PAN-3253` → agent `running`, `paused=null`, `sbu=null`, live in tmux. The review's feedback now has a target.
+- **Still latched, and noted rather than filed:** `stuck=1 / feedback_delivery_needs_you` does **not** clear or re-attempt now that a live target exists. Recording it as a candidate defect (same family as PAN-3324 and the review-comms wedges) rather than opening a ninth issue this run; will file if it recurs.
+- Two smaller observations: `pan unpause` **resumed** the agent rather than only clearing the gate, which diverges from the documented "clears the gate without spawning" — harmless here, since a live target was what I wanted. And the agent is on **Haiku 4.5 at 100% context, mid-`/compact`**; it had already run `pan review request` before being paused, so I let compaction finish rather than interfering.
+
+### Close of tick 7
+
+- **PAN-3260** reached `ready_for_merge=1` (its test verdict resolved despite the earlier ghost session) and PR #3268 is CLEAN with 0 non-green checks; merge scheduled for 11:10:42Z.
+- Deliberately still blocked, no overrides taken: **PAN-3259** and **PAN-3305** (PAN-3326 patch-id gate), **PAN-3253** (review feedback, 1 blocking finding, now deliverable), **MIN-911** (MYN, out of merge scope).
+- CLIProxy (PAN-3313) not re-measured this tick — no GPT-routed agent was blocked on it and the leak/close-out work took priority; carried forward.
+
+- **RUN TOTALS (RUN-75): 6 close-outs, 9 PRs merged (+1 scheduled), 20 substrate bugs driven (8 fixed and merged: PAN-3300/3320/3294/3286/3202/2390/3266/3305; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes: PAN-3294/3282/2706/3326/3324), 1 duplicate closed, 3 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across an automated sync, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 6 review convoys re-driven.**
