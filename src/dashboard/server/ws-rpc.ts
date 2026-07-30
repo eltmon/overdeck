@@ -40,6 +40,7 @@ import { jsonResponse } from './http-helpers.js';
 import { runDashboardDbJob } from './services/dashboard-db-task.js';
 import { readCurrentLatestFlywheelStatus, subscribeLatestFlywheelStatus } from './services/flywheel-run-state.js';
 import { readWorkspaceFileEffect } from './services/read-workspace-file.js';
+import { readFileAtPathEffect, writeFileAtPathEffect } from './services/file-at-path.js';
 import { resolveFilePathExistsEffect } from './services/resolve-file-path-exists.js';
 import { getHarnessBehavior } from '../../lib/runtimes/behavior.js';
 import { normalizeSessionsFeedFilter, toDiscoveredSessionSnapshot, toSessionsFeedRowSnapshot } from './services/sessions-feed-rpc.js';
@@ -1058,6 +1059,14 @@ const PanRpcLayer = PanRpcGroup.toLayer(
 
       [WS_METHODS.readWorkspaceFile]: (input) =>
         readWorkspaceFileEffect(input),
+
+      // ── readFileAtPath / writeFileAtPath — absolute-path markdown file
+      // door (PAN-3260), independent of issueId. ──────────────────────────
+      [WS_METHODS.readFileAtPath]: (input) =>
+        readFileAtPathEffect(input),
+
+      [WS_METHODS.writeFileAtPath]: (input) =>
+        writeFileAtPathEffect(input),
 
       [WS_METHODS.resolveFilePathExists]: (input) =>
         resolveFilePathExistsEffect(input),

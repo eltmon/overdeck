@@ -26,6 +26,7 @@ export type PaneType =
   | 'plan'
   | 'docs'
   | 'browser'
+  | 'editor'
 
 export interface WorkspacePane {
   paneId: PaneId
@@ -55,6 +56,8 @@ export interface WorkspacePane {
   docFilePath?: string
   // browser pane
   browserInitialUrl?: string
+  // editor pane (PAN-3260) — absolute path of the file being edited
+  editorFilePath?: string
 }
 
 /** Fields a caller supplies when opening a pane; paneId/createdAt are generated. */
