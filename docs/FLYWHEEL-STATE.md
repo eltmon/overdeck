@@ -8988,3 +8988,52 @@ Operator promoted UAT generation `uat/min-ember-0730` to main across six repos (
 - Hook artifact still 445/`guard=1`; leak 0.
 
 - **RUN TOTALS (RUN-75): 16 close-outs, 12 PRs merged, 21 substrate bugs driven (8 fixed and merged; 8 filed: PAN-3313/3321/3322/3324/3325/3326/3327/3328; 5 escalated with located root causes), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across four automated syncs, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
+
+## RUN-75 tick 12 (2026-07-30 20:29-20:40Z) — QUIESCENCE + RETROSPECTIVE
+
+### Final tick actions
+
+- Hook artifact still **445 / guard=1** (mtime 20:27:42Z — yet another automated sync writing the correct file). Leak **0 procs**.
+- **CLIProxy has improved substantially: 134x200 / 39x503 / 12x408 = 21% failing**, down from 47% -> 37% -> 21% across the run. The failure *mode* is unchanged (PAN-3313), but the rate is a third of what it was.
+- **Filed PAN-3339** — the PAN-3296 verification dead end, traced to the line. Verification is dispatched only from `review-pipeline.ts:291`; `pending` is written at finalization by `service.ts:327` / `deacon-swarm-finalization.ts:22`; and `reconcileInterruptedVerifications` (`verification-runner.ts:159`) early-`continue`s on anything but `running`, while its own recovery note promises "verification re-runs on the next cycle" — which for a merged issue never comes. `verification_cycle_count = 0` proves it never ran once. No `pan verify` verb exists, so the only exit is `--accept-verification`. **Not used.**
+- Read door swept for all 12 projects: **23 in-pipeline rows**; MIN-911 correctly dropped off after last tick's close-out. No new `post_merge_limbo` to drain.
+- PAN-3330 (`planning,in-progress`) and PAN-3331 (`planning,planned`) vetted: operator-authored, neither `ready` nor `released`, so **not startable** with `auto_pickup_backlog=false`. Planning floor has `needsPlanning: []` — nothing to plan, so spawning nothing is correct rather than an omission.
+
+### Quiescence
+
+Every remaining item is operator-gated, blocked on a filed machinery bug, or out of scope:
+
+| Item | Blocked on |
+| --- | --- |
+| PAN-3296 | PAN-3339 (verification recorded but never dispatched) |
+| PAN-3259, PAN-3305 | PAN-3326 (patch-id gate; rows 1/2/5 all fail) |
+| PAN-3330, PAN-3331 | operator release |
+| MIN-* (17 rows) | out of merge scope — MYN is `auto_merge` hold |
+| TIN-1 | planned backlog, unreleased |
+| papers-please, puzzdom, lexerra, krux | typed blind spots (tracker/forge unavailable) |
+
+Nothing is merge-ready, nothing is startable, and no autonomous action remains.
+
+### RUN-75 RETROSPECTIVE
+
+**Shipped:** 16 close-outs, 12 PRs merged, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed, 3 outages recovered, 3 deploys delivered.
+
+**Fixed and merged (8):** PAN-3300 (red-main file-size), PAN-3320 (red-main fake-timer), PAN-3294 (stop-hook fan-out — the 50 GB leak), PAN-3286, PAN-3202 (DoD row 6), PAN-2390 (tmux OOM preference), PAN-3266, PAN-3305.
+
+**Filed (9):** PAN-3313, PAN-3321, PAN-3322, PAN-3324, PAN-3325, PAN-3326, PAN-3327, PAN-3328, PAN-3339.
+
+**The five lessons worth carrying to RUN-76:**
+
+1. **Verify the artifact, then verify it again.** A deploy that succeeded was silently reverted four minutes later by a patrol reading a frozen generation (PAN-3327). A success message is a claim about a command, not about the world — and for anything an automated patrol also writes, the check has to be *re-run*, not merely performed once.
+
+2. **The recurring defect shape this run was "a state with no exit and no watchdog."** `stoppedByUser` latched by machinery stops (PAN-3324), `merging` with no timeout or failure_reason (PAN-3328), `feedback_delivery_needs_you` that never re-attempts, and `verificationStatus: pending` with no dispatcher (PAN-3339). All four look healthy to every surface that filters on terminal states. **Look for transitional states that nothing is responsible for advancing** — that single question found four separate bugs.
+
+3. **Go to the code even when the inference already justifies filing.** PAN-3324 filed from timestamp correlation supported "handle OOM specially"; the actual line (`markAgentStopped` hardcoding `stoppedByUser = true`) supported a far smaller and more general fix. An inferred root cause and a located one are different artifacts.
+
+4. **Removing a false gate beat doing the work, twice.** One `pan unpause` on a stale machinery pause let PAN-3253 fix its own blocking finding and resubmit. Landing PAN-3202 unblocked two close-outs immediately and seven more in one sweep. The highest-leverage actions were all machinery corrections, never touching the work itself.
+
+5. **The full read-door sweep is not a formality.** For several ticks I drove the two or three issues in front of me while a **nine-item close-out tail** accumulated invisibly; only the complete sweep surfaced it, and draining it produced 7 close-outs in a row.
+
+**One self-correction worth recording:** my tick-2 decision to re-run a flaked CI to unblock a PR also laundered a *second*, different flaky test in the same PR onto main, causing the red-main incident I then spent three ticks fixing. A green rerun is not evidence about a newly-added load-sensitive test.
+
+- **RUN TOTALS (RUN-75): 16 close-outs, 12 PRs merged, 22 substrate bugs driven (8 fixed and merged; 9 filed; 5 escalated with located root causes), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across five automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
