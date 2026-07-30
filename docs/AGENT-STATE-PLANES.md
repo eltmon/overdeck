@@ -38,6 +38,8 @@ record (newer-wins on ISO `updatedAt`) and deletes it, triggered after every
 landed journal write for the issue and on unref'd 5s/30s/120s retries after a
 fallback write.
 
+During a push-race reconciliation, `reconcileStatePush()` checks the state worktree before every rebase. If every dirty path is under `specs/` or `records/`, it adopts those writer-owned changes in a `chore(state): adopt orphaned write before state rebase (PAN-3296)` commit, emits a `[record-update] adopted orphaned state write(s)` warning that lists the paths, and then rebases. A dirty path outside those directories fails closed with an error naming the unowned path, so reconciliation never stages operator or unrelated state.
+
 PAN-3092 hardened that path against verdict loss, because `pipeline.updatedAt`
 is stamped on every status write and so cannot by itself distinguish
 write-recency from verdict-truth:
