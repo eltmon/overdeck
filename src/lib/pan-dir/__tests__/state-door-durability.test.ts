@@ -75,6 +75,61 @@ function installFailingPreCommitHook(root: string, huskyAware: boolean): void {
   execSync('git config core.hooksPath .git/fake-hooks', { cwd: root })
 }
 
+function setupMigratedStateFixture(
+  root: string,
+  label: string,
+  issueId: string,
+  seedSpec: boolean,
+): { home: string; projectRoot: string; stateRoot: string; specPath: string } {
+  const home = join(root, `${label}-home`)
+  const projectRoot = join(root, `${label}-project`)
+  const stateRoot = join(home, 'state', 'durability')
+  const remote = join(root, `${label}-origin.git`)
+  const specPath = join(stateRoot, 'specs', `2026-07-30-${issueId}-${label}.xbrief.json`)
+
+  mkdirSync(projectRoot, { recursive: true })
+  mkdirSync(join(home, 'state'), { recursive: true })
+  mkdirSync(join(stateRoot, 'specs'), { recursive: true })
+  writeFileSync(join(home, 'projects.yaml'), JSON.stringify({
+    projects: {
+      durability: {
+        name: 'Durability',
+        path: projectRoot,
+        issue_prefix: 'PAN',
+      },
+    },
+  }))
+
+  git(projectRoot, 'init', '-q', '-b', 'main')
+  configureGit(projectRoot)
+  writeFileSync(join(projectRoot, 'README.md'), 'project\n')
+  git(projectRoot, 'add', 'README.md')
+  git(projectRoot, 'commit', '-q', '-m', 'seed project')
+
+  git(root, 'init', '--bare', '-q', remote)
+  git(stateRoot, 'init', '-q')
+  configureGit(stateRoot)
+  git(stateRoot, 'branch', '-M', 'overdeck-state')
+  git(stateRoot, 'remote', 'add', 'origin', remote)
+  writeFileSync(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+    sourceMainSha: '0'.repeat(40),
+    stateBranchSha: '0'.repeat(40),
+    completedAt: '2026-07-30T00:00:00.000Z',
+    version: 1,
+  }))
+  if (seedSpec) {
+    writeFileSync(specPath, JSON.stringify(
+      asPanSpecDocument(makeDoc(issueId, label, 'proposed'), 'proposed'),
+      null,
+      2,
+    ))
+  }
+  git(stateRoot, 'add', '.')
+  git(stateRoot, 'commit', '-q', '-m', 'seed state')
+  git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state')
+  return { home, projectRoot, stateRoot, specPath }
+}
+
 describe('state write door durability (PAN-2677)', () => {
   let tmp: string
 
@@ -118,6 +173,82 @@ describe('state write door durability (PAN-2677)', () => {
 
     await Effect.runPromise(updateSpecStatus(tmp, 'PAN-3', 'active'))
     expect(porcelain(tmp)).toBe('')
+  })
+
+  it('keeps every exported spec-mutation door clean and durable on origin', async () => {
+    const originalHome = process.env.OVERDECK_HOME
+    const cases = [
+      { door: 'writeSpecForIssue', label: 'write-spec-for-issue', issueId: 'PAN-3301', seedSpec: false },
+      { door: 'updateSpecStatus', label: 'update-spec-status', issueId: 'PAN-3302', seedSpec: true },
+      { door: 'writeSpecDocument', label: 'write-spec-document', issueId: 'PAN-3303', seedSpec: true },
+      { door: 'transitionXBriefOnMain', label: 'transition-xbrief', issueId: 'PAN-3304', seedSpec: true },
+      { door: 'moveXBrief', label: 'move-xbrief', issueId: 'PAN-3305', seedSpec: true },
+    ] as const
+
+    try {
+      for (const testCase of cases) {
+        const fixture = setupMigratedStateFixture(
+          tmp,
+          testCase.label,
+          testCase.issueId,
+          testCase.seedSpec,
+        )
+        process.env.OVERDECK_HOME = fixture.home
+        vi.resetModules()
+        const panDir = await import('../index.js')
+        const lifecycle = await import('../../xbrief/lifecycle-io.js')
+        const beforeHead = git(fixture.stateRoot, 'rev-parse', 'HEAD')
+
+        switch (testCase.door) {
+          case 'writeSpecForIssue':
+            await Effect.runPromise(panDir.writeSpecForIssue(
+              fixture.projectRoot,
+              makeDoc(testCase.issueId, testCase.label, 'proposed'),
+              'proposed',
+            ))
+            break
+          case 'updateSpecStatus':
+            await Effect.runPromise(panDir.updateSpecStatus(
+              fixture.projectRoot,
+              testCase.issueId,
+              'active',
+            ))
+            break
+          case 'writeSpecDocument':
+            await Effect.runPromise(panDir.writeSpecDocument(
+              fixture.projectRoot,
+              fixture.specPath,
+              asPanSpecDocument(makeDoc(testCase.issueId, 'rewritten document', 'proposed'), 'proposed'),
+            ))
+            break
+          case 'transitionXBriefOnMain':
+            await Effect.runPromise(lifecycle.transitionXBriefOnMain(
+              fixture.projectRoot,
+              testCase.issueId,
+              'active',
+              'running',
+              `chore(state): test ${testCase.door}`,
+            ))
+            break
+          case 'moveXBrief':
+            await Effect.runPromise(lifecycle.moveXBrief(
+              fixture.projectRoot,
+              testCase.issueId,
+              'active',
+            ))
+            break
+        }
+
+        expect(porcelain(fixture.stateRoot), testCase.door).toBe('')
+        const originHead = git(fixture.stateRoot, 'rev-parse', 'origin/overdeck-state')
+        expect(git(fixture.stateRoot, 'rev-parse', 'HEAD'), testCase.door).toBe(originHead)
+        expect(originHead, testCase.door).not.toBe(beforeHead)
+      }
+    } finally {
+      if (originalHome === undefined) delete process.env.OVERDECK_HOME
+      else process.env.OVERDECK_HOME = originalHome
+      vi.resetModules()
+    }
   })
 
   it('commits and pushes the CLI start status flip while preserving workspace-draft fallback', async () => {
