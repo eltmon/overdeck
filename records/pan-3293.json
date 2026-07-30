@@ -12,9 +12,22 @@
       "timestamp": "2026-07-30T03:53:56.277Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-30T06:14Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-30T06:14:11.043Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-30T06:14:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3293\n\n# Review — PAN-3293 — 2026-07-30\n\n## Verdict: CHANGES REQUESTED — `pan reload` discards the new ownership result and can still print an unqualified success\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3293/.pan/review/agent-pan-3293-review-93980806/context.json`\n- Branch: `feature/pan-3293`\n- HEAD reviewed: `93980806c0b2c089b4aec71763bbd3f797039744`\n- Cycle: 1\n- PR: https://github.com/eltmon/overdeck/pull/3310\n- Focused verification: 4 test files passed, 36 tests passed\n\n## Blocking Findings\n\n### ! [requirements/correctness] `pan reload` still claims verified health when ownership is unverified — `src/lib/platform-lifecycle.ts:576`\n**Scope:** in_pr_scope\n**Evidence tier:** Tier 1 — static\n**Requirement:** `owner-verified-health.ac5`: when PID resolution returns null and restart succeeds on identity alone, the success output must include an `ownership unverified` caveat rather than a plain success line.\n\n**Changed code:** `restartDashboardPromise()` now returns `{ ownershipVerified: false, spawnedPid: null }` when the spawn handle cannot resolve its PID. `restartCommand()` consumes that result, but the existing `pan reload` caller at `src/cli/commands/reload.ts:216-247` awaits and discards it, then always prints `✓ Dashboard reloaded and healthy`.\n\n**Runtime impact:** `pan reload` is the normal deployment path. If systemd `MainPID` lookup fails or the transient unit vanishes without producing the watched `EADDRINUSE` marker, a same-repository old server can answer `/api/health`; reload then emits the exact unqualified success this issue is meant to eliminate, even though the new lifecycle result says ownership was not verified.\n\n**Fix:** capture the `DashboardRestartResult` in `reloadCommand`, emit the same explicit `ownership unverified` caveat used by `pan restart`, and add a caller-level regression test that supplies `{ ownershipVerified: false, spawnedPid: null }` and asserts no plain success line is printed.\n\n## Non-blocking Findings\nNone.\n\n## Security\nNo security findings. PID and port values used in the new process-inspection commands originate from validated numeric process data or typed platform configuration, and the server-facing lifecycle path uses asynchronous shell/process I/O.\n\n## Performance\nNo blocking performance findings. Health polling and appended-log reads are bounded by the configured timeout; the multi-probe fallback adds process launches only during lifecycle operations, not request hot paths.\n\n## Requirements Coverage\n- FR-1 health PID payload: implemented and tested.\n- FR-2 detached and systemd spawn PID handles: implemented and tested.\n- FR-3 owner-matched health gate: implemented in the shared lifecycle primitive; caller output remains incomplete for `pan reload` as described above.\n- FR-4 fresh-log `EADDRINUSE` fast failure: implemented and tested.\n- FR-5 async lsof/fuser/ss port-owner probes: implemented and tested.\n- FR-6 targeted PID death verification: implemented and tested.\n- Real squatter coverage: implemented with live socket behavior and fake-timer health deadlines.\n- Documentation: updated, but its general restart-success contract currently overstates `pan reload` behavior until the blocker is fixed.\n\n## Clean Areas Checked\n- Spawn PID resolution and systemd unit collection behavior.\n- Health payload validation, wrong/missing PID handling, and timeout diagnostics.\n- EADDRINUSE log-offset tracking and owner description.\n- SIGTERM/SIGKILL escalation and survivor reporting.\n- Cross-platform probe fallback and IPv4/IPv6 listener parsing.\n- CLI `pan up`, scoped restart, full restart, reload call sites, supervisor propagation, docs, tests, security, and performance.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3293/.pan/review/agent-pan-3293-review-93980806/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3293 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/index.ts",
@@ -51,7 +64,7 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:14:10.267Z",
+  "updated": "2026-07-30T06:14:11.043Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "blocked",
