@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:37:07.117Z",
+  "updated": "2026-07-30T04:43:26.725Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "memory-phase-api": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 3357833,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:37:07.117Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -166,6 +158,17 @@
         "outcome": "completed",
         "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
         "releasedAt": "2026-07-30T04:36:55.569Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3357833,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:37:07.117Z",
+        "itemId": "memory-phase-api",
+        "outcome": "completed",
+        "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
+        "releasedAt": "2026-07-30T04:43:26.725Z"
       }
     ],
     "statusReasons": {
@@ -204,6 +207,10 @@
       "session-start-briefing": {
         "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
         "updatedAt": "2026-07-30T04:36:55.569Z"
+      },
+      "memory-phase-api": {
+        "reason": "workspace-registry list rows carry memoryPhase read server-side from status.json for main/scratch; issue rows return null without any status read (asserted). 6 tests in tests/unit/dashboard/workspace-registry-memory-phase.test.ts plus a no-loss field assertion; updated the pre-existing exact-shape assertion additively.",
+        "updatedAt": "2026-07-30T04:43:26.725Z"
       }
     }
   },
@@ -249,6 +256,9 @@
     "session-start-briefing.session-start-briefing.ac2": "completed",
     "session-start-briefing.session-start-briefing.ac3": "completed",
     "session-start-briefing.session-start-briefing.ac4": "completed",
-    "memory-phase-api": "running"
+    "memory-phase-api": "completed",
+    "memory-phase-api.memory-phase-api.ac1": "completed",
+    "memory-phase-api.memory-phase-api.ac2": "completed",
+    "memory-phase-api.memory-phase-api.ac3": "completed"
   }
 }
