@@ -1,0 +1,542 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T13:36:47Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3330: feat(dashboard): first-class workspace creation and management in the UI — intent form with resolve-before-create preview",
+    "updated": "2026-07-30T13:41:25.915Z"
+  },
+  "plan": {
+    "id": "pan-3330",
+    "title": "feat(dashboard): first-class workspace creation and management in the UI — intent form with resolve-before-create preview",
+    "status": "proposed",
+    "uid": "a822625a-cb00-4f7b-8227-ab38b74fca28",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-30T13:36:47Z",
+    "updated": "2026-07-30T13:41:25.915Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3330",
+        "label": "PAN-3330",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3330.md",
+        "label": "PRD",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3286",
+        "label": "PAN-3286",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1990",
+        "label": "PAN-1990",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "workspaces",
+      "frontend",
+      "api",
+      "registry"
+    ],
+    "metadata": {
+      "sizeJustification": "Genuinely inseparable vertical feature: the shared core (WI-1), routes (WI-2), and modal (WI-3) form one dependency chain where no prefix ships operator-visible value alone, and the entry points/actions/docs are thin leaf edits on that chain. 20 files is under the 25-file limit; the subsystem count is inflated by single-file doc touches (CLAUDE.md, configuration/, docs/, docs/audits/, sync-sources/) that FR-9 requires to land in the same PR.",
+      "canonicalFilename": "2026-07-30-PAN-3330-feat-dashboard-first-class-workspace-creation-and-management-in-the-ui-intent-form-with-resolve-before-create-preview.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-3286 made user workspaces first-class in the CLI and in dashboard presentation, but the dashboard cannot create, relocate, or archive a user workspace: the registry API has no create/relocate/resolve/project-targets routes, and the only 'create workspace' button in the UI is the unrelated issue-worktree affordance. Operator intent must be expressible where the operator works.",
+      "Proposal": "Extract the CLI's intent-resolution/creation logic into a shared core (src/lib/workspaces/create.ts) so CLI and server run literally the same code; add four registry routes (create, write-free resolve dry-run, relocate, project-targets read); build a NewWorkspaceModal with a live resolve-before-create preview cloned from NewProjectModal chrome; add entry points on the sidebar WORKSPACES rail, command palette, and ProjectOverview; add Favorite/Relocate/Archive actions to WorkspaceView for non-issue kinds with explicit react-query invalidation; update all documented surfaces.",
+      "NonGoals": "- Creating or managing issue-kind workspaces from this surface (pipeline-owned; existing issue-worktree affordances untouched)\n- Deleting workspaces or purging memory from the UI (destructive; stays CLI-only with typed confirmations)\n- Any change to memory keying, injection, or recall surfaces\n- New dialog frameworks or shared form components beyond what is cloned (D-8)\n- Any change to existing registry routes, CLI flags, or UI affordances (no-loss, NFR-4)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Executed as one issue with six serialized work items instead of sibling issues.",
+        "rationale": "The PRD authors this as one deliverable with a hard dependency chain (shared core → routes → modal → entry points); the surface is ~20 files across 5 subsystems, under the finalize decomposition limits, and each slice alone ships no operator-visible value."
+      },
+      {
+        "summary": "Corrected three frontend component paths from the canonical PRD: NewProjectModal.tsx and ProjectOverview.tsx live under components/CommandDeck/, WorkspaceView.tsx under components/workspace/.",
+        "rationale": "Verified against feature/pan-3330 @ 036b911899; the PRD's claims are otherwise accurate. The new modal and its test are placed beside their clone source in CommandDeck/."
+      },
+      {
+        "summary": "New frontend tests use the existing __tests__/ directories (CommandDeck/__tests__/, workspace/__tests__/) and run via npm --prefix ./src/dashboard/frontend run test -- <file>.",
+        "rationale": "Matches where NewProjectModal.test.tsx and WorkspaceView.test.tsx already live and how the frontend vitest workspace is invoked."
+      },
+      {
+        "summary": "Only WI-1 (shared core) carries requiresInspection: true.",
+        "rationale": "Its exported types and findings contract are the foundation the routes and modal encode assumptions about; every other item's defects surface immediately at typecheck, named tests, or review."
+      }
+    ],
+    "items": [
+      {
+        "id": "wi1-shared-create-core",
+        "title": "Extract shared workspace-creation core into src/lib/workspaces/create.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3330",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "wi2-registry-routes",
+            "wi3-new-workspace-modal"
+          ],
+          "files_scope": [
+            "src/lib/workspaces/create.ts",
+            "src/cli/commands/workspace-scratch.ts",
+            "tests/unit/lib/workspaces/create-intent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/workspaces/create-intent.test.ts tests/unit/cli/workspace-new-target-path.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "create-intent.test.ts passes; workspace-new-target-path.test.ts passes without modification",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "readinessReason": "Wave-0 root of the dependency chain: it touches only the lib/CLI pair plus its own new test file, and no other item runs concurrently with it.",
+          "traces": [
+            "FR-1",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/workspaces/create.ts exporting resolveWorkspaceCreateIntent(input): Promise<ResolvedWorkspaceIntent> (pure resolution + validation: project resolution via explicit {projectKey?, cwd?} — no process.cwd() in the lib; validateFeatureName; targetPath/isolated exclusivity; inferParentBranch; three-mode path/branch/isGitRepository/wouldCreateWorktree computation; the dry-run JSON shape of workspace-scratch.ts:128-147 plus a findings: [{field, message}] array) and performWorkspaceCreate(intent): Promise<{id: string}> (seeding, optional git worktree add via execFileAsync argument vectors, createWorkspace). Refactor workspaceNewCommand and workspaceMainCommand (src/cli/commands/workspace-scratch.ts:66,182) onto these with byte-identical CLI behavior: same flags, dry-run JSON, chalk messages, exit codes. CLI wrappers keep only flag parsing and console output. Never use execSync (server-reachable, PAN-70 rule)."
+        },
+        "items": [
+          {
+            "id": "wi1-shared-create-core.ac1",
+            "title": "Given the refactor, the existing tests/unit/cli/workspace-new-target-path.test.ts suite passes unmodified and pan workspace new --dry-run emits the identical JSON shape (parity test asserts field-for-field equality for shared, target-path, and isolated modes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-shared-create-core.ac2",
+            "title": "resolveWorkspaceCreateIntent returns findings entries (field + message) for invalid name, missing target directory, and targetPath/isolated exclusivity instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-shared-create-core.ac3",
+            "title": "resolveWorkspaceCreateIntent preserves on-disk and registry state: given all three modes are resolved, the test shows git worktree list output and the registry workspace row count unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi1-shared-create-core.ac4",
+            "title": "src/lib/workspaces/create.ts contains no process.cwd() call (grep in test asserts zero matches); project resolution accepts explicit projectKey or cwd parameters",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi2-registry-routes",
+        "title": "Registry API routes: resolve, create, relocate, project-targets",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspace-registry.ts",
+            "tests/unit/dashboard/workspace-registry-create.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/workspace-registry-create.test.ts",
+            "npm run typecheck",
+            "bash scripts/guard-workspace-doors.sh"
+          ],
+          "expected_outputs": [
+            "workspace-registry-create.test.ts passes",
+            "typecheck completes without errors",
+            "guard-workspace-doors.sh exits 0 (all registry access through resolver/writer/create doors)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/workspace-registry.ts add four routes reusing readJsonBody (:83) and the rejectUnsafeDashboardMutationRequest guard pattern (:160): POST /api/workspace-registry/resolve (body = intent; returns the WI-1 resolved-intent shape incl. findings; MUST perform no writes); POST /api/workspace-registry (body {project, name, targetPath?, isolated?, parentBranch?, bootstrapMain?}; findings ⇒ 422 with findings array, clean ⇒ performWorkspaceCreate ⇒ 201 {id}); POST /api/workspace-registry/:id/relocate (body {path, force?}; 404 unknown id; writer refusals — archived, issue-kind, main without force — map to 409 carrying the writer error message; success 200 {ok:true}); GET /api/workspace-registry/project-targets?project=<key> (returns {primaryPath, targets: ProjectTargetRow[]} via listProjectTargets + project config; 400 unknown key, unguarded like sibling GETs). All registry access goes through src/lib/workspaces/{resolver,writer,create}.ts only. Existing routes unchanged."
+        },
+        "items": [
+          {
+            "id": "wi2-registry-routes.ac1",
+            "title": "POST create, resolve, and relocate each reject a request lacking dashboard mutation auth with the guard's error response, while GET project-targets accepts unauthenticated reads like sibling GETs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-registry-routes.ac2",
+            "title": "POST /api/workspace-registry/resolve returns the dry-run resolved-intent shape plus findings and creates no registry row and no git worktree (test asserts row count and worktree list unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-registry-routes.ac3",
+            "title": "POST /api/workspace-registry with a clean intent returns 201 {id} and the row is readable via the resolver; an intent with findings returns 422 whose body carries the findings array verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-registry-routes.ac4",
+            "title": "POST /:id/relocate returns 404 for an unknown id and 409 carrying the writer's message for archived, issue-kind, and main-without-force refusals; a permitted relocate returns 200 {ok:true} and the row's path updates",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi2-registry-routes.ac5",
+            "title": "GET /api/workspace-registry/project-targets returns {primaryPath, targets} for a registered project key and 400 for an unknown key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi3-new-workspace-modal",
+        "title": "NewWorkspaceModal with live resolve-before-create preview",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/NewWorkspaceModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "NewWorkspaceModal.test.tsx passes (fake-timer debounce, findings, isolated-mode, onCreated cases)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-8",
+            "NFR-3",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/CommandDeck/NewWorkspaceModal.tsx cloning NewProjectModal chrome (CSS-module overlay/dialog, role=dialog, dashboardMutationJsonHeaders, fetchWithTimeout). Fields: Name (validated only via resolver findings — no client regex, D-9); Project select (defaults per D-3: sole project → it, unambiguous rail context → it, else force choice; honors presetProjectKey prop); Mode toggle Shared (default) / Isolated; Target directory (dropdown fed by GET project-targets with primary preselected, plus Browse… opening FolderPicker; disabled in isolated mode); Advanced disclosure (parent-branch input, placeholder shows inferred value); Preview panel (mono resolved path, branch created/observed line, parent branch with 'inferred' tag when parentBranchGuessed, git-repository badge per style guide, wouldCreateWorktree note); Create primary CTA disabled while preview stale or findings present, plus Cancel. Field changes debounce ~300ms into POST /api/workspace-registry/resolve. On successful create: fire onCreated(id); App.tsx mounts the modal beside NewProjectModal (:822-825) with isNewWorkspaceModalOpen state and optional presetProjectKey, invalidates queryKey ['workspace-registry'], activates and navigates to the new workspace. Style: DM Sans, font-mono only for path/branch, font-medium max, semantic tokens, single primary CTA. Debounce tests MUST use vi.useFakeTimers() + advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "wi3-new-workspace-modal.ac1",
+            "title": "The modal renders name/project/mode/target/advanced/preview sections and, under fake timers, emits exactly one resolve request per debounce settle across rapid field changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-new-workspace-modal.ac2",
+            "title": "Given a resolve response with findings, the modal renders each finding inline against its field and displays the Create button as disabled while any finding is present or the preview is stale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-new-workspace-modal.ac3",
+            "title": "Selecting isolated mode disables the target-directory field and the preview renders the derived scratch path and scratch/<name> branch from the resolve response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi3-new-workspace-modal.ac4",
+            "title": "A successful create POSTs the intent to /api/workspace-registry, fires onCreated with the returned id, and the app invalidates the ['workspace-registry'] query and activates the new workspace",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi4-entry-points",
+        "title": "Entry points: sidebar rail +, command palette action, ProjectOverview affordance",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+            "src/dashboard/frontend/src/components/__tests__/Sidebar.workspaces.test.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/__tests__/Sidebar.workspaces.test.tsx src/components/CommandPalette.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Sidebar and CommandPalette suites pass including the new sidebar-new-workspace and palette-action assertions",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Sidebar.tsx: add a '+' button to the WORKSPACES section header with data-testid=\"sidebar-new-workspace\", mirroring the Projects header's sidebar-new-project button (:657); thread a new onNewWorkspace prop exactly like onNewProject. CommandPalette.tsx: add a 'New workspace…' entry to staticActions (following the start-cloister entry pattern) present in both the actions and workspaces scopes; it opens the modal via a callback prop passed from App — NOT via callApi. ProjectOverview.tsx (CommandDeck/): add a 'New workspace' affordance that opens the modal with that project's key as presetProjectKey. Wire all three callbacks through App.tsx to setIsNewWorkspaceModalOpen. No changes to existing rail rows, palette actions, or overview content (no-loss)."
+        },
+        "items": [
+          {
+            "id": "wi4-entry-points.ac1",
+            "title": "The WORKSPACES rail header renders data-testid=\"sidebar-new-workspace\" and clicking it invokes the onNewWorkspace callback (sidebar test asserts render + fire)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-entry-points.ac2",
+            "title": "The command palette shows the 'New workspace…' action in both the actions scope and the workspaces scope, and selecting it opens the modal via the callback prop without sending any API request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi4-entry-points.ac3",
+            "title": "The ProjectOverview affordance opens the modal with that project preselected (presetProjectKey reaches the modal's project select)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi5-workspaceview-actions",
+        "title": "WorkspaceView management actions: Favorite, Relocate, Archive",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+            "src/dashboard/frontend/src/components/workspace/__tests__/workspace-view-actions.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/workspace/__tests__/workspace-view-actions.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "workspace-view-actions.test.tsx passes (kind gating, archive confirm, main relocate typed-confirm + force, invalidation)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7",
+            "FR-8",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "WorkspaceView.tsx header (currently Back, title, kind label only) gains an actions cluster rendered only for kind !== 'issue': Favorite toggle (existing POST favorite route), Relocate (FolderPicker to choose the directory, then a confirm showing the resolved path; for kind === 'main' additionally require a typed confirmation and pass force: true, per writer rules), Archive (ConfirmationDialog via DialogProvider; existing POST archive route; destructive color reserved for this action). All mutations call queryClient.invalidateQueries for ['workspace-registry'] and the detail key ['workspace-registry', workspaceId] on success. Issue-kind workspaces render none of these actions (pipeline-owned). Style guide: DM Sans, single colored signal, semantic tokens."
+        },
+        "items": [
+          {
+            "id": "wi5-workspaceview-actions.ac1",
+            "title": "WorkspaceView renders Favorite/Relocate/Archive for main and scratch kinds and renders none of them for issue kind",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-workspaceview-actions.ac2",
+            "title": "Archive sends the existing archive POST only after the ConfirmationDialog is accepted, and given the dialog is cancelled it sends no request",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-workspaceview-actions.ac3",
+            "title": "Relocate sends {path} for a scratch workspace and sends {path, force: true} for main only when the typed confirmation matches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi5-workspaceview-actions.ac4",
+            "title": "When a relocate or archive mutation succeeds, the component updates the cache by invalidating both the ['workspace-registry'] list key and the ['workspace-registry', workspaceId] detail key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wi6-docs",
+        "title": "Documentation: all surfaces named in FR-9",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T13:36:47Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3330",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/workspaces.mdx",
+            "CLAUDE.md",
+            "sync-sources/skills/pan-workspace/SKILL.md",
+            "docs/audits/pan-1990-surface-inventory.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including scripts/lint-skills.sh) exits green with the updated SKILL.md"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Update exactly the FR-9 surfaces: docs/WORKSPACES-AND-PROJECTS.md gains a UI creation/management section (modal fields, resolve-before-create preview, entry points, WorkspaceView actions, the four routes); configuration/workspaces.mdx documents the operator-facing flow including the preview treatment; the CLAUDE.md workspaces section gains one paragraph stating UI creation exists and listing the routes; sync-sources/skills/pan-workspace/SKILL.md mentions the UI equivalence of pan workspace new/relocate; docs/audits/pan-1990-surface-inventory.md appends the new surfaces. Keep skills lint green (lint-skills.sh cross-checks SKILL.md flags against pan workspace --help — do not invent flags)."
+        },
+        "items": [
+          {
+            "id": "wi6-docs.ac1",
+            "title": "docs/WORKSPACES-AND-PROJECTS.md and configuration/workspaces.mdx each describe the modal flow with the resolve-before-create preview and name all four new routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs.ac2",
+            "title": "CLAUDE.md's workspaces section and sync-sources/skills/pan-workspace/SKILL.md state the UI/CLI equivalence, and docs/audits/pan-1990-surface-inventory.md lists the new UI surfaces and routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wi6-docs.ac3",
+            "title": "npm run lint exits green, proving the updated SKILL.md survives scripts/lint-skills.sh cross-checking",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "wi1-shared-create-core",
+        "to": "wi2-registry-routes",
+        "type": "blocks"
+      },
+      {
+        "from": "wi1-shared-create-core",
+        "to": "wi3-new-workspace-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-registry-routes",
+        "to": "wi3-new-workspace-modal",
+        "type": "blocks"
+      },
+      {
+        "from": "wi2-registry-routes",
+        "to": "wi5-workspaceview-actions",
+        "type": "blocks"
+      },
+      {
+        "from": "wi3-new-workspace-modal",
+        "to": "wi4-entry-points",
+        "type": "blocks"
+      },
+      {
+        "from": "wi4-entry-points",
+        "to": "wi6-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "wi5-workspaceview-actions",
+        "to": "wi6-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
