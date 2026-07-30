@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -63,6 +63,49 @@ describe('updateIssueRecord durability', () => {
     expect(git(root, 'status', '--porcelain')).toBe('');
     expect(git(root, 'rev-parse', 'HEAD')).toBe(git(root, 'rev-parse', 'origin/main'));
     expect(git(root, 'log', '-1', '--format=%s')).toBe(`chore(records): update ${ISSUE_ID} per-issue record`);
+  });
+
+  it('aborts an in-progress merge before restoring retryable state', async () => {
+    const other = mkdtempSync(join(tmpdir(), 'pan-record-update-merge-other-'));
+    const otherRecordPath = join(root, '.pan', 'records', 'other-1.json');
+    const targetRecordPath = join(root, '.pan', 'records', 'durable-1.json');
+
+    try {
+      writeFileSync(otherRecordPath, JSON.stringify({ issueId: 'OTHER-1', summary: 'shared' }, null, 2));
+      git(root, 'add', '.pan/records/other-1.json');
+      git(root, 'commit', '-q', '-m', 'seed second record');
+      git(root, 'push', '-q', 'origin', 'main');
+
+      git(root, 'clone', '-q', '-b', 'main', remote, other);
+      git(other, 'config', 'user.email', 'remote@overdeck.local');
+      git(other, 'config', 'user.name', 'Remote Writer');
+      git(other, 'config', 'commit.gpgsign', 'false');
+
+      writeFileSync(otherRecordPath, JSON.stringify({ issueId: 'OTHER-1', summary: 'local' }, null, 2));
+      git(root, 'add', '.pan/records/other-1.json');
+      git(root, 'commit', '-q', '-m', 'local second record update');
+
+      const remoteOtherRecordPath = join(other, '.pan', 'records', 'other-1.json');
+      writeFileSync(remoteOtherRecordPath, JSON.stringify({ issueId: 'OTHER-1', summary: 'remote' }, null, 2));
+      git(other, 'add', '.pan/records/other-1.json');
+      git(other, 'commit', '-q', '-m', 'remote second record update');
+      git(other, 'push', '-q', 'origin', 'main');
+
+      git(root, 'fetch', '-q', 'origin', 'main');
+      expect(() => git(root, 'merge', 'origin/main')).toThrow();
+      expect(existsSync(join(root, '.git', 'MERGE_HEAD'))).toBe(true);
+
+      await expect(updateIssueRecord(project, ISSUE_ID, (record) => {
+        record.statusOverrides = { 'wi-1': 'completed' };
+      })).rejects.toThrow();
+
+      expect(existsSync(join(root, '.git', 'MERGE_HEAD'))).toBe(false);
+      expect(git(root, 'status', '--porcelain')).toBe('');
+      const restored = JSON.parse(readFileSync(targetRecordPath, 'utf8')) as PanIssueRecord;
+      expect(restored.statusOverrides).toEqual({});
+    } finally {
+      rmSync(other, { recursive: true, force: true });
+    }
   });
 
   it('restores retryable state when a remote-ref race survives reconciliation', async () => {

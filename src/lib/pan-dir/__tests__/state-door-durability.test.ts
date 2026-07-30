@@ -335,7 +335,7 @@ describe('state write door durability (PAN-2677)', () => {
     }
   })
 
-  it('adopts owned orphaned writes before rebase and fails closed on unowned paths', async () => {
+  it('adopts owned orphaned writes before reconciliation and fails closed on unowned paths', async () => {
     const originalHome = process.env.OVERDECK_HOME
     const home = join(tmp, 'reconcile-home')
     const projectRoot = join(tmp, 'reconcile-project')
@@ -424,7 +424,7 @@ describe('state write door durability (PAN-2677)', () => {
         ) as { statusOverrides: Record<string, string> }
         expect(remoteRecord.statusOverrides).toEqual({ 'owned-write': 'completed' })
         expect(git(stateRoot, 'log', '--format=%s', 'origin/overdeck-state'))
-          .toContain('chore(state): adopt orphaned write before state rebase (PAN-3296)')
+          .toContain('chore(state): adopt orphaned write before state reconcile (PAN-3296)')
         expect(warnSpy).toHaveBeenCalledWith(
           expect.stringContaining('[record-update] adopted orphaned state write(s): specs/'),
         )

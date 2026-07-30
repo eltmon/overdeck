@@ -38,9 +38,9 @@ pan restart --force              # explicit operator bypass of the deploy-window
 pan restart --cliproxy --force   # redownload the pinned CLIProxy binary
 ```
 
-Each stage is health-gated: the command waits for `GET /api/health` (dashboard)
-or port binding (CLIProxy) to succeed before reporting `✓`, and exits non-zero
-with a `[stage] reason` message on timeout.
+Each stage is health-gated: the command waits for `GET /api/health` from the
+newly spawned dashboard process, or port binding for CLIProxy, before reporting
+`✓`. It exits non-zero with a `[stage] reason` message on timeout.
 
 ## Identity guard
 
@@ -49,10 +49,29 @@ non-primary checkout: either a workspace worktree or any linked Git worktree,
 including a handoff worktree. It exits with code 2 and names the primary
 checkout where the command must run.
 
-The post-boot health gate verifies both `repoRoot` and `mode` from
-`GET /api/health`. If another server holds the port, the command reports
-`port held by non-primary server (cwd=…, mode=…)`; a 200 response from the wrong
-server is a failure, not a successful restart.
+The post-boot health gate verifies `repoRoot`, `mode`, and the serving process
+PID from `GET /api/health`. A 200 response succeeds only when its PID matches the
+process this restart spawned. A different checkout reports
+`port held by non-primary server (cwd=…, mode=…)`; an old process from the same
+checkout reports `port answered by pid X — not the freshly spawned server (pid
+Y)`. Either response is a failure, not a successful restart.
+
+## Ownership-mismatch recovery
+
+When restart names PID X as the existing port owner, inspect that exact process
+before acting:
+
+```bash
+ps -p X -o pid=,ppid=,etime=,cmd=
+lsof -nP -iTCP:3011 -sTCP:LISTEN
+```
+
+If it is the stale dashboard named by the failure, terminate it with `kill X`,
+verify that the PID and listener are gone, then rerun `pan restart`. Do not use a
+broad `pkill` pattern: it can terminate the supervisor, agents, or unrelated Node
+processes. A fresh `EADDRINUSE` line fails restart immediately and names the same
+owner, while a health timeout leaves the newly spawned process running for
+inspection.
 
 ## Important Notes
 
