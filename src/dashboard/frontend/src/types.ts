@@ -77,6 +77,7 @@ export interface WorkAgentLifecycle {
   isStopped: boolean;
   isCompleted: boolean;
   isCrashed: boolean;
+  handedOff?: boolean;
   runtimeState: string;
   agentStatus: string;
   canStartFresh: boolean;

@@ -70,6 +70,9 @@ function configureLifecycle(options: {
   mockSessionExists.mockReturnValue(false);
   mockExistsSync.mockImplementation((path) => {
     if (path.endsWith('.jsonl')) return options.transcriptExists;
+    // PAN-3334: the lifecycle now probes for a completion marker; these tests
+    // are not about handoff, so the marker is always absent here.
+    if (/(^|\/)completed(\.processed)?$/.test(path)) return false;
     return true;
   });
 }

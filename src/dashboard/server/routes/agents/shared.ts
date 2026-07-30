@@ -39,6 +39,7 @@ import {
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
 } from '../../../../lib/agent-enrichment.js';
 import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
+import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
 import { classifyMemoryPressure } from '../../../../lib/cloister/memory-governor.js';
@@ -297,6 +298,9 @@ function buildStoppedAgentLifecycle(
   const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
   const isRunningButStuck = false;
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const handedOff = typeof state.id === 'string' && state.id.length > 0
+    ? hasCompletionMarkerForAgent(state as AgentState)
+    : false;
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -311,6 +315,11 @@ function buildStoppedAgentLifecycle(
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+  } else if (handedOff) {
+    // PAN-3334: mirror getWorkAgentLifecycleState — a handed-off agent is never
+    // offered a plain resume; there is nothing to continue.
+    recommendedAction = 'none';
+    reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
@@ -336,10 +345,11 @@ function buildStoppedAgentLifecycle(
     isStopped,
     isCompleted,
     isCrashed,
+    handedOff,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,

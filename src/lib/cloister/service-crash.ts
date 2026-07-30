@@ -3,13 +3,12 @@ import { createHash } from 'crypto';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import type { DomainEvent } from '@overdeck/contracts';
-import { isContextOverflowTail, CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
+import { CONTEXT_OVERFLOW_TAIL_LINES } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentStateSync } from '../agents.js';
 import { setCloisterSpawnsPausedSync } from '../overdeck/control-settings.js';
 import { getRuntimeForAgent } from '../runtimes/index.js';
 import { exactPaneTarget } from '../tmux.js';
 import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
-import { deliverOrchestratedCompact } from './orchestrated-compaction.js';
 import type { AgentHealth } from './health.js';
 import type { CloisterConfig } from './config.js';
 
@@ -154,37 +153,27 @@ export async function pokeAgentWithEscalation(host: CrashHost, agentId: string):
     return;
   }
 
-  // Tier 2 (3rd no-progress poke): escalate — /compact on overflow, else a
-  // substantive reconstruct instruction instead of another "are you stuck?".
+  // Tier 2 (3rd no-progress poke): escalate to a substantive reconstruct
+  // instruction instead of another "are you stuck?". PAN-3334: this tier used
+  // to deliver an orchestrated `/compact` when the pane tail showed context
+  // overflow — removed. Routine compaction is owned by the harness
+  // (CLAUDE_CODE_AUTO_COMPACT_WINDOW is exported per-model in every launcher,
+  // PAN-2441); a forced compact strands the session when the continuation is
+  // lost (dashboard restart) or gated (handed-off agent). A genuinely
+  // overflow-wedged agent is recovered by the deacon's compact-respawn tiers,
+  // not by a poke.
   let pokeMessage =
     'Hey, I noticed you haven\'t made progress in a while. Are you stuck? ' +
     'If you need help or clarification, please ask. Otherwise, please continue with your work.';
   if (ineffective >= 2) {
-    let tail = '';
-    try {
-      const { stdout } = await execFileAsync(
-        'tmux',
-        ['-L', 'overdeck', 'capture-pane', '-t', exactPaneTarget(agentId), '-p', '-S', `-${CONTEXT_OVERFLOW_TAIL_LINES}`],
-        { encoding: 'utf-8' },
-      );
-      tail = stdout;
-    } catch { /* fall through to reconstruct nudge */ }
-    if (isContextOverflowTail(tail)) {
-      pokeMessage = '/compact';
-      console.log(`🔔 ${agentId}: overflow tail detected — delivering /compact instead of a poke`);
-    } else {
-      pokeMessage =
-        'You appear active but have made no observable progress (no new commits, unchanged output) across multiple checks. '
-        + 'Do exactly one of: (1) work is done — commit, push, and run pan done; '
-        + '(2) blocked — state the blocker in one sentence and commit what you have as WIP; '
-        + '(3) lost context — re-read your xBRIEF item (`pan task show`), your latest .pan/feedback/ file, and git status, then resume. Act now.';
-    }
+    pokeMessage =
+      'You appear active but have made no observable progress (no new commits, unchanged output) across multiple checks. '
+      + 'Do exactly one of: (1) work is done — commit, push, and run pan done; '
+      + '(2) blocked — state the blocker in one sentence and commit what you have as WIP; '
+      + '(3) lost context — re-read your xBRIEF item (`pan task show`), your latest .pan/feedback/ file, and git status, then resume. Act now.';
   }
 
-  const delivery = pokeMessage === '/compact'
-    ? deliverOrchestratedCompact(agentId, () => Promise.resolve(runtime.sendMessage(agentId, pokeMessage)))
-    : Promise.resolve(runtime.sendMessage(agentId, pokeMessage));
-  await delivery.catch((sendErr) => {
+  await Promise.resolve(runtime.sendMessage(agentId, pokeMessage)).catch((sendErr) => {
     console.error(`Failed to send poke to ${agentId}:`, sendErr);
   });
   host.emit({ type: 'poked_agent', agentId });

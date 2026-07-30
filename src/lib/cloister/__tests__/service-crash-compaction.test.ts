@@ -64,7 +64,7 @@ describe('idle-alive compaction escalation', () => {
     }));
   });
 
-  it('registers a continuation before delivering slash compact', async () => {
+  it('escalates to the reconstruct nudge — never a forced /compact (PAN-3334)', async () => {
     const host = {
       config: {},
       crashTrackers: new Map(),
@@ -83,7 +83,10 @@ describe('idle-alive compaction escalation', () => {
     await pokeAgentWithEscalation(host, 'agent-pan-2899');
     await pokeAgentWithEscalation(host, 'agent-pan-2899');
 
-    expect(mocks.sendMessage).toHaveBeenLastCalledWith('agent-pan-2899', '/compact');
-    expect(orchestratedCompactionContinuations.has('agent-pan-2899')).toBe(true);
+    const lastMessage = mocks.sendMessage.mock.lastCall?.[1] as string;
+    expect(lastMessage).toContain('no observable progress');
+    expect(lastMessage).not.toBe('/compact');
+    // No orchestrated compact was delivered, so no continuation is registered.
+    expect(orchestratedCompactionContinuations.has('agent-pan-2899')).toBe(false);
   });
 });

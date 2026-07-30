@@ -114,7 +114,6 @@ function pane(...lines: string[]): string {
 const deaconMod = await import('../../../src/lib/cloister/deacon.js');
 const checkApiErrorAgents = deaconMod.checkApiErrorAgents;
 const contextOverflowRecoveryState = deaconMod.contextOverflowRecoveryState;
-const contextProactiveCompactState = deaconMod.contextProactiveCompactState;
 const stuckOverflowNativeRecoveryState = deaconMod.stuckOverflowNativeRecoveryState;
 const { orchestratedCompactionContinuations } = await import(
   '../../../src/lib/cloister/orchestrated-compaction.js'
@@ -139,7 +138,6 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     mockResumeAgent.mockReset().mockResolvedValue({ success: true });
 
     contextOverflowRecoveryState.clear();
-    contextProactiveCompactState.clear();
     stuckOverflowNativeRecoveryState.clear();
     orchestratedCompactionContinuations.clear();
   });
@@ -298,7 +296,10 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     expect(contextOverflowRecoveryState.has(SESSION)).toBe(false);
   });
 
-  it('proactively compacts an idle agent above the context high-water mark', async () => {
+  it('does NOT proactively compact an idle agent above the context high-water mark (PAN-3334)', async () => {
+    // Routine compaction is owned by the harness (CLAUDE_CODE_AUTO_COMPACT_WINDOW
+    // per model, PAN-2441). An idle-but-healthy agent near the ceiling gets no
+    // forced /compact, no respawn, no action from the deacon at all.
     mockGetAgentRuntimeState.mockReturnValue({
       state: 'idle',
       lastActivity: new Date().toISOString(),
@@ -316,31 +317,9 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
 
     const actions = await checkApiErrorAgents();
 
-    expect(mockSendKeys).toHaveBeenCalledWith(SESSION, '/compact');
-    expect(contextProactiveCompactState.has(SESSION)).toBe(true);
-    expect(actions.some(a => /86%/.test(a))).toBe(true);
-  });
-
-  it('does not proactively compact below the context high-water mark', async () => {
-    mockGetAgentRuntimeState.mockReturnValue({
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-      claudeSessionId: 'session-123',
-    });
-    mockGetAgentState.mockReturnValue({
-      id: SESSION,
-      issueId: ISSUE,
-      workspace: '/workspace/pan-9001',
-      model: 'gpt-5.5',
-      status: 'running',
-    });
-    mockComputeContextUsage.mockResolvedValue({ percentUsed: 84, contextWindow: 200_000, estimatedTokens: 168_000 });
-    mockCapturePane.mockResolvedValue(pane('all good', 'idle'));
-
-    await checkApiErrorAgents();
-
-    expect(mockSendKeys).not.toHaveBeenCalled();
-    expect(contextProactiveCompactState.has(SESSION)).toBe(false);
+    expect(mockSendKeys).not.toHaveBeenCalledWith(SESSION, '/compact');
+    expect(mockResumeAgent).not.toHaveBeenCalled();
+    expect(actions.some(a => /compact/i.test(a))).toBe(false);
   });
 
   it('does not run the proactive trigger for an already-overflowing agent', async () => {
@@ -365,29 +344,6 @@ describe('checkApiErrorAgents — context-window overflow recovery', () => {
     // compaction, not the harness /compact.
     expect(mockResumeAgent).toHaveBeenCalledWith(SESSION, undefined, { compact: true });
     expect(mockSendKeys).not.toHaveBeenCalledWith(SESSION, '/compact');
-  });
-
-  it('does not proactively compact within the cooldown window', async () => {
-    contextProactiveCompactState.set(SESSION, { lastAttempt: Date.now() - 1_000 });
-    mockGetAgentRuntimeState.mockReturnValue({
-      state: 'idle',
-      lastActivity: new Date().toISOString(),
-      claudeSessionId: 'session-123',
-    });
-    mockGetAgentState.mockReturnValue({
-      id: SESSION,
-      issueId: ISSUE,
-      workspace: '/workspace/pan-9001',
-      model: 'gpt-5.5',
-      status: 'running',
-    });
-    mockComputeContextUsage.mockResolvedValue({ percentUsed: 99, contextWindow: 200_000, estimatedTokens: 198_000 });
-    mockCapturePane.mockResolvedValue(pane('all good', 'idle'));
-
-    await checkApiErrorAgents();
-
-    expect(mockComputeContextUsage).not.toHaveBeenCalled();
-    expect(mockSendKeys).not.toHaveBeenCalled();
   });
 
   // ── PAN-1675 (A2): rescue agents already flagged stuck=context_overflow ──

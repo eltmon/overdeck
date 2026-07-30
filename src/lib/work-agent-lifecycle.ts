@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { access } from 'node:fs/promises';
 import { Data, Effect } from 'effect';
 import { getAgentStateSync, getAgentState, getAgentRuntimeStateSync, getAgentRuntimeState, getLatestSessionIdSync, getLatestSessionId, normalizeAgentId } from './agents.js';
+import { hasCompletionMarkerForAgent } from './agents/supervisor-channels.js';
 import { claudeSessionTranscriptExists } from './paths.js';
 import { sessionExistsSync, sessionExists } from './tmux.js';
 
@@ -25,6 +26,14 @@ export interface WorkAgentLifecycleState {
   isStopped: boolean;
   isCompleted: boolean;
   isCrashed: boolean;
+  /** Agent ran `pan done` and a completion marker exists — its work is handed
+   * off. A handed-off agent is never offered a plain resume (PAN-3334): there
+   * is nothing to continue, the resume only relaunches a huge transcript that
+   * the harness compacts, and the session then strands (continuation nets
+   * correctly refuse to re-drive handed-off agents, PAN-2974). The review →
+   * feedback loop is unaffected — it resurrects through `resumeAgent()`
+   * directly, not through this read door. */
+  handedOff: boolean;
   runtimeState: string;
   agentStatus: string;
   canStartFresh: boolean;
@@ -72,6 +81,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   // the agent is no longer making progress — it needs a resume, not a message.
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -87,6 +97,14 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
   } else if (hasLiveTmuxSession && agentStatus === 'running') {
     recommendedAction = 'none';
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
+  } else if (handedOff) {
+    // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
+    // only relaunches a finished transcript (which the harness then compacts)
+    // and strands the session — continuation nets refuse to re-drive it by
+    // design (PAN-2974). The review → feedback loop is unaffected: it
+    // resurrects through resumeAgent() directly, not through this read door.
+    recommendedAction = 'none';
+    reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (hasLiveTmuxSession && isStopped) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a live tmux session but is stopped. Use 'pan resume ${agentOrIssueId}' to continue or 'pan start ${agentOrIssueId}' will kill the session and start fresh.`;
@@ -123,6 +141,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     isStopped,
     isCompleted,
     isCrashed,
+    handedOff,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
@@ -130,7 +149,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     // session — no resume needed. Stuck agents (isRunning=true, isRunningButStuck=true) must
     // use the dedicated isRunningButStuck flag at call sites; canResumeSession stays false for
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
-    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,
@@ -161,6 +180,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   const isCrashed = (agentStatus === 'running' || isPlaceholder) && !hasLiveTmuxSession;
   const isRunningButStuck = isRunning && (runtime === 'idle' || runtime === 'suspended');
   const hasResumableBackingState = hasAgentState && hasWorkspace && !isPlaceholder;
+  const handedOff = agentState ? hasCompletionMarkerForAgent(agentState) : false;
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -176,6 +196,14 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
   } else if (hasLiveTmuxSession && agentStatus === 'running') {
     recommendedAction = 'none';
     reason = `Agent ${agentId} is already running. Use 'pan tell' to message it.`;
+  } else if (handedOff) {
+    // PAN-3334: a handed-off agent has nothing to resume. Offering Resume here
+    // only relaunches a finished transcript (which the harness then compacts)
+    // and strands the session — continuation nets refuse to re-drive it by
+    // design (PAN-2974). The review → feedback loop is unaffected: it
+    // resurrects through resumeAgent() directly, not through this read door.
+    recommendedAction = 'none';
+    reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (hasLiveTmuxSession && isStopped) {
     recommendedAction = 'resume';
     reason = `Agent ${agentId} has a live tmux session but is stopped. Use 'pan resume ${agentOrIssueId}' to continue or 'pan start ${agentOrIssueId}' will kill the session and start fresh.`;
@@ -212,6 +240,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     isStopped,
     isCompleted,
     isCrashed,
+    handedOff,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: (!hasLiveTmuxSession || (hasLiveTmuxSession && isStopped)) && (!requiresSessionResetBeforeFreshStart || isOrphaned),
@@ -221,7 +250,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     // them so `isRunning` and `canResumeSession` are never simultaneously true.
     // PAN-2908: the async snapshot used to omit hasSavedSession here — every stopped agent with
     // a workspace looked resumable, so the CTA offered Resume with nothing to resume (PAN-806).
-    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed),
+    canResumeSession: !isRunning && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,

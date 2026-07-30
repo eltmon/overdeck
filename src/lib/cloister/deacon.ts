@@ -811,7 +811,6 @@ export {
   checkApiErrorAgents,
   CONTEXT_PROACTIVE_COMPACT_HIGH_WATER_PERCENT,
   contextOverflowRecoveryState,
-  contextProactiveCompactState,
   stuckOverflowNativeRecoveryState,
 } from './deacon-api-recovery.js';
 

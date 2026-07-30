@@ -23,7 +23,12 @@ import { buildStoppedAgentLifecycle } from '../../../../../src/dashboard/server/
 
 function stoppedLifecycle(transcriptExists: boolean) {
   mockGetLatestSessionIdSync.mockReturnValue(null);
-  mockExistsSync.mockReturnValue(transcriptExists);
+  mockExistsSync.mockImplementation((path) => {
+    // PAN-3334: the lifecycle now probes for a completion marker; these tests
+    // are not about handoff, so the marker is always absent here.
+    if (/(^|\/)completed(\.processed)?$/.test(path)) return false;
+    return transcriptExists;
+  });
 
   return buildStoppedAgentLifecycle(
     'agent-pan-3194',
