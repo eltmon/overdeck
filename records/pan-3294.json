@@ -35,7 +35,7 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:36:45.815Z",
+  "updated": "2026-07-30T04:36:48.506Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -45,7 +45,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T04:36:07.586Z",
+    "panDoneRecoveredAt": "2026-07-30T04:36:45.444Z",
+    "updatedAt": "2026-07-30T04:36:45.799Z",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewRequestedAt": "2026-07-30T04:36:45.444Z",
@@ -67,8 +68,7 @@
         "tests/scripts/work-agent-stop-hook.test.ts"
       ],
       "recordedAt": "2026-07-30T04:35:55.129Z"
-    },
-    "panDoneRecoveredAt": "2026-07-30T04:36:45.444Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -106,7 +106,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.729475,
-        "pricingAsOf": "2026-07-30T04:36:07.774Z"
+        "pricingAsOf": "2026-07-30T04:36:48.502Z"
       }
     },
     "merges": [
