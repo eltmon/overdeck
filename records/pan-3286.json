@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T01:10:33.867Z",
+  "updated": "2026-07-30T01:12:35.333Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -40,7 +40,7 @@
     "ranOn": "Edwards-MacBook-Air.local"
   },
   "harness": "claude-code",
-  "model": "claude-fable-5",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3286",
