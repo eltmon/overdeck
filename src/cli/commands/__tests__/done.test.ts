@@ -169,6 +169,33 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
     );
   });
 
+  it('accepts a fix plus fixup that landed as one squashed commit (PAN-3326)', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    // Two commits on the branch: the second supersedes the first, so neither
+    // commit's own tree matches main — only the branch tip does.
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'first pass\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'final\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike fixup']);
+
+    // main carries the combined result under a single commit that also touches
+    // another file, so no patch-id on the branch matches anything upstream.
+    await git(projectPath, ['checkout', 'main']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'final\n');
+    writeFileSync(join(projectPath, 'unrelated.txt'), 'rode along\n');
+    await git(projectPath, ['add', 'strike.txt', 'unrelated.txt']);
+    await git(projectPath, ['commit', '-m', 'combined result landed elsewhere']);
+    await git(projectPath, ['push', 'origin', 'main']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toContain(
+      'has no unlanded content on origin/main',
+    );
+  });
+
   it('names the unlanded commit and paths when content really is missing (PAN-3326)', async () => {
     const { projectPath } = await createStrikeRepo();
 

@@ -46,46 +46,70 @@ function shellQuote(value: string): string {
   return `'${value.replace(/'/g, `'"'"'`)}'`;
 }
 
-/**
- * PAN-3326: `git cherry` answers "was this patch applied?" (patch-id equivalence),
- * not "is this content present?". A commit whose content reached origin/main by a
- * different route — a squash, a re-application on another base, or the same fix
- * landed twice under time pressure — keeps showing as `+` forever, so the landing
- * gate refuses a strike that has nothing left to land.
- *
- * Answer the content question directly: compare the commit's own tree against
- * origin/main over exactly the paths the commit touched. An empty result means
- * every touched path is already identical on main, so the content has landed no
- * matter which commit carried it there.
- */
-async function unlandedPathsForCommit(sha: string, projectPath: string): Promise<string[]> {
-  const quotedSha = shellQuote(sha);
-  const { stdout: touched } = await execAsync(`git show --name-only --format= -z ${quotedSha}`, {
+/** The paths a single commit touched, read NUL-separated so odd filenames survive. */
+async function pathsTouchedByCommit(sha: string, projectPath: string): Promise<string[]> {
+  const { stdout } = await execAsync(`git show --name-only --format= -z ${shellQuote(sha)}`, {
     cwd: projectPath,
     encoding: 'utf-8',
     timeout: 10000,
+    maxBuffer: 10 * 1024 * 1024,
   });
-  const paths = touched.split('\0').filter((path) => path.length > 0);
-  // An empty commit contributes no content, so there is nothing that can be unlanded.
-  if (paths.length === 0) return [];
-
-  const pathArgs = paths.map(shellQuote).join(' ');
-  const { stdout: differing } = await execAsync(
-    `git diff --name-only -z ${quotedSha} origin/main -- ${pathArgs}`,
-    { cwd: projectPath, encoding: 'utf-8', timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
-  );
-  return differing.split('\0').filter((path) => path.length > 0);
+  return stdout.split('\0').filter((path) => path.length > 0);
 }
 
-/** Render the unlanded commits so the next reader can re-check in one command. */
-function describeUnlandedCommits(unlanded: Array<{ sha: string; paths: string[] }>): string {
-  return unlanded
-    .map(({ sha, paths }) => {
-      const shown = paths.slice(0, 5).join(', ');
-      const more = paths.length > 5 ? `, +${paths.length - 5} more` : '';
-      return `  ${sha.slice(0, 10)} — ${shown}${more}`;
-    })
-    .join('\n');
+/**
+ * PAN-3326: `git cherry` answers "was this patch applied?" (patch-id equivalence),
+ * not "is this content present?". A commit whose content reached origin/main by a
+ * different route — a squash of several branch commits, a re-application on
+ * another base, or the same red-main fix landed twice under time pressure —
+ * keeps showing as `+` forever, so the landing gate refuses a strike that has
+ * nothing left to land and no future state can ever satisfy it.
+ *
+ * Ask the content question instead: over exactly the paths those commits touched,
+ * does the branch tip still differ from origin/main? Restricting to the touched
+ * paths is what keeps a branch that is merely far behind `main` from looking like
+ * a huge unlanded change, and comparing the branch *tip* rather than each commit's
+ * own tree is what lets a fix plus its fixups count as landed once main carries
+ * the combined result.
+ */
+async function unlandedPaths(
+  branchHead: string,
+  commits: string[],
+  projectPath: string,
+): Promise<{ paths: string[]; touchedByCommit: Map<string, string[]> }> {
+  const touchedByCommit = new Map<string, string[]>();
+  const union = new Set<string>();
+  for (const sha of commits) {
+    const paths = await pathsTouchedByCommit(sha, projectPath);
+    touchedByCommit.set(sha, paths);
+    for (const path of paths) union.add(path);
+  }
+  // Commits that touch no path (empty commits) contribute no content to land.
+  if (union.size === 0) return { paths: [], touchedByCommit };
+
+  const pathArgs = [...union].map(shellQuote).join(' ');
+  const { stdout } = await execAsync(
+    `git diff --name-only -z ${shellQuote(branchHead)} origin/main -- ${pathArgs}`,
+    { cwd: projectPath, encoding: 'utf-8', timeout: 10000, maxBuffer: 10 * 1024 * 1024 },
+  );
+  return { paths: stdout.split('\0').filter((path) => path.length > 0), touchedByCommit };
+}
+
+/** Name the commits and paths believed unlanded so the next reader can re-check in one command. */
+function describeUnlanded(
+  unlandedPathList: string[],
+  touchedByCommit: Map<string, string[]>,
+): string {
+  const unlandedSet = new Set(unlandedPathList);
+  const lines: string[] = [];
+  for (const [sha, paths] of touchedByCommit) {
+    const guilty = paths.filter((path) => unlandedSet.has(path));
+    if (guilty.length === 0) continue;
+    const shown = guilty.slice(0, 5).join(', ');
+    const more = guilty.length > 5 ? `, +${guilty.length - 5} more` : '';
+    lines.push(`  ${sha.slice(0, 10)} — ${shown}${more}`);
+  }
+  return lines.join('\n');
 }
 
 export async function verifyStrikeBranchMergedIntoMain(issueId: string, projectPath: string): Promise<string> {
@@ -158,17 +182,14 @@ export async function verifyStrikeBranchMergedIntoMain(issueId: string, projectP
       return `${branchName} has no commits missing from origin/main`;
     }
 
-    const unlanded: Array<{ sha: string; paths: string[] }> = [];
-    for (const sha of missingCommits) {
-      const paths = await unlandedPathsForCommit(sha, projectPath);
-      if (paths.length > 0) unlanded.push({ sha, paths });
-    }
-    if (unlanded.length === 0) {
-      return `${branchName} has no unlanded content on origin/main (${missingCommits.length} commit(s) differ by patch-id but every path they touch is already identical on main)`;
+    const { paths, touchedByCommit } = await unlandedPaths(branchHead, missingCommits, projectPath);
+    if (paths.length === 0) {
+      return `${branchName} has no unlanded content on origin/main (${missingCommits.length} commit(s) differ by patch-id, but every path they touch is already identical on main)`;
     }
     throw new Error(
-      `${branchName} has ${unlanded.length} commit(s) whose content is missing from origin/main:\n${describeUnlandedCommits(unlanded)}\n` +
-        `Re-check with: git diff <commit> origin/main -- <path>`,
+      `${branchName} has ${paths.length} path(s) whose content is missing from origin/main:\n` +
+        `${describeUnlanded(paths, touchedByCommit)}\n` +
+        `Re-check with: git diff ${branchName} origin/main -- <path>`,
     );
   }
 
