@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:08:44.568Z",
+  "updated": "2026-07-30T23:08:52.028Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -176,5 +176,38 @@
     "docs-pipeline-membership-reconciliation": "completed",
     "docs-pipeline-membership-reconciliation.docs-pipeline-membership-reconciliation.ac1": "completed",
     "docs-pipeline-membership-reconciliation.docs-pipeline-membership-reconciliation.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
+      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
+      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+    ],
+    "recordedAt": "2026-07-30T23:08:52.027Z"
   }
 }
