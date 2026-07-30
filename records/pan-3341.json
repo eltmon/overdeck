@@ -15,19 +15,53 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
+      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
+      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
+      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
+      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/pipeline-state.ts",
+      "src/dashboard/server/services/resource-discovery.ts",
+      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
+    ],
+    "recordedAt": "2026-07-30T23:08:52.027Z"
+  },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:08:55.005Z",
+  "updated": "2026-07-30T23:08:57.592Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T23:08:55.001Z",
+    "updatedAt": "2026-07-30T23:08:57.541Z",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3353",
     "reviewRequestedAt": "2026-07-30T23:08:55.001Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -61,39 +95,40 @@
         "tests/unit/dashboard/server/services/resource-discovery.test.ts"
       ],
       "recordedAt": "2026-07-30T23:08:52.027Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3353"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 614178,
-            "output": 61982,
-            "cacheRead": 11947520,
+            "input": 899733,
+            "output": 97038,
+            "cacheRead": 37300736,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 614178,
-          "output": 61982,
-          "cacheRead": 11947520,
+          "input": 899733,
+          "output": 97038,
+          "cacheRead": 37300736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.90411,
-        "pricingAsOf": "2026-07-30T21:54:46.010Z"
+        "usd": 26.060173,
+        "pricingAsOf": "2026-07-30T23:08:57.574Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3353"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3341",
@@ -211,38 +246,5 @@
     "docs-pipeline-membership-reconciliation": "completed",
     "docs-pipeline-membership-reconciliation.docs-pipeline-membership-reconciliation.ac1": "completed",
     "docs-pipeline-membership-reconciliation.docs-pipeline-membership-reconciliation.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
-      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
-      "src/dashboard/frontend/src/lib/pipeline-state.ts",
-      "src/dashboard/server/services/resource-discovery.ts",
-      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/PIPELINE-MEMBERSHIP.md",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/FeatureItem.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectOverview.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
-      "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
-      "src/dashboard/frontend/src/components/Pipeline/PipelineView.test.tsx",
-      "src/dashboard/frontend/src/lib/pipeline-state.test.ts",
-      "src/dashboard/frontend/src/lib/pipeline-state.ts",
-      "src/dashboard/server/services/resource-discovery.ts",
-      "tests/unit/dashboard/server/services/resource-discovery.test.ts"
-    ],
-    "recordedAt": "2026-07-30T23:08:52.027Z"
   }
 }
