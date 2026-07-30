@@ -51,8 +51,8 @@ function normalizeProviderConfig(
 }
 
 function validateProviderHarness(provider: ModelProvider, harness: RuntimeName | undefined): void {
-  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp') {
-    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, or acp`);
+  if (harness !== undefined && harness !== 'claude-code' && harness !== 'ohmypi' && harness !== 'codex' && harness !== 'acp' && harness !== 'kimi-code') {
+    throw new Error(`config.yaml: models.providers.${provider}.harness must be claude-code, ohmypi, codex, acp, or kimi-code`);
   }
 }
 
@@ -215,6 +215,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     acp: {
       permissionMode: DEFAULT_CONFIG.acp.permissionMode,
     },
+    kimiCode: {},
   };
 
   // Track providers explicitly disabled in models.providers so that legacy
@@ -739,6 +740,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
         ...result.acp.kimi,
         binaryPath: config.acp.kimi.binaryPath,
       };
+    }
+    if (config.kimiCode?.binaryPath !== undefined) {
+      result.kimiCode.binaryPath = config.kimiCode.binaryPath;
     }
 
     // Merge remote work-agent provisioning settings

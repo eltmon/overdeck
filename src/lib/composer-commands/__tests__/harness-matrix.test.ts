@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 import type { RuntimeName } from '../../runtimes/types.js';
 
 const mocks = vi.hoisted(() => ({
@@ -75,7 +76,10 @@ vi.mock('../../overdeck/conversation-delivery.js', () => ({
 import { handleAgentMessage } from '../../../dashboard/server/routes/agents/messaging.js';
 import { handleConversationMessage } from '../../overdeck/conversation-message.js';
 
-const HARNESSES = ['claude-code', 'codex', 'ohmypi', 'acp'] as const;
+// Derived from the canonical KNOWN_HARNESSES (PAN-1837 review fix) so this
+// matrix automatically covers a newly-added harness instead of silently
+// staying at whatever set was hardcoded when the test was written.
+const HARNESSES = [...KNOWN_HARNESSES] as readonly RuntimeName[];
 const PORTABLE_COMMAND = '/pan start PAN-999';
 const EXPECTED_RESULT = {
   kind: 'activity',
@@ -122,7 +126,7 @@ beforeEach(() => {
   }));
 });
 
-describe('composer command four-harness interception matrix', () => {
+describe('composer command harness interception matrix (all KNOWN_HARNESSES)', () => {
   it('returns identical canonical argv and results for conversation commands without delivery', async () => {
     const results = [];
     for (const harness of HARNESSES) {

@@ -367,7 +367,7 @@ export interface RoleConfig {
   model: RoleModelRef;
   /** Explicit scalar staffing model for autonomous planning dispatch. */
   autonomousModel?: RoleModelRef;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
   effort?: RoleEffort;
   mode?: ReviewMode;
   /** PAN-1862 (FR-7): re-review scope for the review role (default 'changed'). */
@@ -614,6 +614,14 @@ export interface YamlConfig {
     kimi?: {
       binaryPath?: string;
     };
+  };
+
+  /**
+   * Native Kimi Code CLI spawn behavior. The `kimi` binary installs to
+   * ~/.kimi-code/bin and is not added to PATH, so the configured path matters.
+   */
+  kimiCode?: {
+    binaryPath?: string;
   };
 
   /** Remote work-agent provisioning settings (dashboard-editable subset). */
@@ -928,6 +936,11 @@ export interface NormalizedConfig {
     kimi?: {
       binaryPath?: string;
     };
+  };
+
+  /** Native Kimi Code CLI process settings. */
+  kimiCode: {
+    binaryPath?: string;
   };
 
   /** Remote work-agent provisioning settings surfaced by the dashboard. */

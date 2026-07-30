@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
-import { mkdir, writeFile, writeFile as writeFileAsync } from 'fs/promises';
+import { mkdir, readdir as readdirAsync, writeFile, writeFile as writeFileAsync } from 'fs/promises';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { randomUUID } from 'crypto';
@@ -43,6 +43,7 @@ import {
   claudeSystemPromptFiles,
   getAcpLauncherFields,
   getCodexLauncherFields,
+  getKimiCodeLauncherFields,
   getOhmypiLauncherFields,
   getProviderAuthMode,
   getRoleRuntimeBaseCommand,
@@ -246,6 +247,7 @@ async function spawnRunWithoutConsentClaim(
   const shouldDeliverPromptViaTmux = shouldRegisterConversation && resolvedHarness === 'claude-code';
   const shouldDeliverPromptViaPi = shouldRegisterConversation && resolvedHarness === 'ohmypi';
   const shouldDeliverPromptViaCodexTui = shouldRegisterConversation && resolvedHarness === 'codex';
+  const shouldDeliverPromptViaKimiCode = shouldRegisterConversation && resolvedHarness === 'kimi-code';
   const shouldDeliverPromptViaAcp = resolvedHarness === 'acp';
   const prompt = options.prompt
     ? await withSpawnTimeMemoryContext({
@@ -260,7 +262,7 @@ async function spawnRunWithoutConsentClaim(
 
   let promptFile: string | undefined;
   const tracksKickoffDelivery = role === 'flywheel';
-  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui))) {
+  if (prompt && !shouldDeliverPromptViaAcp && (tracksKickoffDelivery || (!shouldDeliverPromptViaTmux && !shouldDeliverPromptViaPi && !shouldDeliverPromptViaCodexTui && !shouldDeliverPromptViaKimiCode))) {
     promptFile = join(getAgentDir(agentId), 'initial-prompt.md');
     await writeFileAsync(promptFile, prompt);
   }
@@ -278,8 +280,8 @@ async function spawnRunWithoutConsentClaim(
     }
   }
 
-  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel);
-  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel);
+  const providerExports = isAcp ? undefined : await getProviderExportsForModel(selectedModel, resolvedHarness);
+  const providerEnv = isAcp ? {} : await getProviderEnvForModel(selectedModel, resolvedHarness);
   // PAN-1048 review feedback 005 (S1): when the resolved harness is ohmypi, thread
   // the per-agent ohmypi launcher fields (--session-dir, --extension, FIFO
   // redirect) through generateLauncherScript so the role launcher emits the
@@ -300,6 +302,13 @@ async function spawnRunWithoutConsentClaim(
         harnessLaunch.binaryPath,
         role,
       )
+    : {};
+  // PAN-1837 review fix: role runs (review/test/ship/plan/flywheel) reached
+  // this launcher path without a Kimi field spread, so buildKimiCodeCommand()
+  // threw 'kimi-code launcher requires kimiCodeModel' before a session could
+  // even be created.
+  const kimiCodeLauncherFields = resolvedHarness === 'kimi-code'
+    ? getKimiCodeLauncherFields(selectedModel)
     : {};
 
   // Create a conversation record for every specialist role — sub-role reviewers,
@@ -390,6 +399,7 @@ async function spawnRunWithoutConsentClaim(
     ...piLauncherFields,
     ...codexLauncherFields,
     ...acpLauncherFields,
+    ...kimiCodeLauncherFields,
   });
 
   const launcherScript = join(getAgentDir(agentId), 'launcher.sh');
@@ -463,7 +473,7 @@ async function spawnRunWithoutConsentClaim(
       } catch (err) {
         console.error(`[${agentId}] ohmypi prompt delivery failed:`, err instanceof Error ? err.message : String(err));
       }
-    } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui) {
+    } else if (shouldDeliverPromptViaTmux || shouldDeliverPromptViaCodexTui || shouldDeliverPromptViaKimiCode) {
       if (tracksKickoffDelivery) {
         const delivery = await deliverInitialPromptWithRetry(agentId, prompt, 'spawnRun:initial-prompt');
         if (delivery.ok) {
@@ -476,12 +486,14 @@ async function spawnRunWithoutConsentClaim(
       } else {
         // PAN-1594: wait for the hook-written ready.json (session-start hook),
         // not a tmux pane-scrape. No dependency on permission-mode footer text.
+        // Kimi Code's own readiness (readinessKind 'kimi-session-signal') is a
+        // pane-scan, not a hook file — waitForPromptReady dispatches correctly.
         const ready = await waitForPromptReady(agentId, resolvedHarness, 30);
         if (ready) {
           await new Promise<void>((resolve) => setTimeout(resolve, 500));
           await deliverAgentMessage(agentId, prompt, 'spawnRun:initial-prompt');
         } else {
-          console.error(`[${agentId}] ${resolvedHarness === 'codex' ? 'Codex' : 'Claude'} did not become ready within 30s`);
+          console.error(`[${agentId}] ${getHarnessBehavior(resolvedHarness).displayName} did not become ready within 30s`);
         }
       }
     }
@@ -811,20 +823,81 @@ async function spawnAgentWithoutConsentClaim(
 
   clearReadySignal(agentId);
 
-  await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
-    env: {
-      ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
-      TERM: 'xterm-256color',
-      OVERDECK_AGENT_ID: agentId,
-      OVERDECK_ISSUE_ID: options.issueId,
-      OVERDECK_SESSION_TYPE: role,
-      OVERDECK_AGENT_STARTED_BY: startedBy,
-      CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
-      GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
-      ...flywheelEnv,
-      ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
+  // PAN-1837: Kimi generates its own session id and cannot be told one via a
+  // launch flag (D2/erratum E1) — it must be captured post-launch as whatever
+  // new directory appears under the workspace's session bucket. Snapshot the
+  // bucket's current contents BEFORE the tmux session exists so the capture
+  // below can diff against it instead of guessing from mtime alone, which
+  // would misfire on a workspace that already has prior kimi sessions
+  // (retries/resumes).
+  //
+  // PAN-1837 review fix: snapshot, launch, and capture/persist all run inside
+  // withKimiSessionCaptureLock — a review cycle 6 finding is that awaiting
+  // the capture (as restartAgent's own fix already did) is not sufficient on
+  // its own: it only guarantees *some* new same-cwd directory was observed,
+  // not that it's THIS launch's directory. Only the per-workDirKey mutex,
+  // held across the whole snapshot -> createSession -> capture span, stops a
+  // concurrent same-cwd Kimi launch (another work agent, a restart, a
+  // recovery, or a conversation) from claiming this session or vice versa.
+  const launchAndCaptureKimiSession = async (): Promise<void> => {
+    let kimiExistingSessionsBefore: Set<string> | undefined;
+    if (resolvedHarness === 'kimi-code') {
+      try {
+        const { kimiSessionsRoot } = await import('../runtimes/kimi-code.js');
+        kimiExistingSessionsBefore = new Set(await readdirAsync(kimiSessionsRoot(join(homedir(), '.kimi-code'), options.workspace)));
+      } catch {
+        kimiExistingSessionsBefore = new Set();
+      }
     }
-  }));
+
+    await Effect.runPromise(createSession(agentId, options.workspace, claudeCmd, {
+      env: {
+        ...BLANKED_PROVIDER_ENV, // Blank stale provider vars inherited by tmux server
+        TERM: 'xterm-256color',
+        OVERDECK_AGENT_ID: agentId,
+        OVERDECK_ISSUE_ID: options.issueId,
+        OVERDECK_SESSION_TYPE: role,
+        OVERDECK_AGENT_STARTED_BY: startedBy,
+        CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false', // Disable suggested prompts for autonomous agents (PAN-251)
+        GIT_SEQUENCE_EDITOR: 'false', // Block interactive rebase / squash (agents forbidden from rewriting history)
+        ...flywheelEnv,
+        ...providerEnv, // Set correct provider env vars (BASE_URL, AUTH_TOKEN, etc.)
+      }
+    }));
+
+    if (kimiExistingSessionsBefore) {
+      const { waitForNewKimiSessionAsync, writeKimiSessionId } = await import('../runtimes/kimi-code.js');
+      const sessionId = await waitForNewKimiSessionAsync(
+        join(homedir(), '.kimi-code'),
+        options.workspace,
+        kimiExistingSessionsBefore,
+      );
+      if (sessionId) {
+        writeKimiSessionId(agentId, sessionId);
+      } else {
+        // PAN-1837 review fix: fail closed like restartAgent — a missing
+        // capture would otherwise leave a running, unowned Kimi session whose
+        // transcript lookup falls back to newest-session-by-mtime, which
+        // cannot establish ownership in a shared cwd bucket and can display a
+        // different session's transcript/cost under this agent.
+        throw new Error(
+          `kimi-code session capture timed out for ${agentId} — no new session directory appeared under the workspace bucket`,
+        );
+      }
+    }
+  };
+
+  if (resolvedHarness === 'kimi-code') {
+    const { withKimiSessionCaptureLock } = await import('../runtimes/kimi-code.js');
+    try {
+      await withKimiSessionCaptureLock(join(homedir(), '.kimi-code'), options.workspace, launchAndCaptureKimiSession);
+    } catch (err) {
+      await Effect.runPromise(stopAgent(agentId)).catch(() => undefined);
+      throw err;
+    }
+  } else {
+    await launchAndCaptureKimiSession();
+  }
   await acceptConsent?.();
   await saveAgentRuntimeState(agentId, {
     claudeSessionId: state.sessionId,

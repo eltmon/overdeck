@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, PROVIDERS } from '../../src/lib/providers.js';
+import { KIMI_CODING_BASE_URL, KIMI_PLATFORM_BASE_URL, getProviderEnvSync, getProviderForModelSync, piProviderForModel, qualifyPiModel, resolveKimiCodeModelAlias, PROVIDERS } from '../../src/lib/providers.js';
 
 describe('providers', () => {
   it('returns no provider-native env for OpenAI subscription routing through CLIProxy', () => {
@@ -52,6 +52,24 @@ describe('providers', () => {
     expect(getProviderForModelSync('kimi-k2.7-code')).toBe(PROVIDERS.kimi);
     expect(getProviderForModelSync('k3')).toBe(PROVIDERS.kimi);
     expect(getProviderForModelSync('k3[1m]')).toBe(PROVIDERS.kimi);
+  });
+
+  describe('resolveKimiCodeModelAlias (PAN-1837 review fix)', () => {
+    it('passes an already-native kimi-code/<alias> id through unchanged', () => {
+      expect(resolveKimiCodeModelAlias('kimi-code/k3')).toBe('kimi-code/k3');
+      expect(resolveKimiCodeModelAlias('kimi-code/kimi-for-coding-highspeed')).toBe('kimi-code/kimi-for-coding-highspeed');
+    });
+
+    it('remaps k3 to the 256K native alias and k3[1m] to the full 1M native alias by context tier', () => {
+      expect(resolveKimiCodeModelAlias('k3')).toBe('kimi-code/k3-256k');
+      expect(resolveKimiCodeModelAlias('k3[1m]')).toBe('kimi-code/k3');
+    });
+
+    it('fails loudly (never guesses) for a legacy id with no native equivalent', () => {
+      for (const legacy of ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview']) {
+        expect(() => resolveKimiCodeModelAlias(legacy)).toThrow(/has no native kimi-code CLI equivalent/);
+      }
+    });
   });
 
   it('resolves the zai provider for glm-5.2', () => {

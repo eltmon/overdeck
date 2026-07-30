@@ -23,6 +23,7 @@
  */
 import { existsSync } from 'node:fs';
 import { readdir, readFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
 
@@ -30,6 +31,7 @@ import type { AcpTranscriptEntry, AcpTranscriptToolCallState } from '../acp/tran
 import type { LegacyConversation as Conversation } from '../overdeck/conversations.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome, sessionFilePath } from '../paths.js';
+import { findKimiWirePathAsync } from '../runtimes/kimi-code.js';
 import {
   parseEntries as parseClaudeCodeEntries,
   serializeConversation as serializeClaudeCodeConversation,
@@ -338,6 +340,138 @@ const acpAdapter: ConversationTranscriptAdapter = {
   },
 };
 
+// ─── Kimi Code ────────────────────────────────────────────────────────────
+//
+// Kimi's native wire.jsonl is an event stream, not message-per-line like
+// Claude/Pi — see kimi-parser.ts and kimi-conversation-parser.ts (the
+// reviewed v1 chat-panel adapter) for the full shape. This serializer covers
+// the same event set that adapter renders: turn.prompt (user), content.part
+// text (assistant; 'think' parts are hidden reasoning, included only when
+// includeThinking), and tool.call (work log). tool.result is intentionally
+// skipped, matching the pi/acp adapters above.
+
+/**
+ * Resolve the native Kimi Code CLI wire.jsonl for a conversation. Mirrors
+ * jsonl-resolver.ts's resolveKimiWirePath, reimplemented locally (rather than
+ * imported) to avoid a circular import this module would otherwise close:
+ * jsonl-resolver.js -> agents.js -> agents/resume.js ->
+ * conversation-compaction.js -> summary-fork.js -> transcript-adapter.js.
+ * Fast path: the captured `kimi-session-id` for this conversation's tmux
+ * session maps directly to the wire.jsonl path; fallback (no captured id):
+ * the newest session directory under the workspace's bucket.
+ */
+async function resolveKimiWireFileFromTmux(tmuxSession: string, workspace: string): Promise<string | null> {
+  const kimiHome = join(homedir(), '.kimi-code');
+  const sessionIdPath = join(getOverdeckHome(), 'agents', tmuxSession, 'kimi-session-id');
+  const sessionId = await readFile(sessionIdPath, 'utf-8').then((s) => s.trim(), () => null);
+  return findKimiWirePathAsync(kimiHome, workspace, sessionId);
+}
+
+interface KimiWireLoopEvent {
+  type?: string;
+  toolCallId?: string;
+  name?: string;
+  args?: unknown;
+  part?: { type?: string; text?: string; think?: string };
+  [k: string]: unknown;
+}
+
+interface KimiWireLine {
+  type?: string;
+  input?: Array<{ type?: string; text?: string }>;
+  event?: KimiWireLoopEvent;
+  [k: string]: unknown;
+}
+
+function extractKimiPromptText(input: KimiWireLine['input']): string {
+  if (!Array.isArray(input)) return '';
+  return input
+    .filter((part) => part?.type === 'text' && typeof part.text === 'string')
+    .map((part) => part.text!.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function serializeKimiEntry(entry: KimiWireLine, includeThinking: boolean): string | undefined {
+  if (entry.type === 'turn.prompt') {
+    const text = extractKimiPromptText(entry.input);
+    return text ? `[user]\n${text}` : undefined;
+  }
+
+  if (entry.type !== 'context.append_loop_event' || !entry.event) return undefined;
+  const event = entry.event;
+
+  if (event.type === 'content.part' && event.part?.type === 'text' && event.part.text?.trim()) {
+    return `[assistant]\n${event.part.text.trim()}`;
+  }
+  if (event.type === 'content.part' && event.part?.type === 'think' && includeThinking && event.part.think?.trim()) {
+    return `[assistant]\n[thinking]\n${event.part.think.trim()}`;
+  }
+  if (event.type === 'tool.call' && typeof event.name === 'string') {
+    let args = '';
+    try {
+      args = JSON.stringify(event.args).slice(0, 500);
+    } catch {
+      args = '<unserializable>';
+    }
+    return `[tool_use: ${event.name}]\n${args}`;
+  }
+  // tool.result, step.begin/end, usage.record, metadata: intentionally
+  // skipped — same rationale as the pi/acp adapters above.
+  return undefined;
+}
+
+const kimiCodeAdapter: ConversationTranscriptAdapter = {
+  name: 'kimi-code',
+  // Not the raw Claude JSONL a `claude --resume` can consume; Kimi has its
+  // own native resume (`-S <id>`), a distinct code path from "plain fork".
+  supportsPlainForkAsSource: false,
+  // Conservative default matching acp/pi: source-authored handoff via
+  // deliverAgentMessage + sentinel-file wait is unverified for kimi-code.
+  supportsSourceAuthoredHandoff: false,
+
+  async resolveSessionFile(conv) {
+    return resolveKimiWireFileFromTmux(conv.tmuxSession, conv.cwd);
+  },
+
+  async serializeTranscript(sessionFile, options) {
+    const includeThinking = options?.includeThinking ?? true;
+    const content = await readFile(sessionFile, 'utf-8');
+    const parts: string[] = [];
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      let entry: KimiWireLine;
+      try {
+        entry = JSON.parse(line) as KimiWireLine;
+      } catch {
+        continue;
+      }
+      const serialized = serializeKimiEntry(entry, includeThinking);
+      if (serialized) parts.push(serialized);
+    }
+    return parts.join('\n\n');
+  },
+
+  async compactSummary(sessionFile, options) {
+    // Kimi's wire.jsonl shape is not what the Claude-Code entry parser
+    // understands, so serialize through this adapter first, then run the
+    // generic text chunk-and-merge summarizer over it (same as pi/acp).
+    const serialized = await kimiCodeAdapter.serializeTranscript(sessionFile, {
+      includeThinking: options?.includeThinking ?? true,
+    });
+    if (!serialized.trim()) {
+      return { summary: '', summaryModel: null };
+    }
+    const summary = await summarizeSerializedText(serialized, {
+      model: options?.model,
+      richMode: options?.richMode ?? false,
+      harness: options?.harness ?? 'claude-code',
+      timeoutMs: options?.timeoutMs,
+    });
+    return { summary, summaryModel: options?.model ?? null };
+  },
+};
+
 // ─── Registry ─────────────────────────────────────────────────────────────
 
 const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
@@ -345,6 +479,7 @@ const REGISTRY: Partial<Record<RuntimeName, ConversationTranscriptAdapter>> = {
   'ohmypi': piAdapter,
   'codex': claudeCodeAdapter,
   'acp': acpAdapter,
+  'kimi-code': kimiCodeAdapter,
 };
 
 /**
