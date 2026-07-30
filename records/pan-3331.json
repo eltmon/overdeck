@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T20:53:35.783Z",
+  "updated": "2026-07-30T21:09:36.106Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "run-command-storage": {
-        "writerId": "agent-pan-3331",
-        "agentId": "agent-pan-3331",
-        "pid": 1553098,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T20:53:35.783Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "GET /:id/git (fetch=1 with per-path 30s throttle, {git:null} for non-git, 404 unknown) + POST /:id/pull (guarded, typed refusal pass-through 409/500, issue-kind 409 to sync-main). 19 route tests pass with fake timers; doors guard green.",
         "releasedAt": "2026-07-30T20:53:26.052Z"
+      },
+      {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 1553098,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T20:53:35.783Z",
+        "itemId": "run-command-storage",
+        "outcome": "completed",
+        "reason": "run_command column (CREATE TABLE + idempotent top-up), resolver field, setWorkspaceRunCommand writer, PUT /:id/run-command and POST /:id/run (default from workspace.services[].start_command, single-live-session 409 re-focus, newline/backtick/500-char validation). 18 tests pass.",
+        "releasedAt": "2026-07-30T21:09:36.105Z"
       }
     ],
     "statusReasons": {
@@ -112,6 +115,10 @@
       "git-pull-routes": {
         "reason": "GET /:id/git (fetch=1 with per-path 30s throttle, {git:null} for non-git, 404 unknown) + POST /:id/pull (guarded, typed refusal pass-through 409/500, issue-kind 409 to sync-main). 19 route tests pass with fake timers; doors guard green.",
         "updatedAt": "2026-07-30T20:53:26.052Z"
+      },
+      "run-command-storage": {
+        "reason": "run_command column (CREATE TABLE + idempotent top-up), resolver field, setWorkspaceRunCommand writer, PUT /:id/run-command and POST /:id/run (default from workspace.services[].start_command, single-live-session 409 re-focus, newline/backtick/500-char validation). 18 tests pass.",
+        "updatedAt": "2026-07-30T21:09:36.105Z"
       }
     }
   },
@@ -127,6 +134,11 @@
     "git-pull-routes.git-pull-routes.ac2": "completed",
     "git-pull-routes.git-pull-routes.ac3": "completed",
     "git-pull-routes.git-pull-routes.ac4": "completed",
-    "run-command-storage": "running"
+    "run-command-storage": "completed",
+    "run-command-storage.run-command-storage.ac1": "completed",
+    "run-command-storage.run-command-storage.ac2": "completed",
+    "run-command-storage.run-command-storage.ac3": "completed",
+    "run-command-storage.run-command-storage.ac4": "completed",
+    "run-command-storage.run-command-storage.ac5": "completed"
   }
 }
