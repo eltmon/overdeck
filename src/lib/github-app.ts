@@ -17,6 +17,7 @@ import { exec, execFile } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { GitHubApiError, ConfigError, FsError } from './errors.js';
+import { ensureBotCredentialFile, resolveWorkspaceRemote } from './github-credentials.js';
 import { withConcurrencyLimitPromise } from './concurrency.js';
 import { isAdvisoryCheckName } from './advisory-checks.js';
 
@@ -725,7 +726,6 @@ export async function configureWorkspaceForBot(
   const { exec } = await import('child_process');
   const { promisify } = await import('util');
   const { writeFileSync } = await import('fs');
-  const { resolve } = await import('path');
   const execAsync = promisify(exec);
   const { name, email } = getBotIdentity();
 
@@ -733,12 +733,10 @@ export async function configureWorkspaceForBot(
   await execAsync(`git config user.name "${name}"`, { cwd: workspacePath, encoding: 'utf-8' });
   await execAsync(`git config user.email "${email}"`, { cwd: workspacePath, encoding: 'utf-8' });
 
-  // Use git credential store with a workspace-local credential file.
+  // One credential file per repo, outside the git dir — see botCredentialFile.
   // Token is refreshed at workspace creation (~1hr TTL). For long sessions,
   // call refreshWorkspaceToken() to get a fresh one.
-  const { stdout: gitDirOutput } = await execAsync('git rev-parse --git-dir', { cwd: workspacePath, encoding: 'utf-8' });
-  const gitDir = resolve(workspacePath, gitDirOutput.trim());
-  const credFile = join(gitDir, 'pan-credentials');
+  const credFile = ensureBotCredentialFile(owner, repo);
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 
   // Set remote to HTTPS and configure credential store
@@ -839,7 +837,10 @@ export async function postOverdeckTestsStatus(
 
   const { token } = await Effect.runPromise(generateInstallationToken(config));
   const { writeFileSync } = await import('fs');
-  const credFile = join(workspacePath, '.git', 'pan-credentials');
+  // Must resolve the SAME file configureWorkspaceForBot wrote (see
+  // github-credentials.ts) — the old path threw ENOTDIR inside a worktree.
+  const { owner, repo } = await resolveWorkspaceRemote(workspacePath);
+  const credFile = ensureBotCredentialFile(owner, repo);
   writeFileSync(credFile, `https://x-access-token:${token}@github.com\n`, { mode: 0o600 });
 }
 
@@ -991,7 +992,7 @@ export const refreshWorkspaceToken = (
       try: () => refreshWorkspaceTokenPromise(workspacePath),
       catch: (cause) =>
         new FsError({
-          path: join(workspacePath, '.git', 'pan-credentials'),
+          path: workspacePath,
           operation: 'refreshWorkspaceToken',
           cause,
         }),
