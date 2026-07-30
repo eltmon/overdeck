@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T03:54:04.249Z",
+  "updated": "2026-07-30T03:56:25.501Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -69,18 +69,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "lock-primitive": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3294",
         "agentId": "agent-pan-3294",
         "pid": 1992193,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:54:04.249Z"
+        "claimedAt": "2026-07-30T03:54:04.249Z",
+        "itemId": "lock-primitive",
+        "outcome": "completed",
+        "reason": "Added atomic mkdir single-flight lock helpers with live-holder detection, stale-lock reclaim, idempotent release, and real-bash regression tests.",
+        "releasedAt": "2026-07-30T03:56:25.501Z"
+      }
+    ],
+    "statusReasons": {
+      "lock-primitive": {
+        "reason": "Added atomic mkdir single-flight lock helpers with live-holder detection, stale-lock reclaim, idempotent release, and real-bash regression tests.",
+        "updatedAt": "2026-07-30T03:56:25.501Z"
       }
     }
   },
   "statusOverrides": {
-    "lock-primitive": "running"
+    "lock-primitive": "completed",
+    "lock-primitive.lock-primitive.ac1": "completed",
+    "lock-primitive.lock-primitive.ac2": "completed",
+    "lock-primitive.lock-primitive.ac3": "completed",
+    "lock-primitive.lock-primitive.ac4": "completed"
   }
 }
