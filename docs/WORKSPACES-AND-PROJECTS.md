@@ -169,6 +169,59 @@ memory phase as plain muted text with no status dot, deliberately unlike the
 pipeline badge's colored dot; `WorkspaceView`'s Memory panel header shows the
 phase and its confidence.
 
+## Quick-action band (PAN-3331)
+
+`WorkspaceView` renders `WorkspaceActionBand` between its header and its panels
+for every kind. Three cards, three routes:
+
+**Git card — `GET /api/workspace-registry/:id/git?fetch=0|1`.** Returns
+`WorkspaceGitState` from `src/lib/workspaces/git-state.ts`, or `{git: null}` for
+an `isGitRepository=false` row. Ahead/behind is computed against the checked-out
+branch's **own upstream** (`@{u}`), falling back to `origin/HEAD` with
+`hasUpstream: false` when the branch tracks nothing — the older
+`getRepoGitStatusAsync` in `routes/workspaces/workspace-data.ts` compares
+`HEAD...origin/HEAD` unconditionally and reports the wrong "behind" for a
+feature branch. `fetch=1` runs a real `git fetch` so the card is not judging
+stale refs, throttled to one fetch per 30 s per path in the route; a throttled
+read still reports the last fetch time in `fetchedAt`. The frontend asks for
+`fetch=1` on mount and on Refresh, and polls every 30 s without forcing one.
+
+**Pull — `POST /api/workspace-registry/:id/pull`.** `pullWorkspaceFastForward`
+runs `git pull --ff-only` and **returns** typed refusals rather than throwing:
+`dirty`, `operation-in-progress` (via `ensureSyncGitQuiescent` with
+`abortMerge: false` — an in-flight merge is refused, never cleaned up),
+`not-fast-forward`, `no-upstream`, `detached`, and `error`. The route answers
+409 for a refusal and 500 for `error`. **`kind='issue'` workspaces are refused
+with 409 and their sync-main URL** — their merge semantics are unchanged and
+the band routes their button to `POST /api/issues/:issueId/sync-main`.
+
+**Run — `run_command` column, `PUT /:id/run-command`, `POST /:id/run`.** The
+command is its own nullable column on `workspaces` (a key inside
+`layout_config` would be clobbered: `react-resizable-panels` rewrites that blob
+wholesale on every panel drag). Reads come through the resolver's `runCommand`
+field, writes through `setWorkspaceRunCommand`. When null, the effective command
+falls back to the project's first `workspace.services[].start_command`; the
+detail route exposes `runCommandDefault` and `runCommandOptions` for the
+placeholder and the service picker. `POST /:id/run` spawns
+`createSession('ws-run-<8 chars of id>', workspace.path, command)`; the name is
+derived from the workspace id so a second Run finds the live session and answers
+409 instead of stacking a second dev server on the same port. Both routes refuse
+a command containing a newline or backtick, or longer than 500 characters — the
+async `createSession` performs no validation of its own, unlike the deprecated
+sync variant.
+
+**Open — `POST /:id/open` with `{target: 'file-manager' | 'editor'}`.**
+`openPath` reveals the path with the platform opener. The editor entry is gated
+on `ui.open_in_editor_command` in `~/.overdeck/config.yaml` (e.g.
+`cursor {path}`): unset means the route answers 409 and the detail route reports
+`openInEditorConfigured: false`, so the band hides the button rather than
+offering one that cannot work. `openInEditor` splits the template into an
+argument vector **before** substituting `{path}`, so a path with spaces or shell
+metacharacters stays a single argument and no shell is involved.
+
+Every mutating route above carries `rejectUnsafeDashboardMutationRequest`; the
+git GET is unguarded like its sibling reads.
+
 ## User-facing surfaces vs. pipeline worktrees (PAN-3286)
 
 `backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a

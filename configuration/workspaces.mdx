@@ -92,6 +92,45 @@ and issues remain reachable from the Pipeline and Board views. Main and scratch
 rows also show the phase Overdeck's memory synthesized for them (`exploring`,
 `building`, `shipping`, …).
 
+### The quick-action band
+
+Open a workspace and a band of three cards sits between the title bar and the
+panels.
+
+**Git** shows the branch, how many files are uncommitted, and how far ahead or
+behind the remote you are — measured against *your branch's own upstream*, not
+the repo's default branch. The count is honest because the dashboard actually
+fetches when you open the view and when you press **Refresh** (at most once
+every 30 seconds per checkout); the background poll only re-reads what that
+fetch left behind. **Incoming (n)** expands the list of commits waiting for you.
+
+**Pull** is fast-forward only, and it tells you plainly when it will not run:
+an uncommitted file, a merge or rebase already in progress, a branch that has
+diverged, no upstream, or a detached HEAD each come back as that specific
+reason rather than a generic failure. Nothing is merged or stashed on your
+behalf. On an issue workspace the button reads **Sync main** and goes through
+the existing sync-main flow instead — that behavior is unchanged.
+
+**Run** launches the workspace's run command in a tmux session rooted in the
+workspace directory, and its terminal appears in the panel below. The command
+defaults to the first `services[].start_command` in your project config; press
+**Edit** to override it for this workspace (saving an empty command restores the
+default). Pressing Run while one is already live re-focuses that session rather
+than starting a second copy, and **Stop** ends it. `Cmd-K → "Run workspace
+command"` does the same thing from the keyboard for the workspace you used last.
+
+**Open** reveals the workspace in your file manager. To get an **Editor** button
+beside it, set a command template in `~/.overdeck/config.yaml`:
+
+```yaml
+ui:
+  open_in_editor_command: cursor {path}   # or: code {path}, subl {path}
+```
+
+`{path}` is replaced with the workspace directory and passed as a single
+argument, so paths with spaces are safe. Without this setting the Editor button
+is not shown at all.
+
 ## Memory scopes
 
 Memory is keyed by workspace, not by issue: observations, status, and

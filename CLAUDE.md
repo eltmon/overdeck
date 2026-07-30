@@ -500,6 +500,19 @@ presentation only, the API still returns every kind. Main/scratch rows badge the
 memory-synthesized phase from the list DTO's `memoryPhase`; issue rows keep the
 pipeline phase.
 
+The workspace view's **quick-action band** (PAN-3331) adds five routes on the
+same registry surface: `GET /:id/git` (ahead/behind against the branch's own
+`@{u}`, not `origin/HEAD`; `?fetch=1` really fetches, throttled to once per 30 s
+per path), `POST /:id/pull` (`git pull --ff-only`, typed refusals for dirty /
+in-flight operation / diverged / no-upstream / detached — `kind=issue` is
+refused with 409 and keeps using `sync-main`), `PUT /:id/run-command` and
+`POST /:id/run` (per-workspace `run_command` column — never `layout_config`,
+which the panels library rewrites — defaulting to the project's first
+`services[].start_command`, spawned as one `ws-run-<id>` tmux session per
+workspace), and `POST /:id/open` (file manager always; editor only when
+`ui.open_in_editor_command` is set in `~/.overdeck/config.yaml`). Git logic
+lives in `src/lib/workspaces/git-state.ts`.
+
 **Memory is keyed by workspace UUID, not issue id**: observations, pending
 turns, status, and summaries live under
 `~/.overdeck/memory/{projectId}/{workspaceId}/…`. A conversation with no

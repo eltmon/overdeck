@@ -185,3 +185,25 @@ it. `--dry-run` writes nothing.
 - **SessionStart briefing.** The SessionStart hook response now carries a rendered
   briefing that the local hook script emits as `additionalContext`, at most once
   per session id. Every failure path returns the previous response unchanged.
+
+### 9.7 Additive: the workspace quick-action band (PAN-3331)
+
+The band adds surfaces above the WorkspaceView panels; it removes none. Audit of
+what existed before and where it is now:
+
+| Pre-PAN-3331 surface | After |
+| --- | --- |
+| Header bar (back, title, kind) | Unchanged, still first in the view |
+| Issue-panels block (`workspace-view-issue-panels`) | Unchanged, still `kind='issue'` only, now below the band |
+| Terminal panel showing the workspace agent's session | Unchanged; a run session renders **beside** it in the same panel, never in place of it |
+| `workspace-view-no-terminal` empty state | Still shown when there is neither an agent terminal nor a run session |
+| Conversations and Memory panels | Unchanged |
+| Layout persistence via `PUT /:id/layout` | Unchanged — the run command got its own `run_command` column precisely so `layout_config` stays owned by the panels library |
+| `GET /api/workspace-registry/:id` fields | All preserved; `runCommandDefault`, `runCommandOptions`, and `openInEditorConfigured` were added alongside |
+| Issue-workspace sync-main (`POST /api/issues/:id/sync-main`) | Unchanged and still the only path for `kind='issue'`; the new ff-only pull route refuses issue rows with 409 |
+
+New routes, all additive: `GET /:id/git`, `POST /:id/pull`,
+`PUT /:id/run-command`, `POST /:id/run`, `POST /:id/open`.
+
+The Cmd-K palette gains one action ("Run workspace command") listed under both
+the Actions and Workspaces groups; no existing palette row changed.
