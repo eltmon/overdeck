@@ -75,6 +75,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'pinned_docs', column: 'id' },
     { table: 'conversations', column: 'workspace_id' },
     { table: 'agents', column: 'workspace_id' },
+    // PAN-3331: the quick-action band's per-workspace run command.
+    { table: 'workspaces', column: 'run_command' },
   ],
   indexes: [
     'cost_session_id_idx',
