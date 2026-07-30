@@ -54,18 +54,18 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T23:31:10.507Z",
+  "updated": "2026-07-30T23:31:12.320Z",
   "pipeline": {
     "issueId": "PAN-3341",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-30T23:31:10.458Z",
-    "reviewNotes": "All four reviewers passed with no blocking or advisory findings.",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-30T23:31:11.173Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3341-review",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3353",
     "reviewedAtCommit": "af4998e5a90a8b4f50783888f1569ca4c1368c2f",
@@ -181,7 +181,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.72596,
-        "pricingAsOf": "2026-07-30T23:31:10.492Z"
+        "pricingAsOf": "2026-07-30T23:31:12.318Z"
       }
     },
     "merges": [
