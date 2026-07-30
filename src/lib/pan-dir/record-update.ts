@@ -188,12 +188,13 @@ async function abortMerge(gitRoot: string, options: GitOptions = {}): Promise<vo
   }
 }
 
-async function replayConflictedRecord(
+async function resolveMergeConflicts(
   project: ProjectConfig,
   issueId: string,
   mutator: IssueRecordMutator,
   gitRoot: string,
   recordPath: string,
+  mergeError: unknown,
   signal?: AbortSignal,
 ): Promise<void> {
   const relativeRecordPath = relative(gitRoot, recordPath).replace(/\\/g, '/');
@@ -201,28 +202,30 @@ async function replayConflictedRecord(
     .split('\n')
     .map((path) => path.trim())
     .filter(Boolean);
-  if (conflicts.length !== 1 || conflicts[0] !== relativeRecordPath) {
-    throw new Error(`state rebase conflicted outside ${relativeRecordPath}: ${conflicts.join(', ') || 'unknown conflict'}`);
+  if (conflicts.length === 0) throw new Error(gitFailureMessage(mergeError));
+
+  const nonRecordConflicts = conflicts.filter((path) => !path.startsWith('records/'));
+  if (nonRecordConflicts.length > 0) {
+    throw new Error(`state merge conflicted outside records/: ${nonRecordConflicts.join(', ')}`);
   }
 
-  // Replace Git's conflict markers with the valid remote record before entering
-  // the verified write door; otherwise it would preserve the markers as a
-  // corrupt-record sidecar instead of resolving this known Git conflict.
-  await git(gitRoot, [
-    'restore',
-    `--source=origin/${STATE_BRANCH}`,
-    '--worktree',
-    '--',
-    relativeRecordPath,
-  ], { signal });
-  const remoteRecord = readIssueRecordSync(project, issueId);
-  if (!remoteRecord) throw new Error(`Remote ${issueId} state record is unreadable`);
-  const result = await mutator(remoteRecord);
+  for (const conflictPath of conflicts) {
+    await git(gitRoot, ['checkout', '--theirs', '--', conflictPath], { signal });
+    await git(gitRoot, ['add', '--', conflictPath], { signal });
+  }
+
   throwIfDurabilityAborted(signal);
-  writeIssueRecordSync(project, issueId, result ?? remoteRecord);
-  await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  if (conflicts.includes(relativeRecordPath)) {
+    const remoteRecord = readIssueRecordSync(project, issueId);
+    if (!remoteRecord) throw new Error(`Remote ${issueId} state record is unreadable`);
+    const result = await mutator(remoteRecord);
+    throwIfDurabilityAborted(signal);
+    writeIssueRecordSync(project, issueId, result ?? remoteRecord);
+    await git(gitRoot, ['add', '--', relativeRecordPath], { signal });
+  }
+
   throwIfDurabilityAborted(signal);
-  await git(gitRoot, ['-c', 'core.editor=true', 'rebase', '--continue'], { signal });
+  await git(gitRoot, ['-c', 'core.editor=true', 'commit', '--no-edit'], { signal });
 }
 
 async function restoreRetryableRecord(
@@ -288,21 +291,23 @@ async function reconcileStatePush(
   signal?: AbortSignal,
 ): Promise<PanIssueRecord> {
   const gitRoot = resolveStateReadHomeSync(project).root;
+  await abortMerge(gitRoot, { signal });
+  await abortRebase(gitRoot, { signal });
 
   for (let attempt = 0; attempt < MAX_STATE_PUSH_RECONCILIATIONS; attempt += 1) {
     throwIfDurabilityAborted(signal);
     await git(gitRoot, ['fetch', 'origin', STATE_BRANCH], { signal });
     try {
-      await git(gitRoot, ['rebase', `origin/${STATE_BRANCH}`], { signal });
+      await git(gitRoot, ['merge', '--no-edit', `origin/${STATE_BRANCH}`], { signal });
     } catch (error) {
       throwIfDurabilityAborted(signal);
       try {
-        await replayConflictedRecord(project, issueId, mutator, gitRoot, recordPath, signal);
-      } catch (replayError) {
-        await abortRebase(gitRoot, { signal });
+        await resolveMergeConflicts(project, issueId, mutator, gitRoot, recordPath, error, signal);
+      } catch (resolveError) {
         await abortMerge(gitRoot, { signal });
+        await abortRebase(gitRoot, { signal });
         throw new Error(
-          `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(replayError)}`,
+          `Failed to reconcile ${issueId} state after push race: ${gitFailureMessage(resolveError)}`,
           { cause: error },
         );
       }
