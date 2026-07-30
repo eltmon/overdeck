@@ -220,6 +220,9 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   telemetry: {
     enabled: true,
   },
+  ui: {
+    openInEditorCommand: null,
+  },
   experimental: {
     experimentalFeatures: false,
     claudeCodeChannels: false,

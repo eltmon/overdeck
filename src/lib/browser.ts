@@ -23,6 +23,44 @@ function runCommand(
   });
 }
 
+/**
+ * Reveal a local path in the platform file manager (PAN-3331). Same platform
+ * branching as openBrowser, and the same argument-vector spawn — a path is
+ * never interpolated into a shell string.
+ */
+export function openPath(path: string): Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner> {
+  if (process.platform === 'darwin') {
+    return runCommand('open', [path]);
+  } else if (process.platform === 'win32') {
+    // `start ""` rather than `explorer`, which exits nonzero even on success.
+    return runCommand('cmd', ['/c', 'start', '', path]);
+  } else {
+    return runCommand('xdg-open', [path]);
+  }
+}
+
+/**
+ * Run an editor command template with `{path}` substituted — e.g.
+ * `cursor {path}`. The template is split on whitespace into an argument vector
+ * BEFORE substitution, so a path containing spaces or shell metacharacters
+ * stays one argument and nothing is interpreted by a shell.
+ */
+export function openInEditor(
+  template: string,
+  path: string,
+): Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner> {
+  const tokens = template.trim().split(/\s+/).filter((token) => token.length > 0);
+  const [command, ...rest] = tokens;
+  if (!command) {
+    return Effect.fail(new ProcessSpawnError({ command: template, args: [], message: 'Editor command is empty' }));
+  }
+  const args = rest.map((token) => token.replace('{path}', path));
+  // A template with no {path} placeholder still needs the path, or the editor
+  // opens nothing.
+  if (!tokens.some((token) => token.includes('{path}'))) args.push(path);
+  return runCommand(command.replace('{path}', path), args);
+}
+
 export function openBrowser(url: string): Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner> {
   if (process.platform === 'darwin') {
     return runCommand('open', [url]);

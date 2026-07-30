@@ -24,6 +24,11 @@ import {
 } from '../../../lib/workspaces/writer.js';
 import { createSession, sessionExists } from '../../../lib/tmux.js';
 import { getProjectSync } from '../../../lib/projects.js';
+import { openInEditor, openPath } from '../../../lib/browser.js';
+import { getOpenInEditorCommandSync } from '../../../lib/config-yaml/load.js';
+import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
+import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
+import * as NodePath from '@effect/platform-node/NodePath';
 import type { WorkspaceGitState, WorkspaceRow } from '../../../lib/workspaces/types.js';
 import { getWorkspaceGitState, pullWorkspaceFastForward } from '../../../lib/workspaces/git-state.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
@@ -136,6 +141,8 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
       memoryStatus,
       runCommandDefault: runCommandOptions[0]?.command ?? null,
       runCommandOptions,
+      // The band hides "Open in editor" entirely when no template is configured.
+      openInEditorConfigured: getOpenInEditorCommandSync() !== null,
     });
   })),
 );
@@ -347,6 +354,44 @@ const postWorkspaceRegistryRunRoute = HttpRouter.add(
   })),
 );
 
+// ─── POST /api/workspace-registry/:id/open ──────────────────────────────────
+
+const spawnerLayer = NodeChildProcessSpawner.layer.pipe(
+  Layer.provide(Layer.mergeAll(NodeFileSystem.layer, NodePath.layer)),
+);
+
+const postWorkspaceRegistryOpenRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/:id/open',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    // Guarded because it spawns a process on the operator's machine.
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    const body = (yield* readJsonBody) as { target?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    const target = body.target;
+    if (target !== 'file-manager' && target !== 'editor') {
+      return jsonResponse({ error: "target must be 'file-manager' or 'editor'" }, { status: 400 });
+    }
+    if (target === 'file-manager') {
+      yield* openPath(workspace.path).pipe(Effect.provide(spawnerLayer));
+      return jsonResponse({ ok: true, target, path: workspace.path });
+    }
+    const template = getOpenInEditorCommandSync();
+    if (!template) {
+      return jsonResponse({
+        error: 'No editor configured. Set ui.open_in_editor_command in ~/.overdeck/config.yaml (e.g. "cursor {path}").',
+      }, { status: 409 });
+    }
+    yield* openInEditor(template, workspace.path).pipe(Effect.provide(spawnerLayer));
+    return jsonResponse({ ok: true, target, path: workspace.path });
+  })),
+);
+
 // ─── POST /api/workspace-registry/:id/activate|archive|favorite ────────────
 
 const postWorkspaceRegistryActivateRoute = HttpRouter.add(
@@ -427,6 +472,7 @@ export const workspaceRegistryRouteLayer = Layer.mergeAll(
   postWorkspaceRegistryPullRoute,
   putWorkspaceRegistryRunCommandRoute,
   postWorkspaceRegistryRunRoute,
+  postWorkspaceRegistryOpenRoute,
   postWorkspaceRegistryActivateRoute,
   postWorkspaceRegistryArchiveRoute,
   postWorkspaceRegistryFavoriteRoute,

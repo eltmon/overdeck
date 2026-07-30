@@ -537,6 +537,19 @@ export function isTldrEnabledSync(): boolean {
   }
 }
 
+/**
+ * The `ui.open_in_editor_command` template (e.g. `cursor {path}`), or null when
+ * unset. Null is the gate: the workspace band hides "Open in editor" entirely
+ * rather than guessing an editor (PAN-3331).
+ */
+export function getOpenInEditorCommandSync(): string | null {
+  try {
+    return loadConfigSync().config.ui.openInEditorCommand;
+  } catch {
+    return DEFAULT_CONFIG.ui.openInEditorCommand;
+  }
+}
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**
