@@ -9103,3 +9103,30 @@ The run is **NOT complete**; the earlier retrospective's quiescence claim is ret
   All five sit on their correct `strike/pan-XXXX` branch — **no worktree drift**. Four have committed, gate-passing work and simply have not pushed; one is still mid-implementation.
 - **LESSON: cost answers "is it spending?", the commit graph answers "is it nearly done?"** I spent two ticks inferring progress from cost deltas and diff line counts, which conflated "writing code" with "iterating on test failures" with "finished but unpushed". One `git -C <ws> rev-list --count origin/main..HEAD` plus `status --porcelain` separated the five into *four ready to push* and *one still writing* — a distinction no cost reading could make. **For "how close is it?", read the branch, not the meter.**
 - Nothing for me to do but wait for the push: the strike pushes and signals, then I review, gate, merge and `pan done --strike`. Read door unchanged; nothing merge-ready; PAN-3313 still the only correctly operator-gated item.
+
+## RUN-75 tick 16 (2026-07-30 21:18Z) — RED MAIN again (PAN-3342); PAN-3326 reviewed and merge-gated
+
+### Red main, independently verified
+
+`strike-pan-3326` reported a pre-existing red on main and refused to fix-forward it. **Verified rather than taken on trust, and it is exactly right:**
+
+- `main` CI: `3f88522ad5` **failure**, `837d470cf7` **failure**.
+- Failing job: `tests/lib/tracker/linear.test.ts` — `getIssue > should get issue by identifier` and `linkPR > should create attachment for PR`. **1 file failed / 1330 passed**, so deterministic and isolated, not contention.
+- Cause confirmed at the commit: `1ca2963972` ("fix(cli): resolve Linear issues by identifier through client.issue, not search (PAN-3337)") changed `src/lib/tracker/linear.ts` **and added** `src/lib/tracker/__tests__/linear-get-issue.test.ts` — while leaving the existing `tests/lib/tracker/linear.test.ts` mocking the old `searchIssues` API.
+- **A third red-main incident this run caused by a test/implementation split**, after PAN-3300 (file-size ratchet) and PAN-3320 (fake timers). The pattern: a change lands with a *new* test file and nobody updates the *old* one covering the same surface.
+- **PAN-3342** was already filed for it; labelled `blocks-main` and **struck**. Capacity checked first: 17 running agents against cap 20, 23.5 GB free.
+- The strike's other finding is worth keeping: **64 of the 66 red files in its full-suite run were pure contention** (5s hook/test timeouts at load average 55 from five concurrent strikes), and 65/66 passed on isolated re-run. Only `linear.test.ts` was real. **Running five Opus strikes concurrently manufactures ~64 false reds** — a real cost of the parallel dispatch I chose, and a reason to read a full-suite failure list sceptically before believing any of it.
+
+### PAN-3326 pushed, PR opened, reviewed — merge gated on main
+
+PR **#3343** opened (my PR monitor fired on it). Reviewed the diff myself: **2 files, +142/-2**, no unrelated changes.
+
+- `git cherry` stays as the fast path; when it reports `+` commits, the gate now asks the **content** question — over exactly the paths those commits touched, does the branch **tip** still differ from `origin/main`?
+- **Restricting to touched paths** is what stops a branch merely far behind `main` from reading as a huge unlanded change — precisely the tick-1 trap where a two-dot diff showed *349 files, 18,779 deletions* for PAN-3264.
+- **Comparing the tip rather than each commit's tree** is what lets a fix plus its fixups count as landed once main carries the combined result — the PAN-3305 case exactly.
+- Still throws on genuinely missing content, and `describeUnlanded` now names the commit and the paths, which was the actionable-message point I raised on the issue.
+- Tests cover all three cases: landed-under-a-different-commit, squashed fix+fixup, and a real miss that must still reject.
+
+**Not merged**: main is red, so #3343 inherits the `linear.test.ts` failure. It merges the moment PAN-3342 lands — review is already done, so that step is immediate.
+
+- Other four strikes still in gates; PAN-3327 was still writing at last check.
