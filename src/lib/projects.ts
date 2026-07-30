@@ -827,6 +827,18 @@ export const listProjects = (): Effect.Effect<Array<{ key: string; config: Proje
   );
 
 /**
+ * Promise variant of {@link listProjectsSync}, for server-reachable callers.
+ *
+ * `listProjectsSync` reads and parses projects.yaml on the calling thread; on
+ * the dashboard's single event loop that stalls every other request. This
+ * wraps the Effect loader so callers that only need a promise do not have to
+ * take an Effect dependency (PAN-3330 review).
+ */
+export async function listProjectsAsync(): Promise<Array<{ key: string; config: ProjectConfig }>> {
+  return Effect.runPromise(listProjects());
+}
+
+/**
  * Rename a project's display name by registration key or exact display name.
  * Loads and persists the registry once so long-lived callers avoid sync I/O.
  */

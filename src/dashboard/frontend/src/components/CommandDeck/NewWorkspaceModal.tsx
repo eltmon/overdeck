@@ -88,10 +88,34 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
   const [stale, setStale] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mainWorkspaceMissing, setMainWorkspaceMissing] = useState(false);
 
   // Guards against an in-flight resolve landing after a newer one and
   // overwriting the preview with an outdated intent.
   const resolveSeq = useRef(0);
+
+  // The dialog stays mounted for the lifetime of the app, so without this its
+  // previous answers survive a close and the next open would inherit them —
+  // including the old project, which is how "new workspace in project B" could
+  // create in project A (PAN-3330 review).
+  useEffect(() => {
+    if (!isOpen) return;
+    setName('');
+    // The preset is applied once the project list lands: callers pass either a
+    // registration key or a display name, and only the list can tell them
+    // apart.
+    setProjectKey('');
+    setMode('shared');
+    setTargetPath('');
+    setBrowsing(false);
+    setParentBranch('');
+    setShowAdvanced(false);
+    setProjectTargets(null);
+    setIntent(null);
+    setStale(true);
+    setError(null);
+    setMainWorkspaceMissing(false);
+  }, [isOpen, presetProjectKey]);
 
   // ─── Project list ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -104,13 +128,38 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
         const list = (await res.json()) as RegisteredProject[];
         if (cancelled) return;
         setProjects(list);
-        // D-3: default to the sole registered project, else the preset, else
-        // force an explicit choice — a browser has no cwd to infer from.
-        setProjectKey((prev) => prev || presetProjectKey || (list.length === 1 ? (list[0]?.key ?? '') : ''));
+        // D-3: an explicit preset always wins; otherwise fall back to the sole
+        // registered project, else force a choice — a browser has no cwd to
+        // infer from. The preset may be a registration key or a display name
+        // (App threads the deck's selected project, which holds either), so
+        // match on both and ignore one that names no registered project.
+        const presetKey = presetProjectKey
+          ? (list.find((p) => p.key === presetProjectKey || p.name === presetProjectKey)?.key ?? '')
+          : '';
+        setProjectKey((prev) => presetKey || prev || (list.length === 1 ? (list[0]?.key ?? '') : ''));
       } catch { /* the select simply stays empty — resolve reports the ambiguity */ }
     })();
     return () => { cancelled = true; };
   }, [isOpen, presetProjectKey]);
+
+  // ─── Does this project still need its main workspace? (D-7/FR-4) ──────────
+  useEffect(() => {
+    if (!isOpen || !projectKey) { setMainWorkspaceMissing(false); return; }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetchWithTimeout(
+          `/api/workspace-registry?project=${encodeURIComponent(projectKey)}&kind=main`,
+          { credentials: 'include' },
+        );
+        if (cancelled || !res?.ok) return;
+        const data = (await res.json()) as { workspaces?: unknown[] };
+        if (cancelled) return;
+        setMainWorkspaceMissing((data.workspaces ?? []).length === 0);
+      } catch { /* absence of the offer is the safe default */ }
+    })();
+    return () => { cancelled = true; };
+  }, [isOpen, projectKey]);
 
   // ─── Registered target paths for the chosen project ───────────────────────
   useEffect(() => {
@@ -137,7 +186,13 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
 
   useEffect(() => {
     if (!isOpen) return;
+    // The displayed intent described the *previous* field values, so drop it
+    // the moment anything changes. Leaving it in place while marking the
+    // preview stale would let Create re-enable against a preview that no
+    // longer matches what would be created (PAN-3330 review).
+    setIntent(null);
     setStale(true);
+    setError(null);
     const seq = ++resolveSeq.current;
     const timer = setTimeout(() => {
       void (async () => {
@@ -154,12 +209,20 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
               ...(parentBranch ? { parentBranch } : {}),
             }),
           });
+          if (!res?.ok) {
+            // Stay stale: a failed resolve leaves us with no trustworthy
+            // preview, so Create must remain disabled.
+            if (seq === resolveSeq.current) setError(`Could not resolve the workspace intent (HTTP ${res?.status ?? 0}).`);
+            return;
+          }
+          const resolved = (await res.json()) as ResolvedWorkspaceIntent;
+          // Re-check AFTER parsing: awaiting the body yields, so a newer
+          // request can supersede this one in between.
           if (seq !== resolveSeq.current) return;
-          if (!res?.ok) { setStale(false); return; }
-          setIntent((await res.json()) as ResolvedWorkspaceIntent);
+          setIntent(resolved);
           setStale(false);
         } catch {
-          if (seq === resolveSeq.current) setStale(false);
+          if (seq === resolveSeq.current) setError('Could not reach the server to resolve the workspace intent.');
         }
       })();
     }, RESOLVE_DEBOUNCE_MS);
@@ -184,7 +247,7 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
   const hasFindings = (intent?.findings.length ?? 0) > 0;
   const canCreate = !creating && !stale && Boolean(intent) && !hasFindings;
 
-  async function handleCreate() {
+  async function submitIntent(body: Record<string, unknown>) {
     setError(null);
     setCreating(true);
     try {
@@ -192,13 +255,7 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
-        body: JSON.stringify({
-          project: projectKey,
-          name,
-          isolated: mode === 'isolated',
-          ...(effectiveTargetPath ? { targetPath: effectiveTargetPath } : {}),
-          ...(parentBranch ? { parentBranch } : {}),
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) {
         const json = (await res.json().catch(() => ({}))) as { findings?: WorkspaceIntentFinding[]; error?: string };
@@ -218,6 +275,21 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
     } finally {
       setCreating(false);
     }
+  }
+
+  function handleCreate() {
+    void submitIntent({
+      project: projectKey,
+      name,
+      isolated: mode === 'isolated',
+      ...(effectiveTargetPath ? { targetPath: effectiveTargetPath } : {}),
+      ...(parentBranch ? { parentBranch } : {}),
+    });
+  }
+
+  /** D-7/FR-4: register the project's singleton main workspace in one click. */
+  function handleBootstrapMain() {
+    void submitIntent({ project: projectKey, bootstrapMain: true });
   }
 
   if (!isOpen) return null;
@@ -363,6 +435,36 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
                 />
               )}
             </div>
+
+            {/* D-7/FR-4: this project has no main workspace registered yet. */}
+            {mainWorkspaceMissing && projectKey && (
+              <div
+                data-testid="new-workspace-bootstrap-main"
+                style={{ ...fieldStyle, gap: 6, borderTop: '1px solid var(--border)', paddingTop: 10 }}
+              >
+                <span style={labelStyle}>
+                  This project has no main workspace registered yet.
+                </span>
+                <div style={{ display: 'flex' }}>
+                  <button
+                    data-testid="new-workspace-bootstrap-main-button"
+                    disabled={creating}
+                    onClick={handleBootstrapMain}
+                    style={{
+                      background: 'none',
+                      border: '1px solid var(--border)',
+                      borderRadius: 2,
+                      cursor: 'pointer',
+                      padding: '4px 10px',
+                      fontSize: 12,
+                      color: 'var(--muted-foreground)',
+                    }}
+                  >
+                    Register main workspace
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Resolve-before-create preview */}
             <div data-testid="new-workspace-preview" style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>

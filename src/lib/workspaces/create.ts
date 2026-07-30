@@ -21,14 +21,19 @@
  * none, so the caller passes `projectKey` or an explicit `cwd`; when neither
  * disambiguates, that surfaces as a `project-ambiguous` finding, never a guess.
  *
+ * Every filesystem and config read here is asynchronous. Resolution runs on
+ * the dashboard's single event loop once per settled keystroke, so a sync
+ * `statSync`/`readFileSync` on a slow or network-mounted path would stall
+ * unrelated HTTP, WebSocket and terminal traffic (PAN-3330 review).
+ *
  * NOTE: `child_process`/`util` are imported unprefixed (not `node:`) because
  * the CLI suites mock those specifiers to assert the argument-vector spawn.
  */
 import { execFile } from 'child_process';
-import { existsSync, statSync } from 'fs';
+import { stat } from 'fs/promises';
 import { join, resolve } from 'path';
 import { promisify } from 'util';
-import { listProjectsSync, type ProjectConfig } from '../projects.js';
+import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultWorkspaceConfigSync } from '../workspace-config.js';
 import { validateFeatureName } from '../workspace-manager/worktree-ops.js';
 import { listProjectTargets, resolveWorkspaceForCwd } from './resolver.js';
@@ -95,6 +100,8 @@ export interface WorkspaceCreateInput {
   projectKey?: string;
   /** Fallback disambiguation for CLI callers; this module never reads an ambient one. */
   cwd?: string;
+  /** Bypass the parent-branch memo — set on the resolve that precedes a write. */
+  refreshParentBranch?: boolean;
   isolated?: boolean;
   targetPath?: string;
   parentBranch?: string;
@@ -105,6 +112,30 @@ interface ResolvedProjectRef {
   config: ProjectConfig;
 }
 
+/** True when `path` exists and is a directory. */
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** True when anything exists at `path`. */
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** True when `<dir>/.git` exists — the same signal the CLI has always used. */
+async function looksLikeGitRepository(dir: string): Promise<boolean> {
+  return pathExists(join(dir, '.git'));
+}
+
 /** True when `path` equals, or is nested under, `candidate`. */
 function isPathUnder(path: string, candidate: string): boolean {
   return path === candidate || path.startsWith(candidate.endsWith('/') ? candidate : `${candidate}/`);
@@ -113,8 +144,8 @@ function isPathUnder(path: string, candidate: string): boolean {
 type ProjectRefResult = { ref: ResolvedProjectRef } | { finding: WorkspaceIntentFinding };
 
 /** Resolve an explicit key, else the sole registered project, else the caller's cwd. */
-function resolveProjectRef(projectKey?: string, cwd?: string): ProjectRefResult {
-  const all = listProjectsSync();
+async function resolveProjectRef(projectKey?: string, cwd?: string): Promise<ProjectRefResult> {
+  const all = await listProjectsAsync();
   if (projectKey) {
     const found = all.find((p) => p.key === projectKey);
     if (!found) {
@@ -146,19 +177,42 @@ function resolveProjectRef(projectKey?: string, cwd?: string): ProjectRefResult 
   };
 }
 
-async function inferParentBranch(cwd: string): Promise<string | null> {
+/**
+ * Short-lived memo of the inferred parent branch per checkout. The dialog
+ * re-resolves on every settled field change, and spawning `git rev-parse` for
+ * an edit to an unrelated field is pure waste; a checkout's current branch
+ * does not change on a keystroke timescale (PAN-3330 review). The mutation
+ * path passes `refreshParentBranch` so the value written to the row is always
+ * freshly read.
+ */
+const PARENT_BRANCH_TTL_MS = 3_000;
+const parentBranchCache = new Map<string, { branch: string | null; readAt: number }>();
+
+async function inferParentBranch(cwd: string, refresh = false): Promise<string | null> {
+  const cached = parentBranchCache.get(cwd);
+  if (!refresh && cached && Date.now() - cached.readAt < PARENT_BRANCH_TTL_MS) {
+    return cached.branch;
+  }
+  let branch: string | null = null;
   try {
     const { stdout } = await execFileAsync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd });
-    const branch = String(stdout).trim();
-    return branch && branch !== 'HEAD' ? branch : null;
+    const value = String(stdout).trim();
+    branch = value && value !== 'HEAD' ? value : null;
   } catch {
-    return null;
+    branch = null;
   }
+  parentBranchCache.set(cwd, { branch, readAt: Date.now() });
+  return branch;
+}
+
+/** Test seam — the memo is process-global, so suites must be able to clear it. */
+export function clearParentBranchCache(): void {
+  parentBranchCache.clear();
 }
 
 /** Upsert the projects row for a registered project key (idempotent). */
-export function ensureProjectSeeded(projectKey: string): void {
-  const project = listProjectsSync().find((p) => p.key === projectKey);
+export async function ensureProjectSeeded(projectKey: string): Promise<void> {
+  const project = (await listProjectsAsync()).find((p) => p.key === projectKey);
   if (!project) throw new Error(`No project registered with key '${projectKey}'.`);
   upsertProjectFromConfig(project.key, project.config);
 }
@@ -230,7 +284,7 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
   // already refused, so we touch neither git nor the filesystem.
   if (findings.length > 0) return intent;
 
-  const project = resolveProjectRef(input.projectKey, input.cwd);
+  const project = await resolveProjectRef(input.projectKey, input.cwd);
   if ('finding' in project) {
     findings.push(project.finding);
     return intent;
@@ -239,17 +293,17 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
   intent.projectId = key;
 
   if (kind === 'scratch') {
-    const parentBranch = input.parentBranch ?? (await inferParentBranch(config.path));
+    const parentBranch = input.parentBranch ?? (await inferParentBranch(config.path, input.refreshParentBranch));
     intent.parentBranch = parentBranch;
     intent.parentBranchGuessed = !input.parentBranch && parentBranch !== null;
   }
 
   if (kind === 'main') {
     intent.path = config.path;
-    intent.isGitRepository = existsSync(join(config.path, '.git'));
+    intent.isGitRepository = await looksLikeGitRepository(config.path);
   } else if (input.targetPath) {
     const resolvedTarget = resolve(input.targetPath);
-    if (!existsSync(resolvedTarget) || !statSync(resolvedTarget).isDirectory()) {
+    if (!(await isDirectory(resolvedTarget))) {
       findings.push({
         field: 'targetPath',
         code: 'target-not-a-directory',
@@ -260,13 +314,13 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
       intent.path = resolvedTarget;
       const registeredPaths = [config.path, ...listProjectTargets(key).map((t) => t.path)];
       intent.unregisteredTargetPath = !registeredPaths.some((candidate) => isPathUnder(resolvedTarget, candidate));
-      intent.isGitRepository = existsSync(join(resolvedTarget, '.git'));
+      intent.isGitRepository = await looksLikeGitRepository(resolvedTarget);
     }
   } else if (input.isolated) {
     const workspaceConfig = config.workspace || getDefaultWorkspaceConfigSync();
     const workspacesDir = join(config.path, workspaceConfig.workspaces_dir || 'workspaces');
     const worktreePath = join(workspacesDir, `scratch-${name}`);
-    if (existsSync(worktreePath)) {
+    if (await pathExists(worktreePath)) {
       findings.push({
         field: 'name',
         code: 'path-exists',
@@ -281,7 +335,7 @@ export async function resolveWorkspaceCreateIntent(input: WorkspaceCreateInput):
     }
   } else {
     intent.path = config.path;
-    intent.isGitRepository = existsSync(join(config.path, '.git'));
+    intent.isGitRepository = await looksLikeGitRepository(config.path);
   }
 
   return intent;
@@ -300,7 +354,7 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
   if (!intent.projectId || !intent.path) {
     throw new Error(`Workspace intent did not resolve to a project and path.`);
   }
-  const project = listProjectsSync().find((p) => p.key === intent.projectId);
+  const project = (await listProjectsAsync()).find((p) => p.key === intent.projectId);
   if (!project) throw new Error(`No project registered with key '${intent.projectId}'.`);
 
   if (intent.wouldCreateWorktree && intent.branchName) {
@@ -309,13 +363,16 @@ export async function performWorkspaceCreate(intent: ResolvedWorkspaceIntent): P
     // same branch checked out in two worktrees at once. Create a distinct
     // scratch branch off of it instead. Argument-vector spawn (execFile, not a
     // shell string) so name/path/parent-branch cannot inject metacharacters.
+    // `--` terminates option parsing: an operator-supplied parent branch like
+    // `--no-checkout` would otherwise be read by git as a flag and quietly
+    // change how the worktree is made (PAN-3330 review).
     const worktreeArgs = intent.parentBranch
-      ? ['worktree', 'add', '-b', intent.branchName, intent.path, intent.parentBranch]
-      : ['worktree', 'add', '-b', intent.branchName, intent.path];
+      ? ['worktree', 'add', '-b', intent.branchName, '--', intent.path, intent.parentBranch]
+      : ['worktree', 'add', '-b', intent.branchName, '--', intent.path];
     await execFileAsync('git', worktreeArgs, { cwd: project.config.path });
   }
 
-  ensureProjectSeeded(project.key);
+  await ensureProjectSeeded(project.key);
   const id = await createWorkspace({
     projectId: project.key,
     kind: intent.kind,

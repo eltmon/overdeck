@@ -64,6 +64,21 @@ immediately and opens.
 This is the dashboard equivalent of `pan workspace new` below — both call the
 same code, so a workspace created either way is identical.
 
+### The routes behind the dialog
+
+The dashboard drives these; they are listed so you can reach them directly or
+recognize them in logs.
+
+| Route | What it does |
+| --- | --- |
+| `POST /api/workspace-registry/resolve` | Dry-runs the intent and returns the resolved outcome plus any validation findings. Writes nothing — this is what the live preview calls. |
+| `POST /api/workspace-registry` | Creates the workspace. Returns `422` with the findings when the intent is invalid, otherwise `201 {id}`. |
+| `POST /api/workspace-registry/:id/relocate` | Body `{path, force?}`. Re-points a workspace; `409` carries the refusal message when the rules below say no. |
+| `GET /api/workspace-registry/project-targets?project=<key>` | The project's primary path plus its registered targets — the target-directory dropdown. |
+
+The three `POST` routes require the dashboard's mutation token; the `GET` is a
+plain read like the rest of the registry's reads.
+
 ## Managing a workspace
 
 Open a workspace's view (`/workspace/:id`) and its header carries:
@@ -73,7 +88,8 @@ Open a workspace's view (`/workspace/:id`) and its header carries:
   the **main** workspace additionally asks you to type its name, because that
   diverges the row from `projects.yaml`.
 - **Archive** — removes it from the rail. Files, branch, and memory are left
-  untouched, and it is reversible.
+  untouched, and it is reversible. Not offered for the **main** workspace: it
+  is the project's singleton anchor, so archiving it is refused.
 
 Issue workspaces show none of these: Overdeck's pipeline owns their worktree.
 Deleting a workspace and purging its memory stay CLI-only

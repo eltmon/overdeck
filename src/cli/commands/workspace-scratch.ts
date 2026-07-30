@@ -98,7 +98,7 @@ export async function workspaceMainCommand(options: WorkspaceMainOptions): Promi
     });
     if (intent.findings.length > 0) throw new Error(cliMessageFor(intent.findings[0]));
     const projectKey = intent.projectId as string;
-    ensureProjectSeeded(projectKey);
+    await ensureProjectSeeded(projectKey);
 
     const row = getMainWorkspace(projectKey);
     if (row) {

@@ -13,7 +13,8 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getProjectByKey, getWorkspaceById, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
+import { getWorkspaceById, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
+import { listProjectsAsync } from '../../../lib/projects.js';
 import {
   archiveWorkspace,
   relocateWorkspace,
@@ -145,9 +146,15 @@ const getWorkspaceRegistryProjectTargetsRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project') ?? '';
     if (!projectKey) return jsonResponse({ error: 'project is required' }, { status: 400 });
-    const project = getProjectByKey(projectKey);
+    // Resolved from projects.yaml, not the `projects` table: that row is only
+    // seeded on a project's first create, so a freshly registered project
+    // would otherwise 400 here and the dialog would offer no primary path at
+    // exactly the moment it is most needed. listProjectTargets stays a table
+    // read — no row simply means no extra targets yet.
+    const projects = yield* Effect.promise(() => listProjectsAsync());
+    const project = projects.find((candidate) => candidate.key === projectKey);
     if (!project) return jsonResponse({ error: `No project registered with key '${projectKey}'` }, { status: 400 });
-    return jsonResponse({ primaryPath: project.primaryPath, targets: listProjectTargets(projectKey) });
+    return jsonResponse({ primaryPath: project.config.path, targets: listProjectTargets(projectKey) });
   })),
 );
 
@@ -225,7 +232,10 @@ const postWorkspaceRegistryCreateRoute = HttpRouter.add(
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
     // Resolved server-side from the raw intent — never from a client-supplied
     // resolved intent, which could otherwise name any path on the box.
-    const intent = yield* Effect.promise(() => resolveWorkspaceCreateIntent(toCreateInput(body)));
+    // `refreshParentBranch` bypasses the preview memo so the branch written to
+    // the row is read fresh, not inherited from a stale preview.
+    const intent = yield* Effect.promise(() =>
+      resolveWorkspaceCreateIntent({ ...toCreateInput(body), refreshParentBranch: true }));
     if (intent.findings.length > 0) return jsonResponse({ findings: intent.findings }, { status: 422 });
     const created = yield* Effect.promise(() => performWorkspaceCreate(intent));
     return jsonResponse({ id: created.id }, { status: 201 });
@@ -288,8 +298,15 @@ const postWorkspaceRegistryArchiveRoute = HttpRouter.add(
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
     const body = (yield* readJsonBody) as { archived?: unknown } | undefined;
     if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
-    if (body.archived === false) unarchiveWorkspace(id);
-    else yield* Effect.promise(() => archiveWorkspace(id));
+    if (body.archived === false) {
+      unarchiveWorkspace(id);
+    } else {
+      // The writer refuses to archive a main workspace; surface its message
+      // rather than reporting a success that did not happen.
+      const failure = yield* Effect.promise(() =>
+        archiveWorkspace(id).then(() => null).catch((err: unknown) => (err instanceof Error ? err.message : String(err))));
+      if (failure) return jsonResponse({ error: failure }, { status: 409 });
+    }
     return jsonResponse(toListRow(getWorkspaceById(id) ?? workspace));
   })),
 );

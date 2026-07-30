@@ -15,7 +15,7 @@ import type { WorkspaceRow } from '../../../src/lib/workspaces/types.js';
 const routeMocks = vi.hoisted(() => ({
   getWorkspaceById: vi.fn(),
   listWorkspaces: vi.fn(),
-  getProjectByKey: vi.fn(),
+  listProjectsAsync: vi.fn(),
   listProjectTargets: vi.fn(),
   archiveWorkspace: vi.fn(),
   unarchiveWorkspace: vi.fn(),
@@ -34,8 +34,11 @@ const routeMocks = vi.hoisted(() => ({
 vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
   getWorkspaceById: routeMocks.getWorkspaceById,
   listWorkspaces: routeMocks.listWorkspaces,
-  getProjectByKey: routeMocks.getProjectByKey,
   listProjectTargets: routeMocks.listProjectTargets,
+}));
+
+vi.mock('../../../src/lib/projects.js', () => ({
+  listProjectsAsync: routeMocks.listProjectsAsync,
 }));
 
 vi.mock('../../../src/lib/workspaces/writer.js', () => ({
@@ -162,7 +165,7 @@ describe('dashboard mutation guard (AC-1)', () => {
 
   it('GET project-targets is served without the mutation guard, like its sibling GETs', async () => {
     routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(GUARD_RESPONSE);
-    routeMocks.getProjectByKey.mockReturnValue({ id: 'overdeck', primaryPath: '/repo' });
+    routeMocks.listProjectsAsync.mockResolvedValue([{ key: 'overdeck', config: { name: 'Overdeck', path: '/repo' } }]);
     routeMocks.listProjectTargets.mockReturnValue([]);
 
     const result = await call('GET', '/api/workspace-registry/project-targets?project=overdeck');
@@ -324,7 +327,7 @@ describe('GET /api/workspace-registry/project-targets (AC-5)', () => {
     const targets = [
       { projectId: 'overdeck', path: '/repo/alt', isPrimary: false, createdAt: 1, lastUsedAt: 2 },
     ];
-    routeMocks.getProjectByKey.mockReturnValue({ id: 'overdeck', primaryPath: '/repo' });
+    routeMocks.listProjectsAsync.mockResolvedValue([{ key: 'overdeck', config: { name: 'Overdeck', path: '/repo' } }]);
     routeMocks.listProjectTargets.mockReturnValue(targets);
 
     const result = await call('GET', '/api/workspace-registry/project-targets?project=overdeck');
@@ -334,7 +337,7 @@ describe('GET /api/workspace-registry/project-targets (AC-5)', () => {
   });
 
   it('returns 400 for an unregistered project key', async () => {
-    routeMocks.getProjectByKey.mockReturnValue(null);
+    routeMocks.listProjectsAsync.mockResolvedValue([]);
 
     const result = await call('GET', '/api/workspace-registry/project-targets?project=nope');
 
@@ -346,11 +349,11 @@ describe('GET /api/workspace-registry/project-targets (AC-5)', () => {
     const result = await call('GET', '/api/workspace-registry/project-targets');
 
     expect(result.status).toBe(400);
-    expect(routeMocks.getProjectByKey).not.toHaveBeenCalled();
+    expect(routeMocks.listProjectsAsync).not.toHaveBeenCalled();
   });
 
   it('is not shadowed by the /:id detail route', async () => {
-    routeMocks.getProjectByKey.mockReturnValue({ id: 'overdeck', primaryPath: '/repo' });
+    routeMocks.listProjectsAsync.mockResolvedValue([{ key: 'overdeck', config: { name: 'Overdeck', path: '/repo' } }]);
     routeMocks.listProjectTargets.mockReturnValue([]);
 
     await call('GET', '/api/workspace-registry/project-targets?project=overdeck');

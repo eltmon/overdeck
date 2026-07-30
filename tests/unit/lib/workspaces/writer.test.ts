@@ -152,3 +152,26 @@ describe('workspaces writer + resolver: main workspace lookup', () => {
     expect(getMainWorkspace(projectId)?.id).toBe(id);
   });
 });
+
+describe('write-door invariants added by PAN-3330 review', () => {
+  it('archiveWorkspace refuses the project main workspace', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'main', name: 'main', path: '/repo/overdeck' });
+
+    await expect(archiveWorkspace(id)).rejects.toThrow(/Cannot archive the main workspace/);
+    expect(getWorkspaceById(id)?.isArchived).toBe(false);
+  });
+
+  it('archiveWorkspace still archives a scratch workspace', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'lens', path: '/repo/overdeck' });
+
+    await archiveWorkspace(id);
+
+    expect(getWorkspaceById(id)?.isArchived).toBe(true);
+  });
+
+  it('archiveWorkspace rejects an unknown id instead of silently doing nothing', async () => {
+    await expect(archiveWorkspace('no-such-workspace')).rejects.toThrow(/No workspace found/);
+  });
+});

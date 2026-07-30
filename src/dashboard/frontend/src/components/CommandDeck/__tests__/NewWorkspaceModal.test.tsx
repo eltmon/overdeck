@@ -60,6 +60,9 @@ const TARGETS = { primaryPath: '/repo', targets: [{ path: '/repo/alt' }] };
 function wireFetch(resolveWith: () => Response, createWith?: () => Response) {
   mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
     if (url === '/api/registered-projects') return Promise.resolve(ok(PROJECTS));
+    // The dialog probes for an existing main workspace (D-7); a row present
+    // means the bootstrap affordance stays hidden in the default fixture.
+    if (url.startsWith('/api/workspace-registry?')) return Promise.resolve(ok({ workspaces: [{ id: 'ws-main' }] }));
     if (url.startsWith('/api/workspace-registry/project-targets')) return Promise.resolve(ok(TARGETS));
     if (url === '/api/workspace-registry/resolve') return Promise.resolve(resolveWith());
     if (url === '/api/workspace-registry' && init?.method === 'POST') {
@@ -307,5 +310,139 @@ describe('NewWorkspaceModal — successful create (AC-4)', () => {
     render(<NewWorkspaceModal isOpen={false} onClose={vi.fn()} onCreated={vi.fn()} />);
 
     expect(screen.queryByTestId('new-workspace-modal')).toBeNull();
+  });
+});
+
+describe('NewWorkspaceModal — reopening does not inherit the last project (review B2)', () => {
+  const TWO_PROJECTS = [
+    { key: 'project-a', name: 'Project A' },
+    { key: 'project-b', name: 'Project B' },
+  ];
+
+  function wireTwoProjects() {
+    mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === '/api/registered-projects') return Promise.resolve(ok(TWO_PROJECTS));
+      if (url.startsWith('/api/workspace-registry?')) return Promise.resolve(ok({ workspaces: [{ id: 'ws-main' }] }));
+      if (url.startsWith('/api/workspace-registry/project-targets')) return Promise.resolve(ok(TARGETS));
+      if (url === '/api/workspace-registry/resolve') return Promise.resolve(ok(intent()));
+      if (url === '/api/workspace-registry' && init?.method === 'POST') return Promise.resolve(ok({ id: 'ws-new' }, 201));
+      return Promise.resolve(ok({}));
+    });
+  }
+
+  it('honours a new preset over the project chosen during the previous open', async () => {
+    wireTwoProjects();
+    const { rerender } = render(
+      <NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} presetProjectKey="project-a" />,
+    );
+    await settle();
+    expect((screen.getByTestId('new-workspace-project-select') as HTMLSelectElement).value).toBe('project-a');
+
+    // Close, then reopen pointed at the other project.
+    rerender(<NewWorkspaceModal isOpen={false} onClose={vi.fn()} onCreated={vi.fn()} presetProjectKey="project-a" />);
+    rerender(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} presetProjectKey="project-b" />);
+    await settle();
+
+    expect((screen.getByTestId('new-workspace-project-select') as HTMLSelectElement).value).toBe('project-b');
+    expect(resolveCalls().at(-1)).toMatchObject({ project: 'project-b' });
+  });
+
+  it('clears the name typed during the previous open', async () => {
+    wireTwoProjects();
+    const { rerender } = render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+    fireEvent.change(screen.getByTestId('new-workspace-name-input'), { target: { value: 'leftover' } });
+    await settle();
+
+    rerender(<NewWorkspaceModal isOpen={false} onClose={vi.fn()} onCreated={vi.fn()} />);
+    rerender(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    expect((screen.getByTestId('new-workspace-name-input') as HTMLInputElement).value).toBe('');
+  });
+
+  it('accepts a preset given as the project display name, not just its key', async () => {
+    wireTwoProjects();
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} presetProjectKey="Project B" />);
+    await settle();
+
+    expect((screen.getByTestId('new-workspace-project-select') as HTMLSelectElement).value).toBe('project-b');
+  });
+});
+
+describe('NewWorkspaceModal — a failed resolve never enables Create (review B3)', () => {
+  it('keeps Create disabled when the resolve request errors', async () => {
+    wireFetch(() => err(500, { error: 'resolver exploded' }));
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    expect((screen.getByTestId('new-workspace-create') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByTestId('new-workspace-error').textContent).toContain('Could not resolve');
+  });
+
+  it('drops a previously good preview as soon as a field changes', async () => {
+    let response = ok(intent());
+    mockFetch.mockImplementation((url: string) => {
+      if (url === '/api/registered-projects') return Promise.resolve(ok(PROJECTS));
+      if (url.startsWith('/api/workspace-registry?')) return Promise.resolve(ok({ workspaces: [{ id: 'ws-main' }] }));
+      if (url.startsWith('/api/workspace-registry/project-targets')) return Promise.resolve(ok(TARGETS));
+      if (url === '/api/workspace-registry/resolve') return Promise.resolve(response);
+      return Promise.resolve(ok({}));
+    });
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+    expect((screen.getByTestId('new-workspace-create') as HTMLButtonElement).disabled).toBe(false);
+
+    // The next resolve fails; the stale-but-clean preview must not survive it.
+    response = err(500, { error: 'resolver exploded' });
+    fireEvent.change(screen.getByTestId('new-workspace-name-input'), { target: { value: 'changed' } });
+    await settle();
+
+    expect((screen.getByTestId('new-workspace-create') as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByTestId('new-workspace-preview-path')).toBeNull();
+  });
+});
+
+describe('NewWorkspaceModal — main bootstrap (review B6, D-7/FR-4)', () => {
+  function wireMain(mainRows: unknown[]) {
+    mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === '/api/registered-projects') return Promise.resolve(ok(PROJECTS));
+      if (url.startsWith('/api/workspace-registry?')) return Promise.resolve(ok({ workspaces: mainRows }));
+      if (url.startsWith('/api/workspace-registry/project-targets')) return Promise.resolve(ok(TARGETS));
+      if (url === '/api/workspace-registry/resolve') return Promise.resolve(ok(intent()));
+      if (url === '/api/workspace-registry' && init?.method === 'POST') return Promise.resolve(ok({ id: 'ws-main-new' }, 201));
+      return Promise.resolve(ok({}));
+    });
+  }
+
+  it('offers the bootstrap affordance when the project has no main workspace', async () => {
+    wireMain([]);
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    expect(screen.getByTestId('new-workspace-bootstrap-main')).toBeDefined();
+  });
+
+  it('hides the affordance when a main workspace already exists', async () => {
+    wireMain([{ id: 'ws-main' }]);
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    expect(screen.queryByTestId('new-workspace-bootstrap-main')).toBeNull();
+  });
+
+  it('POSTs bootstrapMain and reports the new id through onCreated', async () => {
+    const onCreated = vi.fn();
+    wireMain([]);
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={onCreated} />);
+    await settle();
+
+    await act(async () => { fireEvent.click(screen.getByTestId('new-workspace-bootstrap-main-button')); });
+
+    const createCall = mockFetch.mock.calls.find(
+      ([url, init]) => url === '/api/workspace-registry' && (init as { method?: string })?.method === 'POST',
+    );
+    expect(JSON.parse((createCall![1] as { body: string }).body)).toEqual({ project: 'overdeck', bootstrapMain: true });
+    expect(onCreated).toHaveBeenCalledWith('ws-main-new');
   });
 });

@@ -12,7 +12,8 @@
  */
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { stat } from 'node:fs/promises';
+import { join, resolve as resolvePath } from 'node:path';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import { mirrorPin, unmirrorPin } from '../memory/state-mirror.js';
@@ -127,7 +128,17 @@ export function setWorkspaceFavorite(id: string, isFavorite: boolean): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
 }
 
+/**
+ * Archive a workspace. Refuses `kind='main'`: it is the project's singleton
+ * anchor, the CLI destroy path has always refused it, and archiving it would
+ * hide the row from every surface that lists workspaces (PAN-3330 review).
+ */
 export async function archiveWorkspace(id: string): Promise<void> {
+  const existing = getWorkspaceById(id);
+  if (!existing) throw new Error(`No workspace found with id '${id}'`);
+  if (existing.kind === 'main') {
+    throw new Error(`Cannot archive the main workspace for project '${existing.projectId}'`);
+  }
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 1 WHERE id = ?`).run(id);
   const workspace = getWorkspaceById(id);
   if (workspace) {
@@ -171,18 +182,28 @@ export async function relocateWorkspace(id: string, path: string, options: Reloc
     throw new Error(`Relocating the main workspace diverges it from projects.yaml's primary path; pass --force to proceed anyway`);
   }
 
-  const isGitRepository = existsSync(join(path, '.git'));
+  // The stored path is canonical workspace state, so it is normalized and
+  // checked here rather than only in the CLI — a relative path, a regular
+  // file, or a directory removed between selection and confirmation would
+  // otherwise be persisted verbatim (PAN-3330 review).
+  const resolvedPath = resolvePath(path);
+  const stats = await stat(resolvedPath).catch(() => null);
+  if (!stats?.isDirectory()) {
+    throw new Error(`Relocation target must be an existing directory: ${path}`);
+  }
+
+  const isGitRepository = existsSync(join(resolvedPath, '.git'));
   const now = Date.now();
   getOverdeckDatabaseSync()
     .prepare(`UPDATE workspaces SET path = ?, is_git_repository = ?, last_accessed_at = ? WHERE id = ?`)
-    .run(path, isGitRepository ? 1 : 0, now, id);
+    .run(resolvedPath, isGitRepository ? 1 : 0, now, id);
 
   await writeWorkspaceIdentity({
     id: workspace.id,
     projectId: workspace.projectId,
     kind: workspace.kind,
     name: workspace.name,
-    path,
+    path: resolvedPath,
     branchName: workspace.branchName,
     parentBranch: workspace.parentBranch,
     issueId: workspace.issueId,

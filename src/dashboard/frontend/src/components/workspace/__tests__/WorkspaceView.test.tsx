@@ -109,7 +109,7 @@ function renderWorkspaceView(options: {
       </DialogProvider>
     </QueryClientProvider>,
   );
-  return { onBack, fetchMock };
+  return { onBack, fetchMock, client };
 }
 
 describe('WorkspaceView (ac1)', () => {
@@ -352,5 +352,61 @@ describe('WorkspaceView management actions (PAN-3330 WI-5)', () => {
     fireEvent.click(await dialogButton('Relocate'));
 
     expect(await screen.findByTestId('workspace-view-action-error')).toHaveTextContent('Cannot relocate archived workspace');
+  });
+});
+
+describe('WorkspaceView main-workspace and cache invariants (PAN-3330 review)', () => {
+  function main(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'ws-1',
+      projectId: 'overdeck',
+      kind: 'main',
+      name: 'main',
+      path: '/repo',
+      issueId: null,
+      layoutConfig: null,
+      title: null,
+      isFavorite: false,
+      pipeline: null,
+      ...overrides,
+    };
+  }
+
+  it('offers no Archive for the main workspace, which the writer refuses to archive', async () => {
+    renderWorkspaceView({ workspace: main() });
+
+    expect(await screen.findByTestId('workspace-view-actions')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-relocate')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-favorite')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-view-archive')).toBeNull();
+  });
+
+  it('invalidates both the registry list and this workspace detail after a relocate', async () => {
+    const { client } = renderWorkspaceView({
+      workspace: { ...main({ kind: 'scratch', name: 'lens' }) },
+    });
+    const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+
+    fireEvent.click(await screen.findByTestId('workspace-view-relocate'));
+    fireEvent.click(await screen.findByTestId('mock-folder-picker'));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Relocate' }));
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspace-registry'] }));
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspace-registry', 'ws-1'] });
+  });
+
+  it('invalidates both keys after an archive', async () => {
+    const { client } = renderWorkspaceView({
+      workspace: { ...main({ kind: 'scratch', name: 'lens' }) },
+    });
+    const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+
+    fireEvent.click(await screen.findByTestId('workspace-view-archive'));
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspace-registry'] }));
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['workspace-registry', 'ws-1'] });
   });
 });
