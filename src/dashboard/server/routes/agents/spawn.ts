@@ -29,7 +29,7 @@ import { getProjectSync, resolveProjectFromIssueSync } from '../../../../lib/pro
 import { clearWorkspaceStuck, getReviewStatusSync } from '../../../../lib/review-status.js';
 import { isStateMigrated } from '../../../../lib/state-home.js';
 import { shouldCommitLegacyWorkspaceArtifacts } from '../../../../lib/state-read-home.js';
-import { isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
+import { isGeneratedGitHookPath, isOverdeckWorkspaceRuntimePath, parsePorcelainStatusPaths } from '../../../../lib/state-plane.js';
 import { assertWorkspaceStackHealthyForSpawn } from '../../../../lib/agents/spawn-prep.js';
 import { getWorkspaceStackHealth } from '../../../../lib/workspace/stack-health.js';
 import { writeAutoStartXBrief } from '../../../../lib/xbrief/auto-synthesize.js';
@@ -103,9 +103,15 @@ export function emitDirtyWorkspaceRefusalActivity(issueId: string, porcelain: st
   } catch { /* non-fatal — activity emit should not block the response */ }
 }
 
-/** True when git porcelain contains only Overdeck-owned workspace runtime files (PAN-3042; shared predicate since PAN-3245). */
+/**
+ * True when git porcelain contains only Overdeck-owned workspace runtime files
+ * (PAN-3042; shared predicate since PAN-3245) or generated git-hook output — the
+ * `.husky/_/pre-rebase` guard that worktree creation writes made every fresh
+ * workspace read as dirty and 409 the planning auto-handoff (PAN-3266).
+ */
 export function isOnlyOverdeckRuntimeWorkspaceChanges(porcelain: string): boolean {
-  return parsePorcelainStatusPaths(porcelain).every(isOverdeckWorkspaceRuntimePath);
+  return parsePorcelainStatusPaths(porcelain)
+    .every((path) => isOverdeckWorkspaceRuntimePath(path) || isGeneratedGitHookPath(path));
 }
 
 export function spawnGuardrailResourcesHint(hint?: string): string {
