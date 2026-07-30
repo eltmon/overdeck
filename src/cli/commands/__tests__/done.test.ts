@@ -145,6 +145,42 @@ describe('verifyStrikeBranchMergedIntoMain', () => {
 
     await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).rejects.toThrow();
   });
+
+  it('accepts a strike branch whose content landed under a different commit (PAN-3326)', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    // The strike commit carries the fix on its own.
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'the fix\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+
+    // main gets the same content via a commit that also touches another file, so
+    // the patch-ids differ and `git cherry` reports the strike commit as missing.
+    await git(projectPath, ['checkout', 'main']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'the fix\n');
+    writeFileSync(join(projectPath, 'unrelated.txt'), 'rode along\n');
+    await git(projectPath, ['add', 'strike.txt', 'unrelated.txt']);
+    await git(projectPath, ['commit', '-m', 'same fix landed by another route']);
+    await git(projectPath, ['push', 'origin', 'main']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).resolves.toContain(
+      'has no unlanded content on origin/main',
+    );
+  });
+
+  it('names the unlanded commit and paths when content really is missing (PAN-3326)', async () => {
+    const { projectPath } = await createStrikeRepo();
+
+    await git(projectPath, ['checkout', 'strike/pan-2013']);
+    writeFileSync(join(projectPath, 'strike.txt'), 'never landed\n');
+    await git(projectPath, ['add', 'strike.txt']);
+    await git(projectPath, ['commit', '-m', 'strike work']);
+
+    await expect(verifyStrikeBranchMergedIntoMain('PAN-2013', projectPath)).rejects.toThrow(
+      /strike\.txt/,
+    );
+  });
 });
 
 describe('buildStrikeBypassStamp (PAN-3067)', () => {
