@@ -92,11 +92,16 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     // `kimi provider list --json`) — a DIFFERENT id space than the bare
     // claude-code-routed ids above. Both must be registered here so
     // getProviderForModelSync resolves either shape to this provider.
+    // The K2.5/K2.6 generation (kimi-k2, kimi-k2.5, kimi-k2.6,
+    // K2.6-code-preview) is retired — the Kimi CLI's catalog never carried
+    // those ids, so they could not launch under either native harness. They
+    // stay in MODEL_DEPRECATIONS and in getProviderForModelSync so old configs
+    // migrate and historical cost lookups still resolve.
     models: [
-      'k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview',
+      'k3', 'k3[1m]', 'kimi-k2.7-code',
       'kimi-code/k3', 'kimi-code/k3-256k', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed',
     ],
-    tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
+    tierModels: { opus: 'k3[1m]', sonnet: 'k3', haiku: 'kimi-k2.7-code' },
     tested: true,
     description: 'Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
   },
@@ -289,21 +294,29 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
  * context), kimi-code/k3-256k reports maxContextSize=262144 (matches the
  * claude-routed k3 alias's 256K context) — so the context tiers, not the
  * bare-string similarity, decide the mapping.
+ *
+ * This table must stay in sync with KIMI_ACP_MODEL_IDS in src/lib/acp/kimi.ts.
+ * Both translate a claude-code-routed id into the same CLI catalog, because
+ * `acp` and `kimi-code` drive the same `kimi` binary — an id that one accepts
+ * and the other rejects is a bug, not a harness difference.
  */
 const KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS: Record<string, string> = {
   'k3': 'kimi-code/k3-256k',
   'k3[1m]': 'kimi-code/k3',
+  'kimi-k2.7-code': 'kimi-code/kimi-for-coding',
 };
 
 /**
  * Resolve a model id to what the kimi-code CLI's `-m` flag will actually
  * accept. Already-native `kimi-code/<alias>` ids pass through unchanged.
  * Legacy claude-code-routed ids with a defensible native counterpart
- * (KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS) are remapped. Every other legacy id
- * (kimi-k2.7-code, kimi-k2.6, kimi-k2.5, kimi-k2, K2.6-code-preview) has no
- * native equivalent in the installed CLI's catalog — fail loudly (matching
- * the existing PAN-1871 fail-loud-over-silent-wrong-launch philosophy)
- * instead of guessing an alias the operator never chose.
+ * (KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS) are remapped. The retired ids
+ * (kimi-k2.6, kimi-k2.5, kimi-k2, K2.6-code-preview) have no native
+ * equivalent in the installed CLI's catalog; they are remapped to a live id
+ * by MODEL_DEPRECATIONS before reaching this point, and anything that still
+ * arrives here fails loudly (matching the existing PAN-1871
+ * fail-loud-over-silent-wrong-launch philosophy) instead of guessing an alias
+ * the operator never chose.
  */
 export function resolveKimiCodeModelAlias(model: string): string {
   if (model.startsWith('kimi-code/')) return model;
@@ -416,7 +429,8 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
     return PROVIDERS.minimax;
   }
 
-  // Check Kimi models
+  // Check Kimi models — supported set + retired K2.5/K2.6-generation ids
+  // (still routed so the deprecation-migration path can fire before remap).
   if (['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'].includes(modelId)) {
     return PROVIDERS.kimi;
   }

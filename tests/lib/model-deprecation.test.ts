@@ -37,7 +37,13 @@ describe('Model Deprecation System', () => {
       expect(resolveModelIdSync('claude-opus-4-6')).toBe('claude-opus-4-6');
       expect(resolveModelIdSync('claude-sonnet-4-6')).toBe('claude-sonnet-4-6');
       expect(resolveModelIdSync('claude-haiku-4-5')).toBe('claude-haiku-4-5');
-      expect(resolveModelIdSync('kimi-k2.5')).toBe('kimi-k2.5');
+      expect(resolveModelIdSync('k3')).toBe('k3');
+    });
+
+    it('remaps the retired K2.5/K2.6 Kimi generation to the live coding model', () => {
+      for (const retired of ['kimi-k2', 'kimi-k2.5', 'kimi-k2.6', 'K2.6-code-preview']) {
+        expect(resolveModelIdSync(retired)).toBe('kimi-k2.7-code');
+      }
     });
 
     it('should handle unknown model IDs gracefully', () => {

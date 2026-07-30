@@ -55,6 +55,12 @@ export function buildKimiAcpSpawnInput(
  * src/lib/model-capabilities.ts) must be translated at this boundary or the
  * session runtime rejects the spawn with
  * `Invalid value "k3[1m]" for session config option "model"`.
+ *
+ * This table must stay in sync with KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS in
+ * src/lib/providers.ts, which translates the same ids for the `kimi-code`
+ * harness. Both drive the same `kimi` binary against the same catalog, so an
+ * id one accepts and the other rejects is a bug; a test in
+ * __tests__/kimi.test.ts locks the two together.
  */
 const KIMI_ACP_MODEL_IDS: Record<string, string> = {
   "k3": "kimi-code/k3-256k",

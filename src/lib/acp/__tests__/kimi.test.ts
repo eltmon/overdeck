@@ -7,6 +7,7 @@ import {
   translateKimiAcpModelId,
 } from "../kimi.js";
 import { resolveAcpModelId, resolveAcpProviderSupport } from "../providers.js";
+import { PROVIDERS, resolveKimiCodeModelAlias } from "../../providers.js";
 import {
   checkSystemPrerequisites,
   PREREQUISITES,
@@ -114,6 +115,16 @@ describe("Kimi ACP model translation", () => {
   it("routes through resolveAcpModelId for the kimi provider and passes through otherwise", () => {
     expect(resolveAcpModelId("kimi", "k3[1m]")).toBe("kimi-code/k3");
     expect(resolveAcpModelId("not-a-provider", "k3[1m]")).toBe("k3[1m]");
+  });
+
+  // `acp` and `kimi-code` drive the same `kimi` binary against the same
+  // catalog, so an id one accepts and the other rejects is a bug. This locks
+  // the two translation tables together: kimi-k2.7-code launched under ACP but
+  // threw "no native kimi-code CLI equivalent" under kimi-code until 2026-07-30.
+  it("agrees with the kimi-code harness translation for every live Kimi model", () => {
+    for (const model of PROVIDERS.kimi.models) {
+      expect(translateKimiAcpModelId(model)).toBe(resolveKimiCodeModelAlias(model));
+    }
   });
 });
 

@@ -27,11 +27,11 @@ describe('providers', () => {
       ANTHROPIC_BASE_URL: KIMI_CODING_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-kimi-test',
       KIMI_API_KEY: 'sk-kimi-test',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
-      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'k3[1m]',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'k3',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2.7-code',
+      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2.7-code',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2.7-code',
     });
   });
 
@@ -40,11 +40,11 @@ describe('providers', () => {
       ANTHROPIC_BASE_URL: KIMI_PLATFORM_BASE_URL,
       ANTHROPIC_AUTH_TOKEN: 'sk-platform-test',
       KIMI_API_KEY: 'sk-platform-test',
-      ANTHROPIC_DEFAULT_OPUS_MODEL: 'kimi-k2.6',
-      ANTHROPIC_DEFAULT_SONNET_MODEL: 'kimi-k2.5',
-      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2',
-      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2',
-      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2',
+      ANTHROPIC_DEFAULT_OPUS_MODEL: 'k3[1m]',
+      ANTHROPIC_DEFAULT_SONNET_MODEL: 'k3',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'kimi-k2.7-code',
+      ANTHROPIC_SMALL_FAST_MODEL: 'kimi-k2.7-code',
+      CLAUDE_CODE_SUBAGENT_MODEL: 'kimi-k2.7-code',
     });
   });
 
@@ -65,8 +65,12 @@ describe('providers', () => {
       expect(resolveKimiCodeModelAlias('k3[1m]')).toBe('kimi-code/k3');
     });
 
-    it('fails loudly (never guesses) for a legacy id with no native equivalent', () => {
-      for (const legacy of ['kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview']) {
+    it('remaps kimi-k2.7-code the same way the acp harness does — same binary, same catalog', () => {
+      expect(resolveKimiCodeModelAlias('kimi-k2.7-code')).toBe('kimi-code/kimi-for-coding');
+    });
+
+    it('fails loudly (never guesses) for a retired id with no native equivalent', () => {
+      for (const legacy of ['kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview']) {
         expect(() => resolveKimiCodeModelAlias(legacy)).toThrow(/has no native kimi-code CLI equivalent/);
       }
     });
