@@ -237,17 +237,17 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:41:42.421Z",
+  "updated": "2026-07-30T11:41:46.076Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:41:42.377Z",
+    "updatedAt": "2026-07-30T11:41:45.904Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
@@ -260,7 +260,7 @@
     "reviewedAtCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
     "lastVerifiedCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
     "reviewRequestedAt": "2026-07-30T11:23:03.129Z",
-    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z",
+    "reviewSpawnedAt": "2026-07-30T11:41:45.903Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 146.73277,
-        "pricingAsOf": "2026-07-30T11:41:42.405Z"
+        "pricingAsOf": "2026-07-30T11:41:46.005Z"
       }
     },
     "merges": [
