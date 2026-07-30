@@ -991,12 +991,11 @@ program
           traefikEnabled,
           traefikDomain,
           dashboardPort,
-          dashboardApiPort,
-          expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(),
+          dashboardApiPort, expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(), expectedPid: child.pid,
         });
         readyUrl = resolved.readyUrl;
         apiUrl = resolved.apiUrl;
-        console.log(chalk.green('✓ Dashboard started in background and passed /api/health'));
+        console.log(chalk.green(child.pid === undefined ? '✓ Dashboard started in background and passed /api/health — ownership unverified: child pid unavailable' : '✓ Dashboard started in background and passed /api/health'));
         if (traefikEnabled && !resolved.traefikReady) {
           console.log(
             chalk.yellow(
@@ -1047,7 +1046,7 @@ program
           traefikEnabled,
           traefikDomain,
           dashboardPort,
-          dashboardApiPort, expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(),
+          dashboardApiPort, expectedIdentity: restartModule.resolvePrimaryDashboardIdentity(), expectedPid: child.pid,
         });
         readyUrl = resolved.readyUrl;
         apiUrl = resolved.apiUrl;

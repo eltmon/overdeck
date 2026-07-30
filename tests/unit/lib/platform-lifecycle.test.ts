@@ -312,3 +312,111 @@ describe('waitForDashboardHealth', () => {
     }
   });
 });
+
+describe('dashboard health ownership', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
+    vi.setSystemTime(0);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('rejects a healthy responder whose pid differs from the freshly spawned server', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7101 }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7202 }),
+      {
+        healthTimeoutMs: 200,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+    ));
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        stage: 'dashboard',
+        reason: expect.stringMatching(/pid 7101.*pid 7202.*LEFT RUNNING/s),
+        recovery: 'dashboard-left-running',
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    await vi.advanceTimersByTimeAsync(300);
+    await rejection;
+  });
+
+  it('accepts a healthy responder whose pid matches the freshly spawned server', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary', pid: 7303 }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7303 }),
+      { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+    ))).resolves.toEqual({ ownershipVerified: true, spawnedPid: 7303 });
+  });
+
+  it('rejects a pre-fix health payload that omits pid when ownership is expected', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const restart = Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => 7404 }),
+      {
+        healthTimeoutMs: 200,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+    ));
+    const rejection = expect(restart).rejects.toMatchObject({
+      failure: {
+        reason: expect.stringMatching(/pid \(unreported\).*pid 7404.*LEFT RUNNING/s),
+      },
+    });
+    while (fetchMock.mock.calls.length === 0) {
+      await new Promise<void>(resolve => setImmediate(resolve));
+    }
+
+    await vi.advanceTimersByTimeAsync(300);
+    await rejection;
+  });
+
+  it('preserves legacy 200 behavior when no expected pid or identity is provided', async () => {
+    const response = { ok: true, status: 200 };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+
+    await expect(Effect.runPromise(
+      waitForDashboardHealth(43991, { timeoutMs: 200, pollIntervalMs: 50 }),
+    )).resolves.toBeUndefined();
+  });
+
+  it('reports unverified ownership when a spawn handle cannot resolve its pid', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ status: 'ok', repoRoot: '/repo', mode: 'primary' }),
+    }));
+
+    await expect(Effect.runPromise(restartDashboard(
+      baseConfig,
+      () => ({ stop: vi.fn(), pid: async () => null }),
+      { expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+    ))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+  });
+});

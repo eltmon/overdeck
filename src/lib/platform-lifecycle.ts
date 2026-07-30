@@ -306,6 +306,7 @@ async function describePid(pid: number): Promise<string> {
     timeoutMs?: number;
     pollIntervalMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    expectedPid?: number;
   } = {},
 ): Promise<void> {
   const timeoutMs = opts.timeoutMs ?? 15_000;
@@ -314,17 +315,37 @@ async function describePid(pid: number): Promise<string> {
   const deadline = Date.now() + timeoutMs;
 
   let lastError = 'never got a response';
+  let lastResponderPid: number | null = null;
   while (Date.now() < deadline) {
     try {
       const res = await fetch(url, { signal: AbortSignal.timeout(2000) });
       if (res.ok) {
-        if (!opts.expectedIdentity) return;
+        if (!opts.expectedIdentity && opts.expectedPid === undefined) return;
         const body = await res.json().catch(() => null) as unknown;
         const payload = body && typeof body === 'object' ? body as Record<string, unknown> : {};
-        const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
-        const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
-        if (repoRoot === opts.expectedIdentity.repoRoot && mode === opts.expectedIdentity.mode) return;
-        lastError = `port held by non-${opts.expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`;
+        const reportedPid = typeof payload.pid === 'number' && Number.isInteger(payload.pid) && payload.pid > 0
+          ? payload.pid
+          : null;
+        if (reportedPid !== null) lastResponderPid = reportedPid;
+
+        if (opts.expectedIdentity) {
+          const repoRoot = typeof payload.repoRoot === 'string' ? payload.repoRoot : '(missing)';
+          const mode = typeof payload.mode === 'string' ? payload.mode : '(missing)';
+          if (repoRoot !== opts.expectedIdentity.repoRoot || mode !== opts.expectedIdentity.mode) {
+            lastError = `port held by non-${opts.expectedIdentity.mode} server (cwd=${repoRoot}, mode=${mode})`;
+            await sleep(pollIntervalMs);
+            continue;
+          }
+        }
+
+        if (opts.expectedPid !== undefined && reportedPid !== opts.expectedPid) {
+          lastError =
+            `port answered by pid ${reportedPid ?? '(unreported)'} — ` +
+            `not the freshly spawned server (pid ${opts.expectedPid})`;
+          await sleep(pollIntervalMs);
+          continue;
+        }
+        return;
       } else {
         lastError = `HTTP ${res.status}`;
       }
@@ -333,9 +354,14 @@ async function describePid(pid: number): Promise<string> {
     }
     await sleep(pollIntervalMs);
   }
+  const responderDetails = lastResponderPid === null
+    ? ''
+    : `; responder PID ${lastResponderPid} command: ${await describePid(lastResponderPid)}`;
   throw new StageError({
     stage: 'dashboard',
-    reason: `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} (last: ${lastError})`,
+    reason:
+      `health check at ${url} did not pass within ${formatTimeoutMs(timeoutMs)} ` +
+      `(last: ${lastError}${responderDetails})`,
   });
 }async function waitForTraefikHealthPromise(
   traefikDomain: string,
@@ -403,6 +429,11 @@ export interface DashboardSpawnHandle {
   pid?: () => Promise<number | null>;
 }
 
+export interface DashboardRestartResult {
+  ownershipVerified: boolean;
+  spawnedPid: number | null;
+}
+
 async function restartDashboardPromise(
   config: PlatformConfig,
   startDashboardFn: () => Promise<DashboardSpawnHandle | void> | DashboardSpawnHandle | void,
@@ -410,13 +441,15 @@ async function restartDashboardPromise(
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
   } = {},
-): Promise<void> {
+): Promise<DashboardRestartResult> {
   await Effect.runPromise(stopDashboard(config));
-  await startDashboardFn();
+  const handle = await startDashboardFn();
+  const spawnedPid = await handle?.pid?.() ?? null;
   try {
     await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: opts.expectedIdentity,
+      expectedPid: spawnedPid ?? undefined,
     }));
   } catch (error) {
     // #3099: NEVER reap the freshly spawned server on a health timeout. The old
@@ -434,6 +467,7 @@ async function restartDashboardPromise(
       recovery: 'dashboard-left-running',
     });
   }
+  return { ownershipVerified: spawnedPid !== null, spawnedPid };
 }async function restartCliproxyPromise(
   cliproxy: {
     stopCliproxy: () => void;
@@ -520,6 +554,7 @@ export const waitForDashboardHealth = (
     timeoutMs?: number;
     pollIntervalMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
+    expectedPid?: number;
   } = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => waitForDashboardHealthPromise(apiPort, opts), catch: stageErrorOf('waitForDashboardHealth') });
@@ -551,7 +586,7 @@ export const restartDashboard = (
     healthTimeoutMs?: number;
     expectedIdentity?: { repoRoot: string; mode: 'primary' | 'peer' };
   } = {},
-): Effect.Effect<void, StageError> =>
+): Effect.Effect<DashboardRestartResult, StageError> =>
   Effect.tryPromise({
     try: () => restartDashboardPromise(config, startDashboardFn, opts),
     catch: stageErrorOf('restartDashboard'),

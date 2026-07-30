@@ -485,12 +485,14 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
           } catch { /* non-fatal */ }
         }
 
-        await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
+        const result = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, options), {
           healthTimeoutMs,
           expectedIdentity: resolvePrimaryDashboardIdentity(),
         }));
         await recordRestartStatus(startedAt, true);
-        console.log(chalk.green('✓ Dashboard restarted and healthy'));
+        console.log(chalk.green(result.ownershipVerified
+          ? '✓ Dashboard restarted and healthy'
+          : '✓ Dashboard restarted and healthy — ownership unverified: could not resolve the spawned server pid'));
         console.log(chalk.dim('  CLIProxy, Traefik, and TLDR were left running.'));
         break;
       }
@@ -602,10 +604,12 @@ async function runFullRestart(
   }));
 
   const spawnedDashboard = spawnDashboardDetached(config, opts.bootGateOptions);
+  const spawnedPid = await spawnedDashboard.pid?.() ?? null;
   try {
     await Effect.runPromise(waitForDashboardHealth(config.dashboardApiPort, {
       timeoutMs: opts.healthTimeoutMs,
       expectedIdentity: resolvePrimaryDashboardIdentity(),
+      expectedPid: spawnedPid ?? undefined,
     }));
   } catch (error) {
     await spawnedDashboard.stop();
@@ -628,5 +632,7 @@ async function runFullRestart(
     }
   }
 
-  console.log(chalk.green('✓ Full stack restarted and healthy'));
+  console.log(chalk.green(spawnedPid !== null
+    ? '✓ Full stack restarted and healthy'
+    : '✓ Full stack restarted and healthy — dashboard ownership unverified: could not resolve the spawned server pid'));
 }
