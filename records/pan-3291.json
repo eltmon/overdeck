@@ -97,7 +97,7 @@
     "recordedAt": "2026-07-30T05:20:21.210Z"
   },
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T08:14:16.223Z",
+  "updated": "2026-07-30T08:14:20.090Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "passed",
@@ -105,11 +105,11 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "verifying",
-    "mergeStep": "verifying",
+    "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T05:21:06.307Z",
-    "updatedAt": "2026-07-30T08:14:15.958Z",
+    "updatedAt": "2026-07-30T08:14:18.139Z",
     "reviewNotes": "Cycle-three fixes resolve configured escalation routing and keep activity delivery outside state durability locks; no blockers remain.",
     "inspectNotes": "All 5 ACs met: single 3-way merge replaces per-commit rebase (record-update.ts:301) so a poisoned intermediate commit no longer aborts reconcile; records/-only conflicts resolve via checkout --theirs with the active record re-derived by replaying the mutator on origin's version (record-update.ts:212-225); non-records/ conflicts throw naming every path and abort merge+rebase leaving a clean retryable worktree (record-update.ts:207-210, 306-312); delete/modify records/ conflict fails checkout --theirs and aborts rather than auto-resolving, with git stderr naming the path. NFR-1 honored (all git via promisified git() helper with signal + throwIfDurabilityAborted between sync steps, no execSync in server-reachable code); NFR-2 honored (no sleeps added). Tests genuinely exercise the migrated reconcile path — the marker they write satisfies validMarker in state-read-home.ts. Non-blocking observation: entry-point abortMerge/abortRebase (record-update.ts:294-295) discards any in-progress merge in the shared state worktree, intentional per the prior stranded-merge commit and safe under the record fs-lock.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3302",
@@ -211,7 +211,7 @@
       },
       "costAtCloseOut": {
         "usd": 179.099065,
-        "pricingAsOf": "2026-07-30T08:14:16.038Z"
+        "pricingAsOf": "2026-07-30T08:14:20.087Z"
       }
     },
     "merges": [
