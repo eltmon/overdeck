@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:00:16.579Z",
+  "updated": "2026-07-30T21:01:03.698Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -63,18 +63,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "wi1-shared-create-core": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3330",
         "agentId": "agent-pan-3330",
         "pid": 2400456,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:00:16.578Z"
+        "claimedAt": "2026-07-30T21:00:16.578Z",
+        "itemId": "wi1-shared-create-core",
+        "outcome": "completed",
+        "reason": "Extracted resolveWorkspaceCreateIntent/performWorkspaceCreate into src/lib/workspaces/create.ts; refactored workspaceNewCommand + workspaceMainCommand onto them with identical CLI behavior. New create-intent suite (13 tests) plus all existing workspace/CLI suites green.",
+        "releasedAt": "2026-07-30T21:01:03.698Z"
+      }
+    ],
+    "statusReasons": {
+      "wi1-shared-create-core": {
+        "reason": "Extracted resolveWorkspaceCreateIntent/performWorkspaceCreate into src/lib/workspaces/create.ts; refactored workspaceNewCommand + workspaceMainCommand onto them with identical CLI behavior. New create-intent suite (13 tests) plus all existing workspace/CLI suites green.",
+        "updatedAt": "2026-07-30T21:01:03.698Z"
       }
     }
   },
   "statusOverrides": {
-    "wi1-shared-create-core": "running"
+    "wi1-shared-create-core": "completed",
+    "wi1-shared-create-core.wi1-shared-create-core.ac1": "completed",
+    "wi1-shared-create-core.wi1-shared-create-core.ac2": "completed",
+    "wi1-shared-create-core.wi1-shared-create-core.ac3": "completed",
+    "wi1-shared-create-core.wi1-shared-create-core.ac4": "completed"
   }
 }
