@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:02:25.748Z",
+  "updated": "2026-07-30T04:03:56.597Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "rate-limit-primitive": {
-        "writerId": "agent-pan-3294",
-        "agentId": "agent-pan-3294",
-        "pid": 2335083,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:02:25.748Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3294",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Added GNU timeout/gtimeout selection plus a stock-macOS pure-bash watchdog that preserves streams and exit codes, returns 124 on expiry, and cleans up child/timer processes; added regression tests.",
         "releasedAt": "2026-07-30T04:02:15.996Z"
+      },
+      {
+        "writerId": "agent-pan-3294",
+        "agentId": "agent-pan-3294",
+        "pid": 2335083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:02:25.748Z",
+        "itemId": "rate-limit-primitive",
+        "outcome": "completed",
+        "reason": "Added a machine-wide rolling 60-second LLM token bucket with bounded single-flight lock acquisition, stale entry pruning, configurable default limit, and fail-closed behavior; added regression tests.",
+        "releasedAt": "2026-07-30T04:03:56.597Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "timeout-primitive": {
         "reason": "Added GNU timeout/gtimeout selection plus a stock-macOS pure-bash watchdog that preserves streams and exit codes, returns 124 on expiry, and cleans up child/timer processes; added regression tests.",
         "updatedAt": "2026-07-30T04:02:15.996Z"
+      },
+      "rate-limit-primitive": {
+        "reason": "Added a machine-wide rolling 60-second LLM token bucket with bounded single-flight lock acquisition, stale entry pruning, configurable default limit, and fail-closed behavior; added regression tests.",
+        "updatedAt": "2026-07-30T04:03:56.597Z"
       }
     }
   },
@@ -141,6 +148,10 @@
     "timeout-primitive.timeout-primitive.ac2": "completed",
     "timeout-primitive.timeout-primitive.ac3": "completed",
     "timeout-primitive.timeout-primitive.ac4": "completed",
-    "rate-limit-primitive": "running"
+    "rate-limit-primitive": "completed",
+    "rate-limit-primitive.rate-limit-primitive.ac1": "completed",
+    "rate-limit-primitive.rate-limit-primitive.ac2": "completed",
+    "rate-limit-primitive.rate-limit-primitive.ac3": "completed",
+    "rate-limit-primitive.rate-limit-primitive.ac4": "completed"
   }
 }
