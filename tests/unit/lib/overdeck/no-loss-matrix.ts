@@ -563,6 +563,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/workspace-registry/:id/archive',              kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (archiveWorkspace/unarchiveWorkspace)' },
   { surface: 'POST /api/workspace-registry/:id/favorite',             kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (setWorkspaceFavorite)' },
   { surface: 'PUT /api/workspace-registry/:id/layout',                kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (updateWorkspaceLayout)' },
+  // PAN-3330: dashboard workspace creation/management. resolve is a POST only
+  // because it carries a body — it writes nothing and is asserted write-free.
+  { surface: 'POST /api/workspace-registry/resolve',                  kind: 'http', disposition: 'READ',        door: 'workspaces/create.ts (resolveWorkspaceCreateIntent — dry run, no writes)' },
+  { surface: 'POST /api/workspace-registry',                          kind: 'http', disposition: 'WRITE',       door: 'workspaces/create.ts (performWorkspaceCreate → writer.ts createWorkspace)' },
+  { surface: 'POST /api/workspace-registry/:id/relocate',             kind: 'http', disposition: 'RELOCATE',    door: 'workspaces/writer.ts (relocateWorkspace)' },
+  { surface: 'GET /api/workspace-registry/project-targets',           kind: 'http', disposition: 'READ',        door: 'workspaces/resolver.ts (getProjectByKey + listProjectTargets)' },
   { surface: 'GET /api/review/:issueId/status',                      kind: 'http', disposition: 'READ',        door: 'IssuesResolver.get (reviewOutcome + testOutcome + verificationOutcome)' },
   { surface: 'POST /api/review/:issueId/status',                     kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance (verdict edge)' },
   { surface: 'POST /api/review/:issueId/trigger',                    kind: 'http', disposition: 'WRITE',       door: 'IssueWriter.advance("in_review")' },
