@@ -16,6 +16,7 @@ import {
   waitForDashboardHealth,
   StageError,
   parseHealthTimeoutMs,
+  pidsOnPort,
 } from '../../../src/lib/platform-lifecycle.js';
 
 // Use ephemeral ports so stopDashboard's lsof scan never hits a real
@@ -27,6 +28,66 @@ const baseConfig = {
   traefikDomain: 'overdeck.localhost',
   traefikDir: '/tmp/does-not-exist/traefik',
 };
+
+describe('pidsOnPort', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('uses lsof first so IPv4 and IPv6 TCP listeners are covered', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: '4123\n' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([4123]);
+    expect(run).toHaveBeenCalledOnce();
+    expect(run).toHaveBeenCalledWith('lsof -nP -iTCP:3011 -sTCP:LISTEN -t');
+  });
+
+  it('treats lsof exit code 1 with empty stdout as a free port', async () => {
+    const run = vi.fn().mockRejectedValue({ code: 1, stdout: '' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([]);
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('falls back from unavailable lsof to fuser and stops on its result', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('lsof not found'), { code: 127 }))
+      .mockResolvedValueOnce({ stdout: '5234 5235\n' });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([5234, 5235]);
+    expect(run.mock.calls.map(([command]) => command)).toEqual([
+      'lsof -nP -iTCP:3011 -sTCP:LISTEN -t',
+      'fuser 3011/tcp',
+    ]);
+  });
+
+  it('falls back to ss and returns only pids from lines matching the exact port', async () => {
+    const run = vi.fn()
+      .mockRejectedValueOnce(Object.assign(new Error('lsof not found'), { code: 127 }))
+      .mockRejectedValueOnce(Object.assign(new Error('fuser not found'), { code: 127 }))
+      .mockResolvedValueOnce({
+        stdout:
+          'LISTEN 0 511 127.0.0.1:13011 0.0.0.0:* users:(("node",pid=6000,fd=1))\n' +
+          'LISTEN 0 511 [::]:3011 [::]:* users:(("node",pid=6234,fd=2))\n',
+      });
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([6234]);
+    expect(run.mock.calls.map(([command]) => command)).toEqual([
+      'lsof -nP -iTCP:3011 -sTCP:LISTEN -t',
+      'fuser 3011/tcp',
+      'ss -ltnp',
+    ]);
+  });
+
+  it('warns once with every attempted tool when no port probe executes', async () => {
+    const run = vi.fn().mockRejectedValue(Object.assign(new Error('not found'), { code: 127 }));
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(pidsOnPort(3011, run)).resolves.toEqual([]);
+    expect(warning).toHaveBeenCalledOnce();
+    expect(warning).toHaveBeenCalledWith(expect.stringMatching(/lsof.*fuser.*ss/));
+  });
+});
 
 describe('restartDashboard — scope contract', () => {
   beforeEach(() => {

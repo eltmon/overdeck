@@ -14,10 +14,11 @@
  * Health-gating: each stage reports success only after the component's healthcheck
  * passes, or fails with an explicit `{ stage, reason }` on timeout.
  *
- * CLI-side only. Not used from dashboard server code — ok to use sync I/O here.
+ * Shared with the supervisor sidecar. Keep shell/process I/O asynchronous so
+ * lifecycle checks cannot block its request loop.
  */
 
-import { spawn, exec, execSync } from 'child_process';
+import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { existsSync, mkdirSync, openSync, readFileSync } from 'fs';
 import { join } from 'path';
@@ -142,16 +143,71 @@ export function readPlatformConfigSync(): PlatformConfig {
 
 // ─── Port / process helpers ───────────────────────────────────────────────────
 
-async function pidsOnPort(port: number): Promise<number[]> {
-  try {
-    const { stdout } = await execAsync(`fuser ${port}/tcp 2>/dev/null || true`);
-    return stdout
-      .split(/\s+/)
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => Number.isFinite(n) && n > 0);
-  } catch {
-    return [];
+export type PortProbeExec = (command: string) => Promise<{ stdout: string | Buffer }>;
+
+const defaultPortProbeExec: PortProbeExec = async (command) => {
+  const { stdout } = await execAsync(command);
+  return { stdout };
+};
+
+function parsePidList(output: string | Buffer): number[] {
+  return [...new Set(String(output)
+    .split(/\s+/)
+    .map(value => Number(value.trim()))
+    .filter(pid => Number.isInteger(pid) && pid > 0))];
+}
+
+function parseSsListenerPids(output: string | Buffer, port: number): number[] {
+  const pids = new Set<number>();
+  const portPattern = new RegExp(`(?:^|\\s)\\S*:${port}(?:\\s|$)`);
+  for (const line of String(output).split('\n')) {
+    if (!portPattern.test(line)) continue;
+    for (const match of line.matchAll(/pid=(\d+)/g)) {
+      pids.add(Number(match[1]));
+    }
   }
+  return [...pids];
+}
+
+function isEmptyExitOne(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  const failure = error as { code?: number | string; stdout?: string | Buffer };
+  return Number(failure.code) === 1 && String(failure.stdout ?? '').trim() === '';
+}
+
+export async function pidsOnPort(port: number, run: PortProbeExec = defaultPortProbeExec): Promise<number[]> {
+  const probes = [
+    {
+      tool: 'lsof',
+      command: `lsof -nP -iTCP:${port} -sTCP:LISTEN -t`,
+      parse: parsePidList,
+      emptyExitOne: true,
+    },
+    {
+      tool: 'fuser',
+      command: `fuser ${port}/tcp`,
+      parse: parsePidList,
+      emptyExitOne: true,
+    },
+    {
+      tool: 'ss',
+      command: 'ss -ltnp',
+      parse: (output: string | Buffer) => parseSsListenerPids(output, port),
+      emptyExitOne: false,
+    },
+  ];
+
+  for (const probe of probes) {
+    try {
+      const { stdout } = await run(probe.command);
+      return probe.parse(stdout);
+    } catch (error) {
+      if (probe.emptyExitOne && isEmptyExitOne(error)) return [];
+    }
+  }
+
+  console.warn(`[dashboard] could not inspect port ${port}; lsof, fuser, and ss all failed to execute`);
+  return [];
 }
 
 async function sleep(ms: number): Promise<void> {
