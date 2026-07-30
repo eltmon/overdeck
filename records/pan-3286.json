@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:57:23.768Z",
+  "updated": "2026-07-30T05:06:15.530Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -30,21 +30,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T04:55:38.141Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since eeb851b (1 path): CLAUDE.md",
-        "detectedAt": "2026-07-30T04:53:29.358Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "eeb851b1e3eb24f1cfd1ab0d224d3633f5d9b6eb",
-      "detectedAt": "2026-07-30T04:53:29.358Z",
-      "paths": [
-        "CLAUDE.md"
-      ]
-    }
+    "updatedAt": "2026-07-30T05:06:15.517Z"
   },
   "closeOut": {
     "usage": {
@@ -52,7 +38,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T04:55:38.182Z"
+        "pricingAsOf": "2026-07-30T05:06:15.525Z"
       }
     },
     "merges": [],
