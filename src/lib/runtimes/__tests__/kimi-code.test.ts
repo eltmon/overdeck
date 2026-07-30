@@ -409,17 +409,49 @@ describe('KimiCodeRuntimeSync', () => {
 });
 
 /**
+ * PAN-3305: the drain-driven lock tests interleave fake timers with real fs
+ * I/O, so their wall-clock cost tracks how contended the machine is — on a
+ * box running several agents they can take seconds where they take
+ * milliseconds idle. The 5s default testTimeout left no margin for that and
+ * turned load spikes into red builds. The assertions are unchanged; only the
+ * patience is. Keep this above drainFakeTimersUntilSettled's own real-time
+ * bound so a genuine deadlock reports that helper's message rather than a
+ * bare timeout.
+ */
+const DRAIN_DRIVEN_TEST_TIMEOUT_MS = 30_000;
+
+/**
  * Repeatedly advance the fake clock in small steps until `promise` settles.
  * A single large `advanceTimersByTimeAsync` cannot drive this: real fs I/O
  * (readdirAsync) sits between fake `setTimeout` calls, so a new timer
  * scheduled only after real I/O resolves would never fire once the one big
  * advance window has already closed. Small repeated advances give the real
  * I/O a chance to resolve and schedule its next timer between each step.
+ *
+ * PAN-3305: this used to stop after a fixed 300 steps (3s of fake time).
+ * That budget is not actually generous — two launches serialized through the
+ * lock each poll waitForNewKimiSessionAsync for up to 2s of fake time, and
+ * every contended acquire burns more of it on delay(KIMI_CAPTURE_LOCK_POLL_MS)
+ * retries, with how many retries happen depending on real disk speed. When
+ * the budget ran out first, this returned with the promise still pending and
+ * the caller's next `await` parked on a fake clock nobody advances again —
+ * which is why the flake surfaced as a bare "Test timed out in 5000ms"
+ * rather than a failed assertion. Advancing until the work actually settles
+ * removes the cliff; the bound is now real elapsed time, purely so a genuine
+ * deadlock still fails with a legible message instead of spinning.
+ *
+ * The bound has to read `vi.getRealSystemTime()`: under fake timers Date,
+ * performance.now(), and process.hrtime() are all faked, so each of them
+ * would measure the fake clock we are ourselves advancing.
  */
-async function drainFakeTimersUntilSettled(promise: Promise<unknown>, maxSteps = 300, stepMs = 10): Promise<void> {
+async function drainFakeTimersUntilSettled(promise: Promise<unknown>, stepMs = 10, realTimeoutMs = 20_000): Promise<void> {
   let isSettled = false;
   promise.then(() => { isSettled = true; }, () => { isSettled = true; });
-  for (let i = 0; i < maxSteps && !isSettled; i++) {
+  const startedAt = vi.getRealSystemTime();
+  while (!isSettled) {
+    if (vi.getRealSystemTime() - startedAt > realTimeoutMs) {
+      throw new Error(`drainFakeTimersUntilSettled: promise did not settle within ${realTimeoutMs}ms of real time`);
+    }
     await vi.advanceTimersByTimeAsync(stepMs);
   }
 }
@@ -490,28 +522,59 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     expect(captured2).not.toBeNull();
     expect(captured1).not.toBe(captured2);
     expect(new Set([captured1, captured2])).toEqual(new Set(['session_alpha', 'session_beta']));
-  });
+  }, DRAIN_DRIVEN_TEST_TIMEOUT_MS);
 
   it('lets a second bucket proceed immediately — the lock is per-workDirKey, not global', async () => {
+    // PAN-3305: this used to hold the first bucket's lock open for a fixed
+    // 30ms of fake time and then compare completion indices in a shared
+    // array. That is a race — acquiring the second bucket's lock is several
+    // real fs round-trips (mkdir, writeFile, rename) with no timers of its
+    // own, so whether it landed before the 30ms timer fired depended on how
+    // fast the disk was. Two changes make it deterministic:
+    //
+    // 1. Real timers. Unlike its sibling tests, nothing on this path is
+    //    delay-based: both buckets are uncontended, so acquire never reaches
+    //    its `delay(KIMI_CAPTURE_LOCK_POLL_MS)` retry and no callback sleeps.
+    //    Under fake timers the only way to let real fs I/O land is
+    //    drainFakeTimersUntilSettled's fixed step budget, and on a loaded
+    //    machine that budget can expire before the I/O completes — which is
+    //    the flake. With no timers to fake, awaiting the real promise is
+    //    both simpler and immune to how busy the box is. The repo's
+    //    fake-timer rule targets delay-based code; there is none here.
+    // 2. The first bucket's lock is held until the test explicitly releases
+    //    it, so "the second bucket finished while the first lock was still
+    //    held" is a fact rather than an interleaving that usually works out.
+    vi.useRealTimers();
+
     const kimiHome = makeHome();
-    const order: string[] = [];
+    let releaseSlow!: () => void;
+    const slowMayFinish = new Promise<void>((resolve) => { releaseSlow = resolve; });
+    let slowFinished = false;
 
     const slow = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-one', async () => {
-      order.push('slow-start');
-      await new Promise((resolve) => setTimeout(resolve, 30));
-      order.push('slow-end');
+      await slowMayFinish;
+      slowFinished = true;
     });
-    const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => {
-      order.push('fast-start');
-      order.push('fast-end');
-    });
+    const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => 'fast-done');
 
-    const both = Promise.all([slow, fast]);
-    await drainFakeTimersUntilSettled(both);
-    await both;
+    // A global lock would park `fast` behind the still-held first lock
+    // forever; bound the wait so that shows up as a clear assertion rather
+    // than a bare test timeout. The timer only ever elapses on failure.
+    let blockedTimer: NodeJS.Timeout | undefined;
+    const outcome = await Promise.race([
+      fast,
+      new Promise<string>((resolve) => { blockedTimer = setTimeout(() => resolve('still-blocked'), 2_000); }),
+    ]);
+    if (blockedTimer) clearTimeout(blockedTimer);
 
-    // The unrelated-bucket task completes without waiting on the slow one.
-    expect(order.indexOf('fast-end')).toBeLessThan(order.indexOf('slow-end'));
+    // The unrelated-bucket task ran to completion while the first bucket's
+    // lock was still held.
+    expect(outcome).toBe('fast-done');
+    expect(slowFinished).toBe(false);
+
+    releaseSlow();
+    await Promise.all([slow, fast]);
+    expect(slowFinished).toBe(true);
   });
 
   it('pins distinct ids when a work/restart-shaped launch and a conversation-shaped launch race in the same cwd (PAN-1837 review fix)', async () => {
@@ -559,7 +622,7 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     expect(workCaptured).not.toBe(conversationCaptured);
     expect(readFileSync(join(overdeckHome, 'agents', 'agent-work-1', 'kimi-session-id'), 'utf-8').trim()).toBe(workCaptured);
     expect(readFileSync(join(overdeckHome, 'agents', 'conv-abc', 'kimi-session-id'), 'utf-8').trim()).toBe(conversationCaptured);
-  });
+  }, DRAIN_DRIVEN_TEST_TIMEOUT_MS);
 
   // PAN-1837 review fix (P2): a lock directory can exist with no owner.json
   // (the holder died between mkdir succeeding and the owner record being
@@ -585,7 +648,7 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     await expect(result).resolves.toBe('acquired-after-ownerless-reclaim');
     // The lock is released again once the callback completes.
     expect(existsSync(lockPath)).toBe(false);
-  });
+  }, DRAIN_DRIVEN_TEST_TIMEOUT_MS);
 
   it('reclaims a stale lock directory whose owner.json is corrupt JSON', async () => {
     const kimiHome = makeHome();
@@ -605,7 +668,7 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
 
     await expect(result).resolves.toBe('acquired-after-corrupt-owner-reclaim');
     expect(existsSync(lockPath)).toBe(false);
-  });
+  }, DRAIN_DRIVEN_TEST_TIMEOUT_MS);
 
   it('does NOT reclaim a lock directory still owned by a live process, even once its directory mtime is stale', async () => {
     // Guards against a regression that reclaims by directory age alone,
@@ -643,5 +706,5 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
     // acquire (and its timeout timer) don't leak past this test.
     rmSync(lockPath, { recursive: true, force: true });
     await drainFakeTimersUntilSettled(result);
-  });
+  }, DRAIN_DRIVEN_TEST_TIMEOUT_MS);
 });
