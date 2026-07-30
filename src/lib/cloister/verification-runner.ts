@@ -14,6 +14,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Effect } from 'effect';
 import { getReviewStatusSync, markWorkspaceStuck, setReviewStatusSync } from '../review-status.js';
+import { MERGED_VERIFICATION_REASON } from '../review-status-reconcile.js';
 import { runQualityGates, DEFAULT_GATES } from './validation.js';
 import { readVerificationArtifact, writeVerificationArtifact } from './verification-artifact.js';
 import { buildFinalFailureInstructions } from './verification-feedback.js';
@@ -45,7 +46,6 @@ const execAsync = promisify(exec);
 
 export const VERIFICATION_MAX_CYCLES = 3;
 const NO_PROGRESS_REPEAT_THRESHOLD = 2;
-const MERGED_VERIFICATION_REASON = 'Merge already landed; verify-on-main owns post-merge validation.';
 
 export type { VerificationRunnerOptions, VerificationRunnerOutcome, WorkspaceInfo } from './verification-types.js';
 
@@ -151,17 +151,36 @@ async function escalateVerificationStuck(
 }
 
 /**
- * Boot reconciliation for interrupted verifications. Live supervised workers
+ * Boot reconciliation for verifications no worker owns. Live supervised workers
  * survive dashboard restarts and retain ownership of their running status.
  * A running status without a live worker is orphaned, so reset it to pending
  * and finalize the artifact rather than leaving the issue wedged forever.
+ *
+ * PAN-3339: `pending` on an already-merged issue is the other ownerless shape.
+ * "Verification re-runs on the next cycle" is true only while the review
+ * pipeline can still dispatch one; after merge there is no next cycle, so the
+ * verdict sits at `pending` and DoD row 3 blocks close-out forever. The write
+ * door settles this at the merge write going forward — this sweep heals rows
+ * that were already stranded before that guard existed.
  */
 export function reconcileInterruptedVerifications(logPrefix = 'boot-reconciliation'): number {
   let reset = 0;
   try {
     const statuses = readReviewStatusMap() ?? {};
     for (const [issueId, status] of Object.entries(statuses)) {
-      if ((status as { verificationStatus?: string }).verificationStatus !== 'running') continue;
+      const verificationStatus = (status as { verificationStatus?: string }).verificationStatus;
+      if (
+        verificationStatus === 'pending' &&
+        (status as { mergeStatus?: string }).mergeStatus === 'merged'
+      ) {
+        setReviewStatusSync(issueId, {
+          verificationStatus: 'skipped',
+          verificationNotes: MERGED_VERIFICATION_REASON,
+        });
+        console.log(`[${logPrefix}] settled ownerless pending verification for merged ${issueId} (PAN-3339)`);
+        continue;
+      }
+      if (verificationStatus !== 'running') continue;
       if (isVerificationWorkerActive(issueId)) {
         console.log(`[${logPrefix}] preserved live supervised verification for ${issueId}`);
         continue;
