@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T03:54:16.416Z",
+  "updated": "2026-07-30T04:05:46.396Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -69,18 +69,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "start-cli-flip-through-door": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3296",
         "agentId": "agent-pan-3296",
         "pid": 1996095,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:54:16.416Z"
+        "claimedAt": "2026-07-30T03:54:16.416Z",
+        "itemId": "start-cli-flip-through-door",
+        "outcome": "completed",
+        "reason": "Routed pan start's canonical running transition through transitionXBriefOnMain, guarded workspace-only draft updates, and added migrated-state push/cleanliness coverage.",
+        "releasedAt": "2026-07-30T04:05:46.396Z"
+      }
+    ],
+    "statusReasons": {
+      "start-cli-flip-through-door": {
+        "reason": "Routed pan start's canonical running transition through transitionXBriefOnMain, guarded workspace-only draft updates, and added migrated-state push/cleanliness coverage.",
+        "updatedAt": "2026-07-30T04:05:46.396Z"
       }
     }
   },
   "statusOverrides": {
-    "start-cli-flip-through-door": "running"
+    "start-cli-flip-through-door": "completed",
+    "start-cli-flip-through-door.start-cli-flip-through-door.ac1": "completed",
+    "start-cli-flip-through-door.start-cli-flip-through-door.ac2": "completed",
+    "start-cli-flip-through-door.start-cli-flip-through-door.ac3": "completed",
+    "start-cli-flip-through-door.start-cli-flip-through-door.ac4": "completed"
   }
 }
