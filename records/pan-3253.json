@@ -242,18 +242,18 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:57:22.668Z",
+  "updated": "2026-07-30T11:57:34.758Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "verifying",
-    "mergeStep": "squash-merging",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:57:16.650Z",
+    "updatedAt": "2026-07-30T11:57:34.668Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
@@ -369,7 +369,7 @@
       },
       "costAtCloseOut": {
         "usd": 153.580992,
-        "pricingAsOf": "2026-07-30T11:57:22.664Z"
+        "pricingAsOf": "2026-07-30T11:57:34.704Z"
       }
     },
     "merges": [
