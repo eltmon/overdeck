@@ -9,7 +9,7 @@ const execFileAsync = promisify(execFile)
 const LIB_PATH = join(process.cwd(), 'sync-sources', 'hooks', 'pan-hook-lib.sh')
 
 async function runBash(script: string, env: NodeJS.ProcessEnv): Promise<string> {
-  const { stdout } = await execFileAsync('bash', ['-c', script], { env })
+  const { stdout } = await execFileAsync('/bin/bash', ['-c', script], { env })
   return stdout.trim()
 }
 
@@ -89,5 +89,69 @@ describe('pan-hook-lib guard primitives', () => {
 
     expect(output).toBe('first=0 second=0')
     expect(existsSync(lockDir)).toBe(false)
+  })
+
+  it('preserves stdout and the wrapped command exit code', async () => {
+    const output = await runBash(
+      `source "$LIB_PATH"
+result=$(pan_run_with_timeout 5 bash -c 'printf "alpha\\nbeta\\n"; exit 7')
+rc=$?
+printf '%s\\nrc=%s' "$result" "$rc"`,
+      env(),
+    )
+
+    expect(output).toBe('alpha\nbeta\nrc=7')
+  })
+
+  it('returns 124 before the deadline and kills the timed-out child', async () => {
+    const pidFile = join(tempRoot, 'timed-out.pid')
+    const startedAt = Date.now()
+    const output = await runBash(
+      `source "$LIB_PATH"
+pan_run_with_timeout 1 /bin/bash -c 'printf "%s\\n" "$$" > "$PID_FILE"; exec /bin/sleep 3'
+rc=$?
+printf 'rc=%s' "$rc"`,
+      { ...env(), PID_FILE: pidFile },
+    )
+
+    expect(output).toBe('rc=124')
+    expect(Date.now() - startedAt).toBeLessThan(2_500)
+    const childPid = Number.parseInt(readFileSync(pidFile, 'utf-8').trim(), 10)
+    expect(() => process.kill(childPid, 0)).toThrow()
+  })
+
+  it('passes piped stdin through to the wrapped command', async () => {
+    const output = await runBash(
+      `source "$LIB_PATH"
+printf 'hi\\n' | pan_run_with_timeout 5 /bin/cat`,
+      env(),
+    )
+
+    expect(output).toBe('hi')
+  })
+
+  it('uses the pure-bash fallback when timeout commands are absent', async () => {
+    const emptyPath = join(tempRoot, 'empty-path')
+    const pidFile = join(tempRoot, 'fallback-timeout.pid')
+    mkdirSync(emptyPath)
+
+    const startedAt = Date.now()
+    const output = await runBash(
+      `source "$LIB_PATH"
+pan_run_with_timeout 1 /bin/bash -c 'printf "%s\\n" "$$" > "$PID_FILE"; exec /bin/sleep 3'
+rc=$?
+printf 'rc=%s' "$rc"`,
+      {
+        ...env(),
+        HOME: tempRoot,
+        PATH: emptyPath,
+        PID_FILE: pidFile,
+      },
+    )
+
+    expect(output).toBe('rc=124')
+    expect(Date.now() - startedAt).toBeLessThan(2_500)
+    const childPid = Number.parseInt(readFileSync(pidFile, 'utf-8').trim(), 10)
+    expect(() => process.kill(childPid, 0)).toThrow()
   })
 })

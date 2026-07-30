@@ -53,6 +53,70 @@ pan_release_singleflight_lock() {
   return 0
 }
 
+# Run a command with a hard deadline while preserving its stdin, stdout, and
+# ordinary exit code. GNU timeout is preferred when installed; stock macOS uses
+# the pure-bash watchdog fallback. Expiry is always reported as 124.
+pan_run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout -k 5 "$timeout_seconds" "$@"; then
+      return 0
+    else
+      return $?
+    fi
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    if gtimeout -k 5 "$timeout_seconds" "$@"; then
+      return 0
+    else
+      return $?
+    fi
+  fi
+
+  local expired_file="${TMPDIR:-/tmp}/pan-hook-timeout.$$.$RANDOM"
+  "$@" &
+  local command_pid=$!
+  (
+    local sleep_pid=""
+    trap '[ -n "$sleep_pid" ] && kill "$sleep_pid" 2>/dev/null; exit 0' TERM INT
+
+    /bin/sleep "$timeout_seconds" &
+    sleep_pid=$!
+    wait "$sleep_pid" 2>/dev/null || exit 0
+    sleep_pid=""
+
+    if kill -0 "$command_pid" 2>/dev/null; then
+      : > "$expired_file"
+      kill -TERM "$command_pid" 2>/dev/null || true
+      /bin/sleep 5 &
+      sleep_pid=$!
+      wait "$sleep_pid" 2>/dev/null || exit 0
+      sleep_pid=""
+      kill -KILL "$command_pid" 2>/dev/null || true
+    fi
+  ) &
+  local watchdog_pid=$!
+
+  local command_rc
+  if wait "$command_pid"; then
+    command_rc=0
+  else
+    command_rc=$?
+  fi
+
+  kill "$watchdog_pid" 2>/dev/null || true
+  wait "$watchdog_pid" 2>/dev/null || true
+
+  if [ -f "$expired_file" ]; then
+    /bin/rm -f "$expired_file" 2>/dev/null || true
+    return 124
+  fi
+
+  return "$command_rc"
+}
+
 # Internal token for authenticated HTTP ingestion (PAN-1596). The
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity
