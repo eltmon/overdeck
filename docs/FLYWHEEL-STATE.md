@@ -8726,3 +8726,62 @@ Chased the Deacon's stray-writer errors and found the warning is three defects, 
 - Memory healthy: ~50 GB available, PSI ≈ 0, leak at 0 with the guard live.
 
 - **RUN TOTALS (RUN-75): 4 close-outs, 5 PRs merged, 16 substrate bugs driven (PAN-3300/3320/3294/3286 fixed; PAN-2390/3305/3202 struck; PAN-3313/3321/3322/3324/3325/3326/3327 filed; PAN-3294/3282/2706/3202 escalated), 1 duplicate closed, 2 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed across 6 relief passes, 1 process leak permanently fixed and verified, 2 outages recovered, 2 deploys delivered, 6 review convoys re-driven.**
+
+## RUN-75 tick 6 (2026-07-30 10:36-10:50Z) — all four strikes merged, deploy delivered, and the stale generation caught reverting my own fix
+
+### The generation reverted my deploy within four minutes
+
+- Opened by re-checking the just-deployed leak fix and found **`guard=0` on the on-disk hook** — reverted to 423 lines at **10:34:24Z, about four minutes after I deployed it**. An automated `pan sync` (running through the shim into the stale generation) had clobbered the correct file.
+- **This escalates PAN-3327 from "fails to deploy" to "actively reverts a correct deploy."** Any manual fix to a `sync-sources/` artifact has a lifetime of minutes.
+- Ran the batched `pan reload --health-timeout 180000`. It built from `origin/main e90c2647ad08` and came back healthy — verified properly rather than on the success line: health `200`, `buildCommit e90c2647ad08`, pid **1392600** binding `:3011`, parent pid **1892 = systemd** (not a `containerd-shim` container peer).
+- **Then found the real reason the staleness is durable: `pan reload` alternates generations, and the `pan` shim does not follow.** After the deploy:
+  ```
+  445 lines guard=1 :: .pan-reload-generation-a   <- what reload just built
+  423 lines guard=0 :: .pan-reload-generation-b   <- what `pan` still resolves to
+  ```
+  `readlink -f $(which pan)` still pointed into **generation-b**. So the dashboard runs the new build while the CLI keeps reading the *other*, now-stale generation — and reload will flip which one is stale on every deploy.
+- **Stopgap applied and verified by outcome:** `rsync -a --delete` the repo's `sync-sources/` into generation-b so both generations match `main`, then ran the **previously-broken path** — bare `pan sync` — as the test. It deployed the correct hook (445 lines, `guard=1`). The leak fix is now durable against the automated sync.
+- **LESSON: verifying a fix once is not verifying it stays.** I checked the artifact right after deploying (tick 5's lesson) and it was correct; four minutes later it was not. For anything an automated patrol also writes, the check has to be *re-run*, not just performed. The leak would have quietly returned with the deploy recorded as successful.
+
+### All four strike PRs merged — and one refused to close for a reason worth having
+
+Reviewed every diff before landing rather than trusting the green CI:
+
+- **#3319 PAN-3202** — `dod-gate.ts` +102, tests +76. Adds `readContainingDefaultBranchCommits` (via `git rev-list --ancestry-path --first-parent`) and probes up to 5 containing heads for an all-green check set. Row 6 passes on the merge commit's own green run **or** a later containing green run; keeps `skip` vs `miss` semantics, always records the primary outcome first, and never passes without positive green evidence. Merged first because it gates two close-outs.
+- **#3315 PAN-2390** — 8 lines, test-only. **I suspected an incomplete fix and was wrong:** `origin/main:src/lib/tmux.ts:310` already carried `--property=ManagedOOMPreference=avoid`, so the strike's job was locking it in against regression on both the sync and async founding paths. Verified the **live unit** has it (`ManagedOOMPreference=avoid`, active since 08:02:13Z). Notably the tmux server **survived** the 09:31 global OOM that killed panes and the dashboard, where it died at 08:02 — evidence `avoid` helped, while my earlier caveat that it is deprioritization rather than protection also held.
+- **#3318 PAN-3266** — recognizes `.husky/_/` as generated in both gate predicates *and* writes a self-ignoring `.gitignore` at worktree creation. The part I liked: it explicitly handles workspaces created *before* the fix, which carry the untracked guard for life, so the gates recognize the path instead of relying on the ignore rule.
+- **#3316 PAN-3305** — replaces `drainFakeTimersUntilSettled`'s fixed 300-step budget with a real-time bound read from `vi.getRealSystemTime()` (correctly noting `Date`, `performance.now()`, and `hrtime` are all faked), and moves the one non-delay-based test to real timers with a written justification. Explains exactly why the old cliff surfaced as a bare 5s timeout rather than a failed assertion.
+
+### PAN-3326 is deterministic, not occasional — squash + multi-commit = permanently unclosable
+
+- `pan done PAN-3305 --strike` refused: *"3 commit(s) missing from origin/main"*. All three are false — the branch touched one file, that file is **byte-identical** on `main`, and `main` carries all **9** references to the helpers the fix introduced.
+- **The controlled comparison came free, because I merged four strikes the same way minutes apart:**
+
+  | Issue | PR | Commits | `pan done --strike` |
+  | --- | --- | --- | --- |
+  | PAN-3202 | #3319 | single | ✅ |
+  | PAN-2390 | #3315 | single | ✅ |
+  | PAN-3266 | #3318 | single | ✅ |
+  | **PAN-3305** | **#3316** | **three** | ❌ 3 "missing" |
+
+- **A squash collapses N commits into one new patch-id, so every commit of a multi-commit branch reads as unlanded — forever.** Identical command, identical result on `main`, opposite verdicts, and the only variable is commit count. Commented on PAN-3326: this is the expected outcome for most non-trivial strikes, not an edge case, and the gate could simply read the merged PR (which it already does elsewhere — `pan done PAN-3320 --strike` printed `✓ Verified strike merge: … merged by PR at 4fb8ea92ac`).
+- **LESSON: a batch of near-identical operations is a free controlled experiment — read it as one.** Four merges, one differing variable, and the single-vs-multi commit distinction fell out without designing a test for it. Had PAN-3305 been the only strike, I would have filed "sometimes false-positives" again and missed the rule.
+
+### PAN-3202's fix verified live, and a sizing flaw found by using it
+
+- Confirmed the new code path is running: row 6 now reports `…; no green CI run among the 5 newest default-branch commit(s) containing the merge`.
+- Both PAN-3264 and PAN-3300 still miss — **not a logic error, a timing one.** All five probed candidates were `in_progress`, because I had just merged four PRs plus a docs push inside ten minutes:
+  ```
+  e90c2647ad in_progress   5fc369d92b in_progress   33bb6efd4a in_progress
+  e6caccb8d5 in_progress   d4d6321fa4 in_progress
+  ```
+- **A pending candidate consumes one of the five slots, so a merge burst starves the search even with a green head just below the window.** Suggested on the issue: count *failed* candidates against the budget but **skip pending ones without consuming it**, scanning deeper up to a larger bound. As written, the busier the pipeline, the less able row 6 is to find evidence — backwards, since a busy pipeline is when close-outs queue.
+- Did **not** override either close-out. Both should pass unaided once the burst's CI concludes.
+
+### Close of tick 6
+
+- **9 PRs merged this run:** PAN-3300, PAN-3291, PAN-3320, PAN-3294, PAN-3286, PAN-3202, PAN-2390, PAN-3266, PAN-3305.
+- **Leak: 0 procs, ~51 GB available, PSI 0**, with the guard live and now surviving the automated sync path.
+- Blocked, deliberately not forced: **PAN-3259** and **PAN-3305** (both PAN-3326), **PAN-3260** (PAN-2706 ghost test session), **PAN-3264** and **PAN-3300** (row 6 pending CI).
+
+- **RUN TOTALS (RUN-75): 4 close-outs, 9 PRs merged, 20 substrate bugs driven (PAN-3300/3320/3294/3286/3202/2390/3266/3305 fixed and merged; PAN-3313/3321/3322/3324/3325/3326/3327 filed; PAN-3294/3282/2706/3202/3326 escalated with evidence), 1 duplicate closed, 2 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified twice, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 6 review convoys re-driven.**
