@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T22:01:37.317Z",
+  "updated": "2026-07-30T22:05:48.890Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "pipeline-view-lane-reconcile": {
-        "writerId": "agent-pan-3341",
-        "agentId": "agent-pan-3341",
-        "pid": 3613250,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T22:01:37.317Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3341",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Mapped the close-out label to the review tone and ship lane, with focused frontend regression coverage.",
         "releasedAt": "2026-07-30T22:01:19.860Z"
+      },
+      {
+        "writerId": "agent-pan-3341",
+        "agentId": "agent-pan-3341",
+        "pid": 3613250,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T22:01:37.317Z",
+        "itemId": "pipeline-view-lane-reconcile",
+        "outcome": "completed",
+        "reason": "Made available post-merge limbo membership the sole membership lane override, mapping stale phases to Ship while preserving clean, in-flight, and unavailable behavior.",
+        "releasedAt": "2026-07-30T22:05:48.890Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "tree-renders-closeout-state": {
         "reason": "Mapped the close-out label to the review tone and ship lane, with focused frontend regression coverage.",
         "updatedAt": "2026-07-30T22:01:19.860Z"
+      },
+      "pipeline-view-lane-reconcile": {
+        "reason": "Made available post-merge limbo membership the sole membership lane override, mapping stale phases to Ship while preserving clean, in-flight, and unavailable behavior.",
+        "updatedAt": "2026-07-30T22:05:48.890Z"
       }
     }
   },
@@ -127,6 +134,10 @@
     "tree-renders-closeout-state.tree-renders-closeout-state.ac1": "completed",
     "tree-renders-closeout-state.tree-renders-closeout-state.ac2": "completed",
     "tree-renders-closeout-state.tree-renders-closeout-state.ac3": "completed",
-    "pipeline-view-lane-reconcile": "running"
+    "pipeline-view-lane-reconcile": "completed",
+    "pipeline-view-lane-reconcile.pipeline-view-lane-reconcile.ac1": "completed",
+    "pipeline-view-lane-reconcile.pipeline-view-lane-reconcile.ac2": "completed",
+    "pipeline-view-lane-reconcile.pipeline-view-lane-reconcile.ac3": "completed",
+    "pipeline-view-lane-reconcile.pipeline-view-lane-reconcile.ac4": "completed"
   }
 }
