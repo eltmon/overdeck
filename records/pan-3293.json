@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T03:59:06.868Z",
+  "updated": "2026-07-30T04:03:46.542Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "spawn-pid-handle": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 2200283,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:59:06.868Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Added process.pid to DashboardIdentity and regression coverage for the health identity payload",
         "releasedAt": "2026-07-30T03:58:44.923Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 2200283,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T03:59:06.868Z",
+        "itemId": "spawn-pid-handle",
+        "outcome": "completed",
+        "reason": "Added optional pid handles for detached and systemd dashboard spawns with fake-timer MainPID polling tests",
+        "releasedAt": "2026-07-30T04:03:46.542Z"
       }
     ],
     "statusReasons": {
       "health-pid": {
         "reason": "Added process.pid to DashboardIdentity and regression coverage for the health identity payload",
         "updatedAt": "2026-07-30T03:58:44.923Z"
+      },
+      "spawn-pid-handle": {
+        "reason": "Added optional pid handles for detached and systemd dashboard spawns with fake-timer MainPID polling tests",
+        "updatedAt": "2026-07-30T04:03:46.542Z"
       }
     }
   },
@@ -104,6 +111,10 @@
     "health-pid.health-pid.ac1": "completed",
     "health-pid.health-pid.ac2": "completed",
     "health-pid.health-pid.ac3": "completed",
-    "spawn-pid-handle": "running"
+    "spawn-pid-handle": "completed",
+    "spawn-pid-handle.spawn-pid-handle.ac1": "completed",
+    "spawn-pid-handle.spawn-pid-handle.ac2": "completed",
+    "spawn-pid-handle.spawn-pid-handle.ac3": "completed",
+    "spawn-pid-handle.spawn-pid-handle.ac4": "completed"
   }
 }
