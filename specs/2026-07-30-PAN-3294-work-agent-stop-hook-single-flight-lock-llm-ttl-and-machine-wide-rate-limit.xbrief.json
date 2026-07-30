@@ -4,17 +4,17 @@
     "created": "2026-07-30T03:52:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3294: bug(infra): work-agent-stop-hook has no concurrency guard — dashboard crash-loop fanned out 35 concurrent haiku LLM calls and froze the machine",
-    "updated": "2026-07-30T03:52:15.554Z"
+    "updated": "2026-07-30T03:52:58.133Z"
   },
   "plan": {
     "id": "pan-3294",
     "title": "work-agent-stop-hook: single-flight lock, LLM TTL, and machine-wide rate limit",
-    "status": "proposed",
+    "status": "approved",
     "uid": "3e09323a-79b1-4ada-8ce4-4a86df7fa7d4",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-30T03:52:00.000Z",
-    "updated": "2026-07-30T03:52:15.554Z",
+    "updated": "2026-07-30T03:52:58.133Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3294",
@@ -508,5 +508,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
