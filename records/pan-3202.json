@@ -3,18 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-30T08:11:20.548Z",
-  "updated": "2026-07-30T10:33:01.459Z",
+  "updated": "2026-07-30T10:37:39.534Z",
   "pipeline": {
     "issueId": "PAN-3202",
     "reviewStatus": "pending",
-    "testStatus": "pending",
-    "verificationStatus": "failed",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
     "mergeStatus": "failed",
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T10:33:01.448Z",
-    "verificationNotes": "Verification FAILED at test (266553ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3202-strike/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3202-strike\u001b[39m\n\nNo test files found, exiting with code 0\n\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/auto-merge-integration.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 29878\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m cancels during cooldown and never invokes merge after expiry \u001b[33m 28772\u001b[2mms\u001b[22m\u001b[39m\u001b[33m (retry x1)\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m fires one merge after the cooldown expires and records merged state \u001b[33m 497\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m blocks instead of merging when eligibility flips red during cooldown \u001b[33m 463\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mbases Channels MCP override eligibility on work role and claude-code harness\n\u001b[22m\u001b[39m[agent-pan-channels] channels:ineligible:not-a-work-agent\n[agent-pan-channels] channels:ineligible:harness-pi\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent from cached stack health before side effects\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init-1 init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mblocks spawnAgent before side effects when the workspace stack is unhealthy\n\u001b[22m\u001b[39m[agents] Workspace stack for PAN-1140 unhealthy (overdeck-feature-pan-1140-init init exited non-zero (1)) — rebuilding before spawn (attempt 1/3)\n\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agent-state-role.test.ts\u001b[2m > \u001b[22m\u001b[2mAgentState role persistence\u001b[2m > \u001b[22m\u001b[2mallows \n…(115592 chars elided)…\nes-core-services.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/service-swarm-fastpath.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/server/routes/resync-review-route.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-start-args.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/workspaces/__tests__/review-pipeline-dirty-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/dashboard/server/routes/__tests__/agents-git-info-fallback.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/li\n...(truncated)",
+    "updatedAt": "2026-07-30T10:37:39.497Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
     "mergeNotes": "Post-rebase verification failed at test",
     "strikeReadyHead": "f3f28d2b4470015623dfd8fbafc1dd93dc948c47",
     "strikeReadyAt": "2026-07-30T08:43:35.727Z",
@@ -38,7 +39,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T10:33:01.453Z"
+        "pricingAsOf": "2026-07-30T10:37:39.519Z"
       }
     },
     "merges": [],
