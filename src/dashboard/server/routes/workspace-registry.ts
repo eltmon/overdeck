@@ -13,14 +13,20 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getWorkspaceById, listWorkspaces } from '../../../lib/workspaces/resolver.js';
+import { getProjectByKey, getWorkspaceById, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   archiveWorkspace,
+  relocateWorkspace,
   setWorkspaceFavorite,
   touchWorkspaceAccessed,
   unarchiveWorkspace,
   updateWorkspaceLayout,
 } from '../../../lib/workspaces/writer.js';
+import {
+  performWorkspaceCreate,
+  resolveWorkspaceCreateIntent,
+  type WorkspaceCreateInput,
+} from '../../../lib/workspaces/create.js';
 import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { readCurrentStatus, readRecentObservations } from '../../../lib/memory/rollup.js';
@@ -111,6 +117,40 @@ const listWorkspaceRegistryRoute = HttpRouter.add(
   })),
 );
 
+/**
+ * Read the creation-intent fields out of a request body. Everything is
+ * optional at this layer — the shared core is the single validator, so an
+ * absent or wrong-typed field becomes a finding rather than a 400 here.
+ */
+function toCreateInput(body: Record<string, unknown>): WorkspaceCreateInput {
+  const str = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined);
+  return {
+    name: str(body.name),
+    kind: body.bootstrapMain === true ? 'main' : 'scratch',
+    projectKey: str(body.project),
+    targetPath: str(body.targetPath),
+    isolated: body.isolated === true,
+    parentBranch: str(body.parentBranch),
+  };
+}
+
+// ─── GET /api/workspace-registry/project-targets ────────────────────────────
+// Registered BEFORE the `/:id` detail route: `project-targets` is a literal
+// that would otherwise be captured as an id.
+
+const getWorkspaceRegistryProjectTargetsRoute = HttpRouter.add(
+  'GET',
+  '/api/workspace-registry/project-targets',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project') ?? '';
+    if (!projectKey) return jsonResponse({ error: 'project is required' }, { status: 400 });
+    const project = getProjectByKey(projectKey);
+    if (!project) return jsonResponse({ error: `No project registered with key '${projectKey}'` }, { status: 400 });
+    return jsonResponse({ primaryPath: project.primaryPath, targets: listProjectTargets(projectKey) });
+  })),
+);
+
 // ─── GET /api/workspace-registry/:id ────────────────────────────────────────
 
 const getWorkspaceRegistryDetailRoute = HttpRouter.add(
@@ -147,6 +187,75 @@ const getWorkspaceRegistryMemoryRoute = HttpRouter.add(
       status,
       observations,
     });
+  })),
+);
+
+// ─── POST /api/workspace-registry/resolve ───────────────────────────────────
+
+/**
+ * Dry-run the creation intent. A POST because it carries a JSON body, but it
+ * MUST stay write-free — the dialog calls it on every settled keystroke, and
+ * its whole value is that the preview is produced by the same code the real
+ * create runs (PAN-3330 D-2/NFR-6).
+ */
+const postWorkspaceRegistryResolveRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/resolve',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = (yield* readJsonBody) as Record<string, unknown> | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    const intent = yield* Effect.promise(() => resolveWorkspaceCreateIntent(toCreateInput(body)));
+    return jsonResponse(intent);
+  })),
+);
+
+// ─── POST /api/workspace-registry ───────────────────────────────────────────
+
+const postWorkspaceRegistryCreateRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = (yield* readJsonBody) as Record<string, unknown> | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    // Resolved server-side from the raw intent — never from a client-supplied
+    // resolved intent, which could otherwise name any path on the box.
+    const intent = yield* Effect.promise(() => resolveWorkspaceCreateIntent(toCreateInput(body)));
+    if (intent.findings.length > 0) return jsonResponse({ findings: intent.findings }, { status: 422 });
+    const created = yield* Effect.promise(() => performWorkspaceCreate(intent));
+    return jsonResponse({ id: created.id }, { status: 201 });
+  })),
+);
+
+// ─── POST /api/workspace-registry/:id/relocate ──────────────────────────────
+
+const postWorkspaceRegistryRelocateRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/:id/relocate',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    const body = (yield* readJsonBody) as { path?: unknown; force?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    if (typeof body.path !== 'string' || !body.path) return jsonResponse({ error: 'path is required' }, { status: 400 });
+    // The writer owns the refusal rules (archived, issue-kind, main without
+    // force); surface its message as a 409 rather than restating them here.
+    const failure = yield* Effect.promise(() =>
+      relocateWorkspace(id, body.path as string, { force: body.force === true })
+        .then(() => null)
+        .catch((err: unknown) => (err instanceof Error ? err.message : String(err))),
+    );
+    if (failure) return jsonResponse({ error: failure }, { status: 409 });
+    return jsonResponse({ ok: true });
   })),
 );
 
@@ -224,6 +333,11 @@ const putWorkspaceRegistryLayoutRoute = HttpRouter.add(
 
 export const workspaceRegistryRouteLayer = Layer.mergeAll(
   listWorkspaceRegistryRoute,
+  // Literal-path routes precede `/:id`, which would otherwise capture them.
+  getWorkspaceRegistryProjectTargetsRoute,
+  postWorkspaceRegistryResolveRoute,
+  postWorkspaceRegistryCreateRoute,
+  postWorkspaceRegistryRelocateRoute,
   getWorkspaceRegistryDetailRoute,
   getWorkspaceRegistryMemoryRoute,
   postWorkspaceRegistryActivateRoute,
