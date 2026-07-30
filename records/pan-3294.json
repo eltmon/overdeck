@@ -35,20 +35,21 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:41:58.617Z",
+  "updated": "2026-07-30T04:42:00.234Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T04:36:45.444Z",
-    "updatedAt": "2026-07-30T04:37:51.692Z",
+    "updatedAt": "2026-07-30T04:42:00.162Z",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
+    "lastVerifiedCommit": "bf9282426e145a107b1cbdc1c32f1388bd9dc89f",
     "reviewRequestedAt": "2026-07-30T04:36:45.444Z",
     "reviewSpawnedAt": "2026-07-30T04:37:51.691Z",
     "scopeDrift": {
@@ -107,7 +108,7 @@
       },
       "costAtCloseOut": {
         "usd": 31.729475,
-        "pricingAsOf": "2026-07-30T04:37:51.728Z"
+        "pricingAsOf": "2026-07-30T04:42:00.205Z"
       }
     },
     "merges": [
@@ -116,7 +117,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3294",
