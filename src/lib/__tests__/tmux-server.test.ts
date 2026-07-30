@@ -161,6 +161,11 @@ describe('ensureOverdeckTmuxServerSync', () => {
     // win the founding race (observed 5x per boot, 2026-07-03).
     expect(argv).toContain('--service-type=forking');
     expect(argv.indexOf('--service-type=forking')).toBeLessThan(argv.indexOf('tmux'));
+    // PAN-2390: every agent pane is a child of this one unit, so an oomd kill of
+    // it wipes the whole fleet at once (observed 2026-07-05 and 2026-07-30).
+    // `avoid` deprioritizes the unit among the slice's kill candidates.
+    expect(argv).toContain('--property=ManagedOOMPreference=avoid');
+    expect(argv.indexOf('--property=ManagedOOMPreference=avoid')).toBeLessThan(argv.indexOf('tmux'));
   });
 
   it('skips founding when the server is already alive', () => {
@@ -290,6 +295,9 @@ describe('ensureOverdeckTmuxServerAsync', () => {
     expect(argv).toContain('--unit');
     expect(argv).toContain('overdeck-tmux-server');
     expect(argv).not.toContain('--scope');
+    // PAN-2390: the async founding path must carry the same oomd deprioritization.
+    expect(argv).toContain('--property=ManagedOOMPreference=avoid');
+    expect(argv.indexOf('--property=ManagedOOMPreference=avoid')).toBeLessThan(argv.indexOf('tmux'));
   });
 
   it('falls back to setsid when systemd-run is unavailable', async () => {
