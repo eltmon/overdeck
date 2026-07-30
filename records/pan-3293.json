@@ -15,8 +15,43 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/index.ts",
+      "src/cli/up-readiness.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/server.ts"
+    ],
+    "declaredScope": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/restart.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/platform-lifecycle.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/cli/restart-spawn-pid.test.ts",
+      "tests/unit/dashboard/health-identity.test.ts",
+      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/cli/up-readiness.ts",
+      "src/dashboard/server/identity.ts",
+      "src/lib/platform-lifecycle.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/cli/restart-spawn-pid.test.ts",
+      "tests/unit/dashboard/health-identity.test.ts",
+      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "recordedAt": "2026-07-30T05:57:56.797Z"
+  },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T05:58:00.472Z",
+  "updated": "2026-07-30T05:58:04.100Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -26,9 +61,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T05:58:00.466Z",
+    "updatedAt": "2026-07-30T05:58:04.056Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 1496190 exited before writing a result",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
     "reviewRequestedAt": "2026-07-30T05:58:00.466Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -64,8 +100,7 @@
         "tests/unit/lib/platform-lifecycle.test.ts"
       ],
       "recordedAt": "2026-07-30T05:57:56.797Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3310"
+    }
   },
   "closeOut": {
     "usage": {
@@ -80,9 +115,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1296817,
-            "output": 212211,
-            "cacheRead": 75908096,
+            "input": 1298551,
+            "output": 212781,
+            "cacheRead": 76662272,
             "cacheWrite": 0
           }
         }
@@ -95,18 +130,20 @@
           "cacheWrite": 186978
         },
         "openai/gpt-5.6-sol": {
-          "input": 1296817,
-          "output": 212211,
-          "cacheRead": 75908096,
+          "input": 1298551,
+          "output": 212781,
+          "cacheRead": 76662272,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 60.270291,
-        "pricingAsOf": "2026-07-30T05:50:07.778Z"
+        "usd": 60.673149,
+        "pricingAsOf": "2026-07-30T05:58:04.095Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3310"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -287,40 +324,5 @@
     "docs-owner-verified-restart.docs-owner-verified-restart.ac1": "completed",
     "docs-owner-verified-restart.docs-owner-verified-restart.ac2": "completed",
     "docs-owner-verified-restart.docs-owner-verified-restart.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/index.ts",
-      "src/cli/up-readiness.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/server/server.ts"
-    ],
-    "declaredScope": [
-      "docs/OVERDECK_DEV_SOP.md",
-      "src/cli/commands/restart.ts",
-      "src/dashboard/server/identity.ts",
-      "src/dashboard/server/server.ts",
-      "src/lib/platform-lifecycle.ts",
-      "sync-sources/skills/pan-restart/SKILL.md",
-      "tests/unit/cli/restart-spawn-pid.test.ts",
-      "tests/unit/dashboard/health-identity.test.ts",
-      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
-      "tests/unit/lib/platform-lifecycle.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/OVERDECK_DEV_SOP.md",
-      "src/cli/commands/restart.ts",
-      "src/cli/index.ts",
-      "src/cli/up-readiness.ts",
-      "src/dashboard/server/identity.ts",
-      "src/lib/platform-lifecycle.ts",
-      "sync-sources/skills/pan-restart/SKILL.md",
-      "tests/unit/cli/restart-spawn-pid.test.ts",
-      "tests/unit/dashboard/health-identity.test.ts",
-      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
-      "tests/unit/lib/platform-lifecycle.test.ts"
-    ],
-    "recordedAt": "2026-07-30T05:57:56.797Z"
   }
 }
