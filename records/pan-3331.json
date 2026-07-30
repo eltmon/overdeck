@@ -158,22 +158,23 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:49:20.602Z",
+  "updated": "2026-07-30T23:53:04.471Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:45:39.294Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed both cycle-2 blocking findings. (1) WorkspaceActionBand is mounted with key={workspaceId}, so the first-fetch ref, expander, error text, and run-command edit draft reset on navigation instead of following the component instance — two regression tests drive cached A-to-B navigation and both fail without the key (verified by reverting it). (2) DELETE /api/terminals/:name is idempotent: a session that already exited returns {ok:true, alreadyStopped:true} instead of 500, so Restart and Stop recover from a run process that died on its own; a real kill failure still 500s. Non-blocking open-await left as-is with the reasoning recorded at the call site and in docs. 2081 frontend + 726 dashboard tests pass; typecheck, lint, and all guards green.",
+    "updatedAt": "2026-07-30T23:53:04.365Z",
+    "reviewNotes": "cycle 3 fixes resolve both prior blockers; remaining findings are advisory or previously reviewed and not promotable",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
-    "reviewedAtCommit": "0bb888875a9c4ecda8df66fab29ebca611b765aa",
+    "reviewedAtCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
     "lastVerifiedCommit": "0bb888875a9c4ecda8df66fab29ebca611b765aa",
     "reviewSpawnedAt": "2026-07-30T23:45:39.292Z",
     "scopeDrift": {
@@ -252,6 +253,24 @@
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
       "recordedAt": "2026-07-30T23:25:58.701Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea"
+      }
     }
   },
   "closeOut": {
@@ -267,9 +286,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 5631149,
-            "output": 133837,
-            "cacheRead": 43987968,
+            "input": 11343828,
+            "output": 241879,
+            "cacheRead": 67229184,
             "cacheWrite": 0
           }
         },
@@ -314,15 +333,15 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 8493641,
-          "output": 330752,
-          "cacheRead": 73640448,
+          "input": 14206320,
+          "output": 438794,
+          "cacheRead": 96881664,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 97.995634,
-        "pricingAsOf": "2026-07-30T23:45:39.332Z"
+        "usd": 141.420897,
+        "pricingAsOf": "2026-07-30T23:53:04.456Z"
       }
     },
     "merges": [
@@ -331,7 +350,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
