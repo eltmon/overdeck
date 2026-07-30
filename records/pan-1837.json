@@ -374,7 +374,7 @@
     "recordedAt": "2026-07-28T23:16:54.700Z"
   },
   "created": "2026-07-28T15:54:33.431Z",
-  "updated": "2026-07-30T04:51:13.747Z",
+  "updated": "2026-07-30T04:51:36.475Z",
   "pipeline": {
     "issueId": "PAN-1837",
     "reviewStatus": "passed",
@@ -386,7 +386,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-28T23:19:08.283Z",
-    "updatedAt": "2026-07-30T04:51:13.691Z",
+    "updatedAt": "2026-07-30T04:51:36.450Z",
     "reviewNotes": "Main merge preserved all previously approved Kimi behavior; conflict resolution and focused verification are clean.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3255",
@@ -444,7 +444,7 @@
       },
       "costAtCloseOut": {
         "usd": 476.441486,
-        "pricingAsOf": "2026-07-30T04:51:13.727Z"
+        "pricingAsOf": "2026-07-30T04:51:36.469Z"
       }
     },
     "merges": [
