@@ -9130,3 +9130,46 @@ PR **#3343** opened (my PR monitor fired on it). Reviewed the diff myself: **2 f
 **Not merged**: main is red, so #3343 inherits the `linear.test.ts` failure. It merges the moment PAN-3342 lands — review is already done, so that step is immediate.
 
 - Other four strikes still in gates; PAN-3327 was still writing at last check.
+
+## RUN-75 tick 17 (2026-07-30 21:32Z) — P0 fix verified passing but unpushed; my own parallelism is now the bottleneck
+
+- Hook **445 / guard=1**; leak **0 procs**; memory **22.5 GB free**, PSI 0. **Load average 44.4** — six concurrent Opus strikes each running full suites.
+- **Main still RED**: `4362f4810d` and `3f88522ad5` both failure.
+- **PAN-3342 (the P0) is done and verified — but unpushed.** 2 commits, clean tree, cost only `$3.10`. Reviewed its diff locally without waiting for a PR: **1 file, +8/-6**, switching three mocks from `searchIssues` to `client.issue` to match PAN-3337, plus `expect(mockClient.searchIssues).not.toHaveBeenCalled()` locking the new behaviour against regression, and a comment naming why (search nodes lack the `labels()` relation `normalizeIssue` needs). Test-only, no production code.
+- **Ran it myself: 15/15 pass in 866 ms.** The red-main fix is confirmed correct before its PR exists.
+- **Did not push it under the agent** — its pane showed `npm test` at 2m47s, mid-gate; it pushes itself.
+- Other strikes: PAN-3328 4 commits clean (`$34.01`), PAN-3324 1 commit clean, PAN-3339 1 + 2 dirty, PAN-3327 still writing. PAN-3326's PR **#3343** open, reviewed, gated only on main.
+- **LESSON: my parallel dispatch became the bottleneck it was meant to relieve.** Five simultaneous strikes drove load to 44–55, and at that load every full-suite gate produces ~64 contention-only failures each agent must investigate and dismiss. PAN-3342's fix cost `$3.10` to write and is spending far longer proving itself against a machine I overloaded. **N strikes at once does not deliver N fixes N times faster when they all gate on the same host.**
+
+## RUN-75 tick 17b — I committed my own state onto a strike branch
+
+**Caught only because a push silently failed.** `git push origin main` reported `Everything up-to-date` while three commits sat unpushed. The explicit refspec told the truth — and so did `git branch --show-current`: **`strike/pan-3342`**.
+
+- **Cause: the Bash tool's cwd persists between calls.** I ran `cd <workspace> && npx vitest run` to verify the P0 fix, and every later `git` command inherited that cwd. My tick-17 state commit landed on `strike/pan-3342` instead of `main`.
+- **I recorded this exact trap at tick 1 of this run** ("Bash cwd persists between calls and an earlier `cd` had left me inside the strike worktree") and repeated it anyway. Writing a lesson down is not the same as changing the habit that causes it.
+- **Blast radius, bounded by checking rather than assuming:** only tick 17 was affected. Ticks 15 and 16 are on `main` (`56d96eafab`), the primary worktree is intact on `main`, and the strike's own two commits are untouched.
+- **`git push origin main` masking a hook rejection as `Everything up-to-date` is its own hazard** — the pre-push guard had actually failed (code 1) on `.pan/continues/`, `.pan/backlog/`, `.beads/` paths, visible only via `git push origin HEAD:refs/heads/main`. A push that reports success while rejecting is worth its own issue.
+- **Fixes applied:** re-appended tick 17 to `main` from the primary worktree using `git -C` and absolute paths (no `cd`), and reverted the stray commit off the strike branch so its eventual squash does not carry unrelated docs or conflict with main.
+- **Rule going forward: never `cd` into a workspace. Use `git -C <path>` and `npx --prefix`/subshells so the orchestrator's cwd never leaves the primary worktree.**
+
+### Correction to tick 17b — git did not lie; I did
+
+I wrote above that `git push origin main` "masked a hook rejection as `Everything up-to-date`". **That is wrong and I am correcting it rather than leaving a plausible-but-false diagnosis in durable memory.**
+
+`git push origin main` pushes `refs/heads/main`. That ref genuinely *was* identical to `origin/main`, because my commits had landed on `strike/pan-3342`. **Git reported the truth.** The pre-push guard rejection (`.pan/continues/`, `.pan/backlog/`, `.beads/`) only appeared when I ran `git push origin HEAD:refs/heads/main`, which asked git to push strike-branch content onto main — and the state-plane guard correctly refused that.
+
+So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My "push masks failures" claim was me inventing a second bug to explain my own. No issue to file.
+
+**What actually deserved suspicion, and the generalisable check:** `unpushed=3` with `behind=0` and a push saying up-to-date is arithmetically impossible *for the ref you think you are on*. That contradiction was the real signal, and the one command that resolves it is `git branch --show-current` — not more push diagnostics.
+
+**Recovery verified:** `origin/main` = `f1f9d75921` with tick 17 + 17b recorded and 0 unpushed; the stray commit reverted off `strike/pan-3342`, whose diff against main is once again only its own fix (`tests/lib/tracker/linear.test.ts`, +8/-6). The strike's own two commits were never touched.
+
+## RUN-75 tick 18 (2026-07-30 21:48Z) — landed the P0 myself after its agent finished and held
+
+- `cwd-guard: main` verified before touching anything (the tick-17 lesson, now a standing pre-commit check). Hook **445 / guard=1**; leak **0**; memory 21 GB; PSI 0; **load down to 38** from 44–55.
+- **Main still RED** — last completed run `56d96eafab` = failure. `linear.test.ts` on main still carried 3 `searchIssues` mocks.
+- **All six strikes now hold committed, clean trees.** PAN-3342 (4 ahead), PAN-3326 (2, pushed, #3343), PAN-3339 (1), PAN-3327 (1 — was 12 dirty last tick), PAN-3328 (5, pushed), PAN-3324 (1). Four had not pushed.
+- **PAN-3342's agent had finished and was holding, not working.** Its pane carried a complete report: it merged `origin/main` rather than rebasing because the per-agent git shim (`src/lib/launcher-git-guard.ts`) blocks `git rebase` inside an agent's own worktree — and it correctly flagged that **the strike role's step 4 is at odds with that guard**. It also declined to fix-forward ~15 failures that all die at ~5000–5300 ms in `Hook timed out in 5000ms` inside `setupOverdeckTestDb()` (a `beforeEach` doing real `mkdtemp` + DB copy + DDL against vitest's 5 s hook budget) at load 31–33 with 24 agents, attributing them to the PAN-3344 concurrent-gate-load story. **That triage is right and its restraint was correct.**
+- **So I landed it.** Confirmed the branch diff was only `tests/lib/tracker/linear.test.ts` (+8/-6), pushed it, and opened **PR #3345**. Doctrine makes the strike's merge mine and explicitly contemplates `gh pr create` — the agent had done the work and stopped; waiting longer would have been deference to a process step, not to a person.
+- **LESSON: "the agent is still working" and "the agent has finished and is waiting" look identical from a cost reading.** PAN-3342 sat at clean-tree/committed/unpushed for ~15 minutes while I assumed a gate was still running. The pane text showed a finished report the whole time. **When a strike holds a clean tree with commits, read the pane before granting it more time** — the distinction between mid-gate and done-and-holding is only ever in the text.
+- Deliberately did **not** push the other three unpushed strikes: their CI would inherit the red-main `linear.test.ts` failure and burn runs. They go out after #3345 lands.

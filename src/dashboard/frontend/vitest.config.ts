@@ -89,6 +89,11 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     pool: 'threads',
+    // Without an explicit cap, the threads pool defaults to CPU count (~24 on
+    // the dev box). Several agents run this suite concurrently during
+    // verification, so unbounded threads multiply into a machine-wide CPU
+    // storm. Mirror the root vitest.config.ts cap.
+    maxWorkers: process.env.CI ? 2 : 4,
     // canvas-setup.ts must load first — it stubs canvas before test-setup.ts
     // imports @xterm/xterm (which probes canvas on import). See PAN-1989.
     setupFiles: [
