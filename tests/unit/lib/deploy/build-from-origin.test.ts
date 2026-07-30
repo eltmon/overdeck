@@ -11,6 +11,7 @@ import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
   dashboardDeploymentRoots,
+  liveDashboardDeploymentRoots,
   removeDashboardDeployment,
   selectDashboardDeploymentRoot,
   sweepDashboardDeployments,
@@ -241,6 +242,59 @@ describe('buildDashboardFromOriginMain', () => {
     expect(selectDashboardDeploymentRoot(null)).toBe(first);
     expect(selectDashboardDeploymentRoot(first)).toBe(second);
     expect(selectDashboardDeploymentRoot(second)).toBe(first);
+  });
+
+  it('never selects a generation with live processes, even when the record disagrees', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-live-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+
+    // PAN-3329: the record claimed `second` was active while the live server
+    // ran from `first`; trusting the record rebuilt origin/main inside the
+    // live generation. Live processes must win over the record.
+    expect(selectDashboardDeploymentRoot(second, [first])).toBe(second);
+    expect(selectDashboardDeploymentRoot(first, [second])).toBe(first);
+    expect(selectDashboardDeploymentRoot(null, [first])).toBe(second);
+  });
+
+  it('refuses to select any generation when both have live processes', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-both-live-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+
+    expect(() => selectDashboardDeploymentRoot(first, [first, second]))
+      .toThrow(/both dashboard deployment generations have live processes/i);
+  });
+
+  it('detects live generations from /proc cmdline scans', async () => {
+    const home = await fs.mkdtemp(join(tmpdir(), 'overdeck-deployment-proc-'));
+    temporaryRoots.push(home);
+    process.env.OVERDECK_HOME = home;
+    const [first, second] = dashboardDeploymentRoots();
+
+    const cmdlines: Record<string, string> = {
+      '100': `/usr/bin/node\0${first}/dist/dashboard/server.js\0`,
+      '200': '/usr/bin/node\0/somewhere/else/server.js\0',
+      '300': `/usr/bin/node\0${second}/dist/dashboard/deacon.js\0`,
+    };
+    const live = await liveDashboardDeploymentRoots({
+      listPids: async () => Object.keys(cmdlines),
+      readCmdline: async (pid) => {
+        const cmdline = cmdlines[pid];
+        if (cmdline === undefined) throw new Error('ESRCH');
+        return cmdline;
+      },
+    });
+
+    expect(live.sort()).toEqual([first, second].sort());
+
+    const none = await liveDashboardDeploymentRoots({
+      listPids: async () => ['200'],
+      readCmdline: async () => cmdlines['200'],
+    });
+    expect(none).toEqual([]);
   });
 
   it('sweeps legacy deployment roots while retaining the two bounded generations', async () => {

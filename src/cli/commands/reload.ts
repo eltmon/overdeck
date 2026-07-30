@@ -6,6 +6,7 @@ import {
   activateDashboardDeployment,
   buildDashboardFromOriginMain,
   dashboardDeploymentRoots,
+  liveDashboardDeploymentRoots,
   removeDashboardDeployment,
   runGitAsync,
   selectDashboardDeploymentRoot,
@@ -172,7 +173,15 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
           ...generationRoots,
           ...(previousBundle ? [previousBundle.deployRoot] : []),
         ]);
-        const nextDeployRoot = selectDashboardDeploymentRoot(previousBundle?.deployRoot);
+        const liveRoots = await liveDashboardDeploymentRoots();
+        const recordedRoot = previousBundle?.deployRoot ?? null;
+        if (recordedRoot && liveRoots.length > 0
+          && !liveRoots.some((root) => resolve(root) === resolve(recordedRoot))) {
+          console.warn(chalk.yellow(
+            `Active-deployment record says ${recordedRoot} but live processes run from ${liveRoots.join(', ')} — trusting the live processes (PAN-3329).`,
+          ));
+        }
+        const nextDeployRoot = selectDashboardDeploymentRoot(recordedRoot, liveRoots);
         deployment = await buildDashboardFromOriginMain(repoRoot, {
           deploymentRoot: () => nextDeployRoot,
         });

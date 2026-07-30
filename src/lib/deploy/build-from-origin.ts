@@ -66,7 +66,7 @@ function runCommand(command: string, args: string[], cwd: string): Promise<numbe
  * `bun install` is idempotent and ~instant on a warm cache, so running it
  * unconditionally before every reload makes "apply my merged changes" safe.
  */
-async function resolveBunBinary(cwd: string): Promise<string> {
+export async function resolveBunBinary(cwd: string): Promise<string> {
   const pathDirectories = (process.env.PATH ?? '')
     .split(delimiter)
     .filter(Boolean)
@@ -168,8 +168,64 @@ export function dashboardDeploymentRoots(): readonly [string, string] {
   ];
 }
 
-export function selectDashboardDeploymentRoot(activeRoot?: string | null): string {
+/**
+ * Generation roots that currently have live processes executing from them,
+ * detected by scanning /proc/<pid>/cmdline for argv entries inside each root.
+ * The active-dashboard-bundle record can diverge from reality after a failed
+ * deploy (PAN-3329: the record said generation-b while the live server ran
+ * from generation-a, so every deploy rebuilt origin/main in place inside the
+ * live generation). Observed processes, not the record, decide which
+ * generation is unsafe to build into.
+ */
+export async function liveDashboardDeploymentRoots(
+  dependencies: {
+    listPids?: () => Promise<string[]>;
+    readCmdline?: (pid: string) => Promise<string>;
+  } = {},
+): Promise<string[]> {
+  const listPids = dependencies.listPids ?? (async () => {
+    try {
+      return (await fs.readdir('/proc')).filter((entry) => /^\d+$/.test(entry));
+    } catch {
+      return [];
+    }
+  });
+  const readCmdline = dependencies.readCmdline
+    ?? ((pid: string) => fs.readFile(`/proc/${pid}/cmdline`, 'utf8'));
+
+  const roots = dashboardDeploymentRoots();
+  const prefixes = roots.map((root) => `${resolve(root)}/`);
+  const live = new Set<string>();
+  for (const pid of await listPids()) {
+    let cmdline: string;
+    try {
+      cmdline = await readCmdline(pid);
+    } catch {
+      continue;
+    }
+    const args = cmdline.split('\0');
+    for (let index = 0; index < roots.length; index += 1) {
+      if (args.some((arg) => arg.startsWith(prefixes[index]))) live.add(roots[index]);
+    }
+    if (live.size === roots.length) break;
+  }
+  return [...live];
+}
+
+export function selectDashboardDeploymentRoot(
+  activeRoot?: string | null,
+  liveRoots: readonly string[] = [],
+): string {
   const [first, second] = dashboardDeploymentRoots();
+  const live = new Set(liveRoots.map((path) => resolve(path)));
+  if (live.has(resolve(first)) && live.has(resolve(second))) {
+    throw new Error(
+      'Both dashboard deployment generations have live processes — refusing to build into either. '
+      + 'Stop the stale generation before deploying.',
+    );
+  }
+  if (live.has(resolve(first))) return second;
+  if (live.has(resolve(second))) return first;
   return activeRoot && resolve(activeRoot) === resolve(first) ? second : first;
 }
 
