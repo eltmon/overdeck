@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T02:50:16.393Z",
+  "updated": "2026-07-30T02:50:30.733Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,8 +57,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "ws-relocate": {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 63288,
+        "host": "Edwards-MacBook-Air.local",
+        "claimedAt": "2026-07-30T02:50:30.732Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -103,6 +111,7 @@
     "ws-new-dry-run": "completed",
     "ws-new-dry-run.ws-new-dry-run.ac1": "completed",
     "ws-new-dry-run.ws-new-dry-run.ac2": "completed",
-    "ws-new-dry-run.ws-new-dry-run.ac3": "completed"
+    "ws-new-dry-run.ws-new-dry-run.ac3": "completed",
+    "ws-relocate": "running"
   }
 }
