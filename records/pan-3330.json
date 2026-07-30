@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T20:27:43.008Z",
+  "updated": "2026-07-30T21:00:16.579Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -61,5 +61,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-30T19:54:36.982Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "wi1-shared-create-core": {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 2400456,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:00:16.578Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "wi1-shared-create-core": "running"
+  }
 }
