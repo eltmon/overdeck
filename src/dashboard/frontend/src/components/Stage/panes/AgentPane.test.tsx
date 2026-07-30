@@ -15,6 +15,7 @@ vi.mock('../../chat/ConversationPanel', () => ({
     targetMessageIndex,
     targetMessageNonce,
     onTargetMessageHandled,
+    hideComposer,
   }: {
     conversation: { name: string }
     viewMode: string
@@ -23,11 +24,13 @@ vi.mock('../../chat/ConversationPanel', () => ({
     targetMessageIndex?: number
     targetMessageNonce?: number
     onTargetMessageHandled?: () => void
+    hideComposer?: boolean
   }) => (
     <div
       data-testid="conversation-panel"
       data-view={viewMode}
       data-conv={conversation.name}
+      data-hide-composer={String(!!hideComposer)}
       data-target-id={targetMessageId ?? ''}
       data-target-index={targetMessageIndex ?? ''}
       data-target-nonce={targetMessageNonce ?? ''}
@@ -66,6 +69,18 @@ describe('AgentPane', () => {
     render(<AgentPane pane={pane} ctx={ctxWith({ conversation: { name: 'conv-1' } as unknown as Conversation })} />)
     expect(screen.getByTestId('conversation-panel')).toHaveAttribute('data-conv', 'conv-1')
     expect(screen.getByTestId('conversation-panel')).toHaveAttribute('data-view', 'conversation')
+  })
+
+  it('hides the composer for a read-only conversation — there is no live session to send to', () => {
+    const id = usePanesStore.getState().addPane(WS, {
+      paneType: 'agent',
+      label: 'Agent',
+      conversationId: '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607',
+    })
+    const pane = selectPanesForWorkspace(WS)(usePanesStore.getState()).find((p) => p.paneId === id)!
+    const data = { conversation: { name: '3f2b1a4c-5d6e-4f70-8a91-b2c3d4e5f607' } as unknown as Conversation, readOnly: true }
+    render(<AgentPane pane={pane} ctx={ctxWith(data)} />)
+    expect(screen.getByTestId('conversation-panel')).toHaveAttribute('data-hide-composer', 'true')
   })
 
   it('renders SessionPanel for a session-backed pane', () => {

@@ -6,6 +6,12 @@ import type { Conversation } from '../CommandDeck/ConversationList'
 export interface AgentPaneData {
   conversation?: Conversation
   session?: SessionNodeType
+  /**
+   * The conversation is a historical transcript with no live session behind it
+   * (an indexed Claude session Overdeck never registered, opened from search).
+   * The pane renders it without a composer — there is nothing to send to.
+   */
+  readOnly?: boolean
 }
 
 /**

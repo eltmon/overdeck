@@ -78,6 +78,28 @@ function result(body: unknown, status?: number): ConversationReadResult {
 const SAFE_SESSION_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
 
 /**
+ * A bare Claude Code session UUID, as used to name `<session-id>.jsonl`.
+ *
+ * Conversation search indexes every transcript under ~/.claude/projects/, but
+ * only a minority of them are dashboard conversations — the rest are work-agent
+ * and plain terminal sessions that have no conversations-table row. A palette
+ * hit on one of those arrives here as a raw session id, so the read paths fall
+ * back to resolving the transcript by id and serving it read-only rather than
+ * 404ing a session the operator can plainly see in search results.
+ *
+ * Narrower than SAFE_SESSION_ID_PATTERN on purpose: the by-id fallback sweeps
+ * every project dir on a miss, so only the exact shape Claude generates is
+ * allowed to trigger it.
+ */
+const CLAUDE_SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The transcript of an indexed-but-unregistered Claude session, or null. */
+async function resolveUnregisteredClaudeSessionFile(name: string): Promise<string | null> {
+  if (!CLAUDE_SESSION_UUID_PATTERN.test(name)) return null;
+  return findClaudeSessionFileById(name);
+}
+
+/**
  * Find a Claude Code session JSONL by its (globally-unique) session id, searching
  * every project dir under ~/.claude/projects/. Claude keys session files by the
  * cwd AT RUNTIME, so when a repo directory is renamed (e.g. Projects/panopticon-cli
@@ -627,7 +649,8 @@ export async function getConversationMessagesRead(
     const conv = getConversationByName(name);
     let sessionFile: string | null | undefined = conv ? await deps.resolveSessionFile(conv) : undefined;
     if (!conv) {
-      sessionFile = await resolveSpecialistSessionFile(name);
+      sessionFile = await resolveSpecialistSessionFile(name)
+        ?? await resolveUnregisteredClaudeSessionFile(name);
       if (!sessionFile) return result({ error: 'Conversation not found' }, 404);
     }
 
@@ -701,9 +724,10 @@ export async function getConversationMessageLocator(
 ): Promise<ConversationReadResult> {
   try {
     const conv = getConversationByName(name) ?? getConversationByClaudeSessionId(name);
-    if (!conv) return result({ error: 'Conversation not found' }, 404);
-
-    const sessionFile = await deps.resolveSessionFile(conv);
+    const sessionFile = conv
+      ? await deps.resolveSessionFile(conv)
+      : await resolveUnregisteredClaudeSessionFile(name);
+    if (!conv && !sessionFile) return result({ error: 'Conversation not found' }, 404);
     if (!sessionFile) return result({ error: 'Conversation transcript not found' }, 404);
 
     const locator = await resolveConversationMessageLocator(sessionFile, byteOffset);

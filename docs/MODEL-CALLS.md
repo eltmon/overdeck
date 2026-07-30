@@ -48,6 +48,8 @@ Operator-initiated planning through `pan plan`, dashboard planning, or `pan star
 
 These are the 8 features in the canonical registry (`src/lib/background-ai/registry.ts`) plus silent calls outside the registry. Most record cost via `recordBackgroundAiCost()` (`src/lib/background-ai/cost.ts:56`) under the `background:<feature>` tag.
 
+The Claude-backed ones spawn `claude -p` from the empty scratch cwd `${OVERDECK_HOME}/tmp/background-ai` (`backgroundAiScratchCwd()`, `src/lib/conversations/transcript-summary.ts`), so Claude Code writes a session transcript for each call under `~/.claude/projects/<encoded-scratch-cwd>/`. Those transcripts are Overdeck's own prompts, carrying verbatim excerpts of whatever conversation they were summarizing. **Conversation search excludes that project dir** (`isExcludedProjectDir()`, `src/lib/conversation-search/indexer.ts`) in the directory sweep, in the per-file path the watcher uses, and in the prune pass — otherwise search returns a machine-made shadow copy of a conversation, attributed to a session no surface can open.
+
 | Call site | What it does | File:line | Default model | Configurable? (key/where) | Cost-ledger tag | In Settings? |
 |---|---|---|---|---|---|---|
 | `conversationTitles` | Auto-title a conversation from its first user message | `src/lib/conversations/transcript-summary.ts:31` | `claude-haiku-4-5-20251001` | `conversations.titleModel` (falls back to module constant) | `background:conversationTitles` | Yes (Background AI) |

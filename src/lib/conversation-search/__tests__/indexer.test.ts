@@ -7,6 +7,7 @@ import { estimateFullReindexConversationSearchCost, fullReindexConversationSearc
 import type { ChunkInsert, EmbeddingsDbHandle } from '../../database/conversation-embeddings-db.js';
 import type { ConversationEmbeddingProvider } from '../embedding-provider.js';
 import type { NormalizedConversationSearchConfig } from '../../config-yaml.js';
+import { encodeClaudeProjectDir } from '../../paths.js';
 
 let tmpDir: string | undefined;
 
@@ -69,6 +70,7 @@ function fakeProvider(): ConversationEmbeddingProvider {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   if (tmpDir) {
     rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = undefined;
@@ -128,6 +130,46 @@ describe('conversation search indexer', () => {
     expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-kept']);
     expect(db.cursors.has(gonePath)).toBe(false);
     expect(db.cursors.has(keptPath)).toBe(true);
+  });
+
+  it('never indexes background AI utility transcripts, and prunes ones already indexed', async () => {
+    const dir = makeTmpDir();
+    const overdeckHome = join(dir, 'overdeck-home');
+    vi.stubEnv('OVERDECK_HOME', overdeckHome);
+    const projects = join(dir, 'projects');
+    const backgroundDir = join(projects, encodeClaudeProjectDir(join(overdeckHome, 'tmp', 'background-ai')));
+    const realDir = join(projects, '-home-user-project');
+    mkdirSync(backgroundDir, { recursive: true });
+    mkdirSync(realDir, { recursive: true });
+    const backgroundPath = join(backgroundDir, 'session-bg.jsonl');
+    writeFileSync(backgroundPath, line(message('assistant', 'a generated conversation title')));
+    writeFileSync(join(realDir, 'session-real.jsonl'), line(message('user', 'a real conversation')));
+    const db = fakeDb();
+    const provider = fakeProvider();
+
+    // Seed the index as if the transcript had been indexed before the exclusion existed.
+    db.upsertChunk({
+      sessionId: 'session-bg',
+      projectId: 'background',
+      role: 'assistant',
+      byteOffset: 0,
+      charLength: 5,
+      text: 'stale',
+      tokenCount: 1,
+      indexedAt: '2026-06-02T01:00:00.000Z',
+    });
+    db.setCursor(backgroundPath, 10);
+
+    const result = await indexConversationSearch({ config: config(), roots: [projects], db, provider });
+
+    expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-real']);
+    expect(db.cursors.has(backgroundPath)).toBe(false);
+    expect(result.sessionsPruned).toBe(1);
+
+    // The file watcher indexes new transcripts one at a time, bypassing the sweep.
+    const direct = await indexConversationFile({ filePath: backgroundPath, config: config(), db, provider });
+    expect(direct.chunksIndexed).toBe(0);
+    expect(db.chunks.map((chunk) => chunk.sessionId)).toEqual(['session-real']);
   });
 
   it('no-ops when conversation search is disabled', async () => {

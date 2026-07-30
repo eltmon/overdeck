@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../config-yaml.js';
+import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { dimensionsForModel, openEmbeddingsDb, type EmbeddingsDbHandle } from '../overdeck/conversations-search.js';
 import { chunkConversationJsonl, getLastCompleteJsonlOffset, type ConversationChunkRecord } from './chunker.js';
 import { createConversationEmbeddingProvider, type ConversationEmbeddingCostEstimate, type ConversationEmbeddingProvider } from './embedding-provider.js';
@@ -178,6 +179,12 @@ export async function indexConversationFile(
 ): Promise<ConversationIndexResult> {
   const config = options.config ?? getConversationSearchConfigSync();
   if (!config.enabled) return { ...EMPTY_RESULT, disabled: true, unavailableReason: 'conversationSearch is disabled' };
+  // Enforced here rather than only in the directory sweep: the file watcher
+  // indexes each new transcript directly as it appears, so a sweep-only
+  // exclusion would still admit every background AI spawn between restarts.
+  if (isExcludedProjectDir(projectIdFromPath(options.filePath))) {
+    return { ...EMPTY_RESULT, filesScanned: 1, chunksSkipped: 1 };
+  }
 
   const owned = openIndexerResources(config, options);
   const result: ConversationIndexResult = { ...EMPTY_RESULT, filesScanned: 1, errors: [] };
@@ -274,24 +281,44 @@ async function discoverConversationJsonlFiles(roots: string[], signal?: AbortSig
 }
 
 /**
- * Drop index rows whose JSONL transcript no longer exists on disk. Without this,
- * chunks and cursors outlive deleted sessions forever and palette search surfaces
- * hits that 404 when opened. Cursor paths are absolute, so the check is exact;
- * a session id still present in the discovered set keeps its chunks (the file was
- * moved or renamed, not deleted).
+ * Drop index rows whose JSONL transcript no longer exists on disk, or that live
+ * in an excluded project dir. Without this, chunks and cursors outlive deleted
+ * sessions forever and palette search surfaces hits that 404 when opened. Cursor
+ * paths are absolute, so the check is exact; a session id still present in the
+ * discovered set keeps its chunks (the file was moved or renamed, not deleted).
+ * Excluded sessions are dropped unconditionally so an exclusion added after the
+ * fact heals the index on the next run instead of needing manual DB surgery.
  */
 async function pruneStaleIndexedSessions(db: EmbeddingsDbHandle, files: string[]): Promise<number> {
   const liveSessionIds = new Set(files.map(sessionIdFromPath));
   let pruned = 0;
   for (const cursorPath of db.listFileCursors()) {
-    const exists = await fs.stat(cursorPath).then(() => true, () => false);
-    if (exists) continue;
+    const excluded = isExcludedProjectDir(projectIdFromPath(cursorPath));
+    if (!excluded) {
+      const exists = await fs.stat(cursorPath).then(() => true, () => false);
+      if (exists) continue;
+    }
     db.deleteCursor(cursorPath);
-    if (liveSessionIds.has(sessionIdFromPath(cursorPath))) continue;
+    if (!excluded && liveSessionIds.has(sessionIdFromPath(cursorPath))) continue;
     db.deleteSession(sessionIdFromPath(cursorPath));
     pruned += 1;
   }
   return pruned;
+}
+
+/**
+ * Project dirs that must never enter the search index.
+ *
+ * Background AI utility spawns (conversation titles, summaries, TTS) run
+ * `claude -p` from the empty scratch cwd `${OVERDECK_HOME}/tmp/background-ai`,
+ * and Claude Code writes a transcript for every one of them. Those transcripts
+ * are Overdeck's own prompts — each carrying verbatim excerpts of the real
+ * conversation it was summarizing — so indexing them fills search with a
+ * machine-made shadow copy of a conversation that belongs to no session any
+ * surface can open.
+ */
+function isExcludedProjectDir(dirName: string): boolean {
+  return dirName === encodeClaudeProjectDir(join(getOverdeckHome(), 'tmp', 'background-ai'));
 }
 
 async function collectJsonlFiles(dir: string, files: string[], signal?: AbortSignal): Promise<void> {
@@ -305,8 +332,10 @@ async function collectJsonlFiles(dir: string, files: string[], signal?: AbortSig
   for (const entry of entries) {
     const path = join(dir, entry.name);
     throwIfAborted(signal);
-    if (entry.isDirectory()) await collectJsonlFiles(path, files, signal);
-    else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(path);
+    if (entry.isDirectory()) {
+      if (isExcludedProjectDir(entry.name)) continue;
+      await collectJsonlFiles(path, files, signal);
+    } else if (entry.isFile() && entry.name.endsWith('.jsonl')) files.push(path);
   }
 }
 

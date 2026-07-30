@@ -29,6 +29,7 @@ export function AgentPane({ pane, ctx }: PaneWrapperProps) {
       <ConversationPanel
         conversation={data.conversation}
         viewMode={viewMode}
+        hideComposer={data.readOnly}
         onViewModeChange={(mode) => updatePane(ctx.workspaceId, pane.paneId, { viewMode: mode })}
         targetMessageId={pane.targetMessageId}
         targetMessageIndex={pane.targetMessageIndex}

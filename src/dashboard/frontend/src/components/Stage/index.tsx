@@ -123,6 +123,40 @@ function renderPane(pane: WorkspacePane, ctx: StageContext) {
   }
 }
 
+/** A bare Claude Code session UUID, the `<session-id>.jsonl` file stem. */
+const CLAUDE_SESSION_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * A read-only stand-in for a Claude session that conversation search indexed but
+ * Overdeck never registered — a work-agent or plain terminal session, which is
+ * most of what search can find. The palette opens such a hit by session id, so
+ * without this the pane resolves nothing and spins on "Starting…" forever.
+ *
+ * `id < 0` is the established synthetic marker (SessionPanel uses it too) and
+ * suppresses the row-keyed polls. The timestamps are structural — they exist so
+ * ConversationPanel takes its ended/history branch rather than reading a null
+ * `endedAt` as "still spawning" — and are deliberately the epoch rather than a
+ * plausible-looking `Date.now()`: nothing renders them today, and if some future
+ * surface starts to, an obviously wrong 1970 is a bug report instead of a
+ * quietly fabricated date.
+ */
+function unregisteredSessionConversation(sessionId: string): Conversation {
+  const structuralTimestamp = new Date(0).toISOString()
+  return {
+    id: -1,
+    name: sessionId,
+    tmuxSession: sessionId,
+    status: 'ended',
+    cwd: '',
+    issueId: null,
+    createdAt: structuralTimestamp,
+    endedAt: structuralTimestamp,
+    lastAttachedAt: null,
+    sessionAlive: false,
+    harness: 'claude-code',
+  }
+}
+
 /**
  * Stage — the project-scoped deck (PAN-1561, evolves PAN-1549). Renders the
  * persistent PaneBar plus the active pane. Pane state lives in `panesStore`,
@@ -250,7 +284,12 @@ export function Stage({ deckKey, conversations = [], resolveSession, terminalCwd
         }
         if (!pane.conversationId) return undefined
         const conversation = conversations.find((c) => c.name === pane.conversationId)
-        return conversation ? { conversation } : undefined
+        if (conversation) return { conversation }
+        // A palette search hit on an indexed-but-unregistered Claude session.
+        if (CLAUDE_SESSION_UUID.test(pane.conversationId)) {
+          return { conversation: unregisteredSessionConversation(pane.conversationId), readOnly: true }
+        }
+        return undefined
       },
     }),
     [deckKey, openPane, conversations, resolveSession],
