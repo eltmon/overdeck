@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T06:32:45.868Z",
+  "updated": "2026-07-30T06:33:00.188Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "passed",
@@ -55,41 +55,17 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z",
-    "updatedAt": "2026-07-30T06:32:43.169Z",
-    "reviewNotes": "Approved: durable start transitions, owned-path reconciliation adoption, requirements coverage, and focused quality gates all pass with no findings.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "All four ACs met by executed production code; verified locally with a full run of state-door-durability.test.ts (7 passed, including the new adoption test). AC1: the test installs a pre-receive hook that rejects the first push with a 'cannot lock ref ... but expected' message matching isRemoteRefRaceError (record-update.ts:170), so reconcileStatePush is genuinely entered; adoptOrphanedStateWrites (record-update.ts:187, called at :324 between fetch and rebase) commits the dirty spec, the rebase completes, and the test proves the record mutation reached the remote by reading origin/overdeck-state:records/pan-3298.json and asserting statusOverrides == {owned-write: completed}, plus that origin log contains 'chore(state): adopt orphaned write before state rebase (PAN-3296)'. AC2: porcelain(stateRoot) asserted empty after the adoption-path reconciliation. AC3: a dirty operator-note.txt outside specs/records rejects with a message naming that path (record-update.ts:194) and the test pins adoption-commit counts unchanged on BOTH origin/overdeck-state and HEAD, so no local-only adoption commit slipped through either. AC4: console.warn at record-update.ts:208 lists every adopted path via paths.join and the test asserts the '[record-update] adopted orphaned state write(s): specs/' prefix. NFR-2 holds: only the existing async git() helper with { signal }, no sync/tmux primitives, specs.ts untouched. Checked the new rebase-conflict exposure — an adopted spec that conflicts on rebase is caught by replayConflictedRecord's single-path guard (record-update.ts:234-236), which aborts the rebase and throws loudly rather than corrupting state. Three non-blocking observations for later hardening, all fail-closed and none in AC scope: (1) 'git add -- specs records' at record-update.ts:203 exits 128 when a pathspec dir is entirely ABSENT (empirically verified; an existing-but-empty dir is fine), so a records-only dirty worktree on a state clone with no specs/ dir still wedges, now with an opaque git pathspec error — adding the already-enumerated paths instead of the two dir pathspecs would close it; (2) isOwnedStatePath (record-update.ts:183) covers only specs/ and records/, exactly as FR-4 specifies, so orphaned drafts/ or continues/ writes still wedge; (3) porcelainPaths (record-update.ts:173) does not unquote porcelain v1 quoted paths, so an owned path containing a space would be classified unowned and fail closed rather than adopt.",
+    "updatedAt": "2026-07-30T06:32:58.916Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-30T06:32:58.915Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3311",
     "reviewedAtCommit": "6458678c860d5d9309a0440031784d00f1e49eb3",
-    "reviewSpawnedAt": "2026-07-30T06:11:09.532Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/cli/commands/start-status.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/AGENT-STATE-PLANES.md",
-        "docs/XBRIEF.md",
-        "src/cli/commands/start.ts",
-        "src/dashboard/server/routes/agents/spawn.ts",
-        "src/lib/pan-dir/__tests__/state-door-durability.test.ts",
-        "src/lib/pan-dir/record-update.ts",
-        "src/lib/xbrief/__tests__/lifecycle-io.test.ts",
-        "src/lib/xbrief/lifecycle-io.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/AGENT-STATE-PLANES.md",
-        "docs/XBRIEF.md",
-        "src/cli/commands/start-status.ts",
-        "src/cli/commands/start.ts",
-        "src/dashboard/server/routes/agents/spawn.ts",
-        "src/lib/pan-dir/__tests__/state-door-durability.test.ts",
-        "src/lib/pan-dir/record-update.ts",
-        "src/lib/xbrief/__tests__/lifecycle-io.test.ts",
-        "src/lib/xbrief/lifecycle-io.ts"
-      ],
-      "recordedAt": "2026-07-30T05:59:49.887Z"
-    }
+    "reviewSpawnedAt": "2026-07-30T06:11:09.532Z"
   },
   "closeOut": {
     "usage": {
@@ -112,10 +88,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 60,
-            "output": 7957,
-            "cacheRead": 4092687,
-            "cacheWrite": 123308
+            "input": 62,
+            "output": 8131,
+            "cacheRead": 4246665,
+            "cacheWrite": 123889
           }
         },
         "work": {
@@ -141,15 +117,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 60,
-          "output": 7957,
-          "cacheRead": 4092687,
-          "cacheWrite": 123308
+          "input": 62,
+          "output": 8131,
+          "cacheRead": 4246665,
+          "cacheWrite": 123889
         }
       },
       "costAtCloseOut": {
-        "usd": 90.193836,
-        "pricingAsOf": "2026-07-30T06:32:45.864Z"
+        "usd": 90.227828,
+        "pricingAsOf": "2026-07-30T06:32:58.960Z"
       }
     },
     "merges": [
