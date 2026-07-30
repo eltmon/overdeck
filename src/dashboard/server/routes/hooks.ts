@@ -30,6 +30,11 @@ import { derivePromptTitle } from '../../../lib/conversations/transcript-summary
 import { generateAiTitle, resolveSessionFile } from '../../../lib/overdeck/conversation-reads.js';
 import { handleTurnComplete } from '../../../lib/overdeck/title-refinement.js';
 import { appendFreshBriefingUpdate, recordBriefingSessionStart } from '../../../lib/briefing-freshness.js';
+import {
+  claimSessionBriefing,
+  composeSessionStartBriefing,
+  recordSessionBriefingSize,
+} from '../../../lib/memory/session-briefing.js';
 import { resolveComplianceAdvisoryWarning } from '../../../lib/compliance/advisory-warning.js';
 import { injectPromptTimeMemory } from '../../../lib/memory/injection.js';
 import type { ExtractFromTranscriptDeltaInput } from '../../../lib/memory/pipeline.js';
@@ -87,6 +92,9 @@ export interface HandleMemorySessionStartBodyOptions {
   areObservationsEnabled?: () => boolean | Promise<boolean>;
   resolveTranscriptPath?: (body: Record<string, unknown>, sessionId: string) => Promise<string | null>;
   resolveAgentIdBySessionId?: (sessionId: string) => Promise<string | null>;
+  claimSessionBriefing?: typeof claimSessionBriefing;
+  composeSessionStartBriefing?: typeof composeSessionStartBriefing;
+  recordSessionBriefingSize?: typeof recordSessionBriefingSize;
   now?: Date;
 }
 
@@ -99,7 +107,8 @@ export type HandleMemoryTurnBodyResult =
 export type HandleMemorySessionStartBodyResult =
   | { status: 'subagent' }
   | { status: 'disabled' }
-  | { status: 'accepted'; sessionId: string }
+  /** `briefing` is the rendered SessionStart briefing when this session id has not been briefed yet (PAN-3286 FR-10). */
+  | { status: 'accepted'; sessionId: string; briefing?: string }
   | { status: 'transcript-missing'; sessionId: string }
   | { status: 'error'; statusCode: 400 | 422; error: string };
 
@@ -227,7 +236,44 @@ export async function handleMemorySessionStartBody(
     mtimeMs: fileStat.mtimeMs,
   });
 
-  return { status: 'accepted', sessionId };
+  // PAN-3286 FR-10: hand the hook a rendered standing briefing to emit as
+  // SessionStart additionalContext. Claim-then-compose so a second (or
+  // concurrent) SessionStart for the same session id gets nothing, and so any
+  // composition failure degrades to the plain accepted response.
+  const briefing = await composeBriefingForSessionStart(identity, sessionId, options);
+  return briefing ? { status: 'accepted', sessionId, briefing } : { status: 'accepted', sessionId };
+}
+
+/**
+ * Claim the session, compose the briefing, then record its size. Returns null
+ * whenever the briefing must not be delivered: already claimed, nothing to say,
+ * or any failure — never throws, so the SessionStart hook keeps its current
+ * behavior (PAN-3286 FR-10).
+ */
+async function composeBriefingForSessionStart(
+  identity: MemoryIdentity,
+  sessionId: string,
+  options: HandleMemorySessionStartBodyOptions,
+): Promise<string | null> {
+  try {
+    const claim = options.claimSessionBriefing ?? claimSessionBriefing;
+    if (!await claim({ identity, sessionId, now: options.now })) return null;
+
+    const compose = options.composeSessionStartBriefing ?? composeSessionStartBriefing;
+    const briefing = await compose({ identity, sessionId, now: options.now });
+    if (!briefing) return null;
+
+    await (options.recordSessionBriefingSize ?? recordSessionBriefingSize)({
+      identity,
+      sessionId,
+      byteSize: briefing.byteSize,
+      now: options.now,
+    }).catch(() => {});
+    return briefing.context;
+  } catch (error) {
+    console.error('[memory] SessionStart briefing composition failed:', error);
+    return null;
+  }
 }
 
 export interface HandleMemoryInjectBodyOptions {
@@ -395,7 +441,13 @@ const postMemorySessionStartRoute = HttpRouter.add(
     }
     if (result.status === 'error') return jsonResponse({ ok: false, error: result.error }, { status: result.statusCode });
 
-    return jsonResponse({ ok: true }, { status: 202 });
+    // `briefing` is what the local SessionStart hook script emits as
+    // hookSpecificOutput.additionalContext (PAN-3286 FR-10). Absent when this
+    // session id was already briefed or there was nothing to say.
+    return jsonResponse(
+      result.briefing ? { ok: true, briefing: result.briefing } : { ok: true },
+      { status: 202 },
+    );
   })),
 );
 

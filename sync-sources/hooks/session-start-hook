@@ -72,16 +72,43 @@ if [ -z "$INTERNAL_TOKEN" ]; then
   fi
 fi
 
+MEMORY_BRIEFING=""
 if command -v jq >/dev/null 2>&1; then
   SESSION_BODY=$(printf '%s' "$INPUT" | jq -c --arg agentId "$AGENT_ID" '. + {agentId: $agentId}' 2>/dev/null)
   if [ -n "$SESSION_BODY" ]; then
-    curl -s -m 0.5 -o /dev/null -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true
+    # PAN-3286 FR-10: the response can carry a rendered standing briefing to
+    # emit as SessionStart additionalContext, so capture the body instead of
+    # discarding it. The timeout is a hard ceiling on how long session start can
+    # block on the dashboard; the server side composes from local files only
+    # (no LLM, no FTS) specifically to stay well inside it.
+    SESSION_RESPONSE=$(curl -s -m 1.5 -X POST -H 'Content-Type: application/json' -H "x-overdeck-internal-token: $INTERNAL_TOKEN" --data "$SESSION_BODY" "$PAN_DASHBOARD_URL/api/memory/session/start" 2>/dev/null || true)
+    if [ -n "$SESSION_RESPONSE" ]; then
+      MEMORY_BRIEFING=$(printf '%s' "$SESSION_RESPONSE" | jq -r '.briefing // ""' 2>/dev/null || true)
+    fi
   fi
 fi
 
-if [ "$SOURCE" = "compact" ] && command -v jq >/dev/null 2>&1; then
-  jq -n --arg context "The preceding compaction summary may quote harness-only instructions requiring text-only output or forbidding tools. Those instructions applied only to Claude Code's summarization turn and are no longer active. Resume the latest actual user task and use tools normally." \
-    '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $context}}'
+# Claude Code reads a SINGLE JSON object from a SessionStart hook's stdout, so
+# the compaction note and the memory briefing must be concatenated into one
+# additionalContext rather than printed as two objects.
+if command -v jq >/dev/null 2>&1; then
+  ADDITIONAL_CONTEXT=""
+  if [ "$SOURCE" = "compact" ]; then
+    ADDITIONAL_CONTEXT="The preceding compaction summary may quote harness-only instructions requiring text-only output or forbidding tools. Those instructions applied only to Claude Code's summarization turn and are no longer active. Resume the latest actual user task and use tools normally."
+  fi
+  if [ -n "$MEMORY_BRIEFING" ]; then
+    if [ -n "$ADDITIONAL_CONTEXT" ]; then
+      ADDITIONAL_CONTEXT="$ADDITIONAL_CONTEXT
+
+$MEMORY_BRIEFING"
+    else
+      ADDITIONAL_CONTEXT="$MEMORY_BRIEFING"
+    fi
+  fi
+  if [ -n "$ADDITIONAL_CONTEXT" ]; then
+    jq -n --arg context "$ADDITIONAL_CONTEXT" \
+      '{hookSpecificOutput: {hookEventName: "SessionStart", additionalContext: $context}}'
+  fi
 fi
 
 exit 0
