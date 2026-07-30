@@ -8,10 +8,12 @@ import {
   createArtifact,
   getArtifactStatus,
   listArtifacts,
+  parseAgentHarness,
   publishArtifact,
   resolveArtifactUrl,
   unshareArtifact,
 } from '../../src/lib/artifacts/lifecycle.js';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 
 describe('artifact lifecycle', () => {
   let originalHome: string | undefined;
@@ -157,6 +159,22 @@ describe('artifact lifecycle', () => {
     await expect(createArtifact(filePath, { repository: repo })).rejects.toBeInstanceOf(ArtifactValidationError);
     expect(repo.getByFilePath(filePath)).toBeNull();
     expect(existsSync(join(home, 'artifacts', 'snapshots'))).toBe(false);
+  });
+});
+
+describe('parseAgentHarness', () => {
+  it('no-loss: recognizes every canonical harness from PAN_AGENT_HARNESS (PAN-1837 review fix)', () => {
+    // Derived from KNOWN_HARNESSES so a future harness addition that forgets
+    // to update parseAgentHarness's literal list fails here instead of
+    // silently recording null provenance for that harness's artifacts.
+    for (const harness of KNOWN_HARNESSES) {
+      expect(parseAgentHarness(harness)).toBe(harness);
+    }
+  });
+
+  it('returns null for an unrecognized value', () => {
+    expect(parseAgentHarness('some-future-harness')).toBeNull();
+    expect(parseAgentHarness(undefined)).toBeNull();
   });
 });
 

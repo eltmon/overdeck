@@ -361,6 +361,20 @@ describe('AC3 — reads and writes route through their designated doors', () => 
     expect(Array.isArray(result.files)).toBe(true);
   });
 
+  it('ConversationsResolver.get decodes a kimi-code conversation row without throwing (PAN-1837)', async () => {
+    const { fdb, dbLayer } = makeFakeDb();
+    fdb.convRows.push(makeConvRow('kimi-conv', { harness: 'kimi-code', model: 'kimi-code/k3' }));
+
+    const layer = ConversationsResolverLive.pipe(Layer.provide(dbLayer));
+
+    const result = await Effect.runPromise(
+      ConversationsResolver.use((r) => r.get('kimi-conv' as ConversationName)).pipe(Effect.provide(layer)),
+    );
+
+    expect(result.harness).toBe('kimi-code');
+    expect(result.model).toBe('kimi-code/k3');
+  });
+
   it('ConversationsResolver.get fails with ConversationNotFound for unknown name', async () => {
     const { dbLayer } = makeFakeDb();
     const layer = ConversationsResolverLive.pipe(Layer.provide(dbLayer));

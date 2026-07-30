@@ -1543,6 +1543,112 @@ describe('generateLauncherScript — ohmypi harness (PAN-1989)', () => {
     });
     expect(a).toBe(b);
   });
+
+  describe('kimi-code harness (PAN-1837)', () => {
+    it('launches the native kimi TUI wrapped in the PTY supervisor with an isolated provider environment', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        overdeckEnv: { agentId: 'agent-pan-1837' },
+        unsetProviderEnv: true,
+        useSupervisor: true,
+        supervisorScriptPath: '/dist/pty-supervisor.js',
+      });
+
+      expect(script).toMatch(/^exec node '\/dist\/pty-supervisor\.js' kimi -m 'k3' --yolo$/m);
+      expect(script).toContain('unset ANTHROPIC_API_KEY');
+      expect(script).toContain('unset ANTHROPIC_BASE_URL');
+      expect(script).toContain('unset ANTHROPIC_AUTH_TOKEN');
+      expect(script).not.toMatch(/export ANTHROPIC_(?:API_KEY|BASE_URL|AUTH_TOKEN)=/);
+    });
+
+    it('never emits --session (long form), --work-dir, or -p/--print (D2/erratum E1)', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        promptFile: '/workspace/project/.pan/init-prompt.txt',
+      });
+      expect(script).not.toMatch(/--session\b/);
+      expect(script).not.toMatch(/--work-dir/);
+      expect(script).not.toMatch(/(^|\s)-p(\s|$)/);
+      expect(script).not.toMatch(/--print/);
+    });
+
+    it('resumes a captured session id via -S (PAN-1837)', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        resumeSessionId: 'session-abc-123',
+      });
+      expect(script).toMatch(/^exec kimi -m 'k3' -S 'session-abc-123' --yolo$/m);
+    });
+
+    it('omits -S when no resumeSessionId is set (fresh launch)', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+      });
+      expect(script).not.toMatch(/-S /);
+    });
+
+    it('appends --add-dir once per configured directory', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        kimiCodeAddDirs: ['/workspace/other-repo', '/workspace/third'],
+      });
+      expect(script).toMatch(/^exec kimi -m 'k3' --yolo --add-dir '\/workspace\/other-repo' --add-dir '\/workspace\/third'$/m);
+    });
+
+    it('omits --yolo when kimiCodeYolo is not set', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+      });
+      expect(script).toMatch(/^exec kimi -m 'k3'$/m);
+      expect(script).not.toMatch(/--yolo/);
+    });
+
+    it('refuses to launch without a configured model', () => {
+      expect(() => generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+      })).toThrow('kimi-code launcher requires kimiCodeModel');
+    });
+
+    it('conversation panel mode wraps the same command under the PTY supervisor', () => {
+      const script = generateLauncherScriptSync({
+        ...DEFAULT_CONFIG,
+        role: 'work',
+        harness: 'kimi-code',
+        kimiCodeModel: 'k3',
+        kimiCodeYolo: true,
+        spawnMode: 'conversation',
+        useSupervisor: true,
+        supervisorScriptPath: '/dist/pty-supervisor.js',
+      });
+      expect(script).toMatch(/^node '\/dist\/pty-supervisor\.js' kimi -m 'k3' --yolo$/m);
+      expect(script).not.toMatch(/^exec /m);
+    });
+  });
 });
 
 describe('pi model provider qualification (PAN-1799)', () => {

@@ -7,6 +7,7 @@ import {
   ContextPreviewRequest,
   ContextPreviewResponse,
   ContextSyncRequest,
+  KNOWN_HARNESSES,
 } from "./index"
 import type { Harness } from "./types"
 
@@ -95,7 +96,7 @@ describe("context dashboard contracts", () => {
 
   it("names harness previews with shared harness values and fullPrompt", () => {
     const harnesses: readonly Harness[] = CONTEXT_PREVIEW_HARNESSES
-    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex", "acp"])
+    expect(harnesses).toEqual(["claude-code", "ohmypi", "codex", "acp", "kimi-code"])
 
     const parsed = decodePreviewResponse({
       operation: "preview",
@@ -104,6 +105,7 @@ describe("context dashboard contracts", () => {
         ohmypi: "oh-my-pi rendered context",
         codex: "Codex rendered context",
         acp: "ACP rendered context",
+        "kimi-code": "Kimi Code rendered context",
         fullPrompt: "Overdeck injected prompt audit",
       },
       diagnostics: [],
@@ -112,7 +114,14 @@ describe("context dashboard contracts", () => {
     expect(parsed.previews["claude-code"]).toBe("Claude Code rendered context")
     expect(parsed.previews.ohmypi).toBe("oh-my-pi rendered context")
     expect(parsed.previews.acp).toBe("ACP rendered context")
+    expect(parsed.previews["kimi-code"]).toBe("Kimi Code rendered context")
     expect(parsed.previews.fullPrompt).toBe("Overdeck injected prompt audit")
+  })
+
+  it("no-loss: CONTEXT_PREVIEW_HARNESSES covers every canonical harness (PAN-1837 review fix)", () => {
+    for (const harness of KNOWN_HARNESSES) {
+      expect(CONTEXT_PREVIEW_HARNESSES).toContain(harness)
+    }
   })
 
   it("keeps preview, save, and sync operations distinct", () => {

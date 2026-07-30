@@ -33,8 +33,10 @@ import {
   summarizeSerializedText as mockedSummarize,
 } from '../smart-compaction.js';
 import { getTranscriptAdapter } from '../transcript-adapter.js';
+import { kimiSessionsRoot } from '../../runtimes/kimi-code.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
+const originalHome = process.env.HOME;
 let workDir: string;
 
 beforeEach(async () => {
@@ -49,6 +51,11 @@ afterEach(async () => {
     delete process.env.OVERDECK_HOME;
   } else {
     process.env.OVERDECK_HOME = originalOverdeckHome;
+  }
+  if (originalHome === undefined) {
+    delete process.env.HOME;
+  } else {
+    process.env.HOME = originalHome;
   }
   await rm(workDir, { recursive: true, force: true });
 });
@@ -173,6 +180,65 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
     expect(mockedGenerateSmartSummary).not.toHaveBeenCalled();
   });
 
+  it('resolves, serializes, and compacts a native Kimi Code source transcript (PAN-1837)', async () => {
+    process.env.HOME = workDir;
+    const workspace = join(workDir, 'kimi-workspace');
+    await mkdir(workspace, { recursive: true });
+    const tmuxSession = 'conv-kimi-source';
+    const kimiHome = join(workDir, '.kimi-code');
+    const sessionDir = join(kimiSessionsRoot(kimiHome, workspace), 'session-abc', 'agents', 'main');
+    await mkdir(sessionDir, { recursive: true });
+    const file = join(sessionDir, 'wire.jsonl');
+    await writeFile(file, [
+      JSON.stringify({ type: 'metadata', created_at: 1 }),
+      JSON.stringify({
+        type: 'turn.prompt',
+        time: 1,
+        input: [{ type: 'text', text: 'Continue the kimi-code work' }],
+      }),
+      '{malformed',
+      JSON.stringify({
+        type: 'context.append_loop_event',
+        time: 2,
+        event: { type: 'content.part', part: { type: 'text', text: 'I will inspect the runtime adapter' } },
+      }),
+      JSON.stringify({
+        type: 'context.append_loop_event',
+        time: 3,
+        event: { type: 'tool.call', toolCallId: 'call-1', name: 'Read', args: { file: 'kimi-code.ts' } },
+      }),
+      JSON.stringify({
+        type: 'context.append_loop_event',
+        time: 4,
+        event: { type: 'tool.result', toolCallId: 'call-1', result: { output: 'UNBOUNDED_TOOL_OUTPUT_MUST_NOT_APPEAR' } },
+      }),
+    ].join('\n') + '\n', 'utf-8');
+
+    const adapter = getTranscriptAdapter('kimi-code');
+    expect(adapter.name).toBe('kimi-code');
+    expect(adapter.supportsPlainForkAsSource).toBe(false);
+    expect(adapter.supportsSourceAuthoredHandoff).toBe(false);
+
+    const conv = { tmuxSession, cwd: workspace } as Parameters<typeof adapter.resolveSessionFile>[0];
+    await expect(adapter.resolveSessionFile(conv)).resolves.toBe(file);
+
+    const serialized = await adapter.serializeTranscript(file);
+    expect(serialized).toContain('[user]\nContinue the kimi-code work');
+    expect(serialized).toContain('[assistant]\nI will inspect the runtime adapter');
+    expect(serialized).toContain('[tool_use: Read]');
+    expect(serialized).not.toContain('UNBOUNDED_TOOL_OUTPUT_MUST_NOT_APPEAR');
+    expect(serialized).not.toContain('{malformed');
+
+    const { summary, summaryModel } = await adapter.compactSummary(file, {
+      model: 'claude-haiku-4-5',
+      includeThinking: false,
+    });
+    expect(summary).toContain('Continue the kimi-code work');
+    expect(summaryModel).toBe('claude-haiku-4-5');
+    expect(mockedSummarize).toHaveBeenCalledTimes(1);
+    expect(mockedGenerateSmartSummary).not.toHaveBeenCalled();
+  });
+
   it('routes a Claude Code source through the entry-aware smart-compaction path', async () => {
     const file = await writeJsonl('cc-session.jsonl', [
       { type: 'user', message: { role: 'user', content: [{ type: 'text', text: 'Fix the failing test in foo.spec.ts' }] } },
@@ -204,6 +270,7 @@ describe('ConversationTranscriptAdapter.compactSummary', () => {
   it('selects the source adapter independently of the summarizer harness', () => {
     expect(getTranscriptAdapter('ohmypi').name).toBe('ohmypi');
     expect(getTranscriptAdapter('claude-code').name).toBe('claude-code');
+    expect(getTranscriptAdapter('kimi-code').name).toBe('kimi-code');
     expect(getTranscriptAdapter(undefined).name).toBe('claude-code');
   });
 });

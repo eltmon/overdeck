@@ -24,7 +24,7 @@ import type { RuntimeName } from '../runtimes/types.js';
 import { requireModelOverrideSync, shellQuoteModelIdSync } from '../model-validation.js';
 import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { getOverdeckHome, packageRoot, resolveOhmypiExtensionPath, resolvePiExtensionPath } from '../paths.js';
-import { getProviderForModelSync } from '../providers.js';
+import { getProviderForModelSync, resolveKimiCodeModelAlias } from '../providers.js';
 import type { AuthMode } from '../subscription-types.js';
 import { capturePane, sessionExists } from '../tmux.js';
 import { getAgentDir, getAgentStateSync, type Role } from './agent-state.js';
@@ -245,6 +245,23 @@ export function getAcpLauncherFields(
   };
 }
 
+export function getKimiCodeLauncherFields(model: string): {
+  harness: 'kimi-code';
+  kimiCodeModel: string;
+  kimiCodeYolo: true;
+  model: string;
+  unsetProviderEnv: true;
+} {
+  const kimiCodeModel = resolveKimiCodeModelAlias(model);
+  return {
+    harness: 'kimi-code',
+    kimiCodeModel,
+    kimiCodeYolo: true,
+    model,
+    unsetProviderEnv: true,
+  };
+}
+
 export function getCodexLauncherFields(agentId: string, model: string, workspacePath?: string, role?: Role): {
   harness: 'codex';
   codexMode: 'app-server' | 'work-tui';
@@ -338,6 +355,35 @@ export function describeOhmypiSpawnFailure(agentId: string): string {
     }
   } catch { /* best-effort */ }
   return parts.length ? ` [${parts.join(' ')}]` : '';
+}
+
+/**
+ * PAN-1837: readinessKind 'kimi-session-signal' has no consumer of its own —
+ * without this branch, waitForPromptReady's default case waits for Claude
+ * Code's ready-signal file, which the native kimi binary never writes, so
+ * every kimi-code spawn times out after 30s (confirmed live: wi14 e2e run).
+ * Ready is defined the same way as the codex TUI branch above: the pane must
+ * show both the input box (a `>` inside its box-drawn border) and the bottom
+ * status line (verified live against installed kimi 0.29.2 — the status line
+ * always renders `context: N% (…)` regardless of --yolo/model).
+ */
+async function waitForKimiCodeTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
+  const deadline = Date.now() + timeoutSec * 1000;
+  while (Date.now() < deadline) {
+    try {
+      if (!(await Effect.runPromise(sessionExists(agentId)))) return false;
+      const pane = await Effect.runPromise(capturePane(agentId, 80));
+      const hasInputPrompt = /[│|]\s*>\s*[│|]?/.test(pane);
+      const hasStatusLine = /context:\s*\d+%/.test(pane);
+      if (hasInputPrompt && hasStatusLine) {
+        return true;
+      }
+    } catch {
+      // The pane may not exist yet immediately after tmux session creation.
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
 }
 
 async function waitForCodexTuiReady(agentId: string, timeoutSec = 30): Promise<boolean> {
@@ -547,6 +593,7 @@ export async function waitForPromptReady(agentId: string, harness: RuntimeName |
     return true;
   }
   if (readinessKind === 'codex-tui-prompt') return waitForCodexTuiReady(agentId, timeoutSec);
+  if (readinessKind === 'kimi-session-signal') return waitForKimiCodeTuiReady(agentId, timeoutSec);
   return waitForReadySignal(agentId, timeoutSec);
 }
 
@@ -723,6 +770,11 @@ export async function getAgentRuntimeBaseCommand(
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
+  }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
+    // command; return a stub base command so the launcher generator can short-circuit.
+    return 'kimi-code';
   }
 
   // Integration tests can inject a harmless harness command so a leaked or
@@ -911,6 +963,11 @@ export async function getRoleRuntimeBaseCommand(
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return 'acp-host';
+  }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    // buildKimiCodeCommand in launcher-generator builds the full `kimi -m ... --yolo`
+    // command; return a stub base command so the launcher generator can short-circuit.
+    return 'kimi-code';
   }
 
   // Integration tests can inject a harmless harness command so a leaked or

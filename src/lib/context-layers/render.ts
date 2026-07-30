@@ -103,10 +103,11 @@ export function renderGlobalLayer(harness: Harness, includeDevRules: boolean): s
 }
 
 /**
- * Render a project layer for one harness. Returns '' when the project has no
- * `project.md` — sync then leaves that project's CLAUDE.md alone.
+ * Render a project layer for one harness, or a union of harnesses sharing
+ * one physical target file. Returns '' when the project has no
+ * `project.md` — sync then leaves that project's CLAUDE.md/AGENTS.md alone.
  */
-export function renderProjectLayer(projectRoot: string, harness: Harness): string {
+export function renderProjectLayer(projectRoot: string, harness: Harness | readonly Harness[]): string {
   const raw = readLayerContent(resolveProjectContextFile(projectRoot));
   if (raw.trim().length === 0) return '';
   return renderForHarness(raw, harness).trim();

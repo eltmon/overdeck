@@ -26,8 +26,10 @@ import {
   artifactUnshareCommand,
   artifactUrlCommand,
   artifactValidateCommand,
+  parseAgentHarness,
   registerArtifactCommands,
 } from '../artifacts.js';
+import { KNOWN_HARNESSES } from '@overdeck/contracts';
 
 const artifact = {
   artifactId: 'artifact-1',
@@ -324,3 +326,19 @@ function createIndexedArtifact(): { home: string; repo: ArtifactIndexRepository;
 function html(title: string, body: string): string {
   return `<!doctype html><html><head><title>${title}</title></head><body>${body}</body></html>`;
 }
+
+describe('parseAgentHarness (PAN-1837 review fix)', () => {
+  it('returns undefined for an undefined value', () => {
+    expect(parseAgentHarness(undefined)).toBeUndefined();
+  });
+
+  it('throws for an unrecognized value', () => {
+    expect(() => parseAgentHarness('not-a-harness')).toThrow('Invalid --agent-harness: not-a-harness');
+  });
+
+  it('no-loss: accepts every canonical harness', () => {
+    for (const harness of KNOWN_HARNESSES) {
+      expect(parseAgentHarness(harness)).toBe(harness);
+    }
+  });
+});

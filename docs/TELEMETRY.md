@@ -79,7 +79,7 @@ the public contract and lists every allowed value.
 | `duration_bucket` | `under_100ms`, `100ms-999ms`, `1s-9s`, `10s+` |
 | `forge` | `github`, `gitlab` |
 | `fork_kind` | `summary`, `handoff`, `plain` |
-| `harness` | `claude-code`, `ohmypi`, `codex`, `acp` |
+| `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |

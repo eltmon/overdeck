@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
 import {
+  ArtifactAgentHarness,
   ArtifactCreateResponse,
   ArtifactListResponse,
   ArtifactMetadata,
@@ -8,6 +9,7 @@ import {
   ArtifactValidationResult,
   WorkspaceArtifactsResponse,
 } from "./artifacts"
+import { KNOWN_HARNESSES } from "./types"
 
 const decodeArtifactMetadata = Schema.decodeUnknownSync(ArtifactMetadata)
 const decodeArtifactValidationResult = Schema.decodeUnknownSync(ArtifactValidationResult)
@@ -143,5 +145,17 @@ describe("artifact contracts", () => {
       ...validation,
       errors: [{ ...validation.errors[0], code: "xss_detected" }],
     })).toThrow()
+  })
+
+  it("no-loss: every canonical harness is a valid ArtifactAgentHarness literal (PAN-1837 review fix)", () => {
+    // FR-1 requires kimi-code (and every future harness addition) in every
+    // hand-maintained validator, not just the Harness union itself. This test
+    // is derived from KNOWN_HARNESSES so a future harness addition that
+    // forgets to update ArtifactAgentHarness fails here instead of silently
+    // dropping/nulling provenance on published artifacts.
+    const decodeHarness = Schema.decodeUnknownSync(ArtifactAgentHarness)
+    for (const harness of KNOWN_HARNESSES) {
+      expect(() => decodeHarness(harness)).not.toThrow()
+    }
   })
 })
