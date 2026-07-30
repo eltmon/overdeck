@@ -9250,3 +9250,17 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **19 close-outs, 18 PRs merged**, 22 substrate bugs driven (14 fixed and merged, 9 filed).
 - Six issues at verifying-on-main awaiting their close-out gate.
 - **Genuinely blocked, none forced:** PAN-3305 (residual gate case, reported), PAN-3313 (operator — CLIProxy second auth entry), 4 new backlog items awaiting release (PAN-3330/3331/3340/3341), 17 MYN rows out of merge scope, TIN-1, and 4 typed blind spots.
+
+## RUN-75 tick 26 (2026-07-30 22:56Z) — all six strikes CLOSED OUT; the cwd drift finally bit
+
+- **All six merged strikes closed out**: PAN-3342, PAN-3326, PAN-3339, PAN-3324, PAN-3328, PAN-3327. Main CI green at `2a17c95e9e`. **25 close-outs for the run**, none with an `--accept-*` override.
+- **The cwd drift produced its real consequence, and it is worth recording precisely.** Closing PAN-3342 **deleted the workspace my shell was standing in** (`workspaces/feature-pan-3342-strike` — close-out tears down the workspace), so every following command died with `pwd: error retrieving current directory: getcwd: cannot access parent directories`. Five close-outs silently produced no output before I noticed.
+- **This is the failure mode the rule exists to prevent, and it took three escalating forms in one run:** (1) tick 17, a state commit landed on a strike branch; (2) tick 24, `pan reload` refused because the process was in a non-primary checkout; (3) now, the ground was deleted underneath the shell mid-batch. **Each time `git -C` kept the git commands correct, which is exactly why the drift stayed invisible for so long — the symptom only ever surfaced through something that reads the process cwd.**
+- **LESSON: `git -C` is not cwd hygiene, it is a workaround for the lack of it.** The orchestrator's cwd is itself state, and I let it point at a directory owned by an agent whose lifecycle I control — so my own close-out destroyed it. The rule is not "prefer `git -C`", it is **never let the process leave the primary checkout**: use subshells for anything that must run elsewhere, and treat a bare `cd` as an edit to durable state.
+- Recovered with a single `cd` back to the primary; the five remaining close-outs then ran clean.
+
+### RUN-75 standing state after tick 26
+
+- **25 close-outs, 18 PRs merged, 22 substrate bugs driven** (14 fixed, merged and closed out; 9 filed).
+- **Every machinery bug I filed this run that was mine to fix is now merged, deployed, and closed out.**
+- **Remaining, none forced:** PAN-3305 (residual gate case — merged work, branch behind main; fix suggested and the merged-PR path already exists), PAN-3313 (operator: CLIProxy second auth entry), PAN-3330/3331/3340/3341 (awaiting operator release), 17 MYN rows out of merge scope, TIN-1, 4 typed blind spots.
