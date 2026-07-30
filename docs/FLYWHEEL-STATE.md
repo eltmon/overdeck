@@ -8931,3 +8931,45 @@ Close-out failed: reviewStatus: pending
 PAN-3253 and PAN-3296 were mid-merge at tick close, so the cohort has not drained and **I did not declare the run complete**. If the next tick finds only PAN-3259/PAN-3305 (PAN-3326), the CLIProxy auth gap (PAN-3313), and out-of-scope MYN work, that is quiescence and the retrospective follows.
 
 - **RUN TOTALS (RUN-75): 14 close-outs, 10 PRs merged (+2 scheduled), 20 substrate bugs driven (8 fixed and merged; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across three automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
+
+## RUN-75 tick 10 (2026-07-30 12:13-12:20Z) — a 26-day-old merge-queue wedge, found because one PR would not merge
+
+### The artifact keeps holding
+
+Hook 445 lines / `guard=1`, mtime 12:00:42Z — a **fourth** automated `pan sync` re-wrote it correctly. Leak **0 procs**, ~51 GB free. PAN-3253 (#3279) merged 11:57:33Z.
+
+### PAN-3296 would not merge, and the reason was 26 days old
+
+PR #3311 was `MERGEABLE`, `CLEAN`, 0 non-green checks, review-passed, test-passed — and its scheduled auto-merge simply never fired, while PAN-3253's (scheduled one second apart) did. `GET /api/flywheel/auto-merge/problems` returned `[]`.
+
+Following it into the tables:
+
+```
+pending_auto_merges
+id 47  PAN-3253  status=merged   merged_at=11:57:36
+id 48  PAN-3296  status=merging  merged_at=null  failure_reason=null   <- stuck 16+ min
+
+merge_queue  (12 rows, ALL status=queued, ALL started_at=NULL)
+pos 1  PAN-2325  queued 2026-07-04   …   pos 16 PAN-3189 queued 2026-07-27
+pos 17 PAN-3296  queued 2026-07-30T11:57
+```
+
+- **The queue has never advanced. Not once in 26 days** — `started_at` is NULL on every row, so `markMergeProcessing()` has never fired.
+- **Closed issues hold the head positions.** PAN-2987, PAN-3166 and PAN-3189 are all CLOSED and still occupy positions 14–16 ahead of live work.
+- **Root cause:** `dequeueNextMerge()` is only invoked as a side effect of a merge completing through `merge-ops.ts` (`:433`, `:1174` — *"Step 5: Mark merged and dequeue next BEFORE post-merge lifecycle"*). A merge completing through the flywheel auto-merge scheduler never calls it. Today's two rows show the asymmetry exactly: PAN-3253 merged directly and reached `merged`; PAN-3296 was enqueued and parked.
+- **The failure is invisible by construction.** The problems endpoint reports `failed`/`blocked`; this row sits in `merging`, a state it can never leave, with `failure_reason=null`. So a permanently wedged merge presents as in-progress forever. That is why this survived twelve occurrences since July without being noticed.
+- Filed **PAN-3328** with the full table dump, the two call sites, and four proposed fixes. Noted the position gaps (5→8→11→13) as evidence some rows *were* removed historically, so this may be a regression rather than a never-worked path.
+- **LESSON: "no problems reported" is not evidence of no problem — check the state machine for states that have no exit.** I trusted an empty problems endpoint for several ticks while a merge sat wedged. The generalisable check is to look for rows in a transitional state with no timeout and no failure field, because those are invisible to every surface that filters on terminal states.
+- **Drove it to done rather than waiting on the wedge:** completed #3311 with a normal `gh pr merge --squash`. No failing check bypassed, no admin override. **12 PRs merged this run.**
+
+### Close-outs
+
+- **PAN-3253 closed out** — 15 for the run.
+- **PAN-3296 blocks only on DoD row 7 (deploy):** `verificationStatus: pending at 28290e7702…`, i.e. the live build does not yet contain a merge that is 90 seconds old. Legitimate and expected.
+- **Deliberately did not deploy for it.** The deploy patrol has redeployed twice unprompted today (observed at `22b6dfc7` and again later), so the mechanical owner will clear row 7 without a ~60s outage initiated at the tail of a context window. Deferred to the next tick rather than overridden — `--accept-deploy` is the operator's lever and was not used.
+
+### Not quiescent
+
+PAN-3296 still owes a deploy-gated close-out, so the cohort has **not** drained and the run is **not** declared complete. Remaining after that: PAN-3259/PAN-3305 (PAN-3326), PAN-3313 (operator-gated CLIProxy auth), MIN/tindra out of scope.
+
+- **RUN TOTALS (RUN-75): 15 close-outs, 12 PRs merged, 21 substrate bugs driven (8 fixed and merged; 8 filed: PAN-3313/3321/3322/3324/3325/3326/3327/3328; 5 escalated with located root causes), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across four automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
