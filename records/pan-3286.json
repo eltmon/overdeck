@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T04:25:56.144Z",
+  "updated": "2026-07-30T04:36:55.569Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "session-start-briefing": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 3010019,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:25:56.144Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
         "releasedAt": "2026-07-30T04:24:58.492Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 3010019,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:25:56.144Z",
+        "itemId": "session-start-briefing",
+        "outcome": "completed",
+        "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
+        "releasedAt": "2026-07-30T04:36:55.569Z"
       }
     ],
     "statusReasons": {
@@ -189,6 +192,10 @@
       "injection-cross-workspace": {
         "reason": "Null-issue turns now get same-project cross-workspace hits in the sibling slot (search.ts gains crossWorkspace/excludeWorkspaceId). Superseded the old D-6 skip test; issue-turn render locked by a score-normalized snapshot recorded pre-change and verified identical post-change. Note: PRD pointed at cli.ts's searchMemory but injection uses search.ts's.",
         "updatedAt": "2026-07-30T04:24:58.492Z"
+      },
+      "session-start-briefing": {
+        "reason": "SessionStart briefing composed from local status/observations/pin titles, delivered as additionalContext, at-most-once via an exclusive-create marker. CHECKPOINT RESOLVED: additionalContext IS deliverable (no fallback needed) but the hook script had to change to capture the response (outside declared files_scope) and merge with the compact note into ONE JSON object; curl timeout 0.5s->1.5s. Runtime-boot-tested on a throwaway instance at :3199; live :3011 untouched.",
+        "updatedAt": "2026-07-30T04:36:55.569Z"
       }
     }
   },
@@ -229,6 +236,10 @@
     "injection-cross-workspace.injection-cross-workspace.ac1": "completed",
     "injection-cross-workspace.injection-cross-workspace.ac2": "completed",
     "injection-cross-workspace.injection-cross-workspace.ac3": "completed",
-    "session-start-briefing": "running"
+    "session-start-briefing": "completed",
+    "session-start-briefing.session-start-briefing.ac1": "completed",
+    "session-start-briefing.session-start-briefing.ac2": "completed",
+    "session-start-briefing.session-start-briefing.ac3": "completed",
+    "session-start-briefing.session-start-briefing.ac4": "completed"
   }
 }
