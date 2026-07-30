@@ -1,7 +1,7 @@
 {
   "id": "2026-07-30-hardening-20260729",
   "name": "hardening-20260729",
-  "status": "draft",
+  "status": "ready",
   "settings": {
     "laneAConcurrency": 1,
     "posture": "open"
@@ -81,5 +81,5 @@
     }
   ],
   "createdAt": "2026-07-30T02:58:20.266Z",
-  "updatedAt": "2026-07-30T03:00:05.727Z"
+  "updatedAt": "2026-07-30T03:03:15.817Z"
 }
