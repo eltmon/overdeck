@@ -25,7 +25,7 @@ model.
 ## Commands
 
 ```bash
-pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>]
+pan workspace new <name> [--project <key>] [--isolated] [--parent-branch <branch>] [--target-path <dir>]
 pan workspace main [--project <key>]
 pan workspace get <ws>
 pan workspace activate <ws>
@@ -39,6 +39,14 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
   primary directory (same worktree, no new branch); pass `--isolated` to create a
   separate git worktree instead, with `--parent-branch` overriding the inferred
   parent (defaults to the project's current branch).
+- `--target-path <dir>` points the scratch workspace at any existing directory
+  instead of the project's primary path — this is how a workspace becomes a
+  long-lived lens onto an arbitrary repo, independent of `--isolated`'s
+  worktree-per-branch model. Mutually exclusive with `--isolated`; the path must
+  already exist. `is_git_repository` is detected from `<dir>/.git`. If the
+  resolved directory isn't the project's primary path or a path registered via
+  `pan project add-target`, the command still creates the row but prints an
+  informational note suggesting `pan project add-target`.
 - `main [--project <key>]` resolves the project's singleton main workspace, creating
   it if it doesn't exist yet. There is exactly one `main` workspace per project —
   `archive` refuses to touch it.

@@ -80,6 +80,7 @@ export function registerWorkspaceCommands(program: Command): void {
     .option('--project <key>', 'Registered project key (defaults to the sole project, or the one resolved from cwd)')
     .option('--isolated', 'Create an isolated git worktree instead of sharing the project directory')
     .option('--parent-branch <branch>', 'Parent branch for the isolated worktree (default: inferred from the project\'s current branch)')
+    .option('--target-path <dir>', 'Target an existing directory as the workspace path (rejects --isolated)')
     .action(workspaceNewCommand);
 
   workspace

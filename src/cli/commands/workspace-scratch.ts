@@ -1,14 +1,19 @@
 import { exec, execFile } from 'child_process';
-import { existsSync } from 'fs';
-import { join } from 'path';
+import { existsSync, statSync } from 'fs';
+import { join, resolve } from 'path';
 import { promisify } from 'util';
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { getDefaultWorkspaceConfigSync } from '../../lib/workspace-config.js';
-import { getMainWorkspace, resolveWorkspaceForCwd } from '../../lib/workspaces/resolver.js';
+import { getMainWorkspace, listProjectTargets, resolveWorkspaceForCwd } from '../../lib/workspaces/resolver.js';
 import { createWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
 import { validateFeatureName } from '../../lib/workspace-manager/worktree-ops.js';
+
+/** True when `path` equals, or is nested under, `candidate`. */
+function isPathUnder(path: string, candidate: string): boolean {
+  return path === candidate || path.startsWith(candidate.endsWith('/') ? candidate : `${candidate}/`);
+}
 
 const execAsync = promisify(exec);
 const execFileAsync = promisify(execFile);
@@ -54,6 +59,7 @@ export interface WorkspaceNewOptions {
   project?: string;
   isolated?: boolean;
   parentBranch?: string;
+  targetPath?: string;
 }
 
 export async function workspaceNewCommand(name: string, options: WorkspaceNewOptions): Promise<void> {
@@ -66,6 +72,9 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
     if (!validateFeatureName(name)) {
       throw new Error(`Invalid workspace name '${name}'. Use alphanumeric and hyphens only.`);
     }
+    if (options.targetPath && options.isolated) {
+      throw new Error(`--target-path cannot be combined with --isolated.`);
+    }
     const project = resolveProjectByKey(options.project);
     ensureProjectSeeded(project);
 
@@ -74,7 +83,16 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
 
     let path = project.config.path;
     let scratchBranch: string | undefined;
-    if (options.isolated) {
+    let unregisteredTargetPath = false;
+    if (options.targetPath) {
+      const resolvedTarget = resolve(options.targetPath);
+      if (!existsSync(resolvedTarget) || !statSync(resolvedTarget).isDirectory()) {
+        throw new Error(`--target-path must be an existing directory: ${options.targetPath}`);
+      }
+      path = resolvedTarget;
+      const registeredPaths = [project.config.path, ...listProjectTargets(project.key).map((t) => t.path)];
+      unregisteredTargetPath = !registeredPaths.some((candidate) => isPathUnder(path, candidate));
+    } else if (options.isolated) {
       const workspaceConfig = project.config.workspace || getDefaultWorkspaceConfigSync();
       const workspacesDir = join(project.config.path, workspaceConfig.workspaces_dir || 'workspaces');
       path = join(workspacesDir, `scratch-${name}`);
@@ -102,12 +120,19 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       branchName: scratchBranch,
       parentBranch: parentBranch ?? undefined,
       parentBranchGuessed,
-      isGitRepository: options.isolated ? true : existsSync(join(project.config.path, '.git')),
+      isGitRepository: options.isolated ? true : existsSync(join(path, '.git')),
     });
 
     console.log(chalk.green(`✓ Created scratch workspace '${name}' (${id})`));
     console.log(chalk.dim(`  path: ${path}`));
     if (options.isolated) console.log(chalk.dim(`  isolated worktree, parent branch: ${parentBranch ?? '(none)'}`));
+    if (unregisteredTargetPath) {
+      console.log(
+        chalk.yellow(
+          `ℹ '${path}' is not a registered target for project '${project.key}'. Run 'pan project add-target ${project.key} --path ${path}' to register it.`,
+        ),
+      );
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`✗ ${message}`));
