@@ -8890,3 +8890,44 @@ I restarted the sidecar as velocity recovery. **It recovered exactly one request
 - Deliberately still blocked, no overrides: **PAN-3259**/**PAN-3305** (PAN-3326 patch-id gate), **PAN-3296** (PAN-3313), **MIN-911** (MYN, out of merge scope).
 
 - **RUN TOTALS (RUN-75): 7 close-outs, 10 PRs merged, 20 substrate bugs driven (8 fixed and merged: PAN-3300/3320/3294/3286/3202/2390/3266/3305; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes: PAN-3294/3282/2706/3326/3324), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across two automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
+
+## RUN-75 tick 9 (2026-07-30 11:51-11:58Z) — drained the close-out tail: 7 in a row, 14 for the run
+
+### The sweep found the real remaining work, and it was not what I was watching
+
+- Hook artifact holding through a **third** automated sync (445 lines, `guard=1`, mtime 11:29:52Z); leak **0 procs**; ~50 GB free; `main` CI green on `e6dfb670d4` verified at the **job** level (6 jobs, 0 non-green).
+- **PAN-3253 and PAN-3296 both reached `ready_for_merge=1`.** PAN-3296's review completed despite the CLIProxy blockage I reported as blocking last tick — the intermittency eventually let it through, so my tick-8 characterisation was accurate at the time and stale within the hour. Both PRs CLEAN with 0 non-green checks; both scheduled.
+- **The membership read-door sweep is what changed the tick's shape.** I had been tracking two in-flight issues; the sweep showed **nine** rows in `post_merge_limbo` — merged work that had never been closed out and was therefore still counted as in-flight pipeline work.
+- **LESSON: the sweep is not a formality, and I had been under-reading it.** For several ticks I drove the two or three issues I was actively touching while a nine-item close-out tail accumulated behind me. Doctrine puts "close out the tail" in the Act step for exactly this reason, and it took the full read-door sweep — not the review-status query I usually reach for — to surface it.
+
+### Seven close-outs in a row, all clean
+
+`pan close --force` (confirmation only; **no `--accept-*` override anywhere**): **PAN-2390, PAN-3202, PAN-3266, PAN-3286, PAN-3291, PAN-3293, PAN-3294** — all "Close-out complete". Verified on the tracker rather than trusting the CLI: all seven are `CLOSED` carrying the `closed-out` label.
+
+That is **14 close-outs for the run**, and it is the direct dividend of landing PAN-3202: every one of these passed DoD row 6 through the later-green-containment evidence form, which before today would have blocked all of them permanently.
+
+### PAN-3326's real cost: one bug, three failing rows
+
+PAN-3259 and PAN-3305 are the only two that could not close, and the failure is now precisely characterised:
+
+```
+Row 1 (review) blocks close-out; --accept-review …
+Row 2 (tests)  blocks close-out; --accept-tests …
+Row 5 (post-merge) blocks close-out; --accept-post-merge …
+Close-out failed: reviewStatus: pending
+```
+
+- Strikes skip the review pipeline, so `pan done --strike` is what records their verdicts. PAN-3326's patch-id false positive refuses that handoff, so `reviewStatus` stays `pending` forever and **three** rows fail for one underlying reason.
+- **An operator forcing these needs three separate overrides** for a commit comparison that is provably wrong — the strongest argument yet for the machinery fix over the override. Recorded on PAN-3326 with the seven-clean-close-outs contrast: the only two that cannot drain are the two this gate holds.
+- Still not force-closed.
+
+### Verified, and a benign lag worth knowing
+
+- After the seven close-outs the read door still listed five of them as `post_merge_limbo` while two had already dropped off. **Checked the tracker before calling it drift: all seven are genuinely CLOSED and labelled.** So the membership read model refreshes incrementally and lags close-out by minutes — benign, but it means a mid-refresh sweep can overstate in-flight work. Not filed; noted.
+- MYN carries 18 rows (13 `zombie_pr`, MIN-908 post-merge limbo, MIN-911 stuck, 2 planned backlog, MIN-864 in flight) — **no merge verbs emitted**, since MYN is `auto_merge` hold and spans a GitLab backend. Tindra has TIN-1 in planned backlog. Four typed blind spots unchanged (lexerra/krux `forge_unavailable`, papers-please/puzzdom `tracker_unconfigured`), emitted as `investigate` and never reconstructed.
+
+### Not yet quiescent
+
+PAN-3253 and PAN-3296 were mid-merge at tick close, so the cohort has not drained and **I did not declare the run complete**. If the next tick finds only PAN-3259/PAN-3305 (PAN-3326), the CLIProxy auth gap (PAN-3313), and out-of-scope MYN work, that is quiescence and the retrospective follows.
+
+- **RUN TOTALS (RUN-75): 14 close-outs, 10 PRs merged (+2 scheduled), 20 substrate bugs driven (8 fixed and merged; 7 filed: PAN-3313/3321/3322/3324/3325/3326/3327; 5 escalated with located root causes), 1 duplicate closed, 4 stale gates cleared, 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~110 GB reclaimed, 1 process leak permanently fixed and verified across three automated syncs, 1 deploy-path reversion caught and stopgapped, 3 outages recovered, 3 deploys delivered, 8 review convoys re-driven.**
