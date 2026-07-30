@@ -511,7 +511,10 @@ which the panels library rewrites — defaulting to the project's first
 `services[].start_command`, spawned as one `ws-run-<id>` tmux session per
 workspace), and `POST /:id/open` (file manager always; editor only when
 `ui.open_in_editor_command` is set in `~/.overdeck/config.yaml`). Git logic
-lives in `src/lib/workspaces/git-state.ts`.
+lives in `src/lib/workspaces/git-state.ts`. The detail and git reads are
+`rejectUnauthorizedDashboardRequest`-guarded — the first returns executable
+command text, the second reaches the network — and the unauthenticated list DTO
+omits `runCommand` entirely.
 
 **Memory is keyed by workspace UUID, not issue id**: observations, pending
 turns, status, and summaries live under

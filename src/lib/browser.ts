@@ -23,6 +23,19 @@ function runCommand(
   });
 }
 
+/** Like runCommand, but a nonzero exit is not a failure. */
+function runCommandIgnoringExitCode(
+  command: string,
+  args: ReadonlyArray<string>,
+): Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner> {
+  return Effect.gen(function* () {
+    const spawner = yield* ChildProcessSpawner;
+    yield* spawner
+      .exitCode(ChildProcess.make(command, args, { stdout: 'ignore', stderr: 'ignore' }))
+      .pipe(Effect.mapError((e) => new ProcessSpawnError({ command, args, message: e.message, cause: e })));
+  });
+}
+
 /**
  * Reveal a local path in the platform file manager (PAN-3331). Same platform
  * branching as openBrowser, and the same argument-vector spawn — a path is
@@ -32,8 +45,11 @@ export function openPath(path: string): Effect.Effect<void, ProcessSpawnError, C
   if (process.platform === 'darwin') {
     return runCommand('open', [path]);
   } else if (process.platform === 'win32') {
-    // `start ""` rather than `explorer`, which exits nonzero even on success.
-    return runCommand('cmd', ['/c', 'start', '', path]);
+    // explorer.exe directly rather than `cmd /c start`: cmd re-parses its
+    // arguments and would interpret metacharacters in a path that arrived here
+    // as a plain argv element. explorer exits nonzero even on success, so its
+    // exit code is deliberately not treated as failure.
+    return runCommandIgnoringExitCode('explorer.exe', [path]);
   } else {
     return runCommand('xdg-open', [path]);
   }
@@ -44,11 +60,22 @@ export function openPath(path: string): Effect.Effect<void, ProcessSpawnError, C
  * `cursor {path}`. The template is split on whitespace into an argument vector
  * BEFORE substitution, so a path containing spaces or shell metacharacters
  * stays one argument and nothing is interpreted by a shell.
+ *
+ * Splitting is whitespace-only, so quoting is NOT supported — a quoted template
+ * is rejected with an explanatory error rather than silently producing argv with
+ * stray quote characters in it.
  */
 export function openInEditor(
   template: string,
   path: string,
 ): Effect.Effect<void, ProcessSpawnError, ChildProcessSpawner> {
+  if (/["']/.test(template)) {
+    return Effect.fail(new ProcessSpawnError({
+      command: template,
+      args: [],
+      message: 'ui.open_in_editor_command does not support quoting — the template is split on whitespace and {path} is passed as one argument, so quotes are unnecessary and would be taken literally.',
+    }));
+  }
   const tokens = template.trim().split(/\s+/).filter((token) => token.length > 0);
   const [command, ...rest] = tokens;
   if (!command) {

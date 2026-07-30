@@ -207,3 +207,13 @@ New routes, all additive: `GET /:id/git`, `POST /:id/pull`,
 
 The Cmd-K palette gains one action ("Run workspace command") listed under both
 the Actions and Workspaces groups; no existing palette row changed.
+
+### 9.8 Review-cycle amendment (PAN-3331 cycle 1)
+
+Two entries in 9.7 changed as a result of review; both are tightenings, and
+neither drops an affordance:
+
+| Surface | 9.7 said | Now |
+| --- | --- | --- |
+| `GET /api/workspace-registry` fields | all preserved plus additions | all preserved **except `runCommand`**, which is executable text and is served only over authenticated reads. Every other field, including the PAN-3286 `memoryPhase`, is unchanged and locked by the no-loss assertion in `workspace-registry-memory-phase.test.ts`. |
+| `GET /api/workspace-registry/:id` and `/:id/git` | unguarded like sibling reads | `rejectUnauthorizedDashboardRequest` — the detail read returns command text, and `?fetch=1` reaches the network and rewrites remote-tracking refs. Same-origin dashboard requests carry the session cookie, so no UI affordance is lost. |

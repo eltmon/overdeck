@@ -89,11 +89,16 @@ worth knowing when you are reasoning about workspace state:
   with the specific reason — on a dirty tree, an in-flight merge or rebase, a
   diverged branch, no upstream, or a detached HEAD. `kind=issue` workspaces are
   refused there entirely; they still sync through `pan sync-main`.
+- **Reads that carry command text are authenticated.** `GET /api/workspace-registry`
+  (the list) never includes `run_command`; the detail read and the git read both
+  require dashboard auth. A `run_command` you set from the CLI or the dashboard
+  is not visible to an unauthenticated caller.
 - **Run** launches the workspace's run command in a tmux session named
   `ws-run-<8 chars of workspace id>` (visible under `tmux -L overdeck
   list-sessions`). The command is the `run_command` column when set, otherwise
   the project's first `workspace.services[].start_command`. One live session per
-  workspace: a second Run re-focuses rather than spawning a duplicate.
+  workspace: a second Run re-focuses rather than spawning a duplicate, while
+  Restart kills the session and starts a fresh one under the same name.
 - **Open** reveals the directory, and shows an editor entry only when
   `ui.open_in_editor_command` is set in `~/.overdeck/config.yaml`
   (e.g. `cursor {path}`).

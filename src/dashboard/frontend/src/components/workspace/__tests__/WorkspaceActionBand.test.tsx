@@ -7,7 +7,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { WorkspaceActionBand, type WorkspaceGitState } from '../WorkspaceActionBand';
+import { WorkspaceActionBand, rememberRunSession, useRunSession, type WorkspaceGitState } from '../WorkspaceActionBand';
 
 function gitState(overrides: Partial<WorkspaceGitState> = {}): WorkspaceGitState {
   return {
@@ -305,6 +305,65 @@ describe('run card (ac3)', () => {
     expect(await screen.findByTestId('workspace-band-run-start')).toHaveTextContent('Restart');
   });
 
+  // Review finding: Restart used to call the plain run route, which the server
+  // answers 409 for a live session — the process was never replaced.
+  it('Restart kills the live session before starting a new one', async () => {
+    const { fetchMock, onRunSessionChange } = renderBand({
+      runCommand: 'npm run dev',
+      runSessionName: 'ws-run-abc12345',
+      responses: {
+        'DELETE /api/terminals/ws-run-abc12345': { status: 200, body: { ok: true } },
+        'POST /api/workspace-registry/ws-1/run': { status: 200, body: { sessionName: 'ws-run-abc12345', command: 'npm run dev' } },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-start'));
+
+    await waitFor(() => expect(onRunSessionChange).toHaveBeenCalledWith('ws-run-abc12345'));
+    const calls = fetchMock.mock.calls.map((call) => `${(call[1] as RequestInit | undefined)?.method ?? 'GET'} ${String(call[0])}`);
+    const killIndex = calls.indexOf('DELETE /api/terminals/ws-run-abc12345');
+    const runIndex = calls.indexOf('POST /api/workspace-registry/ws-1/run');
+    expect(killIndex).toBeGreaterThanOrEqual(0);
+    expect(runIndex).toBeGreaterThan(killIndex);
+    // Dropped in between so the terminal unmounts instead of staying attached
+    // to a dead pane, then re-set for the fresh session.
+    expect(onRunSessionChange.mock.calls.map((c) => c[0])).toEqual([null, 'ws-run-abc12345']);
+  });
+
+  it('reports a Restart whose new session could not start', async () => {
+    renderBand({
+      runCommand: 'npm run dev',
+      runSessionName: 'ws-run-abc12345',
+      responses: {
+        'DELETE /api/terminals/ws-run-abc12345': { status: 200, body: { ok: true } },
+        'POST /api/workspace-registry/ws-1/run': {
+          status: 409,
+          body: { sessionName: 'ws-run-abc12345', alreadyRunning: true },
+        },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-start'));
+
+    expect(await screen.findByTestId('workspace-band-run-message')).toHaveTextContent('still shutting down');
+  });
+
+  it('does not start a new session when the kill fails', async () => {
+    const { fetchMock } = renderBand({
+      runCommand: 'npm run dev',
+      runSessionName: 'ws-run-abc12345',
+      responses: {
+        'DELETE /api/terminals/ws-run-abc12345': { status: 500, body: { error: 'nope' } },
+      },
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-start'));
+
+    await screen.findByTestId('workspace-band-run-message');
+    const ran = fetchMock.mock.calls.some((call) => String(call[0]).endsWith('/run'));
+    expect(ran).toBe(false);
+  });
+
   it('disables Run when nothing is configured', async () => {
     renderBand();
 
@@ -357,5 +416,50 @@ describe('open-in menu and cadence (ac4)', () => {
 
     const after = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/git')).length;
     expect(after).toBeGreaterThan(before);
+  });
+});
+
+// Review finding: the run session used to live in once-seeded local state, so
+// navigating between workspaces showed the wrong terminal and a palette start
+// for the mounted workspace never appeared.
+describe('run-session store (keyed and reactive)', () => {
+  function Probe({ workspaceId }: { workspaceId: string }) {
+    const session = useRunSession(workspaceId);
+    return <span data-testid="probe">{session ?? 'none'}</span>;
+  }
+
+  afterEach(() => {
+    rememberRunSession('ws-a', null);
+    rememberRunSession('ws-b', null);
+  });
+
+  it('returns the session of the workspace it was asked about', () => {
+    rememberRunSession('ws-a', 'ws-run-aaaa');
+    rememberRunSession('ws-b', 'ws-run-bbbb');
+
+    const { rerender } = render(<Probe workspaceId="ws-a" />);
+    expect(screen.getByTestId('probe')).toHaveTextContent('ws-run-aaaa');
+
+    // Same component instance, different workspace — exactly what the router
+    // does, and what once-seeded state got wrong.
+    rerender(<Probe workspaceId="ws-b" />);
+    expect(screen.getByTestId('probe')).toHaveTextContent('ws-run-bbbb');
+  });
+
+  it('re-renders when a session is started elsewhere, such as from the palette', async () => {
+    render(<Probe workspaceId="ws-a" />);
+    expect(screen.getByTestId('probe')).toHaveTextContent('none');
+
+    act(() => { rememberRunSession('ws-a', 'ws-run-aaaa'); });
+
+    await waitFor(() => expect(screen.getByTestId('probe')).toHaveTextContent('ws-run-aaaa'));
+  });
+
+  it('reports none for a workspace with no run session', () => {
+    rememberRunSession('ws-a', 'ws-run-aaaa');
+
+    render(<Probe workspaceId="ws-b" />);
+
+    expect(screen.getByTestId('probe')).toHaveTextContent('none');
   });
 });

@@ -174,6 +174,15 @@ phase and its confidence.
 `WorkspaceView` renders `WorkspaceActionBand` between its header and its panels
 for every kind. Three cards, three routes:
 
+**Authentication.** Every mutating route below carries
+`rejectUnsafeDashboardMutationRequest`. Two *reads* additionally carry
+`rejectUnauthorizedDashboardRequest`: the detail route, because it is the only
+read that returns executable command text (the stored run command plus every
+configured `start_command`, which may embed a token), and the git route, because
+`fetch=1` reaches the network and rewrites remote-tracking refs. The list route
+stays unauthenticated and its DTO **omits `runCommand`** — `toListRow`
+destructures it out so a future field cannot leak through a forgotten delete.
+
 **Git card — `GET /api/workspace-registry/:id/git?fetch=0|1`.** Returns
 `WorkspaceGitState` from `src/lib/workspaces/git-state.ts`, or `{git: null}` for
 an `isGitRepository=false` row. Ahead/behind is computed against the checked-out
@@ -185,6 +194,13 @@ feature branch. `fetch=1` runs a real `git fetch` so the card is not judging
 stale refs, throttled to one fetch per 30 s per path in the route; a throttled
 read still reports the last fetch time in `fetchedAt`. The frontend asks for
 `fetch=1` on mount and on Refresh, and polls every 30 s without forcing one.
+
+The throttle keeps two clocks and coalesces. `lastFetchAttemptByPath` is claimed
+*before* the fetch is awaited, so two requests arriving in the same tick cannot
+each start a `git fetch`; concurrent callers share one in-flight promise per
+path. `lastFetchSuccessByPath` is what `fetchedAt` reports, so a failed fetch
+holds the window (don't hammer a broken remote) without claiming the data is
+fresh.
 
 **Pull — `POST /api/workspace-registry/:id/pull`.** `pullWorkspaceFastForward`
 runs `git pull --ff-only` and **returns** typed refusals rather than throwing:
@@ -217,10 +233,23 @@ on `ui.open_in_editor_command` in `~/.overdeck/config.yaml` (e.g.
 `openInEditorConfigured: false`, so the band hides the button rather than
 offering one that cannot work. `openInEditor` splits the template into an
 argument vector **before** substituting `{path}`, so a path with spaces or shell
-metacharacters stays a single argument and no shell is involved.
+metacharacters stays a single argument and no shell is involved. Splitting is
+whitespace-only, so a template containing quotes is rejected with an
+explanatory error rather than silently producing argv with stray quotes. On
+Windows the file manager is `explorer.exe` directly rather than `cmd /c start`,
+because `cmd` re-parses metacharacters in what arrived as a plain argv element;
+explorer's nonzero exit is deliberately not treated as failure.
 
-Every mutating route above carries `rejectUnsafeDashboardMutationRequest`; the
-git GET is unguarded like its sibling reads.
+The editor template is read through `getOpenInEditorCommand()`, an **async**
+Effect over `loadConfigWithoutMigration`. The sync loader stats and parses
+config files on the event loop, which server-reachable request code must never
+do — a slow filesystem would stall HTTP and terminal traffic.
+
+The two open routes await the opener's exit rather than returning at spawn, so
+"editor not found" reaches the operator instead of a silent 200. `Effect.timeout`
+is the wrong tool for bounding that: it interrupts the effect and would kill the
+child the operator just asked for. If a template ever names a foreground
+process, the fix is a spawn-and-detach primitive in `src/lib/browser.ts`.
 
 ## User-facing surfaces vs. pipeline worktrees (PAN-3286)
 

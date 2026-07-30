@@ -14,7 +14,7 @@
  * the existing sync-main flow, whose merge semantics this feature does not
  * touch; main and scratch use the ff-only pull route.
  */
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export interface RemoteCommit {
@@ -55,16 +55,38 @@ export interface WorkspaceActionBandProps {
  * The command palette can start a run before the workspace view mounts, and a
  * view remounted by navigation would otherwise show no terminal for a session
  * that is very much alive.
+ *
+ * It is a subscribable store rather than a plain map because both readers need
+ * to react: the view is NOT remounted when the route changes workspace id, so a
+ * once-only read would leave workspace A's terminal and Stop button showing
+ * inside workspace B; and a palette start for the already-mounted workspace
+ * would update the map with nothing re-rendering.
  */
 const runSessionsByWorkspace = new Map<string, string>();
+const runSessionListeners = new Set<() => void>();
 
 export function rememberRunSession(workspaceId: string, sessionName: string | null): void {
   if (sessionName) runSessionsByWorkspace.set(workspaceId, sessionName);
   else runSessionsByWorkspace.delete(workspaceId);
+  for (const listener of runSessionListeners) listener();
 }
 
 export function recallRunSession(workspaceId: string): string | null {
   return runSessionsByWorkspace.get(workspaceId) ?? null;
+}
+
+function subscribeRunSessions(listener: () => void): () => void {
+  runSessionListeners.add(listener);
+  return () => { runSessionListeners.delete(listener); };
+}
+
+/** The live run session for one workspace, re-rendering whenever it changes. */
+export function useRunSession(workspaceId: string): string | null {
+  return useSyncExternalStore(
+    subscribeRunSessions,
+    () => recallRunSession(workspaceId),
+    () => null,
+  );
 }
 
 const CARD = 'rounded-sm border border-border bg-card px-3 py-2 flex flex-col gap-1.5 min-w-0';
@@ -163,21 +185,46 @@ export function WorkspaceActionBand({
     onError: (error: Error) => setRunMessage(error.message),
   });
 
+  const postRun = useCallback(async () => {
+    const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const body = await res.json().catch(() => ({})) as { sessionName?: string; alreadyRunning?: boolean; error?: string };
+    // 409 means a run session is already live — re-focus it instead of
+    // stacking a second dev server on the same port.
+    if (res.status === 409 && body.sessionName) return body;
+    if (!res.ok) throw new Error(errorTextFrom(body, `Run failed (${res.status})`));
+    return body;
+  }, [workspaceId]);
+
   const startRun = useMutation({
-    mutationFn: async () => {
-      const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      const body = await res.json().catch(() => ({})) as { sessionName?: string; alreadyRunning?: boolean; error?: string };
-      // 409 means a run session is already live — re-focus it instead of
-      // stacking a second dev server on the same port.
-      if (res.status === 409 && body.sessionName) return body;
-      if (!res.ok) throw new Error(errorTextFrom(body, `Run failed (${res.status})`));
+    mutationFn: postRun,
+    onSuccess: (body) => {
+      setRunMessage(body.alreadyRunning ? 'Already running — showing the live session.' : null);
+      if (body.sessionName) onRunSessionChange(body.sessionName);
+    },
+    onError: (error: Error) => setRunMessage(error.message),
+  });
+
+  /**
+   * A real restart, not a re-focus. The run session name is derived from the
+   * workspace id, so a plain Run against a live session only ever comes back
+   * 409 — the process would never be replaced. Kill first, drop the session so
+   * the terminal unmounts rather than staying attached to a dead pane, then
+   * start the fresh one under the same name.
+   */
+  const restartRun = useMutation({
+    mutationFn: async (sessionName: string) => {
+      const killed = await fetch(`/api/terminals/${encodeURIComponent(sessionName)}`, { method: 'DELETE' });
+      if (!killed.ok) throw new Error(`Could not stop the run session (${killed.status})`);
+      onRunSessionChange(null);
+      const body = await postRun();
+      if (body.alreadyRunning) throw new Error('The previous run session is still shutting down — try again.');
       return body;
     },
     onSuccess: (body) => {
-      setRunMessage(body.alreadyRunning ? 'Already running — showing the live session.' : null);
+      setRunMessage(null);
       if (body.sessionName) onRunSessionChange(body.sessionName);
     },
     onError: (error: Error) => setRunMessage(error.message),
@@ -334,10 +381,10 @@ export function WorkspaceActionBand({
                 type="button"
                 className={PRIMARY_ACTION}
                 data-testid="workspace-band-run-start"
-                disabled={startRun.isPending || !effectiveCommand}
-                onClick={() => startRun.mutate()}
+                disabled={startRun.isPending || restartRun.isPending || !effectiveCommand}
+                onClick={() => (runSessionName ? restartRun.mutate(runSessionName) : startRun.mutate())}
               >
-                {runSessionName ? 'Restart' : 'Run'}
+                {runSessionName ? (restartRun.isPending ? 'Restarting…' : 'Restart') : 'Run'}
               </button>
               {runSessionName && (
                 <button

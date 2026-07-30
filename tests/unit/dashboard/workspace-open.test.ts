@@ -21,6 +21,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
   getWorkspaceGitState: vi.fn(),
   pullWorkspaceFastForward: vi.fn(),
   getProjectSync: vi.fn(),
@@ -28,7 +29,7 @@ const routeMocks = vi.hoisted(() => ({
   sessionExists: vi.fn(),
   openPath: vi.fn(),
   openInEditor: vi.fn(),
-  getOpenInEditorCommandSync: vi.fn(),
+  getOpenInEditorCommand: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
@@ -74,11 +75,12 @@ vi.mock('../../../src/lib/browser.js', () => ({
 }));
 
 vi.mock('../../../src/lib/config-yaml/load.js', () => ({
-  getOpenInEditorCommandSync: routeMocks.getOpenInEditorCommandSync,
+  getOpenInEditorCommand: routeMocks.getOpenInEditorCommand,
 }));
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
@@ -130,11 +132,12 @@ async function call(method: string, url: string, body?: unknown): Promise<RouteR
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
   routeMocks.getReviewStatusSync.mockReturnValue(null);
   routeMocks.getProjectSync.mockReturnValue(null);
-  routeMocks.getOpenInEditorCommandSync.mockReturnValue(null);
+  routeMocks.getOpenInEditorCommand.mockReturnValue(Effect.succeed(null));
   routeMocks.openPath.mockReturnValue(Effect.void);
   routeMocks.openInEditor.mockReturnValue(Effect.void);
 });
@@ -153,7 +156,7 @@ describe('POST /api/workspace-registry/:id/open (FR-6)', () => {
 
   it('refuses the editor target with 409 when no editor command is configured', async () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
-    routeMocks.getOpenInEditorCommandSync.mockReturnValue(null);
+    routeMocks.getOpenInEditorCommand.mockReturnValue(Effect.succeed(null));
 
     const response = await call('POST', '/api/workspace-registry/ws-main-1234abcd/open', {
       target: 'editor',
@@ -166,7 +169,7 @@ describe('POST /api/workspace-registry/:id/open (FR-6)', () => {
 
   it('opens the editor with the configured template when one is set', async () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
-    routeMocks.getOpenInEditorCommandSync.mockReturnValue('cursor {path}');
+    routeMocks.getOpenInEditorCommand.mockReturnValue(Effect.succeed('cursor {path}'));
 
     const response = await call('POST', '/api/workspace-registry/ws-main-1234abcd/open', {
       target: 'editor',
@@ -210,7 +213,7 @@ describe('POST /api/workspace-registry/:id/open (FR-6)', () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace());
 
     const hidden = await call('GET', '/api/workspace-registry/ws-main-1234abcd');
-    routeMocks.getOpenInEditorCommandSync.mockReturnValue('code {path}');
+    routeMocks.getOpenInEditorCommand.mockReturnValue(Effect.succeed('code {path}'));
     const shown = await call('GET', '/api/workspace-registry/ws-main-1234abcd');
 
     expect(hidden.body.openInEditorConfigured).toBe(false);
@@ -265,5 +268,19 @@ describe('openInEditor template handling (D-6)', () => {
     const spawned = await spawnedArgv('cursor {path}', '/repo/main; rm -rf ~');
 
     expect(spawned.args).toEqual(['/repo/main; rm -rf ~']);
+  });
+
+  it('rejects a quoted template with an explanatory error instead of passing quotes through', async () => {
+    const { openInEditor: realOpenInEditor } =
+      await vi.importActual<typeof import('../../../src/lib/browser.js')>('../../../src/lib/browser.js');
+    const { ChildProcessSpawner } = await import('effect/unstable/process/ChildProcessSpawner');
+    const spawn = vi.fn(() => Effect.succeed(0));
+
+    await expect(Effect.runPromise(
+      realOpenInEditor('"/opt/My Editor/bin/edit" {path}', '/repo/main').pipe(
+        Effect.provideService(ChildProcessSpawner, { exitCode: spawn } as never),
+      ),
+    )).rejects.toThrow(/quoting/i);
+    expect(spawn).not.toHaveBeenCalled();
   });
 });

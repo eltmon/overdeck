@@ -2,9 +2,9 @@
  * PAN-1990 dashboard-workspace-view: /workspace/:id renders terminals,
  * workspace-filtered conversations, and the memory surface.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../XTerminal', () => ({
   XTerminal: ({ sessionName }: { sessionName: string }) => <div data-testid="xterm" data-session={sessionName} />,
@@ -43,6 +43,7 @@ vi.mock('../../../lib/store', () => ({
 }));
 
 import { WorkspaceView } from '../WorkspaceView';
+import { rememberRunSession } from '../WorkspaceActionBand';
 
 const CONVERSATIONS = [
   { id: 1, name: 'conv-in-workspace', tmuxSession: 'conv-in-workspace', status: 'active', cwd: '/repo/workspaces/feature-pan-9001', issueId: null, createdAt: '', endedAt: null, lastAttachedAt: null, sessionAlive: true },
@@ -202,5 +203,66 @@ describe('WorkspaceView (ac4)', () => {
     fireEvent.click(await screen.findByText('conv-in-workspace'));
 
     expect(await screen.findByTestId('conversation-panel')).toHaveAttribute('data-conversation', 'conv-in-workspace');
+  });
+});
+
+// PAN-3331 review finding: the run session used to be once-seeded local state.
+// The router swaps `workspaceId` on the SAME component instance, so workspace
+// A's run terminal appeared inside workspace B.
+describe('WorkspaceView run terminal (PAN-3331)', () => {
+  afterEach(() => {
+    rememberRunSession('ws-a', null);
+    rememberRunSession('ws-b', null);
+  });
+
+  function renderForWorkspace(workspaceId: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/api/workspace-registry/${workspaceId}`) {
+        return Response.json({
+          id: workspaceId, projectId: 'overdeck', kind: 'scratch', name: workspaceId,
+          path: `/repo/${workspaceId}`, issueId: null, layoutConfig: null, title: null, pipeline: null,
+        });
+      }
+      if (url.startsWith('/api/workspace-registry/')) return Response.json({ headline: null, status: null, observations: [] });
+      if (url === '/api/conversations') return Response.json([]);
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return render(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId={workspaceId} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('shows the run session belonging to the workspace currently on screen', async () => {
+    rememberRunSession('ws-a', 'ws-run-aaaa');
+
+    const { rerender } = renderForWorkspace('ws-a');
+    const terminal = await screen.findByTestId('workspace-view-run-terminal');
+    expect(terminal).toBeInTheDocument();
+    expect(screen.getByTestId('xterm')).toHaveAttribute('data-session', 'ws-run-aaaa');
+
+    // Same instance, different workspace — B has no run session.
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <WorkspaceView workspaceId="ws-b" />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId('workspace-view-run-terminal')).toBeNull());
+  });
+
+  it('mounts a terminal for a run started elsewhere, such as from the palette', async () => {
+    renderForWorkspace('ws-a');
+    await screen.findByTestId('conversation-list');
+    expect(screen.queryByTestId('workspace-view-run-terminal')).toBeNull();
+
+    act(() => { rememberRunSession('ws-a', 'ws-run-aaaa'); });
+
+    const terminal = await screen.findByTestId('workspace-view-run-terminal');
+    expect(terminal).toBeInTheDocument();
   });
 });

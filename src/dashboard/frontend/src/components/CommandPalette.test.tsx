@@ -379,6 +379,56 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
     expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001');
   });
 
+  // Review finding: the target used to be visibleWorkspaceRows[0], which sorts
+  // favorites first and hides collapsed issue worktrees.
+  it('targets the newest workspace even when an older one is favorited', async () => {
+    renderPaletteWithWorkspace();
+
+    // ws-issue (lastAccessedAt 200) is newer than the favorited ws-fav (50).
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001'));
+  });
+
+  it('still offers the action when every row is a collapsed pipeline worktree', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') {
+        return Response.json({
+          workspaces: [
+            { id: 'ws-hidden', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9002', issueId: 'PAN-9002', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 300 },
+          ],
+        });
+      }
+      if (method === 'POST' && url === '/api/workspace-registry/ws-hidden/run') {
+        return Response.json({ sessionName: 'ws-run-wshidden', command: 'npm run dev' });
+      }
+      return undefined;
+    });
+    renderPaletteWithWorkspace();
+
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9002'));
+  });
+
+  it('ignores archived workspaces when picking the target', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') {
+        return Response.json({
+          workspaces: [
+            { id: 'ws-archived', projectId: 'overdeck', kind: 'scratch', name: 'archived-scratch', issueId: null, isFavorite: false, isArchived: true, title: null, lastAccessedAt: 900 },
+            { id: 'ws-live', projectId: 'overdeck', kind: 'scratch', name: 'live-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
+          ],
+        });
+      }
+      return undefined;
+    });
+    renderPaletteWithWorkspace();
+
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('live-scratch'));
+  });
+
   it('starts the run command for the most recently used workspace and opens its view', async () => {
     const { onSelectWorkspace } = renderPaletteWithWorkspace();
     await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());

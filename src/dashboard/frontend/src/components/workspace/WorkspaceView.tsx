@@ -26,7 +26,7 @@ import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from 'r
 import { ConversationList, fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
-import { WorkspaceActionBand, recallRunSession, rememberRunSession } from './WorkspaceActionBand';
+import { WorkspaceActionBand, rememberRunSession, useRunSession } from './WorkspaceActionBand';
 import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -142,12 +142,13 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
     return ids;
   }, [showAllConversations, workspace, workspaceId, conversations]);
 
-  // Lifted so the band can start/stop the run session while its terminal lives
-  // in the panel area below (PAN-3331 D-5).
-  const [runSessionName, setRunSessionNameState] = useState<string | null>(() => recallRunSession(workspaceId));
+  // Read from the keyed run-session store rather than local state: this
+  // component is not remounted when the route changes workspace id, so local
+  // state seeded once would show the previous workspace's terminal here, and a
+  // palette-started run would never appear (PAN-3331 D-5).
+  const runSessionName = useRunSession(workspaceId);
   const setRunSessionName = useCallback((sessionName: string | null) => {
     rememberRunSession(workspaceId, sessionName);
-    setRunSessionNameState(sessionName);
   }, [workspaceId]);
 
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);

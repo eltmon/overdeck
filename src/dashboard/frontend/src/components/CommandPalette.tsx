@@ -601,20 +601,35 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     [workspaceRows, pipelineWorkspacesExpanded],
   );
 
-  // PAN-3331: start the most recently used workspace's run command without
-  // leaving the keyboard. Workspace rows arrive most-recent-first, so [0] is
-  // the one the operator was last in — its name is in the row so the target is
-  // never a guess.
-  const runTargetWorkspace = visibleWorkspaceRows[0] ?? null;
+  // PAN-3331 FR-8: start the most recently used workspace's run command without
+  // leaving the keyboard. Derived from ALL non-archived rows by lastAccessedAt,
+  // NOT from the visible list — that one sorts favorites first and hides
+  // collapsed issue worktrees, so an older favorite could win over the
+  // workspace the operator actually just used, and the action would vanish
+  // whenever every row was a collapsed worktree.
+  const runTargetWorkspace = useMemo(() => {
+    let newest: WorkspaceRegistryRow | null = null;
+    for (const ws of workspaceRows) {
+      if (ws.isArchived) continue;
+      if (!newest || (ws.lastAccessedAt ?? 0) > (newest.lastAccessedAt ?? 0)) newest = ws;
+    }
+    return newest;
+  }, [workspaceRows]);
+
   const runWorkspaceCommand = useCallback(async (workspaceId: string) => {
-    const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    });
-    const body = await res.json().catch(() => ({})) as { sessionName?: string; error?: string };
-    if (body.sessionName) rememberRunSession(workspaceId, body.sessionName);
-    // 409 means one was already live — that is a success for "show me the run".
-    else if (!res.ok) toast.error(body.error ?? 'Could not start the run command');
+    try {
+      const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const body = await res.json().catch(() => ({})) as { sessionName?: string; error?: string };
+      if (body.sessionName) rememberRunSession(workspaceId, body.sessionName);
+      // 409 means one was already live — that is a success for "show me the run".
+      else if (!res.ok) toast.error(body.error ?? 'Could not start the run command');
+    } catch (error) {
+      // A transport failure must surface, not become an unhandled rejection.
+      toast.error(error instanceof Error ? error.message : 'Could not reach the dashboard API');
+    }
     onSelectWorkspace?.(workspaceId);
   }, [onSelectWorkspace]);
 

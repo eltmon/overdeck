@@ -24,6 +24,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
   getWorkspaceGitState: vi.fn(),
   pullWorkspaceFastForward: vi.fn(),
 }));
@@ -57,6 +58,7 @@ vi.mock('../../../src/lib/memory/rollup.js', () => ({
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
@@ -129,6 +131,7 @@ function uniquePath(): string {
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
   routeMocks.getReviewStatusSync.mockReturnValue(null);
@@ -236,6 +239,75 @@ describe('GET /api/workspace-registry/:id/git (FR-2)', () => {
     await call('GET', '/api/workspace-registry/ws-b/git?fetch=1');
 
     expect(routeMocks.getWorkspaceGitState.mock.calls[1]![1]).toEqual({ fetch: true });
+  });
+});
+
+describe('GET /api/workspace-registry/:id/git authentication', () => {
+  it('rejects an unauthenticated read before fetching, since fetch=1 rewrites remote refs', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: uniquePath() }));
+    routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(
+      new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
+    );
+
+    const response = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    expect(response.status).toBe(401);
+    expect(routeMocks.getWorkspaceGitState).not.toHaveBeenCalled();
+  });
+});
+
+describe('fetch coalescing (concurrent fetch=1)', () => {
+  it('runs one git fetch for overlapping requests against the same checkout', async () => {
+    const path = uniquePath();
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path }));
+    let resolveFetch: ((state: WorkspaceGitState) => void) | undefined;
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) => {
+      if (!options.fetch) return gitState();
+      return new Promise<WorkspaceGitState>((resolve) => { resolveFetch = resolve; });
+    });
+
+    // Both requests are in flight before either fetch resolves — the exact
+    // window in which a check-then-await throttle starts two fetches.
+    const first = call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    const second = call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    await Promise.resolve();
+    await Promise.resolve();
+    resolveFetch?.(gitState({ fetchedAt: 1234 }));
+    await Promise.all([first, second]);
+
+    const fetching = routeMocks.getWorkspaceGitState.mock.calls.filter((c) => c[1]?.fetch === true);
+    expect(fetching).toHaveLength(1);
+  });
+
+  it('both coalesced callers receive the fetched state', async () => {
+    const path = uniquePath();
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path }));
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) =>
+      (options.fetch ? gitState({ behind: 7, fetchedAt: 4242 }) : gitState()));
+
+    const [first, second] = await Promise.all([
+      call('GET', '/api/workspace-registry/ws-main/git?fetch=1'),
+      call('GET', '/api/workspace-registry/ws-main/git?fetch=1'),
+    ]);
+
+    expect((first.body.git as WorkspaceGitState).behind).toBe(7);
+    expect((second.body.git as WorkspaceGitState).behind).toBe(7);
+  });
+
+  it('holds the throttle window after a fetch that reports no success, without claiming freshness', async () => {
+    vi.useFakeTimers();
+    const path = uniquePath();
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path }));
+    // fetchedAt null is how the module reports "the fetch did not succeed".
+    routeMocks.getWorkspaceGitState.mockResolvedValue(gitState({ fetchedAt: null }));
+
+    const failed = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    vi.advanceTimersByTime(5_000);
+    await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    expect((failed.body.git as WorkspaceGitState).fetchedAt).toBeNull();
+    const fetching = routeMocks.getWorkspaceGitState.mock.calls.filter((c) => c[1]?.fetch === true);
+    expect(fetching).toHaveLength(1);
   });
 });
 

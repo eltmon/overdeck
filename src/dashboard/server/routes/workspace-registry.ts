@@ -12,7 +12,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { getWorkspaceById, listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   archiveWorkspace,
@@ -25,7 +25,7 @@ import {
 import { createSession, sessionExists } from '../../../lib/tmux.js';
 import { getProjectSync } from '../../../lib/projects.js';
 import { openInEditor, openPath } from '../../../lib/browser.js';
-import { getOpenInEditorCommandSync } from '../../../lib/config-yaml/load.js';
+import { getOpenInEditorCommand } from '../../../lib/config-yaml/load.js';
 import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem';
 import * as NodePath from '@effect/platform-node/NodePath';
@@ -42,7 +42,13 @@ export interface WorkspacePipelineBadge {
   readyForMerge?: boolean;
 }
 
-export interface WorkspaceListRow extends WorkspaceRow {
+/**
+ * The public list DTO deliberately OMITS `runCommand` (PAN-3331 review): a run
+ * command is executable text an operator may have embedded a token in, and the
+ * list read is unauthenticated. Command text is served only by the
+ * authenticated detail route and the already-guarded run-command write.
+ */
+export interface WorkspaceListRow extends Omit<WorkspaceRow, 'runCommand'> {
   pipeline: WorkspacePipelineBadge | null;
   /**
    * Memory-synthesized phase (exploring/planning/building/verifying/cleaning/
@@ -67,7 +73,10 @@ function pipelineBadgeForWorkspace(workspace: WorkspaceRow): WorkspacePipelineBa
 }
 
 function toListRow(workspace: WorkspaceRow, memoryPhase: string | null = null): WorkspaceListRow {
-  return { ...workspace, pipeline: pipelineBadgeForWorkspace(workspace), memoryPhase };
+  // Destructured out rather than deleted afterwards, so a future field added to
+  // WorkspaceRow cannot silently leak through a forgotten delete.
+  const { runCommand: _runCommand, ...publicFields } = workspace;
+  return { ...publicFields, pipeline: pipelineBadgeForWorkspace(workspace), memoryPhase };
 }
 
 /**
@@ -126,6 +135,11 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
   'GET',
   '/api/workspace-registry/:id',
   httpHandler(Effect.gen(function* () {
+    // Authenticated because this is the one read that returns executable command
+    // text — the stored run command plus every configured start_command.
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
     const id = (yield* HttpRouter.params)['id'] ?? '';
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
@@ -136,13 +150,15 @@ const getWorkspaceRegistryDetailRoute = HttpRouter.add(
     // The band's run card needs both what it would run today and what else the
     // project offers, so it can show a placeholder and a service picker.
     const runCommandOptions = runCommandOptionsFor(workspace);
+    const editorCommand = yield* getOpenInEditorCommand();
     return jsonResponse({
       ...toListRow(workspace, memoryPhase),
       memoryStatus,
+      runCommand: workspace.runCommand,
       runCommandDefault: runCommandOptions[0]?.command ?? null,
       runCommandOptions,
       // The band hides "Open in editor" entirely when no template is configured.
-      openInEditorConfigured: getOpenInEditorCommandSync() !== null,
+      openInEditorConfigured: editorCommand !== null,
     });
   })),
 );
@@ -172,41 +188,74 @@ const getWorkspaceRegistryMemoryRoute = HttpRouter.add(
 // ─── GET /api/workspace-registry/:id/git ────────────────────────────────────
 
 /**
- * Per-path epoch-ms of the last `git fetch` this process ran for a workspace.
- * A card that judges freshness from refs nobody refreshed is lying, so the GET
- * route fetches — but at most once per FETCH_MIN_INTERVAL_MS per path, so a
- * 30s poll (or several open views) cannot turn into a fetch storm.
+ * Fetch throttling, per workspace path. A card that judges freshness from refs
+ * nobody refreshed is lying, so the GET route fetches — but at most once per
+ * FETCH_MIN_INTERVAL_MS, so a 30s poll (or several open views) cannot turn into
+ * a fetch storm.
+ *
+ * Two clocks, deliberately: `lastFetchAttemptByPath` is claimed BEFORE the fetch
+ * is awaited so overlapping requests cannot each start one, while
+ * `lastFetchSuccessByPath` is what `fetchedAt` reports — a failed fetch must
+ * hold the throttle window (don't hammer a broken remote) without claiming the
+ * data is fresh.
  */
-const lastFetchByPath = new Map<string, number>();
+const lastFetchAttemptByPath = new Map<string, number>();
+const lastFetchSuccessByPath = new Map<string, number>();
+/** In-flight fetches, so concurrent callers share one `git fetch` per path. */
+const inFlightFetchByPath = new Map<string, Promise<WorkspaceGitState>>();
 const FETCH_MIN_INTERVAL_MS = 30_000;
 
 function fetchIsDue(path: string, now: number): boolean {
-  const last = lastFetchByPath.get(path);
+  const last = lastFetchAttemptByPath.get(path);
   return last === undefined || now - last >= FETCH_MIN_INTERVAL_MS;
+}
+
+function withFreshness(state: WorkspaceGitState, path: string): WorkspaceGitState {
+  return { ...state, fetchedAt: state.fetchedAt ?? lastFetchSuccessByPath.get(path) ?? null };
 }
 
 /**
  * Reads state, fetching first when the caller asked and the throttle allows.
- * `fetchedAt` reports the last fetch for this path — not only the one this call
- * performed — so a throttled read still shows honest freshness.
+ * `fetchedAt` reports the last successful fetch for this path — not only the one
+ * this call performed — so a throttled read still shows honest freshness.
  */
 async function readGitState(path: string, wantFetch: boolean): Promise<WorkspaceGitState> {
-  const now = Date.now();
-  const shouldFetch = wantFetch && fetchIsDue(path, now);
-  const state = await getWorkspaceGitState(path, { fetch: shouldFetch });
-  if (state.fetchedAt !== null) lastFetchByPath.set(path, state.fetchedAt);
-  return { ...state, fetchedAt: state.fetchedAt ?? lastFetchByPath.get(path) ?? null };
+  if (wantFetch) {
+    // A fetch already running for this checkout is the fetch this caller wanted.
+    const inFlight = inFlightFetchByPath.get(path);
+    if (inFlight) return withFreshness(await inFlight, path);
+
+    if (fetchIsDue(path, Date.now())) {
+      // Claim the window before awaiting anything: two requests that arrive in
+      // the same tick would otherwise both see a stale timestamp and each spawn
+      // a `git fetch` against the same refs.
+      lastFetchAttemptByPath.set(path, Date.now());
+      const run = getWorkspaceGitState(path, { fetch: true })
+        .then((state) => {
+          if (state.fetchedAt !== null) lastFetchSuccessByPath.set(path, state.fetchedAt);
+          return state;
+        })
+        .finally(() => { inFlightFetchByPath.delete(path); });
+      inFlightFetchByPath.set(path, run);
+      return withFreshness(await run, path);
+    }
+  }
+  return withFreshness(await getWorkspaceGitState(path, { fetch: false }), path);
 }
 
 const getWorkspaceRegistryGitRoute = HttpRouter.add(
   'GET',
   '/api/workspace-registry/:id/git',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    // Authenticated: `fetch=1` reaches out to the remote and rewrites
+    // remote-tracking refs, so this read has a side effect worth protecting.
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
     const id = (yield* HttpRouter.params)['id'] ?? '';
     const workspace = getWorkspaceById(id);
     if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
     if (!workspace.isGitRepository) return jsonResponse({ git: null });
-    const request = yield* HttpServerRequest.HttpServerRequest;
     const wantFetch = new URL(request.url, 'http://localhost').searchParams.get('fetch') === '1';
     const git = yield* Effect.promise(() => readGitState(workspace.path, wantFetch));
     return jsonResponse({ git });
@@ -246,7 +295,8 @@ const postWorkspaceRegistryPullRoute = HttpRouter.add(
     }
     // The pull itself contacted the remote, so it counts as a fetch.
     const pulledAt = Date.now();
-    lastFetchByPath.set(workspace.path, pulledAt);
+    lastFetchAttemptByPath.set(workspace.path, pulledAt);
+    lastFetchSuccessByPath.set(workspace.path, pulledAt);
     return jsonResponse({ git: { ...result.state, fetchedAt: pulledAt } });
   })),
 );
@@ -315,6 +365,9 @@ const putWorkspaceRegistryRunCommandRoute = HttpRouter.add(
     const updated = getWorkspaceById(id) ?? { ...workspace, runCommand: command };
     return jsonResponse({
       ...toListRow(updated),
+      // Echoed back explicitly: toListRow omits command text from the public
+      // DTO, and this route is already session+CSRF guarded.
+      runCommand: updated.runCommand,
       runCommandDefault: runCommandOptionsFor(updated)[0]?.command ?? null,
       runCommandOptions: runCommandOptionsFor(updated),
     });
@@ -377,11 +430,18 @@ const postWorkspaceRegistryOpenRoute = HttpRouter.add(
     if (target !== 'file-manager' && target !== 'editor') {
       return jsonResponse({ error: "target must be 'file-manager' or 'editor'" }, { status: 400 });
     }
+    // These await the opener's exit rather than returning at spawn. That is
+    // deliberate: it is what surfaces "cursor: not found" to the operator
+    // instead of a silent 200. The openers used here (open/xdg-open/explorer,
+    // and every GUI editor launcher) return immediately. If a future template
+    // names a foreground process, the fix is a spawn-and-detach primitive in
+    // browser.ts — NOT Effect.timeout here, which interrupts the effect and
+    // would kill the child the operator just asked for.
     if (target === 'file-manager') {
       yield* openPath(workspace.path).pipe(Effect.provide(spawnerLayer));
       return jsonResponse({ ok: true, target, path: workspace.path });
     }
-    const template = getOpenInEditorCommandSync();
+    const template = yield* getOpenInEditorCommand();
     if (!template) {
       return jsonResponse({
         error: 'No editor configured. Set ui.open_in_editor_command in ~/.overdeck/config.yaml (e.g. "cursor {path}").',

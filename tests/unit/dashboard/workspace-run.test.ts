@@ -21,6 +21,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
   getWorkspaceGitState: vi.fn(),
   pullWorkspaceFastForward: vi.fn(),
   getProjectSync: vi.fn(),
@@ -67,6 +68,7 @@ vi.mock('../../../src/lib/tmux.js', () => ({
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
@@ -118,6 +120,7 @@ async function call(method: string, url: string, body?: unknown): Promise<RouteR
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
   routeMocks.getReviewStatusSync.mockReturnValue(null);
@@ -212,6 +215,58 @@ describe('PUT /api/workspace-registry/:id/run-command (FR-4)', () => {
     routeMocks.getWorkspaceById.mockReturnValue(undefined);
 
     expect((await call('PUT', '/api/workspace-registry/nope/run-command', { command: 'x' })).status).toBe(404);
+  });
+});
+
+describe('command-text disclosure (review finding)', () => {
+  async function listRows(): Promise<Array<Record<string, unknown>>> {
+    const response = await call('GET', '/api/workspace-registry');
+    return (response.body as { workspaces: Array<Record<string, unknown>> }).workspaces;
+  }
+
+  it('never returns the stored run command in the unauthenticated list', async () => {
+    routeMocks.listWorkspaces.mockReturnValue([baseWorkspace({ runCommand: 'deploy --token=hunter2' })]);
+
+    const rows = await listRows();
+
+    expect(Object.hasOwn(rows[0]!, 'runCommand')).toBe(false);
+    expect(JSON.stringify(rows)).not.toContain('hunter2');
+  });
+
+  it('keeps every other list field when the command is withheld (no-loss)', async () => {
+    const workspace = baseWorkspace({ runCommand: 'npm run dev' });
+    routeMocks.listWorkspaces.mockReturnValue([workspace]);
+
+    const row = (await listRows())[0]!;
+
+    for (const field of ['id', 'projectId', 'kind', 'name', 'path', 'branchName', 'isGitRepository', 'issueId', 'layoutConfig', 'isFavorite', 'isArchived', 'title', 'createdAt', 'lastAccessedAt', 'pipeline', 'memoryPhase']) {
+      expect(Object.hasOwn(row, field)).toBe(true);
+    }
+  });
+
+  it('rejects an unauthenticated detail read rather than disclosing command text', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ runCommand: 'deploy --token=hunter2' }));
+    routeMocks.getProjectSync.mockReturnValue({
+      workspace: { services: [{ name: 'api', path: 'api', start_command: './run-dev.sh --secret' }] },
+    });
+    routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(
+      new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 }),
+    );
+
+    const response = await call('GET', '/api/workspace-registry/ws-main-1234abcd');
+
+    expect(response.status).toBe(401);
+    expect(JSON.stringify(response.body)).not.toContain('hunter2');
+    expect(JSON.stringify(response.body)).not.toContain('run-dev.sh');
+  });
+
+  it('serves the stored command to an authenticated detail read', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ runCommand: 'npm run dev' }));
+
+    const response = await call('GET', '/api/workspace-registry/ws-main-1234abcd');
+
+    expect(response.status).toBe(200);
+    expect(response.body.runCommand).toBe('npm run dev');
   });
 });
 
