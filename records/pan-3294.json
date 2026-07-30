@@ -80,10 +80,10 @@
     "recordedAt": "2026-07-30T06:34:43.205Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T08:17:42.757Z",
+  "updated": "2026-07-30T08:49:29.680Z",
   "pipeline": {
     "issueId": "PAN-3294",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -91,14 +91,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:35:04.907Z",
-    "updatedAt": "2026-07-30T08:17:42.699Z",
+    "updatedAt": "2026-07-30T08:49:29.638Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3294-review",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "reviewedAtCommit": "d872af6cd80efdb90f2eb0c98e040cb8d6075ec0",
     "lastVerifiedCommit": "d872af6cd80efdb90f2eb0c98e040cb8d6075ec0",
     "reviewRequestedAt": "2026-07-30T06:35:04.907Z",
-    "reviewSpawnedAt": "2026-07-30T08:02:29.860Z",
+    "reviewSpawnedAt": "2026-07-30T08:49:29.636Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -163,7 +163,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.201314,
-        "pricingAsOf": "2026-07-30T08:17:42.750Z"
+        "pricingAsOf": "2026-07-30T08:49:29.665Z"
       }
     },
     "merges": [
