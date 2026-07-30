@@ -446,3 +446,62 @@ describe('NewWorkspaceModal — main bootstrap (review B6, D-7/FR-4)', () => {
     expect(onCreated).toHaveBeenCalledWith('ws-main-new');
   });
 });
+
+describe('NewWorkspaceModal — archived main is still a main (review cycle 3)', () => {
+  /** Records what the modal asked the registry for, so the probe can be asserted. */
+  function wireMainProbe(mainRows: (url: string) => unknown[]) {
+    mockFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === '/api/registered-projects') return Promise.resolve(ok(PROJECTS));
+      if (url.startsWith('/api/workspace-registry?')) return Promise.resolve(ok({ workspaces: mainRows(url) }));
+      if (url.startsWith('/api/workspace-registry/project-targets')) return Promise.resolve(ok(TARGETS));
+      if (url === '/api/workspace-registry/resolve') return Promise.resolve(ok(intent()));
+      if (url === '/api/workspace-registry' && init?.method === 'POST') return Promise.resolve(ok({ id: 'ws-new' }, 201));
+      return Promise.resolve(ok({}));
+    });
+  }
+
+  it('asks for archived rows too when probing for an existing main', async () => {
+    wireMainProbe(() => []);
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    const probe = mockFetch.mock.calls.map(([url]) => String(url)).find((url) => url.startsWith('/api/workspace-registry?'));
+    expect(probe).toContain('includeArchived=true');
+  });
+
+  it('offers no bootstrap when the project main exists but is archived', async () => {
+    // The archived row is only visible because the probe asks for it; this is
+    // the sequence that previously offered a replacement main and 500ed.
+    wireMainProbe((url) => (url.includes('includeArchived=true') ? [{ id: 'ws-main', isArchived: true }] : []));
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+
+    expect(screen.queryByTestId('new-workspace-bootstrap-main')).toBeNull();
+  });
+
+  it('surfaces a 409 from a refused create instead of appearing to succeed', async () => {
+    const onCreated = vi.fn();
+    wireFetch(() => ok(intent()), () => err(409, { error: 'Project overdeck already has a main workspace' }));
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={onCreated} />);
+    await settle();
+
+    await act(async () => { fireEvent.click(screen.getByTestId('new-workspace-create')); });
+
+    expect(screen.getByTestId('new-workspace-error').textContent).toContain('already has a main workspace');
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+});
+
+describe('NewWorkspaceModal — switching project drops the old project state', () => {
+  it('clears the previous project target selection when the project changes', async () => {
+    wireFetch(() => ok(intent()));
+    render(<NewWorkspaceModal isOpen onClose={vi.fn()} onCreated={vi.fn()} />);
+    await settle();
+    expect(resolveCalls().at(-1)).toMatchObject({ targetPath: '/repo' });
+
+    fireEvent.change(screen.getByTestId('new-workspace-project-select'), { target: { value: '' } });
+
+    // No stale target survives the switch — the select falls back to Browse….
+    expect((screen.getByTestId('new-workspace-target-select') as HTMLSelectElement).value).not.toBe('/repo');
+  });
+});

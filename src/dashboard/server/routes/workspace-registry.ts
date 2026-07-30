@@ -237,7 +237,14 @@ const postWorkspaceRegistryCreateRoute = HttpRouter.add(
     const intent = yield* Effect.promise(() =>
       resolveWorkspaceCreateIntent({ ...toCreateInput(body), refreshParentBranch: true }));
     if (intent.findings.length > 0) return jsonResponse({ findings: intent.findings }, { status: 422 });
-    const created = yield* Effect.promise(() => performWorkspaceCreate(intent));
+    // A create can still be refused past validation — the main-singleton check
+    // and `git worktree add` both throw. Surface the message as a conflict
+    // rather than letting it escape as an opaque 500.
+    const created = yield* Effect.promise(() =>
+      performWorkspaceCreate(intent)
+        .then((result) => ({ ok: true as const, ...result }))
+        .catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) })));
+    if (!created.ok) return jsonResponse({ error: created.error }, { status: 409 });
     return jsonResponse({ id: created.id }, { status: 201 });
   })),
 );

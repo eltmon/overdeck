@@ -226,6 +226,34 @@ describe('POST /api/workspace-registry/:id/archive keeps its pre-existing contra
   });
 });
 
+describe('archive-then-bootstrap: the sequence that used to end in a 500 (cycle 3)', () => {
+  it('an archived main still counts as existing, so the list probe the modal uses reports it', async () => {
+    upsertProjectFromConfig(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
+    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'main', name: 'main', path: projectRoot });
+    await call('POST', `/api/workspace-registry/${id}/archive`, { archived: true });
+
+    // Without includeArchived the row is invisible and the dialog would offer
+    // a replacement main it could never create.
+    const hidden = await call('GET', `/api/workspace-registry?project=${PROJECT_KEY}&kind=main`);
+    expect((hidden.body.workspaces as unknown[])).toHaveLength(0);
+
+    const probed = await call('GET', `/api/workspace-registry?project=${PROJECT_KEY}&kind=main&includeArchived=true`);
+    expect((probed.body.workspaces as unknown[])).toHaveLength(1);
+  });
+
+  it('bootstrapping main against an archived main is refused as a conflict, not a 500', async () => {
+    upsertProjectFromConfig(PROJECT_KEY, { name: 'Registry integration project', path: projectRoot });
+    const id = await createWorkspace({ projectId: PROJECT_KEY, kind: 'main', name: 'main', path: projectRoot });
+    await call('POST', `/api/workspace-registry/${id}/archive`, { archived: true });
+
+    const result = await call('POST', '/api/workspace-registry', { project: PROJECT_KEY, bootstrapMain: true });
+
+    expect(result.status).toBe(409);
+    expect(String(result.body.error)).toMatch(/already has a main workspace/);
+    expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'main', includeArchived: true })).toHaveLength(1);
+  });
+});
+
 describe('GET /api/workspace-registry/project-targets reads real config', () => {
   it('returns the project primary path', async () => {
     const result = await call('GET', `/api/workspace-registry/project-targets?project=${PROJECT_KEY}`);

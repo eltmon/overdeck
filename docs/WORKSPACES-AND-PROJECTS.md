@@ -48,9 +48,10 @@ Representative exports:
 
 - **`main`** — the project's primary checkout. Exactly one per project;
   `createWorkspace()` enforces the singleton (throws if a `main` row already
-  exists) and `archiveWorkspace()`/`deleteWorkspace()` both refuse
-  `kind === 'main'`. Resolved or lazily created via `getMainWorkspace()` /
-  `pan workspace main`.
+  exists — including an archived one, since `getMainWorkspace()` does not
+  filter by archived state) and `deleteWorkspace()` refuses `kind === 'main'`.
+  `archiveWorkspace()` does **not** refuse it. Resolved or lazily created via
+  `getMainWorkspace()` / `pan workspace main`.
 - **`issue`** — one worktree per tracked issue, at most one non-archived row
   per `(projectId, issueId)` (`getWorkspaceForIssue()` queries
   `kind='issue' AND issue_id=? AND is_archived=0`). This is the workspace a

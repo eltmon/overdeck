@@ -93,6 +93,8 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
   // Guards against an in-flight resolve landing after a newer one and
   // overwriting the preview with an outdated intent.
   const resolveSeq = useRef(0);
+  // Same idea for creates, but invalidated by closing rather than by typing.
+  const submitSeq = useRef(0);
 
   // The dialog stays mounted for the lifetime of the app, so without this its
   // previous answers survive a close and the next open would inherit them —
@@ -116,6 +118,14 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
     setError(null);
     setMainWorkspaceMissing(false);
   }, [isOpen, presetProjectKey]);
+
+  // Closing the dialog invalidates any create still in flight: the workspace
+  // is still made, but navigating away from what the operator just dismissed
+  // would be a surprise.
+  useEffect(() => {
+    if (isOpen) return;
+    submitSeq.current += 1;
+  }, [isOpen]);
 
   // ─── Project list ─────────────────────────────────────────────────────────
   useEffect(() => {
@@ -148,8 +158,13 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
     let cancelled = false;
     void (async () => {
       try {
+        // includeArchived matters: archiving main only sets is_archived, and
+        // the singleton check in createWorkspace() still sees that row. Probing
+        // without it would offer "Register main workspace" for a project whose
+        // main is merely archived, and confirming that offer could only fail
+        // (PAN-3330 review cycle 3).
         const res = await fetchWithTimeout(
-          `/api/workspace-registry?project=${encodeURIComponent(projectKey)}&kind=main`,
+          `/api/workspace-registry?project=${encodeURIComponent(projectKey)}&kind=main&includeArchived=true`,
           { credentials: 'include' },
         );
         if (cancelled || !res?.ok) return;
@@ -250,6 +265,7 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
   async function submitIntent(body: Record<string, unknown>) {
     setError(null);
     setCreating(true);
+    const seq = ++submitSeq.current;
     try {
       const res = await fetchWithTimeout('/api/workspace-registry', {
         method: 'POST',
@@ -268,6 +284,11 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
         return;
       }
       const created = (await res.json()) as { id: string };
+      // The dialog can be dismissed while this is in flight. The workspace was
+      // still made, but navigating away from what the operator chose to close
+      // would be a surprise, so only report it when this submission is still
+      // the current one.
+      if (seq !== submitSeq.current) return;
       onCreated(created.id);
       onClose();
     } catch (err) {
@@ -345,7 +366,17 @@ export function NewWorkspaceModal({ isOpen, onClose, onCreated, presetProjectKey
                 id="new-workspace-project"
                 data-testid="new-workspace-project-select"
                 value={projectKey}
-                onChange={(e) => { setProjectKey(e.target.value); setTargetPath(''); }}
+                onChange={(e) => {
+                  // Everything below is derived from the project, so drop it
+                  // now rather than letting project A's targets and
+                  // missing-main answer linger while B loads — or survive if
+                  // B's request fails.
+                  setProjectKey(e.target.value);
+                  setTargetPath('');
+                  setProjectTargets(null);
+                  setMainWorkspaceMissing(false);
+                  setBrowsing(false);
+                }}
               >
                 <option value="">Select a project…</option>
                 {projects.map((project) => (
