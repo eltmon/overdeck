@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T05:02:04.030Z",
+  "updated": "2026-07-30T05:03:47.307Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "squatter-integration-test": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 4157057,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:02:04.030Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -161,6 +153,17 @@
         "outcome": "completed",
         "reason": "Teardown now escalates any originally targeted process that survives SIGTERM and rejects if it remains alive after SIGKILL, even after releasing its listener",
         "releasedAt": "2026-07-30T05:01:50.121Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 4157057,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:02:04.030Z",
+        "itemId": "squatter-integration-test",
+        "outcome": "completed",
+        "reason": "Added a real node:http squatter test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds",
+        "releasedAt": "2026-07-30T05:03:47.306Z"
       }
     ],
     "statusReasons": {
@@ -187,6 +190,10 @@
       "stop-verifies-pid-death": {
         "reason": "Teardown now escalates any originally targeted process that survives SIGTERM and rejects if it remains alive after SIGKILL, even after releasing its listener",
         "updatedAt": "2026-07-30T05:01:50.121Z"
+      },
+      "squatter-integration-test": {
+        "reason": "Added a real node:http squatter test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds",
+        "updatedAt": "2026-07-30T05:03:47.306Z"
       }
     }
   },
@@ -219,6 +226,9 @@
     "stop-verifies-pid-death.stop-verifies-pid-death.ac1": "completed",
     "stop-verifies-pid-death.stop-verifies-pid-death.ac2": "completed",
     "stop-verifies-pid-death.stop-verifies-pid-death.ac3": "completed",
-    "squatter-integration-test": "running"
+    "squatter-integration-test": "completed",
+    "squatter-integration-test.squatter-integration-test.ac1": "completed",
+    "squatter-integration-test.squatter-integration-test.ac2": "completed",
+    "squatter-integration-test.squatter-integration-test.ac3": "completed"
   }
 }
