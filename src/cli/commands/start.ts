@@ -2,7 +2,7 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora, { type Ora } from 'ora';
 import { existsSync, readFileSync } from 'fs';
-import { join, dirname, resolve } from 'path';
+import { join, dirname, resolve, sep } from 'path';
 import { homedir } from 'os';
 import { createInterface } from 'readline/promises';
 import { promisify } from 'util';
@@ -706,6 +706,24 @@ export function resolveSpawnModel(
 ): string | undefined {
   return explicitModel || (fresh ? undefined : recordedModel);
 }
+
+async function transitionStartedXBrief(projectRoot: string, issueId: string) {
+  return Effect.runPromise(transitionXBriefOnMain(
+    projectRoot,
+    issueId,
+    'active',
+    'running',
+    `chore(state): start ${issueId.toUpperCase()} xBRIEF (status=running)`,
+  ));
+}
+
+function updateWorkspaceDraftPlanStatus(workspace: string): boolean {
+  const spawnedPlanPath = findPlanSync(workspace);
+  if (!spawnedPlanPath?.startsWith(workspace + sep)) return false;
+  updatePlanStatus(spawnedPlanPath, 'running');
+  return true;
+}
+
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
   try {
@@ -1213,13 +1231,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
-      const transition = await Effect.runPromise(transitionXBriefOnMain(
-        projectRoot,
-        id,
-        'active',
-        'approved',
-        `scope: approve ${id.toUpperCase()} xBRIEF`,
-      ));
+      const transition = await transitionStartedXBrief(projectRoot, id);
       if (transition.moved) {
         console.log(chalk.green(`  ✓ xBRIEF moved ${transition.fromDir} → active`));
       }
@@ -1227,13 +1239,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.warn(chalk.dim(`  ⚠ Could not update main xBRIEF lifecycle: ${err?.message ?? String(err)}`));
     }
 
-    const spawnedPlanPath = findPlanSync(workspace);
-    if (spawnedPlanPath) {
-      try {
-        updatePlanStatus(spawnedPlanPath, 'running');
-      } catch (err: any) {
-        console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
-      }
+    try {
+      updateWorkspaceDraftPlanStatus(workspace);
+    } catch (err: any) {
+      console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
     }
 
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
@@ -1273,4 +1282,11 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
   }
 }
 
-export const __testInternals = { failPostCreateValidation, repairMainBranchWorkspace, resolveExplicitHarnessFlag, runStartPrepStep };
+export const __testInternals = {
+  failPostCreateValidation,
+  repairMainBranchWorkspace,
+  resolveExplicitHarnessFlag,
+  runStartPrepStep,
+  transitionStartedXBrief,
+  updateWorkspaceDraftPlanStatus,
+};

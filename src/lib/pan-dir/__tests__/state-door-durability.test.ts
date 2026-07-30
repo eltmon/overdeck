@@ -1,7 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from '@effect/vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from '@effect/vitest'
 import { Effect } from 'effect'
-import { execSync } from 'child_process'
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs'
+import { execFileSync, execSync } from 'child_process'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs'
 import { tmpdir } from 'os'
 import { join } from 'path'
 
@@ -26,6 +26,10 @@ function configureGit(root: string): void {
   execSync('git config user.email t@e.t', { cwd: root })
   execSync('git config user.name "Test"', { cwd: root })
   execSync('git config commit.gpgsign false', { cwd: root })
+}
+
+function git(root: string, ...args: string[]): string {
+  return execFileSync('git', args, { cwd: root, encoding: 'utf-8' }).trim()
 }
 
 function porcelain(root: string): string {
@@ -114,6 +118,84 @@ describe('state write door durability (PAN-2677)', () => {
 
     await Effect.runPromise(updateSpecStatus(tmp, 'PAN-3', 'active'))
     expect(porcelain(tmp)).toBe('')
+  })
+
+  it('commits and pushes the CLI start status flip while preserving workspace-draft fallback', async () => {
+    const originalHome = process.env.OVERDECK_HOME
+    const home = join(tmp, 'overdeck-home')
+    const projectRoot = join(tmp, 'project')
+    const stateRoot = join(home, 'state', 'durability')
+    const remote = join(tmp, 'origin.git')
+    const specPath = join(stateRoot, 'specs', '2026-07-30-PAN-3296-start-status.xbrief.json')
+
+    try {
+      process.env.OVERDECK_HOME = home
+      mkdirSync(projectRoot, { recursive: true })
+      mkdirSync(join(home, 'state'), { recursive: true })
+      mkdirSync(join(stateRoot, 'specs'), { recursive: true })
+      writeFileSync(join(home, 'projects.yaml'), JSON.stringify({
+        projects: {
+          durability: {
+            name: 'Durability',
+            path: projectRoot,
+            issue_prefix: 'PAN',
+          },
+        },
+      }))
+
+      git(projectRoot, 'init', '-q', '-b', 'main')
+      configureGit(projectRoot)
+      writeFileSync(join(projectRoot, 'README.md'), 'project\n')
+      git(projectRoot, 'add', 'README.md')
+      git(projectRoot, 'commit', '-q', '-m', 'seed project')
+
+      git(tmp, 'init', '--bare', '-q', remote)
+      git(stateRoot, 'init', '-q')
+      configureGit(stateRoot)
+      git(stateRoot, 'branch', '-M', 'overdeck-state')
+      git(stateRoot, 'remote', 'add', 'origin', remote)
+      writeFileSync(join(stateRoot, 'migration-complete.json'), JSON.stringify({
+        sourceMainSha: '0'.repeat(40),
+        stateBranchSha: '0'.repeat(40),
+        completedAt: '2026-07-30T00:00:00.000Z',
+        version: 1,
+      }))
+      writeFileSync(specPath, JSON.stringify(
+        asPanSpecDocument(makeDoc('PAN-3296', 'CLI start status', 'proposed'), 'proposed'),
+        null,
+        2,
+      ))
+      git(stateRoot, 'add', '.')
+      git(stateRoot, 'commit', '-q', '-m', 'seed state')
+      git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state')
+
+      vi.resetModules()
+      const { __testInternals } = await import('../../../cli/commands/start.js')
+      await __testInternals.transitionStartedXBrief(projectRoot, 'PAN-3296')
+
+      const started = JSON.parse(readFileSync(specPath, 'utf-8')) as XBriefDocument
+      expect(started.plan.status).toBe('running')
+      expect(porcelain(stateRoot)).toBe('')
+      expect(git(stateRoot, 'rev-parse', 'HEAD')).toBe(git(stateRoot, 'rev-parse', 'origin/overdeck-state'))
+      expect(git(stateRoot, 'log', '-1', '--format=%s', 'origin/overdeck-state'))
+        .toBe('chore(state): start PAN-3296 xBRIEF (status=running)')
+
+      const workspace = join(projectRoot, 'workspaces', 'feature-pan-3297')
+      const draftPath = join(workspace, '.overdeck', 'spec.vbrief.json')
+      mkdirSync(join(workspace, '.overdeck'), { recursive: true })
+      writeFileSync(draftPath, JSON.stringify(makeDoc('PAN-3297', 'Workspace draft', 'proposed'), null, 2))
+      const stateHead = git(stateRoot, 'rev-parse', 'HEAD')
+
+      expect(__testInternals.updateWorkspaceDraftPlanStatus(workspace)).toBe(true)
+      const workspaceDraft = JSON.parse(readFileSync(draftPath, 'utf-8')) as XBriefDocument
+      expect(workspaceDraft.plan.status).toBe('running')
+      expect(porcelain(stateRoot)).toBe('')
+      expect(git(stateRoot, 'rev-parse', 'HEAD')).toBe(stateHead)
+    } finally {
+      if (originalHome === undefined) delete process.env.OVERDECK_HOME
+      else process.env.OVERDECK_HOME = originalHome
+      vi.resetModules()
+    }
   })
 
   it('commits through a husky-style core.hooksPath (HUSKY=0 reaches git)', async () => {
