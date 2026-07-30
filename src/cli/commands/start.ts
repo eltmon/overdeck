@@ -27,8 +27,8 @@ import type { RuntimeName } from '../../lib/runtimes/types.js';
 import { findPlanSync, readWorkspacePlanSync } from '../../lib/xbrief/io.js';
 import { findSpecByIssue } from '../../lib/pan-dir/specs.js';
 import { writeAutoStartXBrief, type AutoSynthesizeIssueInput } from '../../lib/xbrief/auto-synthesize.js';
-import { transitionXBriefOnMain, updatePlanStatus } from '../../lib/xbrief/lifecycle-io.js';
 import { resolveIssueWorkModel } from '../../lib/agents/staffing.js';
+import { transitionStartedXBrief, updateWorkspaceDraftPlanStatus } from './start-status.js';
 import {
   buildStartPlanningBody,
   printPlanningConnectionError,
@@ -706,6 +706,7 @@ export function resolveSpawnModel(
 ): string | undefined {
   return explicitModel || (fresh ? undefined : recordedModel);
 }
+
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {
   process.env['OVERDECK_AGENT_STARTED_BY'] = resolveCliStartedBy('operator:cli:pan-start');
   try {
@@ -1213,13 +1214,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     spinner.succeed(`Agent spawned: ${agent.id}`);
 
     try {
-      const transition = await Effect.runPromise(transitionXBriefOnMain(
-        projectRoot,
-        id,
-        'active',
-        'approved',
-        `scope: approve ${id.toUpperCase()} xBRIEF`,
-      ));
+      const transition = await transitionStartedXBrief(projectRoot, id);
       if (transition.moved) {
         console.log(chalk.green(`  ✓ xBRIEF moved ${transition.fromDir} → active`));
       }
@@ -1227,13 +1222,10 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
       console.warn(chalk.dim(`  ⚠ Could not update main xBRIEF lifecycle: ${err?.message ?? String(err)}`));
     }
 
-    const spawnedPlanPath = findPlanSync(workspace);
-    if (spawnedPlanPath) {
-      try {
-        updatePlanStatus(spawnedPlanPath, 'running');
-      } catch (err: any) {
-        console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
-      }
+    try {
+      updateWorkspaceDraftPlanStatus(workspace);
+    } catch (err: any) {
+      console.warn(chalk.dim(`  ⚠ Could not set workspace xBRIEF status=running: ${err?.message ?? String(err)}`));
     }
 
     const skipTrackerUpdate = await Effect.runPromise(shouldSkipTrackerUpdate(id, options.shadow));
