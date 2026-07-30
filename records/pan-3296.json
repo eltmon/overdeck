@@ -12,6 +12,11 @@
       "timestamp": "2026-07-30T03:53:24.964Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T08:22:36.272Z"
     }
   ],
   "feedback": [],
@@ -44,7 +49,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T08:20:59.677Z",
+  "updated": "2026-07-30T08:22:36.273Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "passed",
@@ -53,12 +58,19 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z",
-    "updatedAt": "2026-07-30T08:20:54.482Z",
+    "updatedAt": "2026-07-30T08:22:35.995Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 5a40cca (2 paths): docs/AGENT-STATE-PLANES.md, src/lib/pan-dir/record-update.ts",
+        "detectedAt": "2026-07-30T08:22:22.577Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "8c8518de9ec13d3f8a73e1b069e15afc981605f1",
-      "detectedAt": "2026-07-30T08:16:09.807Z",
+      "sha": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
+      "detectedAt": "2026-07-30T08:22:22.577Z",
       "paths": [
         "docs/AGENT-STATE-PLANES.md",
         "src/lib/pan-dir/record-update.ts"
@@ -126,7 +138,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.227828,
-        "pricingAsOf": "2026-07-30T08:20:54.511Z"
+        "pricingAsOf": "2026-07-30T08:22:36.022Z"
       }
     },
     "merges": [
