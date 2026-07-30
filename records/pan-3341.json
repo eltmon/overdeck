@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-30T21:54:58.207Z",
+  "updated": "2026-07-30T22:01:19.860Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "tree-renders-closeout-state": {
-        "writerId": "agent-pan-3341",
-        "agentId": "agent-pan-3341",
-        "pid": 3228699,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:54:58.207Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3341",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Derived resource state labels from canonical membership, including close-out limbo precedence and terminal tracker guards, with six regression cases.",
         "releasedAt": "2026-07-30T21:51:22.909Z"
+      },
+      {
+        "writerId": "agent-pan-3341",
+        "agentId": "agent-pan-3341",
+        "pid": 3228699,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:54:58.207Z",
+        "itemId": "tree-renders-closeout-state",
+        "outcome": "completed",
+        "reason": "Mapped the close-out label to the review tone and ship lane, with focused frontend regression coverage.",
+        "releasedAt": "2026-07-30T22:01:19.860Z"
       }
     ],
     "statusReasons": {
       "membership-aware-state-label": {
         "reason": "Derived resource state labels from canonical membership, including close-out limbo precedence and terminal tracker guards, with six regression cases.",
         "updatedAt": "2026-07-30T21:51:22.909Z"
+      },
+      "tree-renders-closeout-state": {
+        "reason": "Mapped the close-out label to the review tone and ship lane, with focused frontend regression coverage.",
+        "updatedAt": "2026-07-30T22:01:19.860Z"
       }
     }
   },
@@ -108,6 +115,9 @@
     "membership-aware-state-label.membership-aware-state-label.ac3": "completed",
     "membership-aware-state-label.membership-aware-state-label.ac4": "completed",
     "membership-aware-state-label.membership-aware-state-label.ac5": "completed",
-    "tree-renders-closeout-state": "running"
+    "tree-renders-closeout-state": "completed",
+    "tree-renders-closeout-state.tree-renders-closeout-state.ac1": "completed",
+    "tree-renders-closeout-state.tree-renders-closeout-state.ac2": "completed",
+    "tree-renders-closeout-state.tree-renders-closeout-state.ac3": "completed"
   }
 }
