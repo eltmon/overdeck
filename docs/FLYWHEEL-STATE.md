@@ -8652,3 +8652,51 @@ Chased the Deacon's stray-writer errors and found the warning is three defects, 
 - Still deferred with reason: **PAN-3264** close-out (needs PAN-3202), **PAN-3300** close-out (needs main verify), **PAN-3259** (blocked by PAN-3326, not by its own work).
 
 - **RUN TOTALS (RUN-75): 4 close-outs, 3 PRs merged (PAN-3300, PAN-3291, PAN-3320), 12 substrate bugs driven (PAN-3300/3320 fixed; PAN-2390/3305/3202 struck; PAN-3313/3321/3322/3324/3325/3326 filed; PAN-3294/3282 escalated), 1 duplicate closed, 2 stale gates cleared (PAN-3253, PAN-3260), 1 red-main incident closed, 2 host-wide OOM incidents root-caused, ~61 GB reclaimed across 3 relief passes, 2 outages recovered, 1 deploy delivered, 6 review convoys re-driven.**
+
+## RUN-75 tick 5 (2026-07-30 10:21-10:35Z) — main GREEN confirmed; leak rate was 4x my estimate; the leak fix needs `pan sync`, not a dashboard build
+
+### Main is GREEN — verified at the job level
+
+- `4fb8ea92ac` (the PAN-3320 squatter fix) concluded **success**, and I checked the jobs rather than the run headline: **6 jobs, 0 non-green.** `019177d2e8` (my docs commit) then also concluded **success**. Main is genuinely green for the first time since 08:21Z.
+- The red-main incident that opened at tick 3 is closed. Total elapsed red-main window: roughly two hours, spanning `5a40cca9ff` → `4fb8ea92ac`.
+
+### My leak-rate estimate was wrong by 4x, and the error direction was dangerous
+
+- Opened the tick with the memory check first, as required — and found **130 procs / 53.7 GB with only 9.9 GB available.** I had told myself 2–3 procs/min last tick; the actual rate was **~9–12/min**, roughly 4 GB/min of RSS.
+- **The mechanism for the acceleration is my own fleet.** The hook fires on every work-agent stop, so the leak rate is proportional to how many agents are cycling. Tick 4 measured the rate with ~10 agents; by tick 5 there were 16 sessions with reviews and tests turning over. **Saturating the fleet — which is my job — is also what accelerates the thing that kills the fleet.**
+- **LESSON: a leak rate measured under one load is not a constant, and extrapolating it set my relief interval too long.** I scheduled a 600s wakeup on the 2–3/min figure; at the real rate that window consumed ~44 GB. Had the wakeup been 20 minutes instead of 10, the host would have hit global OOM again before I looked. For a leak whose rate tracks fleet size, the safe move is to re-measure every tick rather than trust the previous tick's slope.
+- Tightened the kill threshold from 300s to **120s** once the danger was clear (a one-shot haiku classification finishes in seconds, so 120s is still conservative). Four relief passes this tick: 78, 70, 13, then 20 procs — the host went 9.9 GB → 43 GB available.
+
+### The leak fix does NOT deploy via the dashboard build — it needs `pan sync`
+
+- Checked *before* the merge landed rather than assuming, and it matters: `work-agent-stop-hook` lives at **`sync-sources/hooks/work-agent-stop-hook`**, and `src/lib/sync.ts:702` ("Sync hooks — copy scripts to `~/.overdeck/bin/`") is what puts it on disk.
+- So merging #3299 changes the repo but **leaves the running hook at `~/.overdeck/bin/work-agent-stop-hook` untouched.** The leak would have continued at full rate after a "successful" merge, and the obvious next move — `pan reload`, which rebuilds the dashboard — would not have helped at all.
+- **LESSON: "merged is not deployed" has more than one deploy path, and picking the wrong one looks like the fix failing.** Mission #5 is written around `pan reload` because most fixes are server code; a `sync-sources/` fix ships through `pan sync` instead. Before declaring any fix live, trace how *that specific artifact* reaches disk.
+
+### Strike PRs unblocked mechanically
+
+- All four PRs I own were carrying the bad squatter test, so a bare CI re-run could never clear them. Used **`gh pr update-branch`** on #3315 (PAN-2390), #3316 (PAN-3305), #3318 (PAN-3266), #3319 (PAN-3202) — a base-into-head merge on GitHub's side, non-destructive and no local push.
+- **Verified the fix actually arrived** rather than trusting the "✓ PR branch updated" message: `vi.useFakeTimers({` count is now **0 on all four branches** (was 1 on each). CI re-triggered on the new heads.
+
+### PAN-3294 and PAN-3286 reached the merge gate
+
+- Both flipped to `review=passed / test=passed / ready_for_merge=1` after the review convoys I re-drove last tick, and both PRs read **CLEAN**. Scheduled both (#3299, #3312) via the auto-merge door for 10:27:2xZ.
+- PAN-3294's merge is the one that matters: it is the durable end of the leak treadmill, and its review had itself been killed by the OOM the leak caused (PAN-3324).
+
+### PAN-3260 — PR green, but its test agent is a ghost
+
+- PR #3268 is **fully green including `test: SUCCESS`** at head `8f081c0646`, while `review_status` still reads `test=failed` from 05:51Z against `reviewed_at_commit=363ae133`.
+- The re-queued test agent is inert: `agent-pan-3260-test`, `status=running` since 10:03:29Z, pane footer **`ctx 0% 0/1.0M out 0 cost $0.0000`**. Not one token processed. `pan answer` reports no pending decision, so it is not parked — it never received a prompt.
+- This is **PAN-2706** ("Ghost test sessions absorb every test dispatch"), commented with the evidence. Also corroborated in `dashboard.log`: `[agent-pan-3231] Kickoff delivery attempt 1/2 failed: kickoff-not-confirmed` three attempt-pairs over. Note the asymmetry — **PAN-3231 logged its kickoff failure and PAN-3260's test dispatch did not**, and a silent failure is strictly worse because it is indistinguishable from a slow start.
+- Offered a mechanical detector on the issue: `running` + zero context + zero output tokens for >60s is uniquely a never-kicked-off session. Flagged that `cost_so_far` cannot be the signal (0 for every row, including live spenders).
+- **Did not hand-run the test suite.** Producing the verdict myself would be doing the agent's work instead of fixing the system; PAN-3260 stays blocked on PAN-2706.
+
+### PAN-3202 now gates TWO close-outs
+
+- `pan close PAN-3300 --force` passes six of seven rows and fails only row 6: `failed checks: test on 3a3a94bc43`, while row 7 passes by containment (`build commit 5a40cca9 contains merge 3a3a94bc`).
+- **There is a structural unfairness here worth naming: PAN-3300 *was* the red-main strike.** It merged while main was red because that is precisely what it was fixing, so its merge commit inherited the failure it eliminated. **Every red-main fix hits row 6 by construction**, which makes PAN-3202 a systematic tax on exactly the work that unblocks the pipeline. Recorded on PAN-3202 alongside PAN-3264.
+
+### Unchanged
+
+- **CLIProxy (PAN-3313):** 85×503 / 69×200 / 28×408 over the last ~90 minutes — ~47% hard-failing, statistically identical to tick 3's 45%. Still third-party code; not struck.
+- Fleet 15 sessions, cap 20. **PAN-3259** still blocked by PAN-3326 (patch-id false positive) and deliberately not force-closed.
