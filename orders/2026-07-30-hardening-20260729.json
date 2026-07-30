@@ -6,7 +6,53 @@
     "laneAConcurrency": 1,
     "posture": "open"
   },
-  "items": [],
+  "items": [
+    {
+      "issue": "PAN-3293",
+      "lane": "A",
+      "order": 1,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3294",
+      "lane": "A",
+      "order": 2,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3296",
+      "lane": "A",
+      "order": 3,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3291",
+      "lane": "A",
+      "order": 4,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedBy": "operator"
+    },
+    {
+      "issue": "PAN-3297",
+      "lane": "A",
+      "order": 5,
+      "prereqs": [],
+      "reVerify": false,
+      "addedAt": "2026-07-30T02:58:41.679Z",
+      "addedBy": "operator"
+    }
+  ],
   "createdAt": "2026-07-30T02:58:20.266Z",
-  "updatedAt": "2026-07-30T02:58:20.266Z"
+  "updatedAt": "2026-07-30T02:58:41.679Z"
 }
