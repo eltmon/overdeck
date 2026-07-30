@@ -17,9 +17,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-30T05:25:07.156Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-30T05:41Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-30T05:41:00.553Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-30T05:41:00Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3294\n\n# Code Review — PAN-3294\n\n## Verdict: CHANGES REQUESTED\n\nThe timeout and rate-limit behavior is otherwise well-scoped and covered, but the shared lock primitive has an initialization race that can admit two concurrent holders. Because both the per-agent single-flight guard and the machine-wide token bucket depend on this primitive, the change does not yet guarantee the concurrency limits that motivated the issue.\n\n## Context\n\n- Branch: `feature/pan-3294`\n- HEAD reviewed: `bf9282426e145a107b1cbdc1c32f1388bd9dc89f`\n- PR: `#3299`\n- Review dimensions: correctness, security, requirements, performance\n\n## Blocking Findings\n\n### P1 — [correctness / requirements] A newly created lock can be reclaimed before its owner writes the PID — `sync-sources/hooks/pan-hook-lib.sh:24`\n\n`pan_acquire_singleflight_lock` exposes the lock directory with `mkdir` and writes the ownership marker in a separate operation on the next line. A concurrent invocation can run between those operations:\n\n1. Caller A creates `lock_dir` at line 24 and is descheduled before line 25.\n2. Caller B's `mkdir` fails, then line 30 reads no PID.\n3. Caller B classifies the lock as stale, moves and removes it at lines 39-41, recreates it at line 42, and returns success.\n4. Caller A resumes, writes its PID into B's replacement directory, and also returns success.\n\nBoth callers now execute the guarded body. Caller A's unconditional release can also remove Caller B's replacement lock while B is still running. I reproduced the critical interleaving by pausing a creator after `mkdir` but before the PID write; the contender returned `0` while the creator was still alive.\n\nThis directly violates FR-1 and AC-4's guarantee that at most one hook body runs per agent. The same primitive guards `pan_llm_rate_check`, so the race can also admit multiple callers into the token-bucket read/modify/write section and exceed FR-4's machine-wide cap during the crash-loop scenario this issue exists to contain.\n\nThe tests do not cover this boundary. `tests/scripts/pan-hook-lib-guards.test.ts:62` explicitly treats every missing PID file as stale, while the concurrent hook test relies on normal scheduling and does not pause the winner between directory creation and owner publication.\n\nFix the protocol so an initializing lock cannot be mistaken for a stale lock, and make release ownership-safe so an old holder cannot delete a successor's lock. Add a deterministic test that suspends the first acquirer after lock-directory creation but before owner publication and proves the second acquirer cannot return success.\n\n## Non-blocking Review Results\n\n- **Security:** No new injection, authorization, secret-exposure, or unsafe external-input path was found in the changed code.\n- **Performance:** The timestamp bucket remains bounded by the configured admission limit, and its approximately one-second lock-contention wait is bounded as specified.\n- **Requirements:** FR-2, FR-3, FR-5, FR-6, NFR-1, NFR-2, and NFR-3 are implemented as specified. FR-1 and FR-4 remain blocked by the lock race above.\n- **CodeRabbit advisory:** The missing `mkdir -p \"$AGENT_STATE_DIR\"` comment is not a merge blocker because managed agent spawn/runtime paths create the per-agent state directory before the hook can run. The lock protocol race occurs even when that parent directory exists and is the blocking issue.\n\n## Verification Performed\n\n- `git diff --check $(git merge-base origin/main HEAD)..HEAD` — passed.\n- `bash -n sync-sources/hooks/pan-hook-lib.sh sync-sources/hooks/work-agent-stop-hook` — passed.\n- `npx vitest run tests/scripts/pan-hook-lib-guards.test.ts tests/scripts/work-agent-stop-hook.test.ts` — 24 tests passed.\n- PR CI checks reported by GitHub are green.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3294/.pan/review/agent-pan-3294-review-bf928242/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3294 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -40,10 +53,10 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T05:25:07.157Z",
+  "updated": "2026-07-30T05:41:00.554Z",
   "pipeline": {
     "issueId": "PAN-3294",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -51,12 +64,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T04:36:45.444Z",
-    "updatedAt": "2026-07-30T05:25:05.957Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3294-review",
+    "updatedAt": "2026-07-30T05:40:59.769Z",
+    "reviewNotes": "Single-flight lock can be stolen before PID publication, allowing concurrent hook and rate-bucket holders",
     "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3299",
     "lastVerifiedCommit": "bf9282426e145a107b1cbdc1c32f1388bd9dc89f",
-    "reviewRequestedAt": "2026-07-30T04:36:45.444Z",
     "reviewSpawnedAt": "2026-07-30T05:25:05.956Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -89,6 +101,14 @@
             "cacheWrite": 165672
           }
         },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 943578,
+            "output": 124420,
+            "cacheRead": 8348672,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1263878,
@@ -106,15 +126,15 @@
           "cacheWrite": 165672
         },
         "openai/gpt-5.6-sol": {
-          "input": 1263878,
-          "output": 102494,
-          "cacheRead": 30457344,
+          "input": 2207456,
+          "output": 226914,
+          "cacheRead": 38806016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 31.729475,
-        "pricingAsOf": "2026-07-30T05:25:05.971Z"
+        "usd": 44.354301,
+        "pricingAsOf": "2026-07-30T05:40:59.818Z"
       }
     },
     "merges": [
