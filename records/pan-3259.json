@@ -10,7 +10,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:05:06.073Z",
-  "updated": "2026-07-30T22:44:43.229Z",
+  "updated": "2026-07-30T22:45:34.913Z",
   "pipeline": {
     "issueId": "PAN-3259",
     "reviewStatus": "passed",
@@ -20,7 +20,7 @@
     "mergeStep": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:44:41.424Z",
+    "updatedAt": "2026-07-30T22:45:34.893Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "lastVerifiedCommit": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyHead": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
@@ -49,7 +49,9 @@
         "outcome": "failed",
         "detail": "GitHub PR #3263 has failing required checks on HEAD c686bdd6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3263 for details."
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-07-30T22:45:34.893Z"
   },
   "closeOut": {
     "usage": {
@@ -61,7 +63,80 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-30T22:45:34.913Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: skipped (skipped per issue policy)",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at c686bdd6eee99413c0a2b1671f50b212d442bb40",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3263 MERGED at 2026-07-29T02:05:57Z",
+          "status": "pass",
+          "mergedAt": "2026-07-29T02:05:57Z",
+          "mergeCommit": "8ad7d847e89431613f798ed8d0f65131e4034230"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 8ad7d847e89431613f798ed8d0f65131e4034230",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 2a17c95e contains merge 8ad7d847",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Removed 1 agent state directory; Preserved local branch strike/pan-3259 — not merged to main; Preserved remote branch strike/pan-3259 — not merged to main; Pruned 39 checkpoint ref(s) for agent-pan-3259, planning-pan-3259, strike-pan-3259; No specialist registry entries for PAN-3259"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-opus-5"
