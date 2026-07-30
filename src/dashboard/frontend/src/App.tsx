@@ -16,6 +16,9 @@ import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
+import { NewWorkspaceModal } from './components/CommandDeck/NewWorkspaceModal';
+import { fetchWithTimeout } from './lib/apiFetch';
+import { dashboardMutationJsonHeaders } from './lib/wsTransport';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -238,6 +241,11 @@ export default function App() {
     }
     usePanesStore.getState().ensureHome(project.key);
   }, [queryClient]);
+  // PAN-3330: New Workspace modal. The entry points that open it (rail "+",
+  // command palette, project overview) arrive with WI-4.
+  const [isNewWorkspaceModalOpen, setIsNewWorkspaceModalOpen] = useState(false);
+  const closeNewWorkspaceModal = useCallback(() => setIsNewWorkspaceModalOpen(false), []);
+
   const seenWorkspaceActivityIds = useRef(new Set<string>());
 
   useEffect(() => {
@@ -495,6 +503,23 @@ export default function App() {
     setWorkspaceRouteId(null);
     setActiveTab('home');
   }, [setActiveTab]);
+
+  // PAN-3330 D-5/FR-8: a just-created workspace is invalidated into the rail
+  // immediately rather than waiting out its 10s poll, then activated (a
+  // recency touch — the same posture as palette activation) and opened.
+  const handleWorkspaceCreated = useCallback((workspaceId: string) => {
+    void queryClient.invalidateQueries({ queryKey: ['workspace-registry'] });
+    void (async () => {
+      try {
+        await fetchWithTimeout(`/api/workspace-registry/${encodeURIComponent(workspaceId)}/activate`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: await dashboardMutationJsonHeaders(),
+        });
+      } catch { /* the row exists either way; activation only touches recency */ }
+    })();
+    onSelectWorkspace(workspaceId);
+  }, [queryClient, onSelectWorkspace]);
 
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
@@ -823,6 +848,13 @@ export default function App() {
         isOpen={isNewProjectModalOpen}
         onClose={() => setIsNewProjectModalOpen(false)}
         onCreated={handleProjectCreated}
+      />
+
+      {/* PAN-3330: New Workspace modal */}
+      <NewWorkspaceModal
+        isOpen={isNewWorkspaceModalOpen}
+        onClose={closeNewWorkspaceModal}
+        onCreated={handleWorkspaceCreated}
       />
 
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
