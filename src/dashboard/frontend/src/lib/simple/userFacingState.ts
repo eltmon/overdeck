@@ -18,11 +18,11 @@ export interface UserFacingInput {
   /** An agent is waiting on an AskUserQuestion / operator message. */
   pendingInput?: boolean;
   /**
-   * The pending input is a bare turn-end — the agent simply stopped talking —
-   * rather than an actual open decision (a question, a plan approval, a
-   * permission prompt). See `isBareTurnEnd` in ./derive.ts.
+   * The plan is written and the plan agent has stopped talking without asking
+   * anything — so what this needs is the start button, whatever the raw
+   * pipeline state says. See `isPlanReadyToStart` in ./derive.ts.
    */
-  bareTurnEnd?: boolean;
+  planReadyToStart?: boolean;
   /** An agent is past the stuck threshold or gated troubled. */
   stuck?: boolean;
 }
@@ -77,21 +77,30 @@ const BASE_BY_PIPELINE_STATE: Record<PipelineState, BaseDisplay> = {
 
 /**
  * A finished plan's agent goes idle, which reads as pending input even though
- * it asked nothing. When that bare turn-end is the ONLY pending signal and the
- * plan is done, the base state already says the true thing ("the plan is ready,
- * press start") — a generic question card would replace it with a lie and an
- * answer box that goes nowhere.
+ * it asked nothing. Showing the generic question card there is a lie plus an
+ * answer box that goes nowhere — the true thing is "the plan is ready, press
+ * start".
  */
 function showsQuestion(input: UserFacingInput): boolean {
   if (!input.pendingInput) return false;
-  return !(input.bareTurnEnd === true && input.pipelineState === 'planning_done_awaiting_work');
+  return input.planReadyToStart !== true;
+}
+
+/**
+ * The base state to project. `planning_active` is decided by the plan agent's
+ * *process* being alive, which stays true while it sits idle at a prompt with
+ * the plan already written — so a live-but-finished plan agent claims to still
+ * be breaking the work down. The written plan is the honest signal.
+ */
+function baseStateFor(input: UserFacingInput): PipelineState {
+  return input.planReadyToStart === true ? 'planning_done_awaiting_work' : input.pipelineState;
 }
 
 /** Signals that override the base projection: questions and stuck agents always win. */
 export function userFacingState(input: UserFacingInput): UserFacingState {
   if (showsQuestion(input)) return 'needs-you';
   if (input.stuck) return 'needs-you';
-  return BASE_BY_PIPELINE_STATE[input.pipelineState].state;
+  return BASE_BY_PIPELINE_STATE[baseStateFor(input)].state;
 }
 
 export function userFacingDisplay(input: UserFacingInput): UserFacingDisplay {
@@ -115,7 +124,7 @@ export function userFacingDisplay(input: UserFacingInput): UserFacingDisplay {
       needsYouReason: 'stuck',
     };
   }
-  const base = BASE_BY_PIPELINE_STATE[input.pipelineState];
+  const base = BASE_BY_PIPELINE_STATE[baseStateFor(input)];
   const secondaryActions: string[] = [];
   if (base.state === 'working') secondaryActions.push('Tell the agent something');
   if (base.state === 'ready') secondaryActions.push('See what changed');

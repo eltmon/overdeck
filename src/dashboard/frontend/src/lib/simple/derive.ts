@@ -102,6 +102,22 @@ export function isBareTurnEnd(agent: AgentSnapshot): boolean {
   return kinds.length > 0 && kinds.every((k) => k === 'agentTurnEnded');
 }
 
+/**
+ * The plan exists and the plan agent has stopped talking without asking
+ * anything: nothing will happen until a human starts the work.
+ *
+ * Keyed on the written plan, NOT on the agent's process being dead. A finished
+ * plan agent commonly sits idle at a live prompt for hours, which keeps the
+ * machine in `planning_active` — so process state answers "is it alive", never
+ * "is it still planning". Mid-planning there is no plan yet, so a turn-end
+ * there is a real question and stays one.
+ */
+export function isPlanReadyToStart(issue: Issue, pendingInputAgent: AgentSnapshot | undefined): boolean {
+  if (issue.hasPlan !== true) return false;
+  if (!pendingInputAgent || pendingInputAgent.role !== 'plan') return false;
+  return isBareTurnEnd(pendingInputAgent);
+}
+
 export function deriveSimpleIssue(
   issue: Issue,
   agents: AgentSnapshot[],
@@ -136,7 +152,7 @@ export function deriveSimpleIssue(
     display: userFacingDisplay({
       pipelineState,
       pendingInput: !!pendingInputAgent,
-      bareTurnEnd: !!pendingInputAgent && isBareTurnEnd(pendingInputAgent),
+      planReadyToStart: isPlanReadyToStart(issue, pendingInputAgent),
       stuck,
     }),
     primaryAgent,

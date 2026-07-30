@@ -103,13 +103,32 @@ describe('deriveSimpleIssue', () => {
     expect(d.display.primaryAction).toBe('Answer');
   });
 
-  it('a still-planning agent that ends its turn keeps asking for you', () => {
+  it('mid-planning turn-end (no plan yet) is still a real question', () => {
     const d = deriveSimpleIssue(
-      makeIssue({ state: 'todo' }),
+      makeIssue({ state: 'todo', hasPlan: false }),
       [agent({ role: 'plan', status: 'running', pendingInputKinds: ['agentTurnEnded'], pendingInputCount: 1 })],
     );
     expect(d.pipelineState).toBe('planning_active');
     expect(d.display.needsYouReason).toBe('question');
+  });
+
+  /**
+   * The observed PAN-3330 render: the plan agent finished hours ago but its
+   * tmux session is still alive, so the machine reports `planning_active` and
+   * the page claimed "The agent is breaking this down into tasks" — with a
+   * question card over it. Process liveness answers "is it alive", never "is it
+   * still planning"; the written plan is the honest signal.
+   */
+  it('live-but-finished plan agent reads as ready to start, not still planning', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({ role: 'plan', status: 'running', pendingInputKinds: ['agentTurnEnded'], pendingInputCount: 1 })],
+    );
+    expect(d.pipelineState).toBe('planning_active');
+    expect(d.display.needsYouReason).toBe('start-work');
+    expect(d.display.title).toBe('The plan is ready');
+    expect(d.display.sentence).not.toContain('breaking this down');
+    expect(simpleStepIndex(d.pipelineState)).toBe(0);
   });
 
   it('troubled agent → needs-you / stuck', () => {
