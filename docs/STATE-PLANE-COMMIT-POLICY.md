@@ -24,6 +24,26 @@ the legacy surface.
   `origin` makes commit-and-push part of the canonical write operation.
   A failed origin push is logged and returned as `pushed: false`, never reported
   as fully durable success.
+- After a record push loses a remote-ref race, the record write door fetches and
+  merges `origin/overdeck-state` into the local state branch. Conflicts confined
+  to `records/` resolve automatically with the origin version as the base; the
+  record currently being written then replays its mutator so the local operation
+  lands on top of current remote state. A conflict outside `records/`, or a
+  delete/modify record conflict, aborts the merge and remains operator-owned.
+- Reconcile outcomes are tracked in
+  `${OVERDECK_HOME}/push-health/<stateWorktreeBasename>.json`. The runtime file
+  records the consecutive failure count, last failure time/reason/conflicted
+  paths, and last success time. Crossing three consecutive failures emits one
+  `state-door` error activity entry; later failures remain quiet until a
+  successful reconcile resets the streak and it crosses three again.
+- `pan doctor` reports each migrated state worktree's ahead/behind counts against
+  `origin/overdeck-state`, the reconcile-failure streak, and the last failure.
+  A streak of three is an error; any nonzero streak or at least ten local-ahead
+  commits is a warning. If fetch fails, Doctor uses the cached origin ref and
+  labels the counts stale instead of hiding the divergence. For a warning or
+  error, run `git merge origin/overdeck-state` in the state worktree named by
+  Doctor, resolve the named non-record conflicts, and push; record mirrors
+  regenerate on their next write-door update.
 - Spec lifecycle transitions are stricter: the transition does not return
   success until its `plan.status` update has passed through the state writer's
   commit-and-push flush. A configured origin that rejects the push fails the
