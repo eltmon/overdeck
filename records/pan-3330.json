@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:04:37.177Z",
+  "updated": "2026-07-30T21:11:06.382Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "wi2-registry-routes": {
-        "writerId": "agent-pan-3330",
-        "agentId": "agent-pan-3330",
-        "pid": 2805492,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:04:37.177Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3330",
@@ -86,12 +78,27 @@
         "outcome": "completed",
         "reason": "Extracted resolveWorkspaceCreateIntent/performWorkspaceCreate into src/lib/workspaces/create.ts; refactored workspaceNewCommand + workspaceMainCommand onto them with identical CLI behavior. New create-intent suite (13 tests) plus all existing workspace/CLI suites green.",
         "releasedAt": "2026-07-30T21:01:03.698Z"
+      },
+      {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 2805492,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:04:37.177Z",
+        "itemId": "wi2-registry-routes",
+        "outcome": "completed",
+        "reason": "Added POST resolve/create, POST :id/relocate, GET project-targets to workspace-registry.ts on the WI-1 core; 23 new route tests green, doors guard green, no existing route changed.",
+        "releasedAt": "2026-07-30T21:11:06.381Z"
       }
     ],
     "statusReasons": {
       "wi1-shared-create-core": {
         "reason": "Extracted resolveWorkspaceCreateIntent/performWorkspaceCreate into src/lib/workspaces/create.ts; refactored workspaceNewCommand + workspaceMainCommand onto them with identical CLI behavior. New create-intent suite (13 tests) plus all existing workspace/CLI suites green.",
         "updatedAt": "2026-07-30T21:01:03.698Z"
+      },
+      "wi2-registry-routes": {
+        "reason": "Added POST resolve/create, POST :id/relocate, GET project-targets to workspace-registry.ts on the WI-1 core; 23 new route tests green, doors guard green, no existing route changed.",
+        "updatedAt": "2026-07-30T21:11:06.381Z"
       }
     }
   },
@@ -101,6 +108,11 @@
     "wi1-shared-create-core.wi1-shared-create-core.ac2": "completed",
     "wi1-shared-create-core.wi1-shared-create-core.ac3": "completed",
     "wi1-shared-create-core.wi1-shared-create-core.ac4": "completed",
-    "wi2-registry-routes": "running"
+    "wi2-registry-routes": "completed",
+    "wi2-registry-routes.wi2-registry-routes.ac1": "completed",
+    "wi2-registry-routes.wi2-registry-routes.ac2": "completed",
+    "wi2-registry-routes.wi2-registry-routes.ac3": "completed",
+    "wi2-registry-routes.wi2-registry-routes.ac4": "completed",
+    "wi2-registry-routes.wi2-registry-routes.ac5": "completed"
   }
 }
