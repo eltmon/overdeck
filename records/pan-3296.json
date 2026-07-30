@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:39:33.604Z",
+  "updated": "2026-07-30T04:42:53.367Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "remove-bare-write-doors": {
-        "writerId": "agent-pan-3296",
-        "agentId": "agent-pan-3296",
-        "pid": 3426454,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:39:33.603Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3296",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Changed markWorkStartAccepted to commit plan.status=running through transitionXBriefOnMain and limited direct updates to workspace-local drafts; typecheck and lint pass.",
         "releasedAt": "2026-07-30T04:39:15.208Z"
+      },
+      {
+        "writerId": "agent-pan-3296",
+        "agentId": "agent-pan-3296",
+        "pid": 3426454,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:39:33.603Z",
+        "itemId": "remove-bare-write-doors",
+        "outcome": "completed",
+        "reason": "Removed the two unused exported lifecycle helpers that wrote or deleted specs outside the durable state door; no source consumers remain and lifecycle tests/typecheck pass.",
+        "releasedAt": "2026-07-30T04:42:53.366Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "spawn-route-flip-through-door": {
         "reason": "Changed markWorkStartAccepted to commit plan.status=running through transitionXBriefOnMain and limited direct updates to workspace-local drafts; typecheck and lint pass.",
         "updatedAt": "2026-07-30T04:39:15.208Z"
+      },
+      "remove-bare-write-doors": {
+        "reason": "Removed the two unused exported lifecycle helpers that wrote or deleted specs outside the durable state door; no source consumers remain and lifecycle tests/typecheck pass.",
+        "updatedAt": "2026-07-30T04:42:53.366Z"
       }
     }
   },
@@ -140,6 +147,9 @@
     "spawn-route-flip-through-door.spawn-route-flip-through-door.ac1": "completed",
     "spawn-route-flip-through-door.spawn-route-flip-through-door.ac2": "completed",
     "spawn-route-flip-through-door.spawn-route-flip-through-door.ac3": "completed",
-    "remove-bare-write-doors": "running"
+    "remove-bare-write-doors": "completed",
+    "remove-bare-write-doors.remove-bare-write-doors.ac1": "completed",
+    "remove-bare-write-doors.remove-bare-write-doors.ac2": "completed",
+    "remove-bare-write-doors.remove-bare-write-doors.ac3": "completed"
   }
 }
