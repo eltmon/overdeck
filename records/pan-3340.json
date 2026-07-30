@@ -93,7 +93,7 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T23:28:26.959Z",
+  "updated": "2026-07-30T23:28:32.585Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "blocked",
@@ -103,10 +103,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T23:28:26.251Z",
+    "updatedAt": "2026-07-30T23:28:32.556Z",
     "reviewNotes": "The trigger auth guard rejects existing pan done/Cloister callers, and transport-level policy-save failures remain silent",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
-    "reviewedAtCommit": "40b669c4ae26b284d559dba80cbfc497246b48e0",
+    "reviewedAtCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b",
     "reviewSpawnedAt": "2026-07-30T23:20:39.275Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -136,24 +136,6 @@
         "src/dashboard/server/routes/workspaces/review-pipeline.ts"
       ],
       "recordedAt": "2026-07-30T22:33:38.650Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
-      }
     }
   },
   "closeOut": {
@@ -218,7 +200,7 @@
       },
       "costAtCloseOut": {
         "usd": 122.15787,
-        "pricingAsOf": "2026-07-30T23:28:26.278Z"
+        "pricingAsOf": "2026-07-30T23:28:32.574Z"
       }
     },
     "merges": [
