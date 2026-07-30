@@ -208,6 +208,36 @@ export async function readRecentObservations(projectId: string, workspaceId: str
 }
 
 export async function readArchivedStatuses(projectId: string, workspaceId: string, limit = 3): Promise<MemoryStatus[]> {
+  const entries = await readArchivedStatusEntries(projectId, workspaceId, limit);
+  // Oldest-first, matching the order the rollup prompt renders them in.
+  return entries.map((entry) => entry.status).reverse();
+}
+
+export interface ArchivedStatusEntry {
+  /**
+   * The archive timestamp recovered from the filename `archiveStatus` writes,
+   * or null when the filename predates / does not match that shape.
+   * `MemoryStatus` itself carries no timestamp field.
+   */
+  archivedAt: string | null;
+  path: string;
+  status: MemoryStatus;
+}
+
+const ARCHIVE_FILENAME_TIMESTAMP =
+  /^(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z_/;
+
+/**
+ * Archived statuses newest-first, each paired with the timestamp encoded in
+ * its filename — the recall surface behind `pan memory status --history`
+ * (PAN-3286 FR-6). Note that `commitStatusRollup` prunes the archive to the
+ * three most recent entries, so a larger limit returns whatever is retained.
+ */
+export async function readArchivedStatusEntries(
+  projectId: string,
+  workspaceId: string,
+  limit = 3,
+): Promise<ArchivedStatusEntry[]> {
   const archiveDir = resolveArchiveDir(projectId, workspaceId);
   const files = (await readdir(archiveDir).catch((error: unknown) => {
     if (isEnoent(error)) return [] as string[];
@@ -215,13 +245,20 @@ export async function readArchivedStatuses(projectId: string, workspaceId: strin
   }))
     .filter((file) => file.endsWith('.json'))
     .sort()
-    .slice(-limit);
+    .slice(-limit)
+    .reverse();
 
-  const statuses: MemoryStatus[] = [];
+  const entries: ArchivedStatusEntry[] = [];
   for (const file of files) {
-    statuses.push(JSON.parse(await readFile(`${archiveDir}/${file}`, 'utf8')) as MemoryStatus);
+    const path = `${archiveDir}/${file}`;
+    const match = ARCHIVE_FILENAME_TIMESTAMP.exec(file);
+    entries.push({
+      archivedAt: match ? `${match[1]}T${match[2]}:${match[3]}:${match[4]}.${match[5]}Z` : null,
+      path,
+      status: JSON.parse(await readFile(path, 'utf8')) as MemoryStatus,
+    });
   }
-  return statuses;
+  return entries;
 }
 
 async function archiveStatus(projectId: string, workspaceId: string, status: MemoryStatus, now: Date): Promise<string> {

@@ -15,14 +15,26 @@ import {
 } from './paths.js';
 import { getMemoryHealthPath, type MemoryHealthSnapshot } from './health.js';
 import { mirrorDailySummary } from './state-mirror.js';
-import { readCurrentStatus } from './rollup.js';
+import { readArchivedStatusEntries, readCurrentStatus, type ArchivedStatusEntry } from './rollup.js';
 import { getAgentStateSync } from '../agents.js';
-import { getWorkspaceForIssue, listProjects, listWorkspaces, listWorkspacesForPath, resolveWorkspaceRef } from '../workspaces/resolver.js';
+import {
+  getWorkspaceForIssue,
+  listProjects,
+  listWorkspaces,
+  listWorkspacesForPath,
+  resolveWorkspaceForCwd,
+  resolveWorkspaceRef,
+} from '../workspaces/resolver.js';
 import { searchMemory as searchMemoryFts, type MemorySearchHit } from './search.js';
 
 const DEFAULT_PROJECT_ID = 'overdeck';
 const MIN_DAILY_SUMMARY_OBSERVATIONS = 3;
 const DAILY_SUMMARY_REGENERATION_OBSERVATIONS = 20;
+/** Upper bound on `pan memory status --history <n>` (PAN-3286 D-8). */
+export const MEMORY_STATUS_HISTORY_LIMIT = 50;
+
+const ADDRESSING_MODES_HINT =
+  'Address a workspace with --workspace <id|name>, with an issue positional, or by running the command from inside the workspace directory.';
 
 export interface MemorySearchOptions {
   project?: string;
@@ -207,10 +219,106 @@ async function resolveObservationFromHit(
   return observations.find((observation) => observation.id === hit.source) ?? null;
 }
 
+/**
+ * Issue-shaped facade over `getMemoryStatusForWorkspace`, retained as the
+ * pre-PAN-3286 public entry point (the CLI now resolves a workspace first).
+ */
 export async function getMemoryStatus(projectId: string, issueId: string): Promise<MemoryStatus | undefined> {
   const workspaceId = getWorkspaceForIssue(issueId)?.id;
   if (!workspaceId) return undefined;
+  return getMemoryStatusForWorkspace(projectId, workspaceId);
+}
+
+export interface MemoryWorkspaceTargetInput {
+  /**
+   * `--project`, used only by the issue-positional arm so its memory-root
+   * resolution stays byte-identical to `getMemoryStatus` (PAN-3286 FR-5).
+   */
+  projectId?: string;
+  issueId?: string;
+  workspaceRef?: string;
+  cwd?: string;
+}
+
+export interface MemoryWorkspaceTarget {
+  projectId: string;
+  workspaceId: string;
+  workspaceName: string;
+  issueId: string | null;
+  /** What to print in messages and summary titles: the issue id, else the workspace name. */
+  label: string;
+}
+
+/**
+ * The three memory addressing modes, in precedence order: `--workspace <ref>`,
+ * an issue positional, then the workspace owning the cwd (PAN-3286 FR-5).
+ * Throws with an actionable message naming all three when nothing resolves.
+ */
+export function resolveMemoryWorkspaceTarget(input: MemoryWorkspaceTargetInput): MemoryWorkspaceTarget {
+  if (input.workspaceRef) {
+    const resolution = resolveWorkspaceRef(input.workspaceRef);
+    if (resolution.ambiguous) {
+      throw new Error(
+        `Multiple workspaces named '${input.workspaceRef}' found (projects: ${resolution.matches.map((w) => w.projectId).join(', ')}); use the workspace id instead.`,
+      );
+    }
+    if (!resolution.workspace) {
+      throw new Error(`No workspace found with id or name '${input.workspaceRef}'`);
+    }
+    const workspace = resolution.workspace;
+    return {
+      projectId: workspace.projectId,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      issueId: workspace.issueId,
+      label: workspace.issueId ?? workspace.name,
+    };
+  }
+
+  if (input.issueId) {
+    const workspace = getWorkspaceForIssue(input.issueId);
+    // Message deliberately unchanged from the pre-PAN-3286 issue-only path.
+    if (!workspace) throw new Error(`No workspace found for issue ${input.issueId}`);
+    return {
+      projectId: input.projectId ?? DEFAULT_PROJECT_ID,
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      issueId: input.issueId,
+      label: input.issueId,
+    };
+  }
+
+  const cwd = input.cwd ?? process.cwd();
+  const workspace = resolveWorkspaceForCwd(cwd);
+  if (!workspace) {
+    throw new Error(`No workspace is registered for ${cwd}. ${ADDRESSING_MODES_HINT}`);
+  }
+  return {
+    projectId: workspace.projectId,
+    workspaceId: workspace.id,
+    workspaceName: workspace.name,
+    issueId: workspace.issueId,
+    label: workspace.issueId ?? workspace.name,
+  };
+}
+
+/** Current status for an already-resolved workspace (PAN-3286 FR-5). */
+export async function getMemoryStatusForWorkspace(projectId: string, workspaceId: string): Promise<MemoryStatus | undefined> {
   return readCurrentStatus(projectId, workspaceId);
+}
+
+/**
+ * Archived statuses newest-first, capped at `MEMORY_STATUS_HISTORY_LIMIT`
+ * (PAN-3286 FR-6). The rollup writer prunes the on-disk archive to its three
+ * most recent entries, so a larger request returns whatever is still retained.
+ */
+export async function getMemoryStatusHistory(
+  projectId: string,
+  workspaceId: string,
+  limit: number,
+): Promise<ArchivedStatusEntry[]> {
+  const bounded = Math.min(Math.max(1, Math.floor(limit)), MEMORY_STATUS_HISTORY_LIMIT);
+  return readArchivedStatusEntries(projectId, workspaceId, bounded);
 }
 
 export async function createResetMarker(input: {
@@ -242,14 +350,21 @@ export async function createResetMarker(input: {
 
 export async function generateDailySummary(input: {
   projectId?: string;
-  issueId: string;
+  issueId?: string;
+  /** `--workspace <id|name>`; when omitted the issue positional or cwd resolves the target. */
+  workspaceRef?: string;
+  cwd?: string;
   date?: string;
 }): Promise<DailySummaryResult> {
-  const projectId = input.projectId ?? DEFAULT_PROJECT_ID;
+  const target = resolveMemoryWorkspaceTarget({
+    projectId: input.projectId,
+    issueId: input.issueId,
+    workspaceRef: input.workspaceRef,
+    cwd: input.cwd,
+  });
+  const projectId = target.projectId;
   const date = input.date ?? new Date().toISOString().slice(0, 10);
-  const workspace = getWorkspaceForIssue(input.issueId);
-  if (!workspace) throw new Error(`No workspace found for issue ${input.issueId}`);
-  const workspaceId = workspace.id;
+  const workspaceId = target.workspaceId;
   const path = join(resolveSummariesDir(projectId, workspaceId), `${date}.md`);
   const observations = await readObservationsFile(resolveObservationsFile(projectId, workspaceId, date));
   const existingMarkdown = await readTextFile(path);
@@ -263,11 +378,11 @@ export async function generateDailySummary(input: {
     return { status: 'up-to-date', path, markdown: existingMarkdown, observationCount: observations.length, previousObservationCount };
   }
 
-  const markdown = buildDailySummaryMarkdown(input.issueId, date, observations);
+  const markdown = buildDailySummaryMarkdown(target.label, date, observations);
   await ensureParentDir(path);
   await writeFile(path, markdown, 'utf8');
-  await indexDailySummary(projectId, input.issueId, date, observations, markdown);
-  await mirrorDailySummary(projectId, workspace.name, date, markdown);
+  await indexDailySummary(projectId, target, date, observations, markdown);
+  await mirrorDailySummary(projectId, target.workspaceName, date, markdown);
   return { status: 'generated', path, markdown, observationCount: observations.length, previousObservationCount };
 }
 
@@ -363,22 +478,28 @@ function parseSummaryObservationCount(markdown: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-async function indexDailySummary(projectId: string, issueId: string, date: string, observations: MemoryObservation[], markdown: string): Promise<void> {
+async function indexDailySummary(projectId: string, target: MemoryWorkspaceTarget, date: string, observations: MemoryObservation[], markdown: string): Promise<void> {
   const latest = observations.at(-1);
   const files = [...new Set(observations.flatMap((observation) => observation.files))].join(',');
   const tags = [...new Set(['memory', 'summary', ...observations.flatMap((observation) => observation.tags)])].join(',');
   const entryTime = latest?.timestamp.slice(11) ?? '00:00:00.000Z';
+  // Issue-addressed summaries keep the pre-PAN-3286 issue-keyed identity;
+  // workspace-addressed ones (no issue) key on workspace_id instead so their
+  // reset-marker scope and per-day dedupe both resolve. Both column names are
+  // literals from a closed set, never user input.
+  const dedupeColumn = target.issueId ? 'issue_id' : 'workspace_id';
+  const dedupeValue = target.issueId ?? target.workspaceId;
   await runMemoryFtsTransaction(projectId, [
     {
       method: 'run',
       sql: `
         DELETE FROM memory_fts
         WHERE project_id = ?
-          AND issue_id = ?
+          AND ${dedupeColumn} = ?
           AND doc_type = 'summary'
           AND entry_date = ?
       `,
-      params: [projectId, issueId, date],
+      params: [projectId, dedupeValue, date],
     },
     {
       method: 'run',
@@ -415,10 +536,10 @@ async function indexDailySummary(projectId: string, issueId: string, date: strin
         files,
         tags,
         'summary',
-        'issue',
+        target.issueId ? 'issue' : 'workspace',
         projectId,
-        latest?.workspaceId ?? '',
-        issueId,
+        target.workspaceId,
+        target.issueId ?? '',
         latest?.runId ?? '',
         latest?.sessionId ?? '',
         latest?.agentRole ?? '',

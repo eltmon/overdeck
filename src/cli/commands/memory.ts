@@ -3,8 +3,10 @@ import chalk from 'chalk';
 import {
   createResetMarker,
   generateDailySummary,
-  getMemoryStatus,
+  getMemoryStatusForWorkspace,
+  getMemoryStatusHistory,
   readMemorySettingsSummary,
+  resolveMemoryWorkspaceTarget,
   runMemoryDoctor,
   searchMemory,
 } from '../../lib/memory/cli.js';
@@ -65,6 +67,88 @@ export async function memorySearchCommand(query: string, options: MemorySearchCo
   }
 }
 
+export interface MemoryStatusCommandOptions {
+  project?: string;
+  workspace?: string;
+  history?: number;
+  json?: boolean;
+}
+
+/**
+ * `pan memory status [issue]` — addressable by `--workspace <id|name>`, by the
+ * issue positional, or by cwd, with optional `--history <n>` archived-status
+ * recall (PAN-3286 WI-4, FR-5/FR-6).
+ */
+export async function memoryStatusCommand(issue: string | undefined, options: MemoryStatusCommandOptions): Promise<void> {
+  let target: ReturnType<typeof resolveMemoryWorkspaceTarget>;
+  try {
+    target = resolveMemoryWorkspaceTarget({ projectId: options.project, issueId: issue, workspaceRef: options.workspace });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    return exitCli(1);
+  }
+
+  const status = await getMemoryStatusForWorkspace(target.projectId, target.workspaceId);
+  const history = options.history === undefined
+    ? []
+    : await getMemoryStatusHistory(target.projectId, target.workspaceId, options.history);
+
+  if (options.json) {
+    if (options.history === undefined) {
+      console.log(JSON.stringify(status ?? null, null, 2));
+      return;
+    }
+    console.log(JSON.stringify({ current: status ?? null, history }, null, 2));
+    return;
+  }
+
+  if (!status) {
+    console.log(chalk.yellow(`No memory status found for ${target.label}.`));
+  } else {
+    console.log(chalk.bold(status.headline));
+    console.log(status.summary);
+    console.log(chalk.dim(`phase=${status.phase} confidence=${status.confidence}`));
+    if (status.nextSteps.length > 0) console.log(`Next: ${status.nextSteps.join('; ')}`);
+  }
+
+  if (options.history === undefined) return;
+  if (history.length === 0) {
+    console.log(chalk.yellow('No archived statuses retained.'));
+    return;
+  }
+  console.log(chalk.bold(`\nArchived statuses (${history.length}, newest first):`));
+  for (const entry of history) {
+    console.log(`  ${entry.archivedAt ?? 'unknown-time'} phase=${entry.status.phase} ${entry.status.headline}`);
+  }
+}
+
+export interface MemorySummaryCommandOptions {
+  project?: string;
+  workspace?: string;
+  date?: string;
+  json?: boolean;
+}
+
+/** `pan memory summary [issue]` — same three addressing modes as `status` (PAN-3286 FR-7). */
+export async function memorySummaryCommand(issue: string | undefined, options: MemorySummaryCommandOptions): Promise<void> {
+  let result: Awaited<ReturnType<typeof generateDailySummary>>;
+  try {
+    result = await generateDailySummary({
+      projectId: options.project,
+      issueId: issue,
+      workspaceRef: options.workspace,
+      date: options.date,
+    });
+  } catch (err) {
+    console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+    return exitCli(1);
+  }
+  if (options.json) console.log(JSON.stringify(result, null, 2));
+  else if (result.status === 'insufficient-data') console.log(chalk.yellow(`Insufficient data: ${result.observationCount} observations found; 3 required.`));
+  else if (result.status === 'up-to-date') console.log(chalk.yellow(`Summary already up to date at ${result.path}; ${result.observationCount - (result.previousObservationCount ?? 0)} new observations found, 20 required.`));
+  else console.log(chalk.green(`Wrote ${result.observationCount} observations to ${result.path}`));
+}
+
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
     .description('Search and inspect Overdeck memory');
@@ -85,25 +169,13 @@ export function createMemoryCommand(): Command {
     .action(memorySearchCommand);
 
   memory
-    .command('status <issue>')
-    .description('Show current memory status for an issue')
+    .command('status [issue]')
+    .description('Show current memory status for an issue, a workspace, or the current directory')
     .option('--project <id>', 'Project ID', 'overdeck')
+    .option('--workspace <id|name>', 'Workspace id or name instead of an issue positional')
+    .option('--history <n>', 'Also print up to N archived statuses, newest first (max 50)', parseInt)
     .option('--json', 'Output JSON')
-    .action(async (issue, options) => {
-      const status = await getMemoryStatus(options.project, issue);
-      if (options.json) {
-        console.log(JSON.stringify(status ?? null, null, 2));
-        return;
-      }
-      if (!status) {
-        console.log(chalk.yellow(`No memory status found for ${issue}.`));
-        return;
-      }
-      console.log(chalk.bold(status.headline));
-      console.log(status.summary);
-      console.log(chalk.dim(`phase=${status.phase} confidence=${status.confidence}`));
-      if (status.nextSteps.length > 0) console.log(`Next: ${status.nextSteps.join('; ')}`);
-    });
+    .action(memoryStatusCommand);
 
   memory
     .command('reset <scope> <scopeId>')
@@ -125,18 +197,13 @@ export function createMemoryCommand(): Command {
     });
 
   memory
-    .command('summary <issue>')
-    .description('Generate a daily markdown memory summary')
+    .command('summary [issue]')
+    .description('Generate a daily markdown memory summary for an issue, a workspace, or the current directory')
     .option('--project <id>', 'Project ID', 'overdeck')
+    .option('--workspace <id|name>', 'Workspace id or name instead of an issue positional')
     .option('--date <yyyy-mm-dd>', 'Summary date')
     .option('--json', 'Output JSON')
-    .action(async (issue, options) => {
-      const result = await generateDailySummary({ projectId: options.project, issueId: issue, date: options.date });
-      if (options.json) console.log(JSON.stringify(result, null, 2));
-      else if (result.status === 'insufficient-data') console.log(chalk.yellow(`Insufficient data: ${result.observationCount} observations found; 3 required.`));
-      else if (result.status === 'up-to-date') console.log(chalk.yellow(`Summary already up to date at ${result.path}; ${result.observationCount - (result.previousObservationCount ?? 0)} new observations found, 20 required.`));
-      else console.log(chalk.green(`Wrote ${result.observationCount} observations to ${result.path}`));
-    });
+    .action(memorySummaryCommand);
 
   memory
     .command('doctor')
