@@ -118,6 +118,53 @@ describe('review status', () => {
     expect(capturePipelineStageForIssueMock).toHaveBeenCalledWith('PAN-2200', 'review_passed');
   });
 
+  // PAN-3339: verification is dispatched only from inside the review pipeline, which
+  // never runs again once the issue merges. A `pending` verdict carried past the merge
+  // has no owner and blocks DoD row 3 forever, so the merge write settles it here with
+  // the same policy every merged-issue verification run already applies.
+  it('settles a pending verification when the merge lands', () => {
+    setReviewStatusSync('PAN-3296', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'pending',
+    });
+
+    const merged = setReviewStatusSync('PAN-3296', { mergeStatus: 'merged', readyForMerge: false });
+
+    // The note is journal-only (PAN-1988), so assert it on the write's own result.
+    expect(merged).toMatchObject({
+      mergeStatus: 'merged',
+      verificationStatus: 'skipped',
+      verificationNotes: 'Merge already landed; verify-on-main owns post-merge validation.',
+      readyForMerge: false,
+    });
+    expect(getReviewStatusSync('PAN-3296')).toMatchObject({
+      mergeStatus: 'merged',
+      verificationStatus: 'skipped',
+    });
+  });
+
+  it('leaves verification pending when a merge lifecycle reset restarts the work', () => {
+    setReviewStatusSync('PAN-3297', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'merged',
+    });
+
+    setReviewStatusSync('PAN-3297', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+    });
+
+    expect(getReviewStatusSync('PAN-3297')).toMatchObject({
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+    });
+  });
+
   it('consumes a serviced review request when review passes', () => {
     const initial = setReviewStatusSync('PAN-3083', {
       reviewStatus: 'pending',

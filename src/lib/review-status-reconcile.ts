@@ -97,6 +97,31 @@ export function verificationSatisfied(
   return status.verificationStatus !== 'failed';
 }
 
+/**
+ * The one reason a merged issue's verification is `skipped`. Every verification
+ * run for a merged issue already returns this (`skipMergedVerification` in
+ * cloister/verification-runner.ts).
+ */
+export const MERGED_VERIFICATION_REASON =
+  'Merge already landed; verify-on-main owns post-merge validation.';
+
+/**
+ * PAN-3339: `pending` verification on a merged issue is a state with no owner.
+ * Verification is dispatched only from inside the review pipeline, and that
+ * pipeline never runs again once the issue merges — so the verdict recorded as
+ * `pending` at finalization can never advance, and DoD row 3 blocks close-out
+ * forever (observed on PAN-3296 with verificationCycleCount 0). The write door
+ * settles it at the write that makes it unownable, using the same policy every
+ * merged-issue verification run already applies. A merge lifecycle reset writes
+ * mergeStatus 'pending' in the same update, so it never trips this.
+ */
+export function settleMergedVerification<
+  T extends Pick<ReviewStatus, 'mergeStatus' | 'verificationStatus' | 'verificationNotes'>,
+>(status: T): T {
+  if (status.mergeStatus !== 'merged' || status.verificationStatus !== 'pending') return status;
+  return { ...status, verificationStatus: 'skipped', verificationNotes: MERGED_VERIFICATION_REASON };
+}
+
 /** PAN-1988: merge-gate predicate shared by direct writes and journal reconciliation. */
 export function reviewGatesPassedSync(
   status: Pick<
@@ -142,7 +167,9 @@ export function reconcileJournalIntoCacheSync(
   merged.updatedAt = journal.updatedAt;
   const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
   merged.readyForMerge = hasBlockers ? false : reviewGatesPassedSync(merged);
-  const reconciled = normalizeReviewStatusSync(merged);
+  // PAN-3339: same settlement as the write door, so a journal record still
+  // carrying the ownerless `pending` cannot reinstate it in the cache on read.
+  const reconciled = normalizeReviewStatusSync(settleMergedVerification(merged));
   try {
     dbUpsert(reconciled);
     // PAN-2988 — the reconcile changed the effective status; the read model only

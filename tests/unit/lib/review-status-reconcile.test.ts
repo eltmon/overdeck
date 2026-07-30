@@ -86,6 +86,26 @@ describe('review status journal reconciliation', () => {
     expect(result?.updatedAt).toBe('2026-07-22T20:01:00.000Z');
   });
 
+  // PAN-3339: the write door settles merged + pending verification to skipped.
+  // A journal record still carrying the ownerless `pending` must not reinstate it.
+  it('settles a pending verification carried by a merged journal record', () => {
+    mockReadJournalStatusSync.mockReturnValue({
+      updatedAt: '2026-07-22T20:01:00.000Z',
+      durable: {
+        reviewStatus: 'passed',
+        testStatus: 'passed',
+        verificationStatus: 'pending',
+        mergeStatus: 'merged',
+      },
+    });
+
+    expect(getReviewStatusSync(dbStatus.issueId)).toMatchObject({
+      mergeStatus: 'merged',
+      verificationStatus: 'skipped',
+      verificationNotes: 'Merge already landed; verify-on-main owns post-merge validation.',
+    });
+  });
+
   it('does not emit when the DB cache is current with the journal', () => {
     mockReadJournalStatusSync.mockReturnValue({
       updatedAt: dbStatus.updatedAt,

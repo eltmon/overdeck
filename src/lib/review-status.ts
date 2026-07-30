@@ -22,7 +22,7 @@ import { updateIssueRecordForReviewStatusSync, readJournalStatusSync } from './o
 import { carriesNewTerminalVerdict } from './pan-dir/pipeline-verdict-merge.js';
 import {
   reviewGatesPassedSync,
-  verificationSatisfied,
+  verificationSatisfied, settleMergedVerification,
   type BlockerReason, type ReviewStatus, type StatusHistoryEntry,
 } from './review-status-reconcile.js';
 import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
@@ -32,7 +32,7 @@ import { resolveJournalReconciledReviewStatusSync } from './review-status-read.j
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 
-export { reviewGatesPassedSync, verificationSatisfied } from './review-status-reconcile.js';
+export { reviewGatesPassedSync, verificationSatisfied, MERGED_VERIFICATION_REASON } from './review-status-reconcile.js';
 export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
 export type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 
@@ -237,7 +237,7 @@ export function setReviewStatusSync(
     delete update.testNotes;
   }
 
-  const merged = { ...status, ...update };
+  const merged = settleMergedVerification({ ...status, ...update });
 
   // PAN-1862 (FR-6): reviewerVerdicts is a per-sub-role MAP — a partial update
   // (synthesis reporting only the reviewers that re-ran this cycle) must merge
