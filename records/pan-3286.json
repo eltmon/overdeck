@@ -159,7 +159,7 @@
     "recordedAt": "2026-07-30T06:50:15.598Z"
   },
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T10:28:20.535Z",
+  "updated": "2026-07-30T10:28:39.623Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "passed",
@@ -167,10 +167,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T06:50:33.466Z",
-    "updatedAt": "2026-07-30T10:28:13.990Z",
+    "updatedAt": "2026-07-30T10:28:39.459Z",
     "reviewNotes": "All four prior blockers are resolved; correctness, security, requirements, and performance review passed",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -299,7 +299,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.116605,
-        "pricingAsOf": "2026-07-30T10:28:15.957Z"
+        "pricingAsOf": "2026-07-30T10:28:39.544Z"
       }
     },
     "merges": [
@@ -308,7 +308,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3286",
