@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T03:58:10.132Z",
+  "updated": "2026-07-30T04:03:41.060Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "pending",
@@ -69,16 +69,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "merge-reconcile": {
-        "writerId": "agent-pan-3291",
-        "agentId": "agent-pan-3291",
-        "pid": 2152549,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:58:10.132Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3291",
@@ -90,12 +82,27 @@
         "outcome": "completed",
         "reason": "Added bounded git merge --abort cleanup beside rebase cleanup and regression-tested recovery from an in-progress conflicting merge",
         "releasedAt": "2026-07-30T03:57:42.109Z"
+      },
+      {
+        "writerId": "agent-pan-3291",
+        "agentId": "agent-pan-3291",
+        "pid": 2152549,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T03:58:10.132Z",
+        "itemId": "merge-reconcile",
+        "outcome": "completed",
+        "reason": "Replaced per-commit rebase replay with a 3-way merge that auto-resolves records from origin, replays the active mutator, and aborts non-record or delete-modify conflicts; added real-git regression coverage",
+        "releasedAt": "2026-07-30T04:03:41.060Z"
       }
     ],
     "statusReasons": {
       "abort-merge-cleanup": {
         "reason": "Added bounded git merge --abort cleanup beside rebase cleanup and regression-tested recovery from an in-progress conflicting merge",
         "updatedAt": "2026-07-30T03:57:42.109Z"
+      },
+      "merge-reconcile": {
+        "reason": "Replaced per-commit rebase replay with a 3-way merge that auto-resolves records from origin, replays the active mutator, and aborts non-record or delete-modify conflicts; added real-git regression coverage",
+        "updatedAt": "2026-07-30T04:03:41.060Z"
       }
     }
   },
@@ -104,6 +111,11 @@
     "abort-merge-cleanup.abort-merge-cleanup.ac1": "completed",
     "abort-merge-cleanup.abort-merge-cleanup.ac2": "completed",
     "abort-merge-cleanup.abort-merge-cleanup.ac3": "completed",
-    "merge-reconcile": "running"
+    "merge-reconcile": "completed",
+    "merge-reconcile.merge-reconcile.ac1": "completed",
+    "merge-reconcile.merge-reconcile.ac2": "completed",
+    "merge-reconcile.merge-reconcile.ac3": "completed",
+    "merge-reconcile.merge-reconcile.ac4": "completed",
+    "merge-reconcile.merge-reconcile.ac5": "completed"
   }
 }
