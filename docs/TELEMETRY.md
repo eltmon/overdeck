@@ -74,12 +74,12 @@ the public contract and lists every allowed value.
 | `cli_verb` | `abort`, `approve`, `backlog`, `backup`, `clean`, `context`, `destroy`, `dev`, `diff`, `doctor`, `done`, `down`, `edit`, `finalize`, `fork`, `handoff`, `health`, `init`, `issues`, `kill`, `list`, `migrate`, `mode`, `open`, `pause`, `pending`, `plan`, `project`, `projects`, `recover`, `reload`, `reopen`, `request`, `reset`, `restart`, `restore`, `resume`, `review`, `scope`, `serve`, `show`, `skills`, `spawn-reviewer`, `staffing`, `start`, `status`, `strike`, `sync`, `sync-main`, `tell`, `unarchive-conversation`, `unpause`, `untroubled`, `up`, `update`, `validate`, `wipe`, `write-sequence`, `other` |
 | `close_out_variant` | `card`, `inspector` |
 | `count_bucket` | `0`, `1-2`, `3-5`, `6-10`, `11+` |
-| `dashboard_tab` | `home`, `pipeline`, `kanban`, `command-deck`, `agents`, `flywheel`, `orders`, `backlog`, `resources`, `knowledge`, `skills`, `context`, `health`, `activity`, `metrics`, `costs`, `autopreso`, `settings`, `god-view`, `deacon`, `sessions`, `awaiting-merge` |
+| `dashboard_tab` | `home`, `pipeline`, `kanban`, `command-deck`, `agents`, `flywheel`, `orders`, `backlog`, `resources`, `knowledge`, `skills`, `context`, `health`, `activity`, `metrics`, `costs`, `autopreso`, `settings`, `god-view`, `deacon`, `sessions`, `awaiting-merge`, `workspace` |
 | `decision_subject` | `agent`, `conversation` |
 | `duration_bucket` | `under_100ms`, `100ms-999ms`, `1s-9s`, `10s+` |
 | `forge` | `github`, `gitlab` |
 | `fork_kind` | `summary`, `handoff`, `plain` |
-| `harness` | `claude-code`, `ohmypi`, `codex`, `acp` |
+| `harness` | `claude-code`, `ohmypi`, `codex`, `acp`, `kimi-code` |
 | `merge_kind` | `pipeline` |
 | `model_family` | `claude`, `gpt`, `gemini`, `kimi`, `minimax`, `glm`, `mimo`, `other` |
 | `pipeline_stage` | `work_done`, `review_passed`, `verification_passed`, `merged`, `closed_out` |

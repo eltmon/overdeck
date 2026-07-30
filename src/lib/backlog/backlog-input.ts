@@ -143,7 +143,8 @@ export async function collectOpenBacklog(
 
     const hasPrd = opts?.hasPrdFn
       ? opts.hasPrdFn(issue.ref)
-      : existsSync(join(paths.draftsDir, `${issue.ref.toUpperCase()}.md`));
+      : existsSync(join(paths.draftsDir, `${issue.ref.toLowerCase()}.md`)) ||
+        existsSync(join(paths.draftsDir, `${issue.ref.toUpperCase()}.md`));
 
     const ready = opts?.hasSpecFn
       ? opts.hasSpecFn(issue.ref)

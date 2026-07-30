@@ -19,6 +19,7 @@ import { getEventStore, type EventStore, type StoredEvent } from '../event-store
 import { writeAgentStateJsonSync, type AgentState } from '../../../lib/agents.js';
 import { WORK_LAUNCHER_GRACE_MS } from '../../../lib/cloister/agent-grace.js';
 import { logAgentLifecycleSync } from '../../../lib/persistent-logger.js';
+import { getWorkspaceForIssue } from '../../../lib/workspaces/resolver.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 export interface AgentProjectionResult {
@@ -96,7 +97,14 @@ function writeProjectionRows(
   const record = event as Record<string, unknown>;
   const timestamp = (record['timestamp'] as string) ?? new Date().toISOString();
   const timestampMs = new Date(timestamp).getTime();
-  const payload = JSON.stringify(record['payload'] ?? {});
+  // PAN-1990 D-10/WI-11: stamp workspaceId from the projected agent's issueId
+  // when the caller didn't already set one — this transactional path bypasses
+  // event-store.ts's append()/appendAsync() stamping, so it needs its own.
+  const rawPayload = (record['payload'] ?? {}) as Record<string, unknown>;
+  const payloadRecord = rawPayload.workspaceId === undefined
+    ? { ...rawPayload, workspaceId: getWorkspaceForIssue(state.issueId)?.id }
+    : rawPayload;
+  const payload = JSON.stringify(payloadRecord);
   const updatedAt = Date.now();
 
   db.prepare(
@@ -113,7 +121,7 @@ function writeProjectionRows(
     | { sequence: number }
     | undefined;
   const sequence = row?.sequence ?? 0;
-  return { sequence, stored: buildStoredEvent(event, sequence) };
+  return { sequence, stored: buildStoredEvent({ ...event, payload: payloadRecord }, sequence) };
 }
 
 function emitCommittedProjection(

@@ -39,6 +39,40 @@ export function buildKimiAcpSpawnInput(
   };
 }
 
+/**
+ * Overdeck model ids → kimi-code session-config model values.
+ *
+ * The kimi-code ACP agent validates the "model" session config option against
+ * its own registry ids (see `kimi provider list --json`), which carry the
+ * managed-provider prefix:
+ *
+ *   kimi-code/k3                         K3, 1,048,576-token context
+ *   kimi-code/k3-256k                    K3, 262,144-token context
+ *   kimi-code/kimi-for-coding            K2.7 Coding, 262,144-token context
+ *   kimi-code/kimi-for-coding-highspeed  K2.7 Coding Highspeed
+ *
+ * Overdeck's catalog ids (`k3` = 256K, `k3[1m]` = 1M — see
+ * src/lib/model-capabilities.ts) must be translated at this boundary or the
+ * session runtime rejects the spawn with
+ * `Invalid value "k3[1m]" for session config option "model"`.
+ */
+const KIMI_ACP_MODEL_IDS: Record<string, string> = {
+  "k3": "kimi-code/k3-256k",
+  "k3[1m]": "kimi-code/k3",
+  "kimi-k2.7-code": "kimi-code/kimi-for-coding",
+  "kimi-for-coding": "kimi-code/kimi-for-coding",
+};
+
+/**
+ * Translate an Overdeck model id to the kimi-code agent's model config value.
+ * Unknown ids (including already-prefixed `kimi-code/...` values) pass through
+ * unchanged so the session runtime's allowed-values validation fails loudly
+ * instead of silently substituting a model the operator never chose.
+ */
+export function translateKimiAcpModelId(modelId: string): string {
+  return KIMI_ACP_MODEL_IDS[modelId] ?? modelId;
+}
+
 function authMethodSearchText(method: EffectAcpSchema.AuthMethod): string {
   return [method.id, method.name, method.description ?? ""].join(" ").toLowerCase();
 }

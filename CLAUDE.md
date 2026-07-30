@@ -103,7 +103,7 @@ git push origin v0.9.4
 
 ## Harnesses
 
-Overdeck supports four coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), and `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only blocked combination (ToS gate in `src/lib/harness-policy.ts`).
+Overdeck supports five coding-agent harnesses: `claude-code` (default), `pi`/`ohmypi` (alternative, multi-provider), `codex` (OpenAI Codex CLI — first-party agent loop for the GPT model family), `acp` (native Agent Client Protocol, with Kimi Code CLI as the first wired agent), and `kimi-code` (Moonshot's own Kimi Code CLI, driven natively — no ACP host, Kimi models only). Codex work agents use the persistent `codex app-server` transport by default, with `codex.transport: tui` as a temporary escape hatch to the legacy `codexMode: work-tui` path; the runtime adapter remains `src/lib/runtimes/codex.ts`. The ACP integration vendors the Effect-based protocol client in `packages/effect-acp/` and runs through `src/lib/runtimes/acp.ts`. `kimi-code`'s runtime adapter is `src/lib/runtimes/kimi-code.ts`; it coexists with `acp` rather than replacing it — both drive the same `kimi` binary through different surfaces. The harness is picked per spawn at plan kickoff, role runs, work agent start, and the conversation panel; roles read harness/model defaults from Settings. Pi + Anthropic + subscription auth is the only ToS-blocked combination (gate in `src/lib/harness-policy.ts`); the same gate blocks `kimi-code` for any non-Kimi model, since kimi-code runs Kimi models only.
 
 See [configuration/harnesses.mdx](configuration/harnesses.mdx) for installation, picker locations, ToS rules, and troubleshooting. The wider field of coding-agent harnesses Overdeck could adopt is surveyed in [reference/harness-landscape.mdx](reference/harness-landscape.mdx). (`docs/HARNESSES.md` is now a redirect stub — the harness docs are published in the Mintlify site.)
 
@@ -462,6 +462,31 @@ Key rules:
 - `OVERDECK_NO_RESUME=1` disables event-driven deacon resume/orphan recovery as a kill switch.
 
 See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.
+
+## Workspaces & Projects (PAN-1990)
+
+The `projects`/`workspaces`/`project_targets`/`pinned_docs` tables are a
+first-class domain in the runtime plane above: one row per registered project
+and one row per git worktree Overdeck knows about (`kind`: `main` — exactly
+one per project — `issue`, or `scratch`). Reads go through
+`src/lib/workspaces/resolver.ts`, writes through
+`src/lib/workspaces/writer.ts` — no other module may touch these tables
+directly (`scripts/guard-workspace-doors.sh` enforces this in `npm run lint`).
+`pan admin db rebuild-workspaces` reconstructs them from `projects.yaml`, a
+worktree scan, and memory-home identity records, the same disposable-cache
+pattern `rebuild-agents` uses for the `agents` table. Full model, cardinalities,
+and the polyrepo wrapper-repo git posture: [`docs/WORKSPACES-AND-PROJECTS.md`](docs/WORKSPACES-AND-PROJECTS.md).
+
+**Memory is keyed by workspace UUID, not issue id**: observations, pending
+turns, status, and summaries live under
+`~/.overdeck/memory/{projectId}/{workspaceId}/…`. A conversation with no
+spawned agent (a main/scratch workspace turn) still gets a full
+`MemoryIdentity` — `issueId` is nullable and `agentRole` accepts
+`'conversation'` precisely so a non-issue turn has somewhere to attribute its
+observations. `pan memory search --global` and `pan memory pin/unpin/pins`
+read/write through the same two doors; `pan memory backfill` retroactively
+extracts observations from historical Claude Code JSONL transcripts, matching
+each session's cwd to a workspace via `resolveWorkspaceForCwd()`.
 
 ## Project Resolution from Issue IDs
 

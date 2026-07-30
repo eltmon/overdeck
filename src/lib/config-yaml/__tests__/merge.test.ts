@@ -42,6 +42,6 @@ describe('ACP config merge', () => {
 
     expect(config.providerHarnesses.kimi).toBe('acp');
     expect(config.acp.permissionMode).toBe('auto');
-    expect(PROVIDERS.kimi.defaultHarness).toBe('claude-code');
+    expect(PROVIDERS.kimi.defaultHarness).toBe('kimi-code');
   });
 });

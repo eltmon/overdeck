@@ -8,6 +8,12 @@ import {
   runMemoryDoctor,
   searchMemory,
 } from '../../lib/memory/cli.js';
+import { backfillMemoryFromTranscripts } from '../../lib/memory/backfill.js';
+import { resolveContainedPinPath, verifyPinPathContainment } from '../../lib/memory/pin-path.js';
+import { getProjectByKey, getWorkspaceById, listPinnedDocs } from '../../lib/workspaces/resolver.js';
+import { pinDoc, unpinDoc } from '../../lib/workspaces/writer.js';
+import type { PinScope, ProjectRow } from '../../lib/workspaces/types.js';
+import { exitCli } from '../exit.js';
 
 export function createMemoryCommand(): Command {
   const memory = new Command('memory')
@@ -17,15 +23,22 @@ export function createMemoryCommand(): Command {
     .command('search <query>')
     .description('Search memory observations')
     .option('--project <id>', 'Project ID')
-    .option('--workspace <id>', 'Workspace ID')
+    .option('--workspace <id|name>', 'Workspace id or name')
     .option('--issue <id>', 'Issue ID')
     .option('--tag <tag>', 'Filter by tag')
     .option('--sibling', 'Search same-project sibling issues instead of the selected issue')
+    .option('--global', 'Search across all registered projects instead of just one')
     .option('--include-archived', 'Include observations hidden by reset markers')
     .option('--limit <n>', 'Maximum results', parseInt)
     .option('--json', 'Output JSON')
     .action(async (query, options) => {
-      const results = await searchMemory(query, options);
+      let results: Awaited<ReturnType<typeof searchMemory>>;
+      try {
+        results = await searchMemory(query, options);
+      } catch (err) {
+        console.error(chalk.red(err instanceof Error ? err.message : String(err)));
+        return exitCli(1);
+      }
       if (options.json) {
         console.log(JSON.stringify(results, null, 2));
         return;
@@ -123,6 +136,55 @@ export function createMemoryCommand(): Command {
     });
 
   memory
+    .command('backfill')
+    .description('Backfill memory observations from historical Claude Code JSONL transcripts')
+    .option('--workspace <id>', 'Only backfill sessions resolved to this workspace id')
+    .option('--project <id>', 'Only backfill sessions resolved to this project id')
+    .option('--dry-run', 'Report matched sessions without extracting or writing anything')
+    .option('--json', 'Output JSON')
+    .action(async (options) => {
+      const result = await backfillMemoryFromTranscripts({
+        workspaceId: options.workspace,
+        projectId: options.project,
+        dryRun: options.dryRun,
+      });
+      if (options.json) {
+        console.log(JSON.stringify(result, null, 2));
+        return;
+      }
+      for (const warning of result.warnings) console.log(chalk.yellow(`warning: ${warning}`));
+      for (const session of result.sessions) {
+        console.log(`${session.transcriptPath}: ${session.status}${session.workspaceId ? ` (workspace ${session.workspaceId})` : ''}`);
+      }
+      const processed = result.sessions.filter((s) => s.status === 'processed' || s.status === 'dry-run-matched').length;
+      console.log(chalk.bold(`${processed}/${result.sessions.length} session(s) matched a workspace.`));
+    });
+
+  memory
+    .command('pin <doc-path>')
+    .description('Pin a doc for prompt-time memory injection (path is stored project-relative)')
+    .option('--project <id>', 'Project key to pin at project scope', 'overdeck')
+    .option('--workspace <id>', 'Workspace id to pin at workspace scope (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryPinCommand);
+
+  memory
+    .command('unpin <doc-path>')
+    .description('Remove a pinned doc')
+    .option('--project <id>', 'Project key the pin was made at project scope', 'overdeck')
+    .option('--workspace <id>', 'Workspace id the pin was made at workspace scope (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryUnpinCommand);
+
+  memory
+    .command('pins')
+    .description('List pinned docs for a project or workspace')
+    .option('--project <id>', 'Project key to list project-scoped pins for', 'overdeck')
+    .option('--workspace <id>', 'Workspace id to list workspace-scoped pins for (overrides --project)')
+    .option('--json', 'Output JSON')
+    .action(memoryPinsCommand);
+
+  memory
     .command('config')
     .description('Show memory provider and rollup configuration')
     .option('--json', 'Output JSON')
@@ -136,4 +198,89 @@ export function createMemoryCommand(): Command {
     });
 
   return memory;
+}
+
+export interface MemoryPinOptions {
+  workspace?: string;
+  project?: string;
+  json?: boolean;
+}
+
+export async function memoryPinCommand(docPath: string, options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId, project } = resolved;
+  // Symlink-safe: a lexically-contained path can still point outside the
+  // project root through an in-project symlink, so pin creation must verify
+  // the REAL target, not just the path string.
+  const projectRelativePath = await verifyPinPathContainment(project.primaryPath, docPath);
+  if (projectRelativePath === null) {
+    console.error(chalk.red(`Refusing to pin '${docPath}': it must resolve to a real file inside the project root '${project.primaryPath}'.`));
+    return exitCli(1);
+  }
+
+  await pinDoc(scope, scopeId, projectRelativePath);
+  if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
+  else console.log(chalk.green(`Pinned ${projectRelativePath} for ${scope} ${scopeId}`));
+}
+
+export async function memoryUnpinCommand(docPath: string, options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId, project } = resolved;
+  const projectRelativePath = resolveContainedPinPath(project.primaryPath, docPath);
+  if (projectRelativePath === null) {
+    console.error(chalk.red(`Refusing to unpin '${docPath}': it resolves outside the project root '${project.primaryPath}'.`));
+    return exitCli(1);
+  }
+
+  await unpinDoc(scope, scopeId, projectRelativePath);
+  if (options.json) console.log(JSON.stringify({ scope, scopeId, docPath: projectRelativePath }, null, 2));
+  else console.log(chalk.green(`Unpinned ${projectRelativePath} for ${scope} ${scopeId}`));
+}
+
+export async function memoryPinsCommand(options: MemoryPinOptions): Promise<void> {
+  const resolved = resolvePinTarget(options);
+  if (!resolved) return exitCli(1);
+  const { scope, scopeId } = resolved;
+  const pins = listPinnedDocs(scope, scopeId);
+  if (options.json) {
+    console.log(JSON.stringify(pins, null, 2));
+    return;
+  }
+  if (pins.length === 0) {
+    console.log(chalk.yellow(`No pinned docs for ${scope} ${scopeId}.`));
+    return;
+  }
+  for (const pin of pins) console.log(pin.docPath);
+}
+
+/**
+ * Resolves pin/unpin/pins scope+scopeId from --workspace|--project, plus the
+ * owning project (needed to make an absolute doc-path project-relative —
+ * memory-pins stores paths project-relative regardless of pin scope, since a
+ * workspace is one worktree of the same project repo).
+ */
+function resolvePinTarget(options: { workspace?: string; project?: string }): { scope: PinScope; scopeId: string; project: ProjectRow } | null {
+  if (options.workspace) {
+    const workspace = getWorkspaceById(options.workspace);
+    if (!workspace) {
+      console.error(chalk.red(`No workspace found with id '${options.workspace}'`));
+      return null;
+    }
+    const project = getProjectByKey(workspace.projectId);
+    if (!project) {
+      console.error(chalk.red(`No project registered for workspace '${options.workspace}' (project key '${workspace.projectId}')`));
+      return null;
+    }
+    return { scope: 'workspace', scopeId: workspace.id, project };
+  }
+
+  const projectKey = options.project ?? 'overdeck';
+  const project = getProjectByKey(projectKey);
+  if (!project) {
+    console.error(chalk.red(`No project registered with key '${projectKey}'`));
+    return null;
+  }
+  return { scope: 'project', scopeId: projectKey, project };
 }

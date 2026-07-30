@@ -9,7 +9,7 @@ import { promises as fs } from 'fs';
 import { homedir } from 'os';
 import { basename, join } from 'path';
 
-export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp';
+export type DiscoveredHarness = 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
 
 export interface DiscoveredFile {
   jsonlPath: string;

@@ -47,6 +47,7 @@ import {
   getIssueIdFromPath,
   getLastTab,
   getSessionKeyFromSearch,
+  getWorkspaceRouteFromPath,
   LAST_TAB_STORAGE_KEY,
   normalizeCurrentRoute,
   TAB_PATHS,
@@ -73,6 +74,7 @@ export {
   getConversationViewModeFromSearch,
   getConvIdFromPath,
   getSessionKeyFromSearch,
+  getWorkspaceRouteFromPath,
   normalizeLegacyAwaitingMergeRoute,
   parseConversationViewModes,
   serializeConversationViewModes,
@@ -180,6 +182,8 @@ export default function App() {
   const [cockpitRoute, setCockpitRouteState] = useState<{ project: string; issue: string } | null>(
     () => initialCockpitRoute,
   );
+  // Workspace deep-link (PAN-1990): restored from /workspace/<id>.
+  const [workspaceRouteId, setWorkspaceRouteId] = useState<string | null>(() => getWorkspaceRouteFromPath());
   // Last-written command-deck path. The conversation-route sync rewrites the
   // URL whenever the active conversation clears — which every issue click does
   // via setSelectedConversation(null) — and collapsing that write to bare
@@ -478,6 +482,20 @@ export default function App() {
     }
   }, []);
 
+  // PAN-1990: open the Workspace view for a workspace-registry row, from the
+  // Sidebar's Workspaces rail or the Cmd-K switcher.
+  const onSelectWorkspace = useCallback((workspaceId: string) => {
+    setActiveTabState('workspace');
+    setWorkspaceRouteId(workspaceId);
+    const path = `/workspace/${encodeURIComponent(workspaceId)}`;
+    if (window.location.pathname !== path) window.history.pushState({ tab: 'workspace' }, '', path);
+  }, []);
+
+  const onWorkspaceViewBack = useCallback(() => {
+    setWorkspaceRouteId(null);
+    setActiveTab('home');
+  }, [setActiveTab]);
+
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
     // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
@@ -563,6 +581,7 @@ export default function App() {
       setConversationViewModes(routeState.viewModes);
       const cockpitRoute = getCockpitRouteFromPath();
       setCockpitRouteState(cockpitRoute);
+      setWorkspaceRouteId(getWorkspaceRouteFromPath());
       const routeProject = cockpitRoute?.project ?? getCommandDeckProjectRouteFromPath();
       commandDeckPathRef.current = cockpitRoute
         ? `/command-deck/${encodeURIComponent(cockpitRoute.project)}/${encodeURIComponent(cockpitRoute.issue)}`
@@ -818,6 +837,7 @@ export default function App() {
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
         onOpenUpdater={() => setIsUpdateDialogOpen(true)}
+        onSelectWorkspace={onSelectWorkspace}
       />
 
       {/* Main content area */}
@@ -857,6 +877,8 @@ export default function App() {
             selectedProjectKey={selectedProjectKey}
             pendingConversationTarget={pendingConversationTarget}
             cockpitRoute={cockpitRoute}
+            workspaceRouteId={workspaceRouteId}
+            onWorkspaceViewBack={onWorkspaceViewBack}
             initialSessionKey={initialSessionKey}
             onOpenWorkspaceHome={handleOpenWorkspaceHome}
             onNewProject={handleNewProject}
@@ -959,6 +981,7 @@ export default function App() {
           if (issueId) openIssue(issueId);
         }}
         onOpenConversationHit={handleOpenConversationHit}
+        onSelectWorkspace={onSelectWorkspace}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}

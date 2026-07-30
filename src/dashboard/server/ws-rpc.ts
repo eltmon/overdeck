@@ -646,6 +646,21 @@ function mapEventToDelta(event: StoredEvent): SessionTreeDelta | null {
       const sessionName = p['sessionName'] as string;
       return { kind: 'session_added', issueId, sessionId: sessionName, timestamp: event.timestamp };
     }
+    case 'agent.enrichment_changed': {
+      const agentId = p['agentId'] as string | undefined;
+      const payloadIssueId = p['issueId'] as string | undefined;
+      if (!agentId || !payloadIssueId) return null;
+      return {
+        kind: 'pending_input_changed',
+        issueId: payloadIssueId,
+        sessionId: agentId,
+        awaitingInput: p['hasPendingQuestion'] as boolean | undefined,
+        awaitingInputPrompt: p['pendingQuestionPrompt'] as string | undefined,
+        awaitingInputReason: p['pendingQuestionReason'] as string | undefined,
+        pendingInputKinds: p['pendingInputKinds'] as string[] | undefined,
+        timestamp: event.timestamp,
+      };
+    }
     default:
       return null;
   }

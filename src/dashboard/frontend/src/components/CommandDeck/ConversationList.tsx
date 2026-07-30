@@ -43,7 +43,7 @@ export interface Conversation {
   /** Model used for this conversation. Null until backfilled from session file. */
   model?: string | null;
   /** Harness used to spawn this conversation. */
-  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | null;
+  harness?: 'claude-code' | 'pi' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
   /** Effort level used when spawning this conversation. */
   effort?: string | null;
   /** Async fork provisioning status. Null = not a fork or completed. */
@@ -88,6 +88,8 @@ export interface Conversation {
   /** True when the live session is parked on a boot-blocking TUI screen (Claude
    *  first-run onboarding, trust dialog) that only the terminal can answer. */
   needsTerminal?: boolean;
+  /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
+  workspaceId?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

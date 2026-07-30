@@ -27,6 +27,7 @@ import { FlywheelPage } from '../pages/FlywheelPage';
 import { OrderBookPage } from '../pages/OrderBookPage';
 import { BacklogSequencerPage } from '../pages/BacklogSequencerPage';
 import { HomePage } from '../pages/HomePage';
+import { WorkspaceView } from '../components/workspace/WorkspaceView';
 import type { Tab } from '../components/Header';
 import type { Issue } from '../types';
 import type { ViewMode as ConversationViewMode } from '../components/chat/ConversationPanel';
@@ -49,6 +50,9 @@ interface AppRoutesProps {
   selectedProjectKey: string | null;
   pendingConversationTarget: PendingConversationTarget | null;
   cockpitRoute: { project: string; issue: string } | null;
+  /** PAN-1990: the workspace-registry id restored from /workspace/<id>. */
+  workspaceRouteId: string | null;
+  onWorkspaceViewBack: () => void;
   initialSessionKey: string | null;
   onOpenWorkspaceHome: (issueId: string) => void;
   onNewProject: () => void;
@@ -77,6 +81,8 @@ export function AppRoutes({
   selectedProjectKey,
   pendingConversationTarget,
   cockpitRoute,
+  workspaceRouteId,
+  onWorkspaceViewBack,
   initialSessionKey,
   onOpenWorkspaceHome,
   onNewProject,
@@ -120,6 +126,11 @@ export function AppRoutes({
             cockpitIssue={cockpitRoute}
             onCockpitChange={onCockpitChange}
           />
+        </div>
+      )}
+      {activeTab === 'workspace' && workspaceRouteId && (
+        <div className="w-full h-full overflow-hidden">
+          <WorkspaceView workspaceId={workspaceRouteId} onBack={onWorkspaceViewBack} />
         </div>
       )}
       {activeTab === 'pipeline' && (

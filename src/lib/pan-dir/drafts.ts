@@ -1,5 +1,5 @@
 import { join, basename } from 'path'
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs'
 import { Effect, FileSystem, Option } from 'effect'
 import * as NodeFileSystem from '@effect/platform-node/NodeFileSystem'
 import { FsError } from '../errors.js'
@@ -15,8 +15,28 @@ export function getDraftPath(projectRoot: string, filename: string): string {
   return join(getDraftsDir(projectRoot), filename)
 }
 
+/** Exact-case existence check. `existsSync` is case-blind on case-insensitive
+ * filesystems (macOS APFS), which would mis-resolve a legacy uppercase draft
+ * to its lowercase name and queue a case-colliding path (PAN-3287). */
+function hasExactCaseEntry(dir: string, filename: string): boolean {
+  try {
+    return readdirSync(dir).includes(filename)
+  } catch {
+    return false
+  }
+}
+
 export function getIssueDraftPath(projectRoot: string, issueId: string): string {
-  return getDraftPath(projectRoot, `${issueId.toUpperCase()}.md`)
+  // Canonical draft filename is lowercase (`drafts/pan-123.md`). Legacy
+  // uppercase drafts are resolved in place — writing the other case would
+  // track a case-colliding twin that case-insensitive checkouts (macOS)
+  // cannot materialize (PAN-3287). New drafts get the lowercase name.
+  const draftsDir = getDraftsDir(projectRoot)
+  const lowerFile = `${issueId.toLowerCase()}.md`
+  if (hasExactCaseEntry(draftsDir, lowerFile)) return join(draftsDir, lowerFile)
+  const upperFile = `${issueId.toUpperCase()}.md`
+  if (hasExactCaseEntry(draftsDir, upperFile)) return join(draftsDir, upperFile)
+  return join(draftsDir, lowerFile)
 }
 
 export function hasIssueDraft(
@@ -94,7 +114,9 @@ export function listIssueDrafts(
     )
     return entries
       .filter((filename) => filename.endsWith('.md'))
-      .map((filename) => basename(filename, '.md'))
+      // Issue IDs are canonically uppercase; filenames may be either case
+      // (lowercase canonical since PAN-3287, legacy uppercase before it).
+      .map((filename) => basename(filename, '.md').toUpperCase())
   }).pipe(Effect.provide(NodeFileSystem.layer))
 }
 

@@ -75,7 +75,7 @@ export interface FlywheelLifecycleOptions {
   briefOverlayContent?: string;
   prompt?: string;
   model?: string;
-  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+  harness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
   effort?: RoleEffort;
   minAgents?: number;
   maxAgents?: number;

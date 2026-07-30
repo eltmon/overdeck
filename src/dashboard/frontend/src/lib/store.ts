@@ -400,8 +400,18 @@ export const selectPendingPermissionAgentIds = memoizeArraySelector<
  * detection's `hasPendingQuestion` + `pendingQuestionReason === 'tool_permission'`,
  * which is the only one that fires when the Channels bridge is off.
  */
+/**
+ * Which domain a pending decision came from. Agents and conversations are
+ * genuinely separate planes (a conversation is not a row in the agents table),
+ * and they deep-link to different routes — `/issues/:id` vs `/conv/:name` — so
+ * any surface that navigates to a subject has to know which it is holding.
+ */
+export type PendingInputSource = 'agent' | 'conversation'
+
 export interface PendingInputSubject {
   agentId: string
+  /** Domain this subject came from, so consumers can route to it (PAN-3276). */
+  source: PendingInputSource
   issueId?: string
   kinds: string[]
   /** AUQ payload when an AskUserQuestion is among the kinds (for the dialog). */
@@ -412,6 +422,10 @@ export interface PendingInputSubject {
   permissionRequestIds: string[]
   /** Oldest blocking timestamp for stable ordering. */
   since: string
+  /** The pending input prompt from the agent enrichment (for pending-input display). */
+  pendingQuestionPrompt?: string
+  /** The pending input reason from the agent enrichment (for classification). */
+  pendingQuestionReason?: string
 }
 
 function deriveMemo<S, A, B, R>(
@@ -501,12 +515,15 @@ export const selectPendingInputSubjects = deriveMemo<
         ''
       subjects.push({
         agentId: a.id,
+        source: 'agent',
         issueId: a.issueId,
         kinds,
         pendingAskUserQuestion: a.pendingAskUserQuestion,
         pendingProposedPlan: a.pendingProposedPlan,
         permissionRequestIds: agentPerms.map((p) => p.requestId),
         since,
+        pendingQuestionPrompt: a.pendingQuestionPrompt,
+        pendingQuestionReason: a.pendingQuestionReason,
       })
     }
     subjects.sort((x, y) =>

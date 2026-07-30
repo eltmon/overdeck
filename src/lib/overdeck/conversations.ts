@@ -24,6 +24,7 @@ import { HttpApiEndpoint, HttpApiGroup } from 'effect/unstable/httpapi';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getOverdeckHome } from '../paths.js';
 import { Db, EventBus, getOverdeckDatabaseSync } from './infra.js';
+import { resolveWorkspaceForCwd } from '../workspaces/resolver.js';
 import { getEventStore } from '../../dashboard/server/event-store.js';
 import { ensureDiscoveredSessionsSchema } from './discovered-sessions.js';
 
@@ -99,7 +100,9 @@ export type  ConversationId   = typeof ConversationId.Type;
 export const ConversationName = Schema.String.pipe(Schema.brand('ConversationName'));
 export type  ConversationName = typeof ConversationName.Type;
 
-export const Harness     = Schema.Literals(['claude-code', 'pi', 'codex', 'kimi']);
+// Includes legacy 'pi' (pre-rename alias for 'ohmypi', see normalizeHarness) so
+// decoding old DB rows never throws; 'pi' is never written by current code.
+export const Harness     = Schema.Literals(['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code']);
 export type  Harness     = typeof Harness.Type;
 
 export const TitleSource = Schema.Literals(['manual', 'auto', 'ai', 'ai-refined', 'ai-explicit', 'default']);
@@ -666,6 +669,7 @@ export interface LegacyConversation {
   clearedToConvId: number | null;
   forkRequest: string | null;
   forkRetryCount: number;
+  workspaceId: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -753,6 +757,7 @@ interface LegacyConversationRow {
   fork_fallback_reason: string | null;
   delivery_method: string | null;
   spawn_error: string | null;
+  workspace_id: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -786,6 +791,7 @@ const LEGACY_CONVERSATION_SELECT = `
     c.fork_fallback_reason,
     c.delivery_method,
     c.spawn_error,
+    c.workspace_id,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -855,7 +861,7 @@ function toMillis(value: Date | string | number = new Date()): number {
 /** Map a raw DB harness string to a canonical RuntimeName, normalizing legacy 'pi' to 'ohmypi' on read. */
 export function normalizeHarness(harness: string | null): RuntimeName | null {
   if (harness === 'pi' || harness === 'ohmypi') return 'ohmypi';
-  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp') return harness;
+  if (harness === 'claude-code' || harness === 'codex' || harness === 'acp' || harness === 'kimi-code') return harness;
   return null;
 }
 
@@ -910,6 +916,7 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     clearedToConvId: legacyRowIdForConversationId(row.cleared_to_conv_id),
     forkRequest: row.fork_request ?? null,
     forkRetryCount: row.fork_retry_count ?? 0,
+    workspaceId: row.workspace_id ?? null,
   };
 }
 
@@ -1199,10 +1206,15 @@ export function createConversation(opts: {
   forkStatus?: string;
   harness?: RuntimeName;
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
+  /** PAN-1990: explicit workspace id. Falls back to resolveWorkspaceForCwd(cwd) when omitted. */
+  workspaceId?: string | null;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
   const now = toMillis();
+  const workspaceId = opts.workspaceId !== undefined
+    ? opts.workspaceId
+    : (resolveWorkspaceForCwd(opts.cwd)?.id ?? null);
 
   db.transaction(() => {
     db.prepare(`DELETE FROM conversation_files WHERE conversation_id IN (SELECT id FROM conversations WHERE name = ?)`).run(opts.name);
@@ -1210,8 +1222,8 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -1227,6 +1239,7 @@ export function createConversation(opts: {
       opts.forkStatus ?? null,
       opts.deliveryMethod ?? null,
       null,  // spawn_error starts null
+      workspaceId,
     );
     if (opts.claudeSessionId) {
       db.prepare(`

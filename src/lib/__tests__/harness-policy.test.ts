@@ -16,8 +16,8 @@ const MODEL_BY_PROVIDER = {
   openrouter: 'qwen/qwen3.6-plus:free',
 } as const
 
-const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp']
-const HARNESSES_WITHOUT_ACP = HARNESSES.filter((harness) => harness !== 'acp')
+const HARNESSES: Array<RuntimeName | 'pi'> = ['claude-code', 'pi', 'ohmypi', 'codex', 'acp', 'kimi-code']
+const HARNESSES_WITHOUT_ACP = HARNESSES.filter((harness) => harness !== 'acp' && harness !== 'kimi-code')
 const PROVIDERS = Object.keys(MODEL_BY_PROVIDER) as Array<keyof typeof MODEL_BY_PROVIDER>
 const AUTH_MODES: Array<AuthMode | undefined> = ['api-key', 'subscription', undefined]
 
@@ -100,6 +100,25 @@ describe('canUseHarness', () => {
     expect(decision.reason).toContain('Kimi')
   })
 
+  it('allows Kimi Code + Kimi under API-key and subscription-backed OAuth auth', () => {
+    expect(canUseHarnessSync('kimi-code', 'kimi-k2.7-code', 'api-key')).toEqual({ allowed: true })
+    expect(canUseHarnessSync('kimi-code', 'kimi-k2.7-code', 'subscription')).toEqual({ allowed: true })
+  })
+
+  it.each(PROVIDERS)('blocks Kimi Code + unsupported %s provider', (provider) => {
+    const decision = canUseHarnessSync('kimi-code', MODEL_BY_PROVIDER[provider], 'subscription')
+    expect(decision.allowed).toBe(false)
+    expect(decision.reason).toContain('Kimi')
+  })
+
+  it('never coerces the harness for a blocked kimi-code + non-Kimi model combination', () => {
+    const decision = canUseHarnessSync('kimi-code', MODEL_BY_PROVIDER.openai, 'api-key')
+    expect(decision).toEqual({
+      allowed: false,
+      reason: 'The Kimi Code harness runs Kimi (Moonshot) models only. Pick a Kimi model, or use the model\'s supported harness.',
+    })
+  })
+
   it('blocks gpt-5.5 + api-key on every harness (subscription-only model)', () => {
     for (const harness of HARNESSES) {
       const decision = canUseHarnessSync(harness, 'gpt-5.5', 'api-key')
@@ -151,7 +170,7 @@ describe('canUseHarness', () => {
     },
   )
 
-  it('covers the full 5 x 5 x 3 matrix including Kimi-only ACP policy', () => {
+  it('covers the full 6 x 5 x 3 matrix including Kimi-only ACP and Kimi Code policy', () => {
     const cells: Array<{ harness: RuntimeName | 'pi'; provider: string; authMode: AuthMode | undefined; allowed: boolean }> = []
     for (const harness of HARNESSES) {
       for (const provider of PROVIDERS) {
@@ -159,11 +178,12 @@ describe('canUseHarness', () => {
           const isBlockedCell =
             (harness === 'ohmypi' && provider === 'anthropic' && authMode === 'subscription')
             || harness === 'acp'
+            || harness === 'kimi-code'
           cells.push({ harness, provider, authMode, allowed: !isBlockedCell })
         }
       }
     }
-    expect(cells).toHaveLength(5 * 5 * 3)
+    expect(cells).toHaveLength(6 * 5 * 3)
     for (const cell of cells) {
       const model = MODEL_BY_PROVIDER[cell.provider as keyof typeof MODEL_BY_PROVIDER]
       const decision = canUseHarnessSync(cell.harness, model, cell.authMode)

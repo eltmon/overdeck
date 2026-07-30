@@ -59,6 +59,27 @@ describe('spawnSequencerAgent', () => {
     expect(prompt).toContain('INCREMENTAL pass');
   });
 
+  it('downgrades an explicit incremental pass to creation when no sequence.md exists', async () => {
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    await spawnSequencerAgent('incremental', { projectRoot: '/tmp/proj', projectKey: 'overdeck' });
+    const prompt = (spawnRun as ReturnType<typeof vi.fn>).mock.calls[0][2].prompt as string;
+    expect(prompt).toContain('CREATION pass');
+  });
+
+  it('refuses to spawn when the backlog manifest is empty', async () => {
+    (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    const { collectOpenBacklog } = await import('../backlog-input.js');
+    (collectOpenBacklog as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      manifest: [],
+      bodies: { count: 0, getBatch: () => [] },
+      priorSequence: null,
+    });
+    await expect(
+      spawnSequencerAgent('creation', { projectRoot: '/tmp/proj', projectKey: 'overdeck', issues: [] }),
+    ).rejects.toThrow(/refusing to spawn: backlog manifest is empty/);
+    expect(spawnRun).not.toHaveBeenCalled();
+  });
+
   it('accepts explicit review pass regardless of sequence.md state', async () => {
     (existsSync as ReturnType<typeof vi.fn>).mockReturnValue(false);
     await spawnSequencerAgent('review', { projectRoot: '/tmp/proj', projectKey: 'overdeck' });

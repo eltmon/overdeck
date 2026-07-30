@@ -21,6 +21,7 @@ import {
   selectIssues,
   selectPendingInputSubjects,
   type PendingInputSubject,
+  type PendingInputSource,
 } from './store';
 import { fetchWithTimeout } from './apiFetch';
 import { formatIssueRef } from './issueLabel';
@@ -38,7 +39,8 @@ export interface ConversationPendingInputRow {
   pendingPaneChoice?: PendingPaneChoice;
 }
 
-export type DecisionSource = 'agent' | 'conversation';
+/** One definition, shared with `PendingInputSubject` so the two never drift. */
+export type DecisionSource = PendingInputSource;
 
 export interface Decision {
   /** The subject id `requestReopen` routes on: an agent id or a conversation name. */
@@ -62,6 +64,10 @@ export interface Decision {
    * outright; a plan review does not necessarily.
    */
   blocking: boolean;
+  /** The pending input prompt from the agent enrichment (for pending-input display). */
+  pendingQuestionPrompt?: PendingInputSubject['pendingQuestionPrompt'];
+  /** The pending input reason from the agent enrichment (for classification). */
+  pendingQuestionReason?: PendingInputSubject['pendingQuestionReason'];
 }
 
 /**
@@ -130,6 +136,7 @@ export function usePendingInputSubjects(): PendingInputSubject[] {
       if (kinds.length === 0) continue;
       out.push({
         agentId: c.name,
+        source: 'conversation',
         issueId: c.issueId ?? undefined,
         kinds,
         pendingAskUserQuestion: c.pendingAskUserQuestion,
@@ -177,6 +184,8 @@ export function useDecisions(): Decision[] {
         pendingProposedPlan: s.pendingProposedPlan,
         since: s.since,
         blocking: isBlockingDecision(s.kinds),
+        pendingQuestionPrompt: s.pendingQuestionPrompt,
+        pendingQuestionReason: s.pendingQuestionReason,
       });
     }
 

@@ -10,13 +10,16 @@ extensibility mechanism each one exposes, and what that means for future
 features.
 
 <Note>
-**This is a planning survey, not a support matrix.** Overdeck supports four
-harnesses today — `claude-code`, `ohmypi`, `codex`, and native `acp` (see
-[Harnesses](/configuration/harnesses) for the operational guide). Kimi Code CLI
-is the first agent wired through ACP; other tools on this page remain surveyed
-for evaluation until their provider adapters land. Facts are current as of May
-2026 unless a profile says otherwise and should be re-verified before any
-decision. Items flagged **⚠ verify** could not be cleanly confirmed.
+**This is a planning survey, not a support matrix.** Overdeck supports five
+harnesses today — `claude-code`, `ohmypi`, `codex`, native `acp`, and native
+`kimi-code` (see [Harnesses](/configuration/harnesses) for the operational
+guide). Kimi Code CLI is wired two ways: as the first agent through the `acp`
+protocol harness, and natively through `kimi-code`, which drives Kimi's own
+terminal UI directly with no ACP host in between. Other tools on this page
+remain surveyed for evaluation until their provider adapters land. Facts are
+current as of May 2026 unless a profile says otherwise and should be
+re-verified before any decision. Items flagged **⚠ verify** could not be
+cleanly confirmed.
 </Note>
 
 ## Why this document exists
@@ -82,11 +85,14 @@ them.
 | `ohmypi` | **Supported** (alternative) | `src/lib/runtimes/ohmypi.ts` + vendored `packages/ohmypi-extension/` |
 | `codex` | **Supported** (alternative) | `src/lib/runtimes/codex.ts` |
 | `acp` | **Supported** (Kimi first) | `src/lib/runtimes/acp.ts` + vendored `packages/effect-acp/` |
+| `kimi-code` | **Supported** (native, Kimi-only) | `src/lib/runtimes/kimi-code.ts` |
 
 The native `acp` harness is a reusable protocol integration, but version one
-registers only Kimi Code CLI as a selectable ACP provider. The remaining
-profiles are surveyed for planning unless their status explicitly says
-supported.
+registers only Kimi Code CLI as a selectable ACP provider. `kimi-code` is a
+separate, capability-layer harness: it drives Kimi's own terminal UI and wire
+protocol directly, reaching Kimi-specific behavior the ACP lowest-common-
+denominator surface can't. The remaining profiles are surveyed for planning
+unless their status explicitly says supported.
 
 ## ACP-capable agents
 

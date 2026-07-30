@@ -133,7 +133,7 @@ describe('memory query expansion', () => {
       previousObservations: [previousObservation],
     }));
 
-    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/feature-pan-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
     const entries = ragRuns.trim().split('\n').map((line) => JSON.parse(line));
     expect(entries).toMatchObject([
       { id: 'run-1', type: 'query-expansion', outcome: 'expanded', query: first.query, expandedTerms: first.expandedTerms, reason: null },
@@ -190,7 +190,7 @@ describe('memory query expansion', () => {
       reason: 'extraction-failed',
     });
 
-    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/PAN-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/feature-pan-1052/rag-runs/2026-05-16.jsonl'), 'utf8');
     expect(JSON.parse(ragRuns.trim())).toMatchObject({
       id: 'failed-run',
       outcome: 'expansion-failed',
@@ -198,6 +198,22 @@ describe('memory query expansion', () => {
       expandedTerms: [],
       reason: 'extraction-failed',
     });
+  });
+
+  it('logs rag-runs for a main/scratch turn (null issueId) keyed by workspaceId, not dropped (FR-7)', async () => {
+    const mainWorkspaceIdentity = { ...identity, workspaceId: 'main-workspace-uuid', issueId: null };
+
+    const result = await expandMemoryQuery({
+      prompt: 'main workspace search',
+      identity: mainWorkspaceIdentity,
+      now: new Date('2026-05-16T20:00:00.000Z'),
+      id: 'main-run-1',
+      expand: async () => extracted({ terms: ['main workspace term'] }),
+    });
+
+    expect(result.status).toBe('expanded');
+    const ragRuns = await readFile(join(tempDir!, 'memory/overdeck/main-workspace-uuid/rag-runs/2026-05-16.jsonl'), 'utf8');
+    expect(JSON.parse(ragRuns.trim())).toMatchObject({ id: 'main-run-1', outcome: 'expanded' });
   });
 
   it('falls back to the raw prompt when the provider returns malformed terms', async () => {

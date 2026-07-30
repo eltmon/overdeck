@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { Schema } from "effect"
-import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, SubstrateBugFiledEvent, SystemHeartbeatEvent } from "./events"
+import { AgentContextSaturationChangedEvent, DomainEvent, OperatorInterventionEvent, PipelineStatusChangedEvent, SubstrateBugFiledEvent, SystemHeartbeatEvent, WorkCompletedEvent } from "./events"
 import { AgentSnapshot } from "./types"
 import { INITIAL_READ_MODEL_STATE, applyEvent } from "./event-reducers"
 
@@ -92,6 +92,90 @@ describe("OperatorInterventionEvent", () => {
         kind: "poke",
       },
     })).toThrow()
+  })
+})
+
+// PAN-1990 FR-15: issueId-carrying event payloads additively carry an
+// optional workspaceId once a workspace row exists for the issue. No field
+// was removed or renamed — decode must accept payloads with and without it,
+// across every structural shape (plain top-level, nested struct, and an
+// already-optional issueId).
+describe("events-workspaceid (PAN-1990 ac2)", () => {
+  it("OperatorInterventionEvent decodes with and without workspaceId", () => {
+    const withWorkspace = {
+      ...operatorInterventionEvent("tell"),
+      payload: { ...operatorInterventionEvent("tell").payload, workspaceId: "ws-pan-1487" },
+    }
+    const withoutWorkspace = operatorInterventionEvent("tell")
+
+    expect(decodeOperatorInterventionEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeDomainEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeOperatorInterventionEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+    expect(decodeDomainEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+  })
+
+  it("WorkCompletedEvent (plain top-level payload) decodes with and without workspaceId", () => {
+    const decodeWorkCompletedEvent = Schema.decodeUnknownSync(WorkCompletedEvent)
+    const withWorkspace = {
+      type: "work.completed",
+      sequence: 1,
+      timestamp: "2026-07-29T00:00:00.000Z",
+      payload: { issueId: "PAN-1990", workspaceId: "ws-pan-1990" },
+    }
+    const withoutWorkspace = {
+      type: "work.completed",
+      sequence: 2,
+      timestamp: "2026-07-29T00:01:00.000Z",
+      payload: { issueId: "PAN-1990" },
+    }
+
+    expect(decodeWorkCompletedEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeDomainEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeWorkCompletedEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+    expect(decodeDomainEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+  })
+
+  it("AgentHeartbeatDeadEvent (already-optional issueId) decodes with and without workspaceId", () => {
+    const decodeEvent = Schema.decodeUnknownSync(AgentHeartbeatDeadEvent)
+    const withWorkspace = {
+      type: "agent.heartbeat_dead",
+      sequence: 1,
+      timestamp: "2026-07-29T00:00:00.000Z",
+      payload: { agentId: "agent-pan-1990", issueId: "PAN-1990", workspaceId: "ws-pan-1990" },
+    }
+    const withoutWorkspaceOrIssue = {
+      type: "agent.heartbeat_dead",
+      sequence: 2,
+      timestamp: "2026-07-29T00:01:00.000Z",
+      payload: { agentId: "agent-pan-1990" },
+    }
+
+    expect(decodeEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeDomainEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeEvent(withoutWorkspaceOrIssue)).toEqual(withoutWorkspaceOrIssue)
+    expect(decodeDomainEvent(withoutWorkspaceOrIssue)).toEqual(withoutWorkspaceOrIssue)
+  })
+
+  it("PipelineStatusChangedEvent (nested ReviewStatusSnapshot payload) decodes with and without workspaceId", () => {
+    const decodeEvent = Schema.decodeUnknownSync(PipelineStatusChangedEvent)
+    const status = { issueId: "PAN-1990", reviewStatus: "passed" as const }
+    const withWorkspace = {
+      type: "pipeline.status_changed",
+      sequence: 1,
+      timestamp: "2026-07-29T00:00:00.000Z",
+      payload: { issueId: "PAN-1990", workspaceId: "ws-pan-1990", status },
+    }
+    const withoutWorkspace = {
+      type: "pipeline.status_changed",
+      sequence: 2,
+      timestamp: "2026-07-29T00:01:00.000Z",
+      payload: { issueId: "PAN-1990", status },
+    }
+
+    expect(decodeEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeDomainEvent(withWorkspace)).toEqual(withWorkspace)
+    expect(decodeEvent(withoutWorkspace)).toEqual(withoutWorkspace)
+    expect(decodeDomainEvent(withoutWorkspace)).toEqual(withoutWorkspace)
   })
 })
 

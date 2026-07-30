@@ -1,0 +1,16 @@
+{
+  "createdAt": "2026-07-28T19:00:06.349Z",
+  "updatedAt": "2026-07-28T19:00:23.071Z",
+  "title": "Read the file sample.txt in this directory using your file read tool and tell me what it says.",
+  "isCustomTitle": false,
+  "agents": {
+    "main": {
+      "homedir": "/home/eltmon/.kimi-code/sessions/wd_kimi-fixture-scratch_ef33f89ad7cf/session_1fc830f7-151f-477c-ae4a-571dfee57723/agents/main",
+      "type": "main",
+      "parentAgentId": null
+    }
+  },
+  "custom": {},
+  "workDir": "/tmp/kimi-fixture-scratch",
+  "lastPrompt": "Now create a file named result.txt containing the word 'done', using your file write tool, then confirm."
+}

@@ -5,6 +5,7 @@ import { Effect } from 'effect';
 
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { listSessionNames } from '../tmux.js';
+import { listWorkspaces } from '../workspaces/resolver.js';
 
 const execAsync = promisify(exec);
 
@@ -76,6 +77,27 @@ const firstIdleAt = new Map<string, number>();
 /** Test-only: reset the in-memory grace clock between cases. */
 export function __resetIdleStackReaperState(): void {
   firstIdleAt.clear();
+}
+
+/**
+ * HAZARD H8 (PAN-1990): a kind='main' workspace sits on the project's own
+ * primary path, never a `feature-<issue>` worktree, so it cannot match
+ * UI_CONTAINER_RE / FEATURE_PROJECT_RE today — the exclusion is incidental,
+ * not a deliberate rule. This is the explicit, structural guard: before
+ * reaping any candidate, confirm no registered main workspace's own path
+ * basename produces the same issueLower/project string. Never throws — a
+ * resolver failure (e.g. table not yet seeded) must not block the reaper's
+ * primary safety net, only skip this extra check.
+ */
+function isMainWorkspaceIssue(issueLower: string): boolean {
+  try {
+    return listWorkspaces({ kind: 'main' }).some((ws) => {
+      const base = ws.path.split('/').pop()?.toLowerCase() ?? '';
+      return base === issueLower || base === `feature-${issueLower}`;
+    });
+  } catch {
+    return false;
+  }
 }
 
 function issueLowerFromAgentId(agentId: string): string | null {
@@ -197,8 +219,8 @@ export async function reconcileIdleWorkspaceStacks(
   const nowMs = d.now();
 
   for (const [issueLower, names] of byIssue) {
-    if (sessionBlob.includes(issueLower)) {
-      firstIdleAt.delete(issueLower); // active — reset the clock
+    if (sessionBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
+      firstIdleAt.delete(issueLower); // active, or a protected main workspace — reset the clock
       continue;
     }
 
@@ -258,8 +280,8 @@ export async function reconcileIdleWorkspaceStacks(
 
   for (const [project, { issueLower, names }] of byProject) {
     const clockKey = `full:${project}`;
-    if (sessionBlob.includes(issueLower)) {
-      firstIdleAt.delete(clockKey); // active — reset the clock
+    if (sessionBlob.includes(issueLower) || isMainWorkspaceIssue(issueLower)) {
+      firstIdleAt.delete(clockKey); // active, or a protected main workspace — reset the clock
       continue;
     }
 

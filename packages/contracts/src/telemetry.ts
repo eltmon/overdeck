@@ -82,7 +82,7 @@ export const TELEMETRY_CLI_VERBS = [
   "other",
 ] as const
 
-const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp"] as const satisfies readonly Harness[]
+const TELEMETRY_HARNESSES = ["claude-code", "ohmypi", "codex", "acp", "kimi-code"] as const satisfies readonly Harness[]
 
 export const TELEMETRY_PROPERTY_DOMAINS = {
   agent_spawn_mode: ["spawn-and-send", "spawn-work-and-send"],
@@ -115,6 +115,7 @@ export const TELEMETRY_PROPERTY_DOMAINS = {
     "deacon",
     "sessions",
     "awaiting-merge",
+    "workspace",
   ],
   decision_subject: ["agent", "conversation"],
   duration_bucket: ["under_100ms", "100ms-999ms", "1s-9s", "10s+"],

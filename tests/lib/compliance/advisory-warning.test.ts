@@ -44,7 +44,7 @@ describe('compliance advisory warning', () => {
     ]);
 
     expect(await resolveComplianceAdvisoryWarning({ identity, loadComplianceMode: async () => 'advisory' })).toBe(COMPLIANCE_ADVISORY_WARNING);
-    expect(await readComplianceWarningMarkers(identity.projectId, identity.issueId)).toEqual({
+    expect(await readComplianceWarningMarkers(identity.projectId, identity.workspaceId)).toEqual({
       warnedObservationIds: ['miss-1'],
     });
   });
@@ -63,7 +63,7 @@ describe('compliance advisory warning', () => {
     ]);
 
     expect(await resolveComplianceAdvisoryWarning({ identity, loadComplianceMode: async () => 'enforcing' })).toBe(COMPLIANCE_ADVISORY_WARNING);
-    expect(await readComplianceWarningMarkers(identity.projectId, identity.issueId)).toEqual({
+    expect(await readComplianceWarningMarkers(identity.projectId, identity.workspaceId)).toEqual({
       warnedObservationIds: ['miss-1', 'miss-2'],
     });
   });
@@ -74,7 +74,7 @@ describe('compliance advisory warning', () => {
     ]);
 
     expect(await resolveComplianceAdvisoryWarning({ identity, loadComplianceMode: async () => 'off' })).toBeNull();
-    expect(await readComplianceWarningMarkers(identity.projectId, identity.issueId)).toEqual({ warnedObservationIds: [] });
+    expect(await readComplianceWarningMarkers(identity.projectId, identity.workspaceId)).toEqual({ warnedObservationIds: [] });
   });
 
   it('ignores unrelated observations', async () => {
@@ -87,7 +87,7 @@ describe('compliance advisory warning', () => {
 });
 
 async function writeObservations(observations: MemoryObservation[]) {
-  const path = resolveObservationsFile(identity.projectId, identity.issueId, '2026-05-24T00:00:00.000Z');
+  const path = resolveObservationsFile(identity.projectId, identity.workspaceId, '2026-05-24T00:00:00.000Z');
   await ensureParentDir(path);
   await writeFile(path, `${observations.map((item) => JSON.stringify(item)).join('\n')}\n`, 'utf8');
 }

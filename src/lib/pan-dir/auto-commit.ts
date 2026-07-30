@@ -560,6 +560,36 @@ function doCommit(
       return { committed: false, reason: 'all paths excluded from auto-commit' };
     }
 
+    // Refuse to stage any path whose case-insensitive twin is already tracked
+    // under different casing. Case-insensitive checkouts (macOS APFS) can
+    // materialize only one of the pair, leaving the other as a permanent
+    // phantom modification (PAN-3287).
+    const lsFiles: FlushResult | string = yield* runGit(['ls-files', '-z'], gitRoot).pipe(
+      Effect.matchEffect({
+        onSuccess: (r) => Effect.succeed(r.stdout),
+        onFailure: (err) =>
+          Effect.succeed({
+            committed: false as const,
+            errored: true as const,
+            reason: `ls-files failed: ${err.stderr || err._tag}`,
+          } satisfies FlushResult),
+      }),
+    );
+    if (typeof lsFiles !== 'string') return lsFiles;
+    const trackedByFold = new Map<string, string>();
+    for (const tracked of lsFiles.split('\0')) {
+      if (tracked) trackedByFold.set(tracked.toLowerCase(), tracked);
+    }
+    const caseCollisions = relativePaths.flatMap((p) => {
+      const tracked = trackedByFold.get(p.toLowerCase());
+      return tracked !== undefined && tracked !== p ? [`${p} vs tracked ${tracked}`] : [];
+    });
+    if (caseCollisions.length > 0) {
+      const reason = `refusing case-colliding add on ${branch}: ${caseCollisions.join('; ')}`;
+      console.warn(`[pan-dir/auto-commit] ${reason}`);
+      return { committed: false, errored: true, reason };
+    }
+
     // git add
     const addOk: boolean | FlushResult = yield* runGit(
       ['add', '--', ...relativePaths],
@@ -626,9 +656,47 @@ function doCommit(
   });
 }
 
-interface PushResult {
+export interface PushResult {
   pushed: boolean;
   reason?: string;
+}
+
+/**
+ * Push whatever local commits already exist on a project's state-plane
+ * branch, without requiring a new diff to stage.
+ *
+ * Review fix (PAN-1990 cycle 3): a durable-cleanup caller (e.g.
+ * removeMemoryStateMirror) that deletes a file, commits the deletion, but
+ * fails to push leaves a REAL local commit on disk. A naive retry that only
+ * checks "does the file still exist locally" sees it's already gone and
+ * skips straight to "nothing to do" — the stuck commit never gets another
+ * push attempt. `git push` sends every local commit ahead of the remote
+ * tracking ref, not just the newest one, so retrying the push alone (with no
+ * new file change required) is enough to carry the earlier stuck commit
+ * along. Returns null when there's no repo, the branch doesn't match, or no
+ * `origin` remote is configured (mirrors maybePushStateCommit's own
+ * "no origin = not part of the write" convention for local/test repos).
+ */
+export function pushPendingStateCommits(projectRoot: string): Effect.Effect<PushResult | null, never> {
+  const project = findProjectByPathSync(projectRoot);
+  let gitRoot = projectRoot;
+  let expectedBranch = 'main';
+  if (project) {
+    const stateHome = resolveStateReadHomeSync(project);
+    if (stateHome.migrated) {
+      gitRoot = stateHome.root;
+      expectedBranch = STATE_BRANCH;
+    }
+  }
+  if (!existsSync(join(gitRoot, '.git'))) return Effect.succeed(null);
+
+  return runGit(['rev-parse', '--abbrev-ref', 'HEAD'], gitRoot).pipe(
+    Effect.matchEffect({
+      onSuccess: (r) => Effect.succeed(r.stdout.trim() as string | null),
+      onFailure: () => Effect.succeed(null as string | null),
+    }),
+    Effect.flatMap((branch) => branch === expectedBranch ? maybePushStateCommit(gitRoot, expectedBranch) : Effect.succeed(null)),
+  );
 }
 
 function maybePushStateCommit(
