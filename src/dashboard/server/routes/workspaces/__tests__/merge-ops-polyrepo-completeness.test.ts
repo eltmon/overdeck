@@ -90,6 +90,7 @@ vi.mock('../../workspaces.js', () => ({
 
 vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
+  advanceMergeQueue: vi.fn(),
   ensureAgentReadyForMerge: vi.fn(),
   mergeCompletionStatus: vi.fn(() => ({})),
   mergeVerificationOptions: vi.fn(() => ({})),

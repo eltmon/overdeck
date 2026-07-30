@@ -124,6 +124,7 @@ vi.mock('../../workspaces.js', () => ({
 
 vi.mock('../merge-strike.js', () => ({
   activeStrikeMerge: vi.fn(() => false),
+  advanceMergeQueue: vi.fn(),
   ensureAgentReadyForMerge: mocks.ensureAgentReadyForMerge,
   mergeCompletionStatus: vi.fn(() => ({})),
   mergeVerificationOptions: vi.fn(() => ({})),
