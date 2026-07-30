@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:46:32.757Z",
+  "updated": "2026-07-30T06:33:54.794Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "docs-updates": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 1429700,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T05:46:32.756Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -221,6 +213,17 @@
         "outcome": "completed",
         "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
         "releasedAt": "2026-07-30T05:46:29.464Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 1429700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:46:32.756Z",
+        "itemId": "docs-updates",
+        "outcome": "completed",
+        "reason": "docs/WORKSPACES-AND-PROJECTS.md, CLAUDE.md, and configuration/workspaces.mdx all updated naming every new flag exactly; reflowed the CLAUDE.md memory paragraph into a list so 'status --workspace' is greppable on one line.",
+        "releasedAt": "2026-07-30T06:33:54.794Z"
       }
     ],
     "statusReasons": {
@@ -279,6 +282,10 @@
       "no-loss-audit": {
         "reason": "New tests/unit/dashboard/no-loss-audit-cli.test.ts asserts every pre-PAN-3286 workspace/memory verb+flag still parses (expected surface extracted from the pre-change composer manifest at the merge-base, not memory), the status/summary positionals stay declared-but-optional, and the inventory doc records every new surface. Gate proven to bite by removing --tag. DEVIATION: had to be a sibling file, not inside no-loss-audit.test.ts — that file's jsdom env breaks the CLI import chain (Anthropic SDK constructed at module load).",
         "updatedAt": "2026-07-30T05:46:29.464Z"
+      },
+      "docs-updates": {
+        "reason": "docs/WORKSPACES-AND-PROJECTS.md, CLAUDE.md, and configuration/workspaces.mdx all updated naming every new flag exactly; reflowed the CLAUDE.md memory paragraph into a list so 'status --workspace' is greppable on one line.",
+        "updatedAt": "2026-07-30T06:33:54.794Z"
       }
     }
   },
@@ -345,6 +352,9 @@
     "no-loss-audit.no-loss-audit.ac1": "completed",
     "no-loss-audit.no-loss-audit.ac2": "completed",
     "no-loss-audit.no-loss-audit.ac3": "completed",
-    "docs-updates": "running"
+    "docs-updates": "completed",
+    "docs-updates.docs-updates.ac1": "completed",
+    "docs-updates.docs-updates.ac2": "completed",
+    "docs-updates.docs-updates.ac3": "completed"
   }
 }
