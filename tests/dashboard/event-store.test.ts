@@ -444,3 +444,72 @@ describe('EventStore.compact idempotency keys (PAN-3092)', () => {
     expect(() => store.compact()).not.toThrow()
   })
 })
+
+describe('EventStore.appendOnce with oversized review.status_changed (PAN-3253 append-door-bound.ac4)', () => {
+  it('bounds oversized review.status_changed and dedupes on idempotent re-call', () => {
+    const db = makeDb()
+    const store = createEventStore(db)
+
+    const longNote = 'x'.repeat(10000); // Far exceeds 500-char limit
+    const largeHistory = Array.from({ length: 40 }, (_, i) => ({
+      type: 'review',
+      status: i % 2 === 0 ? 'pending' : 'passed',
+      timestamp: new Date(1_753_000_000_000 + i * 1000).toISOString(),
+      notes: longNote,
+    }));
+
+    const result1 = store.appendOnce(
+      {
+        type: 'review.status_changed',
+        timestamp: ts(),
+        payload: {
+          status: {
+            history: largeHistory,
+            issueId: 'PAN-TEST-APPENDONCE',
+            reviewStatus: 'passed',
+          },
+        },
+      } as any,
+      'test-appendonce-idempotency-key'
+    );
+
+    // First call should append
+    expect(result1.outcome).toBe('appended');
+
+    // Verify the persisted event has bounded history and truncated notes
+    const raw = db as unknown as SqliteDatabase;
+    const rows = raw.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    expect(rows).toHaveLength(1);
+
+    const parsed = JSON.parse(rows[0]!.payload) as { status?: { history?: Array<{ notes?: string }> } };
+    expect(parsed.status?.history).toHaveLength(20); // Bounded to 20
+    for (const entry of parsed.status?.history || []) {
+      if (entry.notes) {
+        expect(entry.notes.length).toBeLessThanOrEqual(500); // Notes truncated
+        expect(entry.notes.endsWith('…')).toBe(true); // Should have ellipsis
+      }
+    }
+
+    // Second call with same key should be duplicate and not add a new row
+    const result2 = store.appendOnce(
+      {
+        type: 'review.status_changed',
+        timestamp: ts(),
+        payload: {
+          status: {
+            history: largeHistory,
+            issueId: 'PAN-TEST-APPENDONCE-2',
+            reviewStatus: 'failed',
+          },
+        },
+      } as any,
+      'test-appendonce-idempotency-key' // Same key
+    );
+
+    expect(result2.outcome).toBe('duplicate');
+
+    // Verify still only one row
+    const rowsAfter = raw.prepare('SELECT payload FROM events WHERE type = ?').all(['review.status_changed']) as Array<{ payload: string }>;
+    expect(rowsAfter).toHaveLength(1);
+  });
+});

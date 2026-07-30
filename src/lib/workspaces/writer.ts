@@ -11,6 +11,8 @@
  * only to await that mirror write; the SQLite row write itself stays sync.
  */
 import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import { writeWorkspaceIdentity } from '../memory/identity-record.js';
 import { mirrorPin, unmirrorPin } from '../memory/state-mirror.js';
@@ -145,6 +147,47 @@ export async function archiveWorkspace(id: string): Promise<void> {
 
 export function unarchiveWorkspace(id: string): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_archived = 0 WHERE id = ?`).run(id);
+}
+
+export interface RelocateWorkspaceOptions {
+  /** Required to relocate a kind='main' workspace (diverges it from projects.yaml's primary path). */
+  force?: boolean;
+}
+
+/**
+ * Point a workspace at a new path (Subspace `workspaces update --relocate` parity,
+ * PAN-3286 WI-2/D-2/D-5). Refuses `kind='issue'` (pipeline-owned, not a user
+ * relocation target) and archived workspaces. `kind='main'` requires
+ * `force: true` since it diverges the row from projects.yaml's primary path.
+ * Re-writes the memory-home metadata.json recovery hint (best-effort — the
+ * workspaces row remains the source of truth).
+ */
+export async function relocateWorkspace(id: string, path: string, options: RelocateWorkspaceOptions = {}): Promise<void> {
+  const workspace = getWorkspaceById(id);
+  if (!workspace) throw new Error(`No workspace found with id '${id}'`);
+  if (workspace.isArchived) throw new Error(`Cannot relocate archived workspace '${workspace.name}'`);
+  if (workspace.kind === 'issue') throw new Error(`Cannot relocate an issue-kind workspace — it is owned by the pipeline worktree`);
+  if (workspace.kind === 'main' && !options.force) {
+    throw new Error(`Relocating the main workspace diverges it from projects.yaml's primary path; pass --force to proceed anyway`);
+  }
+
+  const isGitRepository = existsSync(join(path, '.git'));
+  const now = Date.now();
+  getOverdeckDatabaseSync()
+    .prepare(`UPDATE workspaces SET path = ?, is_git_repository = ?, last_accessed_at = ? WHERE id = ?`)
+    .run(path, isGitRepository ? 1 : 0, now, id);
+
+  await writeWorkspaceIdentity({
+    id: workspace.id,
+    projectId: workspace.projectId,
+    kind: workspace.kind,
+    name: workspace.name,
+    path,
+    branchName: workspace.branchName,
+    parentBranch: workspace.parentBranch,
+    issueId: workspace.issueId,
+    createdAt: workspace.createdAt,
+  }).catch(() => {});
 }
 
 /**

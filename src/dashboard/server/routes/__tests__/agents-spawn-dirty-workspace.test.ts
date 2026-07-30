@@ -24,6 +24,12 @@ describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
     // the planning→work auto-handoff.
     ['an expanded pipeline-authored PRD draft', '?? .pan/drafts/MIN-898.md'],
     ['any other Overdeck-owned .pan/ path', '?? .pan/user-notes.md'],
+    // PAN-3266: worktree creation writes the Overdeck pre-rebase guard into
+    // core.hooksPath (.husky/_), creating that directory before husky's install
+    // has written its self-ignoring `.gitignore`. Every freshly created
+    // workspace was therefore born dirty and 409'd the planning auto-handoff.
+    ['the generated pre-rebase guard in a fresh workspace', '?? .husky/_/pre-rebase'],
+    ['generated hook output beside pipeline runtime files', '?? .husky/_/pre-rebase\n?? .pan/drafts/PAN-3254.md'],
   ])('allows %s', (_label, porcelain) => {
     expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(true);
   });
@@ -32,6 +38,8 @@ describe('isOnlyOverdeckRuntimeWorkspaceChanges', () => {
     ['a source file', ' M src/index.ts'],
     ['runtime files mixed with a source file', '?? .pan/spec.vbrief.json\n M src/index.ts'],
     ['a runtime-lookalike path outside the runtime dirs', '?? pan/drafts/MIN-898.md'],
+    ['generated hook output mixed with a source file', '?? .husky/_/pre-rebase\n M src/index.ts'],
+    ['an edit to a tracked hook source', ' M .husky/pre-push'],
   ])('rejects %s', (_label, porcelain) => {
     expect(isOnlyOverdeckRuntimeWorkspaceChanges(porcelain)).toBe(false);
   });

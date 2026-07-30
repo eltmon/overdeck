@@ -22,6 +22,7 @@ import { setActivityEventStoreProvider } from '../../lib/activity-logger.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
 import { getOverdeckDatabaseSync } from '../../lib/overdeck/infra.js';
 import { getWorkspaceForIssue } from '../../lib/workspaces/resolver.js';
+import { REVIEW_STATUS_HISTORY_LIMIT, REVIEW_STATUS_NOTE_LIMIT } from '../../lib/review-status-limits.js';
 import type { DomainEvent } from '@overdeck/contracts';
 
 /** Default workspace-id resolver: the real workspaces resolver against the global overdeck.db. */
@@ -200,17 +201,60 @@ export async function openEventDb(): Promise<DbAdapter> {
   return db as unknown as DbAdapter;
 }
 
-// ─── One-shot payload trim (PAN-3253) ─────────────────────────────────────────
+// ─── Review status payload bounding (PAN-3253) ────────────────────────────────
 
-const REVIEW_HISTORY_TRIM_LIMIT = 20;
 const OVERSIZED_REVIEW_PAYLOAD_CHARS = 16 * 1024;
 
+function truncateHistoryNote(notes: string | undefined): string | undefined {
+  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes;
+  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
+}
+
 /**
- * PAN-3253: older review.status_changed rows embed the full unbounded
- * `status.history` array — on one machine that single event type was 80% of a
- * 1.3 GB overdeck.db. Rewrite each oversized payload keeping only the bounded
- * history tail. New emissions are already bounded at hydration
- * (REVIEW_STATUS_HISTORY_LIMIT), so this converges to a no-op.
+ * Enforce review.status_changed payload bounds at the persistence door.
+ * Returns the bounded JSON string if changes were needed, or the original string unchanged.
+ * Applied before every append/appendOnce to prevent unbounded payloads from entering the store.
+ */
+function boundReviewStatusPayload(payload: string): string {
+  try {
+    const parsed = JSON.parse(payload) as { status?: { history?: Array<{ notes?: string }> } };
+    const history = parsed.status?.history;
+    if (!Array.isArray(history)) return payload;
+
+    // Check if bounding is needed
+    const needsHistorySlice = history.length > REVIEW_STATUS_HISTORY_LIMIT;
+    let needsNoteTruncation = false;
+    for (const entry of history) {
+      if (entry.notes && entry.notes.length > REVIEW_STATUS_NOTE_LIMIT) {
+        needsNoteTruncation = true;
+        break;
+      }
+    }
+
+    if (!needsHistorySlice && !needsNoteTruncation) return payload;
+
+    // Apply bounding
+    const boundedHistory = needsHistorySlice
+      ? history.slice(-REVIEW_STATUS_HISTORY_LIMIT)
+      : history;
+
+    for (const entry of boundedHistory) {
+      entry.notes = truncateHistoryNote(entry.notes);
+    }
+
+    parsed.status!.history = boundedHistory;
+    return JSON.stringify(parsed);
+  } catch {
+    // On parse failure, return original payload (graceful degradation)
+    return payload;
+  }
+}
+
+/**
+ * PAN-3253: Boot-time trim for older review.status_changed rows.
+ * On one machine, this event type was 80% of a 1.3 GB overdeck.db.
+ * Delegates to boundReviewStatusPayload to enforce the same bounds
+ * that prevent new unbounded payloads from entering at the append door.
  */
 export function trimReviewStatusHistoryPayloads(
   db: DbAdapter,
@@ -223,16 +267,12 @@ export function trimReviewStatusHistoryPayloads(
   let trimmed = 0;
   let savedChars = 0;
   for (const row of rows) {
-    try {
-      const parsed = JSON.parse(row.payload) as { status?: { history?: unknown } };
-      const history = parsed.status?.history;
-      if (!Array.isArray(history) || history.length <= REVIEW_HISTORY_TRIM_LIMIT) continue;
-      parsed.status!.history = history.slice(-REVIEW_HISTORY_TRIM_LIMIT);
-      const next = JSON.stringify(parsed);
-      update.run([next, row.sequence]);
-      trimmed += 1;
-      savedChars += row.payload.length - next.length;
-    } catch { /* leave unparseable rows untouched */ }
+    const bounded = boundReviewStatusPayload(row.payload);
+    if (bounded === row.payload) continue;
+
+    update.run([bounded, row.sequence]);
+    trimmed += 1;
+    savedChars += row.payload.length - bounded.length;
   }
   return { trimmed, savedChars };
 }
@@ -391,7 +431,12 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
   function append(event: Omit<DomainEvent, 'sequence'>): number {
     event = withWorkspaceId(event, resolveWorkspaceId);
     const timestamp = eventTimestampMillis(event);
-    const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+
+    // Enforce bounds on review.status_changed payloads at the append door
+    if (event.type === 'review.status_changed') {
+      payload = boundReviewStatusPayload(payload);
+    }
 
     insertStmt.run([event.type, timestamp, payload]);
 
@@ -416,7 +461,12 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     event = withWorkspaceId(event, resolveWorkspaceId);
     return new Promise((resolve) => {
       const timestamp = eventTimestampMillis(event);
-      const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+      let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+
+      // Enforce bounds on review.status_changed payloads at the append door
+      if (event.type === 'review.status_changed') {
+        payload = boundReviewStatusPayload(payload);
+      }
 
       writeQueue.push({
         type: event.type,
@@ -501,7 +551,14 @@ export function createEventStore(db: DbAdapter, options?: CreateEventStoreOption
     event = withWorkspaceId(event, resolveWorkspaceId);
     const stmts = getIdempotencyStmts();
     const timestamp = eventTimestampMillis(event);
-    const payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+    let payload = JSON.stringify((event as Record<string, unknown>)['payload'] ?? {});
+
+    // Enforce bounds on review.status_changed payloads at the append door,
+    // before the dedup check so the bounded form is used for idempotency.
+    if (event.type === 'review.status_changed') {
+      payload = boundReviewStatusPayload(payload);
+    }
+
     let sequence = 0;
     let duplicate = false;
 

@@ -10,7 +10,13 @@ import { Data, Effect } from 'effect';
 import { getDatabase } from './index.js';
 import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
 import { REVIEW_STATUS_HISTORY_LIMIT } from '../review-status-reconcile.js';
+import { REVIEW_STATUS_NOTE_LIMIT } from '../review-status-limits.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
+
+function truncateHistoryNote(notes: string | null): string | undefined {
+  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes || undefined;
+  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
+}
 
 /**
  * PAN-1249: Local typed error for SQLite failures against review_status.
@@ -316,7 +322,7 @@ export function getAllReviewStatusesFromDb(): Record<string, ReviewStatus> {
       type: row.type as StatusHistoryEntry['type'],
       status: row.status,
       timestamp: row.timestamp,
-      ...(row.notes ? { notes: row.notes } : {}),
+      ...(truncateHistoryNote(row.notes) ? { notes: truncateHistoryNote(row.notes) } : {}),
     });
     historyByIssue.set(row.issue_id, bucket);
   }
@@ -360,7 +366,7 @@ export function getReviewStatusesFromDb(issueIds: string[]): Record<string, Revi
       type: row.type as StatusHistoryEntry['type'],
       status: row.status,
       timestamp: row.timestamp,
-      ...(row.notes ? { notes: row.notes } : {}),
+      ...(truncateHistoryNote(row.notes) ? { notes: truncateHistoryNote(row.notes) } : {}),
     });
     historyByIssue.set(row.issue_id, bucket);
   }

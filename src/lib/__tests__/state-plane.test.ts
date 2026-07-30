@@ -5,6 +5,8 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   getMainDivergence,
+  isGeneratedGitHookPath,
+  isOverdeckOwnedOnlyStatus,
   isStatePlaneOnlyDiff,
   isStatePlaneOnlyStatus,
   parsePorcelainStatusPaths,
@@ -241,5 +243,40 @@ describe('getMainDivergence', () => {
     } finally {
       rmSync(notRepo, { recursive: true, force: true });
     }
+  });
+});
+
+describe('isGeneratedGitHookPath (PAN-3266)', () => {
+  it.each([
+    ['the Overdeck pre-rebase guard worktree creation writes', '.husky/_/pre-rebase'],
+    ['a husky-generated shim', '.husky/_/pre-commit'],
+    ["husky's own self-ignore file", '.husky/_/.gitignore'],
+    ['the generated hooks directory itself', '.husky/_'],
+  ])('classifies %s as generated hook output', (_label, path) => {
+    expect(isGeneratedGitHookPath(path)).toBe(true);
+  });
+
+  it.each([
+    ['a tracked hook source file', '.husky/pre-push'],
+    ['the tracked hook directory', '.husky'],
+    ['a lookalike path outside the generated dir', 'husky/_/pre-rebase'],
+    ['a source file', 'src/lib/state-plane.ts'],
+  ])('does not classify %s as generated hook output', (_label, path) => {
+    expect(isGeneratedGitHookPath(path)).toBe(false);
+  });
+});
+
+describe('isOverdeckOwnedOnlyStatus with generated hook output (PAN-3266)', () => {
+  it('does not treat a freshly created workspace carrying only the generated guard as dirty', () => {
+    expect(isOverdeckOwnedOnlyStatus('?? .husky/_/pre-rebase')).toBe(true);
+  });
+
+  it('still treats the generated guard alongside real work as dirty', () => {
+    const porcelain = ['?? .husky/_/pre-rebase', ' M src/lib/state-plane.ts'].join('\n');
+    expect(isOverdeckOwnedOnlyStatus(porcelain)).toBe(false);
+  });
+
+  it('still treats an edit to a tracked hook source as real work', () => {
+    expect(isOverdeckOwnedOnlyStatus(' M .husky/pre-push')).toBe(false);
   });
 });

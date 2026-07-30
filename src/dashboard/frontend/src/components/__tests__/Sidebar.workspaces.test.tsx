@@ -121,7 +121,10 @@ describe('Sidebar Workspaces pipeline badge (ac2)', () => {
       agentsById: {},
       reviewStatusByIssueId: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
-    const workspaces = [ws({ id: 'ws-issue', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001' })];
+    // Favorited so the row stays in the default rail: PAN-3286 FR-13 collapses
+    // non-favorited pipeline worktrees behind a count row. The badge logic under
+    // test here is identical either way.
+    const workspaces = [ws({ id: 'ws-issue', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: true })];
 
     renderSidebar({ workspaces });
 

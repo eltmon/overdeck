@@ -297,10 +297,15 @@ describe('CommandPalette navigation actions', () => {
 });
 
 describe('CommandPalette workspaces switcher (PAN-1990)', () => {
+  // `ws-issue` is favorited because PAN-3286 FR-13 keeps NON-favorited pipeline
+  // worktrees out of this switcher; favoriting it preserves what these three
+  // cases actually test (ordering, query matching, selection) with an issue-kind
+  // row still present. The hiding behavior itself is covered in
+  // workspace-rail-filter.test.tsx.
   const WORKSPACES = [
     { id: 'ws-old', projectId: 'overdeck', kind: 'scratch', name: 'old-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
     { id: 'ws-fav', projectId: 'overdeck', kind: 'scratch', name: 'fav-scratch', issueId: null, isFavorite: true, isArchived: false, title: null, lastAccessedAt: 50 },
-    { id: 'ws-issue', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 200 },
+    { id: 'ws-issue', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9001', issueId: 'PAN-9001', isFavorite: true, isArchived: false, title: null, lastAccessedAt: 200 },
   ];
 
   beforeEach(() => {
@@ -325,12 +330,13 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
 
     await waitFor(() => expect(getOptionByValue('workspace-ws-fav')).toBeInTheDocument());
     const options = [
-      getOptionByValue('workspace-ws-fav'),
       getOptionByValue('workspace-ws-issue'),
+      getOptionByValue('workspace-ws-fav'),
       getOptionByValue('workspace-ws-old'),
     ];
     const order = options.map((o) => o.getAttribute('data-value'));
-    expect(order).toEqual(['workspace-ws-fav', 'workspace-ws-issue', 'workspace-ws-old']);
+    // Both favorites first, most-recent among them leading, then non-favorites.
+    expect(order).toEqual(['workspace-ws-issue', 'workspace-ws-fav', 'workspace-ws-old']);
   });
 
   it('ac2: typed input shows only matching workspaces', async () => {

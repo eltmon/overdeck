@@ -219,6 +219,20 @@ re-seeding from `projects.yaml`, backfilling `issue`-kind rows from existing
 identity mirrors, and migrating pre-PAN-1990 issue-keyed memory homes onto
 their workspace UUID.
 
+### Bounded review-status history (PAN-3253)
+
+The `review.status_changed` event payload embeds a **bounded** `status.history` array (≤20 entries, ≤500-char notes per entry) for replay.
+Uncapped history arrays caused database bloat (one machine's event store was 80% review events).
+All four enforcement points apply identical bounds to prevent silent drift:
+
+- **Composition limit** (20 entries, 500-char notes): `review-status.ts` truncates notes when transitions are recorded
+- **Hydration limit** (20 entries, 500-char notes): `src/lib/overdeck/review-status-sync.ts` (canonical owner) truncates notes when loading from `status_history` table via SQL bounds
+- **Persistence limit** (20 entries, 500-char notes): `event-store.ts` bounds payloads in `append()`, `appendAsync()`, `appendOnce()` before persistence
+- **Boot-time migration** (20 entries, 500-char notes): `event-store.ts` trims historical oversized rows with `trimReviewStatusHistoryPayloads()`
+
+The canonical limits live in `src/lib/review-status-limits.ts` to ensure all enforcement points use identical values.
+The raw `status_history` table intentionally retains the full unbounded record for archival; only in-memory objects and event payloads are bounded.
+
 ### Agent spawn provenance
 
 Agent state records two complementary provenance fields:

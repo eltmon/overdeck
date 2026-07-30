@@ -14,6 +14,232 @@
 PAN_DASHBOARD_URL="${OVERDECK_DASHBOARD_URL:-http://localhost:3011}"
 PAN_CURL_TIMEOUT="${OVERDECK_HOOK_TIMEOUT:-0.5}"
 
+# Acquire a portable single-flight lock. A tiny Python helper holds the kernel
+# advisory lock for the caller's lifetime; the directory is ownership metadata,
+# not the synchronization primitive. Publishing the kernel lock before creating
+# the metadata closes the mkdir-to-PID initialization race (PAN-3294).
+pan_acquire_singleflight_lock() {
+  local lock_dir="$1"
+  local guard_file="${lock_dir}.flock"
+  local ready_file="${guard_file}.ready.$$.$RANDOM"
+  local lock_parent
+  lock_parent=$(dirname "$lock_dir")
+  mkdir -p "$lock_parent" 2>/dev/null || return 1
+
+  python3 - "$guard_file" "$ready_file" "$$" >/dev/null 2>&1 <<'PY' &
+import fcntl
+import os
+import sys
+import time
+
+guard_file, ready_file, parent_pid_text = sys.argv[1:]
+parent_pid = int(parent_pid_text)
+fd = os.open(guard_file, os.O_CREAT | os.O_RDWR, 0o600)
+try:
+    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except BlockingIOError:
+    with open(ready_file, "w", encoding="utf-8") as ready:
+        ready.write("busy\n")
+    raise SystemExit(0)
+
+with open(ready_file, "w", encoding="utf-8") as ready:
+    ready.write("acquired\n")
+
+while True:
+    try:
+        os.kill(parent_pid, 0)
+    except OSError:
+        break
+    if os.getppid() == 1:
+        break
+    time.sleep(0.1)
+PY
+  local helper_pid=$!
+
+  local attempts=0
+  while [ ! -s "$ready_file" ] && kill -0 "$helper_pid" 2>/dev/null && [ "$attempts" -lt 100 ]; do
+    /bin/sleep 0.01
+    attempts=$((attempts + 1))
+  done
+
+  local lock_status
+  lock_status=$(cat "$ready_file" 2>/dev/null || true)
+  rm -f "$ready_file" 2>/dev/null || true
+  if [ "$lock_status" != "acquired" ]; then
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  fi
+
+  # The kernel lock is already held, so stale metadata can be replaced without
+  # exposing an unowned interval to contenders.
+  rm -rf "$lock_dir" 2>/dev/null || {
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  mkdir "$lock_dir" 2>/dev/null || {
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  printf '%s\n' "$$" > "$lock_dir/pid" || {
+    rm -rf "$lock_dir" 2>/dev/null || true
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  printf '%s\n' "$helper_pid" > "$lock_dir/helper-pid" || {
+    rm -rf "$lock_dir" 2>/dev/null || true
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+    return 1
+  }
+  return 0
+}
+
+pan_release_singleflight_lock() {
+  local lock_dir="$1"
+  local owner_pid helper_pid
+  owner_pid=$(cat "$lock_dir/pid" 2>/dev/null || true)
+  helper_pid=$(cat "$lock_dir/helper-pid" 2>/dev/null || true)
+
+  # A caller may release only metadata it owns. Remove that metadata before
+  # dropping the kernel lock; a successor cannot acquire until the helper exits,
+  # and this owner performs no destructive filesystem action after that point.
+  [ "$owner_pid" = "$$" ] || return 0
+  rm -rf "$lock_dir" 2>/dev/null || return 0
+  if [[ "$helper_pid" =~ ^[1-9][0-9]*$ ]]; then
+    kill "$helper_pid" 2>/dev/null || true
+    wait "$helper_pid" 2>/dev/null || true
+  fi
+  return 0
+}
+
+# Run a command with a hard deadline while preserving its stdin, stdout, and
+# ordinary exit code. GNU timeout is preferred when installed; stock macOS uses
+# the pure-bash watchdog fallback. Expiry is always reported as 124.
+pan_run_with_timeout() {
+  local timeout_seconds="$1"
+  shift
+
+  if command -v timeout >/dev/null 2>&1; then
+    if timeout -k 5 "$timeout_seconds" "$@"; then
+      return 0
+    else
+      return $?
+    fi
+  fi
+  if command -v gtimeout >/dev/null 2>&1; then
+    if gtimeout -k 5 "$timeout_seconds" "$@"; then
+      return 0
+    else
+      return $?
+    fi
+  fi
+
+  local expired_file="${TMPDIR:-/tmp}/pan-hook-timeout.$$.$RANDOM"
+  "$@" &
+  local command_pid=$!
+  (
+    local sleep_pid=""
+    trap '[ -n "$sleep_pid" ] && kill "$sleep_pid" 2>/dev/null; exit 0' TERM INT
+
+    /bin/sleep "$timeout_seconds" &
+    sleep_pid=$!
+    wait "$sleep_pid" 2>/dev/null || exit 0
+    sleep_pid=""
+
+    if kill -0 "$command_pid" 2>/dev/null; then
+      : > "$expired_file"
+      kill -TERM "$command_pid" 2>/dev/null || true
+      /bin/sleep 5 &
+      sleep_pid=$!
+      wait "$sleep_pid" 2>/dev/null || exit 0
+      sleep_pid=""
+      kill -KILL "$command_pid" 2>/dev/null || true
+    fi
+  ) &
+  local watchdog_pid=$!
+
+  local command_rc
+  if wait "$command_pid"; then
+    command_rc=0
+  else
+    command_rc=$?
+  fi
+
+  kill "$watchdog_pid" 2>/dev/null || true
+  wait "$watchdog_pid" 2>/dev/null || true
+
+  if [ -f "$expired_file" ]; then
+    /bin/rm -f "$expired_file" 2>/dev/null || true
+    return 124
+  fi
+
+  return "$command_rc"
+}
+
+# Admit at most OVERDECK_HOOK_LLM_RATE_LIMIT hook-initiated LLM calls in a
+# rolling 60-second machine-wide window. Returns 0 after recording an allowed
+# call and 1 when the bucket is full or cannot be locked safely.
+pan_llm_rate_check() {
+  local overdeck_home="${OVERDECK_HOME:-$HOME/.overdeck}"
+  local bucket_file="$overdeck_home/hook-llm-calls.log"
+  local lock_dir="$overdeck_home/hook-llm-calls.lock.d"
+  local limit="${OVERDECK_HOOK_LLM_RATE_LIMIT:-6}"
+  [[ "$limit" =~ ^[0-9]+$ ]] || limit=6
+
+  mkdir -p "$overdeck_home" 2>/dev/null || return 1
+
+  local attempt=0
+  local acquired=0
+  while [ "$attempt" -lt 10 ]; do
+    if pan_acquire_singleflight_lock "$lock_dir"; then
+      acquired=1
+      break
+    fi
+    attempt=$((attempt + 1))
+    [ "$attempt" -lt 10 ] && /bin/sleep 0.1
+  done
+  [ "$acquired" = "1" ] || return 1
+
+  local now cutoff timestamp count=0
+  now=$(date +%s 2>/dev/null) || {
+    pan_release_singleflight_lock "$lock_dir"
+    return 1
+  }
+  cutoff=$((now - 60))
+
+  local bucket_tmp="${bucket_file}.tmp.$$"
+  : > "$bucket_tmp" 2>/dev/null || {
+    pan_release_singleflight_lock "$lock_dir"
+    return 1
+  }
+
+  if [ -f "$bucket_file" ]; then
+    while IFS= read -r timestamp; do
+      if [[ "$timestamp" =~ ^[0-9]+$ ]] && [ "$timestamp" -ge "$cutoff" ]; then
+        printf '%s\n' "$timestamp" >> "$bucket_tmp"
+        count=$((count + 1))
+      fi
+    done < "$bucket_file"
+  fi
+
+  local allowed=1
+  if [ "$count" -lt "$limit" ]; then
+    printf '%s\n' "$now" >> "$bucket_tmp"
+    allowed=0
+  fi
+
+  if ! mv "$bucket_tmp" "$bucket_file" 2>/dev/null; then
+    rm -f "$bucket_tmp" 2>/dev/null || true
+    allowed=1
+  fi
+  pan_release_singleflight_lock "$lock_dir"
+  return "$allowed"
+}
+
 # Internal token for authenticated HTTP ingestion (PAN-1596). The
 # /api/agents/:id/heartbeat route is token-gated — without this header every
 # hook POST gets 403 and is dropped on 4xx, so hook-emitted runtime activity

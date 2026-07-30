@@ -69,7 +69,7 @@ function renderWorkspaceView(options: {
   };
   const memory = options.memory !== undefined ? options.memory : {
     headline: 'Building the workspace view.',
-    status: { headline: 'Building the workspace view.', summary: 'summary', phase: 'building', nextSteps: ['Ship it'] },
+    status: { headline: 'Building the workspace view.', summary: 'summary', phase: 'building', confidence: 0.9, nextSteps: ['Ship it'] },
     observations: [{ id: 'obs-1', timestamp: '2026-07-29T00:00:00.000Z', summary: 'did a thing', actionStatus: null }],
   };
 
@@ -101,6 +101,22 @@ describe('WorkspaceView (ac1)', () => {
     expect(await screen.findByTestId('conversation-list')).toHaveAttribute('data-include-ids', '1');
     expect(await screen.findByTestId('workspace-view-memory-status')).toHaveTextContent('Building the workspace view.');
     expect(await screen.findByTestId('workspace-view-observation-timeline')).toHaveTextContent('did a thing');
+  });
+
+  // PAN-3286 FR-12
+  it('shows the memory phase and confidence in the Memory header', async () => {
+    renderWorkspaceView();
+
+    const header = await screen.findByTestId('workspace-view-memory-phase');
+    expect(header).toHaveTextContent('building');
+    expect(header).toHaveTextContent('confidence 0.9');
+  });
+
+  it('omits the phase header for a workspace with no memory status', async () => {
+    renderWorkspaceView({ memory: { headline: '', status: null, observations: [] } });
+
+    expect(await screen.findByTestId('xterm')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-view-memory-phase')).toBeNull();
   });
 });
 

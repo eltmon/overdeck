@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Plus, X, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
+import { Home, CircleDot, Bot, Terminal, FileCode, GitCommit, ListTodo, FileText, Globe, Pencil, Plus, X, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react'
 import type { PaneType, WorkspacePane, PaneId } from '../../lib/panesStore'
 import styles from './stage.module.css'
 
@@ -21,6 +21,7 @@ const PANE_ICONS: Record<PaneType, typeof Home> = {
   plan: ListTodo,
   docs: FileText,
   browser: Globe,
+  editor: Pencil,
 }
 
 export interface PaneBarProps {

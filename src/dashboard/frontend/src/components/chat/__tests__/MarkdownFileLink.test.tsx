@@ -29,6 +29,7 @@ vi.mock('@pierre/diffs', () => ({
 }));
 
 import { MarkdownFileLink, fileLinkIconForPath } from '../MarkdownFileLink';
+import { StageDeckProvider, type StageDeckContextValue } from '../../Stage/StageDeckContext';
 
 const meta = {
   filePath: '/home/eltmon/project/src/App.tsx',
@@ -38,6 +39,40 @@ const meta = {
   line: 12,
   column: 5,
 };
+
+const markdownMeta = {
+  filePath: '/home/eltmon/project/docs/README.md',
+  targetPath: '/home/eltmon/project/docs/README.md',
+  displayPath: 'project/docs/README.md',
+  basename: 'README.md',
+};
+
+// PAN-3260 — the reported case: a repo-root markdown chip inside a
+// conversation with no workspace, so no issueId prop and no
+// /workspaces/feature-<issue>/ path segment for issueIdFromPath to match.
+const flywheelBriefMeta = {
+  filePath: '/home/eltmon/Projects/overdeck/docs/flywheel-brief.md',
+  targetPath: '/home/eltmon/Projects/overdeck/docs/flywheel-brief.md',
+  displayPath: 'overdeck/docs/flywheel-brief.md',
+  basename: 'flywheel-brief.md',
+};
+
+// PAN-3260 review fix — a markdown chip with line/column metadata: targetPath
+// (used for external-editor goto syntax) carries a trailing `:12:5` that
+// filePath (the real path) does not. The internal editor pane must read
+// filePath, not targetPath, or extname() sees ".md:12:5" and rejects it.
+const positionedMarkdownMeta = {
+  filePath: '/home/eltmon/project/docs/README.md',
+  targetPath: '/home/eltmon/project/docs/README.md:12:5',
+  displayPath: 'project/docs/README.md:12:5',
+  basename: 'README.md',
+  line: 12,
+  column: 5,
+};
+
+function renderWithDeck(ui: React.ReactElement, deck: StageDeckContextValue | null) {
+  return render(<StageDeckProvider value={deck}>{ui}</StageDeckProvider>);
+}
 
 describe('MarkdownFileLink', () => {
   beforeEach(() => {
@@ -263,5 +298,181 @@ describe('MarkdownFileLink', () => {
     expect(fileLinkIconForPath('/tmp/photo.png').displayName ?? fileLinkIconForPath('/tmp/photo.png').name).toBe('FileImage');
     expect(fileLinkIconForPath('/tmp/archive.zip').displayName ?? fileLinkIconForPath('/tmp/archive.zip').name).toBe('FileArchive');
     expect(fileLinkIconForPath('/tmp/unknown').displayName ?? fileLinkIconForPath('/tmp/unknown').name).toBe('File');
+  });
+
+  describe('markdown chip default-to-internal (PAN-3260)', () => {
+    it('opens/focuses the internal editor pane by default and never calls shellOpenInEditor', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane for a repo-root chip with no issueId and no workspace path segment (the flywheel-brief case)', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...flywheelBriefMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(flywheelBriefMeta.filePath, flywheelBriefMeta.basename);
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane with the real file path, not the line-suffixed targetPath, for a positioned chip', () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...positionedMarkdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+      expect(openOrFocusEditorPane).not.toHaveBeenCalledWith(positionedMarkdownMeta.targetPath, expect.anything());
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('launches a persisted external editor target instead of opening a pane', async () => {
+      localStorage.setItem('overdeck:markdown-open-target', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
+
+    it('falls back to the external flow when the internal target has no deck context', async () => {
+      localStorage.setItem('overdeck:last-editor', 'vscode');
+      render(<MarkdownFileLink {...markdownMeta} />);
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+    });
+
+    it('leaves non-markdown chips on the external flow even inside a deck', async () => {
+      localStorage.setItem('overdeck:last-editor', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...meta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: meta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('markdown chip right-click menu (PAN-3260)', () => {
+    // wsTransportMock.getAvailableEditors resolves ['cursor', 'vscode'] per
+    // the outer beforeEach; MarkdownFileLink caches that fetch module-wide
+    // (same pattern as the Quickview highlighter cache), so every test in
+    // this block sees the same two external editors.
+    it('lists the internal editor, then each available external editor, then the copy actions, in that order', async () => {
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane: vi.fn() });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+          'Open in internal editor',
+          'Open in Cursor',
+          'Open in VS Code',
+          'Copy relative path',
+          'Copy full path',
+        ]);
+      });
+
+      // showContextMenu appends its menu directly to document.body, outside
+      // React's tree, so RTL's automatic per-test cleanup does not remove it
+      // — dismiss it explicitly or a later test's role queries can match
+      // this leftover menu instead of its own.
+      fireEvent.keyDown(document, { key: 'Escape' });
+      expect(screen.queryByRole('menuitem')).not.toBeInTheDocument();
+    });
+
+    it('choosing an external editor launches it and persists the choice for a later left click', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      const { unmount } = renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const vscodeItem = await screen.findByRole('menuitem', { name: 'Open in VS Code' });
+      fireEvent.click(vscodeItem);
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('vscode');
+
+      // A later left click (even a fresh mount) reuses the persisted choice.
+      unmount();
+      wsTransportMock.shellOpenInEditor.mockClear();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+      fireEvent.click(screen.getByRole('link'));
+
+      await waitFor(() => {
+        expect(wsTransportMock.shellOpenInEditor).toHaveBeenCalledWith({
+          cwd: markdownMeta.targetPath,
+          editor: 'vscode',
+        });
+      });
+      expect(openOrFocusEditorPane).not.toHaveBeenCalled();
+    });
+
+    it('choosing "Open in internal editor" opens/focuses the pane and persists the internal target', async () => {
+      localStorage.setItem('overdeck:markdown-open-target', 'vscode');
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...markdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(markdownMeta.filePath, markdownMeta.basename);
+      expect(localStorage.getItem('overdeck:markdown-open-target')).toBe('internal');
+      expect(wsTransportMock.shellOpenInEditor).not.toHaveBeenCalled();
+    });
+
+    it('opens the internal editor pane with the real file path from the context menu for a positioned chip', async () => {
+      const openOrFocusEditorPane = vi.fn();
+      renderWithDeck(<MarkdownFileLink {...positionedMarkdownMeta} />, { deckKey: 'overdeck', openOrFocusEditorPane });
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+      const internalItem = await screen.findByRole('menuitem', { name: 'Open in internal editor' });
+      fireEvent.click(internalItem);
+
+      expect(openOrFocusEditorPane).toHaveBeenCalledWith(positionedMarkdownMeta.filePath, positionedMarkdownMeta.basename);
+    });
+
+    it('renders exactly the three original items for a non-markdown chip', () => {
+      render(<MarkdownFileLink {...meta} />);
+
+      fireEvent.contextMenu(screen.getByRole('link'));
+
+      expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual([
+        'Open in editor',
+        'Copy relative path',
+        'Copy full path',
+      ]);
+    });
   });
 });
