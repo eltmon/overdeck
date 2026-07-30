@@ -106,23 +106,23 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:25:58.704Z",
+  "updated": "2026-07-30T23:25:59.750Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T23:15:29.025Z",
+    "updatedAt": "2026-07-30T23:25:59.748Z",
     "reviewNotes": "Review pipeline error: Command failed: git push origin feature/pan-3331\nerror: failed to push some refs to 'https://github.com/eltmon/overdeck.git'\n",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "58b44843760db716c0755cd9a54480eadbf6e4c9",
     "lastVerifiedCommit": "58b44843760db716c0755cd9a54480eadbf6e4c9",
-    "reviewRequestedAt": "2026-07-30T22:51:39.967Z",
+    "reviewRequestedAt": "2026-07-30T23:25:59.748Z",
     "reviewSpawnedAt": "2026-07-30T22:43:49.339Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -130,9 +130,11 @@
         "scripts/file-size-allowlist.txt",
         "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
         "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceActionBand.test.tsx",
+        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
         "src/lib/config-yaml/defaults.ts",
         "src/lib/config-yaml/load.ts",
         "src/lib/config-yaml/merge.ts",
+        "tests/unit/dashboard/routes/workspaces-routes.test.ts",
         "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
         "tests/unit/lib/overdeck/no-loss-matrix.ts"
       ],
@@ -176,6 +178,7 @@
         "src/dashboard/frontend/src/components/workspace/WorkspaceActionBand.tsx",
         "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
         "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceActionBand.test.tsx",
+        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
         "src/dashboard/server/routes/workspace-registry.ts",
         "src/lib/browser.ts",
         "src/lib/config-yaml/defaults.ts",
@@ -188,6 +191,7 @@
         "src/lib/workspaces/types.ts",
         "src/lib/workspaces/writer.ts",
         "sync-sources/skills/pan-workspace/SKILL.md",
+        "tests/unit/dashboard/routes/workspaces-routes.test.ts",
         "tests/unit/dashboard/workspace-open.test.ts",
         "tests/unit/dashboard/workspace-registry-git.test.ts",
         "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
@@ -195,7 +199,7 @@
         "tests/unit/lib/overdeck/no-loss-matrix.ts",
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
-      "recordedAt": "2026-07-30T22:41:42.331Z"
+      "recordedAt": "2026-07-30T23:25:58.701Z"
     }
   },
   "closeOut": {
