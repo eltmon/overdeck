@@ -148,7 +148,7 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T23:43:55.670Z",
+  "updated": "2026-07-30T23:44:00.953Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "blocked",
@@ -159,7 +159,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-30T23:43:54.991Z",
+    "updatedAt": "2026-07-30T23:44:00.944Z",
     "reviewNotes": "workspace-scoped band state can mutate the wrong workspace after navigation",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
@@ -312,7 +312,7 @@
       },
       "costAtCloseOut": {
         "usd": 97.521595,
-        "pricingAsOf": "2026-07-30T23:43:55.018Z"
+        "pricingAsOf": "2026-07-30T23:44:00.948Z"
       }
     },
     "merges": [
