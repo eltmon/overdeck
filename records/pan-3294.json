@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:07:05.528Z",
+  "updated": "2026-07-30T04:08:38.664Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "wire-llm-guards": {
-        "writerId": "agent-pan-3294",
-        "agentId": "agent-pan-3294",
-        "pid": 2565802,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:07:05.527Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3294",
@@ -139,6 +131,17 @@
         "outcome": "completed",
         "reason": "Acquired a per-agent stop-hook lock immediately after the completed-file exit, logged and exited before external work when held, released via EXIT trap, and replaced the test stub with the real hook library plus concurrency/stale-lock regressions.",
         "releasedAt": "2026-07-30T04:06:47.583Z"
+      },
+      {
+        "writerId": "agent-pan-3294",
+        "agentId": "agent-pan-3294",
+        "pid": 2565802,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:07:05.527Z",
+        "itemId": "wire-llm-guards",
+        "outcome": "completed",
+        "reason": "Gated the completion-check spawn through the machine-wide bucket, wrapped claude with the configurable 60-second watchdog, suppressed resolution events for rate-limit/timeout drops, preserved non-timeout UNCLEAR fallback, and added isolated regression tests.",
+        "releasedAt": "2026-07-30T04:08:38.664Z"
       }
     ],
     "statusReasons": {
@@ -157,6 +160,10 @@
       "wire-singleflight": {
         "reason": "Acquired a per-agent stop-hook lock immediately after the completed-file exit, logged and exited before external work when held, released via EXIT trap, and replaced the test stub with the real hook library plus concurrency/stale-lock regressions.",
         "updatedAt": "2026-07-30T04:06:47.583Z"
+      },
+      "wire-llm-guards": {
+        "reason": "Gated the completion-check spawn through the machine-wide bucket, wrapped claude with the configurable 60-second watchdog, suppressed resolution events for rate-limit/timeout drops, preserved non-timeout UNCLEAR fallback, and added isolated regression tests.",
+        "updatedAt": "2026-07-30T04:08:38.664Z"
       }
     }
   },
@@ -181,6 +188,10 @@
     "wire-singleflight.wire-singleflight.ac2": "completed",
     "wire-singleflight.wire-singleflight.ac3": "completed",
     "wire-singleflight.wire-singleflight.ac4": "completed",
-    "wire-llm-guards": "running"
+    "wire-llm-guards": "completed",
+    "wire-llm-guards.wire-llm-guards.ac1": "completed",
+    "wire-llm-guards.wire-llm-guards.ac2": "completed",
+    "wire-llm-guards.wire-llm-guards.ac3": "completed",
+    "wire-llm-guards.wire-llm-guards.ac4": "completed"
   }
 }
