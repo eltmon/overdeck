@@ -102,7 +102,7 @@ vi.mock('../../specialists.js', () => ({
 }));
 
 vi.mock('../../../services/merge-queue-service.js', () => ({
-  setMergeQueueTriggerHandler: vi.fn(),
+  setMergeQueueAdvanceHandler: vi.fn(),
 }));
 
 vi.mock('../../../../../lib/merge-set.js', () => ({

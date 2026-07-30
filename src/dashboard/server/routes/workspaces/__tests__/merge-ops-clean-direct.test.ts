@@ -141,7 +141,7 @@ vi.mock('../merge-strike.js', () => ({
 }));
 
 vi.mock('../../specialists.js', () => ({ _serverManagedMerges: new Set<string>() }));
-vi.mock('../../../services/merge-queue-service.js', () => ({ setMergeQueueTriggerHandler: vi.fn() }));
+vi.mock('../../../services/merge-queue-service.js', () => ({ setMergeQueueAdvanceHandler: vi.fn() }));
 
 import { triggerMerge } from '../merge-ops.js';
 
