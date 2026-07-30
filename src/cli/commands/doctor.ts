@@ -30,6 +30,7 @@ import {
   type PrerequisiteProbe,
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
+import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkStateDivergence } from './doctor-state-divergence.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
@@ -788,6 +789,8 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
       fix: 'Install Claude Code first',
     });
   }
+
+  checks.push(checkDeployedHooksDrift());
 
   // Check environment variables
   const envFile = join(homedir(), '.overdeck.env');
