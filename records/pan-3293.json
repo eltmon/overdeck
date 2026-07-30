@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T04:49:48.448Z",
+  "updated": "2026-07-30T04:56:13.499Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "eaddrinuse-fastfail": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 3614249,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:44:38.817Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -139,6 +131,17 @@
         "outcome": "completed",
         "reason": "Health checks now require the responder pid to match the spawned server across restart, full restart, and current pan up wiring; failures name both pids and preserve the fresh process",
         "releasedAt": "2026-07-30T04:44:25.025Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 3614249,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:44:38.817Z",
+        "itemId": "eaddrinuse-fastfail",
+        "outcome": "completed",
+        "reason": "Restart now watches only post-spawn dashboard log bytes and rejects immediately on EADDRINUSE with the current port owner, without the left-running marker",
+        "releasedAt": "2026-07-30T04:56:13.499Z"
       }
     ],
     "statusReasons": {
@@ -157,6 +160,10 @@
       "owner-verified-health": {
         "reason": "Health checks now require the responder pid to match the spawned server across restart, full restart, and current pan up wiring; failures name both pids and preserve the fresh process",
         "updatedAt": "2026-07-30T04:44:25.025Z"
+      },
+      "eaddrinuse-fastfail": {
+        "reason": "Restart now watches only post-spawn dashboard log bytes and rejects immediately on EADDRINUSE with the current port owner, without the left-running marker",
+        "updatedAt": "2026-07-30T04:56:13.499Z"
       }
     }
   },
@@ -181,6 +188,9 @@
     "owner-verified-health.owner-verified-health.ac3": "completed",
     "owner-verified-health.owner-verified-health.ac4": "completed",
     "owner-verified-health.owner-verified-health.ac5": "completed",
-    "eaddrinuse-fastfail": "running"
+    "eaddrinuse-fastfail": "completed",
+    "eaddrinuse-fastfail.eaddrinuse-fastfail.ac1": "completed",
+    "eaddrinuse-fastfail.eaddrinuse-fastfail.ac2": "completed",
+    "eaddrinuse-fastfail.eaddrinuse-fastfail.ac3": "completed"
   }
 }
