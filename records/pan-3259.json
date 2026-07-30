@@ -10,19 +10,18 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:05:06.073Z",
-  "updated": "2026-07-30T22:44:28.525Z",
+  "updated": "2026-07-30T22:44:32.141Z",
   "pipeline": {
     "issueId": "PAN-3259",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "mergeStep": "validating-pr",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:44:28.484Z",
+    "updatedAt": "2026-07-30T22:44:29.098Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
-    "mergeNotes": "GitHub PR #3263 has failing required checks on HEAD c686bdd6. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3263 for details.",
     "lastVerifiedCommit": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyHead": "c686bdd6eee99413c0a2b1671f50b212d442bb40",
     "strikeReadyAt": "2026-07-29T01:17:42.180Z",
@@ -58,7 +57,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T22:44:28.505Z"
+        "pricingAsOf": "2026-07-30T22:44:32.138Z"
       }
     },
     "merges": [],
