@@ -1,0 +1,517 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-30T03:45:15.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3291: bug(state): push-race reconciler wedges permanently on records/*.json content conflicts — state pushes fail forever until manual merge",
+    "updated": "2026-07-30T03:50:15.257Z"
+  },
+  "plan": {
+    "id": "pan-3291",
+    "title": "bug(state): push-race reconciler wedges permanently on records/*.json content conflicts — state pushes fail forever until manual merge",
+    "status": "proposed",
+    "uid": "c8eb161f-1cb7-494a-b66e-ab69a9b2d6ad",
+    "author": "agent:claude-fable-5",
+    "sequence": 2,
+    "created": "2026-07-30T03:45:15.000Z",
+    "updated": "2026-07-30T03:50:15.257Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3291",
+        "label": "PAN-3291",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2541",
+        "label": "PAN-2541 (state plane)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/2375",
+        "label": "PAN-2375 (divergence surfacing)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "state-plane",
+      "reliability",
+      "write-door",
+      "doctor"
+    ],
+    "narratives": {
+      "Problem": "The record write door's push-race reconciler (reconcileStatePush, src/lib/pan-dir/record-update.ts:274) rebases local state commits onto origin/overdeck-state and can only auto-resolve a conflict when the sole conflicted path is the current issue's record. With N local unpushed commits, one poisoned intermediate commit (e.g. another issue's restore checkpoint) aborts the rebase identically on every attempt — a permanent wedge. Each failed cycle adds another restore checkpoint, so divergence only grows (74 ahead / 44 behind on 2026-07-29) until an operator performs a manual merge. Nothing surfaces the wedge while it compounds.",
+      "Proposal": "Replace the reconcile rebase with a single 3-way merge of origin into the local state branch, with a deterministic conflict policy: conflicts confined to records/ auto-resolve (origin wins; the actively-written record is re-derived by replaying the caller's mutator so current truth wins); any other conflict aborts the merge cleanly. Track a per-project consecutive reconcile-failure streak in a runtime-plane push-health file; on crossing 3 failures emit one self-contained error activity entry (dashboard needs-you). Add a pan doctor check reporting state-branch ahead/behind, streak, and last failure per migrated project.",
+      "NonGoals": "- No change to the legacy unmigrated main-branch state push path (pushOriginMain / rebaseLegacyMainAndRetry in auto-commit.ts)\n- No reconcile logic in the auto-commit queue itself (PAN-2541 D10: the paths-only queue never replays or rebases)\n- No auto-resolution of conflicts outside records/ (specs/, drafts/, continues/ conflicts remain human-resolved)\n- No .gitattributes merge driver for records\n- No push-health wiring into plain non-reconcile push successes\n- No new dashboard UI surface beyond the activity entry\n- No retroactive repair of already-diverged machines (doctor's fix string documents the manual merge)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Merge-based reconcile chosen over keeping rebase (issue offered either)",
+        "rationale": "A merge is one 3-way resolution regardless of how many local commits accumulated, so a poisoned intermediate commit structurally cannot wedge it; matches the operator recovery precedent (b115fb6b2b, d902f8fea3)."
+      },
+      {
+        "summary": "Take-origin-then-replay-mutator chosen over regenerate-from-canonical for the actively-written record",
+        "rationale": "The issue names this the cheaper option and the write door already owns mutator replay (existing replayConflictedRecord pattern)."
+      },
+      {
+        "summary": "Conflict policy in reconciler code, not a .gitattributes merge driver",
+        "rationale": "A custom driver requires per-clone merge.<name>.driver config that silently disappears when the state worktree is recreated; code is self-contained and testable."
+      },
+      {
+        "summary": "Failure streak persisted in ${OVERDECK_HOME}/push-health/<stateWorktreeBasename>.json via a new push-health module",
+        "rationale": "Must not live on the state branch (the failing transport) nor require the server's SQLite (write door runs in CLI processes); a tiny atomic local file is the runtime plane's simplest durable option."
+      },
+      {
+        "summary": "Needs-you threshold = 3 consecutive failed reconcileStatePush calls, emitted once on crossing via emitActivityEntry with new source 'state-door'",
+        "rationale": "Aligned with MAX_STATE_PUSH_RECONCILIATIONS; emit-on-crossing avoids alert spam while divergence persists."
+      },
+      {
+        "summary": "Delete/modify conflicts on records are NOT auto-resolved; reconcile aborts",
+        "rationale": "Records are essentially never deleted, so a deletion conflict is anomalous — safety over cleverness."
+      },
+      {
+        "summary": "For conflicted records other than the one being written, origin wins even if local had unpushed mutations",
+        "rationale": "records/*.json are re-derivable full-file mirrors regenerated on every write; they self-heal on their next write-door update (stated in the issue and confirmed by the incident recovery)."
+      }
+    ],
+    "items": [
+      {
+        "id": "abort-merge-cleanup",
+        "title": "Add bounded abortMerge cleanup alongside abortRebase in every record-durability cleanup path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/__tests__/record-update.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/record-update.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-update.test.ts passes including the new mid-merge cleanup test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add abortMerge(gitRoot, options) next to abortRebase (record-update.ts:173): git merge --abort with timeoutMs 5000, swallowing errors. Call it immediately after every existing abortRebase call site — restoreRetryableRecord (record-update.ts:230) and the reconcile onTimeout cleanup (record-update.ts:370) — keeping abortRebase in place. See PRD work item 1."
+        },
+        "items": [
+          {
+            "id": "abort-merge-cleanup.ac1",
+            "title": "Given a state worktree stranded mid-merge with conflicts, when restoreRetryableRecord runs, then git status reports no in-progress merge and the record file contains the restored snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abort-merge-cleanup.ac2",
+            "title": "abortMerge bounds its git subprocess to a 5s timeout and returns without throwing when no merge is in progress",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "abort-merge-cleanup.ac3",
+            "title": "After a durability-deadline abort fires during a conflicted reconcile, the state worktree exits any in-progress merge or rebase within the bounded cleanup and preserves the record file in a retryable state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-reconcile",
+        "title": "Replace reconcile rebase with 3-way merge plus deterministic records/ conflict policy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3291",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "reconcile-health-wiring"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/pan-dir/__tests__/record-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/record-reconcile.test.ts src/lib/pan-dir/__tests__/record-update.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-reconcile.test.ts passes: two-writer convergence, poisoned-commit, non-records abort, delete/modify abort",
+            "existing record-update.test.ts still passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In reconcileStatePush (record-update.ts:283-313): swap `git rebase origin/${STATE_BRANCH}` for `git merge --no-edit origin/${STATE_BRANCH}`; on conflict run new resolveMergeConflicts (replaces replayConflictedRecord, which is deleted): list conflicts via diff --name-only --diff-filter=U; throw if any path is outside records/; resolve each conflicted record with git checkout --theirs + git add (throw on checkout failure = delete/modify, per D6); if the actively-written record conflicted, replay the mutator on the origin version through readIssueRecordSync/writeIssueRecordSync and re-add (mirrors record-update.ts:200-216); conclude with `git -c core.editor=true commit --no-edit`. On resolve failure: abortMerge + abortRebase then throw the reconcile error. Run abortMerge+abortRebase once at reconcile start to recover crash-stranded worktrees. Push retry loop unchanged. All git steps take { signal }; throwIfDurabilityAborted between synchronous mutations. CAUTION (hazard H1): during this merge, --theirs = origin. Follow PRD work item 2 exactly, including the before/after snippet."
+        },
+        "items": [
+          {
+            "id": "merge-reconcile.ac1",
+            "title": "Given two clones that both mutated the same records/<issue>.json from a shared base and clone B pushed first, when clone A's updateIssueRecord runs, then it returns successfully and origin's final record contains A's mutation applied on top of B's pushed version",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-reconcile.ac2",
+            "title": "Given a local state branch 3+ commits ahead including an intermediate commit that content-conflicts with origin (another issue's restore checkpoint), when the next updateIssueRecord runs, then reconcile completes in that single call and the branch pushes with ahead count 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-reconcile.ac3",
+            "title": "After a successful reconcile, origin history contains no 'restore ... after failed state push' checkpoint from the converging write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-reconcile.ac4",
+            "title": "Given a merge conflict on a specs/ path, when reconcile runs, then updateIssueRecord rejects with an error naming the conflicted path and the state worktree shows no in-progress merge afterwards",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-reconcile.ac5",
+            "title": "Given a delete/modify conflict on a records/ path, when reconcile runs, then it aborts the merge and rejects rather than auto-resolving",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "push-health-module",
+        "title": "Add push-health runtime-plane module tracking consecutive reconcile failures per project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/push-health.ts",
+            "src/lib/pan-dir/__tests__/push-health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/push-health.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "push-health.test.ts passes: increment, reset, threshold-crossing-once, corrupt-file default, atomic write",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/pan-dir/push-health.ts owning ${OVERDECK_HOME}/push-health/<stateWorktreeBasename>.json (key = basename(resolveStateReadHomeSync(project).root)). Exports: readPushHealth(project) returning a zeroed default for missing/corrupt files; recordReconcileFailure(project, { reason, conflictedPaths }) returning { health, crossedThreshold } where crossedThreshold is true only when the streak moves from 2 to 3; recordReconcileSuccess(project) resetting the streak and stamping lastSuccessAt; RECONCILE_FAILURE_NEEDS_YOU_THRESHOLD = 3. Writes are sync fs, tmp-file + renameSync (NFR-4, PAN-2623 zero-byte precedent). Fields per PRD work item 3: consecutiveReconcileFailures, lastFailureAt, lastFailureReason, lastConflictedPaths, lastSuccessAt."
+        },
+        "items": [
+          {
+            "id": "push-health-module.ac1",
+            "title": "recordReconcileFailure persists an incremented streak that survives across separate calls, and recordReconcileSuccess returns the persisted streak to 0 and persists lastSuccessAt",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-health-module.ac2",
+            "title": "crossedThreshold returns true exactly once when the streak reaches 3 and returns false at 4 and beyond",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-health-module.ac3",
+            "title": "readPushHealth returns a zeroed default when the file is missing, empty, or contains invalid JSON",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "push-health-module.ac4",
+            "title": "Writes produce the target file via temp-file-then-rename, so a crash before the rename preserves the previous file contents intact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-health-wiring",
+        "title": "Record reconcile outcomes in push-health and emit the threshold needs-you activity entry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pan-dir/record-update.ts",
+            "src/lib/activity-logger.ts",
+            "src/lib/pan-dir/__tests__/record-reconcile.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/pan-dir/__tests__/record-reconcile.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-reconcile.test.ts passes the streak/emission scenarios: exactly one state-door error entry at 3 failures, nothing at 4, reset on success",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add 'state-door' to the ActivitySource union (src/lib/activity-logger.ts:22). In reconcileStatePush: call recordReconcileFailure on any throw (conflict-resolution failure or attempts-exhausted, with reason + conflicted paths when known) and recordReconcileSuccess on the successful push return. When crossedThreshold is true, emit the error-level emitActivityEntry with source 'state-door' using the self-contained operator message from PRD work item 4 (names project, conflicted paths, streak, points at pan doctor and the manual merge). Health/emission failures are console.warn'd and never mask the original reconcile error (hazard H5). Test with setActivityEventStoreProvider (activity-logger.ts:89) capture."
+        },
+        "items": [
+          {
+            "id": "reconcile-health-wiring.ac1",
+            "title": "Given 3 consecutive updateIssueRecord calls that fail reconcile on a non-records conflict, then exactly one activity entry with source 'state-door' and level 'error' is emitted, and its details name the conflicted path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-health-wiring.ac2",
+            "title": "A 4th consecutive failure emits no additional activity entry, and a subsequent successful reconcile resets the persisted streak to 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-health-wiring.ac3",
+            "title": "When push-health persistence or activity emission itself throws, updateIssueRecord still rejects with the original reconcile error message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "doctor-state-divergence",
+        "title": "Add pan doctor state-divergence check (ahead/behind, streak, last failure)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/doctor-state-divergence.ts",
+            "src/cli/commands/doctor.ts",
+            "src/cli/commands/__tests__/doctor-state-divergence.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/doctor-state-divergence.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "doctor-state-divergence.test.ts passes: ok/warn/error mapping and offline-stale path",
+            "typecheck completes without errors",
+            "lint (including lint-skills) passes without changes to pan doctor --help"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/doctor-state-divergence.ts exporting checkStateDivergence(projects = listProjectsSync()) with the same check shape as checkStateWorktrees (doctor-state-worktree.ts). Per migrated project: bounded 10s `git fetch origin overdeck-state` (on failure flag counts as stale instead of erroring), `git rev-list --left-right --count overdeck-state...origin/overdeck-state` for ahead/behind, readPushHealth for streak + lastFailureReason. Status: error if streak >= 3; warn if streak >= 1 or ahead >= 10; else ok. fix string documents the manual same-branch merge in the state worktree. Wire `checks.push(...await checkStateDivergence())` next to doctor.ts:851. Async execFile only — no execSync."
+        },
+        "items": [
+          {
+            "id": "doctor-state-divergence.ac1",
+            "title": "Against a converged temp state worktree, checkStateDivergence returns ok with ahead/behind counts rendered in the message",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-state-divergence.ac2",
+            "title": "With a seeded push-health streak of 3, the check returns error and the message includes the streak and last failure reason; with ahead >= 10 and streak 0 it returns warn",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-state-divergence.ac3",
+            "title": "With an unreachable origin, the check still returns a result whose message labels the counts stale instead of throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "doctor-state-divergence.ac4",
+            "title": "Running pan doctor renders the new per-project state-divergence rows in its output after the state-worktree checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-state-reconcile",
+        "title": "Document the merge-based reconcile policy, escalation threshold, and doctor check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-30T03:45:15.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3291",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/STATE-PLANE-COMMIT-POLICY.md",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes; STATE-PLANE-COMMIT-POLICY.md contains the reconcile conflict policy, threshold, push-health file location, and doctor check description"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/STATE-PLANE-COMMIT-POLICY.md push section (~lines 22-31) so it states: the record write door reconciles push races by merging origin/overdeck-state into the local branch; conflicts confined to records/ auto-resolve with origin winning and the actively-written record replaying its mutation; other conflicts abort and count toward a 3-strike error activity entry; the push-health file path/shape; and that pan doctor reports ahead/behind + streak. Add one paragraph in docs/AGENT-STATE-PLANES.md's durability section (~line 30) linking to that policy. Check the doctor wrapper skill under skills/ and update only if it enumerates individual checks (pan doctor --help is unchanged)."
+        },
+        "items": [
+          {
+            "id": "docs-state-reconcile.ac1",
+            "title": "STATE-PLANE-COMMIT-POLICY.md describes the records/-only auto-resolution rule, the 3-failure escalation, and the push-health file location so an operator can act on a doctor error without reading source",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-state-reconcile.ac2",
+            "title": "AGENT-STATE-PLANES.md's durability section renders a markdown link to the reconcile policy section of STATE-PLANE-COMMIT-POLICY.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "abort-merge-cleanup",
+        "to": "merge-reconcile",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-reconcile",
+        "to": "reconcile-health-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "push-health-module",
+        "to": "reconcile-health-wiring",
+        "type": "blocks"
+      },
+      {
+        "from": "push-health-module",
+        "to": "doctor-state-divergence",
+        "type": "blocks"
+      },
+      {
+        "from": "merge-reconcile",
+        "to": "docs-state-reconcile",
+        "type": "informs"
+      },
+      {
+        "from": "doctor-state-divergence",
+        "to": "docs-state-reconcile",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-30-PAN-3291-bug-state-push-race-reconciler-wedges-permanently-on-records-json-content-conflicts-state-pushes-fail-forever-until-manual-merge.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
