@@ -61,21 +61,22 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:27:29.270Z",
+  "updated": "2026-07-30T06:32:32.898Z",
   "pipeline": {
     "issueId": "PAN-3293",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:27:28.200Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-30T06:32:32.810Z",
+    "reviewNotes": "Approved: prior reload ownership caveat blocker is fixed; correctness, security, requirements, and performance review is clean",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
-    "reviewedAtCommit": "93980806c0b2c089b4aec71763bbd3f797039744",
+    "reviewedAtCommit": "6b235ae933878af9e7c3ac7ba580fafa31e374c4",
     "reviewSpawnedAt": "2026-07-30T06:27:28.198Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -126,9 +127,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 775245,
-            "output": 108433,
-            "cacheRead": 14516736,
+            "input": 1695356,
+            "output": 115530,
+            "cacheRead": 17123840,
             "cacheWrite": 0
           }
         },
@@ -149,15 +150,15 @@
           "cacheWrite": 186978
         },
         "openai/gpt-5.6-sol": {
-          "input": 2629397,
-          "output": 333151,
-          "cacheRead": 109281280,
+          "input": 3549508,
+          "output": 340248,
+          "cacheRead": 111888384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 87.247983,
-        "pricingAsOf": "2026-07-30T06:27:28.228Z"
+        "usd": 93.365,
+        "pricingAsOf": "2026-07-30T06:32:32.884Z"
       }
     },
     "merges": [
