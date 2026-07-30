@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T21:17:56.885Z",
+  "updated": "2026-07-30T21:35:24.051Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "action-band-ui": {
-        "writerId": "agent-pan-3331",
-        "agentId": "agent-pan-3331",
-        "pid": 4091700,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:17:56.885Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -124,6 +116,17 @@
         "outcome": "completed",
         "reason": "openPath + openInEditor in browser.ts (argv split before {path} substitution; no shell path), new optional ui.open_in_editor_command config.yaml section (schema/default/merge/getOpenInEditorCommandSync), POST /:id/open guarded with 409 gate + openInEditorConfigured on detail. 11 tests pass. Deviation: accessor lives in config-yaml/load.ts (yaml) not config.ts (toml). Also added an audited file-size allowlist row for schema.ts (1025->1040).",
         "releasedAt": "2026-07-30T21:17:46.832Z"
+      },
+      {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 4091700,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:17:56.885Z",
+        "itemId": "action-band-ui",
+        "outcome": "completed",
+        "reason": "WorkspaceActionBand.tsx + WorkspaceView wiring: git card (branch/dirty/ahead-behind/incoming expander/refresh, kind-correct Pull vs Sync main, non-git hidden, detached chip, no-upstream label), run card (default/override edit, Run/Restart/Stop, 409 re-focus), config-gated open-in; run terminal shares the panel with the agent terminal (no-loss). 24 new + 8 existing view tests pass. Playwright screenshots at 560/1440 px in both themes verified by me; fixed a narrow-width mid-phrase wrap.",
+        "releasedAt": "2026-07-30T21:35:24.050Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "open-in-external": {
         "reason": "openPath + openInEditor in browser.ts (argv split before {path} substitution; no shell path), new optional ui.open_in_editor_command config.yaml section (schema/default/merge/getOpenInEditorCommandSync), POST /:id/open guarded with 409 gate + openInEditorConfigured on detail. 11 tests pass. Deviation: accessor lives in config-yaml/load.ts (yaml) not config.ts (toml). Also added an audited file-size allowlist row for schema.ts (1025->1040).",
         "updatedAt": "2026-07-30T21:17:46.832Z"
+      },
+      "action-band-ui": {
+        "reason": "WorkspaceActionBand.tsx + WorkspaceView wiring: git card (branch/dirty/ahead-behind/incoming expander/refresh, kind-correct Pull vs Sync main, non-git hidden, detached chip, no-upstream label), run card (default/override edit, Run/Restart/Stop, 409 re-focus), config-gated open-in; run terminal shares the panel with the agent terminal (no-loss). 24 new + 8 existing view tests pass. Playwright screenshots at 560/1440 px in both themes verified by me; fixed a narrow-width mid-phrase wrap.",
+        "updatedAt": "2026-07-30T21:35:24.050Z"
       }
     }
   },
@@ -168,6 +175,11 @@
     "open-in-external.open-in-external.ac2": "completed",
     "open-in-external.open-in-external.ac3": "completed",
     "open-in-external.open-in-external.ac4": "completed",
-    "action-band-ui": "running"
+    "action-band-ui": "completed",
+    "action-band-ui.action-band-ui.ac1": "completed",
+    "action-band-ui.action-band-ui.ac2": "completed",
+    "action-band-ui.action-band-ui.ac3": "completed",
+    "action-band-ui.action-band-ui.ac4": "completed",
+    "action-band-ui.action-band-ui.ac5": "completed"
   }
 }
