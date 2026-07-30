@@ -91,10 +91,10 @@
     "recordedAt": "2026-07-30T22:50:55.493Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T22:53:40.031Z",
+  "updated": "2026-07-30T22:53:40.673Z",
   "pipeline": {
     "issueId": "PAN-3330",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -102,13 +102,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:51:39.967Z",
-    "updatedAt": "2026-07-30T22:53:38.585Z",
+    "updatedAt": "2026-07-30T22:53:38.887Z",
     "reviewNotes": "Verification failed at typecheck",
     "inspectNotes": "AC1-4 met. Three existing CLI suites (workspace-commands, workspace-new-target-path, workspace-scratch-isolated) untouched by the commit and all pass alongside the new create-intent suite (41/41, --hookTimeout 60000; the default-5s hook failure also hits untouched relocate.test.ts, so it is machine load, not a regression). Dry-run parity asserted field-for-field and key-order against real CLI output for shared/target-path/isolated. cliMessageFor reproduces all six original message strings verbatim, exit path still exitCli. Findings returned (not thrown) for invalid-name, target-not-a-directory, mode-conflict, plus project-not-found/ambiguous; fail-fast ordering preserved so a rejected name touches neither git nor fs. Resolution writes nothing (worktree list, workspace row count, and projects row all asserted unchanged). grep confirms zero process.cwd() in src/lib/workspaces/create.ts; the test proves it by runtime spy instead of a source grep because scripts/lint-source-introspection.sh forbids source-text assertions - deviation from AC4's literal wording, substantively satisfied. NFR-2: promisify(exec) shell string replaced by execFileAsync argument vector for rev-parse and worktree add; no execSync. Non-blocking: intent.projectId as string cast in workspaceMainCommand relies on findings-empty implying non-null, and kind=main now stats .git before the getMainWorkspace short-circuit (extra stat, no visible change); createWorkspace maps omitted and false parentBranchGuessed to the same 0.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
     "reviewedAtCommit": "26b7b29dd6e32d1e41eac8ba094ef1bcd83823f2",
     "reviewRequestedAt": "2026-07-30T22:51:39.967Z",
-    "reviewSpawnedAt": "2026-07-30T22:22:57.017Z",
+    "reviewSpawnedAt": "2026-07-30T22:53:38.885Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -253,7 +253,7 @@
       },
       "costAtCloseOut": {
         "usd": 84.601857,
-        "pricingAsOf": "2026-07-30T22:53:38.595Z"
+        "pricingAsOf": "2026-07-30T22:53:40.668Z"
       }
     },
     "merges": [
@@ -262,7 +262,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3330",
