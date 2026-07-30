@@ -379,7 +379,7 @@
     "recordedAt": "2026-07-29T03:30:44.354Z"
   },
   "created": "2026-07-28T18:17:29.412Z",
-  "updated": "2026-07-29T11:39:47.554Z",
+  "updated": "2026-07-30T05:08:25.933Z",
   "pipeline": {
     "issueId": "PAN-3232",
     "reviewStatus": "passed",
@@ -390,13 +390,15 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T06:12:06.508Z",
-    "updatedAt": "2026-07-29T11:39:45.746Z",
+    "updatedAt": "2026-07-30T05:08:25.901Z",
     "reviewNotes": "Verification infrastructure error: Verification worker bundle missing at /home/eltmon/.overdeck/deployments/dashboard/.pan-reload-generation-a/dist/verification-worker.js; run npm run build",
     "testNotes": "Gates run from workspace feature-pan-3232 (HEAD 3322b75b00, matches reviewedAtCommit; review passed). bun install OK, packages/contracts unchanged vs origin/main so no rebuild needed. npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED (eslint + all custom guards: skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 77 baselined/0 new, ratchet-audit, quarantine-audit). npm test PASSED: root vitest 1286 files/12067 tests passed (3 files/50 tests skipped, pre-existing quarantine); frontend targeted subset (issueActions.test.ts, issueActions.no-actions-lost.test.ts, issueActions.parity.test.tsx, fr7-conversation-pending-input.test.tsx) 4 files/59 tests passed. No browser UAT performed: PRD (drafts/PAN-3232.md) and GitHub issue #3232 contain no UAT/browser/Playwright/manual-test language; every xBRIEF item's verify_commands is vitest/typecheck/grep only; the two items whose acceptance criteria describe live push-based runtime behavior (live-tree-delta: pending_input_changed SessionTreeDelta; specialist-pending-input: review/test/ship node awaiting-input fields) were deliberately cancelled and deferred to follow-up work (recorded in tasks.claimHistory with reasons), a scope reduction already reviewed and passed on this exact commit. The 6 shipped items (issue-view-awaiting-fields, decisions-prompt-threading, session-panel-kind-label, remove-project-pending-input, widen-direct-selector-surfaces, docs-askuserquestion-dashboard) are fully covered by component-level unit tests mocking the exact prop shapes named in the issue's acceptance criteria.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3251",
     "reviewedAtCommit": "3322b75b00bc87a2e0095159948d4e458d133694",
     "reviewRequestedAt": "2026-07-29T06:12:06.508Z",
-    "reviewSpawnedAt": "2026-07-29T06:42:23.329Z"
+    "reviewSpawnedAt": "2026-07-29T06:42:23.329Z",
+    "closedOut": true,
+    "closedOutAt": "2026-07-30T05:08:25.901Z"
   },
   "closeOut": {
     "usage": {
@@ -476,7 +478,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3251"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-07-30T05:08:25.929Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed (no lastVerifiedCommit recorded)",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3251 MERGED at 2026-07-29T11:39:03Z",
+          "status": "pass",
+          "mergedAt": "2026-07-29T11:39:03Z",
+          "mergeCommit": "e4976e820ff9bffcf89938ac320d3564cab67026"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on e4976e820ff9bffcf89938ac320d3564cab67026",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit eeb851b1 contains merge e4976e82",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; No orphaned processes found; Removed git worktree; Removed 4 agent state directories; No strike branch strike/pan-3232 found; Pruned 424 checkpoint ref(s) for agent-pan-3232, planning-pan-3232, strike-pan-3232; No specialist registry entries for PAN-3232"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
