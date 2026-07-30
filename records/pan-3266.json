@@ -10,23 +10,23 @@
   ],
   "feedback": [],
   "created": "2026-07-29T00:54:30.938Z",
-  "updated": "2026-07-30T09:16:23.080Z",
+  "updated": "2026-07-30T09:16:24.992Z",
   "pipeline": {
     "issueId": "PAN-3266",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "merging",
+    "mergeStatus": "failed",
     "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T09:16:20.763Z",
-    "mergeNotes": "github merge failed: GitHub PR #3318 has failing required checks",
+    "updatedAt": "2026-07-30T09:16:22.495Z",
+    "mergeNotes": "GitHub PR #3318 has failing required checks on HEAD b6b1049e. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3318 for details.",
     "lastVerifiedCommit": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
     "strikeReadyHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
     "strikeReadyAt": "2026-07-30T08:50:20.011Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
     "strikeTransportRetryCount": 1,
     "strikeNextAttemptAt": "2026-07-30T09:07:30.487Z",
     "strikeLandingAttempts": [
@@ -36,6 +36,13 @@
         "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
+      },
+      {
+        "timestamp": "2026-07-30T09:16:22.491Z",
+        "strikeHead": "b6b1049e0735eb185c8cf5f88659e00bdaf732c8",
+        "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
+        "outcome": "failed",
+        "detail": "GitHub PR #3318 has failing required checks on HEAD b6b1049e. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3318 for details."
       }
     ]
   },
@@ -45,7 +52,7 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T09:16:20.795Z"
+        "pricingAsOf": "2026-07-30T09:16:24.990Z"
       }
     },
     "merges": [],
