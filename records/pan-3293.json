@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T05:03:47.307Z",
+  "updated": "2026-07-30T05:04:10.661Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,8 +85,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "docs-owner-verified-restart": {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 12634,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:04:10.661Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -229,6 +237,7 @@
     "squatter-integration-test": "completed",
     "squatter-integration-test.squatter-integration-test.ac1": "completed",
     "squatter-integration-test.squatter-integration-test.ac2": "completed",
-    "squatter-integration-test.squatter-integration-test.ac3": "completed"
+    "squatter-integration-test.squatter-integration-test.ac3": "completed",
+    "docs-owner-verified-restart": "running"
   }
 }
