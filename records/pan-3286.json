@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T03:59:05.257Z",
+  "updated": "2026-07-30T04:09:36.640Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,16 +57,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "mem-timeline": {
-        "writerId": "agent-pan-3286",
-        "agentId": "agent-pan-3286",
-        "pid": 2199287,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:59:05.256Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -122,6 +114,17 @@
         "outcome": "completed",
         "reason": "Workspace-addressed pan memory status/summary via resolveMemoryWorkspaceTarget (--workspace / issue positional / cwd), status --history N with archived statuses newest-first from readArchivedStatusEntries, capped at 50; 10 new tests in tests/unit/cli/memory-status-workspace.test.ts including issue-positional regression locks. Also regenerated the drifted composer-command manifest.",
         "releasedAt": "2026-07-30T03:58:50.411Z"
+      },
+      {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 2199287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T03:59:05.256Z",
+        "itemId": "mem-timeline",
+        "outcome": "completed",
+        "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
+        "releasedAt": "2026-07-30T04:09:36.640Z"
       }
     ],
     "statusReasons": {
@@ -144,6 +147,10 @@
       "mem-status-history": {
         "reason": "Workspace-addressed pan memory status/summary via resolveMemoryWorkspaceTarget (--workspace / issue positional / cwd), status --history N with archived statuses newest-first from readArchivedStatusEntries, capped at 50; 10 new tests in tests/unit/cli/memory-status-workspace.test.ts including issue-positional regression locks. Also regenerated the drifted composer-command manifest.",
         "updatedAt": "2026-07-30T03:58:50.411Z"
+      },
+      "mem-timeline": {
+        "reason": "pan memory timeline with --workspace/cwd addressing, --days window (default 7), --limit cap (default 50), --json; readObservationsSince added to rollup.ts with readRecentObservations delegating to it. 7 tests in tests/unit/lib/memory/timeline-read.test.ts.",
+        "updatedAt": "2026-07-30T04:09:36.640Z"
       }
     }
   },
@@ -172,6 +179,9 @@
     "mem-status-history.mem-status-history.ac2": "completed",
     "mem-status-history.mem-status-history.ac3": "completed",
     "mem-status-history.mem-status-history.ac4": "completed",
-    "mem-timeline": "running"
+    "mem-timeline": "completed",
+    "mem-timeline.mem-timeline.ac1": "completed",
+    "mem-timeline.mem-timeline.ac2": "completed",
+    "mem-timeline.mem-timeline.ac3": "completed"
   }
 }
