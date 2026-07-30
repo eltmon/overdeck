@@ -115,6 +115,7 @@ export const HARNESS_BRANDS: Record<Harness, BrandDef> = {
   codex: { id: 'codex', label: 'Codex', color: PROVIDER_BRANDS.openai.color, Icon: OpenAIIcon },
   ohmypi: { id: 'ohmypi', label: 'oh-my-pi', color: '#7c3aed', Icon: PiHarnessIcon },
   acp: { id: 'acp', label: 'ACP', color: '#475569', Icon: AcpHarnessIcon },
+  'kimi-code': { id: 'kimi-code', label: 'Kimi Code', color: PROVIDER_BRANDS.kimi.color, Icon: KimiIcon },
 };
 
 export const PROVIDER_COLORS: Record<Provider, string> = Object.fromEntries(

@@ -77,6 +77,13 @@ describe('checkSystemPrerequisites', () => {
       expect(definition.purpose.length).toBeGreaterThan(0);
     }
   });
+
+  it('lists the Kimi Code CLI prerequisite exactly once, covering both native and ACP harnesses (PAN-1837 wi10.ac1)', () => {
+    const kimiEntries = PREREQUISITES.filter((definition) => definition.id === 'kimi');
+    expect(kimiEntries).toHaveLength(1);
+    expect(kimiEntries[0]?.purpose).toContain('native (kimi-code)');
+    expect(kimiEntries[0]?.purpose).toContain('ACP (acp)');
+  });
 });
 
 describe('collectSetupDiagnostics', () => {

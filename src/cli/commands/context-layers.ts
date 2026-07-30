@@ -51,6 +51,7 @@ function contextDiffHarnesses(rawHarness: string | undefined): Harness[] {
     case 'ohmypi':
     case 'codex':
     case 'acp':
+    case 'kimi-code':
       break;
     default:
       return allHarnesses;

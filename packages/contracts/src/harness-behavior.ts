@@ -3,7 +3,7 @@ import type { Harness } from "./types"
 export type RuntimeName = Harness
 export type HarnessName = RuntimeName | "pi"
 
-export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host"
+export type HarnessLaunchCommandKind = "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
 export type HarnessDeliveryKind =
   | "pty-supervisor"
   | "rpc-fifo"
@@ -17,10 +17,11 @@ export type HarnessReadinessKind =
   | "codex-tui-prompt"
   | "codex-app-server-ready"
   | "acp-host-ready"
-export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl"
-export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id"
-export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp"
-export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp"
+  | "kimi-session-signal"
+export type HarnessTranscriptKind = "claude-jsonl" | "ohmypi-jsonl" | "codex-rollout-jsonl" | "acp-jsonl" | "kimi-wire-jsonl"
+export type HarnessSessionIdSource = "launcher-session-id" | "transcript-jsonl" | "codex-thread-id" | "acp-session-id" | "kimi-session-newest"
+export type HarnessContextLayerKind = "claude" | "pi" | "codex" | "acp" | "kimi-code"
+export type HarnessFeedKind = "claude_code" | "pi" | "codex" | "acp" | "kimi_code"
 
 export interface HarnessNativeCommand {
   readonly name: string
@@ -47,7 +48,7 @@ export interface HarnessBehavior {
   readonly usesRpcFifo: boolean
   readonly usesCodexHome: boolean
   readonly injectsPromptTimeMemory: boolean
-  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host"
+  readonly workAgentMode: "claude-code" | "ohmypi-rpc" | "codex-work-tui" | "codex-app-server" | "acp-host" | "kimi-code-tui"
   readonly readyTimeoutSeconds: number
 }
 
@@ -152,17 +153,42 @@ export const ACP_BEHAVIOR: HarnessBehavior = {
   readyTimeoutSeconds: 30,
 }
 
+export const KIMI_CODE_BEHAVIOR: HarnessBehavior = {
+  displayName: "Kimi Code",
+  nativeCommands: [], // no machine-readable inventory verified yet
+  executableName: "kimi",
+  processNames: ["kimi"],
+  launchCommandKind: "kimi-code-tui",
+  deliveryKind: "pty-supervisor",
+  readinessKind: "kimi-session-signal",
+  transcriptKind: "kimi-wire-jsonl",
+  sessionIdSource: "kimi-session-newest",
+  contextLayerKind: "kimi-code",
+  feedKind: "kimi_code",
+  supportsPtySupervisor: true,
+  supportsChannelsBridge: false,
+  supportsConversationStreaming: true,
+  supportsPatchProjection: false,
+  usesRpcFifo: false,
+  usesCodexHome: false,
+  injectsPromptTimeMemory: false,
+  workAgentMode: "kimi-code-tui",
+  readyTimeoutSeconds: 60,
+}
+
 const BEHAVIORS: Record<RuntimeName, HarnessBehavior> = {
   "claude-code": CLAUDE_CODE_BEHAVIOR,
   ohmypi: OHMYPI_BEHAVIOR,
   codex: CODEX_BEHAVIOR,
   acp: ACP_BEHAVIOR,
+  "kimi-code": KIMI_CODE_BEHAVIOR,
 }
 
 export function getHarnessBehavior(harness: HarnessName | undefined | null): HarnessBehavior {
   if (harness === "ohmypi" || harness === "pi") return OHMYPI_BEHAVIOR
   if (harness === "codex") return CODEX_BEHAVIOR
   if (harness === "acp") return ACP_BEHAVIOR
+  if (harness === "kimi-code") return KIMI_CODE_BEHAVIOR
   return CLAUDE_CODE_BEHAVIOR
 }
 
