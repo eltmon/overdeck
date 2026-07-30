@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
-import { sortWorkspaces, type WorkspaceRegistryRow } from './Sidebar';
+import { isUserFacingWorkspace, sortWorkspaces, type WorkspaceRegistryRow } from './Sidebar';
 import type { Issue, Agent } from '../types';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -559,8 +559,11 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
 
   // ─── Dynamic: workspaces (PAN-1990) ─────────────────────────────────────────
   // Favorites first, then most-recent-first (same ordering as the Sidebar rail).
+  // PAN-3286 FR-13: and the same default filter — non-favorited pipeline
+  // worktrees stay out of the switcher, which reaches issues through the Issues
+  // scope instead.
 
-  const workspaceActions = useMemo<PaletteAction[]>(() => sortWorkspaces(workspaceRows).map((ws) => ({
+  const workspaceActions = useMemo<PaletteAction[]>(() => sortWorkspaces(workspaceRows.filter(isUserFacingWorkspace)).map((ws) => ({
     id: `workspace-${ws.id}`,
     label: ws.title ?? ws.name,
     description: ws.issueId ?? ws.kind,
