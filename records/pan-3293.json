@@ -61,18 +61,19 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:32:40.706Z",
+  "updated": "2026-07-30T06:40:35.830Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:32:40.693Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-07-30T06:40:35.739Z",
     "reviewNotes": "Approved: prior reload ownership caveat blocker is fixed; correctness, security, requirements, and performance review is clean",
+    "testNotes": "HEAD 6b235ae9 (matches reviewedAtCommit), tree clean. Gates: npm run typecheck (root+hooks+evals+dashboard+frontend ratchets) exit 0; npm run lint (eslint+effect+permissions+state-writes+state-paths+overdeck-boundaries+pipeline-membership+workspace-doors+skills+slash-commands+prompts+file-size+source-introspection+circular+ratchet-audit+quarantine-audit) exit 0. Scoped tests: npx vitest run tests/unit/cli/restart-spawn-pid.test.ts tests/unit/dashboard/health-identity.test.ts tests/unit/lib/platform-lifecycle-squatter.test.ts tests/unit/lib/platform-lifecycle.test.ts -> 4 files, 36/36 passed, incl. real node:http squatter integration test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds. Full changed-file gate: OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main -> 130 passed | 1 skipped (131 files), 1170 passed | 14 skipped (1191 tests), no failures. UAT: not required — this is a pure CLI/backend restart-lifecycle fix (dashboard health payload pid, spawn pid handles, port-owner probing, teardown pid-death verification); no acceptance criterion, issue body, or PR body references dashboard UI/browser behavior, and the squatter integration test already covers the end-to-end restart-ownership scenario. No browser session opened.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
@@ -133,6 +134,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 28,
+            "output": 4106,
+            "cacheRead": 2090698,
+            "cacheWrite": 151842
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1854152,
@@ -154,11 +163,17 @@
           "output": 340438,
           "cacheRead": 112256000,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 28,
+          "output": 4106,
+          "cacheRead": 2090698,
+          "cacheWrite": 151842
         }
       },
       "costAtCloseOut": {
-        "usd": 93.566048,
-        "pricingAsOf": "2026-07-30T06:32:40.700Z"
+        "usd": 94.404907,
+        "pricingAsOf": "2026-07-30T06:40:35.808Z"
       }
     },
     "merges": [
