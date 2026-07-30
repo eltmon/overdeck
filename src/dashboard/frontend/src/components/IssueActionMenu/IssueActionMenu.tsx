@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
-import { MoreHorizontal, X } from 'lucide-react';
+import { ChevronRight, MoreHorizontal, X } from 'lucide-react';
 import { useMenuOpen } from '../../lib/menuOpenState';
 
 import { AgentTellForm } from '../AgentTellForm';
@@ -60,20 +60,59 @@ function actionButtonClass(view: IssueActionView, inline: boolean) {
 }
 
 function ActionButton({ view, inline = false, onInvoked }: { view: IssueActionView; inline?: boolean; onInvoked?: () => void }) {
+  const [submenuOpen, setSubmenuOpen] = useState(false);
+  const hasSubmenu = !!view.submenu?.length;
+
   return (
-    <button
-      type="button"
-      data-testid={`issue-action-${view.action.key}`}
-      className={actionButtonClass(view, inline)}
-      disabled={!view.enabled || view.isPending}
-      title={view.disabledReason ?? view.action.label}
-      onClick={() => {
-        view.invoke();
-        onInvoked?.();
-      }}
-    >
-      {view.isPending ? `${view.action.label}…` : view.action.label}
-    </button>
+    <span className="relative inline-flex">
+      <button
+        type="button"
+        data-testid={`issue-action-${view.action.key}`}
+        className={actionButtonClass(view, inline)}
+        disabled={!view.enabled || view.isPending}
+        title={view.disabledReason ?? view.action.label}
+        aria-haspopup={hasSubmenu ? 'menu' : undefined}
+        aria-expanded={hasSubmenu ? submenuOpen : undefined}
+        onClick={() => {
+          if (hasSubmenu) {
+            setSubmenuOpen((open) => !open);
+            return;
+          }
+          view.invoke();
+          onInvoked?.();
+        }}
+      >
+        {view.isPending ? `${view.action.label}…` : view.action.label}
+        {hasSubmenu ? <ChevronRight className="ml-1 h-3 w-3 opacity-50" /> : null}
+      </button>
+      {hasSubmenu && submenuOpen ? (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setSubmenuOpen(false)} />
+          <div
+            role="menu"
+            data-testid={`issue-action-submenu-${view.action.key}`}
+            className="absolute left-0 top-full z-50 mt-1 w-[220px] rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
+          >
+            {view.submenu!.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                role="menuitem"
+                data-testid={`issue-action-${view.action.key}-option-${option.key}`}
+                className="relative flex w-full cursor-pointer select-none items-center rounded px-3 py-1.5 text-left text-xs text-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground"
+                onClick={() => {
+                  setSubmenuOpen(false);
+                  option.invoke();
+                  onInvoked?.();
+                }}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </span>
   );
 }
 
