@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T06:09:38.395Z",
+  "updated": "2026-07-30T06:09:45.424Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -85,7 +85,9 @@
         "src/lib/xbrief/lifecycle-io.ts"
       ],
       "recordedAt": "2026-07-30T05:59:49.887Z"
-    }
+    },
+    "reviewRequestedAt": "2026-07-30T06:09:44.925Z",
+    "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z"
   },
   "closeOut": {
     "usage": {
