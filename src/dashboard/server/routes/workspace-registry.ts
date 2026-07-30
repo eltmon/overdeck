@@ -21,7 +21,8 @@ import {
   unarchiveWorkspace,
   updateWorkspaceLayout,
 } from '../../../lib/workspaces/writer.js';
-import type { WorkspaceRow } from '../../../lib/workspaces/types.js';
+import type { WorkspaceGitState, WorkspaceRow } from '../../../lib/workspaces/types.js';
+import { getWorkspaceGitState, pullWorkspaceFastForward } from '../../../lib/workspaces/git-state.js';
 import { getReviewStatusSync } from '../../../lib/review-status.js';
 import { readCurrentStatus, readRecentObservations } from '../../../lib/memory/rollup.js';
 
@@ -150,6 +151,88 @@ const getWorkspaceRegistryMemoryRoute = HttpRouter.add(
   })),
 );
 
+// ─── GET /api/workspace-registry/:id/git ────────────────────────────────────
+
+/**
+ * Per-path epoch-ms of the last `git fetch` this process ran for a workspace.
+ * A card that judges freshness from refs nobody refreshed is lying, so the GET
+ * route fetches — but at most once per FETCH_MIN_INTERVAL_MS per path, so a
+ * 30s poll (or several open views) cannot turn into a fetch storm.
+ */
+const lastFetchByPath = new Map<string, number>();
+const FETCH_MIN_INTERVAL_MS = 30_000;
+
+function fetchIsDue(path: string, now: number): boolean {
+  const last = lastFetchByPath.get(path);
+  return last === undefined || now - last >= FETCH_MIN_INTERVAL_MS;
+}
+
+/**
+ * Reads state, fetching first when the caller asked and the throttle allows.
+ * `fetchedAt` reports the last fetch for this path — not only the one this call
+ * performed — so a throttled read still shows honest freshness.
+ */
+async function readGitState(path: string, wantFetch: boolean): Promise<WorkspaceGitState> {
+  const now = Date.now();
+  const shouldFetch = wantFetch && fetchIsDue(path, now);
+  const state = await getWorkspaceGitState(path, { fetch: shouldFetch });
+  if (state.fetchedAt !== null) lastFetchByPath.set(path, state.fetchedAt);
+  return { ...state, fetchedAt: state.fetchedAt ?? lastFetchByPath.get(path) ?? null };
+}
+
+const getWorkspaceRegistryGitRoute = HttpRouter.add(
+  'GET',
+  '/api/workspace-registry/:id/git',
+  httpHandler(Effect.gen(function* () {
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    if (!workspace.isGitRepository) return jsonResponse({ git: null });
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const wantFetch = new URL(request.url, 'http://localhost').searchParams.get('fetch') === '1';
+    const git = yield* Effect.promise(() => readGitState(workspace.path, wantFetch));
+    return jsonResponse({ git });
+  })),
+);
+
+// ─── POST /api/workspace-registry/:id/pull ──────────────────────────────────
+
+const postWorkspaceRegistryPullRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/:id/pull',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    if (!workspace.isGitRepository) {
+      return jsonResponse({ error: `Workspace is not a git repository: ${id}` }, { status: 400 });
+    }
+    // Issue workspaces keep their existing semantics: sync-main merges main into
+    // the feature branch with its own dirty-tree and quiescence handling. This
+    // route never touches them — the band routes their button there instead.
+    if (workspace.kind === 'issue') {
+      return jsonResponse({
+        error: 'Issue workspaces sync through sync-main, not fast-forward pull.',
+        syncMainUrl: workspace.issueId ? `/api/issues/${workspace.issueId}/sync-main` : null,
+      }, { status: 409 });
+    }
+    const result = yield* Effect.promise(() => pullWorkspaceFastForward(workspace.path));
+    if (!result.ok) {
+      return jsonResponse(
+        { error: result.detail, reason: result.reason },
+        { status: result.reason === 'error' ? 500 : 409 },
+      );
+    }
+    // The pull itself contacted the remote, so it counts as a fetch.
+    const pulledAt = Date.now();
+    lastFetchByPath.set(workspace.path, pulledAt);
+    return jsonResponse({ git: { ...result.state, fetchedAt: pulledAt } });
+  })),
+);
+
 // ─── POST /api/workspace-registry/:id/activate|archive|favorite ────────────
 
 const postWorkspaceRegistryActivateRoute = HttpRouter.add(
@@ -226,6 +309,8 @@ export const workspaceRegistryRouteLayer = Layer.mergeAll(
   listWorkspaceRegistryRoute,
   getWorkspaceRegistryDetailRoute,
   getWorkspaceRegistryMemoryRoute,
+  getWorkspaceRegistryGitRoute,
+  postWorkspaceRegistryPullRoute,
   postWorkspaceRegistryActivateRoute,
   postWorkspaceRegistryArchiveRoute,
   postWorkspaceRegistryFavoriteRoute,
