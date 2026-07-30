@@ -208,6 +208,45 @@ describe('handleMemorySessionStartBody briefing delivery (PAN-3286 WI-6 FR-10)',
     })).toMatchObject({ sessionId: 'session-1', byteSize: 22 });
   });
 
+  // Review fix: SessionStart legitimately fires before the harness writes the
+  // transcript's first line, and that is exactly a fresh session — the case that
+  // most needs the briefing. ENOENT must skip poller registration only.
+  it('still returns the briefing when the transcript does not exist yet', async () => {
+    const registerTranscript = vi.fn();
+
+    const result = await handleMemorySessionStartBody(body(), {
+      ...baseOptions(),
+      registerTranscript,
+      statTranscript: async () => {
+        throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+      },
+      composeSessionStartBriefing: async () => ({ context: '<briefing>fresh</briefing>', byteSize: 25 }),
+    });
+
+    expect(result).toEqual({
+      status: 'transcript-missing',
+      sessionId: 'session-1',
+      briefing: '<briefing>fresh</briefing>',
+    });
+    // The transcript is not registered for polling — that part is genuinely skipped.
+    expect(registerTranscript).not.toHaveBeenCalled();
+  });
+
+  it('keeps transcript-missing briefing-less when the session was already briefed', async () => {
+    const options = {
+      ...baseOptions(),
+      statTranscript: async () => {
+        throw Object.assign(new Error('ENOENT: no such file'), { code: 'ENOENT' });
+      },
+      composeSessionStartBriefing: async () => ({ context: '<briefing>fresh</briefing>', byteSize: 25 }),
+    };
+
+    await handleMemorySessionStartBody(body(), options);
+    const second = await handleMemorySessionStartBody(body(), options);
+
+    expect(second).toEqual({ status: 'transcript-missing', sessionId: 'session-1' });
+  });
+
   it('degrades to the plain accepted response when composition throws', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

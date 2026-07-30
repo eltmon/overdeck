@@ -27,6 +27,7 @@ import {
   rebuildMainAndScratchWorkspaces,
   seedProjectsFromYaml,
 } from '../../lib/workspaces/rebuild.js';
+import { resolveTerminalIssueIds } from '../../lib/overdeck/terminal-issues.js';
 import type { DatabaseConfig, ProjectConfig as FullProjectConfig } from '../../lib/workspace-config.js';
 import { readIssueRecordForWorkspaceSync } from '../../lib/pan-dir/record.js';
 
@@ -529,7 +530,13 @@ async function rebuildWorkspacesCommand(options: {
     // PAN-3286 FR-14: hygiene pass — take worktrees for finished issues out of
     // the user-facing surfaces. Archives, never deletes; the rows keep owning
     // their memory homes.
-    const archival = await archiveTerminalIssueWorkspaces({ dryRun: options.dryRun, verbose: options.verbose });
+    const archival = await archiveTerminalIssueWorkspaces({
+      // Terminality is resolved through IssuesResolver, the canonical issues
+      // read door — the archival pass performs no issue-state read of its own.
+      terminalIssueIds: await resolveTerminalIssueIds(),
+      dryRun: options.dryRun,
+      verbose: options.verbose,
+    });
 
     if (options.dryRun) {
       spinner.info(

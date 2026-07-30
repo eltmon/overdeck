@@ -77,8 +77,11 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       throw new Error(`--target-path cannot be combined with --isolated.`);
     }
     const project = resolveProjectByKey(options.project);
-    ensureProjectSeeded(project);
-
+    // NOTE: project seeding is deliberately NOT done here. It writes a `projects`
+    // row, and `--dry-run` must write nothing at all (FR-2/AC-1) — it also has to
+    // stay out of the way of the validation below, so a rejected `--target-path`
+    // leaves no trace either. Seeding happens just before createWorkspace, which
+    // is the only caller that needs the row to exist (review fix).
     const parentBranch = options.parentBranch ?? await inferParentBranch(project.config.path);
     const parentBranchGuessed = !options.parentBranch && parentBranch !== null;
 
@@ -143,6 +146,7 @@ export async function workspaceNewCommand(name: string, options: WorkspaceNewOpt
       return;
     }
 
+    ensureProjectSeeded(project);
     const id = await createWorkspace({
       projectId: project.key,
       kind: 'scratch',

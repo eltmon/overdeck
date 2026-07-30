@@ -179,9 +179,14 @@ user-facing surfaces default to what the operator made:
 - The sidebar WORKSPACES rail and the Cmd-K `workspaces` scope list
   `kind !== 'issue' || isFavorite`, sharing one exported predicate
   (`isUserFacingWorkspace` in `Sidebar.tsx`) so the two cannot drift.
-- Hidden rows collapse into an expandable "N pipeline worktrees" count row,
-  the same pattern as the Archived row; its state persists in
-  `overdeck.ui.sidebarWorkspacesPipelineExpanded`.
+- Hidden rows collapse into an expandable "N pipeline worktrees" count row in
+  **both** surfaces — the rail's row uses the same pattern as the Archived row,
+  and Cmd-K carries an equivalent entry whose keywords include the hidden
+  workspaces' own names, so typing a hidden workspace surfaces the row that
+  reveals it. Expansion state is shared: both read and write
+  `WORKSPACES_PIPELINE_EXPANDED_KEY`
+  (`overdeck.ui.sidebarWorkspacesPipelineExpanded`), so expanding in one expands
+  the other.
 - This is **presentation only** — the API still returns every kind, and issues
   stay reachable through the Issues scope and the pipeline views.
 

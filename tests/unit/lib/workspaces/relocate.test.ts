@@ -50,11 +50,25 @@ describe('relocateWorkspace writer (PAN-3286 WI-2)', () => {
   it('updates the path column, refreshes is_git_repository, rewrites memory-home metadata.json, and touches last_accessed_at', async () => {
     const projectId = seedProject();
     mkdirSync(join(newDir, '.git'));
-    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: oldDir });
-    const before = getWorkspaceById(id)!;
+    // The writer stamps last_accessed_at from Date.now(), so the clock has to
+    // move between create and relocate. Drive it with fake timers rather than a
+    // real sleep — NFR-3 and the repository timer rule forbid wall-clock waits,
+    // and this also makes the assertion deterministic instead of relying on a
+    // 2ms delay actually crossing a millisecond boundary. shouldAdvanceTime keeps
+    // any internal timer in the fs/writer path progressing.
+    let id: string;
+    let before: NonNullable<ReturnType<typeof getWorkspaceById>>;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      vi.setSystemTime(new Date('2026-07-30T00:00:00.000Z'));
+      id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: oldDir });
+      before = getWorkspaceById(id)!;
 
-    await new Promise((r) => setTimeout(r, 2));
-    await relocateWorkspace(id, newDir);
+      vi.setSystemTime(new Date('2026-07-30T00:00:01.000Z'));
+      await relocateWorkspace(id, newDir);
+    } finally {
+      vi.useRealTimers();
+    }
 
     const after = getWorkspaceById(id)!;
     expect(after.path).toBe(newDir);

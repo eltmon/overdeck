@@ -14,8 +14,9 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../helpers/overdeck-test-db.js';
 import { registerProjectSync, unregisterProjectSync } from '../../../src/lib/projects.js';
-import { listWorkspaces } from '../../../src/lib/workspaces/resolver.js';
+import { getProjectByKey, listWorkspaces } from '../../../src/lib/workspaces/resolver.js';
 import { addProjectTarget, upsertProjectFromConfig } from '../../../src/lib/workspaces/writer.js';
+import { resolveMemoryRoot } from '../../../src/lib/memory/paths.js';
 import { workspaceNewCommand } from '../../../src/cli/commands/workspace-scratch.js';
 
 let odb: OverdeckTestDb;
@@ -149,6 +150,46 @@ describe('workspaceNewCommand --dry-run (PAN-3286 WI-1)', () => {
       wouldCreateWorktree: false,
     });
     expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'scratch' })).toHaveLength(0);
+  });
+
+  // Review fix: `--dry-run` must write NOTHING. The command used to seed the
+  // project row before resolving the intent, so a supposedly read-only planning
+  // command mutated canonical runtime state.
+  it('leaves the projects table and the memory root untouched', async () => {
+    const exitSpy = mockExit();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    expect(getProjectByKey(PROJECT_KEY)).toBeNull();
+
+    await workspaceNewCommand('theta', { project: PROJECT_KEY, dryRun: true });
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(getProjectByKey(PROJECT_KEY)).toBeNull();
+    expect(existsSync(resolveMemoryRoot(PROJECT_KEY))).toBe(false);
+  });
+
+  it('leaves the projects table untouched when --target-path is rejected', async () => {
+    const exitSpy = mockExit();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await expect(workspaceNewCommand('theta', {
+      project: PROJECT_KEY,
+      targetPath: join(targetDir, 'does-not-exist'),
+    })).rejects.toThrow(/process\.exit/);
+
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(getProjectByKey(PROJECT_KEY)).toBeNull();
+  });
+
+  it('does seed the project row on a real (non-dry-run) create', async () => {
+    const exitSpy = mockExit();
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    await workspaceNewCommand('theta-real', { project: PROJECT_KEY });
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(getProjectByKey(PROJECT_KEY)).not.toBeNull();
+    expect(listWorkspaces({ projectId: PROJECT_KEY, kind: 'scratch' })).toHaveLength(1);
   });
 
   it('prints wouldCreateWorktree=true and creates no worktree directory for the --isolated variant', async () => {

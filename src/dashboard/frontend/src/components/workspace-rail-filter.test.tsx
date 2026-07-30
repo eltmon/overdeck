@@ -159,6 +159,84 @@ describe('Sidebar workspaces rail filter (PAN-3286 FR-13)', () => {
 });
 
 describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
+  function renderPalette() {
+    return render(
+      <QueryClientProvider client={newQueryClient()}>
+        <CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} onSelectWorkspace={vi.fn()} />
+      </QueryClientProvider>,
+    );
+  }
+
+  function paletteInput() {
+    return screen.getByPlaceholderText('Search commands, issues, conversations, memory…');
+  }
+
+  // Review fix: filtering alone left hidden workspaces unreachable from Cmd-K.
+  // The scope must carry the same count row and reveal path as the rail.
+  it('offers a count row for the hidden pipeline worktrees', async () => {
+    stubFetch();
+    const { container } = renderPalette();
+
+    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
+    expect(container.textContent).toContain('3 pipeline worktrees');
+    expect(container.textContent).toContain('Show worktrees Overdeck created for issues');
+  });
+
+  it('reveals every hidden worktree when the count row is selected, and persists that', async () => {
+    stubFetch();
+    const { container } = renderPalette();
+
+    const countRow = await waitFor(() => screen.getByText('3 pipeline worktrees'));
+    fireEvent.click(countRow);
+
+    await waitFor(() => expect(container.textContent).toContain('feature-pan-1001'));
+    expect(container.textContent).toContain('feature-pan-1002');
+    expect(container.textContent).toContain('feature-pan-1003');
+    // The count row is gone once expanded, and the choice is shared with the rail.
+    expect(container.textContent).not.toContain('3 pipeline worktrees');
+    expect(localStorage.getItem(PIPELINE_EXPANDED_KEY)).toBe('true');
+  });
+
+  it('starts expanded when the rail already expanded, showing no count row', async () => {
+    localStorage.setItem(PIPELINE_EXPANDED_KEY, 'true');
+    stubFetch();
+    const { container } = renderPalette();
+
+    await waitFor(() => expect(container.textContent).toContain('feature-pan-1001'));
+    expect(container.textContent).not.toContain('pipeline worktrees');
+  });
+
+  it('surfaces the count row when the operator types a hidden workspace name', async () => {
+    stubFetch();
+    const { container } = renderPalette();
+    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
+
+    fireEvent.change(paletteInput(), { target: { value: 'feature-pan-1002' } });
+
+    // The hidden row itself is still not listed, but the row that reveals it is —
+    // so a hidden workspace is discoverable rather than invisible.
+    await waitFor(() => expect(container.textContent).toContain('3 pipeline worktrees'));
+  });
+
+  it('uses the singular label for exactly one hidden worktree', async () => {
+    stubFetch([
+      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-p1', kind: 'issue', name: 'feature-pan-1001', issueId: 'PAN-1001' }),
+    ]);
+    const { container } = renderPalette();
+
+    await waitFor(() => expect(container.textContent).toContain('1 pipeline worktree'));
+    expect(container.textContent).not.toContain('1 pipeline worktrees');
+  });
+
+  it('shows no count row when every workspace is user-facing', async () => {
+    stubFetch(REGISTRY.filter(isUserFacingWorkspace));
+    const { container } = renderPalette();
+
+    await waitFor(() => expect(container.textContent).toContain('scratch-lens'));
+    expect(container.textContent).not.toContain('pipeline worktree');
+  });
+
   it('lists only user-facing workspaces, keeping the favorited issue workspace', async () => {
     stubFetch();
     const { container } = render(

@@ -15,12 +15,14 @@ checkout, exactly one per project), `issue` (one per tracked issue), or
 
 Workspaces are reachable from three places in the dashboard:
 
-- **Sidebar → Workspaces** — favorites first, then most-recently-accessed;
-  archived workspaces collapse into a count row, and a flat/grouped-by-project
-  toggle persists across sessions.
-- **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists every
-  workspace across every project, filterable by name; selecting one activates
-  it and opens its view.
+- **Sidebar → Workspaces** — favorites first, then most-recently-accessed. The
+  workspaces you created are listed directly; worktrees Overdeck created for
+  issues collapse into a **N pipeline worktrees** count row, as do archived
+  workspaces. A flat/grouped-by-project toggle persists across sessions.
+- **Cmd-K / Ctrl-K** — the command palette's "Workspaces" section lists the same
+  set, filterable by name, with the same **N pipeline worktrees** row to reveal
+  the rest; selecting a workspace activates it and opens its view. Expanding in
+  either place expands both.
 - **`/workspace/:id`** — a dedicated view with a terminal (issue-kind
   workspaces, when an agent is running), workspace-filtered conversations,
   and the workspace's memory surface (status headline, phase, and observation

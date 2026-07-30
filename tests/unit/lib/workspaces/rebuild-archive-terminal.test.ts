@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { archiveTerminalIssueWorkspaces } from '../../../../src/lib/workspaces/rebuild.js';
+import { resolveTerminalIssueIds } from '../../../../src/lib/overdeck/terminal-issues.js';
 import { getWorkspaceById, listWorkspaces } from '../../../../src/lib/workspaces/resolver.js';
 import { createWorkspace, upsertProjectFromConfig } from '../../../../src/lib/workspaces/writer.js';
 import { closeDatabase } from '../../../../src/lib/database/index.js';
@@ -53,9 +54,9 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
     const open = await seedIssueWorkspace('feature-pan-open', 'PAN-OPEN');
     seedIssue('PAN-CLOSED', 'closed');
     seedIssue('PAN-MERGED', 'verifying_on_main');
-    seedIssue('PAN-OPEN', 'in_progress');
+    seedIssue('PAN-OPEN', 'working');
 
-    const result = await archiveTerminalIssueWorkspaces();
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() });
 
     expect(result.archived).toBe(2);
     expect(result.archivedIds.sort()).toEqual([closed, merged].sort());
@@ -68,7 +69,7 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
     const closed = await seedIssueWorkspace('feature-pan-closed', 'PAN-CLOSED');
     seedIssue('PAN-CLOSED', 'closed');
 
-    await archiveTerminalIssueWorkspaces();
+    await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() });
 
     const row = getWorkspaceById(closed);
     expect(row).not.toBeNull();
@@ -81,7 +82,7 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
   it('skips an issue row whose issue has no stage recorded', async () => {
     const unknown = await seedIssueWorkspace('feature-pan-unknown', 'PAN-UNKNOWN');
 
-    const result = await archiveTerminalIssueWorkspaces();
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() });
 
     expect(result.archived).toBe(0);
     expect(result.skipped).toBe(1);
@@ -94,7 +95,7 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
     const closed = await seedIssueWorkspace('feature-pan-closed', 'PAN-CLOSED');
     seedIssue('PAN-CLOSED', 'closed');
 
-    const result = await archiveTerminalIssueWorkspaces();
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() });
 
     // Only the issue row was even considered.
     expect(result.scanned).toBe(1);
@@ -107,10 +108,10 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
     const closed = await seedIssueWorkspace('feature-pan-closed', 'PAN-CLOSED');
     const open = await seedIssueWorkspace('feature-pan-open', 'PAN-OPEN');
     seedIssue('PAN-CLOSED', 'closed');
-    seedIssue('PAN-OPEN', 'in_progress');
+    seedIssue('PAN-OPEN', 'working');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
-    const result = await archiveTerminalIssueWorkspaces({ dryRun: true, verbose: true });
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds(), dryRun: true, verbose: true });
 
     expect(result.archived).toBe(1);
     expect(result.archivedIds).toEqual([closed]);
@@ -125,8 +126,55 @@ describe('archiveTerminalIssueWorkspaces (PAN-3286 FR-14)', () => {
     await seedIssueWorkspace('feature-pan-closed', 'PAN-CLOSED');
     seedIssue('PAN-CLOSED', 'closed');
 
-    expect((await archiveTerminalIssueWorkspaces()).archived).toBe(1);
+    expect((await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() })).archived).toBe(1);
     // The row is archived now, so listWorkspaces({kind:'issue'}) no longer sees it.
-    expect((await archiveTerminalIssueWorkspaces()).archived).toBe(0);
+    expect((await archiveTerminalIssueWorkspaces({ terminalIssueIds: await resolveTerminalIssueIds() })).archived).toBe(0);
+  });
+});
+
+/**
+ * Review fix: terminality must come from the canonical issues read door, not a
+ * direct `issues.stage` query inside the archival pass. These cases pin both
+ * halves — the resolver-backed helper classifies stages correctly, and the
+ * archival function treats the set as a pure input.
+ */
+describe('resolveTerminalIssueIds through IssuesResolver (PAN-3286 FR-14)', () => {
+  it('returns exactly the issues whose stage is terminal', async () => {
+    seedIssue('PAN-CLOSED', 'closed');
+    seedIssue('PAN-CANCELLED', 'cancelled');
+    seedIssue('PAN-ON-MAIN', 'verifying_on_main');
+    seedIssue('PAN-WORKING', 'working');
+    seedIssue('PAN-REVIEW', 'in_review');
+
+    const terminal = await resolveTerminalIssueIds();
+
+    expect([...terminal].sort()).toEqual(['PAN-CANCELLED', 'PAN-CLOSED', 'PAN-ON-MAIN']);
+  });
+
+  it('returns an empty set when no issue is terminal', async () => {
+    seedIssue('PAN-WORKING', 'working');
+
+    expect([...await resolveTerminalIssueIds()]).toEqual([]);
+  });
+
+  it('archives on the caller-supplied set alone, ignoring the stored stage', async () => {
+    // The issue is stored as very much NOT terminal; the injected set is what
+    // decides, proving the function performs no stage read of its own.
+    const workspaceId = await seedIssueWorkspace('feature-pan-open', 'PAN-OPEN');
+    seedIssue('PAN-OPEN', 'working');
+
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: new Set(['PAN-OPEN']) });
+
+    expect(result.archived).toBe(1);
+    expect(getWorkspaceById(workspaceId)?.isArchived).toBe(true);
+  });
+
+  it('matches issue ids case-insensitively', async () => {
+    const workspaceId = await seedIssueWorkspace('feature-pan-closed', 'PAN-CLOSED');
+
+    const result = await archiveTerminalIssueWorkspaces({ terminalIssueIds: new Set(['pan-closed']) });
+
+    expect(result.archived).toBe(1);
+    expect(getWorkspaceById(workspaceId)?.isArchived).toBe(true);
   });
 });

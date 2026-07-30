@@ -171,7 +171,12 @@ const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
 };
 
 const WORKSPACES_GROUPED_KEY = 'overdeck.ui.sidebarWorkspacesGrouped';
-const WORKSPACES_PIPELINE_EXPANDED_KEY = 'overdeck.ui.sidebarWorkspacesPipelineExpanded';
+/**
+ * Shared by the sidebar rail and the Cmd-K workspaces scope so expanding
+ * pipeline worktrees in either place reveals them in both — one operator intent,
+ * not two drifting toggles (PAN-3286 FR-13).
+ */
+export const WORKSPACES_PIPELINE_EXPANDED_KEY = 'overdeck.ui.sidebarWorkspacesPipelineExpanded';
 
 /**
  * A workspace the operator actually created, versus a worktree the pipeline
