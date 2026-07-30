@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T20:36:50.180Z",
+  "updated": "2026-07-30T20:38:11.068Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -66,5 +66,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-30T19:54:38.863Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "git-state-module": {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 3834407,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T20:38:11.067Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "git-state-module": "running"
+  }
 }
