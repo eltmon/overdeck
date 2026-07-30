@@ -12,6 +12,11 @@
       "timestamp": "2026-07-30T03:53:05.154Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-30T04:36:01.616Z",
+      "reason": "end",
+      "note": "Anomaly: an early guard test inherited the shell's OVERDECK_HOME and briefly appended timestamps to the live 60-second hook-rate bucket; the test harness now forces an isolated temp home, and no persistent state was changed. No plan deviations. Delivered per-agent single-flight locking, portable 60-second LLM timeout, six-per-minute machine-wide rate limiting, no-resolution timeout/drop behavior, regression coverage, and hook documentation. Full typecheck, lint, 12,284 root tests, and 59 frontend tests pass; branch is clean and pushed."
     }
   ],
   "feedback": [],
@@ -35,7 +40,7 @@
     "recordedAt": "2026-07-30T04:35:55.129Z"
   },
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T04:36:00.489Z",
+  "updated": "2026-07-30T04:36:01.616Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
