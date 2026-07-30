@@ -89,17 +89,18 @@
     "recordedAt": "2026-07-30T22:41:42.331Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T22:51:42.686Z",
+  "updated": "2026-07-30T22:51:50.275Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T22:51:00.474Z",
+    "panDoneRecoveredAt": "2026-07-30T22:51:39.967Z",
+    "updatedAt": "2026-07-30T22:51:43.238Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3331-review",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
@@ -178,8 +179,7 @@
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
       "recordedAt": "2026-07-30T22:41:42.331Z"
-    },
-    "panDoneRecoveredAt": "2026-07-30T22:51:39.967Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.784645,
-        "pricingAsOf": "2026-07-30T22:51:01.929Z"
+        "pricingAsOf": "2026-07-30T22:51:47.498Z"
       }
     },
     "merges": [
