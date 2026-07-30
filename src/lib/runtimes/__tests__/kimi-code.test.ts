@@ -493,25 +493,41 @@ describe('withKimiSessionCaptureLock (PAN-1837 review fix — concurrent same-cw
   });
 
   it('lets a second bucket proceed immediately — the lock is per-workDirKey, not global', async () => {
+    // PAN-3305: this used to hold the first bucket's lock open for a fixed
+    // 30ms of fake time and then compare completion indices in a shared
+    // array. That is a race — acquiring the second bucket's lock is several
+    // real fs round-trips (mkdir, writeFile, rename) with no timers of its
+    // own, so whether it landed before the 30ms timer fired depended on how
+    // fast the disk was. Hold the first bucket's lock until the test
+    // explicitly releases it instead, so "the second bucket finished while
+    // the first lock was still held" is a fact rather than an interleaving
+    // that usually works out.
     const kimiHome = makeHome();
-    const order: string[] = [];
+    let releaseSlow!: () => void;
+    const slowMayFinish = new Promise<void>((resolve) => { releaseSlow = resolve; });
+    let slowFinished = false;
+    let fastFinished = false;
 
     const slow = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-one', async () => {
-      order.push('slow-start');
-      await new Promise((resolve) => setTimeout(resolve, 30));
-      order.push('slow-end');
+      await slowMayFinish;
+      slowFinished = true;
     });
     const fast = withKimiSessionCaptureLock(kimiHome, '/tmp/workspace-two', async () => {
-      order.push('fast-start');
-      order.push('fast-end');
+      fastFinished = true;
     });
 
+    await drainFakeTimersUntilSettled(fast);
+
+    // The unrelated-bucket task ran to completion while the first bucket's
+    // lock was still held — a global lock would have blocked it here.
+    expect(fastFinished).toBe(true);
+    expect(slowFinished).toBe(false);
+
+    releaseSlow();
     const both = Promise.all([slow, fast]);
     await drainFakeTimersUntilSettled(both);
     await both;
-
-    // The unrelated-bucket task completes without waiting on the slow one.
-    expect(order.indexOf('fast-end')).toBeLessThan(order.indexOf('slow-end'));
+    expect(slowFinished).toBe(true);
   });
 
   it('pins distinct ids when a work/restart-shaped launch and a conversation-shaped launch race in the same cwd (PAN-1837 review fix)', async () => {
