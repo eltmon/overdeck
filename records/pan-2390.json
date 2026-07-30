@@ -1,9 +1,16 @@
 {
   "issueId": "PAN-2390",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-07-30T09:36:29.701Z"
+    }
+  ],
   "feedback": [],
   "created": "2026-07-30T08:09:22.409Z",
-  "updated": "2026-07-30T09:36:29.701Z",
+  "updated": "2026-07-30T09:46:01.960Z",
   "pipeline": {
     "issueId": "PAN-2390",
     "reviewStatus": "pending",
@@ -13,15 +20,13 @@
     "mergeStep": "squash-merging",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T08:47:17.969Z",
+    "updatedAt": "2026-07-30T09:46:01.939Z",
     "mergeNotes": "Stale strike signal: recorded HEAD f86194f8257c77dfb939108b5eafdccc01058509 differs from origin/strike/pan-2390 at 2559c02e929622ac80b7877a51d4289ba8ef7bf0",
     "lastVerifiedCommit": "2559c02e929622ac80b7877a51d4289ba8ef7bf0",
-    "strikeReadyHead": "f86194f8257c77dfb939108b5eafdccc01058509",
-    "strikeReadyAt": "2026-07-30T08:32:19.207Z",
-    "strikeLandingState": "recovering",
-    "strikeRecoveryCount": 1,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-07-30T08:38:35.693Z",
+    "strikeReadyHead": "2559c02e929622ac80b7877a51d4289ba8ef7bf0",
+    "strikeReadyAt": "2026-07-30T09:46:01.938Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
     "strikeLandingAttempts": [
       {
         "timestamp": "2026-07-30T08:37:35.693Z",
@@ -45,19 +50,12 @@
       "totals": {},
       "costAtCloseOut": {
         "usd": 0,
-        "pricingAsOf": "2026-07-30T08:47:25.358Z"
+        "pricingAsOf": "2026-07-30T09:46:01.953Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
-  "sessionHistory": [
-    {
-      "reason": "resume",
-      "agentModel": "claude-opus-5",
-      "timestamp": "2026-07-30T09:36:29.701Z"
-    }
-  ]
+  "model": "claude-opus-5"
 }
