@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T04:54:28.244Z",
+  "updated": "2026-07-30T04:56:09.947Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-state-door-invariant": {
-        "writerId": "agent-pan-3296",
-        "agentId": "agent-pan-3296",
-        "pid": 3924404,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:54:28.244Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3296",
@@ -150,6 +142,17 @@
         "outcome": "completed",
         "reason": "Added a migrated-state matrix over writeSpecForIssue, updateSpecStatus, writeSpecDocument, transitionXBriefOnMain, and moveXBrief; every door must return with a clean worktree and matching origin/overdeck-state tip.",
         "releasedAt": "2026-07-30T04:54:07.300Z"
+      },
+      {
+        "writerId": "agent-pan-3296",
+        "agentId": "agent-pan-3296",
+        "pid": 3924404,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:54:28.244Z",
+        "itemId": "docs-state-door-invariant",
+        "outcome": "completed",
+        "reason": "Documented pan start's single committed active/running transition, workspace-only draft fallback, and reconciler adoption/fail-closed behavior for owned versus unowned paths.",
+        "releasedAt": "2026-07-30T04:56:09.946Z"
       }
     ],
     "statusReasons": {
@@ -172,6 +175,10 @@
       "cross-door-clean-tree-gate": {
         "reason": "Added a migrated-state matrix over writeSpecForIssue, updateSpecStatus, writeSpecDocument, transitionXBriefOnMain, and moveXBrief; every door must return with a clean worktree and matching origin/overdeck-state tip.",
         "updatedAt": "2026-07-30T04:54:07.300Z"
+      },
+      "docs-state-door-invariant": {
+        "reason": "Documented pan start's single committed active/running transition, workspace-only draft fallback, and reconciler adoption/fail-closed behavior for owned versus unowned paths.",
+        "updatedAt": "2026-07-30T04:56:09.946Z"
       }
     }
   },
@@ -197,6 +204,8 @@
     "cross-door-clean-tree-gate": "completed",
     "cross-door-clean-tree-gate.cross-door-clean-tree-gate.ac1": "completed",
     "cross-door-clean-tree-gate.cross-door-clean-tree-gate.ac2": "completed",
-    "docs-state-door-invariant": "running"
+    "docs-state-door-invariant": "completed",
+    "docs-state-door-invariant.docs-state-door-invariant.ac1": "completed",
+    "docs-state-door-invariant.docs-state-door-invariant.ac2": "completed"
   }
 }
