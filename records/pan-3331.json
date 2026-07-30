@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T20:48:24.591Z",
+  "updated": "2026-07-30T20:53:26.052Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "git-pull-routes": {
-        "writerId": "agent-pan-3331",
-        "agentId": "agent-pan-3331",
-        "pid": 703798,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T20:48:24.591Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3331",
@@ -91,12 +83,27 @@
         "outcome": "completed",
         "reason": "New src/lib/workspaces/git-state.ts: getWorkspaceGitState (upstream-correct ahead/behind, origin/HEAD fallback, 10-commit remote log) + pullWorkspaceFastForward (typed refusals, never throws). 14 real-temp-repo tests pass; typecheck+lint green.",
         "releasedAt": "2026-07-30T20:45:39.728Z"
+      },
+      {
+        "writerId": "agent-pan-3331",
+        "agentId": "agent-pan-3331",
+        "pid": 703798,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T20:48:24.591Z",
+        "itemId": "git-pull-routes",
+        "outcome": "completed",
+        "reason": "GET /:id/git (fetch=1 with per-path 30s throttle, {git:null} for non-git, 404 unknown) + POST /:id/pull (guarded, typed refusal pass-through 409/500, issue-kind 409 to sync-main). 19 route tests pass with fake timers; doors guard green.",
+        "releasedAt": "2026-07-30T20:53:26.052Z"
       }
     ],
     "statusReasons": {
       "git-state-module": {
         "reason": "New src/lib/workspaces/git-state.ts: getWorkspaceGitState (upstream-correct ahead/behind, origin/HEAD fallback, 10-commit remote log) + pullWorkspaceFastForward (typed refusals, never throws). 14 real-temp-repo tests pass; typecheck+lint green.",
         "updatedAt": "2026-07-30T20:45:39.728Z"
+      },
+      "git-pull-routes": {
+        "reason": "GET /:id/git (fetch=1 with per-path 30s throttle, {git:null} for non-git, 404 unknown) + POST /:id/pull (guarded, typed refusal pass-through 409/500, issue-kind 409 to sync-main). 19 route tests pass with fake timers; doors guard green.",
+        "updatedAt": "2026-07-30T20:53:26.052Z"
       }
     }
   },
@@ -107,6 +114,10 @@
     "git-state-module.git-state-module.ac3": "completed",
     "git-state-module.git-state-module.ac4": "completed",
     "git-state-module.git-state-module.ac5": "completed",
-    "git-pull-routes": "running"
+    "git-pull-routes": "completed",
+    "git-pull-routes.git-pull-routes.ac1": "completed",
+    "git-pull-routes.git-pull-routes.ac2": "completed",
+    "git-pull-routes.git-pull-routes.ac3": "completed",
+    "git-pull-routes.git-pull-routes.ac4": "completed"
   }
 }
