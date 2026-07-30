@@ -2,7 +2,7 @@
  * PAN-1990 dashboard-workspace-view: /workspace/:id renders terminals,
  * workspace-filtered conversations, and the memory surface.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -32,6 +32,20 @@ vi.mock('../../issue-view/VerificationGates', () => ({
   VerificationGates: ({ issueId }: { issueId: string }) => <div data-testid="verification-gates" data-issue={issueId} />,
 }));
 
+vi.mock('../../CommandDeck/FolderPicker', () => ({
+  FolderPicker: ({ onSelect }: { onSelect: (path: string) => void }) => (
+    <button type="button" data-testid="mock-folder-picker" onClick={() => onSelect('/picked/dir')}>Pick</button>
+  ),
+}));
+
+vi.mock('../../../lib/apiFetch', () => ({
+  fetchWithTimeout: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+}));
+
+vi.mock('../../../lib/wsTransport', () => ({
+  dashboardMutationJsonHeaders: async () => ({ 'Content-Type': 'application/json' }),
+}));
+
 vi.mock('../../xbrief/XBriefViewer', () => ({
   XBriefViewer: ({ doc }: { doc: unknown }) => <div data-testid="xbrief-viewer" data-has-doc={String(doc !== null)} />,
 }));
@@ -42,6 +56,7 @@ vi.mock('../../../lib/store', () => ({
   selectAgents: (state: { agentsById: Record<string, unknown> }) => Object.values(state.agentsById),
 }));
 
+import { DialogProvider } from '../../DialogProvider';
 import { WorkspaceView } from '../WorkspaceView';
 
 const CONVERSATIONS = [
@@ -85,9 +100,13 @@ function renderWorkspaceView(options: {
   vi.stubGlobal('fetch', fetchMock);
 
   const onBack = vi.fn();
+  // WorkspaceView's management actions confirm through useConfirm(), which
+  // requires the provider main.tsx already wraps the app in.
   render(
     <QueryClientProvider client={client}>
-      <WorkspaceView workspaceId={workspaceId} onBack={onBack} />
+      <DialogProvider>
+        <WorkspaceView workspaceId={workspaceId} onBack={onBack} />
+      </DialogProvider>
     </QueryClientProvider>,
   );
   return { onBack, fetchMock };
@@ -171,7 +190,9 @@ describe('WorkspaceView conversation filtering (FR-15/AC-11)', () => {
 
     render(
       <QueryClientProvider client={client}>
-        <WorkspaceView workspaceId={workspaceId} />
+        <DialogProvider>
+          <WorkspaceView workspaceId={workspaceId} />
+        </DialogProvider>
       </QueryClientProvider>,
     );
 
@@ -202,5 +223,134 @@ describe('WorkspaceView (ac4)', () => {
     fireEvent.click(await screen.findByText('conv-in-workspace'));
 
     expect(await screen.findByTestId('conversation-panel')).toHaveAttribute('data-conversation', 'conv-in-workspace');
+  });
+});
+
+describe('WorkspaceView management actions (PAN-3330 WI-5)', () => {
+  function scratch(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'ws-1',
+      projectId: 'overdeck',
+      kind: 'scratch',
+      name: 'lens',
+      path: '/repo/lens',
+      issueId: null,
+      layoutConfig: null,
+      title: null,
+      isFavorite: false,
+      pipeline: null,
+      ...overrides,
+    };
+  }
+
+  /** The confirm dialog, scoped so its buttons never collide with the header
+   *  triggers that share their labels ("Archive", "Relocate"). */
+  async function dialogButton(name: string) {
+    const dialog = await screen.findByRole('alertdialog');
+    return within(dialog).getByRole('button', { name });
+  }
+
+  /** The POST bodies sent to a workspace-registry action, in call order. */
+  function actionCalls(fetchMock: ReturnType<typeof vi.fn>, suffix: string) {
+    return fetchMock.mock.calls
+      .filter(([url, init]) => String(url).endsWith(suffix) && (init as RequestInit | undefined)?.method === 'POST')
+      .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>);
+  }
+
+  it('renders Favorite, Relocate and Archive for a scratch workspace', async () => {
+    renderWorkspaceView({ workspace: scratch() });
+
+    expect(await screen.findByTestId('workspace-view-actions')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-favorite')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-relocate')).toBeInTheDocument();
+    expect(screen.getByTestId('workspace-view-archive')).toBeInTheDocument();
+  });
+
+  it('renders the same actions for a main workspace', async () => {
+    renderWorkspaceView({ workspace: scratch({ kind: 'main', name: 'main' }) });
+
+    expect(await screen.findByTestId('workspace-view-actions')).toBeInTheDocument();
+  });
+
+  it('renders none of them for an issue workspace, which the pipeline owns', async () => {
+    renderWorkspaceView();
+
+    expect(await screen.findByTestId('xterm')).toBeInTheDocument();
+    expect(screen.queryByTestId('workspace-view-actions')).toBeNull();
+    expect(screen.queryByTestId('workspace-view-archive')).toBeNull();
+  });
+
+  it('archives only after the confirmation is accepted', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch() });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-archive'));
+    fireEvent.click(await dialogButton('Archive'));
+
+    await waitFor(() => expect(actionCalls(fetchMock, '/archive')).toEqual([{ archived: true }]));
+  });
+
+  it('sends no archive request when the confirmation is cancelled', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch() });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-archive'));
+    fireEvent.click(await dialogButton('Cancel'));
+
+    await waitFor(() => expect(screen.queryByRole('alertdialog')).toBeNull());
+    expect(actionCalls(fetchMock, '/archive')).toEqual([]);
+  });
+
+  it('relocates a scratch workspace with the path alone', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch() });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-relocate'));
+    fireEvent.click(await screen.findByTestId('mock-folder-picker'));
+    fireEvent.click(await dialogButton('Relocate'));
+
+    await waitFor(() => expect(actionCalls(fetchMock, '/relocate')).toEqual([{ path: '/picked/dir' }]));
+  });
+
+  it('requires the typed confirmation before relocating main, then forces it', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch({ kind: 'main', name: 'main' }) });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-relocate'));
+    fireEvent.click(await screen.findByTestId('mock-folder-picker'));
+
+    // The confirm button stays disabled until the workspace name is typed.
+    expect(await dialogButton('Relocate')).toBeDisabled();
+    expect(actionCalls(fetchMock, '/relocate')).toEqual([]);
+
+    const dialog = await screen.findByRole('alertdialog');
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: 'main' } });
+    fireEvent.click(await dialogButton('Relocate'));
+
+    await waitFor(() => expect(actionCalls(fetchMock, '/relocate')).toEqual([{ path: '/picked/dir', force: true }]));
+  });
+
+  it('toggles favorite through the existing favorite route', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch({ isFavorite: true }) });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-favorite'));
+
+    await waitFor(() => expect(actionCalls(fetchMock, '/favorite')).toEqual([{ favorite: false }]));
+  });
+
+  it('surfaces a writer refusal instead of silently doing nothing', async () => {
+    const { fetchMock } = renderWorkspaceView({ workspace: scratch() });
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/relocate')) {
+        return new Response(JSON.stringify({ error: 'Cannot relocate archived workspace' }), { status: 409 });
+      }
+      if (url === '/api/workspace-registry/ws-1') return Response.json(scratch());
+      if (url === '/api/workspace-registry/ws-1/memory') return Response.json({ headline: null, status: null, observations: [] });
+      if (url === '/api/conversations') return Response.json([]);
+      return Response.json({});
+    });
+
+    fireEvent.click(await screen.findByTestId('workspace-view-relocate'));
+    fireEvent.click(await screen.findByTestId('mock-folder-picker'));
+    fireEvent.click(await dialogButton('Relocate'));
+
+    expect(await screen.findByTestId('workspace-view-action-error')).toHaveTextContent('Cannot relocate archived workspace');
   });
 });

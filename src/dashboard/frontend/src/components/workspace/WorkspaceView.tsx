@@ -20,8 +20,8 @@
  * (ConversationList's `includeIds` prop already supports this — no changes
  * needed to ConversationList or ConversationPanel).
  */
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from 'react-resizable-panels';
 import { ConversationList, fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
@@ -30,6 +30,10 @@ import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { VerificationGates } from '../issue-view/VerificationGates';
 import { useDashboardStore, selectAgents } from '../../lib/store';
+import { useConfirm } from '../DialogProvider';
+import { FolderPicker } from '../CommandDeck/FolderPicker';
+import { fetchWithTimeout } from '../../lib/apiFetch';
+import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { Agent } from '../../types';
 
 interface WorkspacePipelineBadge {
@@ -49,6 +53,7 @@ interface WorkspaceRegistryDetail {
   issueId: string | null;
   layoutConfig: string | null;
   title: string | null;
+  isFavorite: boolean;
   pipeline: WorkspacePipelineBadge | null;
 }
 
@@ -169,6 +174,73 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
 
   const { defaultLayout, onLayoutChanged } = useDefaultLayout({ id: `workspace-${workspaceId}`, storage: layoutStorage });
 
+  // ─── Workspace management (PAN-3330 WI-5) ─────────────────────────────────
+  // Offered for main/scratch only: issue workspaces are pipeline-owned, and the
+  // writer refuses to relocate or archive them anyway.
+  const queryClient = useQueryClient();
+  const confirm = useConfirm();
+  const [relocating, setRelocating] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const refreshWorkspace = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['workspace-registry'] });
+    void queryClient.invalidateQueries({ queryKey: ['workspace-registry', workspaceId] });
+  }, [queryClient, workspaceId]);
+
+  const postWorkspaceAction = useCallback(async (path: string, body: unknown): Promise<boolean> => {
+    setActionError(null);
+    try {
+      const res = await fetchWithTimeout(`/api/workspace-registry/${workspaceId}${path}`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: string };
+        setActionError(json.error ?? `HTTP ${res.status}`);
+        return false;
+      }
+      refreshWorkspace();
+      return true;
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : String(err));
+      return false;
+    }
+  }, [workspaceId, refreshWorkspace]);
+
+  const onToggleFavorite = useCallback(() => {
+    void postWorkspaceAction('/favorite', { favorite: !workspace?.isFavorite });
+  }, [postWorkspaceAction, workspace?.isFavorite]);
+
+  const onArchive = useCallback(async () => {
+    const accepted = await confirm({
+      title: 'Archive workspace',
+      message: `Archive '${workspace?.name}'? It disappears from the rail but its files, branch and memory are left untouched.`,
+      confirmLabel: 'Archive',
+      variant: 'destructive',
+    });
+    if (!accepted) return;
+    void postWorkspaceAction('/archive', { archived: true });
+  }, [confirm, postWorkspaceAction, workspace?.name]);
+
+  // Relocating main diverges the row from projects.yaml's primary path, so the
+  // writer demands `force` — mirror that weight in the UI with a typed confirm.
+  const onRelocateTo = useCallback(async (path: string) => {
+    setRelocating(false);
+    const isMain = workspace?.kind === 'main';
+    const accepted = await confirm({
+      title: 'Relocate workspace',
+      message: isMain
+        ? `Point the main workspace at ${path}? Its path will diverge from projects.yaml's primary path.`
+        : `Point '${workspace?.name}' at ${path}?`,
+      confirmLabel: 'Relocate',
+      ...(isMain ? { variant: 'destructive' as const, requiredText: workspace?.name ?? 'main' } : {}),
+    });
+    if (!accepted) return;
+    void postWorkspaceAction('/relocate', isMain ? { path, force: true } : { path });
+  }, [confirm, postWorkspaceAction, workspace?.kind, workspace?.name]);
+
   if (!workspace) {
     return <div className="p-6 text-sm text-muted-foreground" data-testid="workspace-view-loading">Loading workspace…</div>;
   }
@@ -183,7 +255,49 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         )}
         <span className="text-sm font-medium text-foreground truncate">{workspace.title ?? workspace.name}</span>
         <span className="text-xs text-muted-foreground uppercase tracking-wide">{workspace.kind}</span>
+
+        {workspace.kind !== 'issue' && (
+          <div className="ml-auto flex items-center gap-3" data-testid="workspace-view-actions">
+            <button
+              type="button"
+              data-testid="workspace-view-favorite"
+              onClick={onToggleFavorite}
+              aria-pressed={workspace.isFavorite}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              {workspace.isFavorite ? 'Unfavorite' : 'Favorite'}
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-view-relocate"
+              onClick={() => setRelocating((prev) => !prev)}
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Relocate
+            </button>
+            <button
+              type="button"
+              data-testid="workspace-view-archive"
+              onClick={() => void onArchive()}
+              className="text-xs text-destructive hover:brightness-110"
+            >
+              Archive
+            </button>
+          </div>
+        )}
       </div>
+
+      {relocating && workspace.kind !== 'issue' && (
+        <div className="border-b border-border px-4 py-2 shrink-0" data-testid="workspace-view-relocate-picker">
+          <FolderPicker onSelect={(path) => void onRelocateTo(path)} initialPath={workspace.path} />
+        </div>
+      )}
+
+      {actionError && (
+        <div className="border-b border-border px-4 py-2 text-xs text-destructive shrink-0" data-testid="workspace-view-action-error">
+          {actionError}
+        </div>
+      )}
 
       {workspace.kind === 'issue' && workspace.issueId && (
         <div className="border-b border-border p-3 space-y-3 shrink-0 max-h-64 overflow-y-auto" data-testid="workspace-view-issue-panels">
