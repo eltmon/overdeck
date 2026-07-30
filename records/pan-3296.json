@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T08:19:54.674Z",
+  "updated": "2026-07-30T08:20:59.677Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "passed",
@@ -53,16 +53,9 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-30T06:09:44.925Z",
-    "updatedAt": "2026-07-30T08:19:53.283Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 8c8518d (2 paths): docs/AGENT-STATE-PLANES.md, src/lib/pan-dir/record-update.ts",
-        "detectedAt": "2026-07-30T08:16:09.807Z"
-      }
-    ],
+    "updatedAt": "2026-07-30T08:20:54.482Z",
     "conflictsSince": {
       "sha": "8c8518de9ec13d3f8a73e1b069e15afc981605f1",
       "detectedAt": "2026-07-30T08:16:09.807Z",
@@ -133,7 +126,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.227828,
-        "pricingAsOf": "2026-07-30T08:19:54.356Z"
+        "pricingAsOf": "2026-07-30T08:20:54.511Z"
       }
     },
     "merges": [
