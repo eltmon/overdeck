@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T22:04:25.140Z",
+  "updated": "2026-07-30T22:08:53.924Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "policy-strip-save-toast": {
-        "writerId": "agent-pan-3340",
-        "agentId": "agent-pan-3340",
-        "pid": 3847653,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T22:04:25.139Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3340",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Primary action buttons now open accessible submenu popovers, defer mutation until a mode is selected, close on selection/backdrop, and preserve trigger test ids. Four no-loss suites pass (162 tests); frontend typecheck and targeted ESLint pass.",
         "releasedAt": "2026-07-30T22:04:09.932Z"
+      },
+      {
+        "writerId": "agent-pan-3340",
+        "agentId": "agent-pan-3340",
+        "pid": 3847653,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T22:04:25.139Z",
+        "itemId": "policy-strip-save-toast",
+        "outcome": "completed",
+        "reason": "Policies now parse non-OK save responses into a sonner error toast while preserving the existing displayed override. Targeted suite passes 19/19; frontend typecheck and ESLint pass.",
+        "releasedAt": "2026-07-30T22:08:53.924Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "strip-submenu-popover": {
         "reason": "Primary action buttons now open accessible submenu popovers, defer mutation until a mode is selected, close on selection/backdrop, and preserve trigger test ids. Four no-loss suites pass (162 tests); frontend typecheck and targeted ESLint pass.",
         "updatedAt": "2026-07-30T22:04:09.932Z"
+      },
+      "policy-strip-save-toast": {
+        "reason": "Policies now parse non-OK save responses into a sonner error toast while preserving the existing displayed override. Targeted suite passes 19/19; frontend typecheck and ESLint pass.",
+        "updatedAt": "2026-07-30T22:08:53.924Z"
       }
     }
   },
@@ -129,6 +136,9 @@
     "strip-submenu-popover.strip-submenu-popover.ac2": "completed",
     "strip-submenu-popover.strip-submenu-popover.ac3": "completed",
     "strip-submenu-popover.strip-submenu-popover.ac4": "completed",
-    "policy-strip-save-toast": "running"
+    "policy-strip-save-toast": "completed",
+    "policy-strip-save-toast.policy-strip-save-toast.ac1": "completed",
+    "policy-strip-save-toast.policy-strip-save-toast.ac2": "completed",
+    "policy-strip-save-toast.policy-strip-save-toast.ac3": "completed"
   }
 }
