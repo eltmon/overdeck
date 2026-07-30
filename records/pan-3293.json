@@ -61,7 +61,7 @@
     "recordedAt": "2026-07-30T05:57:56.797Z"
   },
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T06:40:38.378Z",
+  "updated": "2026-07-30T06:41:01.591Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "passed",
@@ -70,50 +70,18 @@
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-07-30T06:40:38.297Z",
-    "reviewNotes": "Approved: prior reload ownership caveat blocker is fixed; correctness, security, requirements, and performance review is clean",
-    "testNotes": "HEAD 6b235ae9 (matches reviewedAtCommit), tree clean. Gates: npm run typecheck (root+hooks+evals+dashboard+frontend ratchets) exit 0; npm run lint (eslint+effect+permissions+state-writes+state-paths+overdeck-boundaries+pipeline-membership+workspace-doors+skills+slash-commands+prompts+file-size+source-introspection+circular+ratchet-audit+quarantine-audit) exit 0. Scoped tests: npx vitest run tests/unit/cli/restart-spawn-pid.test.ts tests/unit/dashboard/health-identity.test.ts tests/unit/lib/platform-lifecycle-squatter.test.ts tests/unit/lib/platform-lifecycle.test.ts -> 4 files, 36/36 passed, incl. real node:http squatter integration test proving wrong-pid health is rejected without killing the responder and matching-pid health succeeds. Full changed-file gate: OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main -> 130 passed | 1 skipped (131 files), 1170 passed | 14 skipped (1191 tests), no failures. UAT: not required — this is a pure CLI/backend restart-lifecycle fix (dashboard health payload pid, spawn pid handles, port-owner probing, teardown pid-death verification); no acceptance criterion, issue body, or PR body references dashboard UI/browser behavior, and the squatter integration test already covers the end-to-end restart-ownership scenario. No browser session opened.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "FR-2 satisfied: plain path returns child.pid (restart.ts:301); systemd path resolves MainPID via bounded 100ms poll with 5s deadline, returns null on systemctl throw/empty. Verified typecheck exits 0 (pid?: keeps handle shape, no consumer or fake edits) and tests/unit/cli/restart-spawn-pid.test.ts 4/4 pass in 513ms under fake timers (no real-clock waits).",
+    "readyForMerge": false,
+    "updatedAt": "2026-07-30T06:41:01.436Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-07-30T06:41:01.436Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3310",
     "reviewedAtCommit": "6b235ae933878af9e7c3ac7ba580fafa31e374c4",
-    "reviewSpawnedAt": "2026-07-30T06:27:28.198Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/cli/index.ts",
-        "src/cli/up-readiness.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/server/server.ts"
-      ],
-      "declaredScope": [
-        "docs/OVERDECK_DEV_SOP.md",
-        "src/cli/commands/restart.ts",
-        "src/dashboard/server/identity.ts",
-        "src/dashboard/server/server.ts",
-        "src/lib/platform-lifecycle.ts",
-        "sync-sources/skills/pan-restart/SKILL.md",
-        "tests/unit/cli/restart-spawn-pid.test.ts",
-        "tests/unit/dashboard/health-identity.test.ts",
-        "tests/unit/lib/platform-lifecycle-squatter.test.ts",
-        "tests/unit/lib/platform-lifecycle.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/OVERDECK_DEV_SOP.md",
-        "src/cli/commands/restart.ts",
-        "src/cli/index.ts",
-        "src/cli/up-readiness.ts",
-        "src/dashboard/server/identity.ts",
-        "src/lib/platform-lifecycle.ts",
-        "sync-sources/skills/pan-restart/SKILL.md",
-        "tests/unit/cli/restart-spawn-pid.test.ts",
-        "tests/unit/dashboard/health-identity.test.ts",
-        "tests/unit/lib/platform-lifecycle-squatter.test.ts",
-        "tests/unit/lib/platform-lifecycle.test.ts"
-      ],
-      "recordedAt": "2026-07-30T05:57:56.797Z"
-    }
+    "reviewSpawnedAt": "2026-07-30T06:27:28.198Z"
   },
   "closeOut": {
     "usage": {
@@ -136,10 +104,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 28,
-            "output": 4106,
-            "cacheRead": 2090698,
-            "cacheWrite": 151842
+            "input": 32,
+            "output": 4948,
+            "cacheRead": 2456006,
+            "cacheWrite": 152858
           }
         },
         "work": {
@@ -165,15 +133,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 28,
-          "output": 4106,
-          "cacheRead": 2090698,
-          "cacheWrite": 151842
+          "input": 32,
+          "output": 4948,
+          "cacheRead": 2456006,
+          "cacheWrite": 152858
         }
       },
       "costAtCloseOut": {
-        "usd": 94.404907,
-        "pricingAsOf": "2026-07-30T06:40:38.366Z"
+        "usd": 94.488936,
+        "pricingAsOf": "2026-07-30T06:41:01.491Z"
       }
     },
     "merges": [
