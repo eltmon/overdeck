@@ -1,5 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { createElement, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
+import { DialogProvider } from '../../components/DialogProvider';
+import { useIssueActions } from '../../components/IssueActionMenu/useIssueActions';
+import type { Agent, Issue } from '../../types';
 import {
   GROUP_LABELS,
   GROUP_ORDER,
@@ -13,6 +20,11 @@ import {
   type IssueActionState,
   type PipelinePhase,
 } from '../issueActions';
+import { useDashboardStore } from '../store';
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
 
 const prdActionKeys: readonly IssueActionKey[] = [
   'plan',
@@ -93,6 +105,51 @@ function reviewStatus(overrides: Partial<NonNullable<IssueActionState['reviewSta
     updatedAt: '2026-05-23T00:00:00.000Z',
     ...overrides,
   };
+}
+
+function reviewIssue(): Issue {
+  return {
+    id: 'issue-pan-3340',
+    identifier: 'PAN-3340',
+    title: 'Choose review mode',
+    status: 'In Progress',
+    priority: 2,
+    labels: [],
+    url: 'https://example.test/PAN-3340',
+    createdAt: '2026-07-30T00:00:00.000Z',
+    updatedAt: '2026-07-30T00:00:00.000Z',
+    project: { id: 'pan', name: 'Overdeck', color: '#fff' },
+    hasPlan: true,
+    hasTasks: true,
+    workspacePath: '/tmp/feature-pan-3340',
+  };
+}
+
+function stoppedWorkAgent(): Agent {
+  return {
+    id: 'agent-pan-3340',
+    issueId: 'PAN-3340',
+    runtime: 'claude-code',
+    model: 'claude-opus-5',
+    status: 'stopped',
+    startedAt: '2026-07-30T00:00:00.000Z',
+    consecutiveFailures: 0,
+    killCount: 0,
+    role: 'work',
+  };
+}
+
+function renderReviewActions() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  return renderHook(() => useIssueActions('PAN-3340'), {
+    wrapper: ({ children }: { children: ReactNode }) => createElement(
+      QueryClientProvider,
+      { client },
+      createElement(DialogProvider, null, children),
+    ),
+  });
 }
 
 describe('ISSUE_ACTIONS', () => {
@@ -325,6 +382,73 @@ describe('ISSUE_ACTIONS', () => {
     expect(action('rebuildAndStart').endpoint).toBe('/api/workspaces/:id/rebuild-and-start');
     expect(action('rebuildAndStart').kind).toBe('safe');
     expect(action('rebuildAndStart').group).toBe('recover');
+  });
+});
+
+describe('requestReview mode submenu', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
+      }
+      if (url === '/api/orders') {
+        return Response.json({ books: [] });
+      }
+      return Response.json({ success: true });
+    }));
+    useDashboardStore.setState({
+      issuesRaw: [reviewIssue()],
+      agentsById: { 'agent-pan-3340': stoppedWorkAgent() },
+      reviewStatusByIssueId: {},
+      drawer: { issueId: null, tab: 'overview' },
+    } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.clearAllMocks();
+  });
+
+  it('exposes full, quick, and none options with hint labels', () => {
+    const { result } = renderReviewActions();
+    const requestReview = result.current.all.find((view) => view.action.key === 'requestReview');
+
+    expect(requestReview?.enabled).toBe(true);
+    expect(requestReview?.submenu?.map(({ key, label }) => ({ key, label }))).toEqual([
+      { key: 'full', label: 'Full — 4-reviewer convoy' },
+      { key: 'quick', label: 'Quick — single pass (default)' },
+      { key: 'none', label: 'None — skip AI review' },
+    ]);
+  });
+
+  it('posts the selected full mode to the review trigger endpoint', async () => {
+    const { result } = renderReviewActions();
+    const requestReview = result.current.all.find((view) => view.action.key === 'requestReview');
+
+    act(() => requestReview?.submenu?.find((option) => option.key === 'full')?.invoke());
+
+    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+      '/api/review/PAN-3340/trigger',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ reviewMode: 'full' }),
+      }),
+    ));
+  });
+
+  it('toasts the selected mode and keeps direct invokes mode-less', async () => {
+    const { result } = renderReviewActions();
+    const requestReview = result.current.all.find((view) => view.action.key === 'requestReview');
+
+    act(() => requestReview?.submenu?.find((option) => option.key === 'full')?.invoke());
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('PAN-3340: review requested (full mode)'));
+    await waitFor(() => expect(result.current.isActionPending('requestReview')).toBe(false));
+
+    vi.mocked(toast.success).mockClear();
+    act(() => requestReview?.invoke());
+
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('PAN-3340: review requested'));
   });
 });
 

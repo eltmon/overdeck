@@ -99,6 +99,12 @@ function interpolateEndpoint(endpoint: string, issueId: string, agent: Agent | u
 
 const untroubledAction = ISSUE_ACTIONS.find((action) => action.key === 'untroubled');
 
+const REVIEW_MODE_SUBMENU_OPTIONS = [
+  { mode: 'full', label: 'Full — 4-reviewer convoy' },
+  { mode: 'quick', label: 'Quick — single pass (default)' },
+  { mode: 'none', label: 'None — skip AI review' },
+] as const;
+
 export async function clearTroubledGateForAgent(
   agentId: string,
   queryClient: QueryClient,
@@ -369,8 +375,14 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       }
       return response.json().catch(() => ({ success: true }));
     },
-    onSuccess: async (_data, { action }) => {
+    onSuccess: async (_data, { action, body }) => {
       await refreshDashboardState(queryClient);
+      if (action.key === 'requestReview') {
+        const mode = (body as { reviewMode?: string } | undefined)?.reviewMode;
+        toast.success(mode
+          ? `${issueId}: review requested (${mode} mode)`
+          : `${issueId}: review requested`);
+      }
       if (action.key === 'unpause') {
         // The route resumes immediately when a session exists — no more
         // "deacon resumes it on the next patrol" wait.
@@ -512,9 +524,15 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
             })),
             { key: 'new', label: '+ New book…', invoke },
           ]
-        : undefined,
+        : action.key === 'requestReview' && enabled
+          ? REVIEW_MODE_SUBMENU_OPTIONS.map((option) => ({
+              key: option.mode,
+              label: option.label,
+              invoke: () => submitDialogAction(action, { reviewMode: option.mode }),
+            }))
+          : undefined,
     };
-  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state]);
+  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state, submitDialogAction]);
 
   const layout = useMemo<IssueActionLayout>(() => {
     const byKey = new Map(all.map((view) => [view.action.key, view]));
