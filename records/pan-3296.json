@@ -44,7 +44,7 @@
     "recordedAt": "2026-07-30T05:59:49.887Z"
   },
   "created": "2026-07-30T03:42:14.023Z",
-  "updated": "2026-07-30T06:09:32.976Z",
+  "updated": "2026-07-30T06:09:38.395Z",
   "pipeline": {
     "issueId": "PAN-3296",
     "reviewStatus": "pending",
@@ -54,8 +54,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T06:09:32.160Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed verification error",
+    "updatedAt": "2026-07-30T06:09:32.473Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 2043255 exited before writing a result",
     "inspectNotes": "All four ACs met by executed production code; verified locally with a full run of state-door-durability.test.ts (7 passed, including the new adoption test). AC1: the test installs a pre-receive hook that rejects the first push with a 'cannot lock ref ... but expected' message matching isRemoteRefRaceError (record-update.ts:170), so reconcileStatePush is genuinely entered; adoptOrphanedStateWrites (record-update.ts:187, called at :324 between fetch and rebase) commits the dirty spec, the rebase completes, and the test proves the record mutation reached the remote by reading origin/overdeck-state:records/pan-3298.json and asserting statusOverrides == {owned-write: completed}, plus that origin log contains 'chore(state): adopt orphaned write before state rebase (PAN-3296)'. AC2: porcelain(stateRoot) asserted empty after the adoption-path reconciliation. AC3: a dirty operator-note.txt outside specs/records rejects with a message naming that path (record-update.ts:194) and the test pins adoption-commit counts unchanged on BOTH origin/overdeck-state and HEAD, so no local-only adoption commit slipped through either. AC4: console.warn at record-update.ts:208 lists every adopted path via paths.join and the test asserts the '[record-update] adopted orphaned state write(s): specs/' prefix. NFR-2 holds: only the existing async git() helper with { signal }, no sync/tmux primitives, specs.ts untouched. Checked the new rebase-conflict exposure — an adopted spec that conflicts on rebase is caught by replayConflictedRecord's single-path guard (record-update.ts:234-236), which aborts the rebase and throws loudly rather than corrupting state. Three non-blocking observations for later hardening, all fail-closed and none in AC scope: (1) 'git add -- specs records' at record-update.ts:203 exits 128 when a pathspec dir is entirely ABSENT (empirically verified; an existing-but-empty dir is fine), so a records-only dirty worktree on a state clone with no specs/ dir still wedges, now with an opaque git pathspec error — adding the already-enumerated paths instead of the two dir pathspecs would close it; (2) isOwnedStatePath (record-update.ts:183) covers only specs/ and records/, exactly as FR-4 specifies, so orphaned drafts/ or continues/ writes still wedge; (3) porcelainPaths (record-update.ts:173) does not unquote porcelain v1 quoted paths, so an owned path containing a space would be classified unowned and fail closed rather than adopt.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3311",
     "scopeDrift": {
@@ -123,7 +123,7 @@
       },
       "costAtCloseOut": {
         "usd": 74.28191699999999,
-        "pricingAsOf": "2026-07-30T06:09:32.906Z"
+        "pricingAsOf": "2026-07-30T06:09:32.936Z"
       }
     },
     "merges": [
