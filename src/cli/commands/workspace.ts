@@ -9,7 +9,7 @@ import {
   stopCommand,
   syncAuthCommand,
 } from './workspace-remote.js';
-import { workspaceMainCommand, workspaceNewCommand } from './workspace-scratch.js';
+import { workspaceMainCommand, workspaceNewCommand, workspaceRelocateCommand } from './workspace-scratch.js';
 import { workspaceActivateCommand, workspaceArchiveCommand, workspaceGetCommand } from './workspace-lifecycle.js';
 
 export { destroyCommand } from './workspace-list.js';
@@ -104,6 +104,13 @@ export function registerWorkspaceCommands(program: Command): void {
     .command('archive <ws>')
     .description('Archive a workspace (reversible; refuses kind=main)')
     .action(workspaceArchiveCommand);
+
+  workspace
+    .command('relocate <ws>')
+    .description('Point a workspace at a new path (refuses kind=issue; kind=main requires --force)')
+    .option('--path <dir>', 'New path (must be an existing directory)')
+    .option('--force', 'Allow relocating the main workspace, diverging it from projects.yaml')
+    .action(workspaceRelocateCommand);
 
   // Re-render `<workspace>/.devcontainer/` from the project's compose
   // template. Idempotent. The single source of truth for how the

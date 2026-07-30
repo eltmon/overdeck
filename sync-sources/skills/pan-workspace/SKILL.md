@@ -1,9 +1,10 @@
 ---
 name: pan-workspace
-description: "pan workspace new/main/get/activate/archive — the PAN-1990 projects/workspaces domain: kinds, doors, memory homes"
+description: "pan workspace new/main/get/activate/archive/relocate — the PAN-1990 projects/workspaces domain: kinds, doors, memory homes"
 triggers:
   - pan workspace new
   - pan workspace main
+  - pan workspace relocate
   - scratch workspace
   - workspace kind
 allowed-tools:
@@ -30,6 +31,7 @@ pan workspace main [--project <key>]
 pan workspace get <ws>
 pan workspace activate <ws>
 pan workspace archive <ws>
+pan workspace relocate <ws> --path <dir> [--force]
 pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
 ```
 
@@ -57,10 +59,19 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
 - `--project <key>` on `new`/`main` defaults to the sole registered project, or the
   one resolved from the current working directory, when omitted.
 - `get <ws>` prints the full row (id, kind, project, path, branch, issue, archived,
-  favorite, lastAccess) for a workspace id.
+  favorite, lastAccess) plus `memoryHome` — the workspace's memory-home directory
+  (`resolveWorkspaceMemoryRoot`), keyed by workspace id and stable across relocation.
 - `activate <ws>` bumps `lastAccessedAt` (drives most-recent-first ordering in the
   Sidebar and Cmd-K switcher) and prints a hint to restore `layoutConfig` if the
   workspace has a saved dashboard pane arrangement.
 - `archive <ws>` is reversible and refuses `kind=main`.
+- `relocate <ws> --path <dir>` (Subspace `workspaces update --relocate` parity) points
+  an existing workspace at a new path: updates the `path` column, re-detects
+  `is_git_repository` from `<dir>/.git`, touches `lastAccessedAt`, and re-writes the
+  memory-home `metadata.json` recovery hint — the memory home itself never moves,
+  since it's keyed by workspace id, not path. `<ws>` accepts an id or a name
+  (ambiguous names across projects error out asking for the id). Refuses
+  `kind=issue` (pipeline-owned) and archived workspaces; `kind=main` requires
+  `--force` since it diverges the row from projects.yaml's primary path.
 - `list --kind <kind>` reads through the resolver the same way the dashboard does;
   add `--archived` to include archived rows (only meaningful together with `--kind`).

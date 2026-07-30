@@ -6,8 +6,8 @@ import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import { listProjectsSync, type ProjectConfig } from '../../lib/projects.js';
 import { getDefaultWorkspaceConfigSync } from '../../lib/workspace-config.js';
-import { getMainWorkspace, listProjectTargets, resolveWorkspaceForCwd } from '../../lib/workspaces/resolver.js';
-import { createWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
+import { getMainWorkspace, listProjectTargets, resolveWorkspaceForCwd, resolveWorkspaceRef } from '../../lib/workspaces/resolver.js';
+import { createWorkspace, relocateWorkspace, touchWorkspaceAccessed, upsertProjectFromConfig } from '../../lib/workspaces/writer.js';
 import { validateFeatureName } from '../../lib/workspace-manager/worktree-ops.js';
 
 /** True when `path` equals, or is nested under, `candidate`. */
@@ -198,6 +198,52 @@ export async function workspaceMainCommand(options: WorkspaceMainOptions): Promi
     touchWorkspaceAccessed(id);
     console.log(chalk.green(`✓ Created main workspace for '${project.key}' (${id})`));
     console.log(chalk.dim(`  path: ${project.config.path}${isGitRepository ? '' : ' (not a git repository)'}`));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(chalk.red(`✗ ${message}`));
+    return exitCli(1);
+  }
+}
+
+export interface WorkspaceRelocateOptions {
+  path?: string;
+  force?: boolean;
+}
+
+/** Point a workspace at a new path (Subspace `workspaces update --relocate` parity, PAN-3286 WI-2). */
+export async function workspaceRelocateCommand(ws: string, options: WorkspaceRelocateOptions): Promise<void> {
+  try {
+    if (!options.path) {
+      throw new Error(`--path is required.`);
+    }
+    const resolution = resolveWorkspaceRef(ws);
+    if (resolution.ambiguous) {
+      throw new Error(
+        `Multiple workspaces named '${ws}' found (projects: ${resolution.matches.map((w) => w.projectId).join(', ')}); use the workspace id instead.`,
+      );
+    }
+    if (!resolution.workspace) {
+      throw new Error(`No workspace found with id or name '${ws}'`);
+    }
+    const workspace = resolution.workspace;
+
+    const resolvedPath = resolve(options.path);
+    if (!existsSync(resolvedPath) || !statSync(resolvedPath).isDirectory()) {
+      throw new Error(`--path must be an existing directory: ${options.path}`);
+    }
+
+    const oldPath = workspace.path;
+    await relocateWorkspace(workspace.id, resolvedPath, { force: options.force });
+
+    console.log(chalk.green(`✓ Relocated workspace '${workspace.name}' (${workspace.id})`));
+    console.log(chalk.dim(`  ${oldPath} → ${resolvedPath}`));
+    if (workspace.kind === 'main') {
+      console.log(
+        chalk.yellow(
+          `ℹ '${workspace.name}' is the project's main workspace — its path now diverges from projects.yaml's primary path.`,
+        ),
+      );
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(chalk.red(`✗ ${message}`));
