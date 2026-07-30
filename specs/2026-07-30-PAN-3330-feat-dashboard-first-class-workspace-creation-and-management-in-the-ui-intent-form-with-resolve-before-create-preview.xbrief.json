@@ -4,17 +4,17 @@
     "created": "2026-07-30T13:36:47Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3330: feat(dashboard): first-class workspace creation and management in the UI — intent form with resolve-before-create preview",
-    "updated": "2026-07-30T13:41:25.915Z"
+    "updated": "2026-07-30T20:27:47.559Z"
   },
   "plan": {
     "id": "pan-3330",
     "title": "feat(dashboard): first-class workspace creation and management in the UI — intent form with resolve-before-create preview",
-    "status": "proposed",
+    "status": "running",
     "uid": "a822625a-cb00-4f7b-8227-ab38b74fca28",
     "author": "agent:claude-fable-5",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-30T13:36:47Z",
-    "updated": "2026-07-30T13:41:25.915Z",
+    "updated": "2026-07-30T20:27:47.559Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3330",
@@ -538,5 +538,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
