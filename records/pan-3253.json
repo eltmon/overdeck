@@ -190,15 +190,7 @@
       "timestamp": "2026-07-30T11:07:19.926Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-30T10:37:45Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3253\n\n# Review — PAN-3253 — 2026-07-30\n\n## Verdict: CHANGES REQUESTED — canonical bulk review-status hydration remains unbounded\n\n## Context\n\n- Branch: `feature/pan-3253`\n- HEAD reviewed: `80f12ca60cd20f82d4e060b1e1f6492a1a56e7bd`\n- PR: `#3279`\n- Dimensions reviewed: correctness/logic, security, requirements/acceptance criteria, performance\n- Verification observed: targeted Vitest files passed (58 tests); all GitHub CI checks are green\n\n## Blocking Findings\n\n### ! Canonical bulk hydration bypasses the new history and note bounds — `src/lib/overdeck/review-status-sync.ts:162`\n\n**Dimensions:** correctness, requirements, performance  \n**Evidence tier:** Tier 2 — command reproduction  \n**Scope:** `in_pr_scope` (`notes-cap` / FR-2 and the documented hydration invariant)\n\n**Changed code:** The PR applies `ORDER BY timestamp DESC LIMIT 20` and 500-character note truncation only in `getHistorySync()`, which serves `getReviewStatusFromDbSync()`. The same canonical module's bulk readers, `getAllReviewStatusesFromDb()` and `getReviewStatusesFromDb()`, independently select every `status_history` row and pass the raw arrays and notes to `rowToReviewStatus()`.\n\n**Reproduction:** Against a fresh schema, one issue was seeded with 30 history entries carrying 600-character notes. The single-item reader returned the intended bounds, while both bulk readers returned the full data:\n\n```json\n{\"singleLength\":20,\"singleNote\":500,\"allLength\":30,\"allNote\":600,\"selectedLength\":30,\"selectedNote\":600}\n```\n\n**Runtime impact:** `loadReviewStatuses()` and `loadReviewStatusesForIssues()` are the public readers used across dashboard boot, Deacon patrols, merge processing, webhook handling, metrics, and issue-data enrichment. Those hot paths still hydrate an unbounded number of archival rows and full notes into memory. The documented maximum of 20 entries and 500 characters therefore does not hold for canonical in-memory review-status objects, and the read cost still grows with the intentionally unbounded `status_history` table.\n\n**Required fix:** Apply the bound to all canonical hydration paths before materializing rows. For bulk reads, use a per-issue SQL bound (for example, `ROW_NUMBER() OVER (PARTITION BY issue_id ORDER BY timestamp DESC, id DESC) <= REVIEW_STATUS_HISTORY_LIMIT`), restore chronological order, and apply `truncateHistoryNote()` while mapping. Add regression tests for both `getAllReviewStatusesFromDb()` and `getReviewStatusesFromDb()` that assert 20 entries and 500-character notes. Keep the raw `status_history` rows unchanged.\n\n## Non-blocking Findings\n\n### ~ Legacy database adapter applies inconsistent note bounds — `src/lib/database/review-status-db.ts:388`\n\nThe compatibility adapter limits the single-item history query to 20 rows but returns raw notes there, while its bulk paths truncate notes only after loading every archival row. No production imports of this adapter were found, so this does not independently block the PR, but it should be aligned if the mirror surface remains supported.\n\n### ~ Several new tests conditionally skip their note assertion — `tests/unit/event-store.test.ts:296`\n\nMultiple append-door tests check note length only inside `if (entry.notes)`. A regression that drops `notes` instead of truncating them would let those checks pass. The composition test has a direct definedness assertion, so this is test-strengthening rather than a production blocker.\n\n## Requirements Coverage\n\n- **FR-1 / append-door-bound:** Implemented for `append()`, `appendAsync()`, and `appendOnce()`; persisted and emitted payloads use the bounded JSON round trip.\n- **FR-2 / notes-cap:** Implemented for composition output and single-item canonical hydration, while raw `status_history` writes remain uncapped. **Incomplete for canonical bulk hydration; blocking finding above.**\n- **FR-3 / boot-trim-notes:** `trimReviewStatusHistoryPayloads()` delegates to the shared payload-bounding logic and preserves the required 16 KB selection threshold and 64 MB VACUUM trigger.\n- **FR-4 / docs-bounds:** Documentation was added, but its statement that in-memory objects are bounded is currently contradicted by the bulk readers.\n- **Must-not constraints:** No delta event-contract refactor, status-history retention change, event-retention change, threshold change, upstream churn fix, or destructive/manual VACUUM runbook was introduced.\n\n## Security Review\n\nNo security findings. The change introduces no attacker-controlled code execution, authorization change, credential handling, or SQL interpolation from untrusted input; the new SQL limit is constant/config-owned.\n\n## Performance Review\n\nThe append path adds bounded JSON parsing and an O(20) history scan after composition, which is proportionate. The blocking bulk-hydration gap remains unbounded in archival row count and note size, so the performance acceptance is not complete.\n\n## Clean Areas Checked\n\n- Shared limit constants and import-cycle handling\n- Tail preservation and 500-character ellipsis behavior\n- Raw archival history preservation on normal writes\n- Malformed historical JSON handling\n- Non-review event payload preservation\n- Idempotent append behavior\n- Retention and VACUUM thresholds\n- Documentation and file-size allowlist changes\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3253/.pan/review/agent-pan-3253-review-80f12ca6/review.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3253 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "scripts/file-size-allowlist.txt",
@@ -235,17 +227,17 @@
     "recordedAt": "2026-07-29T15:41:58.832Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:21:14.816Z",
+  "updated": "2026-07-30T11:22:01.696Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-29T15:44:06.178Z",
-    "updatedAt": "2026-07-30T11:21:13.573Z",
+    "updatedAt": "2026-07-30T11:22:01.656Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
@@ -257,7 +249,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "80f12ca60cd20f82d4e060b1e1f6492a1a56e7bd",
     "lastVerifiedCommit": "09d9a69b337d7007077fcfa03672a9a88692a288",
-    "reviewSpawnedAt": "2026-07-30T10:26:26.927Z"
+    "reviewSpawnedAt": "2026-07-30T11:22:01.653Z"
   },
   "closeOut": {
     "usage": {
@@ -280,10 +272,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3979,
-            "output": 184020,
-            "cacheRead": 89863408,
-            "cacheWrite": 4821537
+            "input": 4018,
+            "output": 185009,
+            "cacheRead": 90685312,
+            "cacheWrite": 4823410
           }
         }
       },
@@ -301,15 +293,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3979,
-          "output": 184020,
-          "cacheRead": 89863408,
-          "cacheWrite": 4821537
+          "input": 4018,
+          "output": 185009,
+          "cacheRead": 90685312,
+          "cacheWrite": 4823410
         }
       },
       "costAtCloseOut": {
-        "usd": 135.878008,
-        "pricingAsOf": "2026-07-30T11:21:14.811Z"
+        "usd": 135.967523,
+        "pricingAsOf": "2026-07-30T11:22:01.678Z"
       }
     },
     "merges": [
