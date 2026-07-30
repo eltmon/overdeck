@@ -608,7 +608,12 @@ async function assertTmuxTargetCanReceive(normalizedId: string, caller: string):
   }
 }
 
-const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 3_000;
+// 3s was too tight on hosts where SessionStart hooks (memory RAG injection,
+// Subspace + Overdeck both) delay the first transcript flush past the window —
+// kickoff confirmation then killed healthy agents whose user record landed
+// seconds later (observed 2026-07-29, macOS). The wait returns as soon as the
+// record appears, so a generous ceiling adds no latency on the happy path.
+const RESUME_TRANSCRIPT_CONFIRM_TIMEOUT_MS = 30_000;
 const RESUME_TRANSCRIPT_CONFIRM_INTERVAL_MS = 100;
 
 async function waitForTranscriptUserRecordLanding(

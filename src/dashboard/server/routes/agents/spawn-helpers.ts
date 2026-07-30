@@ -45,7 +45,7 @@ type EventStoreAppend = {
 
 type SpawnPanCommand = (args: string[], cwd?: string) => Promise<string>;
 
-type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+type PlaceholderHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
 
 export function buildAgentStartPlaceholder(input: {
   agentSessionName: string;
@@ -276,7 +276,7 @@ export function handleContainerOrchestration(input: {
   devScript: string;
   agentSessionName: string;
   role: Role;
-  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | null;
+  effectiveHarness: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code' | null;
   startedBy: string;
   allowHost: boolean;
   spawnModel: string;

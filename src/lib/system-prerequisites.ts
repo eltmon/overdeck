@@ -170,7 +170,7 @@ export const PREREQUISITES: readonly PrerequisiteDefinition[] = [
     id: 'kimi',
     name: 'Kimi Code CLI',
     required: false,
-    purpose: 'Kimi Code agents through the Agent Client Protocol (ACP)',
+    purpose: 'Kimi Code agents — native (kimi-code) and ACP (acp) harnesses',
     versionArgs: ['--version'],
     install: {
       linux: 'https://www.kimi.com/code/docs/en/kimi-code-cli/guides/getting-started.html',

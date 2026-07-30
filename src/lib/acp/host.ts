@@ -28,7 +28,7 @@ import {
   isRejectPermissionOption,
   selectAutoPermissionOutcome,
 } from "./permissions.js";
-import { resolveAcpProviderSupport } from "./providers.js";
+import { resolveAcpModelId, resolveAcpProviderSupport } from "./providers.js";
 import {
   AcpSessionRuntime,
   type AcpSessionRuntimeEvent,
@@ -120,7 +120,15 @@ export class AcpHost {
       );
       this.sessionId = started.sessionId;
       if (this.options.model) {
-        await Effect.runPromise(this.options.runtime.setModel(this.options.model));
+        // The launcher passes Overdeck model ids (e.g. `k3[1m]`); the agent
+        // validates against its own registry ids (e.g. `kimi-code/k3`).
+        // Translate at this boundary so every host entrypoint (spawn, resume,
+        // fork) sets a value the agent accepts.
+        await Effect.runPromise(
+          this.options.runtime.setModel(
+            resolveAcpModelId(this.options.provider, this.options.model),
+          ),
+        );
       }
       if (this.options.resumeSessionId) {
         for (const owed of await readOwedAcpPrompts(this.transcriptPath())) {

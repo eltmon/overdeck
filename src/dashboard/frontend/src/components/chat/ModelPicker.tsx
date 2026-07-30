@@ -136,7 +136,7 @@ export function saveStoredModel(modelId: string): void {
 export function loadStoredHarness(): Harness {
   try {
     const stored = localStorage.getItem(HARNESS_STORAGE_KEY);
-    if (stored === 'ohmypi' || stored === 'claude-code' || stored === 'codex' || stored === 'acp') return stored;
+    if (isHarness(stored)) return stored;
   } catch { /* ignore */ }
   return 'claude-code';
 }
@@ -152,7 +152,7 @@ function formatCost(costPer1M: number): string {
 }
 
 function isHarness(value: unknown): value is Harness {
-  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp';
+  return value === 'claude-code' || value === 'ohmypi' || value === 'codex' || value === 'acp' || value === 'kimi-code';
 }
 
 function providerDefaultHarness(provider: string, providerHarnesses: ProviderHarnesses): Harness {

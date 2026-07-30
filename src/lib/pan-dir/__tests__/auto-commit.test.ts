@@ -73,6 +73,26 @@ describe('auto-commit', () => {
     }),
   );
 
+  it.effect('refuses to stage a path that case-collides with a tracked file (PAN-3287)', () =>
+    Effect.gen(function* () {
+      mkdirSync(join(tmp, '.pan', 'drafts'), { recursive: true });
+      writeFileSync(join(tmp, '.pan', 'drafts', 'pan-9.md'), 'canonical draft');
+      exec(tmp, 'git add .pan/drafts/pan-9.md');
+      exec(tmp, 'git commit -q -m "track lowercase draft"');
+
+      const upper = join(tmp, '.pan', 'drafts', 'PAN-9.md');
+      writeFileSync(upper, 'colliding twin');
+      queueAutoCommit({ projectRoot: tmp, paths: [upper], subject: 'chore(state): update PRD draft for PAN-9' });
+      const result = yield* flushAutoCommits(tmp);
+
+      expect(result.committed).toBe(false);
+      expect(result.errored).toBe(true);
+      expect(result.reason).toContain('case-colliding');
+      // The branch still tracks only the canonical casing.
+      expect(exec(tmp, 'git ls-files .pan/drafts')).toBe('.pan/drafts/pan-9.md');
+    }),
+  );
+
   it('bounds a stalled state-writer flush', async () => {
     vi.useFakeTimers();
     try {

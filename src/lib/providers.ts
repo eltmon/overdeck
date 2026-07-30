@@ -75,15 +75,27 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     name: 'kimi',
     displayName: 'Kimi (Moonshot AI)',
     compatibility: 'direct',
-    // claude-code, not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider
-    // (kimi-coding → kimi-code), changed its model ids (kimi-k2.7-code →
-    // kimi-for-coding), and switched it to OAuth, so omp can no longer launch a
-    // Kimi work agent — it exits immediately and the tmux session orphans. Kimi
-    // exposes an Anthropic-compatible endpoint (api.kimi.com/coding + sk-kimi-*
-    // token), so claude-code talks to it natively — no omp, no CLIProxy, no
-    // 200k-window deadlock.
-    defaultHarness: 'claude-code',
-    models: ['k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview'],
+    // Not ohmypi (PAN-2102). omp v16.1.16 renamed Kimi's provider (kimi-coding
+    // → kimi-code), changed its model ids (kimi-k2.7-code → kimi-for-coding),
+    // and switched it to OAuth, so omp can no longer launch a Kimi work agent
+    // — it exits immediately and the tmux session orphans.
+    // PAN-1837 wi7b: flipped from 'claude-code' to 'kimi-code' — the native
+    // Kimi Code CLI harness, proven end-to-end (wi14-e2e: real spawn, kickoff
+    // + mid-session delivery, session/cost resolution, no fallback, all live
+    // against the installed 0.29.2 binary). An operator's providerHarnesses.kimi
+    // config override (e.g. 'acp' or 'claude-code') still wins over this
+    // built-in default (harness-resolve.ts:80-83).
+    defaultHarness: 'kimi-code',
+    // PAN-1837: the native kimi-code harness resolves its own model aliases
+    // under the installed CLI's config.toml, which are namespaced
+    // `kimi-code/<alias>` (verified against the installed 0.29.2 binary's
+    // `kimi provider list --json`) — a DIFFERENT id space than the bare
+    // claude-code-routed ids above. Both must be registered here so
+    // getProviderForModelSync resolves either shape to this provider.
+    models: [
+      'k3', 'k3[1m]', 'kimi-k2.7-code', 'kimi-k2.6', 'kimi-k2.5', 'kimi-k2', 'K2.6-code-preview',
+      'kimi-code/k3', 'kimi-code/k3-256k', 'kimi-code/kimi-for-coding', 'kimi-code/kimi-for-coding-highspeed',
+    ],
     tierModels: { opus: 'kimi-k2.6', sonnet: 'kimi-k2.5', haiku: 'kimi-k2' },
     tested: true,
     description: 'Route directly to Kimi Anthropic-compatible endpoints via claude-code; sk-kimi-* keys use the coding endpoint, platform keys use Moonshot.',
@@ -260,6 +272,50 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
   },
 };
 
+/**
+ * PAN-1837: the native kimi-code CLI's own model catalog (verified via `kimi
+ * provider list --json` against the installed 0.29.2 binary) is a smaller,
+ * DIFFERENT id space than the claude-code-routed Kimi ids in
+ * PROVIDERS.kimi.models — it exposes only kimi-code/k3, kimi-code/k3-256k,
+ * kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. Since
+ * wi7b flipped the built-in default to kimi-code, an existing role/config
+ * pinned to a bare claude-code-routed id (e.g. `kimi-k2.6`) now resolves to
+ * kimi-code but `kimi -m kimi-k2.6` fails — the native binary has never heard
+ * of that id.
+ *
+ * Only remap ids with a defensible 1:1 native correspondence. Reviewed
+ * against `kimi provider list --json`: kimi-code/k3 reports
+ * maxContextSize=1048576 (matches the claude-routed k3[1m] alias's 1M
+ * context), kimi-code/k3-256k reports maxContextSize=262144 (matches the
+ * claude-routed k3 alias's 256K context) — so the context tiers, not the
+ * bare-string similarity, decide the mapping.
+ */
+const KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS: Record<string, string> = {
+  'k3': 'kimi-code/k3-256k',
+  'k3[1m]': 'kimi-code/k3',
+};
+
+/**
+ * Resolve a model id to what the kimi-code CLI's `-m` flag will actually
+ * accept. Already-native `kimi-code/<alias>` ids pass through unchanged.
+ * Legacy claude-code-routed ids with a defensible native counterpart
+ * (KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS) are remapped. Every other legacy id
+ * (kimi-k2.7-code, kimi-k2.6, kimi-k2.5, kimi-k2, K2.6-code-preview) has no
+ * native equivalent in the installed CLI's catalog — fail loudly (matching
+ * the existing PAN-1871 fail-loud-over-silent-wrong-launch philosophy)
+ * instead of guessing an alias the operator never chose.
+ */
+export function resolveKimiCodeModelAlias(model: string): string {
+  if (model.startsWith('kimi-code/')) return model;
+  const mapped = KIMI_LEGACY_MODEL_TO_NATIVE_ALIAS[model];
+  if (mapped) return mapped;
+  throw new Error(
+    `Model "${model}" has no native kimi-code CLI equivalent — the installed binary's catalog only exposes `
+    + `kimi-code/k3, kimi-code/k3-256k, kimi-code/kimi-for-coding, and kimi-code/kimi-for-coding-highspeed. `
+    + `Pick one of those models, or set providerHarnesses.kimi to 'claude-code' or 'acp' in config.yaml to keep using "${model}".`,
+  );
+}
+
 export function getBuiltInDefaultHarness(provider: ProviderName | string): RuntimeName {
   if (provider in PROVIDERS) {
     return PROVIDERS[provider as ProviderName].defaultHarness;
@@ -328,6 +384,12 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   }
   if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
+  }
+  // PAN-1837: native kimi-code CLI model aliases are namespaced `kimi-code/<alias>`
+  // (its own config.toml provider-prefixing, not an OpenRouter id) — carve out
+  // before the generic slash-delimited catch-all below.
+  if (modelId.startsWith('kimi-code/')) {
+    return PROVIDERS.kimi;
   }
   if (modelId.includes('/')) {
     return PROVIDERS.openrouter;
@@ -405,11 +467,19 @@ export function getDirectProviders(): ProviderConfig[] {
 }
 
 /**
- * Get environment variables for spawning agent with specific provider
+ * Get environment variables for spawning agent with specific provider.
+ *
+ * `harness` is optional and defaults to preserving the pre-PAN-1837 behavior
+ * for every existing caller. When harness === 'kimi-code', the Kimi
+ * Anthropic-compatibility shim (ANTHROPIC_BASE_URL / ANTHROPIC_AUTH_TOKEN /
+ * KIMI_API_KEY) is skipped entirely: native Kimi Code auth is host-owned via
+ * `kimi login` / ~/.kimi-code/config.toml, and leaking these vars into the
+ * native binary's env would risk silently redirecting or breaking its auth.
  */
 export function getProviderEnvSync(
   provider: ProviderConfig,
-  apiKey: string
+  apiKey: string,
+  harness?: RuntimeName,
 ): Record<string, string> {
   if (provider.name === 'openai') {
     // OpenAI never receives provider-native or Anthropic token env here.
@@ -418,15 +488,19 @@ export function getProviderEnvSync(
     return {};
   }
 
+  const isKimiCode = provider.name === 'kimi' && harness === 'kimi-code';
+
   const env: Record<string, string> = {};
 
-  if (provider.name === 'kimi') {
-    env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
-  } else if (provider.baseUrl) {
-    env.ANTHROPIC_BASE_URL = provider.baseUrl;
+  if (!isKimiCode) {
+    if (provider.name === 'kimi') {
+      env.ANTHROPIC_BASE_URL = getKimiAnthropicBaseUrl(apiKey);
+    } else if (provider.baseUrl) {
+      env.ANTHROPIC_BASE_URL = provider.baseUrl;
+    }
   }
 
-  if (provider.name !== 'anthropic') {
+  if (provider.name !== 'anthropic' && !isKimiCode) {
     if (provider.authType === 'credential-file') {
       // Credential-file providers use apiKeyHelper for dynamic token refresh.
       // We still need an initial ANTHROPIC_AUTH_TOKEN for the first request,
@@ -442,7 +516,8 @@ export function getProviderEnvSync(
 
   // Pi-native provider env vars so the Pi harness can authenticate directly
   // when driving non-Anthropic models (Pi has its own provider registry).
-  if (provider.name === 'kimi') {
+  // Native kimi-code ignores this var (auth is host-owned), so it's skipped too.
+  if (provider.name === 'kimi' && !isKimiCode) {
     env.KIMI_API_KEY = apiKey;
   } else if (provider.name === 'minimax') {
     env.MINIMAX_API_KEY = apiKey;
@@ -477,14 +552,16 @@ export function getProviderEnvSync(
 
   // Non-Anthropic providers don't support claude-haiku-4-5-20251001.
   // Tell Claude Code to use the provider's small/fast model instead
-  // for Explore agents and other haiku-dependent features.
-  if (provider.haikuModel) {
+  // for Explore agents and other haiku-dependent features. These are all
+  // Claude Code subagent-routing concepts (Explorer/Plan/general-purpose) —
+  // meaningless to the native kimi-code binary, so skip them too.
+  if (provider.haikuModel && !isKimiCode) {
     env.ANTHROPIC_DEFAULT_HAIKU_MODEL = provider.haikuModel;
   }
 
   // Inject subagent model env vars so Claude Code spawns subagents
   // (Explorer, Plan, general-purpose) with model IDs the provider knows.
-  if (provider.tierModels) {
+  if (provider.tierModels && !isKimiCode) {
     if (provider.tierModels.opus) {
       env.ANTHROPIC_DEFAULT_OPUS_MODEL = provider.tierModels.opus;
     }

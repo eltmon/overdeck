@@ -28,7 +28,7 @@ describe('agent harness skill sync', () => {
   });
 
   it('has a native discovery destination for every supported agent harness', () => {
-    expect(SKILL_SYNC_HARNESSES).toEqual(['claude-code', 'codex', 'acp', 'pi', 'ohmypi']);
+    expect(SKILL_SYNC_HARNESSES).toEqual(['claude-code', 'codex', 'acp', 'pi', 'ohmypi', 'kimi-code']);
   });
 
   it('copies the complete skill bundle into the shared Agent Skills directory', () => {

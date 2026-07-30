@@ -38,6 +38,7 @@ interface StubRuntime {
   readonly runtime: AcpHostRuntime;
   readonly prompts: EffectAcpSchema.PromptRequest["prompt"][];
   readonly order: string[];
+  readonly setModels: string[];
   readonly startCalls: () => number;
   readonly requestPermission: (
     request: EffectAcpSchema.RequestPermissionRequest,
@@ -48,6 +49,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
   const events = await Effect.runPromise(Queue.unbounded<AcpSessionRuntimeEvent>());
   const prompts: EffectAcpSchema.PromptRequest["prompt"][] = [];
   const order: string[] = [];
+  const setModels: string[] = [];
   let starts = 0;
   let remainingPromptErrors = options.promptErrorCount ?? (options.promptError ? Number.POSITIVE_INFINITY : 0);
   let sessionUpdateHandler:
@@ -126,9 +128,10 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
         return { stopReason: "end_turn" as const };
       }),
     cancel: Effect.void,
-    setModel: () =>
+    setModel: (model) =>
       Effect.gen(function* () {
         order.push("set-model");
+        setModels.push(model);
         if (options.setModelStarted) {
           yield* Deferred.succeed(options.setModelStarted, undefined);
         }
@@ -142,6 +145,7 @@ async function makeStubRuntime(options: StubRuntimeOptions = {}): Promise<StubRu
     runtime,
     prompts,
     order,
+    setModels,
     startCalls: () => starts,
     requestPermission: (permissionRequest) =>
       Effect.runPromise(permissionHandler!(permissionRequest)),
@@ -286,6 +290,24 @@ describe("AcpHost", () => {
       body: expect.objectContaining({ state: "ready", sessionId: "acp-session-1" }),
     });
     await expect(readFile(sessionIdPath, "utf-8")).resolves.toBe("acp-session-1\n");
+  });
+
+  it("translates Overdeck kimi model ids to kimi-code session-config values at setModel", async () => {
+    const overdeckHome = await makeHome();
+    const stub = await makeStubRuntime();
+    const host = new AcpHost({
+      agentId: "agent-model-translate",
+      provider: "kimi",
+      workspace: process.cwd(),
+      model: "k3[1m]",
+      overdeckHome,
+      runtime: stub.runtime,
+    });
+    hosts.push(host);
+
+    await host.start();
+
+    expect(stub.setModels).toEqual(["kimi-code/k3"]);
   });
 
   it("authenticates delivery, forwards prompts, and records both sides of the turn", async () => {

@@ -69,6 +69,7 @@ describe('buildHarnessPolicyDecisions', () => {
       expect(perModel).toHaveProperty('claude-code');
       expect(perModel).toHaveProperty('codex');
       expect(perModel).toHaveProperty('acp');
+      expect(perModel).toHaveProperty('kimi-code');
     }
   });
 

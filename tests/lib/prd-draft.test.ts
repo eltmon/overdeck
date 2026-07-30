@@ -54,16 +54,16 @@ describe('prd-draft', () => {
       await registerTestProject();
       const path = getPRDDraftPathSync('PAN-123');
 
-      expect(path).toContain('PAN-123.md');
+      expect(path).toContain('pan-123.md');
       expect(path).toContain('drafts');
     });
 
-    it('should uppercase the issue ID', async () => {
+    it('should lowercase the issue ID (PAN-3287)', async () => {
       const { getPRDDraftPathSync } = await import('../../src/lib/prd-draft.js');
       await registerTestProject();
-      const path = getPRDDraftPathSync('pan-456');
+      const path = getPRDDraftPathSync('PAN-456');
 
-      expect(path).toContain('PAN-456.md');
+      expect(path).toContain('pan-456.md');
     });
   });
 
@@ -120,7 +120,7 @@ describe('prd-draft', () => {
 
       const path = await Effect.runPromise(writePRDDraft('PAN-123', '# Test PRD'));
 
-      expect(path).toContain('PAN-123.md');
+      expect(path).toContain('pan-123.md');
     });
 
     it('should overwrite existing draft', async () => {

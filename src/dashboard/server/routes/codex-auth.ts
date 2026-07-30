@@ -38,6 +38,13 @@ function rejectInvalidOrigin(request: HttpServerRequest.HttpServerRequest): Retu
   return null;
 }
 
+// macOS always has a GUI browser reachable via `open` — DISPLAY/WAYLAND_DISPLAY
+// are X11/Wayland variables that never exist on darwin, so checking them alone
+// misclassified every Mac as headless and forced the manual device-code flow.
+function isHeadlessHost(): boolean {
+  return process.platform !== 'darwin' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+}
+
 function generateReauthSession(): { sessionName: string; terminalToken: string; statusToken: string } {
   const sessionName = `reauth-${randomUUID()}`;
   const terminalToken = randomUUID();
@@ -130,7 +137,7 @@ const postCodexReauthRoute = HttpRouter.add(
 
       const existing = yield* Effect.promise(() => getExistingLiveReauthSession());
       if (existing) {
-        const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+        const headless = isHeadlessHost();
         existing.session.terminalToken = randomUUID();
         return jsonResponse(
           { sessionName: existing.sessionName, statusToken: existing.session.statusToken, headless, existing: true },
@@ -140,7 +147,7 @@ const postCodexReauthRoute = HttpRouter.add(
 
       const { sessionName, terminalToken, statusToken } = generateReauthSession();
 
-      const headless = !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY;
+      const headless = isHeadlessHost();
       const command = headless ? 'codex login --device-auth' : 'codex login';
 
       yield* createSession(sessionName, homedir(), command, {

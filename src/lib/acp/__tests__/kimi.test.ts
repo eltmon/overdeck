@@ -4,8 +4,9 @@ import type * as EffectAcpSchema from "effect-acp/schema";
 import {
   buildKimiAcpSpawnInput,
   resolveKimiAuthMethodId,
+  translateKimiAcpModelId,
 } from "../kimi.js";
-import { resolveAcpProviderSupport } from "../providers.js";
+import { resolveAcpModelId, resolveAcpProviderSupport } from "../providers.js";
 import {
   checkSystemPrerequisites,
   PREREQUISITES,
@@ -93,12 +94,36 @@ describe("Kimi ACP support", () => {
   });
 });
 
+describe("Kimi ACP model translation", () => {
+  it.each([
+    ["k3", "kimi-code/k3-256k"],
+    ["k3[1m]", "kimi-code/k3"],
+    ["kimi-k2.7-code", "kimi-code/kimi-for-coding"],
+    ["kimi-for-coding", "kimi-code/kimi-for-coding"],
+  ])("maps Overdeck id %s to %s", (overdeckId, kimiCodeId) => {
+    expect(translateKimiAcpModelId(overdeckId)).toBe(kimiCodeId);
+  });
+
+  it("passes already-prefixed and unknown ids through unchanged", () => {
+    expect(translateKimiAcpModelId("kimi-code/k3")).toBe("kimi-code/k3");
+    expect(translateKimiAcpModelId("kimi-code/kimi-for-coding-highspeed"))
+      .toBe("kimi-code/kimi-for-coding-highspeed");
+    expect(translateKimiAcpModelId("kimi-k2.6")).toBe("kimi-k2.6");
+  });
+
+  it("routes through resolveAcpModelId for the kimi provider and passes through otherwise", () => {
+    expect(resolveAcpModelId("kimi", "k3[1m]")).toBe("kimi-code/k3");
+    expect(resolveAcpModelId("not-a-provider", "k3[1m]")).toBe("k3[1m]");
+  });
+});
+
 describe("ACP provider registry", () => {
   it("resolves the Kimi support module", () => {
     const support = resolveAcpProviderSupport("kimi");
 
     expect(support.buildSpawnInput).toBe(buildKimiAcpSpawnInput);
     expect(support.resolveAuthMethodId).toBe(resolveKimiAuthMethodId);
+    expect(support.translateModelId).toBe(translateKimiAcpModelId);
   });
 
   it("lists supported providers when the provider is unknown", () => {

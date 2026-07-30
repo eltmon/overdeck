@@ -11,7 +11,7 @@ import { buildGitGuardLines } from './launcher-git-guard.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
-export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp';
+export type LauncherHarness = 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code';
 
 export interface LauncherConfig {
   role: Role;
@@ -82,6 +82,19 @@ export interface LauncherConfig {
   acpBinaryPath?: string;
   /** Materialized Overdeck context bundle injected into the first fresh ACP prompt. */
   acpContextFile?: string;
+
+  /**
+   * Native Kimi Code CLI model alias (e.g. 'k3'), passed as `kimi -m <model>`.
+   * Required for harness='kimi-code'. Kimi generates its own session id — no
+   * session/work-dir flag is passed (D2/erratum E1); the id is captured
+   * post-launch as the newest session directory under the workspace's
+   * workDirKey bucket.
+   */
+  kimiCodeModel?: string;
+  /** Auto-approve regular tool calls (`kimi --yolo`). Required for harness='kimi-code'. */
+  kimiCodeYolo?: boolean;
+  /** Additional workspace directories (`kimi --add-dir <dir>`, repeatable). */
+  kimiCodeAddDirs?: string[];
 
   // Command construction
   /**
@@ -241,7 +254,13 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   lines.push('#!/bin/bash');
 
   // Strip tmux/screen host-shell artifacts so nested tmux operations don't fail
-  // with "sessions should be nested with care" (PAN-912).
+  // with "sessions should be nested with care" (PAN-912). Preserve the pane's
+  // real values first under OVERDECK_HOST_* names: node-pty also deletes
+  // TMUX/TMUX_PANE from every child env, and Claude Code silently stops
+  // persisting session transcripts when it runs inside a tmux pane without
+  // them — the PTY supervisor reinstates the truthful values for the harness
+  // process only (see pty-supervisor.ts).
+  lines.push('export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"');
   lines.push('unset TMUX TMUX_PANE STY');
 
   // Pipefail
@@ -446,6 +465,9 @@ function buildCommand(config: LauncherConfig): string[] {
     if (behavior.launchCommandKind === 'acp-host') {
       return buildAcpCommand(config, false);
     }
+    if (behavior.launchCommandKind === 'kimi-code-tui') {
+      return buildKimiCodeCommand(config, false);
+    }
 
     // Conversation panel doesn't use exec — it runs the command then loops
     if (config.baseCommand) {
@@ -536,6 +558,9 @@ function buildNonConversationCommand(config: LauncherConfig, useExec: boolean): 
   }
   if (behavior.launchCommandKind === 'acp-host') {
     return buildAcpCommand(config, useExec);
+  }
+  if (behavior.launchCommandKind === 'kimi-code-tui') {
+    return buildKimiCodeCommand(config, useExec);
   }
 
   const parts: string[] = [];
@@ -754,6 +779,39 @@ function buildAcpCommand(config: LauncherConfig, useExec: boolean): string[] {
   }
 
   const cmd = tokens.join(' ');
+  return [useExec ? `exec ${cmd}` : cmd];
+}
+
+/**
+ * Build a native Kimi Code CLI command line (D2/erratum E1 — RESOLVED 0.29.2
+ * checkpoint): `kimi [-S <id>] -m <model> --yolo [--add-dir <dir>]...`,
+ * wrapped in the PTY supervisor like claude-code
+ * (KIMI_CODE_BEHAVIOR.supportsPtySupervisor is true). Deliberately NO
+ * --session (long form), NO --work-dir (neither flag exists on the installed
+ * binary), and NO -p/--print (v1 work agents run interactively). On a fresh
+ * launch, Kimi generates its own session id, captured post-launch as the
+ * newest session directory under the workspace's workDirKey bucket; on a
+ * true resume, that captured id is passed back via `-S` (PAN-1837).
+ */
+function buildKimiCodeCommand(config: LauncherConfig, useExec: boolean): string[] {
+  if (!config.kimiCodeModel) {
+    throw new Error('kimi-code launcher requires kimiCodeModel');
+  }
+
+  const tokens: string[] = ['kimi', '-m', shellQuoteModelIdSync(config.kimiCodeModel)];
+  if (config.resumeSessionId) {
+    // `-S <id>` resumes that specific session; `kimi`'s own `-c` continue flag
+    // picks "most recent for this cwd" and can't target a captured id (PAN-1837).
+    tokens.push('-S', shellQuote(config.resumeSessionId));
+  }
+  if (config.kimiCodeYolo) {
+    tokens.push('--yolo');
+  }
+  for (const dir of config.kimiCodeAddDirs ?? []) {
+    tokens.push('--add-dir', shellQuote(dir));
+  }
+
+  const cmd = wrapWithSupervisor(config, tokens.join(' '));
   return [useExec ? `exec ${cmd}` : cmd];
 }
 

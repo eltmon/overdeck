@@ -4,6 +4,7 @@ import { projectAcpConversationActivity } from '../acp-conversation-parser.js';
 import { parseCodexConversationMessages } from '../codex-conversation-parser.js';
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from '../ohmypi-conversation-parser.js';
 import { isPiSessionFile, parsePiConversationMessages } from '../pi-conversation-parser.js';
+import { parseKimiConversationMessages } from '../kimi-conversation-parser.js';
 import { parseFromLastCompactBoundary } from './parser.js';
 import type { ConversationActivitySummary } from './types.js';
 
@@ -71,6 +72,7 @@ export async function summarizeConversationActivity(
 
   const parsed = behavior.transcriptKind === 'codex-rollout-jsonl' ? await parseCodexConversationMessages(sessionFile)
     : behavior.transcriptKind === 'ohmypi-jsonl' || isOhmypiSessionFile(sessionFile) ? await parseOhmypiConversationMessages(sessionFile)
+    : behavior.transcriptKind === 'kimi-wire-jsonl' ? await parseKimiConversationMessages(sessionFile)
     : isPiSessionFile(sessionFile) ? await parsePiConversationMessages(sessionFile)
       // Parse from the last compact boundary instead of the full file — avoids
       // re-reading potentially megabytes of history on every list enrichment tick.

@@ -560,6 +560,36 @@ function doCommit(
       return { committed: false, reason: 'all paths excluded from auto-commit' };
     }
 
+    // Refuse to stage any path whose case-insensitive twin is already tracked
+    // under different casing. Case-insensitive checkouts (macOS APFS) can
+    // materialize only one of the pair, leaving the other as a permanent
+    // phantom modification (PAN-3287).
+    const lsFiles: FlushResult | string = yield* runGit(['ls-files', '-z'], gitRoot).pipe(
+      Effect.matchEffect({
+        onSuccess: (r) => Effect.succeed(r.stdout),
+        onFailure: (err) =>
+          Effect.succeed({
+            committed: false as const,
+            errored: true as const,
+            reason: `ls-files failed: ${err.stderr || err._tag}`,
+          } satisfies FlushResult),
+      }),
+    );
+    if (typeof lsFiles !== 'string') return lsFiles;
+    const trackedByFold = new Map<string, string>();
+    for (const tracked of lsFiles.split('\0')) {
+      if (tracked) trackedByFold.set(tracked.toLowerCase(), tracked);
+    }
+    const caseCollisions = relativePaths.flatMap((p) => {
+      const tracked = trackedByFold.get(p.toLowerCase());
+      return tracked !== undefined && tracked !== p ? [`${p} vs tracked ${tracked}`] : [];
+    });
+    if (caseCollisions.length > 0) {
+      const reason = `refusing case-colliding add on ${branch}: ${caseCollisions.join('; ')}`;
+      console.warn(`[pan-dir/auto-commit] ${reason}`);
+      return { committed: false, errored: true, reason };
+    }
+
     // git add
     const addOk: boolean | FlushResult = yield* runGit(
       ['add', '--', ...relativePaths],
