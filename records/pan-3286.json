@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-07-29T21:09:30.326Z",
-  "updated": "2026-07-30T05:37:20.834Z",
+  "updated": "2026-07-30T05:37:34.571Z",
   "pipeline": {
     "issueId": "PAN-3286",
     "reviewStatus": "pending",
@@ -57,8 +57,16 @@
     }
   ],
   "tasks": {
-    "sequence": 26,
-    "claims": {},
+    "sequence": 27,
+    "claims": {
+      "no-loss-audit": {
+        "writerId": "agent-pan-3286",
+        "agentId": "agent-pan-3286",
+        "pid": 1242078,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T05:37:34.571Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3286",
@@ -317,6 +325,7 @@
     "memory-phase-ui": "completed",
     "memory-phase-ui.memory-phase-ui.ac1": "completed",
     "memory-phase-ui.memory-phase-ui.ac2": "completed",
-    "memory-phase-ui.memory-phase-ui.ac3": "completed"
+    "memory-phase-ui.memory-phase-ui.ac3": "completed",
+    "no-loss-audit": "running"
   }
 }
