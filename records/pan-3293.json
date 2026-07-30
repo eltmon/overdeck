@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T04:11:35.413Z",
+  "updated": "2026-07-30T04:44:25.025Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "owner-verified-health": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 2779885,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:11:35.412Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Replaced fuser-only detection with async lsof/fuser/ss probes and parser/fallback regression coverage",
         "releasedAt": "2026-07-30T04:11:24.332Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 2779885,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:11:35.412Z",
+        "itemId": "owner-verified-health",
+        "outcome": "completed",
+        "reason": "Health checks now require the responder pid to match the spawned server across restart, full restart, and current pan up wiring; failures name both pids and preserve the fresh process",
+        "releasedAt": "2026-07-30T04:44:25.025Z"
       }
     ],
     "statusReasons": {
@@ -142,6 +145,10 @@
       "pids-on-port-multiprobe": {
         "reason": "Replaced fuser-only detection with async lsof/fuser/ss probes and parser/fallback regression coverage",
         "updatedAt": "2026-07-30T04:11:24.332Z"
+      },
+      "owner-verified-health": {
+        "reason": "Health checks now require the responder pid to match the spawned server across restart, full restart, and current pan up wiring; failures name both pids and preserve the fresh process",
+        "updatedAt": "2026-07-30T04:44:25.025Z"
       }
     }
   },
@@ -160,6 +167,11 @@
     "pids-on-port-multiprobe.pids-on-port-multiprobe.ac2": "completed",
     "pids-on-port-multiprobe.pids-on-port-multiprobe.ac3": "completed",
     "pids-on-port-multiprobe.pids-on-port-multiprobe.ac4": "completed",
-    "owner-verified-health": "running"
+    "owner-verified-health": "completed",
+    "owner-verified-health.owner-verified-health.ac1": "completed",
+    "owner-verified-health.owner-verified-health.ac2": "completed",
+    "owner-verified-health.owner-verified-health.ac3": "completed",
+    "owner-verified-health.owner-verified-health.ac4": "completed",
+    "owner-verified-health.owner-verified-health.ac5": "completed"
   }
 }
