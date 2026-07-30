@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:41:19.221Z",
-  "updated": "2026-07-30T03:56:44.476Z",
+  "updated": "2026-07-30T03:57:49.727Z",
   "pipeline": {
     "issueId": "PAN-3294",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-30T03:56:44.458Z",
-    "inspectNotes": "Inspecting item lock-primitive"
+    "updatedAt": "2026-07-30T03:57:49.420Z",
+    "inspectNotes": "All 4 ACs verified empirically: absent-lock acquire writes caller PID rc=0; live-holder acquire rc=1 with pid file preserved; both dead-PID and missing-pid-file cases reclaim (stale contents cleaned, no .stale.$$ strays) rc=0; release idempotent rc=0 twice. FR-5 satisfied (shared sourced functions in pan-hook-lib.sh); NFR-1 satisfied (mkdir/mv/rm/kill only, no flock, no timeout dep; [[ =~ ]] consistent with existing bashisms at lines 124/129/174/176). Note (non-blocking): pid written after mkdir, so a contender in that gap sees a missing pid file and reclaims a live lock — exactly what AC-3 mandates, but FR-1 exclusivity depends on that window staying negligible."
   },
   "closeOut": {
     "usage": {
@@ -42,9 +42,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 853742,
-            "output": 18069,
-            "cacheRead": 5582848,
+            "input": 855088,
+            "output": 18211,
+            "cacheRead": 5837824,
             "cacheWrite": 0
           }
         }
@@ -57,15 +57,15 @@
           "cacheWrite": 165672
         },
         "openai/gpt-5.6-sol": {
-          "input": 853742,
-          "output": 18069,
-          "cacheRead": 5582848,
+          "input": 855088,
+          "output": 18211,
+          "cacheRead": 5837824,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.708797,
-        "pricingAsOf": "2026-07-30T03:56:44.467Z"
+        "usd": 14.847275,
+        "pricingAsOf": "2026-07-30T03:57:49.631Z"
       }
     },
     "merges": [],
