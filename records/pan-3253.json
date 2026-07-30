@@ -173,6 +173,11 @@
       "timestamp": "2026-07-29T15:42:04.329Z",
       "reason": "end",
       "note": "Fixed sync-target-branch conflicts by merging origin/main and resolving event-store.ts to preserve both workspace ID stamping and review status payload bounding"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T10:26:28.176Z"
     }
   ],
   "feedback": [],
@@ -212,7 +217,7 @@
     "recordedAt": "2026-07-29T15:41:58.832Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T10:26:26.960Z",
+  "updated": "2026-07-30T10:26:28.190Z",
   "pipeline": {
     "issueId": "PAN-3253",
     "reviewStatus": "reviewing",
@@ -294,7 +299,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3253",
