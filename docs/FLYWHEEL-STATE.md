@@ -9151,3 +9151,15 @@ PR **#3343** opened (my PR monitor fired on it). Reviewed the diff myself: **2 f
 - **`git push origin main` masking a hook rejection as `Everything up-to-date` is its own hazard** — the pre-push guard had actually failed (code 1) on `.pan/continues/`, `.pan/backlog/`, `.beads/` paths, visible only via `git push origin HEAD:refs/heads/main`. A push that reports success while rejecting is worth its own issue.
 - **Fixes applied:** re-appended tick 17 to `main` from the primary worktree using `git -C` and absolute paths (no `cd`), and reverted the stray commit off the strike branch so its eventual squash does not carry unrelated docs or conflict with main.
 - **Rule going forward: never `cd` into a workspace. Use `git -C <path>` and `npx --prefix`/subshells so the orchestrator's cwd never leaves the primary worktree.**
+
+### Correction to tick 17b — git did not lie; I did
+
+I wrote above that `git push origin main` "masked a hook rejection as `Everything up-to-date`". **That is wrong and I am correcting it rather than leaving a plausible-but-false diagnosis in durable memory.**
+
+`git push origin main` pushes `refs/heads/main`. That ref genuinely *was* identical to `origin/main`, because my commits had landed on `strike/pan-3342`. **Git reported the truth.** The pre-push guard rejection (`.pan/continues/`, `.pan/backlog/`, `.beads/`) only appeared when I ran `git push origin HEAD:refs/heads/main`, which asked git to push strike-branch content onto main — and the state-plane guard correctly refused that.
+
+So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My "push masks failures" claim was me inventing a second bug to explain my own. No issue to file.
+
+**What actually deserved suspicion, and the generalisable check:** `unpushed=3` with `behind=0` and a push saying up-to-date is arithmetically impossible *for the ref you think you are on*. That contradiction was the real signal, and the one command that resolves it is `git branch --show-current` — not more push diagnostics.
+
+**Recovery verified:** `origin/main` = `f1f9d75921` with tick 17 + 17b recorded and 0 unpushed; the stray commit reverted off `strike/pan-3342`, whose diff against main is once again only its own fix (`tests/lib/tracker/linear.test.ts`, +8/-6). The strike's own two commits were never touched.
