@@ -242,18 +242,19 @@
     "recordedAt": "2026-07-30T11:22:30.284Z"
   },
   "created": "2026-07-29T00:16:53.872Z",
-  "updated": "2026-07-30T11:41:47.329Z",
+  "updated": "2026-07-30T11:42:01.415Z",
   "pipeline": {
     "issueId": "PAN-3253",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T11:23:03.129Z",
-    "updatedAt": "2026-07-30T11:41:45.904Z",
+    "updatedAt": "2026-07-30T11:42:01.342Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "ffc4ec7f593609a737880ff7027b3c4277205230",
       "detectedAt": "2026-07-29T15:25:25.726Z",
@@ -264,7 +265,6 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3279",
     "reviewedAtCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
     "lastVerifiedCommit": "b20d017739f874e88277a68a163304f6c84cf52b",
-    "reviewRequestedAt": "2026-07-30T11:23:03.129Z",
     "reviewSpawnedAt": "2026-07-30T11:41:45.903Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -323,10 +323,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 60,
-            "output": 12066,
-            "cacheRead": 4582428,
-            "cacheWrite": 155691
+            "input": 64,
+            "output": 13143,
+            "cacheRead": 4957009,
+            "cacheWrite": 158006
           }
         },
         "work": {
@@ -352,10 +352,10 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 60,
-          "output": 12066,
-          "cacheRead": 4582428,
-          "cacheWrite": 155691
+          "input": 64,
+          "output": 13143,
+          "cacheRead": 4957009,
+          "cacheWrite": 158006
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 4122,
@@ -365,8 +365,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 146.73277,
-        "pricingAsOf": "2026-07-30T11:41:46.005Z"
+        "usd": 146.824252,
+        "pricingAsOf": "2026-07-30T11:42:01.399Z"
       }
     },
     "merges": [
@@ -375,7 +375,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3253",
