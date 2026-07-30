@@ -2,7 +2,7 @@
   "issueId": "PAN-3331",
   "schemaVersion": 2,
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-30T19:35:33.848Z",
+  "updated": "2026-07-30T19:35:35.823Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -27,15 +27,5 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-fable-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3331",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-30T19:35:33.846Z"
-    }
-  ]
+  "model": "claude-fable-5"
 }
