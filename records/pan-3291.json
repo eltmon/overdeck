@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T03:51:45.411Z",
+  "updated": "2026-07-30T03:57:42.109Z",
   "pipeline": {
     "issueId": "PAN-3291",
     "reviewStatus": "pending",
@@ -69,18 +69,32 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "abort-merge-cleanup": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3291",
         "agentId": "agent-pan-3291",
         "pid": 1948146,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T03:51:45.411Z"
+        "claimedAt": "2026-07-30T03:51:45.411Z",
+        "itemId": "abort-merge-cleanup",
+        "outcome": "completed",
+        "reason": "Added bounded git merge --abort cleanup beside rebase cleanup and regression-tested recovery from an in-progress conflicting merge",
+        "releasedAt": "2026-07-30T03:57:42.109Z"
+      }
+    ],
+    "statusReasons": {
+      "abort-merge-cleanup": {
+        "reason": "Added bounded git merge --abort cleanup beside rebase cleanup and regression-tested recovery from an in-progress conflicting merge",
+        "updatedAt": "2026-07-30T03:57:42.109Z"
       }
     }
   },
   "statusOverrides": {
-    "abort-merge-cleanup": "running"
+    "abort-merge-cleanup": "completed",
+    "abort-merge-cleanup.abort-merge-cleanup.ac1": "completed",
+    "abort-merge-cleanup.abort-merge-cleanup.ac2": "completed",
+    "abort-merge-cleanup.abort-merge-cleanup.ac3": "completed"
   }
 }
