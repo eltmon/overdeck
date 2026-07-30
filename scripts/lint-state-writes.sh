@@ -14,6 +14,7 @@
 #   - src/lib/pan-dir/context.ts       — context-layer config
 #   - src/lib/pan-dir/feedback.ts      — workspace feedback delivery surface (D6)
 #   - src/lib/pan-dir/sessions.ts      — workspace session log surface (D6)
+#   - src/lib/pan-dir/push-health.ts   — runtime reconcile-health writer (PAN-3291)
 #   - src/lib/agents.ts writeAgentStateJsonSync — state.json writer
 set -euo pipefail
 
@@ -41,6 +42,7 @@ PAN_DIR_APPROVED=(
   ':!src/lib/pan-dir/context.ts'
   ':!src/lib/pan-dir/feedback.ts'
   ':!src/lib/pan-dir/sessions.ts'
+  ':!src/lib/pan-dir/push-health.ts'
 )
 PAN_DIR_LEGACY=()
 
