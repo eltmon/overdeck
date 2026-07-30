@@ -133,7 +133,7 @@ export async function killCommand(id: string, options: KillOptions): Promise<voi
     }
 
     try {
-      stopAgentSync(agentId);
+      stopAgentSync(agentId, 'operator');
       killedAny = true;
       console.log(chalk.green(`  ${agentId}: killed`));
     } catch (error: any) {

@@ -116,7 +116,7 @@ describe('pan pause single-agent regression (PAN-2214)', () => {
     await pauseCommand('PAN-1723', { reason: 'ram' });
 
     expect(agentMocks.setAgentPausedSync).toHaveBeenCalledWith('agent-pan-1723', 'ram', true);
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-1723');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );

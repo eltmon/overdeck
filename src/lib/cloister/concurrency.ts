@@ -20,8 +20,6 @@ import { loadCloisterConfigSync } from './config.js';
 import {
   listRunningAgentsSync,
   stopAgentSync,
-  getAgentStateSync,
-  saveAgentStateSync,
   getAgentRuntimeStateSync,
 } from '../agents.js';
 import { countAgentsByStatus } from '../overdeck/agents.js';
@@ -353,15 +351,10 @@ export function emergencyBrake(): BrakeResult {
   const stopped: string[] = [];
   for (const agent of ordered.slice(0, excess)) {
     try {
-      stopAgentSync(agent.id);
-      // stopAgentSync stamps stoppedByUser=true (deliberate stop). Clear it so the
-      // deacon re-admits this agent when a slot frees — the brake trims to the cap,
-      // it does not retire the work.
-      const state = getAgentStateSync(agent.id);
-      if (state) {
-        delete state.stoppedByUser;
-        saveAgentStateSync(state);
-      }
+      // 'system' cause (the default) leaves stoppedByUser unset so the deacon
+      // re-admits this agent when a slot frees — the brake trims to the cap, it
+      // does not retire the work.
+      stopAgentSync(agent.id, 'system');
       stopped.push(agent.id);
     } catch {
       // best effort — skip agents that fail to stop cleanly

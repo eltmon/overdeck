@@ -47,7 +47,7 @@ export function createAgentStopHandler(
 
     const stateBeforeStop = yield* getAgentState(id);
     yield* Effect.promise(() => appendAgentLifecycleLog(id, lifecycleEvent));
-    yield* stopAgent(id);
+    yield* stopAgent(id, 'operator');
 
     // PAN-1316/PAN-1326: tear down the workspace Docker stack on user-initiated stop.
     // Without this, dev-server containers (Vite/Webpack) outlive their owning
@@ -214,7 +214,7 @@ export const postAgentPauseRoute = HttpRouter.add(
     }
 
     if (hasLiveSession || updatedState.status === 'running' || updatedState.status === 'starting') {
-      const stoppedState = markAgentStoppedState(updatedState);
+      const stoppedState = markAgentStoppedState(updatedState, 'operator');
       updatedState = stoppedState;
       yield* Effect.promise(() => saveAgentRuntimeState(id, {
         state: 'stopped',

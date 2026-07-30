@@ -35,7 +35,7 @@ export async function pauseCommand(id: string, options: PauseOptions): Promise<v
   try {
     setAgentPausedSync(agentId, options.reason, shouldStop);
     if (shouldStop) {
-      stopAgentSync(agentId);
+      stopAgentSync(agentId, 'operator');
     }
     await appendOperatorInterventionEvent({ issueId, kind: 'pause', source: 'pan pause' });
 

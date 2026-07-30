@@ -273,7 +273,7 @@ export async function pauseFlywheelRunForDashboard(): Promise<{ before: Flywheel
     } catch { /* non-fatal: resume falls back to fresh if session.id is missing */ }
   }
   await setPaused(true);
-  await import('../../../lib/agents.js').then(({ stopAgent }) => Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID)));
+  await import('../../../lib/agents.js').then(({ stopAgent }) => Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator')));
   return { before, after: await readGateSnapshot(), changed: true };
 }
 
@@ -288,7 +288,7 @@ export async function abortFlywheelRunForDashboard(): Promise<{ aborted: string 
     return { aborted: stale ?? null };
   }
   const { stopAgent } = await import('../../../lib/agents.js');
-  await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+  await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
   await abortFlywheelRun(candidate);
   return { aborted: candidate };
 }
