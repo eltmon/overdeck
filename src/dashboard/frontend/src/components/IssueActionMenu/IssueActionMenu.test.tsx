@@ -103,6 +103,28 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
   });
 
+  it('enables Close out as the primary action for post-merge limbo membership', async () => {
+    mockStore({
+      currentIssue: issue({
+        status: 'In Progress',
+        state: 'in_progress',
+        pipelineMembership: {
+          available: true,
+          inPipeline: true,
+          bucket: 'post_merge_limbo',
+          labelDrift: null,
+        },
+      }),
+    });
+
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" />);
+
+    const closeOut = await screen.findByTestId('issue-action-closeOut');
+    expect(closeOut).toBeEnabled();
+    expect(closeOut).toHaveTextContent('Close out');
+    expect(screen.queryByTestId('issue-action-plan')).not.toBeInTheDocument();
+  });
+
   it('renders overflow-only as a single trigger with the action dropdown', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
