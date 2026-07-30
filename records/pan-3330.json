@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-30T21:27:01.161Z",
+  "updated": "2026-07-30T21:27:41.955Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "wi3-new-workspace-modal": {
-        "writerId": "agent-pan-3330",
-        "agentId": "agent-pan-3330",
-        "pid": 1018944,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T21:27:01.161Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3330",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Added POST resolve/create, POST :id/relocate, GET project-targets to workspace-registry.ts on the WI-1 core; 23 new route tests green, doors guard green, no existing route changed.",
         "releasedAt": "2026-07-30T21:11:06.381Z"
+      },
+      {
+        "writerId": "agent-pan-3330",
+        "agentId": "agent-pan-3330",
+        "pid": 1018944,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T21:27:01.161Z",
+        "itemId": "wi3-new-workspace-modal",
+        "outcome": "completed",
+        "reason": "NewWorkspaceModal with debounced resolve-before-create preview, inline resolver findings, isolated-mode target lockout; wiring extracted to useNewWorkspaceModal to hold App.tsx under the size ratchet. 14 fake-timer tests green.",
+        "releasedAt": "2026-07-30T21:27:41.955Z"
       }
     ],
     "statusReasons": {
@@ -107,6 +110,10 @@
       "wi2-registry-routes": {
         "reason": "Added POST resolve/create, POST :id/relocate, GET project-targets to workspace-registry.ts on the WI-1 core; 23 new route tests green, doors guard green, no existing route changed.",
         "updatedAt": "2026-07-30T21:11:06.381Z"
+      },
+      "wi3-new-workspace-modal": {
+        "reason": "NewWorkspaceModal with debounced resolve-before-create preview, inline resolver findings, isolated-mode target lockout; wiring extracted to useNewWorkspaceModal to hold App.tsx under the size ratchet. 14 fake-timer tests green.",
+        "updatedAt": "2026-07-30T21:27:41.955Z"
       }
     }
   },
@@ -122,6 +129,10 @@
     "wi2-registry-routes.wi2-registry-routes.ac3": "completed",
     "wi2-registry-routes.wi2-registry-routes.ac4": "completed",
     "wi2-registry-routes.wi2-registry-routes.ac5": "completed",
-    "wi3-new-workspace-modal": "running"
+    "wi3-new-workspace-modal": "completed",
+    "wi3-new-workspace-modal.wi3-new-workspace-modal.ac1": "completed",
+    "wi3-new-workspace-modal.wi3-new-workspace-modal.ac2": "completed",
+    "wi3-new-workspace-modal.wi3-new-workspace-modal.ac3": "completed",
+    "wi3-new-workspace-modal.wi3-new-workspace-modal.ac4": "completed"
   }
 }
