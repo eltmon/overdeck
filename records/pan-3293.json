@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T04:07:39.468Z",
+  "updated": "2026-07-30T04:11:24.332Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "pids-on-port-multiprobe": {
-        "writerId": "agent-pan-3293",
-        "agentId": "agent-pan-3293",
-        "pid": 2582731,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-30T04:07:39.468Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3293",
@@ -117,6 +109,17 @@
         "outcome": "completed",
         "reason": "Added optional pid handles for detached and systemd dashboard spawns with fake-timer MainPID polling tests",
         "releasedAt": "2026-07-30T04:03:46.542Z"
+      },
+      {
+        "writerId": "agent-pan-3293",
+        "agentId": "agent-pan-3293",
+        "pid": 2582731,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-30T04:07:39.468Z",
+        "itemId": "pids-on-port-multiprobe",
+        "outcome": "completed",
+        "reason": "Replaced fuser-only detection with async lsof/fuser/ss probes and parser/fallback regression coverage",
+        "releasedAt": "2026-07-30T04:11:24.332Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "spawn-pid-handle": {
         "reason": "Added optional pid handles for detached and systemd dashboard spawns with fake-timer MainPID polling tests",
         "updatedAt": "2026-07-30T04:03:46.542Z"
+      },
+      "pids-on-port-multiprobe": {
+        "reason": "Replaced fuser-only detection with async lsof/fuser/ss probes and parser/fallback regression coverage",
+        "updatedAt": "2026-07-30T04:11:24.332Z"
       }
     }
   },
@@ -140,6 +147,10 @@
     "spawn-pid-handle.spawn-pid-handle.ac2": "completed",
     "spawn-pid-handle.spawn-pid-handle.ac3": "completed",
     "spawn-pid-handle.spawn-pid-handle.ac4": "completed",
-    "pids-on-port-multiprobe": "running"
+    "pids-on-port-multiprobe": "completed",
+    "pids-on-port-multiprobe.pids-on-port-multiprobe.ac1": "completed",
+    "pids-on-port-multiprobe.pids-on-port-multiprobe.ac2": "completed",
+    "pids-on-port-multiprobe.pids-on-port-multiprobe.ac3": "completed",
+    "pids-on-port-multiprobe.pids-on-port-multiprobe.ac4": "completed"
   }
 }
