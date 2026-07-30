@@ -45,19 +45,19 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T22:55:03.128Z",
+  "updated": "2026-07-30T23:02:51.536Z",
   "pipeline": {
     "issueId": "PAN-3340",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T22:55:02.971Z",
+    "updatedAt": "2026-07-30T23:02:51.497Z",
+    "reviewNotes": "Unauthenticated trigger can persist reviewMode=none; nullable project also breaks typecheck; requirements reviewer timed out",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
-    "reviewRequestedAt": "2026-07-30T22:34:16.186Z",
     "reviewSpawnedAt": "2026-07-30T22:37:43.027Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -87,6 +87,24 @@
         "src/dashboard/server/routes/workspaces/review-pipeline.ts"
       ],
       "recordedAt": "2026-07-30T22:33:38.650Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "a9baf2101b45b187eff69d96b8e39f694fa02454"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "a9baf2101b45b187eff69d96b8e39f694fa02454"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "a9baf2101b45b187eff69d96b8e39f694fa02454"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "a9baf2101b45b187eff69d96b8e39f694fa02454"
+      }
     }
   },
   "closeOut": {
@@ -94,17 +112,17 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 548640,
-            "output": 7975,
-            "cacheRead": 1304576,
+            "input": 612178,
+            "output": 16346,
+            "cacheRead": 4304896,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 531270,
-            "output": 7791,
-            "cacheRead": 1082368,
+            "input": 1589746,
+            "output": 29462,
+            "cacheRead": 3811840,
             "cacheWrite": 0
           }
         },
@@ -126,9 +144,9 @@
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1204792,
-            "output": 14141,
-            "cacheRead": 2947584,
+            "input": 1252464,
+            "output": 24084,
+            "cacheRead": 5386752,
             "cacheWrite": 0
           }
         },
@@ -143,15 +161,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6465755,
-          "output": 158740,
-          "cacheRead": 56788480,
+          "input": 7635441,
+          "output": 198725,
+          "cacheRead": 64957440,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 65.485215,
-        "pricingAsOf": "2026-07-30T22:55:03.122Z"
+        "usd": 76.617675,
+        "pricingAsOf": "2026-07-30T23:02:51.525Z"
       }
     },
     "merges": [
