@@ -80,18 +80,18 @@
     "recordedAt": "2026-07-30T22:33:38.650Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-30T23:22:34.794Z",
+  "updated": "2026-07-30T23:28:26.285Z",
   "pipeline": {
     "issueId": "PAN-3340",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T22:34:16.186Z",
-    "updatedAt": "2026-07-30T23:20:39.276Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added dashboard mutation auth, validated project resolution before pending state, added route-level ordering tests, and replaced false success toasts with semantic rejection feedback.",
+    "updatedAt": "2026-07-30T23:28:26.251Z",
+    "reviewNotes": "The trigger auth guard rejects existing pan done/Cloister callers, and transport-level policy-save failures remain silent",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "40b669c4ae26b284d559dba80cbfc497246b48e0",
     "reviewSpawnedAt": "2026-07-30T23:20:39.275Z",
@@ -123,6 +123,24 @@
         "src/dashboard/server/routes/workspaces/review-pipeline.ts"
       ],
       "recordedAt": "2026-07-30T22:33:38.650Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b"
+      }
     }
   },
   "closeOut": {
@@ -130,9 +148,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 615698,
-            "output": 16742,
-            "cacheRead": 4572160,
+            "input": 4433619,
+            "output": 86701,
+            "cacheRead": 19586560,
             "cacheWrite": 0
           }
         },
@@ -179,15 +197,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8348013,
-          "output": 280533,
-          "cacheRead": 86612480,
+          "input": 12165934,
+          "output": 350492,
+          "cacheRead": 101626880,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 93.462295,
-        "pricingAsOf": "2026-07-30T23:20:39.306Z"
+        "usd": 122.15787,
+        "pricingAsOf": "2026-07-30T23:28:26.278Z"
       }
     },
     "merges": [
