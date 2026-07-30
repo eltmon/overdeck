@@ -197,7 +197,7 @@ describe('reloadCommand', () => {
       traefikDomain: 'overdeck.localhost',
       traefikDir: '/tmp/traefik',
     });
-    mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
+    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: true, spawnedPid: 1234 }));
     mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
     mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);
     mocks.resolveBundledServerPath.mockReturnValue('/tmp/server.js');
@@ -372,6 +372,16 @@ describe('reloadCommand', () => {
     expect(installOrder).toBeLessThan(buildOrder);
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
     expect(process.exitCode).toBeUndefined();
+  });
+
+  it('qualifies reload success when spawned dashboard ownership was not verified', async () => {
+    mocks.restartDashboard.mockReturnValue(Effect.succeed({ ownershipVerified: false, spawnedPid: null }));
+
+    await reloadCommand({ skipBuild: true });
+
+    const messages = vi.mocked(console.log).mock.calls.map(([message]) => String(message));
+    expect(messages.some(message => message.includes('ownership unverified'))).toBe(true);
+    expect(messages).not.toContain('✓ Dashboard reloaded and healthy');
   });
 
   // PAN-3172: the HTTP health check stays green when a generation's

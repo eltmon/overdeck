@@ -12,12 +12,14 @@ export type DashboardMode = 'primary' | 'peer';
 export interface DashboardIdentity extends BuildInfo {
   readonly repoRoot: string;
   readonly mode: DashboardMode;
+  readonly pid: number;
 }
 
 export function getDashboardIdentity(): DashboardIdentity {
   return {
     repoRoot: resolve(cwd()),
     mode: process.env.OVERDECK_DISABLE_DEACON === '1' ? 'peer' : 'primary',
+    pid: process.pid,
     ...getBuildInfo(),
   };
 }

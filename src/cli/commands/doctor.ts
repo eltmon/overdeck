@@ -31,6 +31,7 @@ import {
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
 import { checkInotify } from './doctor-inotify.js';
+import { checkStateDivergence } from './doctor-state-divergence.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
 import { checkDuplicateComposeStacks } from './doctor-duplicate-stacks.js';
 import {
@@ -849,6 +850,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   checks.push(checkOrphanProposedSpecs());
   checks.push(...await checkMainDivergence());
   checks.push(...await checkStateWorktrees());
+  checks.push(...await checkStateDivergence());
   try {
     const { isSmeeProcessRunningSync } = await import('../../lib/smee.js');
     const smeeUrlPath = join(homedir(), '.overdeck', 'github-app', 'smee-url');
