@@ -156,6 +156,12 @@ export interface WorkspaceRegistryRow {
   isArchived: boolean;
   title: string | null;
   lastAccessedAt: number;
+  /**
+   * Memory-synthesized phase for main/scratch rows, null when there is no
+   * status yet and always null for issue rows, which badge the pipeline phase
+   * instead (PAN-3286 FR-12).
+   */
+  memoryPhase?: string | null;
 }
 
 const WORKSPACE_KIND_ICONS: Record<WorkspaceRegistryRow['kind'], LucideIcon> = {
@@ -461,6 +467,10 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
   const renderWorkspaceRow = (ws: WorkspaceRegistryRow) => {
     const Icon = WORKSPACE_KIND_ICONS[ws.kind];
     const phase = ws.kind === 'issue' && ws.issueId ? workspacePhaseByIssueId.get(ws.issueId.toLowerCase()) : undefined;
+    // PAN-3286 FR-12: main/scratch rows have no pipeline phase, so they show the
+    // memory-synthesized one instead — plain text, no status dot, since it
+    // reports what the workspace is doing rather than a pipeline state.
+    const memoryPhase = ws.kind !== 'issue' ? ws.memoryPhase ?? null : null;
     return (
       <button
         key={ws.id}
@@ -475,6 +485,11 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
           <span className="ml-auto flex items-center gap-1.5 shrink-0">
             <span className={`h-2 w-2 rounded-full shrink-0 ${PHASE_DOT_CLASSES[phase]}`} aria-hidden="true" />
             <span className="text-[10px] text-muted-foreground">{PHASE_LABELS[phase]}</span>
+          </span>
+        )}
+        {memoryPhase && (
+          <span className="ml-auto text-[10px] text-muted-foreground shrink-0" data-testid={`sidebar-workspace-memory-phase-${ws.id}`}>
+            {memoryPhase}
           </span>
         )}
       </button>

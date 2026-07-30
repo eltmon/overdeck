@@ -86,7 +86,11 @@ describe('prompt-time injection for a null-issueId workspace turn (ac2, ac3)', (
     agentHarness: 'claude-code',
   };
 
-  it('returns status and observations for the workspace and omits sibling-issue summaries', async () => {
+  // PAN-3286 FR-11 replaced the old "null issue ⇒ empty sibling slot" rule with a
+  // same-project cross-workspace search, so this case now asserts the workspace's
+  // OWN status/observations plus the shape of that cross-workspace call. The
+  // cross-workspace hits themselves are covered in tests/lib/memory/injection.test.ts.
+  it('returns status and observations for the workspace and queries other workspaces for the sibling slot', async () => {
     const status = {
       name: 'Scratch workspace status',
       headline: 'Exploring the memory capture design.',
@@ -101,8 +105,10 @@ describe('prompt-time injection for a null-issueId workspace turn (ac2, ac3)', (
       workingSet: [],
       tags: [],
     };
-    const search = vi.fn(async (params: { sibling?: boolean }) => {
-      if (params.sibling) return [];
+    const search = vi.fn(async (params: { sibling?: boolean; crossWorkspace?: boolean }) => {
+      // The sibling slot is the cross-workspace arm for a null-issue turn; this
+      // case seeds it empty to stay focused on the workspace's own context.
+      if (params.sibling || params.crossWorkspace) return [];
       return [{
         rowid: 1,
         content: 'workspace scoped observation content',
@@ -145,6 +151,12 @@ describe('prompt-time injection for a null-issueId workspace turn (ac2, ac3)', (
     expect(result.context).toContain('workspace scoped observation content');
     expect(result.context).not.toContain('Sibling memory hint');
     expect(result.decision.hitCounts.sibling).toBe(0);
+    // The sibling slot asked other workspaces in this project, excluding this one.
+    expect(search).toHaveBeenCalledWith(expect.objectContaining({
+      projectId: 'overdeck',
+      crossWorkspace: true,
+      excludeWorkspaceId: 'workspace-scratch-1',
+    }));
   });
 
   it('includes the pinned project doc under the knowledge budget', async () => {

@@ -32,6 +32,7 @@ function workspaceRow(overrides: Partial<WorkspaceRegistryRow> = {}): WorkspaceR
     isArchived: overrides.isArchived ?? false,
     title: overrides.title ?? null,
     lastAccessedAt: overrides.lastAccessedAt ?? 1,
+    ...('memoryPhase' in overrides ? { memoryPhase: overrides.memoryPhase } : {}),
   };
 }
 
@@ -177,5 +178,47 @@ describe('Cmd-K workspaces scope filter (PAN-3286 FR-13)', () => {
     expect(container.textContent).not.toContain('feature-pan-1001');
     expect(container.textContent).not.toContain('feature-pan-1002');
     expect(container.textContent).not.toContain('feature-pan-1003');
+  });
+});
+
+describe('Sidebar memory-phase badge (PAN-3286 FR-12)', () => {
+  it('renders the memory phase for a main/scratch row that has one', async () => {
+    stubFetch([
+      workspaceRow({ id: 'ws-main', kind: 'main', name: 'main', issueId: null, memoryPhase: 'shipping', lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-scratch', kind: 'scratch', name: 'scratch-lens', issueId: null, memoryPhase: 'exploring', lastAccessedAt: 40 }),
+    ]);
+    renderSidebar();
+    const rail = await workspacesRail();
+
+    await waitFor(() => expect(within(rail).getByTestId('sidebar-workspace-memory-phase-ws-main')).toBeTruthy());
+    expect(within(rail).getByTestId('sidebar-workspace-memory-phase-ws-main').textContent).toBe('shipping');
+    expect(within(rail).getByTestId('sidebar-workspace-memory-phase-ws-scratch').textContent).toBe('exploring');
+  });
+
+  it('renders no badge for a non-issue row whose memoryPhase is null or absent', async () => {
+    stubFetch([
+      workspaceRow({ id: 'ws-null', kind: 'scratch', name: 'null-phase', issueId: null, memoryPhase: null, lastAccessedAt: 50 }),
+      workspaceRow({ id: 'ws-absent', kind: 'scratch', name: 'absent-phase', issueId: null, lastAccessedAt: 40 }),
+    ]);
+    renderSidebar();
+    const rail = await workspacesRail();
+
+    await waitFor(() => expect(within(rail).getByTestId('sidebar-workspace-ws-null')).toBeTruthy());
+    expect(within(rail).queryByTestId('sidebar-workspace-memory-phase-ws-null')).toBeNull();
+    expect(within(rail).queryByTestId('sidebar-workspace-memory-phase-ws-absent')).toBeNull();
+    expect(within(rail).getByTestId('sidebar-workspace-ws-null').textContent).toBe('null-phase');
+  });
+
+  it('never shows a memory-phase badge on an issue row, even if the DTO carried one', async () => {
+    // The API returns null for issue rows; this asserts the row also refuses to
+    // render one defensively, so an issue row keeps only its pipeline badge (D-1).
+    stubFetch([
+      workspaceRow({ id: 'ws-fav', kind: 'issue', name: 'feature-pan-fav', issueId: 'PAN-FAV', isFavorite: true, memoryPhase: 'building' }),
+    ]);
+    renderSidebar();
+    const rail = await workspacesRail();
+
+    await waitFor(() => expect(within(rail).getByTestId('sidebar-workspace-ws-fav')).toBeTruthy());
+    expect(within(rail).queryByTestId('sidebar-workspace-memory-phase-ws-fav')).toBeNull();
   });
 });
