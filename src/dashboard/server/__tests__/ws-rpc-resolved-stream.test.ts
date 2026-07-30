@@ -34,6 +34,27 @@ describe('streamHarnessFullParseSnapshots — ACP dispatch', () => {
       { kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true },
     ]);
   });
+
+  // kimi-code returned null here, so the caller fell through to its
+  // claude-jsonl check and served the discovering stream — a kimi conversation
+  // showed "Discovering conversation…" forever even with a written wire.jsonl.
+  it('creates a ready stream for a kimi-code conversation instead of returning null', async () => {
+    const stream = streamHarnessFullParseSnapshots(
+      'agent-nonexistent-kimi-stream',
+      'kimi-code',
+      null,
+      true,
+    );
+
+    expect(stream).not.toBeNull();
+    const first = await Effect.runPromise(
+      stream!.pipe(Stream.take(1), Stream.runCollect),
+    );
+
+    expect(Array.from(first)).toEqual([
+      { kind: 'messages', messages: [], workLog: [], streaming: false, snapshot: true },
+    ]);
+  });
 });
 
 describe('streamResolvedFullParseSnapshots — unresolved transcript', () => {

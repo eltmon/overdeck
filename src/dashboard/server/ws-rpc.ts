@@ -21,7 +21,8 @@ import { isPiSessionFile, parsePiConversationMessages } from './services/pi-conv
 import { isOhmypiSessionFile, parseOhmypiConversationMessages } from './services/ohmypi-conversation-parser.js';
 import { parseCodexConversationMessages } from './services/codex-conversation-parser.js';
 import { parseAcpConversationMessages } from './services/acp-conversation-parser.js';
-import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
+import { parseKimiConversationMessages } from './services/kimi-conversation-parser.js';
+import { resolveAgentHarness, resolvePiSessionPath, resolveCodexRolloutPath, resolveAcpTranscriptPath, resolveKimiWirePath, readLauncherPinnedSessionId } from './routes/jsonl-resolver.js';
 import { watch as fsWatch } from 'node:fs';
 import { sessionFilePath } from '../../lib/paths.js';
 import { getRuntimeCensus } from '../../lib/runtime-census.js';
@@ -354,16 +355,15 @@ export function streamHarnessFullParseSnapshots(
     parse: (file: string) => Promise<ParseResult>,
   ) => streamResolvedFullParseSnapshots(resolve, parse, model, unresolvedMeansEmpty);
 
-  if (behavior.transcriptKind === 'ohmypi-jsonl') {
-    return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
+  // A kind missing here falls through to the caller's claude-jsonl check and gets
+  // the discovering stream — why kimi-code hung on "Discovering conversation…".
+  switch (behavior.transcriptKind) {
+    case 'ohmypi-jsonl': return streamResolved(() => resolvePiSessionPath(sessionName), ohmypiSnapshotParser(harness));
+    case 'codex-rollout-jsonl': return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
+    case 'acp-jsonl': return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
+    case 'kimi-wire-jsonl': return streamResolved(() => resolveKimiWirePath(sessionName), parseKimiConversationMessages);
+    default: return null;
   }
-  if (behavior.transcriptKind === 'codex-rollout-jsonl') {
-    return streamResolved(() => resolveCodexRolloutPath(sessionName), parseCodexConversationMessages);
-  }
-  if (behavior.transcriptKind === 'acp-jsonl') {
-    return streamResolved(() => resolveAcpTranscriptPath(sessionName), parseAcpConversationMessages);
-  }
-  return null;
 }
 
 function buildAgentIssueLookup(agents: readonly AgentIssueRecord[]): AgentIssueLookup {
