@@ -241,7 +241,13 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
   lines.push('#!/bin/bash');
 
   // Strip tmux/screen host-shell artifacts so nested tmux operations don't fail
-  // with "sessions should be nested with care" (PAN-912).
+  // with "sessions should be nested with care" (PAN-912). Preserve the pane's
+  // real values first under OVERDECK_HOST_* names: node-pty also deletes
+  // TMUX/TMUX_PANE from every child env, and Claude Code silently stops
+  // persisting session transcripts when it runs inside a tmux pane without
+  // them — the PTY supervisor reinstates the truthful values for the harness
+  // process only (see pty-supervisor.ts).
+  lines.push('export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"');
   lines.push('unset TMUX TMUX_PANE STY');
 
   // Pipefail

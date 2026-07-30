@@ -559,7 +559,20 @@ async function main(): Promise<void> {
   const agentId = resolveAgentIdOrExit();
   const { command, args } = resolveChildCommandOrExit();
   const { cols, rows } = stdoutDimensions();
-  const child = pty.spawn(command, args, {
+  // node-pty's _sanitizeEnv unconditionally deletes TMUX/TMUX_PANE from the
+  // child env, and agent launchers unset them even earlier (PAN-912). Claude
+  // Code silently skips writing its session transcript when it runs inside a
+  // tmux pane whose TMUX vars are missing (observed on macOS, claude-code
+  // 2.1.206–2.1.212), which breaks kickoff confirmation, memory capture, and
+  // cost attribution. Reinstate the host pane's real values via env(1) inside
+  // the PTY, where node-pty's sanitizer can no longer strip them.
+  const hostTmux = process.env.OVERDECK_HOST_TMUX || process.env.TMUX;
+  const hostTmuxPane = process.env.OVERDECK_HOST_TMUX_PANE || process.env.TMUX_PANE;
+  const spawnCommand = hostTmux ? '/usr/bin/env' : command;
+  const spawnArgs = hostTmux
+    ? [`TMUX=${hostTmux}`, ...(hostTmuxPane ? [`TMUX_PANE=${hostTmuxPane}`] : []), command, ...args]
+    : args;
+  const child = pty.spawn(spawnCommand, spawnArgs, {
     name: process.env.TERM || 'xterm-256color',
     cols,
     rows,

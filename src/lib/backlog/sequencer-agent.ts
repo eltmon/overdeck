@@ -87,8 +87,19 @@ export async function spawnSequencerAgent(
   const batchSize = opts.batchSize ?? 20;
 
   const seqPath = join(projectRoot, '.pan', 'backlog', 'sequence.md');
+  const hasPriorSequence = existsSync(seqPath);
+  // An incremental pass without a prior sequence.md is meaningless (there is
+  // nothing to preserve ranks against) — downgrade it to a creation pass. The
+  // auto-trigger always requests 'incremental', so this is the path a project's
+  // first-ever autonomous pass takes.
   const resolvedPass: PassMode =
-    pass !== 'auto' ? pass : existsSync(seqPath) ? 'incremental' : 'creation';
+    pass === 'auto'
+      ? hasPriorSequence
+        ? 'incremental'
+        : 'creation'
+      : pass === 'incremental' && !hasPriorSequence
+        ? 'creation'
+        : pass;
 
   let rawIssues = opts.issues;
   if (!rawIssues) {
@@ -97,7 +108,10 @@ export async function spawnSequencerAgent(
       const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as
         typeof import('../../dashboard/server/services/issue-service-singleton.js');
       rawIssues = getSharedIssueService().getIssues() as Array<Record<string, unknown>>;
-    } catch {
+    } catch (err) {
+      // Do not swallow the evidence — an unavailable issue read model here is
+      // the difference between "empty backlog" and "broken input" downstream.
+      console.warn('[sequencer] issue read model unavailable, falling back to empty issue list:', err);
       rawIssues = [];
     }
   }
@@ -111,6 +125,21 @@ export async function spawnSequencerAgent(
   // PAN-1999 generalizes this to one sequencer per project — drop the filter then.
   const issues = allIssues.filter((issue) => issue.ref.toUpperCase().startsWith('PAN-'));
   const input = await collectOpenBacklog(projectRoot, issues);
+
+  // Refuse to spawn a pass over an empty manifest. On 2026-07-29 a transient
+  // empty/failed getIssues() produced a 0-issue manifest against a 750-issue
+  // open backlog, and a full sequencer run was spawned to rank nothing. An
+  // empty manifest almost always means the issue read model was unavailable
+  // or empty at spawn time — and even for a genuinely empty backlog a
+  // sequencer pass has nothing to do. Guarding BEFORE the manifest write also
+  // preserves the previous good manifest on disk.
+  if (input.manifest.length === 0) {
+    throw new Error(
+      `Sequencer refusing to spawn: backlog manifest is empty (0 open ${projectKey} issues from ` +
+        `${rawIssues.length} raw read-model issues). An empty manifest usually means the issue ` +
+        'read model was unavailable or empty at spawn time, not an empty backlog.',
+    );
+  }
 
   // Write the manifest to a file and reference it from the prompt instead of
   // inlining hundreds of KB of JSON. Inlining produced a single multi-hundred-KB
