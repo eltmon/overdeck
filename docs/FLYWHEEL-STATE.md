@@ -9216,3 +9216,9 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
   - **PAN-3296** close-out (needs PAN-3339's reconcile sweep live)
 - **LESSON: "merged" and "in force" are different states, and this run has now demonstrated it three separate ways** — the hook that needed `pan sync` (PAN-3327), the DoD row-6 fix that needed a rebuild before it could close anything, and now a strike gate refusing its own author because the binary predates the fix. **Mission #5 exists precisely because a merge changes the repo, not the running system.**
 - Deliberately batching: #3346, #3348, #3349 are still in CI (each `test` only). One deploy after they land beats three outages.
+
+## RUN-75 tick 23 (2026-07-30 22:35Z) — five of six strikes merged
+
+- **Merged this cascade, all squash on green checks, no admin bypass, every diff pre-reviewed:** PAN-3342 (red main), PAN-3339, PAN-3326, PAN-3324, **PAN-3328** (the 26-day `merge_queue` wedge). Only **#3349 (PAN-3327)** remains, `test` still running.
+- **One deploy is the single remaining unblock**, and it now covers four things at once: PAN-3326's own strike handoff (currently refused by the pre-fix binary running its own bug), the **PAN-3259** and **PAN-3305** close-outs (need PAN-3326's gate live), the **PAN-3296** close-out (needs PAN-3339's sweep live), and the proof of PAN-3327 itself — a bare `pan sync` should deploy the hook without my hand-rsync of both generations.
+- Load back to 41 from parallel CI; memory 24.7 GB. Will confirm capacity immediately before deploying rather than firing into a spike.
