@@ -102,7 +102,6 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      ".husky/_/pre-rebase",
       "scripts/file-size-allowlist.txt",
       "src/dashboard/frontend/src/components/Stage/PaneBar.tsx",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
@@ -124,7 +123,6 @@
       "src/dashboard/server/ws-rpc.ts"
     ],
     "actualChangedFiles": [
-      ".husky/_/pre-rebase",
       "docs/MARKDOWN-EDITOR-PANE.md",
       "packages/contracts/src/rpc.ts",
       "scripts/file-size-allowlist.txt",
@@ -142,10 +140,10 @@
       "src/dashboard/server/ws-rpc.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
-    "recordedAt": "2026-07-29T01:09:34.738Z"
+    "recordedAt": "2026-07-30T10:30:11.532Z"
   },
   "created": "2026-07-29T00:03:07.787Z",
-  "updated": "2026-07-30T10:30:03.807Z",
+  "updated": "2026-07-30T10:30:11.533Z",
   "pipeline": {
     "issueId": "PAN-3260",
     "reviewStatus": "passed",
