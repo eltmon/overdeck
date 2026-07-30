@@ -85,6 +85,39 @@ describe('detached composer command execution', () => {
     ]);
   });
 
+  it('pins the child API url to loopback instead of the server public DASHBOARD_URL', async () => {
+    // PAN-3331: the server env carries DASHBOARD_URL=https://overdeck.localhost
+    // (public, behind local TLS); a spawned CLI inheriting it as its API target
+    // fails Node's cert check with a bare "fetch failed".
+    const originalDashboardUrl = process.env.DASHBOARD_URL;
+    const originalApiPort = process.env.API_PORT;
+    process.env.DASHBOARD_URL = 'https://overdeck.localhost';
+    process.env.API_PORT = '4599';
+    try {
+      const child = createChild();
+      const spawnPanCli = vi.fn(() => child);
+      const resultPromise = runDetachedCommand(['start', 'PAN-42'], {
+        now: () => 1234,
+        overdeckHome,
+        spawnPanCli,
+        emitActivity: vi.fn(async () => undefined),
+      });
+
+      await emitSpawnWhenReady(spawnPanCli, child);
+      await resultPromise;
+      child.emit('close', 0, null);
+
+      const spawnEnv = (spawnPanCli.mock.calls[0][1] as { env: NodeJS.ProcessEnv }).env;
+      expect(spawnEnv.DASHBOARD_URL).toBeUndefined();
+      expect(spawnEnv.OVERDECK_DASHBOARD_URL).toBe('http://localhost:4599');
+    } finally {
+      if (originalDashboardUrl === undefined) delete process.env.DASHBOARD_URL;
+      else process.env.DASHBOARD_URL = originalDashboardUrl;
+      if (originalApiPort === undefined) delete process.env.API_PORT;
+      else process.env.API_PORT = originalApiPort;
+    }
+  });
+
   it('forwards plan argv without injecting provider-routing flags', async () => {
     const child = createChild();
     const spawnPanCli = vi.fn(() => child);

@@ -4,6 +4,7 @@ import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ComposerCommandResult } from '@overdeck/contracts';
 import { emitActivityEntryDurable, type EmitActivityOptions } from '../activity-logger.js';
+import { getDashboardLoopbackApiUrlSync } from '../config.js';
 import { parseIssueIdSync } from '../issue-id.js';
 import { spawnPanCli } from '../pan-cli-invocation.js';
 import { getOverdeckHome } from '../paths.js';
@@ -99,11 +100,20 @@ export async function launchPanCommandDetached(
   const spawnLogHandle = await open(spawnLogPath, 'a');
   const spawnLogStart = (await spawnLogHandle.stat()).size;
   const spawnCommand = dependencies.spawnPanCli ?? spawnPanCli;
+  // The server's env carries DASHBOARD_URL as its PUBLIC url (behind Traefik,
+  // local TLS). A spawned CLI resolving its API target from that url fails
+  // Node's cert check with a bare "fetch failed" (PAN-3331) — pin children to
+  // the loopback API of the server that spawned them instead.
+  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...input.env };
+  if (!input.env?.OVERDECK_DASHBOARD_URL) {
+    delete childEnv.DASHBOARD_URL;
+    childEnv.OVERDECK_DASHBOARD_URL = getDashboardLoopbackApiUrlSync();
+  }
   const child = spawnCommand(args, {
     cwd,
     detached: true,
     stdio: ['ignore', spawnLogHandle.fd, spawnLogHandle.fd],
-    env: { ...process.env, ...input.env },
+    env: childEnv,
   });
 
   let spawned = false;

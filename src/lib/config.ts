@@ -415,6 +415,22 @@ export function getDashboardApiUrlSync(): string {
 }
 
 /**
+ * The dashboard's own loopback API URL, ignoring the env overrides above.
+ * Inside the server process DASHBOARD_URL holds the PUBLIC url (e.g.
+ * https://overdeck.localhost behind Traefik) — child processes the server
+ * spawns must not inherit it as their API target, because Node's fetch
+ * rejects the local TLS cert and every CLI call back to the server fails
+ * with a bare "fetch failed" (PAN-3331).
+ */
+export function getDashboardLoopbackApiUrlSync(): string {
+  const envPort = Number(process.env.API_PORT || process.env.PORT);
+  const config = loadConfigSync();
+  const port = (Number.isFinite(envPort) && envPort > 0 ? envPort : 0)
+    || config.dashboard?.api_port || 3011;
+  return `http://localhost:${port}`;
+}
+
+/**
  * Get the resolved devroot path from config.
  * Returns null if devroot is disabled (set to null or empty string).
  * Resolves ~ to home directory and validates the directory exists.
