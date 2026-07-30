@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-30T03:40:32.466Z",
-  "updated": "2026-07-30T05:57:48.726Z",
+  "updated": "2026-07-30T05:57:56.800Z",
   "pipeline": {
     "issueId": "PAN-3293",
     "reviewStatus": "pending",
@@ -250,5 +250,40 @@
     "docs-owner-verified-restart.docs-owner-verified-restart.ac1": "completed",
     "docs-owner-verified-restart.docs-owner-verified-restart.ac2": "completed",
     "docs-owner-verified-restart.docs-owner-verified-restart.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/index.ts",
+      "src/cli/up-readiness.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/server.ts"
+    ],
+    "declaredScope": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/restart.ts",
+      "src/dashboard/server/identity.ts",
+      "src/dashboard/server/server.ts",
+      "src/lib/platform-lifecycle.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/cli/restart-spawn-pid.test.ts",
+      "tests/unit/dashboard/health-identity.test.ts",
+      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/OVERDECK_DEV_SOP.md",
+      "src/cli/commands/restart.ts",
+      "src/cli/index.ts",
+      "src/cli/up-readiness.ts",
+      "src/dashboard/server/identity.ts",
+      "src/lib/platform-lifecycle.ts",
+      "sync-sources/skills/pan-restart/SKILL.md",
+      "tests/unit/cli/restart-spawn-pid.test.ts",
+      "tests/unit/dashboard/health-identity.test.ts",
+      "tests/unit/lib/platform-lifecycle-squatter.test.ts",
+      "tests/unit/lib/platform-lifecycle.test.ts"
+    ],
+    "recordedAt": "2026-07-30T05:57:56.797Z"
   }
 }
