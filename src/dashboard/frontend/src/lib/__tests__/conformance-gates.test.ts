@@ -144,3 +144,26 @@ describe('conformance gate: one phase vocabulary (C-VOCAB §3.9)', () => {
     }
   });
 });
+
+describe('conformance gate: a truncating button carries its own width', () => {
+  // A <button> is intrinsically sized: even at `display: block` it shrinks to
+  // its text instead of filling the parent, so `truncate` clips at the text's
+  // own width and the label paints straight over its neighbours. The parent's
+  // `min-w-0 flex-1` cannot save it — the button needs `w-full`/`max-w-*`.
+  // This is the PAN-2908 "Just filed" overflow: titles ran under the buttons.
+  const BUTTON_TAG = /<button\b[\s\S]{0,400}?>/g;
+
+  it('no <button> truncates without an explicit width', () => {
+    const offenders: string[] = [];
+    for (const file of FILES) {
+      if (isTest(file) || rel(file) === SELF || !file.endsWith('.tsx')) continue;
+      const text = readFileSync(file, 'utf8');
+      for (const [tag] of text.matchAll(BUTTON_TAG)) {
+        if (/\btruncate\b/.test(tag) && !/\bw-full\b|\bmax-w-/.test(tag)) {
+          offenders.push(`${rel(file)}: ${tag.replace(/\s+/g, ' ').slice(0, 90)}`);
+        }
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+});

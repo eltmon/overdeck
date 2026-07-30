@@ -49,7 +49,7 @@ function JustFiledCard({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: 
           <span className="font-mono text-[10px]">{item.issue.identifier}</span>
           {age && <span>filed {age}</span>}
         </div>
-        <button onClick={onOpen} className="mt-0.5 block truncate text-left text-sm font-medium hover:underline">{item.issue.title}</button>
+        <button onClick={onOpen} className="mt-0.5 block w-full truncate text-left text-sm font-medium hover:underline">{item.issue.title}</button>
       </div>
       <QuietButton onClick={onOpen}>Open</QuietButton>
       <PrimaryButton disabled={actions.startPlanning.isPending} onClick={() => actions.startPlanning.mutate({ issueId: item.issue.identifier })}>
@@ -150,7 +150,7 @@ function WorkingRow({ item, onOpen }: { item: SimpleIssueDerivation; onOpen: () 
     <div className="mt-2.5 flex items-center gap-3.5 rounded-xl border border-border bg-card px-4 py-3.5 shadow-sm">
       <span className="h-2 w-2 flex-none animate-pulse rounded-full bg-info" />
       <div className="min-w-0 flex-1">
-        <button onClick={onOpen} className="block truncate text-left text-sm font-medium hover:underline">{item.issue.title}</button>
+        <button onClick={onOpen} className="block w-full truncate text-left text-sm font-medium hover:underline">{item.issue.title}</button>
         <div className="mt-0.5 text-xs text-muted-foreground">
           <span className="text-info-foreground">{item.display.title}</span>
           {item.taskProgress ? ` · task ${item.taskProgress.completed} of ${item.taskProgress.total}` : ''}
