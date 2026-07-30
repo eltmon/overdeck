@@ -297,7 +297,7 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     await killCommand('9999', {});
 
     expect(issueIdMocks.resolveBareNumericIdSync).toHaveBeenCalledWith('9999');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-9999');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-9999', 'operator');
   });
 
   it('resolves bare numeric input before pan pause pauses the agent', async () => {

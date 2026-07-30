@@ -18,6 +18,23 @@ export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | '
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
+/**
+ * Why an agent transitioned to `stopped` (PAN-3324).
+ *
+ * `'operator'` means a human asked for the stop — `pan kill`, `pan pause`, a
+ * dashboard stop/pause action, or an explicit flywheel stop/pause/abort. Only
+ * that cause sets `stoppedByUser`, and therefore only that cause engages the
+ * operator-stop gate that suppresses autonomous re-drive.
+ *
+ * `'system'` covers every machinery-initiated stop: memory shedding, health
+ * force-kills, stalled-review-parent reaping, corruption recovery, close-out,
+ * and reconciliation of a process the OOM killer already took. These stops are
+ * transient resource or liveness events, so autonomous recovery must stay
+ * eligible. It is the default precisely so a caller that omits the cause can
+ * never accidentally manufacture a permanent stall.
+ */
+export type AgentStopCause = 'operator' | 'system';
+
 export interface AgentState {
   id: string;
   issueId: string;
@@ -53,9 +70,13 @@ export interface AgentState {
    */
   kickoffDelivered?: boolean;
   stoppedAt?: string;
-  /** True when markAgentStopped was called (user-initiated stop). Cleared on
-   *  resume. Read by deacon's autoResumeStoppedWorkAgents to distinguish a
-   *  deliberate stop from a crash/orphan. */
+  /** True when the agent was stopped with `cause: 'operator'` — `pan kill`,
+   *  `pan pause`, or a dashboard stop/pause action. Cleared on resume. Read by
+   *  deacon's autoResumeStoppedWorkAgents to distinguish a deliberate operator
+   *  stop from a crash/orphan. PAN-3324: machinery-initiated stops (memory
+   *  shedding, health force-kills, stalled-parent reaping, OOM reconciliation)
+   *  pass `cause: 'system'` and must never set this — doing so latches the
+   *  operator-stop gate and permanently suppresses autonomous recovery. */
   stoppedByUser?: boolean;
   stoppedByPause?: boolean;
   paused?: boolean;
@@ -867,19 +888,26 @@ export function markAgentRunning(state: AgentState, options?: { preserveFailureT
   logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → running (markAgentRunning)`);
 }
 
-function markAgentStopped(state: AgentState): void {
+function markAgentStopped(state: AgentState, cause: AgentStopCause): void {
   const oldStatus = state.status;
   state.status = 'stopped';
   state.stoppedAt = new Date().toISOString();
-  state.stoppedByUser = true;
-  logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, user-initiated)`);
+  if (cause === 'operator') {
+    state.stoppedByUser = true;
+  } else {
+    // PAN-3324: a crash, OOM kill, or machinery-initiated stop is not operator
+    // intent. Recording it as one engages the operator-stop gate, which turns a
+    // transient resource event into a permanent stall no patrol can recover.
+    delete state.stoppedByUser;
+  }
+  logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → stopped (markAgentStopped, cause=${cause})`);
 }
 
-export function markAgentStoppedState(state: AgentState): AgentState {
+export function markAgentStoppedState(state: AgentState, cause: AgentStopCause = 'system'): AgentState {
   if (!state.id) {
     state.id = normalizeAgentId(state.issueId);
   }
-  markAgentStopped(state);
+  markAgentStopped(state, cause);
   return state;
 }
 

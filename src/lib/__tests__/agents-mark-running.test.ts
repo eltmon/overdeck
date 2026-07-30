@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { __testInternals, type AgentState } from '../agents.js';
+import { __testInternals, markAgentStoppedState, type AgentState } from '../agents.js';
+import { getAgentResumeGateBlockReason } from '../agents/agent-state.js';
 
 const { markAgentRunning, markAgentStopped } = __testInternals;
 
@@ -19,7 +20,7 @@ function baseState(): AgentState {
 describe('markAgentRunning', () => {
   it('clears stoppedByUser so a later crash can be auto-resumed', () => {
     const state = baseState();
-    markAgentStopped(state);
+    markAgentStopped(state, 'operator');
     expect(state.status).toBe('stopped');
     expect(state.stoppedByUser).toBe(true);
 
@@ -53,11 +54,45 @@ describe('markAgentRunning', () => {
 });
 
 describe('markAgentStopped', () => {
-  it('sets stoppedByUser=true to signal user-initiated stop', () => {
+  it('sets stoppedByUser=true for an operator-initiated stop', () => {
     const state = baseState();
-    markAgentStopped(state);
+    markAgentStopped(state, 'operator');
     expect(state.status).toBe('stopped');
     expect(state.stoppedByUser).toBe(true);
     expect(state.stoppedAt).toBeDefined();
+  });
+
+  // PAN-3324: an OOM kill, crash, or machinery stop recorded as stoppedByUser
+  // engages the operator-stop gate, which permanently suppresses autonomous
+  // re-drive. The stop still happens — only the attribution changes.
+  it('leaves stoppedByUser unset for a system-caused stop', () => {
+    const state = baseState();
+    markAgentStopped(state, 'system');
+    expect(state.status).toBe('stopped');
+    expect(state.stoppedByUser).toBeUndefined();
+    expect(state.stoppedAt).toBeDefined();
+  });
+
+  it('clears a stale stoppedByUser when the new stop is system-caused', () => {
+    const state = { ...baseState(), stoppedByUser: true };
+    markAgentStopped(state, 'system');
+    expect(state.stoppedByUser).toBeUndefined();
+  });
+
+  it('does not engage the operator-stop resume gate after a system stop', () => {
+    const state = baseState();
+    markAgentStopped(state, 'system');
+    expect(getAgentResumeGateBlockReason(state)).toBeUndefined();
+
+    markAgentStopped(state, 'operator');
+    expect(getAgentResumeGateBlockReason(state)?.gate).toBe('stopped-by-user');
+  });
+});
+
+describe('markAgentStoppedState', () => {
+  it('defaults to the system cause so an omitted attribution cannot stall an agent', () => {
+    const state = markAgentStoppedState(baseState());
+    expect(state.status).toBe('stopped');
+    expect(state.stoppedByUser).toBeUndefined();
   });
 });

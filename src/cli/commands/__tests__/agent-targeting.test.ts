@@ -177,7 +177,7 @@ describe('killCommand agent targeting (PAN-1760)', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('strike-pan-1723', {});
     expect(agentMocks.stopAgentSync).toHaveBeenCalledTimes(1);
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith(
       expect.objectContaining({ issueId: 'PAN-1723', kind: 'pause' }),
     );
@@ -191,8 +191,8 @@ describe('killCommand agent targeting (PAN-1760)', () => {
     ];
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-1723', {});
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723');
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-task-slug');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('strike-pan-1723', 'operator');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('inspect-pan-1723-task-slug', 'operator');
     expect(agentMocks.stopAgentSync).not.toHaveBeenCalledWith('agent-pan-9999');
   });
 });

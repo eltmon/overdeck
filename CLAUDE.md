@@ -422,6 +422,15 @@ Deacon auto-resume is intentionally suppressible through the unified
   handoff that owes review/test/verification rework may clear the historical
   flag and re-drive. Explicit operator start clears only `stoppedByUser`; it does
   not silently clear paused or troubled state.
+  Only an operator-initiated stop may set the flag (PAN-3324). `stopAgent`,
+  `stopAgentSync`, and `markAgentStoppedState` take an `AgentStopCause` that
+  defaults to `'system'`; `'operator'` is passed by `pan kill`, `pan pause`, the
+  dashboard stop/pause actions, and the flywheel stop/pause/abort commands, and
+  nowhere else. Every machinery-initiated stop — memory shedding, health
+  force-kills, stalled-review-parent reaping, close-out, reconciling a process
+  the OOM killer already took — leaves the flag unset so autonomous recovery
+  stays eligible. Recording an OOM kill as an operator stop is what turned a
+  transient resource event into a permanent stall.
 - **Memory gate (PAN-2500):** `assessMemoryPressure()` in `src/lib/cloister/memory-governor.ts`
   gates every autonomous resume/dispatch path — boot recovery, patrol auto-resume,
   reactive resume-on-stop, and review/test/ship dispatch — on live memory pressure,

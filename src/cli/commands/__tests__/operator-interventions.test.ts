@@ -207,7 +207,7 @@ describe('operator intervention CLI emission', () => {
     const { killCommand } = await import('../kill.js');
     await killCommand('PAN-2', {});
 
-    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-2');
+    expect(agentMocks.stopAgentSync).toHaveBeenCalledWith('agent-pan-2', 'operator');
     expect(interventionMocks.appendOperatorInterventionEvent).toHaveBeenCalledWith({
       issueId: 'PAN-2',
       kind: 'pause',

@@ -793,7 +793,7 @@ export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = 
   try {
     const sessionAlive = await Effect.runPromise(sessionExists(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
     if (sessionAlive) {
-      await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+      await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
     }
 
     const status = await loadReportFlywheelStatus();
@@ -920,7 +920,7 @@ export async function flywheelAbortCommand(): Promise<void> {
       console.log('No active flywheel run to abort.');
       return;
     }
-    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID));
+    await Effect.runPromise(stopAgent(FLYWHEEL_ORCHESTRATOR_AGENT_ID, 'operator'));
     await abortFlywheelRun(candidate);
     console.log(`Aborted flywheel run ${candidate}.`);
   } catch (error) {

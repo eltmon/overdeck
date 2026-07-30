@@ -76,6 +76,7 @@ export {
   wipeAgentStateDirs,
   writeAgentStateJsonSync,
   type AgentState,
+  type AgentStopCause,
   type Role,
 } from './agents/agent-state.js';
 export { stopAgentSync, stopAgent } from './agents/termination.js';
