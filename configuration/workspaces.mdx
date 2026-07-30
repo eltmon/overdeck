@@ -36,6 +36,15 @@ pan workspace new my-scratch-notes
 # --isolated creates a separate git worktree instead
 pan workspace new my-experiment --isolated --parent-branch main
 
+# --target-path points the workspace at any existing directory
+pan workspace new vendor-lens --target-path ~/code/some-vendored-repo
+
+# --dry-run prints the resolved intent as JSON and creates nothing
+pan workspace new my-scratch-notes --dry-run
+
+# Re-point an existing workspace at a new directory
+pan workspace relocate vendor-lens --path ~/code/moved-vendored-repo
+
 # Resolve (or lazily create) the project's singleton main workspace
 pan workspace main
 
@@ -51,9 +60,35 @@ pan workspace list --kind scratch --archived
 <Note>
   `pan workspace` also carries an older set of subcommands (`create`,
   `migrate`, `ssh`, `destroy`, …) for the separate issue/git-worktree
-  lifecycle that predates this domain. `new`/`main`/`get`/`activate`/`archive`
-  are the ones documented here.
+  lifecycle that predates this domain.
+  `new`/`main`/`get`/`activate`/`archive`/`relocate` are the ones documented
+  here.
 </Note>
+
+### Targeting and relocating
+
+A workspace is a lens that *targets* a directory, so more than one workspace can
+target the same repo and a workspace can be re-pointed later. Two rules to know:
+
+- `--target-path` and `--isolated` are mutually exclusive. An isolated worktree
+  already defines its own path, so accepting both would leave two sources for
+  one field.
+- `pan workspace relocate` refuses issue workspaces (the pipeline owns their
+  worktree path) and requires `--force` for the `main` workspace, since moving
+  it diverges the row from `projects.yaml`.
+
+Relocating never moves memory on disk — memory homes are keyed by workspace id,
+not by path or name.
+
+### What the sidebar shows
+
+The dashboard's **Workspaces** rail lists the workspaces you created — `main`,
+scratch workspaces, and any issue workspace you favorited — and collapses the
+worktrees Overdeck created for issues into an expandable **N pipeline
+worktrees** row. Nothing is hidden permanently: expand the row to see them all,
+and issues remain reachable from the Pipeline and Board views. Main and scratch
+rows also show the phase Overdeck's memory synthesized for them (`exploring`,
+`building`, `shipping`, …).
 
 ## Memory scopes
 
@@ -75,10 +110,46 @@ pan memory pin docs/ARCHITECTURE.md --project myproject
 pan memory pins --workspace <id>
 pan memory unpin docs/ARCHITECTURE.md --workspace <id>
 
+# Search every workspace that targets a directory (bare flag = current directory)
+pan memory search "auth refactor" --target
+pan memory search "auth refactor" --target ~/code/some-repo
+
 # Backfill historical Claude Code sessions into memory, matched by cwd
 pan memory backfill --dry-run
 pan memory backfill --workspace <id>
 ```
+
+### Reading a workspace's memory back
+
+`status` and `summary` take an issue, a workspace, or neither — with neither they
+use the workspace that owns your current directory:
+
+```bash
+# Current status, by issue, by workspace, or from inside the workspace
+pan memory status PAN-123
+pan memory status --workspace my-scratch-notes
+pan memory status
+
+# Plus the archived statuses that came before it, newest first
+pan memory status --workspace my-scratch-notes --history 3
+
+# Observations in order — last 7 days and 50 rows by default
+pan memory timeline --workspace my-scratch-notes
+pan memory timeline --days 2 --limit 20 --json
+
+# Print a file from the workspace's memory home, or a slice of one
+pan memory read summaries/2026-07-30.md
+pan memory read summaries/2026-07-30.md --from 10 --lines 20
+```
+
+`pan memory read` only reaches inside that workspace's own memory home:
+absolute paths, `../` traversal, and symlinks pointing outside it are all
+refused, so your Claude Code session transcripts stay out of reach.
+
+<Note>
+  `--history` is capped at 50, but Overdeck keeps only the three most recent
+  archived statuses on disk, so asking for more returns what is retained.
+</Note>
 
 A pin's scope determines its lifetime: a project-scoped pin survives every
 workspace under that project, while a workspace-scoped pin is deleted when

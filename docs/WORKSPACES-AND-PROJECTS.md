@@ -56,8 +56,43 @@ Representative exports:
   `kind='issue' AND issue_id=? AND is_archived=0`). This is the workspace a
   planning/work/review agent runs in.
 - **`scratch`** — any number per project, not tied to an issue. Created
-  shared-directory by default (same worktree as `main`, no new branch) or
-  `--isolated` for a dedicated git worktree (`pan workspace new`).
+  shared-directory by default (same worktree as `main`, no new branch),
+  `--isolated` for a dedicated git worktree, or `--target-path <dir>` to point
+  at any existing directory (`pan workspace new`; see "Targeting a directory"
+  below).
+
+## Targeting a directory (PAN-3286)
+
+A workspace is a long-lived lens that *targets* a repo directory — several
+workspaces may target the same one, and a workspace may be re-pointed later.
+
+**`pan workspace new <name> --target-path <dir>`** targets an existing
+directory instead of the project's primary path. The directory must already
+exist. `--target-path` **rejects `--isolated`** (D-3): an isolated worktree
+defines its own path by construction, so accepting both would leave two
+conflicting sources for one field.
+
+**`pan workspace new <name> --dry-run`** prints the resolved creation intent as
+JSON and creates nothing — the Subspace `workspaces plan` affordance, folded
+into a flag rather than a separate verb (D-4).
+
+**`pan workspace relocate <ref> --path <dir>`** re-points an existing workspace
+(Subspace `workspaces update --relocate`). The rules (D-5):
+
+- `kind='issue'` is **refused** — a pipeline worktree's path is owned by the
+  worktree, not the row.
+- `kind='main'` requires `--force`, because relocating it diverges the row from
+  `projects.yaml` and that divergence should be deliberate.
+- `kind='scratch'` relocates freely.
+
+Memory homes are keyed by workspace UUID, so relocating never moves or renames
+memory on disk (D-1/D-2) — that rename-safety is exactly why the UUID keying
+exists.
+
+**Target-scoped recall.** `pan memory search --target [path]` searches every
+non-archived workspace whose path targets a directory (bare flag = the current
+directory), merging hits by rank across however many projects those workspaces
+span. It is mutually exclusive with `--workspace`/`--issue`/`--global`.
 
 A pin (`pinned_docs`) is scoped independently: `scope='project'` pins survive
 every workspace under that project; `scope='workspace'` pins are deleted when
@@ -107,9 +142,86 @@ same "disposable cache, rebuilt from sources of truth" pattern
    (`memory/{projectId}/{issueId}/`, from before PAN-1990) onto their
    workspace UUID and re-points `memory_fts.workspace_id` by issue id.
 
-`--dry-run` only previews step 3 (the memory-home scan) — steps 1, 2, and 4
-are idempotent upserts with no dry-run mode of their own. `--verbose` logs
-each processed workspace.
+5. `archiveTerminalIssueWorkspaces()` (PAN-3286) — **archives, never deletes**
+   every non-archived `kind='issue'` row whose issue reached a terminal stage.
+   Terminality comes from `isTerminalIssueStage(getIssueStageSync(...))`, the
+   same shared helper `pan admin db gc-agents` uses, so this pass makes no
+   tracker call of its own. The rows stay because they own their memory homes;
+   they remain readable through `listWorkspaces({ includeArchived: true })` and
+   `unarchiveWorkspace()` reverses it. Rows whose issue has no recorded stage
+   are skipped rather than assumed finished.
+
+`--dry-run` previews step 3 (the memory-home scan) and step 5 (the archival
+pass, which writes nothing under it) — steps 1, 2, and 4 are idempotent upserts
+with no dry-run mode of their own. `--verbose` logs each processed workspace.
+
+## Memory-synthesized phase surfacing (PAN-3286)
+
+`status.json` carries a `phase` (`exploring | planning | building | verifying |
+cleaning | shipping`) synthesized by the memory rollup. It is distinct from the
+*pipeline* phase an issue moves through.
+
+`GET /api/workspace-registry` rows carry `memoryPhase: string | null`, read
+server-side per row so the sidebar needs no extra fetch. It is **always `null`
+for `kind='issue'` rows** — those badge the pipeline phase instead, and the
+route skips the status read for them entirely (D-12). The sidebar renders the
+memory phase as plain muted text with no status dot, deliberately unlike the
+pipeline badge's colored dot; `WorkspaceView`'s Memory panel header shows the
+phase and its confidence.
+
+## User-facing surfaces vs. pipeline worktrees (PAN-3286)
+
+`backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a
+`kind='issue'` row, so a mature checkout has dozens of rows the operator never
+created. The rows are correct and stay — they own the memory homes — but the
+user-facing surfaces default to what the operator made:
+
+- The sidebar WORKSPACES rail and the Cmd-K `workspaces` scope list
+  `kind !== 'issue' || isFavorite`, sharing one exported predicate
+  (`isUserFacingWorkspace` in `Sidebar.tsx`) so the two cannot drift.
+- Hidden rows collapse into an expandable "N pipeline worktrees" count row,
+  the same pattern as the Archived row; its state persists in
+  `overdeck.ui.sidebarWorkspacesPipelineExpanded`.
+- This is **presentation only** — the API still returns every kind, and issues
+  stay reachable through the Issues scope and the pipeline views.
+
+## Workspace-addressed memory recall (PAN-3286)
+
+`pan memory status` and `pan memory summary` resolve a workspace three ways, in
+precedence order: `--workspace <id|name>`, an issue positional, then the
+workspace owning the current directory. With none resolvable they exit non-zero
+naming all three modes. The issue positionals still exist — they became
+*optional*, and their output for a positional invocation is unchanged.
+
+- `pan memory status --history <n>` prints the current status, then archived
+  statuses newest-first with the timestamp recovered from each archive
+  filename (`MemoryStatus` itself carries no timestamp). `n` is capped at 50,
+  but `commitStatusRollup` prunes the on-disk archive to its three most recent
+  entries, so a larger `n` returns whatever is retained.
+- `pan memory timeline [--workspace <ref>] [--days <n>] [--limit <n>]` prints
+  observations oldest-first; `--days` counts today as day 1 and defaults to 7.
+- `pan memory read <path> [--from <n>] [--lines <n>]` prints a file from the
+  workspace's memory home. `<path>` is relative to that home; absolute paths,
+  `../` traversal, and symlinks whose real target escapes the home are all
+  refused with a non-zero exit, so `~/.claude` JSONL session files are
+  unreachable by construction (D-9). Containment reuses
+  `src/lib/memory/pin-path.ts` rather than re-deriving the check.
+
+## SessionStart briefing (PAN-3286)
+
+`POST /api/memory/session/start` returns a rendered `briefing` — current status,
+a digest of recent observations, and pinned-doc titles — which
+`sync-sources/hooks/session-start-hook` emits as SessionStart
+`additionalContext`. Composition reads local files only: no LLM call and no FTS
+query, bounded by `SESSION_START_MEMORY_BUDGETS` in
+`src/lib/memory/session-briefing.ts` (a constant deliberately separate from the
+prompt-time budgets). Delivery is at most once per session id, claimed by an
+exclusive-create marker at `rag-runs/injected-<sessionId>.json`. Every failure
+path returns the previous briefing-less response.
+
+Because Claude Code reads a single JSON object from a SessionStart hook's
+stdout, the hook concatenates the briefing with the post-compaction note into
+one `additionalContext` rather than printing two objects.
 
 ## Wrapper-repo git posture (polyrepo projects)
 
