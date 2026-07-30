@@ -378,6 +378,13 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSuccess: async (_data, { action, body }) => {
       await refreshDashboardState(queryClient);
       if (action.key === 'requestReview') {
+        const result = _data as { success?: boolean; error?: string; message?: string; hint?: string } | undefined;
+        if (result?.success === false) {
+          toast.error('Review request not accepted', {
+            description: result.error ?? result.message ?? result.hint ?? `Review was not requested for ${issueId}`,
+          });
+          return;
+        }
         const mode = (body as { reviewMode?: string } | undefined)?.reviewMode;
         toast.success(mode
           ? `${issueId}: review requested (${mode} mode)`

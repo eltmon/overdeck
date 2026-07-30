@@ -450,6 +450,31 @@ describe('requestReview mode submenu', () => {
 
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('PAN-3340: review requested'));
   });
+
+  it('surfaces an HTTP-success semantic rejection instead of toasting success', async () => {
+    vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/api/dashboard/session')) {
+        return Response.json({ csrfToken: 'test-csrf-token' });
+      }
+      if (url === '/api/orders') {
+        return Response.json({ books: [] });
+      }
+      if (url === '/api/review/PAN-3340/trigger') {
+        return Response.json({ success: false, message: 'Review already passed for PAN-3340' });
+      }
+      return Response.json({ success: true });
+    });
+    const { result } = renderReviewActions();
+    const requestReview = result.current.all.find((view) => view.action.key === 'requestReview');
+
+    act(() => requestReview?.submenu?.find((option) => option.key === 'quick')?.invoke());
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Review request not accepted', {
+      description: 'Review already passed for PAN-3340',
+    }));
+    expect(toast.success).not.toHaveBeenCalled();
+  });
 });
 
 describe('getPhasePrimaryActions', () => {
