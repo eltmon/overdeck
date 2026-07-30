@@ -52,6 +52,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-30T07:01:37.403Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-30T07:09:55.127Z"
     }
   ],
   "feedback": [],
@@ -92,10 +97,10 @@
     "recordedAt": "2026-07-30T05:20:21.210Z"
   },
   "created": "2026-07-30T03:39:53.953Z",
-  "updated": "2026-07-30T07:09:52.872Z",
+  "updated": "2026-07-30T07:09:55.127Z",
   "pipeline": {
     "issueId": "PAN-3291",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -103,13 +108,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T05:21:06.307Z",
-    "updatedAt": "2026-07-30T07:09:52.829Z",
+    "updatedAt": "2026-07-30T07:09:53.553Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "All 5 ACs met: single 3-way merge replaces per-commit rebase (record-update.ts:301) so a poisoned intermediate commit no longer aborts reconcile; records/-only conflicts resolve via checkout --theirs with the active record re-derived by replaying the mutator on origin's version (record-update.ts:212-225); non-records/ conflicts throw naming every path and abort merge+rebase leaving a clean retryable worktree (record-update.ts:207-210, 306-312); delete/modify records/ conflict fails checkout --theirs and aborts rather than auto-resolving, with git stderr naming the path. NFR-1 honored (all git via promisified git() helper with signal + throwIfDurabilityAborted between sync steps, no execSync in server-reachable code); NFR-2 honored (no sleeps added). Tests genuinely exercise the migrated reconcile path — the marker they write satisfies validMarker in state-read-home.ts. Non-blocking observation: entry-point abortMerge/abortRebase (record-update.ts:294-295) discards any in-progress merge in the shared state worktree, intentional per the prior stranded-merge commit and safe under the record fs-lock.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3302",
     "reviewedAtCommit": "e4b53a12eca631be427e9df775b62ebb19d355bc",
     "lastVerifiedCommit": "e4b53a12eca631be427e9df775b62ebb19d355bc",
-    "reviewSpawnedAt": "2026-07-30T07:01:36.187Z",
+    "reviewSpawnedAt": "2026-07-30T07:09:53.552Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "scripts/file-size-allowlist.txt",
@@ -205,7 +210,7 @@
       },
       "costAtCloseOut": {
         "usd": 178.901422,
-        "pricingAsOf": "2026-07-30T07:09:52.868Z"
+        "pricingAsOf": "2026-07-30T07:09:53.844Z"
       }
     },
     "merges": [
