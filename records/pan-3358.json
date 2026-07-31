@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:02:07.911Z",
+  "updated": "2026-07-31T17:03:16.038Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T17:02:07.894Z",
-    "inspectNotes": "Inspecting item version-ship-runner"
+    "updatedAt": "2026-07-31T17:03:15.960Z",
+    "inspectNotes": "AC1-AC4 met; ran tests/unit/lib/cloister/version-ship.test.ts, 9/9 passed. AC1: writeVersion called per set target with the resolved path, runCommand called with command_cwd resolved (/repo/frontend), ShipReport carries per-path results. AC2: expect miss yields status 'partial' listing both non-matching paths; non-zero command exit yields 'failed' with a stderr tail capped at 2000 chars and hasChanges/commit/push all unasserted. AC3: pathspec asserted as ['package.json','generated.txt'] repo-relative, commit skipped when hasChanges is false while push still runs, push dep is execFile git push with no --force and a rejection surfaces as 'failed'. AC4: temp-repo fixture stubs npx on PATH and runs .husky/commit-msg directly — 'chore: bump version to 1.2.3' exits 0, 'chore: update package metadata' exits 1 with the new guidance text. NFR-2 holds: deps use async execFile with argv arrays and tokenizeCommand avoids any shell string. NON-BLOCKING follow-ups for the convoy or a later bead, outside these ACs: (1) FR-3's clause 'the version each file still reports where determinable' is not implemented — src/lib/cloister/version-ship.ts:130 emits a generic 'pattern did not match ${version}' detail with no observed version, so a partial verdict names the path but not what it actually reports; a capture-group substitution for the placeholder would make it determinable. (2) src/lib/cloister/version-ship-deps.ts has no unit coverage, and writeJsonStringField does a first-match regex replace, so a '\"version\"' key nested above the top-level field (e.g. under scripts) would be rewritten instead. (3) On 'partial' the runner still commits and pushes the half-propagated bump — deliberate per the test name, worth an explicit design confirmation."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 921317,
-            "output": 120119,
-            "cacheRead": 22418432,
+            "input": 923257,
+            "output": 120383,
+            "cacheRead": 22757376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 921317,
-          "output": 120119,
-          "cacheRead": 22418432,
+          "input": 923257,
+          "output": 120383,
+          "cacheRead": 22757376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 19.419370999999998,
-        "pricingAsOf": "2026-07-31T17:02:07.904Z"
+        "usd": 19.606463,
+        "pricingAsOf": "2026-07-31T17:03:16.017Z"
       }
     },
     "merges": [],
