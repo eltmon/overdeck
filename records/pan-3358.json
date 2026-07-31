@@ -110,7 +110,7 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T20:13:11.025Z",
+  "updated": "2026-07-31T20:13:13.939Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -120,7 +120,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:12:41.283Z",
+    "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
+    "updatedAt": "2026-07-31T20:13:11.014Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -210,17 +211,16 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 571042,
-            "output": 27100,
-            "cacheRead": 7847424,
+            "input": 1082489,
+            "output": 31534,
+            "cacheRead": 9903616,
             "cacheWrite": 0
           }
         },
@@ -258,24 +258,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6971573,
-            "output": 550071,
-            "cacheRead": 234294784,
+            "input": 6982753,
+            "output": 552162,
+            "cacheRead": 235248640,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 15366099,
-          "output": 799249,
-          "cacheRead": 263670272,
+          "input": 15888726,
+          "output": 805774,
+          "cacheRead": 266680320,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 232.643101,
-        "pricingAsOf": "2026-07-31T20:12:43.438Z"
+        "usd": 236.95701,
+        "pricingAsOf": "2026-07-31T20:13:13.936Z"
       }
     },
     "merges": [
