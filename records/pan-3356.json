@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T16:37:18.358Z",
+  "updated": "2026-07-31T16:49:59.507Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "right-rail": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 3064082,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:37:18.358Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -180,6 +172,17 @@
         "outcome": "completed",
         "reason": "Folded Feed and Status history into Activity segments, preserved the legacy Timeline deep link and protected marker, and kept the top-level Activity tab selected while switching. Typecheck, 40 focused tests, and the 10-test no-loss audit passed.",
         "releasedAt": "2026-07-31T16:37:04.776Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 3064082,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:37:18.358Z",
+        "itemId": "right-rail",
+        "outcome": "completed",
+        "reason": "Added a persistent six-card awareness rail for Now, run details, gates, cost, environment, and recent activity. Run details use the IssueViewModel plus PanOpenInPicker; cost opens the full CostsTab rollup and activity routes to Activity/Feed. Typecheck, 64 focused tests, and the 10-test no-loss audit passed.",
+        "releasedAt": "2026-07-31T16:49:59.507Z"
       }
     ],
     "statusReasons": {
@@ -218,6 +221,10 @@
       "activity-tab": {
         "reason": "Folded Feed and Status history into Activity segments, preserved the legacy Timeline deep link and protected marker, and kept the top-level Activity tab selected while switching. Typecheck, 40 focused tests, and the 10-test no-loss audit passed.",
         "updatedAt": "2026-07-31T16:37:04.776Z"
+      },
+      "right-rail": {
+        "reason": "Added a persistent six-card awareness rail for Now, run details, gates, cost, environment, and recent activity. Run details use the IssueViewModel plus PanOpenInPicker; cost opens the full CostsTab rollup and activity routes to Activity/Feed. Typecheck, 64 focused tests, and the 10-test no-loss audit passed.",
+        "updatedAt": "2026-07-31T16:49:59.507Z"
       }
     }
   },
@@ -261,6 +268,10 @@
     "activity-tab": "completed",
     "activity-tab.activity-tab.ac1": "completed",
     "activity-tab.activity-tab.ac2": "completed",
-    "right-rail": "running"
+    "right-rail": "completed",
+    "right-rail.right-rail.ac1": "completed",
+    "right-rail.right-rail.ac2": "completed",
+    "right-rail.right-rail.ac3": "completed",
+    "right-rail.right-rail.ac4": "completed"
   }
 }
