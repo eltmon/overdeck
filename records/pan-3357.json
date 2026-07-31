@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:27:05.666Z",
+  "updated": "2026-07-31T15:31:09.359Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "deletion-door-module": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3357",
         "agentId": "agent-pan-3357",
         "pid": 443642,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:27:05.665Z"
+        "claimedAt": "2026-07-31T15:27:05.665Z",
+        "itemId": "deletion-door-module",
+        "outcome": "completed",
+        "reason": "Added async transcript-preserving agent state deletion door with four regression tests covering nested Codex rollouts, root Pi JSONL, full removal, and idempotence.",
+        "releasedAt": "2026-07-31T15:31:09.359Z"
+      }
+    ],
+    "statusReasons": {
+      "deletion-door-module": {
+        "reason": "Added async transcript-preserving agent state deletion door with four regression tests covering nested Codex rollouts, root Pi JSONL, full removal, and idempotence.",
+        "updatedAt": "2026-07-31T15:31:09.359Z"
       }
     }
   },
   "statusOverrides": {
-    "deletion-door-module": "running"
+    "deletion-door-module": "completed",
+    "deletion-door-module.deletion-door-module.ac1": "completed",
+    "deletion-door-module.deletion-door-module.ac2": "completed",
+    "deletion-door-module.deletion-door-module.ac3": "completed",
+    "deletion-door-module.deletion-door-module.ac4": "completed"
   }
 }
