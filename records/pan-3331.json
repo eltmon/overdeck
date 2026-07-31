@@ -132,9 +132,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T00:10:43.071Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T00:13Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T00:13:22.448Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T00:13:22Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3331\n\n# Review Synthesis — PAN-3331 — 2026-07-31T00:12:45Z\n\n## Verdict: CHANGES REQUESTED — unreadable working-tree status is rendered as “clean”\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/context.json\n- Branch: feature/pan-3331\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331\n- HEAD reviewed: 41c30af07928fb81def06eaafef88bea21e72e10\n- Cycle number: 4\n- Prior cycle SHA: cf13ebc1f625a0132aaf9c42a9da96fef2155bea\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Unreadable working-tree status is rendered as “clean” — `src/lib/workspaces/git-state.ts:190`\nThe current cycle correctly changed `countDirtyFiles()` to return `null` when `git status` fails and made Pull refuse that unknown state. The display path added in the same cycle immediately projects the unknown result back to zero with `dirtyFiles: dirtyFiles ?? 0`, so the Git card renders `clean` when cleanliness was not established. This is inside the cycle diff and directly contradicts the feature's freshness promise. Preserve an explicit unknown/error state in `WorkspaceGitState` and render “status unknown” rather than `clean`; add module and component/route coverage for a failed status probe.\n\nThis blocker could not have been raised in cycle 1: the `number | null` dirty-status result and its `?? 0` display projection were introduced by the current cycle's fail-closed Pull fix at `41c30af0`.\n\n## Non-blocking Findings\n\n### Correctness\n- `~` **[demoted: previously reviewed]** A requested fetch failure still returns HTTP 200 with stale local refs and `fetchedAt: null`, while the band does not render a refresh error. That behavior predates the current cycle diff, so it is previously reviewed and not promotable in cycle 4. It should be addressed alongside the blocking unknown-status representation if the state model is widened.\n- `~` **[demoted: previously reviewed]** Terminal DELETE uses `sessionExists()`, which maps every tmux probe failure to absence and may report `alreadyStopped` when liveness could not be checked. `src/dashboard/server/routes/terminals.ts` did not change this cycle.\n\n### Performance\n- `~` **[demoted: previously reviewed]** A foreground `ui.open_in_editor_command` retains its HTTP request until the editor exits. The relevant browser/open-route code did not change this cycle.\n\n### Requirements\n- The manifest's `commitsOpen` stub heuristic remains a false positive: the Incoming/Hide incoming control writes the state and displays populated commit data.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-41c30af0/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3331 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -217,7 +230,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:13:21.841Z",
+  "updated": "2026-07-31T00:13:22.449Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "blocked",
