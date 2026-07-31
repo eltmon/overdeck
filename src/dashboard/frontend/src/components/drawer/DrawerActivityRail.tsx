@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 import { cn } from '../../lib/utils';
-import { useDrawerData, type DrawerActivityPhase } from './useDrawerData';
+import { useDrawerData, type DrawerActivityItem, type DrawerActivityPhase } from './useDrawerData';
 
 const PHASE_DOT_CLASSES = {
   work: 'bg-primary',
@@ -18,8 +18,15 @@ function formatWhen(value: string) {
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function DrawerActivityRail({ compact = false, limit }: { compact?: boolean; limit?: number }) {
-  const { activityRail } = useDrawerData();
+export function DrawerActivityRailView({
+  activityRail,
+  compact = false,
+  limit,
+}: {
+  activityRail: DrawerActivityItem[];
+  compact?: boolean;
+  limit?: number;
+}) {
   const displayedActivity = limit ? activityRail.slice(0, limit) : activityRail;
   const scrollRef = useRef<HTMLDivElement>(null);
   const newestId = activityRail[0]?.id;
@@ -69,4 +76,9 @@ export default function DrawerActivityRail({ compact = false, limit }: { compact
       </div>
     </aside>
   );
+}
+
+export default function DrawerActivityRail() {
+  const { activityRail } = useDrawerData();
+  return <DrawerActivityRailView activityRail={activityRail} />;
 }

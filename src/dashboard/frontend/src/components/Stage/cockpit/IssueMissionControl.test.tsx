@@ -195,7 +195,10 @@ vi.mock('../../issue-view/StartAgentCta', () => ({
 }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
-vi.mock('../../drawer/DrawerActivityRail', () => ({ default: ({ compact, limit }: { compact?: boolean; limit?: number }) => <div data-testid="drawer-activity-rail">Activity rail · {String(compact)} · {limit}</div> }))
+vi.mock('../../drawer/DrawerActivityRail', () => ({
+  default: () => <div data-testid="drawer-activity-rail">Activity rail</div>,
+  DrawerActivityRailView: ({ compact, limit }: { compact?: boolean; limit?: number }) => <div data-testid="drawer-activity-rail">Activity rail · {String(compact)} · {limit}</div>,
+}))
 vi.mock('../../PanOpenInPicker', () => ({ PanOpenInPicker: ({ openInCwd }: { openInCwd: string }) => <div data-testid="pan-open-picker">Open {openInCwd}</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
@@ -298,7 +301,7 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl();
     // A known session makes Session the default: route chrome + the ONE
     // IssueDetail at page density.
-    for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'IssueDetail page body']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'Session tab']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
     // The pipeline band is inside IssueDetail now — no duplicate shell in the header.
@@ -376,6 +379,7 @@ describe('IssueMissionControl', () => {
 
     expect(header?.nextElementSibling).toBe(slot)
     expect(slot.nextElementSibling).toBe(nav)
+    expect(slot).toHaveAttribute('data-section', 'NeedsYouSlot')
     expect(slot).toHaveTextContent('Choose the persistence location')
     expect(screen.getByRole('button', { name: 'Tell agent' })).toBeInTheDocument()
   })
@@ -525,15 +529,15 @@ describe('IssueMissionControl', () => {
 
     const changeViews = screen.getByRole('tablist', { name: 'Change views' })
     expect(screen.getByText('Changed files')).toBeInTheDocument()
-    expect(container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-section="Changes tab"]')).toBeInTheDocument()
 
     fireEvent.click(within(changeViews).getByRole('tab', { name: 'Checks' }))
     expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
-    expect(container.querySelector('[data-section="Code tab"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-section="Changes tab"]')).toBeInTheDocument()
 
     fireEvent.click(within(changeViews).getByRole('tab', { name: 'Artifacts' }))
     expect(screen.getByText('Artifacts panel')).toBeInTheDocument()
-    expect(container.querySelector('[data-section="Costs / Artifacts / Ship tabs"]')).toBeInTheDocument()
+    expect(container.querySelector('[data-section="Cost / Artifacts / Ship homes"]')).toBeInTheDocument()
     expect(within(cockpitTabs).getByRole('button', { name: /Changes/ })).toHaveAttribute('aria-selected', 'true')
   })
 
@@ -799,7 +803,7 @@ describe('IssueMissionControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
 
-    const conversation = container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')
+    const conversation = container.querySelector('[data-section="Session tab"]')
     expect(conversation).toBeInTheDocument()
     expect(conversation?.previousElementSibling).toHaveTextContent('Current state')
     expect(container.querySelector('[data-section="Awareness rail"]')).toHaveTextContent('Review blocked — awaiting the work agent')

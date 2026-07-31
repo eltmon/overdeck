@@ -76,31 +76,33 @@ export function NeedsYouSlot({ model, actions }: {
   return (
     <section
       data-testid="needs-you-slot"
-      data-section={SECTION_MARKER[active.kind]}
+      data-section="NeedsYouSlot"
       aria-live="polite"
       className="flex flex-wrap items-center gap-3 rounded-[var(--radius-sm)] border badge-border-warning badge-bg-warning px-3.5 py-2.5 text-[12.5px]"
     >
-      <AlertCircle size={15} className="shrink-0 text-warning-foreground" aria-hidden="true" />
-      <div className="min-w-0 flex-1">
-        <span className="font-medium text-foreground">{copy.title}</span>
-        <span className="text-muted-foreground"> — {active.prompt ?? active.reason ?? copy.fallback}</span>
+      <div data-section={SECTION_MARKER[active.kind]} className="contents">
+        <AlertCircle size={15} className="shrink-0 text-warning-foreground" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <span className="font-medium text-foreground">{copy.title}</span>
+          <span className="text-muted-foreground"> — {active.prompt ?? active.reason ?? copy.fallback}</span>
+        </div>
+        {additionalCount > 0 ? (
+          <span className="shrink-0 rounded-[var(--radius-sm)] border badge-border-warning badge-bg-warning px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
+            +{additionalCount} more
+          </span>
+        ) : null}
+        {action ? (
+          <button
+            type="button"
+            onClick={action.invoke}
+            disabled={!action.enabled || action.isPending}
+            title={!action.enabled ? action.disabledReason : action.action.description}
+            className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {action.action.label}
+          </button>
+        ) : null}
       </div>
-      {additionalCount > 0 ? (
-        <span className="shrink-0 rounded-[var(--radius-sm)] border badge-border-warning badge-bg-warning px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground">
-          +{additionalCount} more
-        </span>
-      ) : null}
-      {action ? (
-        <button
-          type="button"
-          onClick={action.invoke}
-          disabled={!action.enabled || action.isPending}
-          title={!action.enabled ? action.disabledReason : action.action.description}
-          className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {action.action.label}
-        </button>
-      ) : null}
     </section>
   );
 }

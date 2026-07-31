@@ -145,7 +145,8 @@ describe('NeedsYouSlot', () => {
     ['blocker', 'IssueBlockerSpotlight'],
     ['pickup_gate', 'PickupGateCard'],
   ] as const)('renders the absorbed %s section marker', (kind, marker) => {
-    render(<NeedsYouSlot model={modelWith([{ kind }])} actions={[]} />);
-    expect(screen.getByTestId('needs-you-slot')).toHaveAttribute('data-section', marker);
+    const { container } = render(<NeedsYouSlot model={modelWith([{ kind }])} actions={[]} />);
+    expect(screen.getByTestId('needs-you-slot')).toHaveAttribute('data-section', 'NeedsYouSlot');
+    expect(container.querySelector(`[data-section="${marker}"]`)).toBeInTheDocument();
   });
 });

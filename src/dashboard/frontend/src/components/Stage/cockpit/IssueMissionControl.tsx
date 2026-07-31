@@ -21,7 +21,8 @@ import { derivePipelineState, type PipelineState } from '../../../lib/issuePipel
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
-import DrawerActivityRail from '../../drawer/DrawerActivityRail'
+import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
+import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDrawerData'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
@@ -208,7 +209,7 @@ function IssueTreeContextPanel({
     if (context === 'issue') return (
       <div className="space-y-3.5">
         {overview}
-        <div data-section="Conversation / Files / Terminal tabs">
+        <div data-section="Session tab">
           <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
         </div>
       </div>
@@ -411,6 +412,14 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
   )
 }
 
+function drawerActivityPhase(type: string, status: string): DrawerActivityPhase {
+  if (status === 'completed' || status === 'passed' || status === 'merged') return 'done'
+  if (type === 'review' || type === 'reviewer') return 'review'
+  if (type === 'ship' || type === 'merge') return 'ship'
+  if (type === 'work' || type === 'strike') return 'work'
+  return 'info'
+}
+
 function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
   if (tab === 'changes' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
@@ -457,6 +466,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
   const issueView = useIssueView(issueId, { title, branch, projectName })
+  const recentActivity = useMemo<DrawerActivityItem[]>(
+    () => issueView.activity.sections.map((section, index) => ({
+      id: `${section.sessionId}-${section.status}-${index}`,
+      phase: drawerActivityPhase(section.type, section.status),
+      message: `${section.role ?? section.type} ${section.status}`,
+      when: section.startedAt,
+    })),
+    [issueView.activity.sections],
+  )
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
     (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string; url?: string }> | undefined)?.find(
@@ -743,7 +761,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 preserving the ONE IssueDetail page-density renderer. */}
             {issueDetailTab && (
               <div
-                data-section="IssueDetail page body"
+                data-section="Session tab"
                 className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}
               >
                 {activeTab === 'session' ? (
@@ -793,7 +811,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               </div>
             )}
             {activeTab === 'plan' && (
-              <div className="space-y-3.5">
+              <div data-section="Plan / Activity / Discussion tabs" className="space-y-3.5">
                 <div role="tablist" aria-label="Plan views" className="flex gap-1 border-b border-border pb-2">
                   {(['tasks', 'map', 'prd'] as const).map((subView) => (
                     <button
@@ -825,7 +843,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               </div>
             )}
             {activeTab === 'changes' && (
-              <div className="space-y-3.5">
+              <div data-section="Changes tab" className="space-y-3.5">
                 <div role="tablist" aria-label="Change views" className="flex gap-1 border-b border-border pb-2">
                   {(['files', 'checks', 'artifacts'] as const).map((subView) => (
                     <button
@@ -845,18 +863,18 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   ))}
                 </div>
                 {activeSubView === 'files' ? (
-                  <div data-section="Conversation / Files / Terminal tabs"><ChangedFilesView issueId={issueId} /></div>
+                  <div><ChangedFilesView issueId={issueId} /></div>
                 ) : null}
                 {activeSubView === 'checks' ? (
-                  <div data-section="Code tab"><GitHubCiPanel issueId={issueId} /></div>
+                  <div><GitHubCiPanel issueId={issueId} /></div>
                 ) : null}
                 {activeSubView === 'artifacts' ? (
-                  <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>
+                  <div data-section="Cost / Artifacts / Ship homes"><DrawerArtifactsPanel issueId={issueId} /></div>
                 ) : null}
               </div>
             )}
             {activeTab === 'activity' && (
-              <div data-section="PRD / Timeline / Discussion tabs" className="space-y-3.5">
+              <div data-section="Plan / Activity / Discussion tabs" className="space-y-3.5">
                 <div role="tablist" aria-label="Activity views" className="flex gap-1 border-b border-border pb-2">
                   {(['feed', 'history'] as const).map((subView) => (
                     <button
@@ -879,7 +897,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 {activeSubView === 'history' ? <StatusHistoryTab issueId={issueId} /> : null}
               </div>
             )}
-            {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
+            {activeTab === 'discussion' && <div data-section="Plan / Activity / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
           </div>
         </main>
         <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">
@@ -891,7 +909,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Gates</h3>
             <VerificationGates issueId={issueId} />
           </section>
-          <section data-testid="right-rail-cost" className="rounded-[var(--radius)] border border-border bg-card p-3">
+          <section data-testid="right-rail-cost" data-section="Cost / Artifacts / Ship homes" className="rounded-[var(--radius)] border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cost</h3>
@@ -918,7 +936,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 All activity →
               </button>
             </div>
-            <DrawerActivityRail compact limit={3} />
+            <DrawerActivityRailView activityRail={recentActivity} compact limit={3} />
           </section>
         </aside>
       </div>
