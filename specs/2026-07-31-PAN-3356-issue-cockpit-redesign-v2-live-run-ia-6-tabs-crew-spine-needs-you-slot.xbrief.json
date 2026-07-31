@@ -4,17 +4,17 @@
     "created": "2026-07-31T14:56:36Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3356: Issue cockpit redesign v2: live-run IA — 6 tabs, crew spine, needs-you slot",
-    "updated": "2026-07-31T15:05:57.129Z"
+    "updated": "2026-07-31T15:06:14.665Z"
   },
   "plan": {
     "id": "pan-3356",
     "title": "Issue cockpit redesign v2: live-run IA — 6 tabs, crew spine, needs-you slot",
-    "status": "proposed",
+    "status": "running",
     "uid": "5f6de86f-e2d8-4387-bac5-d5955c11a85f",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-31T14:56:36Z",
-    "updated": "2026-07-31T15:05:57.129Z",
+    "updated": "2026-07-31T15:06:14.665Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3356",
@@ -1001,5 +1001,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
