@@ -123,22 +123,24 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:13:51.727Z",
+  "updated": "2026-07-31T00:13:54.749Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T00:13:51.644Z",
-    "reviewNotes": "All four reviewers passed; one advisory remains about distinguishing save success from refresh failure",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-31T00:13:51.650Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3340-review",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91",
     "lastVerifiedCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91",
+    "reviewRequestedAt": "2026-07-31T00:06:38.713Z",
     "reviewSpawnedAt": "2026-07-31T00:10:09.073Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -181,24 +183,6 @@
         "src/lib/cloister/service-completion.ts"
       ],
       "recordedAt": "2026-07-31T00:06:01.082Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91"
-      }
     }
   },
   "closeOut": {
@@ -263,7 +247,7 @@
       },
       "costAtCloseOut": {
         "usd": 183.591466,
-        "pricingAsOf": "2026-07-31T00:13:51.715Z"
+        "pricingAsOf": "2026-07-31T00:13:54.745Z"
       }
     },
     "merges": [
