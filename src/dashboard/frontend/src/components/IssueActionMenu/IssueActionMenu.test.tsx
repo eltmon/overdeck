@@ -103,6 +103,28 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-startAgent')).toHaveTextContent('Start agent');
   });
 
+  it('enables Close out as the primary action for post-merge limbo membership', async () => {
+    mockStore({
+      currentIssue: issue({
+        status: 'In Progress',
+        state: 'in_progress',
+        pipelineMembership: {
+          available: true,
+          inPipeline: true,
+          bucket: 'post_merge_limbo',
+          labelDrift: null,
+        },
+      }),
+    });
+
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" />);
+
+    const closeOut = await screen.findByTestId('issue-action-closeOut');
+    expect(closeOut).toBeEnabled();
+    expect(closeOut).toHaveTextContent('Close out');
+    expect(screen.queryByTestId('issue-action-plan')).not.toBeInTheDocument();
+  });
+
   it('renders overflow-only as a single trigger with the action dropdown', () => {
     renderMenu(<IssueActionMenu issueId="PAN-1" mode="overflow-only" />);
 
@@ -171,6 +193,71 @@ describe('IssueActionMenu', () => {
     expect(screen.getByTestId('issue-action-tasks')).toHaveTextContent('Tasks');
     // The overflow is the full menu: the phase section also shows the primary.
     expect(within(screen.getByTestId('issue-action-overflow-menu')).getAllByTestId('issue-action-startAgent').length).toBeGreaterThan(0);
+  });
+
+  it('opens a primary-strip submenu without invoking the parent action', () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({
+      currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
+      currentAgent: agent({ status: 'stopped' }),
+    });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
+
+    const trigger = screen.getByTestId('issue-action-requestReview');
+    expect(trigger).toHaveAttribute('aria-haspopup', 'menu');
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+    fireEvent.click(trigger);
+
+    const submenu = screen.getByTestId('issue-action-submenu-requestReview');
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(within(submenu).getAllByRole('menuitem')).toHaveLength(3);
+    expect(within(submenu).getByText('Full — 4-reviewer convoy')).toBeInTheDocument();
+    expect(within(submenu).getByText('Quick — single pass (default)')).toBeInTheDocument();
+    expect(within(submenu).getByText('None — skip AI review')).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/review/PAN-1/trigger', expect.anything());
+  });
+
+  it('selects Quick from the primary-strip submenu and closes it', async () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({
+      currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
+      currentAgent: agent({ status: 'stopped' }),
+    });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
+
+    fireEvent.click(screen.getByTestId('issue-action-requestReview'));
+    fireEvent.click(screen.getByTestId('issue-action-requestReview-option-quick'));
+
+    expect(screen.queryByTestId('issue-action-submenu-requestReview')).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      '/api/review/PAN-1/trigger',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ reviewMode: 'quick' }),
+      }),
+    ));
+  });
+
+  it('closes the primary-strip submenu from its backdrop without invoking', () => {
+    const fetchMock = mockFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    mockStore({
+      currentIssue: issue({ status: 'In Progress', hasPlan: true, hasTasks: true, workspacePath: '/tmp/pan-1' }),
+      currentAgent: agent({ status: 'stopped' }),
+    });
+    renderMenu(<IssueActionMenu issueId="PAN-1" mode="primary-strip" pinRight={['requestReview']} />);
+
+    const trigger = screen.getByTestId('issue-action-requestReview');
+    fireEvent.click(trigger);
+    const submenu = screen.getByTestId('issue-action-submenu-requestReview');
+    fireEvent.click(submenu.previousElementSibling as HTMLElement);
+
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('issue-action-submenu-requestReview')).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/review/PAN-1/trigger', expect.anything());
   });
 
   it('pins registry actions and declared components after a flex spacer', () => {

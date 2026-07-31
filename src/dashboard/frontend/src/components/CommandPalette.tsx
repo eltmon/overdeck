@@ -35,6 +35,7 @@ import {
   MessageCircle,
   Clock,
 } from 'lucide-react';
+import { rememberRunSession } from './workspace/WorkspaceActionBand';
 import { isAgentRunningStatus } from '../lib/pipeline-state';
 import { useDashboardStore, selectAgents, selectIssues } from '../lib/store';
 import {
@@ -620,6 +621,38 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     [workspaceRows, pipelineWorkspacesExpanded],
   );
 
+  // PAN-3331 FR-8: start the most recently used workspace's run command without
+  // leaving the keyboard. Derived from ALL non-archived rows by lastAccessedAt,
+  // NOT from the visible list — that one sorts favorites first and hides
+  // collapsed issue worktrees, so an older favorite could win over the
+  // workspace the operator actually just used, and the action would vanish
+  // whenever every row was a collapsed worktree.
+  const runTargetWorkspace = useMemo(() => {
+    let newest: WorkspaceRegistryRow | null = null;
+    for (const ws of workspaceRows) {
+      if (ws.isArchived) continue;
+      if (!newest || (ws.lastAccessedAt ?? 0) > (newest.lastAccessedAt ?? 0)) newest = ws;
+    }
+    return newest;
+  }, [workspaceRows]);
+
+  const runWorkspaceCommand = useCallback(async (workspaceId: string) => {
+    try {
+      const res = await fetch(`/api/workspace-registry/${workspaceId}/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      const body = await res.json().catch(() => ({})) as { sessionName?: string; error?: string };
+      if (body.sessionName) rememberRunSession(workspaceId, body.sessionName);
+      // 409 means one was already live — that is a success for "show me the run".
+      else if (!res.ok) toast.error(body.error ?? 'Could not start the run command');
+    } catch (error) {
+      // A transport failure must surface, not become an unhandled rejection.
+      toast.error(error instanceof Error ? error.message : 'Could not reach the dashboard API');
+    }
+    onSelectWorkspace?.(workspaceId);
+  }, [onSelectWorkspace]);
+
   const workspaceActions = useMemo<PaletteAction[]>(() => {
     const actions: PaletteAction[] = visibleWorkspaceRows.map((ws) => ({
       id: `workspace-${ws.id}`,
@@ -633,6 +666,24 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
         onSelectWorkspace?.(ws.id);
       },
     }));
+
+    // PAN-3331 D-10 — ONE visible row. The group is what maps a row to a scope
+    // chip, so the action normally lives under Actions and moves to Workspaces
+    // only while that scope is the filter. Emitting both unconditionally put two
+    // identical rows in the default `all` view.
+    if (runTargetWorkspace) {
+      const runLabel = runTargetWorkspace.title ?? runTargetWorkspace.name;
+      const group = scope === 'workspaces' ? 'Workspaces' : 'Actions';
+      actions.push({
+        id: `run-workspace-command-${group.toLowerCase()}`,
+        label: 'Run workspace command',
+        description: `Start the run command for ${runLabel}`,
+        icon: Play,
+        group,
+        keywords: ['run', 'start', 'dev server', 'command', runTargetWorkspace.name],
+        onSelect: () => void runWorkspaceCommand(runTargetWorkspace.id),
+      });
+    }
 
     if (!pipelineWorkspacesExpanded && hiddenPipelineWorkspaces.length > 0) {
       actions.push({
@@ -660,7 +711,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     }
 
     return actions;
-  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace]);
+  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand, scope]);
 
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 

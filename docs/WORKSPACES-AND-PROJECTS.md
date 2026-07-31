@@ -246,6 +246,127 @@ memory phase as plain muted text with no status dot, deliberately unlike the
 pipeline badge's colored dot; `WorkspaceView`'s Memory panel header shows the
 phase and its confidence.
 
+## Quick-action band (PAN-3331)
+
+`WorkspaceView` renders `WorkspaceActionBand` between its header and its panels
+for every kind. Three cards over five routes — git state, pull, run-command,
+run, and open:
+
+**Authentication.** Every mutating route below carries
+`rejectUnsafeDashboardMutationRequest`. Two *reads* additionally carry
+`rejectUnauthorizedDashboardRequest`: the detail route, because it is the only
+read that returns executable command text (the stored run command plus every
+configured `start_command`, which may embed a token), and the git route, because
+`fetch=1` reaches the network and rewrites remote-tracking refs. The list route
+stays unauthenticated and its DTO **omits `runCommand`** — `toListRow`
+destructures it out so a future field cannot leak through a forgotten delete.
+
+**Git card — `GET /api/workspace-registry/:id/git?fetch=0|1`.** Returns
+`WorkspaceGitState` from `src/lib/workspaces/git-state.ts`, or `{git: null}` for
+an `isGitRepository=false` row. Ahead/behind is computed against the checked-out
+branch's **own upstream** (`@{u}`), falling back to `origin/HEAD` with
+`hasUpstream: false` when the branch tracks nothing — the older
+`getRepoGitStatusAsync` in `routes/workspaces/workspace-data.ts` compares
+`HEAD...origin/HEAD` unconditionally and reports the wrong "behind" for a
+feature branch. `fetch=1` runs a real `git fetch` so the card is not judging
+stale refs, throttled to one fetch per 30 s per path in the route; a throttled
+read still reports the last fetch time in `fetchedAt`. The frontend asks for
+`fetch=1` on mount and on Refresh, and polls every 30 s without forcing one.
+
+**Unknown is a first-class state, never rendered as good news.** Three fields
+carry it:
+
+- `dirtyFiles: number | null` — null when git could not read the working tree
+  (an unreadable index, output overflowing the buffer). The card says "status
+  unknown", not "clean", and Pull refuses on the same null, so the card and the
+  action always agree.
+- `ahead`/`behind: number | null` — null when the `rev-list` probe failed, and
+  also when there is no ref to compare against at all. A checkout with no
+  remote is not "up to date" with anything, and 0/0 is exactly how the card
+  would render that claim. It shows "sync state unknown" instead.
+- `fetchFailed: boolean` — a fetch was asked for and did not succeed, so the
+  counts are whatever the local refs already said. **The route makes this
+  sticky per path**: the module's flag describes one call and is false on every
+  non-fetching read, so the band's 30-second poll would otherwise erase the
+  warning while the remote was still unreachable. `fetchFailedByPath` clears
+  only on a successful fetch or pull.
+
+The throttle keeps two clocks and coalesces. `lastFetchAttemptByPath` is claimed
+*before* the fetch is awaited, so two requests arriving in the same tick cannot
+each start a `git fetch`; concurrent callers share one in-flight promise per
+path. `lastFetchSuccessByPath` is what `fetchedAt` reports, so a failed fetch
+holds the window (don't hammer a broken remote) without claiming the data is
+fresh.
+
+**Pull — `POST /api/workspace-registry/:id/pull`.** `pullWorkspaceFastForward`
+runs `git pull --ff-only` and **returns** typed refusals rather than throwing:
+`dirty`, `operation-in-progress` (via `ensureSyncGitQuiescent` with
+`abortMerge: false` — an in-flight merge is refused, never cleaned up),
+`not-fast-forward`, `no-upstream`, `detached`, and `error`. The route answers
+409 for a refusal and 500 for `error`. **`kind='issue'` workspaces are refused
+with 409 and their sync-main URL** — their merge semantics are unchanged and
+the band routes their button to `POST /api/issues/:issueId/sync-main`.
+
+**Run — `run_command` column, `PUT /:id/run-command`, `POST /:id/run`.** The
+command is its own nullable column on `workspaces` (a key inside
+`layout_config` would be clobbered: `react-resizable-panels` rewrites that blob
+wholesale on every panel drag). Reads come through the resolver's `runCommand`
+field, writes through `setWorkspaceRunCommand`. When null, the effective command
+falls back to the project's first `workspace.services[].start_command`; the
+detail route exposes `runCommandDefault` and `runCommandOptions` for the
+placeholder and the service picker. `POST /:id/run` spawns
+`createSession('ws-run-<sha256(id) prefix>', workspace.path, command)`; the name
+is derived from the workspace id so a second Run finds the live session and
+answers 409 instead of stacking a second dev server on the same port. The
+derivation is a hash rather than a sanitized prefix of the id because stripping
+characters is not injective and truncating collides — two ids sharing their
+first eight alphanumerics would otherwise share one session and stop or restart
+each other's process. Both routes refuse
+a command containing a newline or backtick, or longer than 500 characters — the
+async `createSession` performs no validation of its own, unlike the deprecated
+sync variant.
+
+**Open — `POST /:id/open` with `{target: 'file-manager' | 'editor'}`.**
+`openPath` reveals the path with the platform opener. The editor entry is gated
+on `ui.open_in_editor_command` in `~/.overdeck/config.yaml` (e.g.
+`cursor {path}`): unset means the route answers 409 and the detail route reports
+`openInEditorConfigured: false`, so the band hides the button rather than
+offering one that cannot work. `openInEditor` splits the template into an
+argument vector **before** substituting `{path}`, so a path with spaces or shell
+metacharacters stays a single argument and no shell is involved. Splitting is
+whitespace-only, so a template containing quotes is rejected with an
+explanatory error rather than silently producing argv with stray quotes. On
+Windows the file manager is `explorer.exe` directly rather than `cmd /c start`,
+because `cmd` re-parses metacharacters in what arrived as a plain argv element;
+explorer's nonzero exit is deliberately not treated as failure.
+
+The editor template is read through `getOpenInEditorCommand()`, an **async**
+Effect over `loadConfigWithoutMigration`. The sync loader stats and parses
+config files on the event loop, which server-reachable request code must never
+do — a slow filesystem would stall HTTP and terminal traffic.
+
+**Band state is workspace-scoped, so the band is keyed by workspace id.**
+`WorkspaceView` is not remounted when the route changes workspace, and with both
+workspaces' detail data cached there is no loading gap either — so `key={workspaceId}`
+on `WorkspaceActionBand` is what resets the first-fetch ref, the expander, error
+text, and above all the run-command edit draft. Without it a draft typed in
+workspace A stays on screen in B and Save writes A's text into B's `run_command`.
+
+**Stopping a run is idempotent.** `DELETE /api/terminals/:name` returns
+`{ok: true, alreadyStopped: true}` when the session is already gone rather than
+failing, because tmux `kill-session` errors on a missing session. The band
+remembers a session name for the browser session, and the process can exit on
+its own; without idempotency a crashed dev server left Stop *and* Restart
+permanently failing at their stop step. A genuine failure (tmux unreachable)
+still surfaces.
+
+The open route awaits the opener's exit — for either target — rather than
+returning at spawn, so
+"editor not found" reaches the operator instead of a silent 200. `Effect.timeout`
+is the wrong tool for bounding that: it interrupts the effect and would kill the
+child the operator just asked for. If a template ever names a foreground
+process, the fix is a spawn-and-detach primitive in `src/lib/browser.ts`.
+
 ## User-facing surfaces vs. pipeline worktrees (PAN-3286)
 
 `backfillIssueWorkspaces()` enrolls *every* `feature-*` worktree as a

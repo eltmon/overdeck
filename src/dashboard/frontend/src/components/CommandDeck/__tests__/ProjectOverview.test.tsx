@@ -115,6 +115,10 @@ describe('bucketFeaturePhase', () => {
     expectPhase('verifying', { stateLabel: 'Verifying On Main' }, { mergeStatus: 'merged' });
   });
 
+  it('buckets merged work that needs close-out in the ship lane', () => {
+    expectPhase('ship', { stateLabel: 'Merged — Needs Close-Out' });
+  });
+
   it('buckets testing issues as tests', () => {
     expectPhase('review', {}, { testStatus: 'testing' });
   });

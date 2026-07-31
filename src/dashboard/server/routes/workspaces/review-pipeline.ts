@@ -37,6 +37,7 @@ import {
   pushDashboardReviewBranch,
   registerDashboardDurableReviewPipeline,
 } from '../../services/durable-review-pipeline.js';
+import { rejectUnsafeDashboardMutationRequest } from '../dashboard-auth.js';
 import { httpHandler } from '../http-handler.js';
 import {
   getProjectPath,
@@ -63,6 +64,22 @@ registerDashboardDurableReviewPipeline({
 });
 /** Safe `.message` read for caught values of unknown shape. */
 const errorMessage = (e: unknown): string | undefined => e instanceof Error ? e.message : undefined;
+
+export function parseRequestedReviewMode(body: unknown):
+  | { ok: true; mode?: 'quick' | 'full' | 'none' }
+  | { ok: false; error: string } {
+  const reviewMode = typeof body === 'object' && body !== null
+    ? (body as { reviewMode?: unknown }).reviewMode
+    : undefined;
+
+  if (reviewMode === undefined || reviewMode === null) {
+    return { ok: true };
+  }
+  if (reviewMode === 'quick' || reviewMode === 'full' || reviewMode === 'none') {
+    return { ok: true, mode: reviewMode };
+  }
+  return { ok: false, error: 'reviewMode must be quick, full, or none' };
+}
 
 /**
  * Push the feature branch of every repo in the workspace (PAN-2948).
@@ -122,13 +139,20 @@ const postWorkspaceReviewRoute = HttpRouter.add(
   'POST',
   '/api/review/:issueId/trigger',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const request = yield* HttpServerRequest.HttpServerRequest;
     const body = yield* readJsonBody;
+    const requestedReviewMode = parseRequestedReviewMode(body);
+    if (!requestedReviewMode.ok) {
+      return jsonResponse({ error: requestedReviewMode.error }, { status: 400 });
+    }
     const eventStore = yield* EventStoreService;
 
     const urlOpt = HttpServerRequest.toURL(request);
@@ -208,6 +232,16 @@ const postWorkspaceReviewRoute = HttpRouter.add(
       return jsonResponse({ error: 'Workspace does not exist' }, { status: 400 });
     }
 
+    const reviewModeProject = requestedReviewMode.mode === undefined
+      ? null
+      : yield* Effect.promise(async () => {
+          const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
+          return resolveProjectForIssue(issueId);
+        });
+    if (requestedReviewMode.mode !== undefined && !reviewModeProject) {
+      return jsonResponse({ error: `No project configured for ${issueId}` }, { status: 500 });
+    }
+
     // Reset review status — keep 'pending' until dispatch succeeds (PAN-511 atomicity fix).
     // reviewStatus is set to 'reviewing' only after the specialist is successfully dispatched
     // or queued, not before. This prevents stuck 'reviewing' state if Cloister crashes mid-dispatch.
@@ -247,6 +281,25 @@ const postWorkspaceReviewRoute = HttpRouter.add(
         message,
         pipeline: 'deferred',
       }, { status: 409 });
+    }
+
+    if (requestedReviewMode.mode !== undefined && reviewModeProject) {
+      const persistenceError = yield* Effect.promise(async () => {
+        const { updateIssueRecord } = await import('../../../../lib/pan-dir/record-update.js');
+        await updateIssueRecord(reviewModeProject, issueId, (record) => {
+          record.reviewMode = requestedReviewMode.mode;
+        });
+      }).pipe(Effect.match({
+        onFailure: (error) => errorMessage(error) ?? String(error),
+        onSuccess: () => null,
+      }));
+
+      if (persistenceError !== null) {
+        const message = `Failed to persist review mode: ${persistenceError}`;
+        completePendingOperation(issueId, message);
+        setReviewStatus(issueId, { reviewStatus: 'pending', reviewNotes: message });
+        return jsonResponse({ error: message }, { status: 500 });
+      }
     }
 
     // Respond immediately

@@ -124,6 +124,11 @@ export function updateWorkspaceLayout(id: string, layoutConfig: string): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET layout_config = ? WHERE id = ?`).run(layoutConfig, id);
 }
 
+/** Set (or clear, with null) the workspace's run command — PAN-3331 quick-action band. */
+export function setWorkspaceRunCommand(id: string, command: string | null): void {
+  getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET run_command = ? WHERE id = ?`).run(command, id);
+}
+
 export function setWorkspaceFavorite(id: string, isFavorite: boolean): void {
   getOverdeckDatabaseSync().prepare(`UPDATE workspaces SET is_favorite = ? WHERE id = ?`).run(isFavorite ? 1 : 0, id);
 }

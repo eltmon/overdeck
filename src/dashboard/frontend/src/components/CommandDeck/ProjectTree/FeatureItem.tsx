@@ -516,7 +516,7 @@ function getFeatureStateTone(stateLabel: string): 'done' | 'progress' | 'review'
   const normalized = stateLabel.trim().toLowerCase();
   if (normalized === 'done') return 'done';
   if (normalized === 'in progress' || normalized === 'active') return 'progress';
-  if (normalized === 'in review' || normalized === 'review' || normalized === 'verifying' || normalized === 'verifying on main') return 'review';
+  if (normalized.includes('close-out') || normalized === 'in review' || normalized === 'review' || normalized === 'verifying' || normalized === 'verifying on main') return 'review';
   if (normalized === 'has context') return 'context';
   if (normalized === 'planning') return 'planning';
   return 'todo';

@@ -202,8 +202,17 @@ function projectPrefixes(project: ProjectRef): string[] {
   return [...prefixes];
 }
 
-function deriveStateLabel(issue: MutableResourceIssue, hasTmux: boolean, hasFreshHeartbeat: boolean): string {
+function deriveStateLabel(
+  issue: MutableResourceIssue,
+  hasTmux: boolean,
+  hasFreshHeartbeat: boolean,
+  membership?: PipelineMembership,
+): string {
   const trackerState = issue.trackerState ?? '';
+  if (membership?.bucket === 'post_merge_limbo') return 'Merged — Needs Close-Out';
+  if (membership?.bucket === 'clean_terminal' && membership.lenses.L3_issueOpen === false) {
+    return hasTmux ? 'Closed' : 'Done';
+  }
   if (issue.readyForMerge) return 'In Review';
   if (trackerState === 'done' || trackerState === 'closed' || trackerState === 'canceled') {
     return hasTmux ? 'Closed' : 'Done';
@@ -746,7 +755,7 @@ async function computeResourceAllocatedIssues(
         const membership = memberships.get(issue.issueId);
         const hasTmux = issue.resourceDetails.tmuxSessions.length > 0;
         const hasRecentHeartbeat = hasRecentActivity(issue.lastActivity);
-        const stateLabel = deriveStateLabel(issue, hasTmux, hasRecentHeartbeat);
+        const stateLabel = deriveStateLabel(issue, hasTmux, hasRecentHeartbeat, membership);
         const isRemoteRunning = issue.resourceDetails.remoteAgent?.status === 'running'
           || issue.resourceDetails.remoteAgent?.status === 'starting';
         const status = (hasTmux && (issue.agentStatus === 'active' || hasRecentHeartbeat)) || isRemoteRunning

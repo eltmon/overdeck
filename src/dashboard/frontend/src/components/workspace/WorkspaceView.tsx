@@ -26,6 +26,7 @@ import { Group, Panel, Separator, useDefaultLayout, type LayoutStorage } from 'r
 import { ConversationList, fetchConversations, type Conversation } from '../CommandDeck/ConversationList';
 import { ConversationPanel } from '../chat/ConversationPanel';
 import { XTerminal } from '../XTerminal';
+import { WorkspaceActionBand, rememberRunSession, useRunSession } from './WorkspaceActionBand';
 import { XBriefViewer } from '../xbrief/XBriefViewer';
 import type { XBriefDocument } from '../xbrief/types';
 import { VerificationGates } from '../issue-view/VerificationGates';
@@ -55,6 +56,12 @@ interface WorkspaceRegistryDetail {
   title: string | null;
   isFavorite: boolean;
   pipeline: WorkspacePipelineBadge | null;
+  /** PAN-3331 quick-action band inputs. */
+  isGitRepository?: boolean;
+  runCommand?: string | null;
+  runCommandDefault?: string | null;
+  runCommandOptions?: Array<{ name: string; command: string }>;
+  openInEditorConfigured?: boolean;
 }
 
 interface WorkspaceMemoryStatus {
@@ -139,6 +146,15 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
     }
     return ids;
   }, [showAllConversations, workspace, workspaceId, conversations]);
+
+  // Read from the keyed run-session store rather than local state: this
+  // component is not remounted when the route changes workspace id, so local
+  // state seeded once would show the previous workspace's terminal here, and a
+  // palette-started run would never appear (PAN-3331 D-5).
+  const runSessionName = useRunSession(workspaceId);
+  const setRunSessionName = useCallback((sessionName: string | null) => {
+    rememberRunSession(workspaceId, sessionName);
+  }, [workspaceId]);
 
   const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
   const selectedConversationObj = conversations.find((c) => c.name === selectedConversation) ?? null;
@@ -287,6 +303,8 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         )}
       </div>
 
+      {/* Kept directly under the header so the picker and any refusal sit with
+          the Relocate/Archive buttons that produced them, above the band. */}
       {relocating && workspace.kind !== 'issue' && (
         <div className="border-b border-border px-4 py-2 shrink-0" data-testid="workspace-view-relocate-picker">
           <FolderPicker onSelect={(path) => void onRelocateTo(path)} initialPath={workspace.path} />
@@ -298,6 +316,27 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
           {actionError}
         </div>
       )}
+
+      {/* Keyed so the band remounts when the route changes workspace: it holds
+          workspace-scoped state (the first-fetch ref, the expanded commit list,
+          error text, and above all the run-command edit draft) and this view is
+          NOT remounted on an id change. With both workspaces' detail data
+          cached there is no loading gap to reset it, so an edit draft opened in
+          A would otherwise still be on screen in B — and Save would write A's
+          draft into B's run command (PAN-3331 review cycle 2). */}
+      <WorkspaceActionBand
+        key={workspaceId}
+        workspaceId={workspaceId}
+        kind={workspace.kind}
+        issueId={workspace.issueId}
+        isGitRepository={workspace.isGitRepository !== false}
+        runCommand={workspace.runCommand ?? null}
+        runCommandDefault={workspace.runCommandDefault ?? null}
+        runCommandOptions={workspace.runCommandOptions ?? []}
+        openInEditorConfigured={workspace.openInEditorConfigured === true}
+        runSessionName={runSessionName}
+        onRunSessionChange={setRunSessionName}
+      />
 
       {workspace.kind === 'issue' && workspace.issueId && (
         <div className="border-b border-border p-3 space-y-3 shrink-0 max-h-64 overflow-y-auto" data-testid="workspace-view-issue-panels">
@@ -313,12 +352,27 @@ export function WorkspaceView({ workspaceId, onBack }: WorkspaceViewProps) {
         className="flex-1 min-h-0"
         id={`workspace-${workspaceId}`}
       >
-        <Panel id="terminal" defaultSize={34} minSize={15} className="min-w-0 h-full overflow-hidden">
+        <Panel id="terminal" defaultSize={34} minSize={15} className="min-w-0 h-full overflow-hidden flex flex-col">
+          {/* The run session (PAN-3331) shares this panel with the agent
+              terminal rather than displacing it: main/scratch workspaces have
+              no agent terminal, so the run session simply fills the panel. */}
           {workspaceAgent ? (
-            <XTerminal sessionName={workspaceAgent.id} embedded />
-          ) : (
+            <div className="flex-1 min-h-0">
+              <XTerminal sessionName={workspaceAgent.id} embedded />
+            </div>
+          ) : !runSessionName ? (
             <div className="p-4 text-xs text-muted-foreground" data-testid="workspace-view-no-terminal">
               No active agent terminal for this workspace.
+            </div>
+          ) : null}
+          {runSessionName && (
+            <div className="flex-1 min-h-0 flex flex-col border-t border-border first:border-t-0" data-testid="workspace-view-run-terminal">
+              <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground px-3 py-1 shrink-0">
+                Run
+              </span>
+              <div className="flex-1 min-h-0">
+                <XTerminal sessionName={runSessionName} embedded />
+              </div>
             </div>
           )}
         </Panel>

@@ -132,21 +132,21 @@ describe('PipelineView', () => {
     expect(container.querySelectorAll('[data-component="phase-header"]')).toHaveLength(6);
   });
 
-  it('keeps phase derivation unchanged when server membership is attached', () => {
+  it('renders available post-merge limbo membership in the ship lane', () => {
     useDashboardStore.setState({
       issuesRaw: [issue({
         identifier: 'PAN-10',
         title: 'Merged but still open',
         state: 'in_review',
-        pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+        pipelineMembership: { available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
       })],
       reviewStatusByIssueId: {},
       agentsById: {},
     } as Parameters<typeof useDashboardStore.setState>[0]);
 
     const { container } = renderPipelineView();
-    const reviewPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="review"]') as HTMLElement;
-    expect(within(reviewPhase).getByText('Merged but still open')).toBeInTheDocument();
+    const shipPhase = container.querySelector('[data-component="pipeline-phase"][data-phase="ship"]') as HTMLElement;
+    expect(within(shipPhase).getByText('Merged but still open')).toBeInTheDocument();
   });
 
   it('excludes open clean-terminal issues before lane derivation and metric counting', () => {
