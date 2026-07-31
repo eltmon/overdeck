@@ -179,7 +179,7 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-31T14:33:29.331Z",
+  "updated": "2026-07-31T14:33:34.332Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "passed",
@@ -190,14 +190,26 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-31T14:33:29.311Z",
+    "updatedAt": "2026-07-31T14:33:34.319Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-07-31T14:31:49.549Z"
+        "summary": "Conflicts with main since 1bd80f6 (6 paths): docs/audits/pan-1990-surface-inventory.md, scripts/file-size-allowlist.txt, src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx, …",
+        "detectedAt": "2026-07-31T14:33:29.315Z"
       }
     ],
+    "conflictsSince": {
+      "sha": "1bd80f642f9eb92fdcd3e15a0b16a97611000f62",
+      "detectedAt": "2026-07-31T14:33:29.315Z",
+      "paths": [
+        "docs/audits/pan-1990-surface-inventory.md",
+        "scripts/file-size-allowlist.txt",
+        "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
+        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+        "src/dashboard/server/routes/workspace-registry.ts",
+        "tests/unit/lib/overdeck/no-loss-matrix.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
     "reviewedAtCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
     "lastVerifiedCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
@@ -271,7 +283,7 @@
       },
       "costAtCloseOut": {
         "usd": 236.198098,
-        "pricingAsOf": "2026-07-31T14:33:29.320Z"
+        "pricingAsOf": "2026-07-31T14:33:34.325Z"
       }
     },
     "merges": [
