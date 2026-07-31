@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:07:06.596Z",
+  "updated": "2026-07-31T17:17:58.888Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "promote-ship-hook": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 833886,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T17:03:27.943Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Added the pure version ship orchestrator and async execFile-backed dependencies, partial/failure reporting, declared-path commits and tracked-upstream pushes, commit-msg support, and nine focused tests; typecheck and shell syntax pass.",
         "releasedAt": "2026-07-31T17:02:02.443Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 833886,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T17:03:27.943Z",
+        "itemId": "promote-ship-hook",
+        "outcome": "completed",
+        "reason": "Threaded operator-supplied versions through promote, ran ship after verification before fan-out, persisted pending/passed/partial/failed per-member ship records, added deferred ship route and generation payload state, preserved ship records across ordinary writes, and added route/orchestrator tests; typecheck, lint, and promotion regressions pass.",
+        "releasedAt": "2026-07-31T17:17:58.888Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "version-ship-runner": {
         "reason": "Added the pure version ship orchestrator and async execFile-backed dependencies, partial/failure reporting, declared-path commits and tracked-upstream pushes, commit-msg support, and nine focused tests; typecheck and shell syntax pass.",
         "updatedAt": "2026-07-31T17:02:02.443Z"
+      },
+      "promote-ship-hook": {
+        "reason": "Threaded operator-supplied versions through promote, ran ship after verification before fan-out, persisted pending/passed/partial/failed per-member ship records, added deferred ship route and generation payload state, preserved ship records across ordinary writes, and added route/orchestrator tests; typecheck, lint, and promotion regressions pass.",
+        "updatedAt": "2026-07-31T17:17:58.888Z"
       }
     }
   },
@@ -127,6 +134,11 @@
     "version-ship-runner.version-ship-runner.ac2": "completed",
     "version-ship-runner.version-ship-runner.ac3": "completed",
     "version-ship-runner.version-ship-runner.ac4": "completed",
-    "promote-ship-hook": "running"
+    "promote-ship-hook": "completed",
+    "promote-ship-hook.promote-ship-hook.ac1": "completed",
+    "promote-ship-hook.promote-ship-hook.ac2": "completed",
+    "promote-ship-hook.promote-ship-hook.ac3": "completed",
+    "promote-ship-hook.promote-ship-hook.ac4": "completed",
+    "promote-ship-hook.promote-ship-hook.ac5": "completed"
   }
 }
