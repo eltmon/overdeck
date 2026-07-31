@@ -12,6 +12,7 @@ beforeEach(() => {
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
   actionInvoke.mockClear()
+  for (const action of Object.values(queryMocks.exactAgentActions)) action.mutate.mockClear()
   useDashboardStore.setState({ xbriefViewerIssueId: null })
   queryMocks.issueActionState.hasPlan = true
   queryMocks.issueActionState.hasTasks = true
@@ -140,7 +141,18 @@ const queryMocks = vi.hoisted(() => {
   const workspaceQuery = { data: null, isLoading: false }
   const shipLogQuery = { data: null, isLoading: false }
   const issueActionState = { hasPlan: true, hasTasks: true }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery, issueActionState }
+  const exactAgentActions = {
+    tell: { mutate: vi.fn(), isPending: false },
+    answer: { mutate: vi.fn(), isPending: false },
+    recover: { mutate: vi.fn(), isPending: false },
+    unpause: { mutate: vi.fn(), isPending: false },
+    untroubled: { mutate: vi.fn(), isPending: false },
+    unstick: { mutate: vi.fn(), isPending: false },
+    merge: { mutate: vi.fn(), isPending: false },
+    startWork: { mutate: vi.fn(), isPending: false },
+    startPlanning: { mutate: vi.fn(), isPending: false },
+  }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery, issueActionState, exactAgentActions }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -156,6 +168,10 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 
 vi.mock('../../../lib/useSharedTick', () => ({
   useSharedTick: () => new Date('2026-06-07T00:05:00Z'),
+}))
+
+vi.mock('../../../lib/simple/useSimpleActions', () => ({
+  useSimpleActions: () => queryMocks.exactAgentActions,
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
@@ -405,7 +421,49 @@ describe('IssueMissionControl', () => {
     expect(pipeline?.nextElementSibling).toBe(nav)
     expect(slot).toHaveAttribute('data-section', 'NeedsYouSlot')
     expect(slot).toHaveTextContent('Choose the persistence location')
-    expect(screen.getByRole('button', { name: 'Tell agent' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open conversation' })).toBeInTheDocument()
+  })
+
+  it('routes a needs-you action to the exact non-primary affected agent', () => {
+    queryMocks.activityQuery.data.sections = [
+      { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'running', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
+      {
+        type: 'reviewer',
+        role: 'security',
+        sessionId: 'agent-pan-1661-review-security',
+        model: 'claude-sonnet-5',
+        status: 'stopped',
+        startedAt: '2026-06-07T00:01:00Z',
+        duration: 1,
+        paused: true,
+        pausedReason: 'operator pause',
+      },
+    ]
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1661': {
+          id: 'agent-pan-1661',
+          issueId: 'PAN-1661',
+          status: 'running',
+          role: 'work',
+        },
+        'agent-pan-1661-review-security': {
+          id: 'agent-pan-1661-review-security',
+          issueId: 'PAN-1661',
+          status: 'stopped',
+          role: 'review',
+          paused: true,
+          pausedReason: 'operator pause',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0])
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpause agent' }))
+
+    expect(queryMocks.exactAgentActions.unpause.mutate).toHaveBeenCalledWith({
+      agentId: 'agent-pan-1661-review-security',
+    })
   })
 
   it('lifts the detail tabs between the header and body without wrapping', () => {

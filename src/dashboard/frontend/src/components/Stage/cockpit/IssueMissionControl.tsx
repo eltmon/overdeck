@@ -53,6 +53,8 @@ import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
+import { useCockpitNeedsYouActions } from './useCockpitNeedsYouActions'
+import { useDeferredSessionSelection } from './useDeferredSessionSelection'
 import type { SessionNode } from '@overdeck/contracts'
 import type { Agent } from '../../../types'
 import styles from './cockpitBody.module.css'
@@ -165,8 +167,6 @@ function nextAction(rs: ReviewStatusData | undefined): string {
   if (rs.reviewStatus === 'passed' && rs.testStatus !== 'passed' && rs.testStatus !== 'skipped') return 'dispatch test'
   return 'awaiting pipeline'
 }
-
-
 
 function githubCompareUrl(issueUrl: string | null, branch: string): string | null {
   if (!issueUrl) return null
@@ -568,6 +568,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setActiveTab(null)
     setActiveSubView(undefined)
   }
+  const resolveNeedsYouAgentAction = useCockpitNeedsYouActions(treeSessions, selectSessionFromTree)
+  const queuePhaseSession = useDeferredSessionSelection(treeSessions, selectSessionFromTree)
   // Open an agent's conversation by session type (work/review/test/…). Shared by
   // the pipeline phases (#4) and the Overview "Now" links (#9).
   const openAgentByType = (type: string): boolean => {
@@ -579,6 +581,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (sessionId) {
       const session = treeSessions.find((candidate) => candidate.sessionId === sessionId)
       if (session) selectSessionFromTree(session)
+      else queuePhaseSession(sessionId)
       return
     }
     if (selectedPhase === 'plan') {
@@ -711,7 +714,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             the cockpit route renders the ONE component, no duplicate shell. */}
       </header>
 
-      <NeedsYouSlot model={issueView} actions={headerActions.all} />
+      <NeedsYouSlot
+        model={issueView}
+        actions={headerActions.all}
+        resolveAgentAction={resolveNeedsYouAgentAction}
+      />
 
       <CockpitPhaseRail
         pipelineState={pipelineState}

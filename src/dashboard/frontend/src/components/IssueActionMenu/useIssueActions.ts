@@ -24,19 +24,11 @@ import { STATUS_LABELS, type Agent, type Issue, type WorkAgentLifecycle } from '
 export type IssueActionDialogState = {
   key: IssueActionKey;
   action: IssueActionEntry;
-  targetAgentId?: string;
 } | null;
 
 export type IssueActionSubmenuOption = {
   key: string;
   label: string;
-  invoke: () => void;
-};
-
-export type TargetedIssueActionView = {
-  enabled: boolean;
-  disabledReason?: string;
-  isPending: boolean;
   invoke: () => void;
 };
 
@@ -46,7 +38,6 @@ export type IssueActionView = {
   disabledReason?: string;
   isPending: boolean;
   invoke: () => void;
-  forAgent?: (agentId: string) => TargetedIssueActionView;
   submenu?: IssueActionSubmenuOption[];
 };
 
@@ -66,7 +57,7 @@ export type UseIssueActionsResult = IssueActionLayout & {
   phase: PipelinePhase;
   activeDialog: IssueActionDialogState;
   closeDialog: () => void;
-  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null, targetAgentId?: string) => void;
+  submitDialogAction: (action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => void;
   createOrderBookForIssue: (name: string) => Promise<void>;
   isActionPending: (key: IssueActionKey) => boolean;
 };
@@ -75,7 +66,6 @@ type PostActionInput = {
   action: IssueActionEntry;
   body?: Record<string, unknown>;
   selectedTaskId?: string | null;
-  targetAgentId?: string;
 };
 
 type AlertFn = ReturnType<typeof useAlert>;
@@ -90,19 +80,6 @@ function activeAgentForIssue(agents: Agent[], issueId: string) {
   // an agent that never has a resumable session (2026-07-14, MIN-865).
   const workAgentId = `agent-${issueId.toLowerCase()}`;
   return issueAgents.find((agent) => agent.id?.toLowerCase() === workAgentId) ?? issueAgents[0];
-}
-
-function agentForIdentity(agents: Agent[], identity: string): Agent | undefined {
-  return agents.find((agent) => agent.id === identity);
-}
-
-function stateForAgent(state: IssueActionState, target: Agent): IssueActionState {
-  return {
-    ...state,
-    agent: target,
-    lifecycle: target.lifecycle ?? null,
-    hasPendingInput: target.hasPendingQuestion === true,
-  };
 }
 
 async function responseError(response: Response, fallback: string, preRead?: { text: string; parsed: unknown }) {
@@ -368,13 +345,10 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
   const phase = useMemo(() => deriveIssueActionPhase(state), [state]);
 
   const postActionMutation = useMutation({
-    mutationFn: async ({ action, body, selectedTaskId, targetAgentId }: PostActionInput) => {
+    mutationFn: async ({ action, body, selectedTaskId }: PostActionInput) => {
       if (!action.endpoint) return { success: true };
       const payload = body ?? bodyForAction(action, issueId, issue);
-      const targetAgent = targetAgentId ? agentForIdentity(agents, targetAgentId) : agent;
-      const targetState = targetAgent ? stateForAgent(state, targetAgent) : state;
-      const endpoint = interpolateEndpoint(action.endpoint, issueId, targetAgent, targetState, selectedTaskId);
-      const response = await fetch(endpoint, {
+      const response = await fetch(interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), {
         method: 'POST',
         credentials: 'include',
         headers: await dashboardMutationJsonHeaders(),
@@ -393,7 +367,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
           openRecovery({
             ...recovery,
             issueId,
-            retry: { url: endpoint, body: payload ?? {} },
+            retry: { url: interpolateEndpoint(action.endpoint, issueId, agent, state, selectedTaskId), body: payload ?? {} },
           });
           return { success: false, recovery: true };
         }
@@ -401,7 +375,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       }
       return response.json().catch(() => ({ success: true }));
     },
-    onSuccess: async (_data, { action, body, targetAgentId }) => {
+    onSuccess: async (_data, { action, body }) => {
       await refreshDashboardState(queryClient);
       if (action.key === 'requestReview') {
         const result = _data as { success?: boolean; error?: string; message?: string; hint?: string } | undefined;
@@ -422,10 +396,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
         const resuming = (_data as { resumeTriggered?: boolean } | undefined)?.resumeTriggered === true;
         toast.success(resuming ? `${issueId} unpaused — resuming now` : `${issueId} unpaused`);
       }
-      const actionAgentId = targetAgentId ?? agent?.id;
-      if (action.key === 'resumeSession' && actionAgentId) {
+      if (action.key === 'resumeSession' && agent?.id) {
         // PAN-2975: every resume affordance reports the actual outcome.
-        toastResumeOutcome(actionAgentId);
+        toastResumeOutcome(agent.id);
       }
     },
     onError: (error: Error) => {
@@ -434,14 +407,9 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     onSettled: () => setPendingKey(null),
   });
 
-  const submitDialogAction = useCallback((
-    action: IssueActionEntry,
-    body?: Record<string, unknown>,
-    selectedTaskId?: string | null,
-    targetAgentId?: string,
-  ) => {
+  const submitDialogAction = useCallback((action: IssueActionEntry, body?: Record<string, unknown>, selectedTaskId?: string | null) => {
     setPendingKey(action.key);
-    postActionMutation.mutate({ action, body, selectedTaskId, targetAgentId });
+    postActionMutation.mutate({ action, body, selectedTaskId });
   }, [postActionMutation]);
 
   const addToOrderBookMutation = useMutation({
@@ -498,13 +466,11 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
 
   const isActionPending = useCallback((key: IssueActionKey) => pendingKey === key && (postActionMutation.isPending || addToOrderBookMutation.isPending), [addToOrderBookMutation.isPending, pendingKey, postActionMutation.isPending]);
 
-  const runAction = useCallback(async (action: IssueActionEntry, targetAgentId?: string) => {
-    const targetAgent = targetAgentId ? agentForIdentity(agents, targetAgentId) : undefined;
-    const actionState = targetAgent ? stateForAgent(state, targetAgent) : state;
-    if (!action.enabledWhen(actionState)) return;
+  const runAction = useCallback(async (action: IssueActionEntry) => {
+    if (!action.enabledWhen(state)) return;
 
     if (action.key === 'viewPr') {
-      const url = actionState.prUrl ?? actionState.workspace?.mrUrl;
+      const url = state.prUrl ?? state.workspace?.mrUrl;
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
       return;
     }
@@ -539,39 +505,23 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
     }
 
     if (dialogActionKeys.has(action.key) || (!action.endpoint && action.kind === 'dialog') || action.key === 'open') {
-      setActiveDialog({ key: action.key, action, targetAgentId });
+      setActiveDialog({ key: action.key, action });
       return;
     }
 
     if (!action.endpoint) return;
-    submitDialogAction(action, undefined, undefined, targetAgentId);
-  }, [agents, confirm, issueId, openIssue, state, submitDialogAction]);
+    submitDialogAction(action);
+  }, [confirm, issueId, openIssue, state, submitDialogAction]);
 
   const all = useMemo<IssueActionView[]>(() => ISSUE_ACTIONS.map((action) => {
     const enabled = action.enabledWhen(state);
     const invoke = () => { void runAction(action); };
-    const forAgent = (targetAgentId: string): TargetedIssueActionView => {
-      const targetAgent = agentForIdentity(agents, targetAgentId);
-      const targetState = targetAgent ? stateForAgent(state, targetAgent) : null;
-      const targetEnabled = targetState ? action.enabledWhen(targetState) : false;
-      return {
-        enabled: targetEnabled,
-        disabledReason: targetEnabled
-          ? undefined
-          : targetAgent
-            ? disabledReasonForAction(action)
-            : `Agent ${targetAgentId} is not available.`,
-        isPending: isActionPending(action.key),
-        invoke: () => { void runAction(action, targetAgentId); },
-      };
-    };
     return {
       action,
       enabled,
       disabledReason: enabled ? undefined : disabledReasonForAction(action),
       isPending: isActionPending(action.key),
       invoke,
-      forAgent,
       submenu: action.key === 'addToOrderBook' && enabled
         ? [
             ...activeOrderBooks.map((book) => ({
@@ -589,7 +539,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
             }))
           : undefined,
     };
-  }), [activeOrderBooks, addIssueToOrderBook, agents, isActionPending, runAction, state, submitDialogAction]);
+  }), [activeOrderBooks, addIssueToOrderBook, isActionPending, runAction, state, submitDialogAction]);
 
   const layout = useMemo<IssueActionLayout>(() => {
     const byKey = new Map(all.map((view) => [view.action.key, view]));

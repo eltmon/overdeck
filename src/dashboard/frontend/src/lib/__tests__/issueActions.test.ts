@@ -451,37 +451,6 @@ describe('requestReview mode submenu', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('PAN-3340: review requested'));
   });
 
-  it('targets a non-primary affected agent through the same registry action', async () => {
-    const reviewerId = 'agent-pan-3340-review-security';
-    useDashboardStore.setState({
-      agentsById: {
-        'agent-pan-3340': stoppedWorkAgent(),
-        [reviewerId]: {
-          ...stoppedWorkAgent(),
-          id: reviewerId,
-          role: 'review',
-          paused: true,
-        },
-      },
-    } as Parameters<typeof useDashboardStore.setState>[0]);
-    const { result } = renderReviewActions();
-    const unpause = result.current.all.find((view) => view.action.key === 'unpause');
-    const targeted = unpause?.forAgent?.(reviewerId);
-
-    expect(unpause?.enabled).toBe(false);
-    expect(targeted?.enabled).toBe(true);
-    act(() => targeted?.invoke());
-
-    await waitFor(() => expect(vi.mocked(fetch)).toHaveBeenCalledWith(
-      `/api/agents/${reviewerId}/unpause`,
-      expect.objectContaining({ method: 'POST' }),
-    ));
-    expect(vi.mocked(fetch)).not.toHaveBeenCalledWith(
-      '/api/agents/agent-pan-3340/unpause',
-      expect.anything(),
-    );
-  });
-
   it('surfaces an HTTP-success semantic rejection instead of toasting success', async () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);

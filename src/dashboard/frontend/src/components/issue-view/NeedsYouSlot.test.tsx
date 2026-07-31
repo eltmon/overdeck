@@ -139,27 +139,32 @@ describe('NeedsYouSlot', () => {
     expect(invoke).toHaveBeenCalledOnce();
   });
 
-  it('resolves enablement and invocation against the affected session', () => {
-    const primaryInvoke = vi.fn();
+  it('resolves agent-scoped actions outside the protected issue action menu', () => {
+    const registryInvoke = vi.fn();
     const targetedInvoke = vi.fn();
-    const forAgent = vi.fn(() => ({
+    const resolveAgentAction = vi.fn(() => ({
+      label: 'Unpause agent',
+      description: 'Unpause this exact agent.',
       enabled: true,
       isPending: false,
       invoke: targetedInvoke,
     }));
-    const action = { ...actionView('unpause', 'Unpause agent', primaryInvoke), forAgent };
     render(
       <NeedsYouSlot
         model={modelWith([{ kind: 'paused', sessionId: 'agent-pan-3356-review-security' }])}
-        actions={[action]}
+        actions={[actionView('unpause', 'Unpause agent', registryInvoke)]}
+        resolveAgentAction={resolveAgentAction}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Unpause agent' }));
 
-    expect(forAgent).toHaveBeenCalledWith('agent-pan-3356-review-security');
+    expect(resolveAgentAction).toHaveBeenCalledWith({
+      kind: 'paused',
+      sessionId: 'agent-pan-3356-review-security',
+    });
     expect(targetedInvoke).toHaveBeenCalledOnce();
-    expect(primaryInvoke).not.toHaveBeenCalled();
+    expect(registryInvoke).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -473,7 +473,7 @@ export function IssueActionDialogHost({ issueId, actions, onAfterClose }: { issu
       <ActionDialogFrame label={activeDialog.action.label} onClose={handleClose}>
         <AgentTellForm
           onSend={(message) => {
-            actions.submitDialogAction(activeDialog.action, { message }, undefined, activeDialog.targetAgentId);
+            actions.submitDialogAction(activeDialog.action, { message });
             handleClose();
           }}
           onCancel={handleClose}

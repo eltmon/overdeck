@@ -88,6 +88,7 @@ export function StatusNarrative({ issueId, workRunning, hasPlan }: {
       if (!res.ok) return {}
       return res.json()
     },
+    staleTime: 60_000,
   })
   const items = plan.data?.plan?.items ?? []
   const counts: PlanCounts | undefined = items.length > 0

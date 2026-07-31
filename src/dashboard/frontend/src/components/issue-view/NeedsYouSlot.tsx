@@ -60,20 +60,44 @@ const SECTION_MARKER: Partial<Record<OperatorNeedsYou['kind'], string>> = {
   pickup_gate: 'PickupGateCard',
 };
 
-export function NeedsYouSlot({ model, actions }: {
+const AGENT_SCOPED_KINDS = new Set<OperatorNeedsYou['kind']>([
+  'awaiting_input',
+  'troubled',
+  'paused',
+  'stopped',
+]);
+
+export interface NeedsYouResolvedAction {
+  label: string;
+  description: string;
+  enabled: boolean;
+  disabledReason?: string;
+  isPending: boolean;
+  invoke: () => void;
+}
+
+export function NeedsYouSlot({ model, actions, resolveAgentAction }: {
   model: IssueViewModel;
   actions: readonly IssueActionView[];
+  resolveAgentAction?: (item: OperatorNeedsYou) => NeedsYouResolvedAction | undefined;
 }) {
   const items = sortOperatorNeeds(model.operator.needsYouItems);
   const active = items[0];
   if (!active) return null;
 
   const copy = COPY[active.kind];
-  const actionKey = ACTION_KEY[active.kind];
-  const action = actionKey ? actions.find((candidate) => candidate.action.key === actionKey) : undefined;
-  const targetedAction = active.sessionId && action?.forAgent
-    ? action.forAgent(active.sessionId)
-    : action;
+  const usesExactAgent = !!active.sessionId && AGENT_SCOPED_KINDS.has(active.kind);
+  const agentAction = usesExactAgent ? resolveAgentAction?.(active) : undefined;
+  const actionKey = usesExactAgent ? undefined : ACTION_KEY[active.kind];
+  const registryAction = actionKey ? actions.find((candidate) => candidate.action.key === actionKey) : undefined;
+  const resolvedAction: NeedsYouResolvedAction | undefined = agentAction ?? (registryAction ? {
+    label: registryAction.action.label,
+    description: registryAction.action.description,
+    enabled: registryAction.enabled,
+    disabledReason: registryAction.disabledReason,
+    isPending: registryAction.isPending,
+    invoke: registryAction.invoke,
+  } : undefined);
   const additionalCount = items.length - 1;
 
   return (
@@ -94,15 +118,15 @@ export function NeedsYouSlot({ model, actions }: {
             +{additionalCount} more
           </span>
         ) : null}
-        {action && targetedAction ? (
+        {resolvedAction ? (
           <button
             type="button"
-            onClick={targetedAction.invoke}
-            disabled={!targetedAction.enabled || targetedAction.isPending}
-            title={!targetedAction.enabled ? targetedAction.disabledReason : action.action.description}
+            onClick={resolvedAction.invoke}
+            disabled={!resolvedAction.enabled || resolvedAction.isPending}
+            title={!resolvedAction.enabled ? resolvedAction.disabledReason : resolvedAction.description}
             className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {action.action.label}
+            {resolvedAction.label}
           </button>
         ) : null}
       </div>
