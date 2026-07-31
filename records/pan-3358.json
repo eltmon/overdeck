@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:28:26.560Z",
+  "updated": "2026-07-31T17:44:26.053Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "version-sync-write-door-api": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 30378,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T17:28:26.560Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Inserted ship as DoD row 7, renumbered deploy/teardown, added durable ship verdict semantics and generated --accept-ship coverage, updated the canonical DoD table, and passed all 179 lifecycle tests plus typecheck.",
         "releasedAt": "2026-07-31T17:28:13.810Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 30378,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T17:28:26.560Z",
+        "itemId": "version-sync-write-door-api",
+        "outcome": "completed",
+        "reason": "Added a CST-range lossless projects.yaml writer, authenticated GET/PUT version-sync routes with validation and newest durable outcome, cache invalidation, and 14 writer/route tests; typecheck and full lint pass.",
+        "releasedAt": "2026-07-31T17:44:26.053Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +146,10 @@
       "dod-ship-row": {
         "reason": "Inserted ship as DoD row 7, renumbered deploy/teardown, added durable ship verdict semantics and generated --accept-ship coverage, updated the canonical DoD table, and passed all 179 lifecycle tests plus typecheck.",
         "updatedAt": "2026-07-31T17:28:13.810Z"
+      },
+      "version-sync-write-door-api": {
+        "reason": "Added a CST-range lossless projects.yaml writer, authenticated GET/PUT version-sync routes with validation and newest durable outcome, cache invalidation, and 14 writer/route tests; typecheck and full lint pass.",
+        "updatedAt": "2026-07-31T17:44:26.053Z"
       }
     }
   },
@@ -168,6 +175,10 @@
     "dod-ship-row.dod-ship-row.ac2": "completed",
     "dod-ship-row.dod-ship-row.ac3": "completed",
     "dod-ship-row.dod-ship-row.ac4": "completed",
-    "version-sync-write-door-api": "running"
+    "version-sync-write-door-api": "completed",
+    "version-sync-write-door-api.version-sync-write-door-api.ac1": "completed",
+    "version-sync-write-door-api.version-sync-write-door-api.ac2": "completed",
+    "version-sync-write-door-api.version-sync-write-door-api.ac3": "completed",
+    "version-sync-write-door-api.version-sync-write-door-api.ac4": "completed"
   }
 }
