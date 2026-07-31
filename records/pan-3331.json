@@ -142,10 +142,12 @@
       "src/dashboard/frontend/src/components/CommandPalette.test.tsx",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceActionBand.test.tsx",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "src/dashboard/server/routes/terminals.ts",
       "src/lib/config-yaml/defaults.ts",
       "src/lib/config-yaml/load.ts",
       "src/lib/config-yaml/merge.ts",
       "tests/unit/dashboard/routes/workspaces-routes.test.ts",
+      "tests/unit/dashboard/terminals-delete-idempotent.test.ts",
       "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
       "tests/unit/lib/overdeck/no-loss-matrix.ts"
     ],
@@ -190,6 +192,7 @@
       "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceActionBand.test.tsx",
       "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
+      "src/dashboard/server/routes/terminals.ts",
       "src/dashboard/server/routes/workspace-registry.ts",
       "src/lib/browser.ts",
       "src/lib/config-yaml/defaults.ts",
@@ -203,6 +206,7 @@
       "src/lib/workspaces/writer.ts",
       "sync-sources/skills/pan-workspace/SKILL.md",
       "tests/unit/dashboard/routes/workspaces-routes.test.ts",
+      "tests/unit/dashboard/terminals-delete-idempotent.test.ts",
       "tests/unit/dashboard/workspace-open.test.ts",
       "tests/unit/dashboard/workspace-registry-git.test.ts",
       "tests/unit/dashboard/workspace-registry-memory-phase.test.ts",
@@ -210,10 +214,10 @@
       "tests/unit/lib/overdeck/no-loss-matrix.ts",
       "tests/unit/lib/workspaces/git-state.test.ts"
     ],
-    "recordedAt": "2026-07-30T23:25:58.701Z"
+    "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:10:58.549Z",
+  "updated": "2026-07-31T00:11:01.764Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "reviewing",
