@@ -17,6 +17,8 @@ beforeEach(() => {
     { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
   ]
   queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
+  queryMocks.prQuery.data.pr = { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
+  queryMocks.issueCostsQuery.data.totalCost = 1.23
   unexpectedRequests = []
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
@@ -79,7 +81,11 @@ const queryMocks = vi.hoisted(() => {
     },
   }
   const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
-  const prQuery = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
+  const prQuery: {
+    data: {
+      pr: { number: number; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string } | null
+    }
+  } = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
   const reviewStatusQuery = {
     data: {
       issueId: 'PAN-1661',
@@ -286,6 +292,33 @@ describe('IssueMissionControl', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
+  })
+
+  it('renders one cost chip, the tracker link, and the narrative phase sentence in the header', () => {
+    const { container } = renderMissionControl()
+    const header = container.querySelector('[data-section="Header bar"]') as HTMLElement
+    const costChip = within(header).getByTestId('header-cost-chip')
+    const narrative = within(header).getByTestId('status-narrative')
+
+    expect(within(header).getAllByText('$1.23')).toHaveLength(1)
+    expect(costChip).toHaveClass('badge-bg-signal-cost', 'badge-border-signal-cost', 'tabular-nums')
+    expect(within(header).queryByRole('link', { name: 'Create PR' })).toBeNull()
+    expect(within(header).getByTestId('header-tracker-link')).toHaveAttribute(
+      'href',
+      'https://github.com/eltmon/overdeck/issues/1661',
+    )
+    expect(narrative).toHaveTextContent('The reviewer found problems')
+    expect(narrative).toHaveAttribute('data-section', 'StatusNarrative')
+  })
+
+  it('renders a GitHub compare link when the issue has no pull request', () => {
+    queryMocks.prQuery.data.pr = null
+    renderMissionControl()
+
+    expect(screen.getByRole('link', { name: 'Create PR' })).toHaveAttribute(
+      'href',
+      'https://github.com/eltmon/overdeck/compare/main...feature%2Fpan-1661?expand=1',
+    )
   })
 
   it('lifts the detail tabs between the header and body without wrapping', () => {

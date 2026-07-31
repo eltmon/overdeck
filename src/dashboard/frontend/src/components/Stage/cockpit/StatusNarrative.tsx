@@ -1,22 +1,12 @@
 /**
- * PAN-2398 — the ONE status narrative. Replaces the cockpit's duplicate
- * pipeline chip row + gates pill row with a single plain-language headline
- * and a "what happens next" line.
- * Design contract: docs/design/mockups/issue-cockpit-redesign.html.
- *
- * Copy rules (binding, from the PRD): no pipeline jargon — never render
- * "verification gate", "merge-ready", "pickup", "released". A failing gate is
- * folded into the headline in plain words; deep detail stays in the Code tab.
- *
- * PAN-2908 C-VOCAB: the five-stage journey strip (Planned→…→Shipping) is gone
- * from the tree, not just the render — the shared IssuePhaseRail beside this
- * narrative is the one phase vocabulary everywhere.
+ * The cockpit header's one-sentence phase narrative. Detailed pipeline state
+ * lives in the pipeline band and right rail; this surface stays plain-language
+ * and sits beside the single phase badge.
  */
 
 import { useQuery } from '@tanstack/react-query'
 import {
   useIssueCheckRunsQuery,
-  usePrQuery,
   useReviewStatusQuery,
   type IssueCheckRunsResponse,
   type ReviewStatusData,
@@ -84,54 +74,13 @@ export function deriveNarrative(args: {
 }
 
 
-export function detailFragments(args: {
-  rs: ReviewStatusData | undefined
-  ci: IssueCheckRunsResponse | undefined
-  prMergeable: string | null | undefined
-  hasPr: boolean
-}): string[] {
-  const { rs, ci, prMergeable, hasPr } = args
-  const fragments: string[] = []
-  fragments.push(
-    rs?.reviewStatus === 'passed' ? 'review passed ✓'
-    : rs?.reviewStatus === 'reviewing' ? 'review in progress'
-    : rs?.reviewStatus === 'blocked' || rs?.reviewStatus === 'failed' ? 'review found problems'
-    : 'review not started')
-  fragments.push(
-    rs?.testStatus === 'passed' ? 'tests passed ✓'
-    : rs?.testStatus === 'skipped' ? 'tests skipped'
-    : rs?.testStatus === 'testing' ? 'tests running'
-    : rs?.testStatus === 'failed' || rs?.testStatus === 'dispatch_failed' ? 'tests failed'
-    : 'tests not run')
-  if (rs?.verificationStatus) {
-    fragments.push(
-      rs.verificationStatus === 'passed' ? 'build check passed ✓'
-      : rs.verificationStatus === 'failed' ? 'build check failed'
-      : rs.verificationStatus === 'running' ? 'build check running'
-      : 'build check pending')
-  }
-  const summary = ci?.summary
-  fragments.push(!summary || summary.total === 0
-    ? 'no automated checks yet'
-    : `checks ${summary.passed}/${summary.total}${summary.failed || summary.cancelled ? ' failing' : summary.running || summary.pending ? ' running' : ' ✓'}`)
-  const mergeable = (prMergeable ?? '').toUpperCase()
-  fragments.push(!hasPr ? 'no PR yet'
-    : mergeable === 'MERGEABLE' || mergeable === 'CLEAN' ? 'PR ready ✓'
-    : mergeable === 'CONFLICTING' ? 'PR has conflicts'
-    : 'PR state unknown')
-  fragments.push(rs?.readyForMerge ? 'cleared to ship ✓' : 'not cleared to ship yet')
-  return fragments
-}
-
-export function StatusNarrative({ issueId, workRunning, hasPlan, cost }: {
+export function StatusNarrative({ issueId, workRunning, hasPlan }: {
   issueId: string
   workRunning: boolean
   hasPlan: boolean
-  cost?: string
 }) {
   const review = useReviewStatusQuery(issueId)
   const ci = useIssueCheckRunsQuery(issueId)
-  const pr = usePrQuery(issueId)
   const plan = useQuery<{ plan?: { items?: Array<{ status: string }> } }>({
     queryKey: ['plan', issueId],
     queryFn: async () => {
@@ -148,32 +97,14 @@ export function StatusNarrative({ issueId, workRunning, hasPlan, cost }: {
   const model = deriveNarrative({ hasPlan, rs: review.data, ci: ci.data, plan: counts, workRunning })
 
   return (
-    <div data-testid="status-narrative" data-section="StatusNarrative">
-      {model.needsYou && (
-        <div className="mb-3 rounded-[10px] border border-amber-500/40 bg-amber-500/10 px-3.5 py-2 text-[12.5px] text-foreground">
-          ⚠ <span className="font-semibold">Waiting on you:</span> {model.next}
-        </div>
-      )}
-      <div className="flex items-center gap-3.5">
-        <span className={`h-3 w-3 shrink-0 rounded-full ${model.needsYou ? 'bg-amber-500' : 'bg-blue-500 animate-pulse'}`} />
-        <div className="min-w-0">
-          <div className="truncate font-['Space_Grotesk'] text-[16.5px] font-semibold text-foreground">{model.headline}</div>
-          {!model.needsYou && <div className="text-[12.5px] text-muted-foreground">{model.next}</div>}
-        </div>
-        {cost && (
-          <div className="ml-auto text-right">
-            <div className="font-['Space_Grotesk'] text-[18px] font-semibold text-foreground">{cost}</div>
-            <div className="text-[10.5px] text-muted-foreground">spent so far</div>
-          </div>
-        )}
-      </div>
-      {/* PAN-2908 C-VOCAB: the legacy journey strip (Planned→…→Shipping) is
-          replaced by the shared IssuePhaseRail mounted beside this narrative
-          in the cockpit header — one vocabulary everywhere. */}
-      <div className="mt-2 text-[11px] text-muted-foreground/80" data-testid="status-details">
-        {detailFragments({ rs: review.data, ci: ci.data, prMergeable: pr.data?.pr?.mergeable, hasPr: Boolean(pr.data?.pr) }).join(' · ')}
-      </div>
-    </div>
+    <span
+      data-testid="status-narrative"
+      data-section="StatusNarrative"
+      className="min-w-0 text-[12.5px] text-muted-foreground"
+      title={model.next}
+    >
+      {model.headline}
+    </span>
   )
 }
 

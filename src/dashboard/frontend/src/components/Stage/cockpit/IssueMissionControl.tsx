@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Copy, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
@@ -24,6 +25,7 @@ import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
+import { trackerIssueUrl } from '../../../lib/issueLinks'
 import { taskStatusRollup } from '../../../lib/taskStatus'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { IssueTreeLane } from './IssueTreeLane'
@@ -156,13 +158,10 @@ function nextAction(rs: ReviewStatusData | undefined): string {
 
 
 
-function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-px text-right">
-      <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
-      <div className="text-[11.5px] text-foreground">{value}</div>
-    </div>
-  )
+function githubCompareUrl(issueUrl: string | null, branch: string): string | null {
+  if (!issueUrl) return null
+  const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/issues\/\d+$/.exec(issueUrl)
+  return match ? `${match[1]}/compare/main...${encodeURIComponent(branch)}?expand=1` : null
 }
 
 function IssueTreeContextPanel({
@@ -467,7 +466,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const headerActions = useIssueActions(issueId)
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
-    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string }> | undefined)?.find(
+    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string; url?: string }> | undefined)?.find(
       (candidate) => candidate.identifier === issueId,
     ),
   )
@@ -497,6 +496,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       ? phaseLabel('done')
       : '—'
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const trackerHref = trackerIssueUrl(issueId, issueRecord?.url)
+  const createPrHref = pr.data?.pr ? null : githubCompareUrl(trackerHref, branch)
   const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
 
   useEffect(() => {
@@ -560,42 +561,86 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
             <div className="text-[11px] text-muted-foreground/70">
-              {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}Issues
+              {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}<span>Issues</span> / <span className="font-mono text-foreground">{issueId}</span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
-              <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
+            <h1 className="mt-1 min-w-0 max-w-full break-words text-[17px] font-medium leading-snug text-foreground">{title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <CockpitPill tone={pillTone(pipelineState)}>{phase}</CockpitPill>
+              <StatusNarrative
+                issueId={issueId}
+                hasPlan={headerActions.state.hasPlan}
+                workRunning={workAgentRunning}
+              />
             </div>
           </div>
           <div className={styles.headerMeta}>
-            <div className="flex items-start gap-4">
-              <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
-              <HeaderStat
-                label="PR / CI"
-                value={pr.data?.pr
-                  ? `#${pr.data.pr.number}${checks.data?.summary.total ? ` · ${checks.data.summary.passed}/${checks.data.summary.total}` : ''}`
-                  : 'no PR'}
-              />
-              <HeaderStat
-                label="Cost"
-                value={<span className="text-signal-cost-foreground tabular-nums">{cost > 0 ? `$${cost.toFixed(2)}` : '—'}</span>}
-              />
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span
+                data-testid="header-branch-chip"
+                className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-muted-foreground"
+              >
+                <GitBranch size={12} aria-hidden="true" />
+                <span className="max-w-44 truncate font-mono text-foreground">{branch}</span>
+                <button
+                  type="button"
+                  aria-label="Copy branch name"
+                  title="Copy branch name"
+                  className="grid h-5 w-5 place-items-center rounded-[var(--radius-sm)] hover:bg-accent hover:text-foreground"
+                  onClick={() => void navigator.clipboard?.writeText(branch)}
+                >
+                  <Copy size={11} aria-hidden="true" />
+                </button>
+              </span>
+
+              {pr.data?.pr ? (
+                <a
+                  href={checks.data?.pr?.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-foreground hover:bg-accent"
+                >
+                  <GitPullRequest size={12} aria-hidden="true" />
+                  <span className="font-mono">PR #{pr.data.pr.number}</span>
+                  {checks.data?.summary.total ? <span className="text-muted-foreground">{checks.data.summary.passed}/{checks.data.summary.total}</span> : null}
+                </a>
+              ) : (
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-muted-foreground">
+                  <GitPullRequest size={12} aria-hidden="true" />
+                  <span>No PR</span>
+                  {createPrHref ? <a href={createPrHref} target="_blank" rel="noreferrer" className="text-primary hover:underline">Create PR</a> : null}
+                </span>
+              )}
+
+              <span
+                data-testid="header-cost-chip"
+                aria-label={`Cost ${cost > 0 ? `$${cost.toFixed(2)}` : 'unavailable'}`}
+                className="inline-flex h-7 items-center rounded-[var(--radius-sm)] border badge-border-signal-cost badge-bg-signal-cost px-2 font-mono text-[11px] font-medium tabular-nums text-signal-cost-foreground"
+              >
+                {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+              </span>
+
+              {trackerHref ? (
+                <a
+                  data-testid="header-tracker-link"
+                  href={trackerHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-7 items-center overflow-hidden rounded-[var(--radius-sm)] border border-border bg-background/40 text-[11px] text-foreground hover:bg-accent"
+                >
+                  <span className="inline-flex h-full items-center gap-1.5 px-2">
+                    Open tracker <ExternalLink size={11} aria-hidden="true" />
+                  </span>
+                  <span className="grid h-full w-6 place-items-center border-l border-border text-muted-foreground" aria-hidden="true">
+                    <ChevronDown size={11} />
+                  </span>
+                </a>
+              ) : null}
+
               {/* PAN-2908 C-ACTIONS: merge flows through the shared registry menu
                   (primary at READY_TO_MERGE); the bespoke MergeCta is gone. */}
               <IssueActionMenu issueId={issueId} mode="primary-strip" className="flex items-center gap-1" />
             </div>
           </div>
-        </div>
-        <div data-section="StatusNarrative" className="mt-4 border-t border-border pt-4">
-          <StatusNarrative
-            issueId={issueId}
-            hasPlan={headerActions.state.hasPlan}
-            workRunning={workAgentRunning}
-            cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
-          />
         </div>
         {/* PAN-2908 C-DETAIL: the pipeline band lives inside IssueDetail now —
             the cockpit route renders the ONE component, no duplicate shell. */}
