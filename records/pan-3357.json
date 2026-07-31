@@ -154,7 +154,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T17:59:43.225Z",
+  "updated": "2026-07-31T17:59:48.450Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "blocked",
@@ -165,7 +165,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T17:59:42.068Z",
+    "updatedAt": "2026-07-31T17:59:48.440Z",
     "reviewNotes": "transcript retention can delete resumable work-agent history",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
@@ -303,7 +303,7 @@
       },
       "costAtCloseOut": {
         "usd": 194.13284,
-        "pricingAsOf": "2026-07-31T17:59:42.095Z"
+        "pricingAsOf": "2026-07-31T17:59:48.446Z"
       }
     },
     "merges": [
