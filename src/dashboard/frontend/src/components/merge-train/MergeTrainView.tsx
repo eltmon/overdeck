@@ -64,6 +64,15 @@ export interface UatGenerationPayload {
   members: UatGenerationMember[];
   heldOut: Array<{ issueId: string; reason: string }>;
   resolutions: Array<{ issueIds: string[]; files: string[]; commitSha: string }>;
+  versionSyncConfigured?: boolean;
+  shipStatus?: {
+    status: 'pending' | 'passed' | 'partial' | 'failed';
+    version?: string;
+    batch: string;
+    error?: string;
+    reason?: string;
+    at: string;
+  } | null;
   stack: {
     status: 'running' | 'degraded' | 'unknown' | 'absent';
     frontendUrl: string;
@@ -163,10 +172,13 @@ export function mergeTrainSections(
   return sections;
 }
 
-/** Batches the surface shows: building + testable, newest first (API-ordered). */
+/** Batches the surface shows: building + testable, plus promoted batches awaiting version ship. */
 function visibleGenerationsOf(section: MergeTrainProjectSection): UatGenerationPayload[] {
   return section.generations.filter(
-    (g) => g.status === 'assembling' || g.status === 'ready' || g.status === 'superseded',
+    (g) => g.status === 'assembling'
+      || g.status === 'ready'
+      || g.status === 'superseded'
+      || (g.status === 'promoted' && g.versionSyncConfigured === true && g.shipStatus?.status === 'pending'),
   );
 }
 
@@ -264,6 +276,12 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   const queryClient = useQueryClient();
   const confirm = useConfirm();
   const [expandedUat, setExpandedUat] = useState<Record<string, boolean>>({});
+  const [versionAction, setVersionAction] = useState<{
+    generationName: string;
+    mode: 'promote' | 'ship';
+    version: string;
+    error?: string;
+  } | null>(null);
   // null = "all projects", the default. A stored array selects a subset.
   const [selectedProjects, setSelectedProjects] = useState<string[] | null>(() => readStoredFilter());
 
@@ -317,9 +335,13 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
   });
 
   const promoteMutation = useMutation({
-    mutationFn: (name: string) =>
-      postJson<{ mergeSha: string; members: string[] }>(`/api/merge-train/generations/${generationParam(name)}/promote`),
+    mutationFn: ({ name, shipVersion }: { name: string; shipVersion?: string }) =>
+      postJson<{ mergeSha: string; members: string[] }>(
+        `/api/merge-train/generations/${generationParam(name)}/promote`,
+        shipVersion ? { shipVersion } : undefined,
+      ),
     onSuccess: (data) => {
+      setVersionAction(null);
       toast.success(`Merged ${data.members.length} feature${data.members.length === 1 ? '' : 's'} to main (${data.members.join(', ')})`);
       invalidate();
     },
@@ -331,6 +353,21 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
       // instead of inviting another doomed click.
       invalidate();
     },
+  });
+
+  const shipMutation = useMutation({
+    mutationFn: ({ name, version }: { name: string; version: string }) =>
+      postJson<{ status: 'passed' | 'partial' | 'failed'; error?: string }>(
+        `/api/merge-train/generations/${generationParam(name)}/ship`,
+        { version },
+      ),
+    onSuccess: (data) => {
+      setVersionAction(null);
+      if (data.status === 'passed') toast.success('Version strings shipped');
+      else toast.warning(data.error ?? `Version ship finished with status ${data.status}`);
+      invalidate();
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Version ship failed'),
   });
 
   const rebuildMutation = useMutation({
@@ -363,17 +400,49 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Merge failed'),
   });
 
-  const onPromote = async (gen: UatGenerationPayload) => {
+  const confirmPromote = async (gen: UatGenerationPayload, shipVersion?: string) => {
     const lines = gen.members.map((m, i) => `${i + 1}. ${m.issueId} (${m.branch}) — ${m.title}`).join('\n');
     const resolutionNote = gen.resolutions.length > 0
       ? `\n\nIncludes ${gen.resolutions.length} conflict resolution${gen.resolutions.length === 1 ? '' : 's'} you tested (${gen.resolutions.map((r) => r.issueIds.join(' ↔ ')).join('; ')}).`
       : '';
+    const shipNote = gen.versionSyncConfigured
+      ? shipVersion
+        ? `\n\nVersion ${shipVersion} will be propagated after the merge lands.`
+        : '\n\nNo version supplied — the batch merges without a version bump and each member\'s ship row will fail until you ship one.'
+      : '';
     const ok = await confirm({
       title: `Merge batch ${shortName(gen.name)} to main?`,
-      message: `Lands exactly the tree you tested — one merge to main containing:\n${lines}${resolutionNote}\n\nThe ${gen.members.length} issue${gen.members.length === 1 ? '' : 's'} close out through the normal post-merge flow, and remaining ready features reassemble into a fresh batch.`,
+      message: `Lands exactly the tree you tested — one merge to main containing:\n${lines}${resolutionNote}${shipNote}\n\nThe ${gen.members.length} issue${gen.members.length === 1 ? '' : 's'} close out through the normal post-merge flow, and remaining ready features reassemble into a fresh batch.`,
       confirmLabel: `Merge batch (${gen.members.length}) to main`,
     });
-    if (ok) promoteMutation.mutate(gen.name);
+    if (ok) promoteMutation.mutate({ name: gen.name, ...(shipVersion ? { shipVersion } : {}) });
+  };
+
+  const onPromote = async (gen: UatGenerationPayload) => {
+    if (gen.versionSyncConfigured) {
+      setVersionAction({ generationName: gen.name, mode: 'promote', version: '' });
+      return;
+    }
+    await confirmPromote(gen);
+  };
+
+  const submitVersionAction = async (gen: UatGenerationPayload) => {
+    if (!versionAction || versionAction.generationName !== gen.name) return;
+    const version = versionAction.version.trim();
+    if ((versionAction.mode === 'ship' || version !== '') && !/^\d+\.\d+\.\d+$/.test(version)) {
+      setVersionAction({ ...versionAction, error: 'version must look like 48.8.0' });
+      return;
+    }
+    if (versionAction.mode === 'promote') {
+      await confirmPromote(gen, version || undefined);
+      return;
+    }
+    const ok = await confirm({
+      title: `Ship version ${version} for ${shortName(gen.name)}?`,
+      message: `Runs this project's configured version-string propagation for ${version}, verifies every declared target, commits only declared paths, and pushes the configured repositories. This does not publish packages, deploy, tag, or submit an app store build.`,
+      confirmLabel: `Ship version ${version}`,
+    });
+    if (ok) shipMutation.mutate({ name: gen.name, version });
   };
 
   const onStack = async (gen: UatGenerationPayload) => {
@@ -544,6 +613,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
               visibleGenerations.find((g) => g.status === 'superseded');
             const featureCount = section.queue.length;
             const batchCount = visibleGenerations.filter((g) => g.status !== 'assembling').length;
+            const promotedPendingCount = visibleGenerations.filter((g) => g.status === 'promoted').length;
             const uatOpen = expandedUat[section.projectKey] ?? true;
 
             return (
@@ -568,10 +638,14 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                 ) : (
                   <div className="space-y-1">
                     <p className="px-1 pb-1 text-[11px] leading-snug text-muted-foreground">
-                      <span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
-                      {batchCount > 0
-                        ? ' They’re assembled into the test batches below — open a batch’s frontend, run its checklist, then merge that batch to main.'
-                        : ' A test batch assembles automatically when the merge train is on.'}
+                      {featureCount === 0 && promotedPendingCount > 0 ? (
+                        <><span className="font-semibold text-foreground">{promotedPendingCount} promoted batch{promotedPendingCount === 1 ? '' : 'es'}</span> await{promotedPendingCount === 1 ? 's' : ''} version ship. Supply the version below to satisfy each member&apos;s ship row.</>
+                      ) : (
+                        <><span className="font-semibold text-foreground">{featureCount} feature{featureCount === 1 ? '' : 's'}</span> passed review &amp; tests.
+                          {batchCount > 0
+                            ? ' They’re assembled into the test batches below — open a batch’s frontend, run its checklist, then merge that batch to main.'
+                            : ' A test batch assembles automatically when the merge train is on.'}</>
+                      )}
                     </p>
 
                     {visibleGenerations.length > 0 && (
@@ -597,15 +671,16 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                             );
                           }
                           const isSuperseded = gen.status === 'superseded';
+                          const isPromoted = gen.status === 'promoted';
                           return (
                             <div
                               key={gen.name}
-                              className={`rounded-lg border p-2 ${isSuperseded ? 'border-border opacity-75' : 'border-emerald-500/35 bg-emerald-500/[0.04]'}`}
+                              className={`rounded-lg border p-2 ${isSuperseded ? 'border-border opacity-75' : isPromoted ? 'border-amber-500/35 bg-amber-500/[0.04]' : 'border-emerald-500/35 bg-emerald-500/[0.04]'}`}
                             >
                               <div className="flex items-center gap-2">
-                                <span className={`text-[10px] ${isSuperseded ? 'text-muted-foreground' : 'text-emerald-400'}`}>{isSuperseded ? '○' : '●'}</span>
-                                <span className={`font-mono text-[11px] font-bold ${isSuperseded ? 'text-foreground' : 'text-emerald-400'}`}>{shortName(gen.name)}</span>
-                                <span className="ml-auto text-[10px] text-muted-foreground">{isSuperseded ? 'superseded · still testable' : 'ready to test'}</span>
+                                <span className={`text-[10px] ${isSuperseded ? 'text-muted-foreground' : isPromoted ? 'text-amber-400' : 'text-emerald-400'}`}>{isSuperseded ? '○' : '●'}</span>
+                                <span className={`font-mono text-[11px] font-bold ${isSuperseded ? 'text-foreground' : isPromoted ? 'text-amber-400' : 'text-emerald-400'}`}>{shortName(gen.name)}</span>
+                                <span className="ml-auto text-[10px] text-muted-foreground">{isSuperseded ? 'superseded · still testable' : isPromoted ? 'promoted · version pending' : 'ready to test'}</span>
                               </div>
                               <div className="mt-0.5 pl-4 text-[10.5px] text-muted-foreground">
                                 {gen.members.map((m, i) => (
@@ -634,16 +709,27 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                 </div>
                               )}
                               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 pl-4">
-                                <StackButton gen={gen} compact={isSuperseded} />
-                                <button
-                                  type="button"
-                                  disabled={promoteMutation.isPending}
-                                  onClick={() => void onPromote(gen)}
-                                  className="rounded-md bg-emerald-500 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-950 hover:brightness-110 disabled:opacity-50"
-                                >
-                                  {promoteMutation.isPending && promoteMutation.variables === gen.name ? 'Merging…' : `Merge batch (${gen.members.length}) to main`}
-                                </button>
-                                {!isSuperseded && (
+                                {!isPromoted && <StackButton gen={gen} compact={isSuperseded} />}
+                                {isPromoted ? (
+                                  <button
+                                    type="button"
+                                    disabled={shipMutation.isPending}
+                                    onClick={() => setVersionAction({ generationName: gen.name, mode: 'ship', version: '' })}
+                                    className="rounded border border-amber-500/50 px-2 py-0.5 text-[10.5px] font-semibold text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+                                  >
+                                    {shipMutation.isPending && shipMutation.variables?.name === gen.name ? 'Shipping…' : 'Ship version'}
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    disabled={promoteMutation.isPending}
+                                    onClick={() => void onPromote(gen)}
+                                    className="rounded-md bg-emerald-500 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-950 hover:brightness-110 disabled:opacity-50"
+                                  >
+                                    {promoteMutation.isPending && promoteMutation.variables?.name === gen.name ? 'Merging…' : `Merge batch (${gen.members.length}) to main`}
+                                  </button>
+                                )}
+                                {!isSuperseded && !isPromoted && (
                                   <button
                                     type="button"
                                     disabled={rebuildMutation.isPending}
@@ -655,11 +741,52 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                                   </button>
                                 )}
                               </div>
+                              {versionAction?.generationName === gen.name && (
+                                <div className="mt-2 ml-4 border-l border-border pl-2" data-testid={`version-action-${gen.name}`}>
+                                  <label className="block text-[10px] font-semibold text-foreground" htmlFor={`version-${gen.name}`}>
+                                    Version (X.Y.Z)
+                                  </label>
+                                  <div className="mt-1 flex items-center gap-1.5">
+                                    <input
+                                      id={`version-${gen.name}`}
+                                      aria-label={`Version for ${shortName(gen.name)}`}
+                                      value={versionAction.version}
+                                      onChange={(event) => setVersionAction({ ...versionAction, version: event.target.value, error: undefined })}
+                                      placeholder="48.8.0"
+                                      className="w-28 rounded border border-border bg-background px-2 py-1 font-mono text-[11px] text-foreground outline-none focus:border-primary"
+                                    />
+                                    <button
+                                      type="button"
+                                      disabled={promoteMutation.isPending || shipMutation.isPending}
+                                      onClick={() => void submitVersionAction(gen)}
+                                      className="rounded border border-border px-2 py-1 text-[10.5px] font-semibold text-foreground hover:bg-accent disabled:opacity-50"
+                                    >
+                                      {versionAction.mode === 'promote' ? 'Continue to merge' : 'Continue to ship'}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setVersionAction(null)}
+                                      className="px-1 py-1 text-[10px] text-muted-foreground hover:text-foreground"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                  {versionAction.error ? (
+                                    <p className="mt-1 text-[10px] text-red-400">{versionAction.error}</p>
+                                  ) : versionAction.mode === 'promote' && versionAction.version.trim() === '' ? (
+                                    <p className="mt-1 text-[10px] leading-snug text-amber-400">
+                                      No version supplied — the batch merges without a version bump and each member&apos;s ship row will fail until you ship one.
+                                    </p>
+                                  ) : null}
+                                </div>
+                              )}
                             </div>
                           );
                         })}
                         <p className="px-1 text-[9.5px] leading-snug text-muted-foreground">
-                          Batches build automatically from the ready features. Nothing here merges to main until you say so.
+                          {visibleGenerations.every((generation) => generation.status === 'promoted')
+                            ? 'This batch is already on main; only its configured version-string propagation remains.'
+                            : 'Batches build automatically from the ready features. Nothing here merges to main until you say so.'}
                         </p>
                       </>
                     )}

@@ -461,6 +461,127 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
     );
   });
 
+  it('asks for a configured ship version and submits it with promote', async () => {
+    const configured = { ...PAN_READY_GEN, versionSyncConfigured: true, shipStatus: null };
+    const fetchMock = mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [configured] },
+      ],
+      'POST /api/merge-train/generations/pan-otter-0610/promote': { mergeSha: 'merged', members: ['PAN-1', 'PAN-2'] },
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getByText(/Merge batch \(2\) to main/));
+    const input = await screen.findByLabelText('Version for pan-otter-0610');
+    fireEvent.change(input, { target: { value: '48.8.0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to merge' }));
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    const arg = mocks.confirm.mock.calls[0]![0] as { message: string };
+    expect(arg.message).toContain('Version 48.8.0 will be propagated');
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/pan-otter-0610/promote'));
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ shipVersion: '48.8.0' });
+    });
+  });
+
+  it('allows an empty promote version and states the ship-row consequence', async () => {
+    const configured = { ...PAN_READY_GEN, versionSyncConfigured: true, shipStatus: null };
+    const fetchMock = mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [configured] },
+      ],
+      'POST /api/merge-train/generations/pan-otter-0610/promote': { mergeSha: 'merged', members: ['PAN-1', 'PAN-2'] },
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getByText(/Merge batch \(2\) to main/));
+    expect(await screen.findByText(/No version supplied — the batch merges without a version bump/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to merge' }));
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    expect((mocks.confirm.mock.calls[0]![0] as { message: string }).message).toContain(
+      "each member's ship row will fail until you ship one",
+    );
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/pan-otter-0610/promote'));
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({});
+    });
+  });
+
+  it('rejects a malformed promote version before confirmation or POST', async () => {
+    const configured = { ...PAN_READY_GEN, versionSyncConfigured: true, shipStatus: null };
+    const fetchMock = mockFetch(twoProjectResponses({
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [configured] },
+      ],
+    }));
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getByText(/Merge batch \(2\) to main/));
+    fireEvent.change(await screen.findByLabelText('Version for pan-otter-0610'), { target: { value: '48.8' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to merge' }));
+
+    expect(await screen.findByText('version must look like 48.8.0')).toBeTruthy();
+    expect(mocks.confirm).not.toHaveBeenCalled();
+    expect(fetchMock.mock.calls.some(([u]) => String(u).includes('/promote'))).toBe(false);
+  });
+
+  it('shows deferred Ship version for a promoted pending batch and refreshes after POST', async () => {
+    const promoted = {
+      ...PAN_READY_GEN,
+      status: 'promoted',
+      versionSyncConfigured: true,
+      shipStatus: {
+        status: 'pending',
+        batch: PAN_READY_GEN.name,
+        reason: 'no version supplied at promote time',
+        at: '2026-06-10T04:00:00.000Z',
+      },
+    };
+    const fetchMock = mockFetch(twoProjectResponses({
+      '/api/merge-train/queues': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
+      ],
+      '/api/merge-train/generations': [
+        { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [promoted] },
+      ],
+      'POST /api/merge-train/generations/pan-otter-0610/ship': { status: 'passed' },
+    }));
+    renderView();
+
+    const section = await screen.findByTestId('merge-train-project-overdeck');
+    expect(section.textContent).toContain('1 promoted batch awaits version ship');
+    expect(section.textContent).toContain('This batch is already on main');
+    fireEvent.click(screen.getByRole('button', { name: 'Ship version' }));
+    fireEvent.change(await screen.findByLabelText('Version for pan-otter-0610'), { target: { value: '48.8.0' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to ship' }));
+
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    await waitFor(() => {
+      const call = fetchMock.mock.calls.find(([u]) => String(u).endsWith('/pan-otter-0610/ship'));
+      expect(JSON.parse(String((call![1] as RequestInit).body))).toEqual({ version: '48.8.0' });
+    });
+    await waitFor(() => {
+      const generationReads = fetchMock.mock.calls.filter(([u]) => String(u).includes('/api/merge-train/generations'));
+      expect(generationReads.length).toBeGreaterThan(1);
+    });
+  });
+
+  it('adds no version UI when the project has no version_sync', async () => {
+    mockFetch(twoProjectResponses());
+    renderView();
+    await waitFor(() => expect(screen.getByTestId('merge-train-project-overdeck')).toBeTruthy());
+
+    fireEvent.click(screen.getAllByText(/Merge batch \(2\) to main/)[0]!);
+    await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+    expect(screen.queryByLabelText('Version for pan-otter-0610')).toBeNull();
+    expect(screen.queryByText('Ship version')).toBeNull();
+  });
+
   it('cancelling promote fires no request', async () => {
     mocks.confirm.mockResolvedValue(false);
     const fetchMock = mockFetch(twoProjectResponses());

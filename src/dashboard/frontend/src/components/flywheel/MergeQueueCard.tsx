@@ -12,7 +12,8 @@
  * Data fetching is no longer gated on a run being active — the card polls while
  * it is mounted (the rail only mounts on the visible Flywheel page). The
  * "UAT batches" label, the feature/batch count, and every action, confirmation
- * dialog, and zone the card used to render live in the shared view.
+ * dialog, and zone the card used to render live in the shared view, including
+ * promote-time version input and deferred version ship.
  */
 import { GitMerge } from 'lucide-react';
 import { RailCard } from './RailCard';
