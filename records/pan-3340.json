@@ -76,7 +76,14 @@
     }
   ],
   "scopeDrift": {
-    "outsideDeclaredScope": [],
+    "outsideDeclaredScope": [
+      "src/cli/commands/__tests__/done-dashboard-client.test.ts",
+      "src/cli/commands/done-dashboard-client.ts",
+      "src/cli/commands/done.ts",
+      "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-route.test.ts",
+      "src/lib/cloister/__tests__/service-completion.test.ts",
+      "src/lib/cloister/service-completion.ts"
+    ],
     "declaredScopeUntouched": [],
     "declaredScope": [
       "docs/ISSUE-VIEW.md",
@@ -93,6 +100,9 @@
     "actualChangedFiles": [
       "docs/ISSUE-VIEW.md",
       "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "src/cli/commands/__tests__/done-dashboard-client.test.ts",
+      "src/cli/commands/done-dashboard-client.ts",
+      "src/cli/commands/done.ts",
       "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.test.tsx",
       "src/dashboard/frontend/src/components/IssueActionMenu/IssueActionMenu.tsx",
       "src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts",
@@ -100,12 +110,15 @@
       "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
       "src/dashboard/frontend/src/lib/__tests__/issueActions.test.ts",
       "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-review-mode.test.ts",
-      "src/dashboard/server/routes/workspaces/review-pipeline.ts"
+      "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-route.test.ts",
+      "src/dashboard/server/routes/workspaces/review-pipeline.ts",
+      "src/lib/cloister/__tests__/service-completion.test.ts",
+      "src/lib/cloister/service-completion.ts"
     ],
-    "recordedAt": "2026-07-30T22:33:38.650Z"
+    "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:05:57.127Z",
+  "updated": "2026-07-31T00:06:01.083Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "blocked",
