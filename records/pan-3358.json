@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T18:29:53.761Z",
+  "updated": "2026-07-31T18:33:30.352Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "batch-card-version-input": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 3230207,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T18:03:19.702Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -136,6 +128,16 @@
         "outcome": "completed",
         "reason": "Added a CST-range lossless projects.yaml writer, authenticated GET/PUT version-sync routes with validation and newest durable outcome, cache invalidation, and 14 writer/route tests; typecheck and full lint pass.",
         "releasedAt": "2026-07-31T17:44:26.053Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 3230207,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T18:03:19.702Z",
+        "itemId": "batch-card-version-input",
+        "outcome": "completed",
+        "releasedAt": "2026-07-31T18:33:30.351Z"
       }
     ],
     "statusReasons": {
@@ -188,6 +190,10 @@
     "version-sync-write-door-api.version-sync-write-door-api.ac2": "completed",
     "version-sync-write-door-api.version-sync-write-door-api.ac3": "completed",
     "version-sync-write-door-api.version-sync-write-door-api.ac4": "completed",
-    "batch-card-version-input": "running"
+    "batch-card-version-input": "completed",
+    "batch-card-version-input.batch-card-version-input.ac1": "completed",
+    "batch-card-version-input.batch-card-version-input.ac2": "completed",
+    "batch-card-version-input.batch-card-version-input.ac3": "completed",
+    "batch-card-version-input.batch-card-version-input.ac4": "completed"
   }
 }
