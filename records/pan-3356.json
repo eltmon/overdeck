@@ -97,9 +97,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T19:30:30.726Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T19:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T19:35:24.708Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T19:35:24Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3356\n\n# Review Synthesis — PAN-3356 — 2026-07-31\n\n## Verdict: CHANGES REQUESTED — the current-cycle fix modifies the explicitly protected IssueActionMenu subsystem\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/context.json`\n- Branch: `feature/pan-3356`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356`\n- HEAD reviewed: `beb7021c23ecfd208894b4849cc74ef3f317a0f2`\n- Cycle number: 3\n- Prior cycle SHA: `e488f9026e6166c241e7298047e5eb33dbb2060a`\n- PR commits: 16; one surviving blocker is below the proportionality threshold of 48\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] The current-cycle fix changes the explicitly protected IssueActionMenu surface — `src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts:27`\nThe approved in-PR-scope NonGoal 3 says, “No changes to IssueActionMenu or the action registry (issueActions.ts).” This cycle adds targeted-agent state and invocation throughout `useIssueActions.ts` and forwards `targetAgentId` through `IssueActionMenu.tsx:476`. Both files are inside the PR diff and the `e488f902..beb7021c` cycle diff, so the finding survives both scope and cycle-3 convergence gates.\n\nThis blocker could not have been raised in cycle 1 because these protected files were not changed until the current cycle, where they were modified to remediate cycle 2's exact-session targeting blockers. Restore the protected action surface and implement the cockpit behavior through an existing supported path, or revise and re-approve the xBRIEF boundary so the shared action-system change is explicit review scope.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: previously reviewed] Needs You Tell uses an unhosted dialog-state instance — `src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx:478`\n`IssueMissionControl` passes `headerActions.all` into `NeedsYouSlot`, but renders the dialog host owned by the separate `IssueActionMenu` hook instance. A Tell action therefore updates dialog state with no mounted host. The defect is real, but the cited `headerActions` ownership and `NeedsYouSlot` wiring were already present at prior-cycle SHA `e488f902`; the current cycle only changes target selection and target propagation. Under the cycle-3 convergence gate, this previously reviewed code is not promotable to a new blocker.\n\n### [correctness] Phase clicks can briefly no-op while the tree snapshot lags — `src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx:578`\nWhen a supplied session id is absent from `treeSessions`, `selectPipelinePhase` returns instead of continuing to the existing phase fallback. This current-cycle behavior is advisory because it is limited to transient snapshot convergence rather than persistent incorrect navigation.\n\n### [performance] Global agent updates rebuild every targeted issue-action view — `src/dashboard/frontend/src/components/IssueActionMenu/useIssueActions.ts:553`\nThe new `forAgent` closures make the complete action-view memo depend on the global agents array, so unrelated agent updates recreate roughly 70 action views for every mounted action surface. The work is bounded, but scales with open issue surfaces and global agent event frequency.\n\n### [performance] StatusNarrative mounts an immediately stale duplicate plan observer — `src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx:84`\nThe observer for `['plan', issueId]` omits the parent's `staleTime: 60_000`, and Overview can mount a second StatusNarrative. This can refetch a recently loaded plan during common remount and focus paths.\n\nThe performance report's additional verification-model advisory does not apply to reviewed HEAD: `IssueMissionControl` now renders `VerificationGatesGrid verification={issueView.verification}` rather than mounting another `useIssueView` subscription.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories.\n- Correctness confirmed that exact-agent direct actions, successful phase-session routing, merge metadata, ship-state sourcing, specialist identity, and cockpit-only status-dot variants are correct; its sole blocker was demoted by the mandatory cycle-3 convergence gate.\n- Performance found no blocking regressions.\n- Requirements verified 19 of 20 in-PR-scope constraints; only the protected IssueActionMenu boundary remains blocking.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-beb7021c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3356 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/CommandDeck/StatusDot.tsx",
@@ -178,10 +191,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T19:30:30.726Z",
+  "updated": "2026-07-31T19:35:24.709Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -189,8 +202,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T19:27:27.170Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-07-31T19:35:23.781Z",
+    "reviewNotes": "Current-cycle exact-session fix modifies the explicitly protected IssueActionMenu subsystem",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a",
@@ -272,6 +285,24 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2"
+      }
     }
   },
   "closeOut": {
@@ -279,9 +310,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2697786,
-            "output": 132789,
-            "cacheRead": 48167424,
+            "input": 11951730,
+            "output": 244430,
+            "cacheRead": 94876672,
             "cacheWrite": 0
           }
         },
@@ -328,15 +359,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 16986469,
-          "output": 891450,
-          "cacheRead": 460544512,
+          "input": 26240413,
+          "output": 1003091,
+          "cacheRead": 507253760,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 341.948101,
-        "pricingAsOf": "2026-07-31T19:27:27.188Z"
+        "usd": 414.921675,
+        "pricingAsOf": "2026-07-31T19:35:23.799Z"
       }
     },
     "merges": [
