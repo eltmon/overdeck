@@ -237,3 +237,41 @@ behavior is locked by `tests/unit/dashboard/terminals-delete-idempotent.test.ts`
 lifecycle change with no surface change: every control, prop, and route is
 identical, but the band's workspace-scoped state resets on navigation instead of
 following the component instance.
+
+## 10. PAN-3330 additions (dashboard workspace creation and management)
+
+Additive only — no existing route, CLI flag, rail row, palette action, or
+WorkspaceView affordance was changed or removed.
+
+### 10.1 New registry routes
+
+| Route | Guard | Notes |
+| --- | --- | --- |
+| `POST /api/workspace-registry/resolve` | mutation guard | Write-free dry run; returns the resolved intent plus `findings`. |
+| `POST /api/workspace-registry` | mutation guard | Resolves server-side; 422 `{findings}` or 201 `{id}`. |
+| `POST /api/workspace-registry/:id/relocate` | mutation guard | 404 / 400 / 409 (writer's message) / 200 `{ok:true}`. |
+| `GET /api/workspace-registry/project-targets` | none (sibling GET parity) | `{primaryPath, targets}`. |
+
+Registered ahead of `GET /api/workspace-registry/:id`, which would otherwise
+capture `project-targets` as an id — asserted by a test.
+
+### 10.2 New UI surfaces
+
+- `sidebar-new-workspace` — `+` in the WORKSPACES rail header, mirroring
+  `sidebar-new-project`. The existing group/flat toggle is untouched.
+- `new-workspace` — command-palette action, visible under both the Actions and
+  Workspaces scope chips via the new `PaletteAction.alsoScopes` field. It is a
+  single row, so All shows no duplicate.
+- `project-overview-new-workspace` — per-project button that preselects the
+  project.
+- `new-workspace-modal` — the dialog itself, with its resolve-before-create
+  preview panel.
+- `workspace-view-actions` — Favorite / Relocate / Archive in the
+  `WorkspaceView` header, rendered for `main` and `scratch` only.
+
+### 10.3 Refactor with no behavior change
+
+Creation intent moved out of `src/cli/commands/workspace-scratch.ts` into
+`src/lib/workspaces/create.ts`. CLI behavior is byte-identical — same flags,
+same `--dry-run` JSON shape and key order, same messages and exit codes — and
+the pre-existing CLI suites pass unmodified, which is what proves it.

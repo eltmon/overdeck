@@ -20,9 +20,16 @@ vi.mock('util', async () => {
 
 const { mockListProjects } = vi.hoisted(() => ({ mockListProjects: vi.fn() }));
 
+// PAN-3330 made the shared creation core async so it cannot block the
+// dashboard event loop, so it reads projects through listProjectsAsync; both
+// are stubbed from the same fixture.
 vi.mock('../../../src/lib/projects.js', async () => {
   const actual = await vi.importActual<typeof import('../../../src/lib/projects.js')>('../../../src/lib/projects.js');
-  return { ...actual, listProjectsSync: mockListProjects };
+  return {
+    ...actual,
+    listProjectsSync: mockListProjects,
+    listProjectsAsync: async () => mockListProjects(),
+  };
 });
 
 import { workspaceMainCommand, workspaceNewCommand } from '../../../src/cli/commands/workspace-scratch.js';
@@ -74,9 +81,11 @@ describe('pan workspace new (PAN-1990)', () => {
     // PAN-1990 review fix: argument-vector spawn (execFile), not an
     // interpolated shell string — see workspace-scratch-isolated.test.ts for
     // the security/branch-collision behavior this call shape fixes.
+    // `--` terminates option parsing so an operator-supplied parent branch
+    // like `--no-checkout` cannot be read by git as a flag (PAN-3330 review).
     expect(mockExecAsync).toHaveBeenCalledWith(
       'git',
-      ['worktree', 'add', '-b', 'scratch/isolated-notes', expectedPath, 'main'],
+      ['worktree', 'add', '-b', 'scratch/isolated-notes', '--', expectedPath, 'main'],
       expect.objectContaining({ cwd: projectRoot }),
     );
   });

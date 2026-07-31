@@ -563,6 +563,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/workspace-registry/:id/archive',              kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (archiveWorkspace/unarchiveWorkspace)' },
   { surface: 'POST /api/workspace-registry/:id/favorite',             kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (setWorkspaceFavorite)' },
   { surface: 'PUT /api/workspace-registry/:id/layout',                kind: 'http', disposition: 'WRITE',       door: 'workspaces/writer.ts (updateWorkspaceLayout)' },
+  // PAN-3330: dashboard workspace creation/management. resolve is a POST only
+  // because it carries a body — it writes nothing and is asserted write-free.
+  { surface: 'POST /api/workspace-registry/resolve',                  kind: 'http', disposition: 'READ',        door: 'workspaces/create.ts (resolveWorkspaceCreateIntent — dry run, no writes)' },
+  { surface: 'POST /api/workspace-registry',                          kind: 'http', disposition: 'WRITE',       door: 'workspaces/create.ts (performWorkspaceCreate → writer.ts createWorkspace)' },
+  { surface: 'POST /api/workspace-registry/:id/relocate',             kind: 'http', disposition: 'RELOCATE',    door: 'workspaces/writer.ts (relocateWorkspace)' },
+  { surface: 'GET /api/workspace-registry/project-targets',           kind: 'http', disposition: 'READ',        door: 'projects.ts (listProjectsAsync) + workspaces/resolver.ts (listProjectTargets)' },
   // PAN-3331 quick-action band.
   { surface: 'GET /api/workspace-registry/:id/git',                   kind: 'http', disposition: 'READ',        door: 'workspaces/git-state.ts (getWorkspaceGitState) via workspaces/resolver.ts for the row' },
   { surface: 'POST /api/workspace-registry/:id/pull',                 kind: 'http', disposition: 'WRITE',       door: 'workspaces/git-state.ts (pullWorkspaceFastForward); kind=issue is refused and keeps using POST /api/issues/:issueId/sync-main' },

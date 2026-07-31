@@ -7,6 +7,7 @@ import type { PipelineIssuePhase } from '../../../lib/pipeline-state';
 import { useDashboardStore } from '../../../lib/store';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import { installStrictFetchMock } from '../../../test-utils/strictFetchMock';
+import { useNewWorkspaceStore } from '../useNewWorkspaceModal';
 
 let fetchControl: ReturnType<typeof installStrictFetchMock>;
 
@@ -482,5 +483,77 @@ describe('ProjectOverview', () => {
 
     fireEvent.click(screen.getByText('Agents').parentElement!);
     expect(onOpenAgents).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
+  let fetchControl: ReturnType<typeof installStrictFetchMock>;
+
+  beforeEach(() => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method !== 'GET') return undefined;
+      if (url === '/api/costs/summary?project=PAN') return Response.json({ totalCost: 0 });
+      if (url === '/api/projects/overdeck/auto-merge-default') return Response.json({ autoMerge: false });
+      if (url === '/api/projects/overdeck/merge-train') return Response.json({ value: null, effective: true });
+      if (url === '/api/merge-train/queues' || url === '/api/merge-train/generations') return Response.json([]);
+      if (url === '/api/projects/overdeck/swarm-policy') return Response.json({});
+      return undefined;
+    });
+    useNewWorkspaceStore.setState({ isOpen: false, presetProjectKey: null });
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await fetchControl.assertNoUnexpectedRequests();
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the dialog with that project preselected', () => {
+    const onNewWorkspace = vi.fn();
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+        onNewWorkspace={onNewWorkspace}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('project-overview-new-workspace'));
+
+    expect(onNewWorkspace).toHaveBeenCalledWith('overdeck');
+  });
+
+  it('falls back to the shared dialog store when given no handler', () => {
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        projectKey="overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('project-overview-new-workspace'));
+
+    const state = useNewWorkspaceStore.getState();
+    expect(state.isOpen).toBe(true);
+    expect(state.presetProjectKey).toBe('overdeck');
+  });
+
+  it('renders no affordance for a project with no key', () => {
+    render(
+      <ProjectOverview
+        projectName="Overdeck"
+        features={[]}
+        issueCosts={{}}
+        onSelectFeature={() => {}}
+      />,
+    );
+
+    expect(screen.queryByTestId('project-overview-new-workspace')).toBeNull();
   });
 });

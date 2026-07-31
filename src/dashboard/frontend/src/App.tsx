@@ -16,6 +16,8 @@ import { ConversationDock } from './components/dock/ConversationDock';
 import { ResumableSessionDialog } from './components/ResumableSessionDialog';
 import { SessionFeedSidebar } from './components/sessionFeed/SessionFeedSidebar';
 import { NewProjectModal, type CreatedProject } from './components/CommandDeck/NewProjectModal';
+import { NewWorkspaceModal } from './components/CommandDeck/NewWorkspaceModal';
+import { useNewWorkspaceModal } from './components/CommandDeck/useNewWorkspaceModal';
 import { Tab } from './components/Header';
 import { Sidebar } from './components/Sidebar';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -496,6 +498,10 @@ export default function App() {
     setActiveTab('home');
   }, [setActiveTab]);
 
+  // PAN-3330: New Workspace dialog. The entry points that call `.open()` (rail
+  // "+", command palette, project overview) arrive with WI-4.
+  const newWorkspace = useNewWorkspaceModal(onSelectWorkspace);
+
   const handleOpenConversationHit = useCallback(async (hit: ConversationPaletteOpenRequest) => {
     const conversationName = hit.conversationId || hit.sessionId;
     // hit.projectKey is the resolved dashboard project key (name ?? key); the raw
@@ -825,6 +831,14 @@ export default function App() {
         onCreated={handleProjectCreated}
       />
 
+      {/* PAN-3330: New Workspace modal */}
+      <NewWorkspaceModal
+        isOpen={newWorkspace.isOpen}
+        onClose={newWorkspace.close}
+        onCreated={newWorkspace.onCreated}
+        presetProjectKey={newWorkspace.presetProjectKey}
+      />
+
       {/* Mounts @keyframes for the pulsing extreme-tier cost warning badge */}
       <CostWarningStyles />
 
@@ -836,6 +850,7 @@ export default function App() {
         selectedProject={selectedProjectKey}
         onSelectProject={handleSelectProject}
         onNewProject={handleNewProject}
+        onNewWorkspace={() => newWorkspace.open(selectedProjectKey ?? undefined)}
         onOpenUpdater={() => setIsUpdateDialogOpen(true)}
         onSelectWorkspace={onSelectWorkspace}
       />
@@ -982,6 +997,7 @@ export default function App() {
         }}
         onOpenConversationHit={handleOpenConversationHit}
         onSelectWorkspace={onSelectWorkspace}
+        onNewWorkspace={() => newWorkspace.open()}
       />
 
       {/* Emergency STOP hotkey (Cmd/Ctrl+Shift+.) — kills all agents, freezes auto-resume */}
