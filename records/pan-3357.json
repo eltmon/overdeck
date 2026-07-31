@@ -343,18 +343,18 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:23:47.462Z",
+  "updated": "2026-07-31T21:23:53.342Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
-    "updatedAt": "2026-07-31T21:23:45.826Z",
+    "updatedAt": "2026-07-31T21:23:53.334Z",
     "reviewNotes": "all four review dimensions passed; no blocking findings remain",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
@@ -463,24 +463,6 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T20:19:49.432Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "126e707e5c6ae8a748885871699cfe82b6757e35"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "126e707e5c6ae8a748885871699cfe82b6757e35"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "126e707e5c6ae8a748885871699cfe82b6757e35"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "126e707e5c6ae8a748885871699cfe82b6757e35"
-      }
     }
   },
   "closeOut": {
@@ -488,9 +470,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30401909,
-            "output": 572114,
-            "cacheRead": 110864896,
+            "input": 30415375,
+            "output": 573850,
+            "cacheRead": 112128512,
             "cacheWrite": 0
           }
         },
@@ -537,15 +519,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 41769735,
-          "output": 1403437,
-          "cacheRead": 468500992,
+          "input": 41783201,
+          "output": 1405173,
+          "cacheRead": 469764608,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 485.202281,
-        "pricingAsOf": "2026-07-31T21:23:45.885Z"
+        "usd": 485.953499,
+        "pricingAsOf": "2026-07-31T21:23:53.338Z"
       }
     },
     "merges": [
@@ -554,7 +536,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3357",
