@@ -88,6 +88,8 @@ export interface AgentRowModel {
   model: string;
   /** Harness that spawned the session (claude-code | pi | codex). */
   harness?: string;
+  /** Session start timestamp used by run-detail surfaces. */
+  startedAt: string;
   /** Formatted cost string, e.g. "$1.23 · 4.5k tok", when available. */
   cost?: string;
   /** Session duration in seconds, or null. */

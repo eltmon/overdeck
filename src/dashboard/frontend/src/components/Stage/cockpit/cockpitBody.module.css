@@ -78,6 +78,13 @@
   align-items: start;
 }
 
+.awarenessRail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
 /* Tree | main. Tasks move into a slide-over drawer so the conversation owns the
  * width previously reserved for a permanent third column. Narrower panes
  * (<840px, e.g. a split) keep the single stacked column. */
@@ -88,6 +95,10 @@
 
   .missionBody.spineCollapsed {
     grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .awarenessRail {
+    grid-column: 1 / -1;
   }
 
   .spineCollapsed [data-section="verification-gates"] {
@@ -132,5 +143,20 @@
   .spineCollapsed [data-section="verification-gate"][data-gate-status="running"] {
     border-color: var(--info);
     background: color-mix(in srgb, var(--info) 28%, transparent);
+  }
+}
+
+@container (min-width: 1180px) {
+  .missionBody {
+    grid-template-columns: minmax(210px, 264px) minmax(0, 1fr) minmax(220px, 280px);
+  }
+
+  .missionBody.spineCollapsed {
+    grid-template-columns: 56px minmax(0, 1fr) minmax(220px, 280px);
+  }
+
+  .awarenessRail {
+    grid-column: auto;
+    grid-template-columns: 1fr;
   }
 }

@@ -22,9 +22,12 @@ import { derivePipelineState, type PipelineState } from '../../../lib/issuePipel
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
+import DrawerActivityRail from '../../drawer/DrawerActivityRail'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
+import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
 import { TellComposer } from '../../issue-view/TellComposer'
+import { VerificationGates } from '../../issue-view/VerificationGates'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -176,8 +179,6 @@ function IssueTreeContextPanel({
   actionDock,
   timeline,
   onBackToIssue,
-  onTab,
-  onOpenAgent,
 }: {
   context: IssueTreeContext
   issueId: string
@@ -188,8 +189,6 @@ function IssueTreeContextPanel({
   actionDock: ReactNode
   timeline: ReactNode
   onBackToIssue: () => void
-  onTab: (tab: MissionTab, subView?: MissionSubView) => void
-  onOpenAgent: (type: string) => void
 }) {
   const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
     issue: { title: issueId, summary: 'Issue overview from the tree. Workspace tabs stay visible above this pane.' },
@@ -209,7 +208,7 @@ function IssueTreeContextPanel({
     }
     if (context === 'issue') return (
       <div className="space-y-3.5">
-        <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
+        <OverviewTab issueId={issueId} />
         <div data-section="Conversation / Files / Terminal tabs">
           <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
         </div>
@@ -414,15 +413,13 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 }
 
 /** Overview — crew, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
-type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }
-function OverviewTab({ issueId, onTab, onOpenAgent }: OverviewTabProps) {
+type OverviewTabProps = { issueId: string }
+function OverviewTab({ issueId }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
-      <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
       <HappenedFeed issueId={issueId} />
       <PlanMapCard issueId={issueId} />
       <IssueBlockerSpotlight issueId={issueId} />
-      <div data-section="NowPanel"><NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} /></div>
       <div data-section="PickupGateCard"><PickupGateCard issueId={issueId} /></div>
     </div>
   )
@@ -452,6 +449,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
+  const [costsOpen, setCostsOpen] = useState(false)
   // Operator decision (#2962): the session-tree lane starts collapsed behind a
   // toggle (persisted preference honored).
   const [spineCollapsed, setSpineCollapsed] = useState(
@@ -736,8 +734,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 actionDock={actionDock}
                 timeline={timeline}
                 onBackToIssue={selectIssueFromTree}
-                onTab={selectTab}
-                onOpenAgent={openAgentByType}
               /></div>
             )}
             {/* The six cockpit tabs fold the legacy surfaces into sub-views while
@@ -821,8 +817,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               </div>
             )}
             {activeTab === 'overview' && (
-              <div data-section="Awareness rail" className="space-y-3.5">
-                <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} />
+              <div className="space-y-3.5">
+                <OverviewTab issueId={issueId} />
                 <div data-section="Costs / Artifacts / Ship tabs" className="space-y-3.5">
                   <CostsTab issueId={issueId} />
                   <ShipTab issueId={issueId} />
@@ -887,7 +883,70 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
           </div>
         </main>
+        <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">
+          <section data-testid="right-rail-now" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div data-section="NowPanel"><NowPanel issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
+          </section>
+          <RunDetailsCard model={issueView} />
+          <section data-testid="right-rail-gates" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Gates</h3>
+            <VerificationGates issueId={issueId} />
+          </section>
+          <section data-testid="right-rail-cost" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cost</h3>
+                <div className="mt-1 font-mono text-[18px] tabular-nums text-signal-cost-foreground">
+                  {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+                  {costs.data?.totalTokens ? `${costs.data.totalTokens.toLocaleString()} tokens` : 'No token data'}
+                </div>
+              </div>
+              <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setCostsOpen(true)}>
+                All costs →
+              </button>
+            </div>
+          </section>
+          <section data-testid="right-rail-environment" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Environment</h3>
+            <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
+          </section>
+          <section data-testid="right-rail-activity" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Recent activity</h3>
+              <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => selectTab('activity', 'feed')}>
+                All activity →
+              </button>
+            </div>
+            <DrawerActivityRail compact limit={3} />
+          </section>
+        </aside>
       </div>
+      {costsOpen ? (
+        <div className="absolute inset-0 z-[60]" data-testid="cost-rollup-layer">
+          <button
+            type="button"
+            aria-label="Close cost breakdown"
+            className="absolute inset-0 w-full border-0 bg-background/60 backdrop-blur-[2px]"
+            onClick={() => setCostsOpen(false)}
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cost breakdown"
+            className="absolute inset-y-0 right-0 w-[min(620px,calc(100%_-_28px))] overflow-y-auto border-l border-border bg-card"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
+              <h2 className="text-[14px] font-medium text-foreground">Cost breakdown</h2>
+              <button type="button" className="text-[12px] text-muted-foreground hover:text-foreground" onClick={() => setCostsOpen(false)}>
+                Close
+              </button>
+            </div>
+            <CostsTab issueId={issueId} />
+          </aside>
+        </div>
+      ) : null}
     </IssueView>
   )
 }

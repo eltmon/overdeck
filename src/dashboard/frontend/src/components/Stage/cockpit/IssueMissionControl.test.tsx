@@ -21,6 +21,8 @@ beforeEach(() => {
   queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
   queryMocks.prQuery.data.pr = { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
+  queryMocks.workspaceQuery.data = null
+  useDashboardStore.setState({ agentsById: {} })
   Object.assign(queryMocks.issueCheckRunsQuery.data.summary, {
     total: 1,
     passed: 1,
@@ -182,6 +184,8 @@ vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Re
 vi.mock('../../issue-view/StartAgentCta', () => ({ StartAgentCta: () => <div>Start agent</div> }))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
+vi.mock('../../drawer/DrawerActivityRail', () => ({ default: ({ compact, limit }: { compact?: boolean; limit?: number }) => <div data-testid="drawer-activity-rail">Activity rail · {String(compact)} · {limit}</div> }))
+vi.mock('../../PanOpenInPicker', () => ({ PanOpenInPicker: ({ openInCwd }: { openInCwd: string }) => <div data-testid="pan-open-picker">Open {openInCwd}</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/ActivityTab', () => ({ ActivityTab: () => <div>Activity tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/BeadsTab', () => ({ BeadsTab: () => <div>Beads tab</div> }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/TasksTab', () => ({ TasksTab: () => <div>Tasks tab</div> }))
@@ -562,6 +566,59 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('Status history')).toHaveLength(2)
   })
 
+  it('renders the six-card awareness rail and routes its cost and activity links', () => {
+    queryMocks.workspaceQuery.data = {
+      exists: true,
+      issueId: 'PAN-1661',
+      path: '/workspace/feature-pan-1661',
+      services: [],
+    }
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1661': {
+          id: 'agent-pan-1661',
+          issueId: 'PAN-1661',
+          status: 'running',
+          runtime: 'claude-code',
+          model: 'gpt-5.5',
+          role: 'work',
+          startedAt: '2026-06-07T00:00:00Z',
+        },
+      },
+    })
+    const { container } = renderMissionControl()
+    const rail = container.querySelector('[data-section="Awareness rail"]') as HTMLElement
+
+    for (const testId of [
+      'right-rail-now',
+      'run-details-card',
+      'right-rail-gates',
+      'right-rail-cost',
+      'right-rail-environment',
+      'right-rail-activity',
+    ]) {
+      expect(within(rail).getByTestId(testId), testId).toBeInTheDocument()
+    }
+    expect(within(rail).getByText('Work')).toBeInTheDocument()
+    expect(within(rail).getByText('gpt-5.5')).toBeInTheDocument()
+    expect(within(rail).getByText('claude-code')).toBeInTheDocument()
+    expect(within(rail).getByText('/workspace/feature-pan-1661')).toBeInTheDocument()
+    expect(within(rail).getByTestId('pan-open-picker')).toBeInTheDocument()
+    expect(within(rail).getByText('1,000 tokens')).toBeInTheDocument()
+    expect(within(rail).getByTestId('drawer-activity-rail')).toHaveTextContent('true · 3')
+    expect(rail.querySelector('time')).toHaveAttribute('datetime', '2026-06-07T00:00:00Z')
+
+    fireEvent.click(within(rail).getByRole('button', { name: 'All costs →' }))
+    const costDialog = screen.getByRole('dialog', { name: 'Cost breakdown' })
+    expect(within(costDialog).getByText('Costs tab')).toBeInTheDocument()
+
+    fireEvent.click(within(costDialog).getByRole('button', { name: 'Close' }))
+    fireEvent.click(within(rail).getByRole('button', { name: 'All activity →' }))
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'activity')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'feed')
+    expect(screen.getByText('Activity tab')).toBeInTheDocument()
+  })
+
   it('persists the collapsible agent spine and defaults to collapsed without a saved choice (#2962)', () => {
     const firstView = renderMissionControl()
     const firstBody = firstView.container.querySelector('[data-spine-collapsed]')
@@ -676,7 +733,8 @@ describe('IssueMissionControl', () => {
 
     const conversation = container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')
     expect(conversation).toBeInTheDocument()
-    expect(conversation?.previousElementSibling).toHaveTextContent('Review blocked — awaiting the work agent')
+    expect(conversation?.previousElementSibling).toHaveTextContent('Blocker spotlight')
+    expect(container.querySelector('[data-section="Awareness rail"]')).toHaveTextContent('Review blocked — awaiting the work agent')
     expect(conversation).toHaveTextContent('Launcher')
     expect(conversation).toHaveTextContent('Agent dock')
     expect(conversation).toHaveTextContent('Action dock')
@@ -742,7 +800,7 @@ describe('IssueMissionControl', () => {
     renderMissionControl()
 
     expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
-    expect(screen.getByText('lint')).toBeTruthy()
+    expect(screen.getAllByText('lint').length).toBeGreaterThan(0)
     expect(screen.getAllByText('1/1 pass').length).toBeGreaterThan(0)
   })
 
