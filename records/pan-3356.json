@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T15:06:44.613Z",
+  "updated": "2026-07-31T15:16:24.589Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "tab-model-fold": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3356",
         "agentId": "agent-pan-3356",
         "pid": 3309672,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:06:44.613Z"
+        "claimedAt": "2026-07-31T15:06:44.613Z",
+        "itemId": "tab-model-fold",
+        "outcome": "completed",
+        "reason": "Folded the cockpit into six tabs, mapped every legacy tab deep link to its new tab/sub-view, and added session-aware default-tab coverage.",
+        "releasedAt": "2026-07-31T15:16:24.589Z"
+      }
+    ],
+    "statusReasons": {
+      "tab-model-fold": {
+        "reason": "Folded the cockpit into six tabs, mapped every legacy tab deep link to its new tab/sub-view, and added session-aware default-tab coverage.",
+        "updatedAt": "2026-07-31T15:16:24.589Z"
       }
     }
   },
   "statusOverrides": {
-    "tab-model-fold": "running"
+    "tab-model-fold": "completed",
+    "tab-model-fold.tab-model-fold.ac1": "completed",
+    "tab-model-fold.tab-model-fold.ac2": "completed",
+    "tab-model-fold.tab-model-fold.ac3": "completed"
   }
 }
