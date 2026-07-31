@@ -115,6 +115,116 @@ export interface ReleaseConfig {
   components: Record<string, ReleaseComponentConfig>;
 }
 
+export interface VersionSyncConfig {
+  set?: Array<{ path: string; json_field: string }>;
+  command?: string;
+  command_cwd?: string;
+  expect?: Array<{ path: string; pattern: string }>;
+  commit_message?: string;
+  push?: string[];
+}
+
+export type VersionSyncValidationResult =
+  | { ok: true; config: VersionSyncConfig }
+  | { ok: false; errors: string[] };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function pathEscapesProjectRoot(path: string): boolean {
+  const root = resolve('/project');
+  const resolvedPath = resolve(root, path);
+  return resolvedPath !== root && !resolvedPath.startsWith(`${root}/`);
+}
+
+export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationResult {
+  if (!isRecord(raw)) {
+    return { ok: false, errors: ['version_sync must be an object'] };
+  }
+
+  const errors: string[] = [];
+  const validatePath = (field: string, value: unknown): value is string => {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      errors.push(`${field} must be a non-empty string`);
+      return false;
+    }
+    if (pathEscapesProjectRoot(value)) {
+      errors.push(`${field} must not escape the project root`);
+      return false;
+    }
+    return true;
+  };
+
+  if (raw.set !== undefined) {
+    if (!Array.isArray(raw.set)) {
+      errors.push('version_sync.set must be an array');
+    } else {
+      raw.set.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          errors.push(`version_sync.set[${index}] must be an object`);
+          return;
+        }
+        validatePath(`version_sync.set[${index}].path`, entry.path);
+        if (typeof entry.json_field !== 'string' || entry.json_field.trim().length === 0) {
+          errors.push(`version_sync.set[${index}].json_field must be a non-empty string`);
+        }
+      });
+    }
+  }
+
+  if (raw.expect !== undefined) {
+    if (!Array.isArray(raw.expect)) {
+      errors.push('version_sync.expect must be an array');
+    } else {
+      raw.expect.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          errors.push(`version_sync.expect[${index}] must be an object`);
+          return;
+        }
+        validatePath(`version_sync.expect[${index}].path`, entry.path);
+        if (typeof entry.pattern !== 'string' || entry.pattern.length === 0) {
+          errors.push(`version_sync.expect[${index}].pattern must be a non-empty string`);
+          return;
+        }
+        try {
+          new RegExp(entry.pattern);
+        } catch {
+          errors.push(`version_sync.expect[${index}].pattern must be a valid regular expression`);
+        }
+      });
+    }
+  }
+
+  if (raw.command !== undefined) {
+    if (typeof raw.command !== 'string' || raw.command.trim().length === 0) {
+      errors.push('version_sync.command must be a non-empty string');
+    } else if (/[\r\n]/.test(raw.command)) {
+      errors.push('version_sync.command must be a single command line');
+    }
+  }
+
+  if (raw.command_cwd !== undefined) {
+    validatePath('version_sync.command_cwd', raw.command_cwd);
+  }
+
+  if (raw.commit_message !== undefined && typeof raw.commit_message !== 'string') {
+    errors.push('version_sync.commit_message must be a string');
+  }
+
+  if (raw.push !== undefined) {
+    if (!Array.isArray(raw.push)) {
+      errors.push('version_sync.push must be an array');
+    } else {
+      raw.push.forEach((path, index) => validatePath(`version_sync.push[${index}]`, path));
+    }
+  }
+
+  return errors.length > 0
+    ? { ok: false, errors }
+    : { ok: true, config: raw as VersionSyncConfig };
+}
+
 /**
  * Project configuration
  */
@@ -173,6 +283,8 @@ export interface ProjectConfig {
   merge_train?: 'enabled' | 'disabled';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
+  /** Version-string propagation performed after a UAT batch merge. */
+  version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */
   release?: ReleaseConfig;
   /**
