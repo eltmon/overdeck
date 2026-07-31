@@ -157,9 +157,26 @@ describe('validateVersionSyncConfig', () => {
     });
   });
 
+  it.each([
+    [{}, [
+      'version_sync.expect must contain at least one entry',
+      'version_sync.push must contain at least one repository',
+    ]],
+    [{ expect: [], push: [] }, [
+      'version_sync.expect must contain at least one entry',
+      'version_sync.push must contain at least one repository',
+    ]],
+    [{ expect: [{ path: 'package.json', pattern: '"version"' }] }, [
+      'version_sync.push must contain at least one repository',
+    ]],
+  ])('rejects a no-op operational shape %#', (config, errors) => {
+    expect(validateVersionSyncConfig(config)).toEqual({ ok: false, errors });
+  });
+
   it('rejects an expect entry with a missing pattern', () => {
     const result = validateVersionSyncConfig({
       expect: [{ path: 'frontend/package.json' }],
+      push: ['frontend'],
     });
 
     expect(result).toEqual({
@@ -171,6 +188,7 @@ describe('validateVersionSyncConfig', () => {
   it('rejects an expect pattern that does not compile', () => {
     const result = validateVersionSyncConfig({
       expect: [{ path: 'frontend/package.json', pattern: '[' }],
+      push: ['frontend'],
     });
 
     expect(result).toEqual({
@@ -182,6 +200,7 @@ describe('validateVersionSyncConfig', () => {
   it('rejects an expectation pattern longer than the bounded evaluator accepts', () => {
     const result = validateVersionSyncConfig({
       expect: [{ path: 'frontend/package.json', pattern: 'a'.repeat(513) }],
+      push: ['frontend'],
     });
 
     expect(result).toEqual({
@@ -193,6 +212,8 @@ describe('validateVersionSyncConfig', () => {
   it('rejects a path that escapes above the project root', () => {
     const result = validateVersionSyncConfig({
       set: [{ path: '../outside/package.json', json_field: 'version' }],
+      expect: [{ path: 'package.json', pattern: '"version"' }],
+      push: ['.'],
     });
 
     expect(result).toEqual({
@@ -202,7 +223,11 @@ describe('validateVersionSyncConfig', () => {
   });
 
   it('requires a sandbox image for a configured command', () => {
-    const result = validateVersionSyncConfig({ command: 'pnpm vsync' });
+    const result = validateVersionSyncConfig({
+      command: 'pnpm vsync',
+      expect: [{ path: 'package.json', pattern: '"version"' }],
+      push: ['.'],
+    });
 
     expect(result).toEqual({
       ok: false,
@@ -211,7 +236,11 @@ describe('validateVersionSyncConfig', () => {
   });
 
   it('rejects a command containing a newline', () => {
-    const result = validateVersionSyncConfig({ command: 'pnpm vsync\ngit push' });
+    const result = validateVersionSyncConfig({
+      command: 'pnpm vsync\ngit push',
+      expect: [{ path: 'package.json', pattern: '"version"' }],
+      push: ['.'],
+    });
 
     expect(result).toEqual({
       ok: false,

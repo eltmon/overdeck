@@ -222,6 +222,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
 
           <div>
             <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Expected version strings</span><button type="button" onClick={() => setDraft({ ...draft, expect: [...draft.expect, { path: '', pattern: '' }] })} className="text-[10px] text-primary hover:underline">Add expectation</button></div>
+            {fieldError('expect')}
             <div className="mt-1 space-y-1.5">
               {draft.expect.map((entry, index) => (
                 <div key={index} className="grid grid-cols-[0.8fr_1fr_auto] gap-1.5">
@@ -235,6 +236,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
 
           <div>
             <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Repositories to push</span><button type="button" onClick={() => setDraft({ ...draft, push: [...draft.push, ''] })} className="text-[10px] text-primary hover:underline">Add repository</button></div>
+            {fieldError('push')}
             <div className="mt-1 space-y-1.5">
               {draft.push.map((path, index) => (
                 <div key={index} className="grid grid-cols-[1fr_auto] gap-1.5">

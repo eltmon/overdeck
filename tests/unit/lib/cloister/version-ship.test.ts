@@ -243,6 +243,50 @@ describe('runVersionShip', () => {
     expect(deps.runCommand).not.toHaveBeenCalled();
   });
 
+  it.each([
+    [{}, 'version_sync.expect must contain at least one entry'],
+    [{ expect: [], push: [] }, 'version_sync.expect must contain at least one entry'],
+    [{ expect: [{ path: 'frontend/package.json', pattern: '"version"' }] }, 'version_sync.push must contain at least one repository'],
+  ] as const)('rejects no-op runner config %# before changing files', async (invalidConfig, error) => {
+    const deps = fakeDeps();
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: invalidConfig,
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [allowedRepo('frontend')],
+    }, deps);
+
+    expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed', error });
+    expect(deps.writeVersion).not.toHaveBeenCalled();
+    expect(deps.commit).not.toHaveBeenCalled();
+    expect(deps.push).not.toHaveBeenCalled();
+  });
+
+  it('rejects a declared output not covered by exactly one push repository', async () => {
+    const deps = fakeDeps();
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({
+        set: [{ path: 'frontend/package.json', json_field: 'version' }],
+        expect: [{ path: 'api/version.txt', pattern: '{version}' }],
+        push: ['frontend'],
+      }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [allowedRepo('frontend'), allowedRepo('api')],
+    }, deps);
+
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'path-validation-failed',
+      error: 'version_sync output is not covered by a push repository: api/version.txt',
+    });
+    expect(deps.writeVersion).not.toHaveBeenCalled();
+    expect(deps.commit).not.toHaveBeenCalled();
+    expect(deps.push).not.toHaveBeenCalled();
+  });
+
   it('rejects an unsandboxed configured command before changing files', async () => {
     const deps = fakeDeps();
     const report = await runVersionShip({
@@ -437,6 +481,15 @@ describe('version ship command sandbox', () => {
 });
 
 describe('version ship diagnostic redaction', () => {
+  it('bounds attacker-controlled diagnostics before applying secret patterns', () => {
+    const token = `ghp_${'A'.repeat(36)}`;
+    const redacted = redactVersionShipDiagnostic(`${'X'.repeat(1024 * 1024)}${token}`);
+
+    expect(redacted.length).toBeLessThanOrEqual(2_000);
+    expect(redacted).not.toContain(token);
+    expect(redacted).toContain('[REDACTED_TOKEN]');
+  });
+
   it('redacts standalone credential formats before local logging', () => {
     const diagnostic = [
       `ghp_${'A'.repeat(36)}`,

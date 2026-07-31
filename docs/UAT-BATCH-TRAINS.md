@@ -308,9 +308,11 @@ creates a temporary detached worktree at the fetched target head. Rooting retrie
 at the current target recovers when an earlier attempt pushed before durable
 settlement failed, while the ancestry check refuses an unrelated target. Commits
 use hook-disabled trusted Git invocations, push with an explicit
-`HEAD:<targetBranch>` ref, and the temporary worktrees are removed after the run,
-so an operator's primary checkout remains untouched even when it is stale or
-dirty.
+`HEAD:<targetBranch>` ref, and the temporary worktrees are removed after the run.
+Local Git and identity commands have a 30-second deadline, network fetch/push a
+two-minute deadline, and cleanup commands a 15-second deadline; timeout kills
+the Git process group and settles the batch with the existing safe failure code.
+An operator's primary checkout remains untouched even when it is stale or dirty.
 
 A project opts in through `version_sync` in `~/.overdeck/projects.yaml`. Mind
 Your Now uses one canonical JSON field plus its existing propagation command:
@@ -365,7 +367,10 @@ projects:
         - .
 ```
 
-The fields are deliberately small:
+The fields are deliberately small. An active block must declare at least one
+`expect` entry and one `push` repository; `{}`, empty arrays, and an expectation
+without a push target are rejected. Removing `version_sync` is the only way to
+select the explicit skip state.
 
 - `set[].path` and `set[].json_field` identify JSON string fields written before
   the command runs.
@@ -389,7 +394,9 @@ The fields are deliberately small:
   parent stages only paths declared by `set` or `expect`; sandbox commands never
   receive Git metadata and cannot self-commit.
 - `push[]` lists repository paths relative to the project root; `.` means the
-  project root itself.
+  project root itself. Every declared `set` and `expect` output must belong to
+  exactly one selected push repository before any file is mutated, so a verified
+  temporary change cannot disappear without a commit and push.
 
 ### Promotion and deferred ship
 
@@ -430,7 +437,8 @@ Version ship**. A `pending` promoted batch also remains visible on the batch
 card until the operator ships a version. Batch and settings API payloads omit
 operational `error` and `reason` text; they expose the status, fixed failure
 code, version, batch, timestamp, and path evidence needed by the UI, while raw
-command and Git diagnostics stay in credential-redacted local logs.
+command and Git diagnostics are bounded before linear-time credential redaction
+and stay only in local logs.
 
 Configure the block by hand in `projects.yaml` or through **Project settings →
 Version ship**. Both surfaces use that file as the single store; dashboard

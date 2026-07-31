@@ -114,10 +114,28 @@ describe('PUT /api/projects/:projectKey/version-sync payload', () => {
     expect(d.writeVersionSync).toHaveBeenLastCalledWith('overdeck', null);
   });
 
+  it.each([{}, { expect: [], push: [] }])(
+    'returns 400 and writes nothing for a no-op active config %#',
+    async (config) => {
+      const d = deps();
+      const result = await putProjectVersionSyncPayload('overdeck', { config }, d);
+      expect(result).toEqual({
+        status: 400,
+        body: {
+          errors: [
+            'version_sync.expect must contain at least one entry',
+            'version_sync.push must contain at least one repository',
+          ],
+        },
+      });
+      expect(d.writeVersionSync).not.toHaveBeenCalled();
+    },
+  );
+
   it('returns 400 with validation errors and writes nothing for a bad pattern', async () => {
     const d = deps();
     const result = await putProjectVersionSyncPayload('overdeck', {
-      config: { expect: [{ path: 'package.json', pattern: '[' }] },
+      config: { expect: [{ path: 'package.json', pattern: '[' }], push: ['.'] },
     }, d);
     expect(result).toEqual({
       status: 400,

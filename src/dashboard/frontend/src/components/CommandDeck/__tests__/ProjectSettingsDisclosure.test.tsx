@@ -321,6 +321,19 @@ describe('ProjectSettingsDisclosure', () => {
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });
 
+  it('renders no-op configuration errors beside expectations and push repositories', async () => {
+    versionSyncValidationErrors = [
+      'version_sync.expect must contain at least one entry',
+      'version_sync.push must contain at least one repository',
+    ];
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure version sync' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('version_sync.expect must contain at least one entry')).toBeInTheDocument();
+    expect(screen.getByText('version_sync.push must contain at least one repository')).toBeInTheDocument();
+  });
+
   it('renders a server validation error beside the offending pattern', async () => {
     versionSyncValidationErrors = ['version_sync.expect[0].pattern must be a valid regular expression'];
     renderDisclosure();

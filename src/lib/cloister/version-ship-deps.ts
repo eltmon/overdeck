@@ -10,7 +10,11 @@ import {
   type ShipFailureCode,
   type VersionShipDeps,
 } from './version-ship.js';
-import { versionShipGitArgs, versionShipGitEnv } from './version-ship-git.js';
+import {
+  runVersionShipGit,
+  VERSION_SHIP_GIT_LOCAL_TIMEOUT_MS,
+  VERSION_SHIP_GIT_NETWORK_TIMEOUT_MS,
+} from './version-ship-git.js';
 
 interface ExecResult {
   exitCode: number;
@@ -63,7 +67,7 @@ function tokenizeCommand(command: string): string[] {
 }
 
 export function redactVersionShipDiagnostic(value: string): string {
-  return redactSensitiveText(value)
+  return redactSensitiveText(value.slice(-8_192))
     .replace(/\b(Bearer\s+)[A-Za-z0-9._~+\/-]+=*/gi, '$1[REDACTED]')
     .slice(-2_000);
 }
@@ -72,21 +76,13 @@ function logDiagnostic(message: string): void {
   console.error(redactVersionShipDiagnostic(message));
 }
 
-function execGitResult(args: string[], cwd: string): Promise<ExecResult> {
-  return new Promise(resolveResult => {
-    execFile('git', versionShipGitArgs(args), {
-      cwd,
-      encoding: 'utf-8',
-      env: versionShipGitEnv(),
-      maxBuffer: 16 * 1024 * 1024,
-    }, (error, stdout, stderr) => {
-      resolveResult({
-        exitCode: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
-        stdout,
-        stderr,
-      });
-    });
-  });
+async function execGitResult(
+  args: string[],
+  cwd: string,
+  timeoutMs = VERSION_SHIP_GIT_LOCAL_TIMEOUT_MS,
+): Promise<ExecResult> {
+  const result = await runVersionShipGit(args, cwd, timeoutMs);
+  return { exitCode: result.exitCode, stdout: result.stdout, stderr: result.stderr };
 }
 
 async function execGitOrThrow(
@@ -94,8 +90,9 @@ async function execGitOrThrow(
   cwd: string,
   code: Extract<ShipFailureCode, 'commit-failed' | 'push-failed'>,
   safeMessage: string,
+  timeoutMs = VERSION_SHIP_GIT_LOCAL_TIMEOUT_MS,
 ): Promise<ExecResult> {
-  const result = await execGitResult(args, cwd);
+  const result = await execGitResult(args, cwd, timeoutMs);
   if (result.exitCode !== 0) {
     logDiagnostic(`[version-ship] git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
     throw new VersionShipOperationError(code, safeMessage);
@@ -429,7 +426,13 @@ export function buildVersionShipDeps(options: BuildVersionShipDepsOptions = {}):
     },
     push: async (repoRoot, targetBranch) => {
       await execGitOrThrow(['check-ref-format', '--branch', targetBranch], repoRoot, 'push-failed', 'configured target branch is invalid');
-      await execGitOrThrow(['push', 'origin', `HEAD:${targetBranch}`], repoRoot, 'push-failed', `could not push version commit to ${targetBranch}`);
+      await execGitOrThrow(
+        ['push', 'origin', `HEAD:${targetBranch}`],
+        repoRoot,
+        'push-failed',
+        `could not push version commit to ${targetBranch}`,
+        VERSION_SHIP_GIT_NETWORK_TIMEOUT_MS,
+      );
     },
     logDiagnostic,
   };

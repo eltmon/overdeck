@@ -200,6 +200,9 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
       });
     }
   }
+  if (raw.expect === undefined || (Array.isArray(raw.expect) && raw.expect.length === 0)) {
+    errors.push('version_sync.expect must contain at least one entry');
+  }
 
   if (raw.command !== undefined) {
     if (typeof raw.command !== 'string' || raw.command.trim().length === 0) {
@@ -239,6 +242,9 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
     } else {
       raw.push.forEach((path, index) => validatePath(`version_sync.push[${index}]`, path));
     }
+  }
+  if (raw.push === undefined || (Array.isArray(raw.push) && raw.push.length === 0)) {
+    errors.push('version_sync.push must contain at least one repository');
   }
 
   return errors.length > 0

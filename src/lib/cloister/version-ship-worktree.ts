@@ -1,13 +1,14 @@
-import { execFile } from 'node:child_process';
 import { mkdir, mkdtemp, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
-import { promisify } from 'node:util';
 import { VersionShipOperationError, type VersionShipAllowedRepo } from './version-ship.js';
 import { redactVersionShipDiagnostic } from './version-ship-deps.js';
-import { versionShipGitArgs, versionShipGitEnv } from './version-ship-git.js';
-
-const execFileAsync = promisify(execFile);
+import {
+  runVersionShipGit,
+  VERSION_SHIP_GIT_CLEANUP_TIMEOUT_MS,
+  VERSION_SHIP_GIT_LOCAL_TIMEOUT_MS,
+  VERSION_SHIP_GIT_NETWORK_TIMEOUT_MS,
+} from './version-ship-git.js';
 
 export interface VersionShipSourceRepo {
   repoKey: string;
@@ -42,21 +43,18 @@ function validateMergeSha(sha: string): void {
   }
 }
 
-async function runGit(args: string[], cwd: string, safeMessage: string): Promise<string> {
-  try {
-    const { stdout } = await execFileAsync('git', versionShipGitArgs(args), {
-      cwd,
-      encoding: 'utf-8',
-      env: versionShipGitEnv(),
-      maxBuffer: 16 * 1024 * 1024,
-    });
-    return stdout.trim();
-  } catch (error) {
-    console.error(redactVersionShipDiagnostic(
-      `[version-ship] git ${args.join(' ')} failed in ${cwd}: ${error instanceof Error ? error.message : String(error)}`,
-    ));
-    throw new VersionShipOperationError('workspace-failed', safeMessage);
-  }
+async function runGit(
+  args: string[],
+  cwd: string,
+  safeMessage: string,
+  timeoutMs = VERSION_SHIP_GIT_LOCAL_TIMEOUT_MS,
+): Promise<string> {
+  const result = await runVersionShipGit(args, cwd, timeoutMs);
+  if (result.exitCode === 0) return result.stdout.trim();
+  console.error(redactVersionShipDiagnostic(
+    `[version-ship] git ${args.join(' ')} failed in ${cwd}${result.timedOut ? ' after timeout' : ''}: ${result.stderr || result.stdout}`,
+  ));
+  throw new VersionShipOperationError('workspace-failed', safeMessage);
 }
 
 export async function withVersionShipWorkspace<T>(
@@ -101,7 +99,12 @@ export async function withVersionShipWorkspace<T>(
       const worktreePath = repo.configPath === '.' ? wrapperRoot : join(wrapperRoot, repo.configPath);
       await mkdir(dirname(worktreePath), { recursive: true });
       await runGit(['check-ref-format', '--branch', repo.targetBranch], sourceRoot, 'configured target branch is invalid');
-      await runGit(['fetch', 'origin', repo.targetBranch], sourceRoot, `could not fetch ${repo.targetBranch} before version ship`);
+      await runGit(
+        ['fetch', 'origin', repo.targetBranch],
+        sourceRoot,
+        `could not fetch ${repo.targetBranch} before version ship`,
+        VERSION_SHIP_GIT_NETWORK_TIMEOUT_MS,
+      );
       await runGit(['cat-file', '-e', `${repo.mergeSha}^{commit}`], sourceRoot, 'promoted merge commit is unavailable locally');
       const targetRef = `refs/remotes/origin/${repo.targetBranch}`;
       await runGit(
@@ -134,18 +137,16 @@ export async function withVersionShipWorkspace<T>(
     });
   } finally {
     for (const repo of [...prepared].reverse()) {
-      await execFileAsync('git', versionShipGitArgs(['worktree', 'remove', '--force', repo.worktreePath]), {
-        cwd: repo.sourceRoot,
-        encoding: 'utf-8',
-        env: versionShipGitEnv(),
-        maxBuffer: 16 * 1024 * 1024,
-      }).catch(() => {});
-      await execFileAsync('git', versionShipGitArgs(['worktree', 'prune']), {
-        cwd: repo.sourceRoot,
-        encoding: 'utf-8',
-        env: versionShipGitEnv(),
-        maxBuffer: 16 * 1024 * 1024,
-      }).catch(() => {});
+      await runVersionShipGit(
+        ['worktree', 'remove', '--force', repo.worktreePath],
+        repo.sourceRoot,
+        VERSION_SHIP_GIT_CLEANUP_TIMEOUT_MS,
+      ).catch(() => null);
+      await runVersionShipGit(
+        ['worktree', 'prune'],
+        repo.sourceRoot,
+        VERSION_SHIP_GIT_CLEANUP_TIMEOUT_MS,
+      ).catch(() => null);
     }
     await rm(tempRoot, { recursive: true, force: true });
   }

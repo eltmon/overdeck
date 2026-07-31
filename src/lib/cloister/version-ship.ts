@@ -144,6 +144,24 @@ export async function runVersionShip(
   if (!VERSION_PATTERN.test(version)) {
     return failedReport(version, batchName, at, 'invalid-version', 'version must look like 48.8.0');
   }
+  if (!config.expect?.length) {
+    return failedReport(
+      version,
+      batchName,
+      at,
+      'path-validation-failed',
+      'version_sync.expect must contain at least one entry',
+    );
+  }
+  if (!config.push?.length) {
+    return failedReport(
+      version,
+      batchName,
+      at,
+      'path-validation-failed',
+      'version_sync.push must contain at least one repository',
+    );
+  }
 
   try {
     // Resolve and validate every configured path before the first mutation. The
@@ -179,14 +197,31 @@ export async function runVersionShip(
           `version_sync.push path is not a registered project repository: ${declaredPath}`,
         );
       }
-      await deps.resolveDirectory(projectRoot, declaredPath);
+      const repoRoot = await deps.resolveDirectory(projectRoot, declaredPath);
       return {
         declaredPath,
+        repoRoot,
         targetBranch: allowed.targetBranch,
         expectedHead: allowed.expectedHead,
         expectedGitDir: allowed.expectedGitDir,
       };
     }));
+    for (const output of [...setTargets, ...expectations]) {
+      const owners = pushTargets.filter(target => {
+        const repoRelativePath = relative(target.repoRoot, output.absolutePath);
+        return repoRelativePath !== ''
+          && repoRelativePath !== '..'
+          && !repoRelativePath.startsWith(`..${sep}`);
+      });
+      if (owners.length !== 1) {
+        throw new VersionShipOperationError(
+          'path-validation-failed',
+          owners.length === 0
+            ? `version_sync output is not covered by a push repository: ${output.path}`
+            : `version_sync output is covered by multiple push repositories: ${output.path}`,
+        );
+      }
+    }
 
     for (const target of setTargets) {
       await deps.writeVersion(target.absolutePath, target.json_field, version);
