@@ -97,6 +97,11 @@
       "reason": "feedback",
       "note": "[2026-07-31T00:01Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-07-31T00:01:48.645Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-31T00:04:05.895Z"
     }
   ],
   "feedback": [],
@@ -178,10 +183,10 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:04:04.641Z",
+  "updated": "2026-07-31T00:04:06.413Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -189,12 +194,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-31T00:04:04.315Z",
+    "updatedAt": "2026-07-31T00:04:04.665Z",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
     "lastVerifiedCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
-    "reviewSpawnedAt": "2026-07-31T00:01:39.276Z",
+    "reviewSpawnedAt": "2026-07-31T00:04:04.663Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -355,7 +360,7 @@
       },
       "costAtCloseOut": {
         "usd": 142.472548,
-        "pricingAsOf": "2026-07-31T00:04:04.355Z"
+        "pricingAsOf": "2026-07-31T00:04:06.407Z"
       }
     },
     "merges": [
