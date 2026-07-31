@@ -1,0 +1,740 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-31T15:57:52Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3358: Add a 'ship' step: propagate version strings across a project's repos when a batch merges (not publish, not store submission)",
+    "updated": "2026-07-31T16:14:54.249Z"
+  },
+  "plan": {
+    "id": "pan-3358",
+    "title": "Add a 'ship' step: propagate version strings across a project's repos when a batch merges (not publish, not store submission)",
+    "status": "proposed",
+    "uid": "a0a9d695-5832-4555-8e76-c7ffe53610a5",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-31T15:57:52Z",
+    "updated": "2026-07-31T16:14:54.249Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3358",
+        "label": "PAN-3358",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3358.md",
+        "label": "PAN-3358 PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "uat-batch",
+      "dod",
+      "versioning",
+      "dashboard",
+      "projects-yaml"
+    ],
+    "narratives": {
+      "Problem": "Every merged UAT batch already gets a version bump — by hand, invisible to the pipeline, with nothing asserting it happened. MIN-908 shipped in 47.3.0 the night it merged and sat in post_merge_limbo for four days; PAN-3341 was filed because three fully-merged MIN issues showed as 'Planning' for over a week. DoD row 7 (deploy) exists because merged != in force; ship is the same assertion one hop earlier: merged != versioned. The silent-partial hazard is concrete: myn's pnpm vsync edits four files across two repos with regex replaces that succeed silently when a pattern misses, so a half-applied bump (frontend 48.7.0, Version.java still 48.6.0) is invisible today.",
+      "Proposal": "Add a per-project version_sync block in projects.yaml (set targets, optional command, expect patterns, commit_message, push repos); a ship runner (src/lib/cloister/version-ship.ts, pure orchestrator + injected deps) that sets the version, runs the command, asserts every expect pattern (catching silent partial propagation), commits declared paths per repo, and pushes; a runShip hook in finishPromote() driven by an operator-supplied shipVersion threaded from the promote route; durable per-member pipeline.ship records; a new DoD row 'ship' at position 7 that passes on a recorded 'passed' verdict, misses loudly on 'pending'/'partial' (naming failing paths), and skips explicitly for no-version_sync projects and non-batch merges; a deferred-ship path (the batch-card Ship version action backed by POST /api/merge-train/generations/:name/ship); and a dashboard Version ship settings section editing version_sync through a lossless yaml Document-API write door, with unset rendered as an explicit 'this project skips ship' state and the latest ship outcome (including partial paths) shown where the mechanism is configured. npm publish, store submission, deploys, and tag creation stay operator-initiated and out of scope.",
+      "NonGoals": "- npm publish, App Store / Play submission, prod deploys, git tag creation — all remain operator-initiated (pan release stable keeps its five atomic steps untouched)\n- Choosing the version number automatically (patch/minor derivation heuristics)\n- Per-issue ship triggers on direct (non-batch) merges\n- A {versionCode}-style placeholder or configurable version-code formulas\n- Release notes / changelog generation (myn's changelog splash entries remain manual)\n- A pan ship CLI verb (deferred ship is dashboard-only, via the batch-card action)\n- Migrating the three legacy lossy projects.yaml setters onto the lossless writer (pre-existing defect; follow-up issue)\n- Healing already-limp historical issues (MIN-908 et al.) — the row helps future closes; existing limbo keeps its current settlement paths"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Operator supplies the version at promote time; ship only propagates it. No auto-derivation.",
+        "rationale": "The issue's own recommended option: propagation is mechanical and error-prone; choosing the number is judgement that is annoying to undo when wrong."
+      },
+      {
+        "summary": "Ship runs in the project's main checkouts, not a throwaway worktree.",
+        "rationale": "Commands like myn's pnpm vsync resolve sibling repos via relative paths (../mind-your-now-api is a symlink to api/) that only exist in the real layout; pan release stable already operates on the main checkout; explicit pathspec commits make it safe against unrelated dirty state."
+      },
+      {
+        "summary": "Runner owns commit+push uniformly; self-committing commands (vsync) are accommodated as a no-op commit.",
+        "rationale": "One code path covers both myn (command commits) and overdeck (no command, set-only) instead of two commit flows."
+      },
+      {
+        "summary": "Only {version} and {majorMinor} placeholders in expect patterns.",
+        "rationale": "myn's versionCode (major*10+minor) formula is project-specific, and every myn target also carries a {version} or {majorMinor} string the assertion can key on; exotic formulas can be added later if a project needs them."
+      },
+      {
+        "summary": "Ship is batch-scoped; direct merges skip the DoD row.",
+        "rationale": "The issue is explicit: the unit is the batch because that is what maps to a version; attaching ship to individual issues would fight the one-batch-one-version model."
+      },
+      {
+        "summary": "The DoD row reads the durable pipeline.ship record; it does not re-verify the filesystem.",
+        "rationale": "Same model as DoD rows 1-3 reading recorded verdicts: the runner is the verifier, the gate is the reader; the observed string preserves the recorded failing paths."
+      },
+      {
+        "summary": "Ship row inserted at DoD position 7, renumbering deploy to 8 and teardown to 9.",
+        "rationale": "Version propagation is a precondition for any meaningful 'the right build is live' claim, so it is asserted before deploy."
+      },
+      {
+        "summary": "commit-msg guard accepts 'chore: bump version to X.Y.Z' instead of reusing 'chore: release X.Y.Z'.",
+        "rationale": "Reusing the release subject would pollute release-notes generation (git log <prev-tag>..HEAD) and mislabel a non-release act."
+      },
+      {
+        "summary": "Unset version_sync renders as an explicit 'this project skips ship' state in the UI.",
+        "rationale": "Operator requirement (issue comment 2026-07-31): absence of config is a deliberate, visible posture, not an empty string."
+      },
+      {
+        "summary": "The settings UI writes projects.yaml through a lossless yaml Document-API door.",
+        "rationale": "Operator requirement (issue comment 2026-07-31): UI and hand-editing share one store with a byte-lossless round-trip outside the edited key; modeled on the existing writeYamlConfigPreservingComments pattern."
+      },
+      {
+        "summary": "Ship verdicts persist only to the per-issue record's pipeline.ship block — no review_status columns, no SQLite migration.",
+        "rationale": "Ship is batch-terminal state; the DoD row reads the durable record only, so the ephemeral live-status plane adds nothing and a schema migration adds risk."
+      },
+      {
+        "summary": "Deferred ship is dashboard-only (batch-card Ship version action); no pan ship CLI.",
+        "rationale": "One remediation surface keeps the story simple; the finalize projected-surface lint's first-two-segment subsystem heuristic counts src/cli and each docs/*.md separately, and a CLI pushed the plan past the 6-subsystem cap. The route stays callable by hand for terminal-only operators."
+      }
+    ],
+    "items": [
+      {
+        "id": "version-sync-config-schema",
+        "title": "Add VersionSyncConfig types and projects.yaml loader exposure",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "version-ship-runner",
+            "promote-ship-hook",
+            "version-sync-write-door-api"
+          ],
+          "files_scope": [
+            "src/lib/projects.ts",
+            "tests/unit/lib/projects-version-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects-version-sync.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projects-version-sync.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Define and expose the version_sync config shape. In src/lib/projects.ts, add to ProjectConfig (interface at lines 121-214, near the quality_gates field at lines 173-175): `version_sync?: VersionSyncConfig`. Define VersionSyncConfig in the same file: `{ set?: Array<{ path: string; json_field: string }>; command?: string; command_cwd?: string; expect?: Array<{ path: string; pattern: string }>; commit_message?: string; push?: string[] }`. Also export a validator `validateVersionSyncConfig(raw: unknown): { ok: true; config: VersionSyncConfig } | { ok: false; errors: string[] }` that checks: set/expect entries have non-empty path strings; expect patterns compile as regex; paths contain no '..' escapes above the project root; command is a single command line (no newlines). The existing loader loadProjectsConfigSync (lines 270-288) needs no change — it parses plain YAML into the interface. Create tests/unit/lib/projects-version-sync.test.ts covering: a project with a full version_sync block parses into the typed field; a project without the key yields undefined; the validator accepts a valid block and rejects (a) an expect entry with a missing pattern, (b) a pattern that does not compile, (c) a path escaping the root. This test file also receives the writer round-trip tests in item version-sync-write-door-api (shared file, blocks edge present). Do NOT touch workspace-config.ts — the type lives beside ProjectConfig."
+        },
+        "items": [
+          {
+            "id": "version-sync-config-schema.ac1",
+            "title": "ProjectConfig exposes a typed version_sync field and loadProjectsConfigSync returns the parsed block for a project that declares it (unit test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-config-schema.ac2",
+            "title": "A project with no version_sync key returns undefined from the typed field, so consumers can render an explicit 'skips ship' state without reading raw YAML (unit test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-config-schema.ac3",
+            "title": "validateVersionSyncConfig rejects a block with a non-compiling expect pattern, a missing pattern, or a '..' root-escaping path, and accepts the PRD's myn example block verbatim (unit test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-config-schema.ac4",
+            "title": "npm run typecheck exits 0 with the new types in place",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "version-ship-runner",
+        "title": "Build the ship runner: set, command, expect-assert, commit, push",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "promote-ship-hook"
+          ],
+          "files_scope": [
+            "src/lib/cloister/version-ship.ts",
+            "src/lib/cloister/version-ship-deps.ts",
+            "tests/unit/lib/cloister/version-ship.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/version-ship.test.ts",
+            "npm run typecheck",
+            "sh -n .husky/commit-msg"
+          ],
+          "expected_outputs": [
+            "version-ship.test.ts passes including the commit-msg guard fixture cases",
+            "typecheck completes without errors",
+            "sh -n exits 0"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-10",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the ship engine as a pure orchestrator with injected deps, matching the uat-* module pattern (pure logic unit-tested, thin real-I/O wiring). src/lib/cloister/version-ship.ts exports `runVersionShip(args: { projectRoot: string; config: VersionSyncConfig; version: string; batchName: string }, deps: VersionShipDeps): Promise<ShipReport>`. ShipReport = `{ status: 'passed' | 'partial' | 'failed'; version: string; batch: string; paths: Array<{ path: string; ok: boolean; detail: string }>; error?: string; at: string }`. Steps, in order: (1) validate version matches /^\\d+\\.\\d+\\.\\d+$/ else return failed; (2) for each config.set entry, write the version into `<projectRoot>/<path>` at json_field (preserve file formatting by regex-replacing the existing '\"version\": \"...\"' line, not JSON round-trip); (3) if config.command, spawn it async in <projectRoot>/<command_cwd ?? '.'> — execFile argv arrays, never shell interpolation, never execSync (NFR-2); non-zero exit => status 'failed' with the stderr tail in error, STOP before commit/push; (4) for each config.expect entry, read the file and test its pattern after substituting {version} and {majorMinor} (majorMinor = first two version segments) — collect per-path results; any miss => status 'partial', and STILL continue to commit/push what did propagate so the operator sees the real state (the report names every miss); (5) per repo root derived from config.push entries (relative to projectRoot, '.' = monorepo), stage ONLY the declared set+expect paths that fall inside that repo (NFR-3), commit with (config.commit_message ?? 'chore: bump version to {version}') when anything is dirty (no-op when the command self-committed, matching vsync's 'already up to date' semantics), then push to the repo's tracked upstream; push rejection (non-fast-forward) => status 'failed' naming the repo, never force-push. src/lib/cloister/version-ship-deps.ts builds the real deps: async execFile wrappers for git/pnpm, fs reads/writes. tests/unit/lib/cloister/version-ship.test.ts covers with fake deps: happy path passed; regex-miss expect => partial naming the path; command non-zero => failed with stderr tail and no commit attempted; staged pathspecs contain only declared paths; dirty-nothing => no commit; push rejection => failed; invalid version => failed. ALSO in this item: edit .husky/commit-msg — extend the final subject check (currently accepts only '^chore: release [0-9]+\\.[0-9]+\\.[0-9]+(-canary\\.[0-9]+)?$') to also accept '^chore: bump version to [0-9]+\\.[0-9]+\\.[0-9]+$', and update the refusal message to name the ship step as the other legal producer. Add fixture cases to version-ship.test.ts that run the guard script in a temp git repo: ship subject + version diff => exit 0; unrelated subject + version diff => exit 1."
+        },
+        "items": [
+          {
+            "id": "version-ship-runner.ac1",
+            "title": "runVersionShip with fake deps writes each set target, spawns the command in command_cwd, and produces a ShipReport with per-path results (unit test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-ship-runner.ac2",
+            "title": "When an expect pattern misses, runVersionShip returns status 'partial' naming every non-matching path; when the command exits non-zero it returns 'failed' with the stderr tail and attempts no commit or push (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-ship-runner.ac3",
+            "title": "The commit stages only declared set+expect paths (test asserts the pathspec list), skips the commit when nothing is dirty, and never force-pushes on push rejection (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-ship-runner.ac4",
+            "title": ".husky/commit-msg accepts a package.json version diff whose subject is 'chore: bump version to 1.2.3' (exit 0) and still rejects the same diff with an unrelated subject (exit 1) in the temp-repo fixture test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "promote-ship-hook",
+        "title": "Wire ship into batch promotion and persist per-member pipeline.ship records",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-promote.ts",
+            "src/lib/cloister/ship-record.ts",
+            "src/dashboard/server/services/uat-train.ts",
+            "src/dashboard/server/routes/merge-train.ts",
+            "tests/unit/lib/cloister/uat-promote-ship.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/cloister/uat-promote-ship.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "uat-promote-ship.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Hook the runner into promotion and make the verdict durable. (1) src/lib/cloister/ship-record.ts (new): `persistShipRecords(gen: UatGeneration, report: ShipReport): Promise<string[]>` writes `pipeline.ship = { status, version, batch, paths, at }` into each member issue's permanent record via the record write door (src/lib/pan-dir/record-update.ts / records.ts — read projectPipeline in records.ts FIRST: it rebuilds the pipeline block from reviewStatus with existing?.pipeline as merge input, so confirm ship fields survive a later record write; that is AC5). Also export `shipPromotedBatch(args: { generationName: string; projectRoot: string; version: string }): Promise<ShipReport>` for deferred ship: load the generation from the store, refuse unless status is 'promoted', resolve version_sync config, run the runner, persist records. (2) src/lib/cloister/uat-promote.ts: add optional `runShip?: (gen: UatGeneration, shipVersion: string | undefined) => Promise<void>` to UatPromoteDeps, and accept `options?: { shipVersion?: string }` on promoteUatGeneration threaded into finishPromote. In finishPromote (lines 590-676), invoke runShip AFTER deps.recordVerification (line 619-623) and BEFORE the per-member firePostMerge fan-out (line 659), wrapped in the same try/catch-and-log pattern as recordVerification — a ship failure never changes the PromoteResult (NFR-1). (3) src/dashboard/server/services/uat-train.ts postUatGenerationPromotePayload (lines 713-781): accept an optional shipVersion argument, resolve the project's version_sync via findProjectByPathSync, and pass a runShip dep that calls runVersionShip then persistShipRecords; when version_sync is declared but shipVersion is undefined, persist a 'pending' record per member ({ status: 'pending', batch, reason: 'no version supplied at promote time' }); when version_sync is undeclared, pass no runShip. Also include a `shipStatus` field (from the newest member record's pipeline.ship) in the generations list payload so the batch card can show a Ship version action. (4) src/dashboard/server/routes/merge-train.ts: the promote route (lines 258-276) accepts an optional JSON body { shipVersion } — 400 on a value failing /^\\d+\\.\\d+\\.\\d+$/; add POST /api/merge-train/generations/:name/ship accepting { version } that calls shipPromotedBatch and returns the ShipReport (404 unknown generation, 409 not promoted, 422 no version_sync). tests/unit/lib/cloister/uat-promote-ship.test.ts: runShip called exactly once, after recordVerification, before fan-out (call-order spy); runShip throw is caught, promote still succeeds with all members' post-merge started; no-version path persists pending records; shipPromotedBatch refuses a non-promoted generation and a project without version_sync; pipeline.ship survives a subsequent record write (H1 round-trip)."
+        },
+        "items": [
+          {
+            "id": "promote-ship-hook.ac1",
+            "title": "finishPromote invokes runShip exactly once after recordVerification and before the member fan-out when the project declares version_sync and shipVersion was supplied (call-order test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-ship-hook.ac2",
+            "title": "A runShip rejection is caught and logged and the PromoteResult still returns success with every member's post-merge started (unit test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-ship-hook.ac3",
+            "title": "With version_sync declared but no shipVersion, every member's durable record persists pipeline.ship.status 'pending' naming the batch; with a passed runner report it persists 'passed' with version and per-path results (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-ship-hook.ac4",
+            "title": "The promote route accepts { shipVersion: '48.8.0' } and forwards it, and rejects a malformed shipVersion with HTTP 400 without promoting (route/service test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "promote-ship-hook.ac5",
+            "title": "pipeline.ship written for a member survives a subsequent unrelated record write to the same issue (round-trip test passes)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dod-ship-row",
+        "title": "Add the 'ship' DoD row (position 7) and its gate check",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "src/lib/lifecycle/dod-gate.ts",
+            "docs/DEFINITION-OF-DONE.md",
+            "tests/unit/lib/lifecycle/dod-gate-ship.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod-gate-ship.test.ts passes",
+            "dod-doc-drift.test.ts passes against the renumbered table",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Add the ship row to the Definition-of-Done machinery. src/lib/lifecycle/dod.ts: extend DodRowId with 'ship'; widen DodRowDef.num to 1|2|3|4|5|6|7|8|9; insert `{ id: 'ship', num: 7, title: 'Version strings propagated', expected: 'every declared version_sync.expect path reports the batch version', overridable: true }` and renumber deploy to 8 and teardown to 9. src/lib/lifecycle/dod-gate.ts: add checkShipRow and wire it into EvaluateDodGateDeps/evaluateDodGate between checkMainVerifyRow and checkDeployRow. Semantics (reads the durable per-issue record's pipeline.ship ONLY — never the filesystem): project declares no version_sync => skip, observed 'project declares no version_sync; ship step not applicable'; issue has no pipeline.ship record => skip, observed 'merged outside a batch; ship is batch-scoped'; status passed => pass, observed names version, batch, and path count; status pending => miss, observed 'batch <name> merged but no version was shipped — use the Ship version action on the batch card for <name>'; status partial => miss naming every failing path from the record; status failed => miss naming the recorded error. docs/DEFINITION-OF-DONE.md: insert row 7 in the table with gate id `ship`, mechanical owner 'ship runner (version-ship.ts) via finishPromote / the batch-card Ship version action; terminal settlement in evaluateDodGate()', and renumber rows 8/9; add a 'Rules of the table' bullet stating the row is batch-scoped and reads recorded ship verdicts. The doc-drift test (tests/unit/lib/lifecycle/dod-doc-drift.test.ts) must pass in the same commit — table and DOD_ROWS change together. pan close needs NO edit: --accept-ship is generated from DOD_ROWS (src/cli/commands/close.ts:59-64). tests/unit/lib/lifecycle/dod-gate-ship.test.ts covers all five semantics cases plus the skip reasons appearing verbatim in observed strings."
+        },
+        "items": [
+          {
+            "id": "dod-ship-row.ac1",
+            "title": "DOD_ROWS contains the ship row at num 7 with deploy at 8 and teardown at 9, and the doc-drift test passes against the updated DEFINITION-OF-DONE.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-ship-row.ac2",
+            "title": "evaluateDodGate passes the ship row on a recorded 'passed' verdict, misses on 'pending' with the batch-card Ship version hint, and misses on 'partial'/'failed' naming the failing paths or recorded error (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-ship-row.ac3",
+            "title": "The row skips with the 'not applicable' reason when the project declares no version_sync and with the 'batch-scoped' reason when the issue has no ship record (unit tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dod-ship-row.ac4",
+            "title": "pan close --help displays --accept-ship (generated from DOD_ROWS) and a flywheel caller remains barred from using it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "version-sync-write-door-api",
+        "title": "Lossless projects.yaml write door plus GET/PUT version-sync routes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3358",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "project-settings-version-sync"
+          ],
+          "files_scope": [
+            "src/lib/projects-writer.ts",
+            "src/dashboard/server/routes/projects.ts",
+            "src/dashboard/server/routes/__tests__/version-sync-routes.test.ts",
+            "tests/unit/lib/projects-version-sync.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/projects-version-sync.test.ts",
+            "npx vitest run src/dashboard/server/routes/__tests__/version-sync-routes.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "round-trip fixture test passes byte-for-byte outside the edited key",
+            "route tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "The operator-requirement item: one lossless read/write door for version_sync, shared by UI and hand-editing, with NO second store. src/lib/projects-writer.ts (new): `setProjectVersionSync(projectKey: string, block: VersionSyncConfig | null): Promise<void>` modeled on writeYamlConfigPreservingComments (src/lib/settings-api.ts:771-850) and updateConversationsConfig (src/lib/config-yaml/load.ts:609-647): read ~/.overdeck/projects.yaml, parseDocument (yaml v2, already a dependency), validate the block with validateVersionSyncConfig (item version-sync-config-schema), doc.setIn(['projects', projectKey, 'version_sync'], block) or doc.deleteIn for null, write back with doc.toString({ lineWidth: 120 }). Unknown projectKey => throw naming the known keys. Extend tests/unit/lib/projects-version-sync.test.ts (shared with item version-sync-config-schema; the blocks edge is declared) with a round-trip fixture: a comment-laden multi-project YAML buffer, set then clear version_sync on one project, assert every byte outside that project's version_sync key is unchanged (comments, quoting, key order, unrelated projects). src/dashboard/server/routes/projects.ts: add GET /api/projects/:projectKey/version-sync returning `{ config: VersionSyncConfig | null, lastOutcome: ShipReport | null }` — lastOutcome derived by reading the project's newest promoted generation via the existing uat store reads and one member's pipeline.ship record; and PUT /api/projects/:projectKey/version-sync accepting `{ config: VersionSyncConfig | null }`, validating via validateVersionSyncConfig (400 with the error list on failure), persisting through setProjectVersionSync. Both guarded by the same unauthorized-request rejection the other project mutating routes use (see the auto-merge-default route at lines 785-802). Route tests in src/dashboard/server/routes/__tests__/version-sync-routes.test.ts: GET null vs set config; PUT persists through the door; PUT with a non-compiling pattern returns 400 naming the pattern. Do NOT migrate the three legacy lossy setters (setProjectAutoMergeDefaultSync/SwarmPolicy/MergeTrain) — documented pre-existing hazard H2, follow-up issue."
+        },
+        "items": [
+          {
+            "id": "version-sync-write-door-api.ac1",
+            "title": "Saving then clearing one project's version_sync preserves every byte outside that key — comments, quoting, key order, unrelated projects — in the round-trip fixture test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-write-door-api.ac2",
+            "title": "GET /api/projects/:projectKey/version-sync returns { config: null } for an unset project and the declared block plus lastOutcome for a set one (route tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-write-door-api.ac3",
+            "title": "PUT rejects an invalid block with HTTP 400 listing the validation errors and writes nothing; a valid PUT persists through the write door and a hand-reader of projects.yaml sees it (route tests pass)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "version-sync-write-door-api.ac4",
+            "title": "PUT with an unknown projectKey returns 404 naming the known project keys",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "batch-card-version-input",
+        "title": "Batch card: promote-time version input and deferred Ship version action",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/flywheel/MergeQueueCard.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes",
+            "browser UAT observes the version input and Ship version action"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/flywheel/MergeQueueCard.tsx only. When the generation's project declares version_sync (the generations payload now carries this + shipStatus per the uat-train.ts change in promote-ship-hook): (1) the 'Merge batch (N) to main' action opens a small inline confirmation that asks for the version — a single text input validated against /^\\d+\\.\\d+\\.\\d+$/ with the error 'version must look like 48.8.0' — and POSTs { shipVersion } to the promote route; leaving the field empty is allowed and the copy states the consequence in one plain sentence: 'No version supplied — the batch merges without a version bump and each member's ship row will fail until you ship one.' (2) A promoted generation whose shipStatus is 'pending' renders a 'Ship version' action that opens the same input and POSTs { version } to /api/merge-train/generations/:name/ship, then invalidates the generations query. Follow the dashboard style guide (pan-style-guide skill): monospace-leaning, no pill badges, color as signal only. When the project declares no version_sync, render nothing new."
+        },
+        "items": [
+          {
+            "id": "batch-card-version-input.ac1",
+            "title": "With version_sync declared, the promote action renders a validated X.Y.Z version input and submits shipVersion with the promote POST (browser UAT observes it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-card-version-input.ac2",
+            "title": "An empty version still promotes, and the dialog displays copy stating the members' ship rows will fail until a version is shipped (browser UAT observes the copy)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-card-version-input.ac3",
+            "title": "A promoted batch with a pending ship record renders a Ship version action that posts to the ship route and refreshes the card (browser UAT observes it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "batch-card-version-input.ac4",
+            "title": "A project without version_sync renders no new promote UI (browser UAT confirms absence)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-settings-version-sync",
+        "title": "Project settings: Version ship section with explicit skip state and latest outcome",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes",
+            "browser UAT observes the skip state, editor, and outcome display"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx only (the existing per-project settings surface with auto-merge/swarm/merge-train toggles). Add a 'Version ship' section that consumes GET/PUT /api/projects/:projectKey/version-sync. Three states: (1) config unset — render the explicit posture line 'This project skips ship: no version_sync is declared, so batch promotes will not touch version strings.' with a 'Configure version sync' affordance; (2) editing — fields for command, command_cwd, commit_message, and editable lists for set/expect/push entries (path + json_field; path + pattern; repo path), saved via PUT on an explicit Save (NOT the 600ms autosave used elsewhere — this is multi-field structured config; Save/Cancel only), with validation errors from the 400 response rendered next to the offending field; (3) configured — a read summary of the block with Edit and 'Remove version sync' (PUT null, which returns the section to state 1). Below the config, render lastOutcome: passed shows version, batch name, and timestamp; partial shows 'Partial propagation — these paths do not report <version>:' followed by the failing paths; failed shows the recorded error; pending shows 'batch <name> merged without a version — ship one from the batch card's Ship version action'. Style per the pan-style-guide skill."
+        },
+        "items": [
+          {
+            "id": "project-settings-version-sync.ac1",
+            "title": "With no version_sync configured, the section renders the explicit 'This project skips ship' posture line, not an empty form (browser UAT observes it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-settings-version-sync.ac2",
+            "title": "Saving a valid block persists it (a hand-read of projects.yaml shows the key with comments elsewhere intact) and a 400 validation error renders beside the offending field (browser UAT observes both)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-settings-version-sync.ac3",
+            "title": "A partial latest outcome renders the failing paths by name in the same section where the mechanism is configured (browser UAT observes it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-settings-version-sync.ac4",
+            "title": "Remove version sync sends PUT null and the section returns to the explicit skip state (browser UAT observes the transition)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-version-ship",
+        "title": "Document the ship step as a Version ship section in UAT-BATCH-TRAINS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:57:52Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3358",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/UAT-BATCH-TRAINS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes with the new section present"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "FR-7",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Edit docs/UAT-BATCH-TRAINS.md only (the operator doc for batch trains; DEFINITION-OF-DONE.md's row is owned by item dod-ship-row). Two additions: (1) extend the 'Promotion — merge what you tested' section with a paragraph on the ship step: after the merge lands and before member post-merge fan-out, an operator-supplied version is propagated per the project's version_sync, the verdict is recorded per member, and a failure never blocks the promote. (2) Add a top-level '## Version ship (PAN-3358)' operator-guide section: what ship is and its deliberate boundary (version strings only — not publish, not store submission, not deploy, not tags); the version_sync schema with the annotated myn (set + pnpm vsync + expect + push) and overdeck (set-only three-package.json lockstep) examples copied from the PRD; the {version}/{majorMinor} placeholders; how promotion supplies the version (batch card input, empty-version consequence); the DoD ship row semantics (pass/pending/partial/failed/skip); deferred ship via the batch-card Ship version action (and that the underlying route is POST /api/merge-train/generations/:name/ship for terminal-only use); the partial-propagation failure mode and where it surfaces (DoD row observed string, settings section, batch card); how to enable a project (edit projects.yaml by hand or the dashboard section — both lossless through the same store); the note that enabling overdeck itself makes package.json on main move ahead of the last npm release and why that is harmless (pan release stable rewrites the field explicitly). Keep it terse and operator-facing; define pipeline terms on first use per the operator-messages rule."
+        },
+        "items": [
+          {
+            "id": "docs-version-ship.ac1",
+            "title": "docs/UAT-BATCH-TRAINS.md contains a Version ship section covering the full version_sync schema, both worked examples (myn and overdeck), the DoD row semantics, and the deferred-ship action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-version-ship.ac2",
+            "title": "The promotion section states that ship runs after the merge lands, that the version is operator-supplied, and that a ship failure never blocks the promote",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-version-ship.ac3",
+            "title": "npm run lint passes with the new section present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "version-sync-config-schema",
+        "to": "version-ship-runner",
+        "type": "blocks"
+      },
+      {
+        "from": "version-sync-config-schema",
+        "to": "promote-ship-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "version-ship-runner",
+        "to": "promote-ship-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-ship-hook",
+        "to": "dod-ship-row",
+        "type": "blocks"
+      },
+      {
+        "from": "version-sync-config-schema",
+        "to": "version-sync-write-door-api",
+        "type": "blocks"
+      },
+      {
+        "from": "version-sync-write-door-api",
+        "to": "project-settings-version-sync",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-ship-hook",
+        "to": "batch-card-version-input",
+        "type": "blocks"
+      },
+      {
+        "from": "promote-ship-hook",
+        "to": "docs-version-ship",
+        "type": "blocks"
+      },
+      {
+        "from": "dod-ship-row",
+        "to": "docs-version-ship",
+        "type": "blocks"
+      },
+      {
+        "from": "version-sync-write-door-api",
+        "to": "docs-version-ship",
+        "type": "blocks"
+      },
+      {
+        "from": "batch-card-version-input",
+        "to": "docs-version-ship",
+        "type": "blocks"
+      },
+      {
+        "from": "project-settings-version-sync",
+        "to": "docs-version-ship",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-31-PAN-3358-add-a-ship-step-propagate-version-strings-across-a-project-s-repos-when-a-batch-merges-not-publish-not-store-submission.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
