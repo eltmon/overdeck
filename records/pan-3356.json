@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T16:03:17.268Z",
+  "updated": "2026-07-31T16:13:32.616Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "crew-spine": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 2435058,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:46:19.760Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Added dated completion durations, fake-timer-backed live counters, linked no-suite skip reasons with dashed styling, blue active state, and compact ShipProgress during merge.",
         "releasedAt": "2026-07-31T15:46:05.051Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 2435058,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:46:19.760Z",
+        "itemId": "crew-spine",
+        "outcome": "completed",
+        "reason": "Merged the standalone crew summary into AgentsLane, added semantic status dots and right-aligned costs, nested selectable review specialists, preserved all protected row and no-loss markers, and passed typecheck plus 69 focused tests.",
+        "releasedAt": "2026-07-31T16:13:32.616Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +146,10 @@
       "pipeline-band-states": {
         "reason": "Added dated completion durations, fake-timer-backed live counters, linked no-suite skip reasons with dashed styling, blue active state, and compact ShipProgress during merge.",
         "updatedAt": "2026-07-31T15:46:05.051Z"
+      },
+      "crew-spine": {
+        "reason": "Merged the standalone crew summary into AgentsLane, added semantic status dots and right-aligned costs, nested selectable review specialists, preserved all protected row and no-loss markers, and passed typecheck plus 69 focused tests.",
+        "updatedAt": "2026-07-31T16:13:32.616Z"
       }
     }
   },
@@ -166,6 +173,10 @@
     "pipeline-band-states.pipeline-band-states.ac1": "completed",
     "pipeline-band-states.pipeline-band-states.ac2": "completed",
     "pipeline-band-states.pipeline-band-states.ac3": "completed",
-    "crew-spine": "running"
+    "crew-spine": "completed",
+    "crew-spine.crew-spine.ac1": "completed",
+    "crew-spine.crew-spine.ac2": "completed",
+    "crew-spine.crew-spine.ac3": "completed",
+    "crew-spine.crew-spine.ac4": "completed"
   }
 }
