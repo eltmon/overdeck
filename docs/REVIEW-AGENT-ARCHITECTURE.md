@@ -31,6 +31,8 @@ trigger route, host auto-dispatch, and every Deacon re-dispatch site honor it:
 | **Per-project** | `.pan.yaml` → `roles.review.mode` | edit the project config (merged over global by `mergeConfigs()`) |
 | **Global** | `~/.overdeck/config.yaml` → `roles.review.mode` | Settings → Roles → Review → *Review mode* selector |
 
+`POST /api/review/:issueId/trigger` accepts an optional `reviewMode` body field with `quick`, `full`, or `none`. The route persists that override through the per-issue record write door before it responds or starts background dispatch, so dashboard **Request review → Full / Quick / None** is one atomic operator interaction. It is equivalent to running `pan review mode <id> <mode>` and then `pan review request <id>`; invalid values and persistence failures return synchronously without dispatching.
+
 The three modes:
 
 - **`quick` (default)** — ONE review agent (`agent-<id>-review`) performs a single

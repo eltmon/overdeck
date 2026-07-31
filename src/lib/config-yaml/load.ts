@@ -537,6 +537,22 @@ export function isTldrEnabledSync(): boolean {
   }
 }
 
+/**
+ * The `ui.open_in_editor_command` template (e.g. `cursor {path}`), or null when
+ * unset. Null is the gate: the workspace band hides "Open in editor" entirely
+ * rather than guessing an editor (PAN-3331).
+ *
+ * Async on purpose — dashboard request handlers read this, and the sync loader
+ * stats and parses config files on the event loop, which would stall HTTP and
+ * terminal traffic on a slow filesystem. It shares `loadConfigWithoutMigration`'s
+ * cache, so a warm read costs one async mtime check.
+ */
+export const getOpenInEditorCommand = (): Effect.Effect<string | null> =>
+  Effect.tryPromise({
+    try: async () => (await loadConfigWithoutMigration()).config.ui.openInEditorCommand,
+    catch: (cause) => cause,
+  }).pipe(Effect.catchCause(() => Effect.succeed(DEFAULT_CONFIG.ui.openInEditorCommand)));
+
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────
 
 /**

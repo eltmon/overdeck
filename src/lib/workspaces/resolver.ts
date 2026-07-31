@@ -13,7 +13,7 @@ import type { PinnedDocRow, PinScope, ProjectRow, ProjectTargetRow, WorkspaceKin
 
 const PROJECT_COLUMNS = `id, name, primary_path, created_at, last_accessed_at, is_system`;
 const WORKSPACE_COLUMNS = `id, project_id, kind, name, path, branch_name, parent_branch,
-  parent_branch_guessed, is_git_repository, issue_id, layout_config, is_favorite,
+  parent_branch_guessed, is_git_repository, issue_id, layout_config, run_command, is_favorite,
   is_archived, title, created_at, last_accessed_at`;
 const PROJECT_TARGET_COLUMNS = `project_id, path, is_primary, created_at, last_used_at`;
 const PINNED_DOC_COLUMNS = `id, scope, scope_id, doc_path, created_at`;
@@ -42,6 +42,7 @@ function rowToWorkspace(row: Record<string, unknown>): WorkspaceRow {
     isGitRepository: (row['is_git_repository'] as number) === 1,
     issueId: (row['issue_id'] as string | null) ?? null,
     layoutConfig: (row['layout_config'] as string | null) ?? null,
+    runCommand: (row['run_command'] as string | null) ?? null,
     isFavorite: (row['is_favorite'] as number) === 1,
     isArchived: (row['is_archived'] as number) === 1,
     title: (row['title'] as string | null) ?? null,

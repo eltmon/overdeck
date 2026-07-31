@@ -24,6 +24,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/workspaces/resolver.js', () => ({
@@ -50,6 +51,7 @@ vi.mock('../../../src/lib/memory/rollup.js', () => ({
 
 vi.mock('../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../src/dashboard/server/routes/workspace-registry.js';
@@ -88,6 +90,7 @@ function baseWorkspace(overrides: Partial<WorkspaceRow> = {}): WorkspaceRow {
     isGitRepository: true,
     issueId: 'PAN-9001',
     layoutConfig: null,
+    runCommand: null,
     isFavorite: false,
     isArchived: false,
     title: null,
@@ -113,6 +116,7 @@ async function listRows(): Promise<Array<Record<string, unknown>>> {
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
   routeMocks.getReviewStatusSync.mockReturnValue(null);
@@ -193,8 +197,11 @@ describe('GET /api/workspace-registry memoryPhase (PAN-3286 FR-12)', () => {
     for (const field of PRE_EXISTING_LIST_FIELDS) {
       expect(Object.hasOwn(row, field)).toBe(true);
     }
+    // runCommand is deliberately absent: it is executable text and this read is
+    // unauthenticated (PAN-3331 review). Everything else is still exhaustive.
+    const { runCommand: _withheld, ...publicFields } = workspace;
     expect(row).toEqual({
-      ...workspace,
+      ...publicFields,
       pipeline: {
         reviewStatus: 'passed',
         testStatus: 'passed',

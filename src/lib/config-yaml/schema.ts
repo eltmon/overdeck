@@ -426,6 +426,15 @@ export interface IssuesConfig {
 
 export interface TelemetryConfig { enabled?: boolean }
 
+/** Dashboard UI behavior that is not theme (theme lives in ~/.overdeck/ui-theme.json). */
+export interface UiConfig {
+  /**
+   * Command template for "Open in editor", with `{path}` substituted — e.g.
+   * `cursor {path}` or `code {path}`. Unset hides the editor entry entirely.
+   */
+  open_in_editor_command?: string;
+}
+
 /**
  * Complete configuration structure (YAML schema)
  */
@@ -569,6 +578,9 @@ export interface YamlConfig {
 
   /** Anonymous product telemetry configuration. */
   telemetry?: TelemetryConfig;
+
+  /** Dashboard UI behavior (PAN-3331). */
+  ui?: UiConfig;
 
   /** Experimental, opt-in features. Each flag is research-preview and may be removed. */
   experimental?: ExperimentalConfig;
@@ -915,6 +927,9 @@ export interface NormalizedConfig {
 
   /** Anonymous product telemetry configuration, normalised (always defined). */
   telemetry: Required<TelemetryConfig>;
+
+  /** Dashboard UI behavior, normalised (always defined; null when unset). */
+  ui: { openInEditorCommand: string | null };
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;

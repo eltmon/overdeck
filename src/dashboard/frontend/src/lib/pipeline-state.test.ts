@@ -35,21 +35,24 @@ describe('Definition of Ready (PAN-1966)', () => {
     expect(getPipelineIssuePhase(backlogIssue())).toBe('todo');
   });
 
-  it('does not use server membership as a lane-assignment signal', () => {
-    const withoutMembership = backlogIssue();
-    const withMembership = backlogIssue({
-      pipelineMembership: { inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
-    });
-    expect(getPipelineIssuePhase(withMembership)).toBe(getPipelineIssuePhase(withoutMembership));
-    expect(getPipelineIssuePhase(withMembership)).toBe('todo');
+  it('uses only available post-merge limbo membership as a lane-assignment override', () => {
+    expect(getPipelineIssuePhase(backlogIssue({
+      pipelineMembership: { available: true, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+    }))).toBe('ship');
 
     const readyWithoutMembership = backlogIssue({ labels: ['ready'] });
-    const readyWithMembership = backlogIssue({
+    const readyWithCleanMembership = backlogIssue({
       labels: ['ready'],
-      pipelineMembership: { inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
+      pipelineMembership: { available: true, inPipeline: false, bucket: 'clean_terminal', labelDrift: 'stale_present' },
     });
-    expect(getPipelineIssuePhase(readyWithMembership)).toBe(getPipelineIssuePhase(readyWithoutMembership));
-    expect(getPipelineIssuePhase(readyWithMembership)).toBe('ready');
+    expect(getPipelineIssuePhase(readyWithCleanMembership)).toBe(getPipelineIssuePhase(readyWithoutMembership));
+    expect(getPipelineIssuePhase(readyWithCleanMembership)).toBe('ready');
+
+    const unavailableMembership = backlogIssue({
+      pipelineMembership: { available: false, inPipeline: true, bucket: 'post_merge_limbo', labelDrift: null },
+    });
+    expect(getPipelineIssuePhase(unavailableMembership)).toBe(getPipelineIssuePhase(backlogIssue()));
+    expect(getPipelineIssuePhase(unavailableMembership)).toBe('todo');
   });
 
   it('preserves in-flight lane assignment when membership is attached', () => {

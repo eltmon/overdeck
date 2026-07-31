@@ -759,6 +759,19 @@ describe('FeatureItem', () => {
     expect(screen.getByText('Planning')).toHaveClass('featureState_planning');
   });
 
+  it('uses the review tone for merged work that needs close-out', () => {
+    renderFeature(
+      <FeatureItem
+        feature={makeFeature({ stateLabel: 'Merged — Needs Close-Out' })}
+        isSelected={false}
+        onSelect={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Merged — Needs Close-Out')).toHaveClass('featureState_review');
+    expect(screen.getByText('Merged — Needs Close-Out')).not.toHaveClass('featureState_planning', 'featureState_todo');
+  });
+
   it('adds contextual tooltip text to the feature state pill', () => {
     renderFeature(
       <FeatureItem

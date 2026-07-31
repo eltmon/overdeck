@@ -198,6 +198,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     telemetry: {
       enabled: DEFAULT_CONFIG.telemetry.enabled,
     },
+    ui: {
+      openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
+    },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
       claudeCodeChannels: DEFAULT_CONFIG.experimental.claudeCodeChannels,
@@ -689,6 +692,11 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
 
     if (typeof config.telemetry?.enabled === 'boolean') {
       result.telemetry.enabled = config.telemetry.enabled;
+    }
+
+    if (typeof config.ui?.open_in_editor_command === 'string') {
+      const command = config.ui.open_in_editor_command.trim();
+      result.ui.openInEditorCommand = command === '' ? null : command;
     }
 
     if (config.issues) {

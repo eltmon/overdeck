@@ -75,3 +75,31 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
   `--force` since it diverges the row from projects.yaml's primary path.
 - `list --kind <kind>` reads through the resolver the same way the dashboard does;
   add `--archived` to include archived rows (only meaningful together with `--kind`).
+
+## The workspace quick-action band (PAN-3331)
+
+The dashboard's workspace view carries a band of three cards above its panels.
+It has no CLI verb — these are dashboard-only affordances — but two of them are
+worth knowing when you are reasoning about workspace state:
+
+- **Git** reads `GET /api/workspace-registry/<ws>/git`, which compares against
+  the branch's own upstream (`@{u}`) and falls back to `origin/HEAD` only when
+  the branch tracks nothing. `?fetch=1` performs a real `git fetch`, throttled
+  to once per 30 s per checkout. **Pull** is `git pull --ff-only` and refuses —
+  with the specific reason — on a dirty tree, an in-flight merge or rebase, a
+  diverged branch, no upstream, or a detached HEAD. `kind=issue` workspaces are
+  refused there entirely; they still sync through `pan sync-main`.
+- **Reads that carry command text are authenticated.** `GET /api/workspace-registry`
+  (the list) never includes `run_command`; the detail read and the git read both
+  require dashboard auth. A `run_command` you set from the CLI or the dashboard
+  is not visible to an unauthenticated caller.
+- **Run** launches the workspace's run command in a tmux session named
+  `ws-run-<sha256 prefix of the workspace id>` (visible under `tmux -L overdeck
+  list-sessions`). The hash keeps the name unique per workspace — a truncated id
+  prefix collided, letting one workspace stop another's process. The command is the `run_command` column when set, otherwise
+  the project's first `workspace.services[].start_command`. One live session per
+  workspace: a second Run re-focuses rather than spawning a duplicate, while
+  Restart kills the session and starts a fresh one under the same name.
+- **Open** reveals the directory, and shows an editor entry only when
+  `ui.open_in_editor_command` is set in `~/.overdeck/config.yaml`
+  (e.g. `cursor {path}`).

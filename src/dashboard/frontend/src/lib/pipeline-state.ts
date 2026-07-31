@@ -134,6 +134,11 @@ export function getPipelineIssuePhase(
     return 'ship';
   }
 
+  // PAN-3341: the canonical post-merge verdict outranks a stale stored phase.
+  if (issue.pipelineMembership?.available === true && issue.pipelineMembership.bucket === 'post_merge_limbo') {
+    return 'ship';
+  }
+
   if (state === 'verifying_on_main') {
     return 'verifying';
   }

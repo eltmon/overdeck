@@ -22,6 +22,7 @@ const routeMocks = vi.hoisted(() => ({
   readCurrentStatus: vi.fn(),
   readRecentObservations: vi.fn(),
   rejectUnsafeDashboardMutationRequest: vi.fn(),
+  rejectUnauthorizedDashboardRequest: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/workspaces/resolver.js', () => ({
@@ -48,6 +49,7 @@ vi.mock('../../../../src/lib/memory/rollup.js', () => ({
 
 vi.mock('../../../../src/dashboard/server/routes/dashboard-auth.js', () => ({
   rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
+  rejectUnauthorizedDashboardRequest: routeMocks.rejectUnauthorizedDashboardRequest,
 }));
 
 import { workspaceRegistryRouteLayer } from '../../../../src/dashboard/server/routes/workspace-registry.js';
@@ -97,6 +99,7 @@ async function requestWorkspaceRegistryRoute(path: string, init: RequestInit = {
 beforeEach(() => {
   for (const mock of Object.values(routeMocks)) mock.mockReset();
   routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
+  routeMocks.rejectUnauthorizedDashboardRequest.mockReturnValue(null);
   routeMocks.readCurrentStatus.mockResolvedValue(undefined);
   routeMocks.readRecentObservations.mockResolvedValue([]);
 });

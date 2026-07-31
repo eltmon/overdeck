@@ -594,6 +594,7 @@ CREATE TABLE `workspaces` (
 	`is_git_repository` integer DEFAULT 1 NOT NULL,
 	`issue_id` text,
 	`layout_config` text,
+	`run_command` text,
 	`is_favorite` integer DEFAULT 0,
 	`is_archived` integer DEFAULT 0,
 	`title` text,
