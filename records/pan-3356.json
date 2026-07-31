@@ -128,10 +128,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T18:31:28.044Z",
+  "updated": "2026-07-31T18:36:34.425Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -139,8 +139,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T18:31:27.013Z",
-    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3356-review",
+    "updatedAt": "2026-07-31T18:36:34.383Z",
+    "reviewNotes": "Needs You actions and pipeline clicks can target a different agent than the one displayed",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "9c64bfacafa046978f0da1548552398f2e1c1874",
@@ -223,6 +223,24 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
+      }
     }
   },
   "closeOut": {
@@ -230,9 +248,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2556529,
-            "output": 98004,
-            "cacheRead": 32852480,
+            "input": 2680388,
+            "output": 127239,
+            "cacheRead": 46853120,
             "cacheWrite": 0
           }
         },
@@ -279,15 +297,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 15536375,
-          "output": 793188,
-          "cacheRead": 380580352,
+          "input": 15660234,
+          "output": 822423,
+          "cacheRead": 394580992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 291.767691,
-        "pricingAsOf": "2026-07-31T18:31:27.034Z"
+        "usd": 300.264356,
+        "pricingAsOf": "2026-07-31T18:36:34.413Z"
       }
     },
     "merges": [
