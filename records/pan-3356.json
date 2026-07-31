@@ -182,6 +182,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T20:47:05.563Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-31T20:50:10.247Z"
     }
   ],
   "feedback": [],
@@ -263,10 +268,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:50:08.888Z",
+  "updated": "2026-07-31T20:50:10.932Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -274,12 +279,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:50:08.413Z",
+    "updatedAt": "2026-07-31T20:50:08.911Z",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
     "lastVerifiedCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
-    "reviewSpawnedAt": "2026-07-31T20:47:04.222Z",
+    "reviewSpawnedAt": "2026-07-31T20:50:08.909Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/CommandDeck/StatusDot.tsx",
@@ -434,7 +439,7 @@
       },
       "costAtCloseOut": {
         "usd": 556.740067,
-        "pricingAsOf": "2026-07-31T20:50:08.456Z"
+        "pricingAsOf": "2026-07-31T20:50:10.927Z"
       }
     },
     "merges": [
