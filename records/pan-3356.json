@@ -113,7 +113,7 @@
     "recordedAt": "2026-07-31T17:27:22.380Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T17:39:59.238Z",
+  "updated": "2026-07-31T17:40:04.867Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "blocked",
@@ -124,11 +124,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T17:29:35.176Z",
-    "updatedAt": "2026-07-31T17:39:58.394Z",
+    "updatedAt": "2026-07-31T17:40:04.839Z",
     "reviewNotes": "Session can message the wrong agent; operator and Ship surfaces are also incomplete",
     "verificationNotes": "Verification FAILED at test (85379ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/src/dashboard/frontend\u001b[39m\n\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx \u001b[2m(\u001b[22m\u001b[2m62 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1035\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Stage/cockpit/IssueMissionControl.test.tsx \u001b[2m(\u001b[22m\u001b[2m43 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1141\u001b[2mms\u001b[22m\u001b[39m\n \u001b[31m❯\u001b[39m src/components/drawer/IssueDrawer.test.tsx \u001b[2m(\u001b[22m\u001b[2m29 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m2 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 1500\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m opens from issue URL params on mount\u001b[32m 89\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders drawer tabs with active underline count chips and URL sync\u001b[32m 48\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders the artifacts tab with artifact cards and quick actions\u001b[32m 100\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders artifact loading, empty, and error states\u001b[32m 57\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m subscribes to issue-filtered drawer events and applies them to the store\u001b[32m 39\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders the open-in picker for an existing drawer workspace\u001b[32m 71\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m hides the drawer open-in picker when no workspace exists\u001b[32m 15\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m tears down the drawer issue subscription on close and reuses quick same-issue reopens\u001b[32m 35\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m scrolls to active agent section when URL hash targets it\u001b[32m 22\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m closes from the X button and removes drawer URL params\u001b[32m 43\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m closes from scrim click and Escape without changing scroll state\u001b[32m 43\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders most-recent-first activity rail items with phase dots and scroll reset\u001b[32m 31\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m matches activity rail agent events through store \n…(4327 chars elided)…\n\u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 111\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-detail/PhaseRail.test.tsx \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 73\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/IssueView.test.tsx \u001b[2m(\u001b[22m\u001b[2m9 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 58\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Stage/panes/AgentPane.test.tsx \u001b[2m(\u001b[22m\u001b[2m7 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 38\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/NeedsYouSlot.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 81\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Stage/cockpit/MissionConversationTab.test.tsx \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 23\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/useIssueView.test.tsx \u001b[2m(\u001b[22m\u001b[2m23 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 33\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/issue-view/VerificationGates.test.tsx \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 42\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[31m1 failed\u001b[39m\u001b[\n...(truncated)",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
+    "reviewedAtCommit": "9c64bfacafa046978f0da1548552398f2e1c1874",
     "reviewSpawnedAt": "2026-07-31T17:31:11.090Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -208,24 +209,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T17:27:22.380Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "9c64bfacafa046978f0da1548552398f2e1c1874"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "9c64bfacafa046978f0da1548552398f2e1c1874"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "9c64bfacafa046978f0da1548552398f2e1c1874"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "9c64bfacafa046978f0da1548552398f2e1c1874"
-      }
     }
   },
   "closeOut": {
@@ -290,7 +273,7 @@
       },
       "costAtCloseOut": {
         "usd": 235.9324,
-        "pricingAsOf": "2026-07-31T17:39:58.435Z"
+        "pricingAsOf": "2026-07-31T17:40:04.857Z"
       }
     },
     "merges": [
