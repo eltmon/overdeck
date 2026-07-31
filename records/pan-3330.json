@@ -189,10 +189,10 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-31T14:54:00.105Z",
+  "updated": "2026-07-31T14:57:59.058Z",
   "pipeline": {
     "issueId": "PAN-3330",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -200,11 +200,31 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-31T14:53:58.676Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3330-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-07-31T14:57:59.005Z",
+    "reviewNotes": "Cycle-5 merge changes do not alter the previously reviewed archive behavior; all in-PR requirements remain complete",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
+    "reviewedAtCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96",
     "lastVerifiedCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
-    "reviewSpawnedAt": "2026-07-31T14:53:58.675Z"
+    "reviewSpawnedAt": "2026-07-31T14:53:58.675Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -219,41 +239,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18518198,
-            "output": 409670,
-            "cacheRead": 109482496,
+            "input": 18991281,
+            "output": 422657,
+            "cacheRead": 114777600,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 2187298,
-            "output": 87190,
-            "cacheRead": 9905152,
+            "input": 8248433,
+            "output": 222823,
+            "cacheRead": 48707584,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 1570492,
-            "output": 29983,
-            "cacheRead": 7552512,
+            "input": 5981311,
+            "output": 135437,
+            "cacheRead": 43584512,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 3085083,
-            "output": 96840,
-            "cacheRead": 8187904,
+            "input": 8034799,
+            "output": 215581,
+            "cacheRead": 44318720,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 2130935,
-            "output": 38948,
-            "cacheRead": 11047936,
+            "input": 7453582,
+            "output": 149870,
+            "cacheRead": 47657984,
             "cacheWrite": 0
           }
         }
@@ -266,15 +286,15 @@
           "cacheWrite": 142719
         },
         "openai/gpt-5.6-sol": {
-          "input": 27492006,
-          "output": 662631,
-          "cacheRead": 146176000,
+          "input": 48709406,
+          "output": 1146368,
+          "cacheRead": 299046400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 236.198098,
-        "pricingAsOf": "2026-07-31T14:53:58.713Z"
+        "usd": 433.232408,
+        "pricingAsOf": "2026-07-31T14:57:59.048Z"
       }
     },
     "merges": [
@@ -283,7 +303,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3330",
