@@ -262,22 +262,9 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T21:46:53.959Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-31T21:48Z] test-agent → FAILED — seq 1",
-      "timestamp": "2026-07-31T21:48:49.158Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-07-31T21:48:49Z",
-      "markdownBody": "# Test failure\n\nnpm run typecheck: PASSED (tsc root+hooks+evals, dashboard-types guard, frontend-types guard all green). npm run lint: FAILED at lint:circular (scripts/lint-circular-deps.sh) — new circular dependency introduced by this branch's new file src/lib/agents/removal.ts (added in commit 73e23449f6, part of route-deletion-sites WI-2): src/dashboard/server/read-model.ts > .../issue-service-singleton.ts > .../issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/agents/removal.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > .../issue-lifecycle.ts > .../domain-services.ts. Confirmed via `git show main:src/lib/agents/removal.ts` (does not exist on main) and `git diff <merge-base>..HEAD --stat` (removal.ts and state-dir-removal.ts are new on this branch). Guard explicitly requires the cycle be removed, not baselined. No UI/dashboard changes in this xBRIEF (deletion door, retention config, CI guard script, migration CLI, docs only) so browser UAT was not required and was not run. npm test was started but did not complete within the verification window (280s timeout, non-conclusive) — not needed to reach a verdict since the lint gate already fails deterministically.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3357`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -381,25 +368,25 @@
     "recordedAt": "2026-07-31T21:40:59.710Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:48:49.158Z",
+  "updated": "2026-07-31T21:48:50.423Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T21:42:13.245Z",
-    "updatedAt": "2026-07-31T21:48:49.071Z",
-    "reviewNotes": "All four reviewers passed; no blocking findings remain after cycle and scope gates.",
-    "testNotes": "typecheck PASSED. lint FAILED at lint:circular: new circular dependency introduced by new file src/lib/agents/removal.ts (part of route-deletion-sites WI-2, commit 73e23449f6): read-model.ts > issue-service-singleton.ts > issue-data-service.ts > review-status.ts > cloister/review-agent.ts > agents/removal.ts > overdeck/agent-state-sync.ts > agents.ts > agents/spawn.ts > cloister/merge-agent.ts > issue-lifecycle.ts > domain-services.ts. Guard requires the cycle be removed, not baselined (scripts/lint-circular-deps.sh). No dashboard/UI changes in scope so UAT not required.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-07-31T21:48:49.127Z",
+    "reviewNotes": "Verification failed at lint — fix and resubmit",
+    "testNotes": "npm run typecheck: PASSED (tsc root+hooks+evals, dashboard-types guard, frontend-types guard all green). npm run lint: FAILED at lint:circular (scripts/lint-circular-deps.sh) — new circular dependency introduced by this branch's new file src/lib/agents/removal.ts (added in commit 73e23449f6, part of route-deletion-sites WI-2): src/dashboard/server/read-model.ts > .../issue-service-singleton.ts > .../issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/agents/removal.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > .../issue-lifecycle.ts > .../domain-services.ts. Confirmed via `git show main:src/lib/agents/removal.ts` (does not exist on main) and `git diff <merge-base>..HEAD --stat` (removal.ts and state-dir-removal.ts are new on this branch). Guard explicitly requires the cycle be removed, not baselined. No UI/dashboard changes in this xBRIEF (deletion door, retention config, CI guard script, migration CLI, docs only) so browser UAT was not required and was not run. npm test was started but did not complete within the verification window (280s timeout, non-conclusive) — not needed to reach a verdict since the lint gate already fails deterministically.",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "3463238aceda5c7113bc48b60fc12712db7b9a9e",
     "lastVerifiedCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0",
+    "reviewRequestedAt": "2026-07-31T21:42:13.245Z",
     "reviewSpawnedAt": "2026-07-31T21:43:04.046Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -502,24 +489,6 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T21:40:59.710Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "3463238aceda5c7113bc48b60fc12712db7b9a9e"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "3463238aceda5c7113bc48b60fc12712db7b9a9e"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "3463238aceda5c7113bc48b60fc12712db7b9a9e"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "3463238aceda5c7113bc48b60fc12712db7b9a9e"
-      }
     }
   },
   "closeOut": {
@@ -598,7 +567,7 @@
       },
       "costAtCloseOut": {
         "usd": 541.7178710000001,
-        "pricingAsOf": "2026-07-31T21:48:49.120Z"
+        "pricingAsOf": "2026-07-31T21:48:49.252Z"
       }
     },
     "merges": [
@@ -607,7 +576,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3357",
