@@ -8,11 +8,9 @@ import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { PickupGateCard } from './PickupGateCard'
-import { CrewStage } from './CrewStage'
 import { HappenedFeed } from './HappenedFeed'
 import { PlanMapCard } from './PlanMapCard'
 import type { CockpitTone } from './CockpitCard'
-import type { SessionNode } from '@overdeck/contracts'
 
 /** Tabs the Overview's inline links can navigate to (a subset of MissionTab —
  * kept narrow so this file never imports from IssueMissionControl). */
@@ -132,11 +130,10 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 }
 
 /** Overview — crew, UAT environment, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
-type OverviewTabProps = { issueId: string; onTab: (tab: OverviewNavTab) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
-export function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
+type OverviewTabProps = { issueId: string; onTab: (tab: OverviewNavTab) => void; onOpenAgent: (type: string) => void }
+export function OverviewTab({ issueId, onTab, onOpenAgent }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
-      {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
       <UatEnvironmentPanel issueId={issueId} />
       <HappenedFeed issueId={issueId} />
       <PlanMapCard issueId={issueId} />

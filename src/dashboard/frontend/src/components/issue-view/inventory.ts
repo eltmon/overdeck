@@ -61,7 +61,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'SessionPanel', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx' },
   { section: 'StackDrawer', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
   { section: 'Detail Tabs', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },
-  { section: 'CrewStage', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/CrewStage.tsx' },
+  { section: 'CrewStage', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
   { section: 'UatEnvironmentPanel', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/UatEnvironmentPanel.tsx' },
   { section: 'HappenedFeed', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/HappenedFeed.tsx' },
   { section: 'NowPanel', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx' },

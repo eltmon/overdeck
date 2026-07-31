@@ -5,11 +5,11 @@
  *   active   → 1.6s alive-dot
  *   thinking → 2.0s alive-dot + info glow
  *   waiting  → 1.5s alive-dot + amber glow
- *   idle     → 4.0s alive-dot (very slow breath)
- *   ended    → static dim, no animation
+ *   reviewing → 1.6s alive-dot in specialist purple
+ *   idle/done/ended/error → static, no animation
  */
 
-export type StatusDotStatus = 'active' | 'thinking' | 'waiting' | 'idle' | 'ended';
+export type StatusDotStatus = 'active' | 'reviewing' | 'thinking' | 'waiting' | 'idle' | 'done' | 'error' | 'ended';
 export type StatusDotSize = 'sm' | 'md';
 
 interface StatusDotProps {
@@ -24,17 +24,23 @@ interface StatusDotProps {
 // no live signal. Emerald is reserved for verified outcomes, never activity.
 const STATUS_COLOR: Record<StatusDotStatus, string> = {
   active: 'var(--info)',
+  reviewing: 'var(--signal-review)',
   thinking: 'var(--info)',
   waiting: 'var(--warning)',
-  idle: 'var(--muted-foreground)',
+  idle: 'transparent',
+  done: 'var(--success)',
+  error: 'var(--destructive)',
   ended: 'var(--muted-foreground)',
 };
 
 const STATUS_ANIM_CLASS: Record<StatusDotStatus, string> = {
   active: 'anim-alive-dot-active',
+  reviewing: 'anim-alive-dot-active',
   thinking: 'anim-alive-dot-thinking',
   waiting: 'anim-alive-dot-waiting',
-  idle: 'anim-alive-dot-idle',
+  idle: '',
+  done: '',
+  error: '',
   ended: '',
 };
 
@@ -48,6 +54,7 @@ export function StatusDot({ status, size = 'sm', title, className }: StatusDotPr
   const animClass = STATUS_ANIM_CLASS[status];
   const opacity = status === 'ended' ? 0.45 : 1;
   const boxShadow = STATUS_GLOW[status];
+  const isHollow = status === 'idle';
 
   return (
     <span
@@ -62,6 +69,9 @@ export function StatusDot({ status, size = 'sm', title, className }: StatusDotPr
         height: dim,
         borderRadius: '50%',
         background: STATUS_COLOR[status],
+        borderWidth: isHollow ? 1 : undefined,
+        borderStyle: isHollow ? 'solid' : undefined,
+        borderColor: isHollow ? 'var(--muted-foreground)' : undefined,
         opacity,
         boxShadow,
       }}

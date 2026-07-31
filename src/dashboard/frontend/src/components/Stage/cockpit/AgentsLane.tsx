@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import {
-  Compass, FlaskConical, BadgeCheck,
   ChevronRight, ChevronDown, GitPullRequest, GitBranch,
-  CircleCheck, CircleX, Loader2, type LucideIcon,
+  Loader2,
 } from 'lucide-react'
 import { useIssueCostsQuery, useReviewStatusQuery, useWorkspaceQuery } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { useIssueActions, type IssueActionView } from '../../IssueActionMenu/useIssueActions'
@@ -45,27 +44,25 @@ function sessionStatus(session: SessionNode): { label: string; tone: Tone } {
   const RUNNING = new Set(['running', 'starting', 'working', 'thinking'])
   if (RUNNING.has(session.status)) return { label: 'running', tone: 'info' }
   if (session.status === 'error') return { label: 'error', tone: 'bad' }
-  return { label: 'done', tone: 'muted' }
+  return { label: 'done', tone: 'ok' }
 }
 
 /** Non-agent lane step (Verification, synthetic Test) — no context menu. */
 function InfoRow({
-  icon: Icon, tileClass, name, status, model, sub, indent, selected, expandable, expanded,
-  onToggle, onClick, verdictTile,
+  name, status, model, sub, cost, indent, selected, expandable, expanded,
+  onToggle, onClick,
 }: {
-  icon: LucideIcon
-  tileClass?: string
   name: string
   status: { label: string; tone: Tone }
   model?: string
   sub?: string
+  cost?: string
   indent?: boolean
   selected?: boolean
   expandable?: boolean
   expanded?: boolean
   onToggle?: () => void
   onClick: () => void
-  verdictTile?: 'ok' | 'bad'
 }) {
   return (
     <button
@@ -75,7 +72,7 @@ function InfoRow({
       onClick={onClick}
     >
       <span className={styles.caret}>
-        {expandable && (
+        {expandable ? (
           <span
             role="button"
             tabIndex={-1}
@@ -84,25 +81,22 @@ function InfoRow({
           >
             {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
           </span>
-        )}
+        ) : null}
       </span>
-      <span className={`${styles.tile} ${verdictTile ? styles[verdictTile] : (tileClass ?? '')}`}>
-        {verdictTile === 'ok' ? <CircleCheck size={11} /> : verdictTile === 'bad' ? <CircleX size={11} /> : <Icon />}
-      </span>
+      <span className={`${styles.syntheticDot} ${styles[`dot-${status.tone}`]}`} aria-hidden="true" />
       <span className={styles.body}>
         <span className={styles.l1}>
           <span className={styles.name}>{name}</span>
+          {cost ? <span className={styles.cost}>{cost}</span> : null}
+        </span>
+        <span className={styles.l2}>
+          <span className={styles.model}>{model ?? 'pipeline'}</span>
+          {sub ? <span className={styles.sub}>{sub}</span> : null}
           <span className={`${styles.status} ${styles[status.tone]}`}>
             {status.tone === 'info' ? <Loader2 size={9} className={styles.spin} /> : null}
             {status.label}
           </span>
         </span>
-        {(model || sub) ? (
-          <span className={styles.l2}>
-            <span className={styles.model}>{model ?? ''}</span>
-            {sub ? <span className={styles.sub}>{sub}</span> : null}
-          </span>
-        ) : null}
       </span>
     </button>
   )
@@ -295,16 +289,26 @@ export function AgentsLane({
 
   // count = real agent rows + verification step (+ synthetic test if no session)
   const count = [plan, ...works, ...knowledges, reviewParent, testSession, ...ships].filter(Boolean).length + 1 + (testSession ? 0 : 1)
+  const activeCount = sessions.filter((session) => session.presence === 'active').length
 
   return (
     <div data-section="AgentsLane">
-      <div className={styles.header}>Agents &amp; steps <span className="n">{count}</span></div>
+      <div data-section="CrewStage">
+        <div className={styles.header}>
+          The crew <span className={styles.n}>{count}</span>
+          <span className={styles.presence}>{activeCount > 0 ? `${activeCount} working` : 'all idle'}</span>
+        </div>
 
-      {plan && (
-        <InfoRow icon={Compass} verdictTile={plan.status === 'error' ? 'bad' : 'ok'}
-          name="Plan" status={sessionStatus(plan)} model={plan.model}
-          sub={[plan.duration ? `${Math.round(plan.duration / 60)}m` : '', costOf(plan)].filter(Boolean).join(' · ')}
-          selected={plan.sessionId === selectedSessionId} onClick={() => onSelectSession(plan)} />
+        {plan && (
+        <InfoRow
+          name="Plan"
+          status={sessionStatus(plan)}
+          model={plan.model}
+          sub={plan.duration ? `${Math.round(plan.duration / 60)}m` : undefined}
+          cost={costOf(plan)}
+          selected={plan.sessionId === selectedSessionId}
+          onClick={() => onSelectSession(plan)}
+        />
       )}
 
       {works.map((w) => (
@@ -347,21 +351,25 @@ export function AgentsLane({
           onAction={() => {}}
         />
       )}
-      {reviewParent && reviewExpanded && reviewers.map((r) => (
-        <AgentStepRow
-          key={r.sessionId}
-          session={r}
-          issueId={issueId}
-          density="cockpit"
-          isSelected={r.sessionId === selectedSessionId}
-          onClick={() => onSelectSession(r)}
-          showMenu={false}
-          onAction={() => {}}
-        />
-      ))}
+      {reviewParent && reviewExpanded && reviewers.length > 0 ? (
+        <div className={styles.reviewChildren} data-testid="review-convoy">
+          {reviewers.map((r) => (
+            <AgentStepRow
+              key={r.sessionId}
+              session={r}
+              issueId={issueId}
+              density="cockpit"
+              isSelected={r.sessionId === selectedSessionId}
+              onClick={() => onSelectSession(r)}
+              showMenu={false}
+              onAction={() => {}}
+            />
+          ))}
+        </div>
+      ) : null}
 
       {/* Verification — a step, not a session. Aggregate status; on failure expands to the gates. */}
-      <InfoRow icon={BadgeCheck} tileClass={styles.ver}
+      <InfoRow
         name="Verification" status={verState} model="build gate"
         sub={rs?.verificationCycleCount ? `cycle ${rs.verificationCycleCount}${rs.verificationMaxCycles ? `/${rs.verificationMaxCycles}` : ''}` : undefined}
         expandable={verFailed} expanded={verExpanded} onToggle={() => setVerExpanded((v) => !v)}
@@ -380,22 +388,23 @@ export function AgentsLane({
           onAction={() => {}}
         />
       ) : (
-        <InfoRow icon={FlaskConical} name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
+        <InfoRow name="Test" status={TEST_TONE[rs?.testStatus ?? 'pending'] ?? TEST_TONE.pending}
           model="pipeline" onClick={onOpenVerification} />
       )}
 
-      {ships.map((s) => (
-        <AgentStepRow
-          key={s.sessionId}
-          session={s}
-          issueId={issueId}
-          density="cockpit"
-          isSelected={s.sessionId === selectedSessionId}
-          onClick={() => onSelectSession(s)}
-          showMenu={false}
-          onAction={() => {}}
-        />
-      ))}
+        {ships.map((s) => (
+          <AgentStepRow
+            key={s.sessionId}
+            session={s}
+            issueId={issueId}
+            density="cockpit"
+            isSelected={s.sessionId === selectedSessionId}
+            onClick={() => onSelectSession(s)}
+            showMenu={false}
+            onAction={() => {}}
+          />
+        ))}
+      </div>
 
       <StackDrawer issueId={issueId} feature={feature} branch={branch} onExpandSpine={onExpandSpine} />
     </div>

@@ -37,7 +37,6 @@ import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
-import { CrewStage } from './CrewStage'
 import { HappenedFeed } from './HappenedFeed'
 import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
@@ -414,11 +413,10 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 }
 
 /** Overview — crew, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
-type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
-function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
+type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }
+function OverviewTab({ issueId, onTab, onOpenAgent }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
-      {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
       <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
       <HappenedFeed issueId={issueId} />
       <PlanMapCard issueId={issueId} />
@@ -743,7 +741,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             )}
             {activeTab === 'overview' && (
               <div data-section="Awareness rail" className="space-y-3.5">
-                <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} />
+                <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} />
                 <div data-section="Costs / Artifacts / Ship tabs" className="space-y-3.5">
                   <CostsTab issueId={issueId} />
                   <ShipTab issueId={issueId} />

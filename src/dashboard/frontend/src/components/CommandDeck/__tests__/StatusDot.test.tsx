@@ -25,9 +25,21 @@ describe('StatusDot', () => {
     expect(getByTestId('status-dot').classList.contains('anim-alive-dot-waiting')).toBe(true);
   });
 
-  it('applies anim-alive-dot-idle class for idle status', () => {
+  it('renders idle as a hollow neutral dot without animation', () => {
     const { getByTestId } = render(<StatusDot status="idle" />);
-    expect(getByTestId('status-dot').classList.contains('anim-alive-dot-idle')).toBe(true);
+    const dot = getByTestId('status-dot');
+    expect(dot.className).not.toContain('anim-alive-dot');
+    expect(dot.style.background).toBe('transparent');
+    expect(dot.style.borderWidth).toBe('1px');
+    expect(dot.style.borderStyle).toBe('solid');
+    expect(dot.style.borderColor).toBe('var(--muted-foreground)');
+  });
+
+  it('uses purple for live review and emerald for completed work', () => {
+    const view = render(<StatusDot status="reviewing" />);
+    expect(view.getByTestId('status-dot').style.background).toBe('var(--signal-review)');
+    view.rerender(<StatusDot status="done" />);
+    expect(view.getByTestId('status-dot').style.background).toBe('var(--success)');
   });
 
   it('applies no animation class for ended status', () => {
