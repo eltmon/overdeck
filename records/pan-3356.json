@@ -226,7 +226,7 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:14:11.746Z",
+  "updated": "2026-07-31T20:14:17.383Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "blocked",
@@ -237,11 +237,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:14:11.057Z",
+    "updatedAt": "2026-07-31T20:14:17.363Z",
     "reviewNotes": "Correctness and requirements reviewers ended before producing reports",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
-    "reviewedAtCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2",
+    "reviewedAtCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393",
     "lastVerifiedCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393",
     "reviewSpawnedAt": "2026-07-31T20:11:45.523Z",
     "scopeDrift": {
@@ -320,24 +320,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
-      }
     }
   },
   "closeOut": {
@@ -402,7 +384,7 @@
       },
       "costAtCloseOut": {
         "usd": 494.724588,
-        "pricingAsOf": "2026-07-31T20:14:11.079Z"
+        "pricingAsOf": "2026-07-31T20:14:17.373Z"
       }
     },
     "merges": [
