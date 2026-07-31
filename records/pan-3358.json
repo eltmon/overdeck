@@ -333,10 +333,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T23:08:58.809Z",
+  "updated": "2026-07-31T23:35:50.298Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -344,8 +344,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T23:08:58.791Z",
-    "reviewNotes": "Version-token validation can authorize unrelated dependency changes; config locking and comment preservation remain incomplete",
+    "updatedAt": "2026-07-31T23:35:50.255Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -442,9 +442,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 40342173,
-            "output": 945325,
-            "cacheRead": 208321024,
+            "input": 40346571,
+            "output": 945543,
+            "cacheRead": 208672256,
             "cacheWrite": 0
           }
         },
@@ -490,18 +490,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9868418,
-            "output": 952358,
-            "cacheRead": 423470080,
+            "input": 10812974,
+            "output": 1117750,
+            "cacheRead": 473787904,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 58034075,
-          "output": 2119761,
-          "cacheRead": 653319168,
+          "input": 58983029,
+          "output": 2285371,
+          "cacheRead": 703988224,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -512,8 +512,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 694.25639,
-        "pricingAsOf": "2026-07-31T23:08:58.801Z"
+        "usd": 729.303988,
+        "pricingAsOf": "2026-07-31T23:35:50.292Z"
       }
     },
     "merges": [
