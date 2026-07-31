@@ -89,20 +89,21 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:40:05.955Z",
+  "updated": "2026-07-31T16:51:32.870Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T16:40:05.900Z",
+    "updatedAt": "2026-07-31T16:51:32.838Z",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
+    "lastVerifiedCommit": "de30049d5b12ff6467078cd49f43407e6511f3f5",
     "reviewRequestedAt": "2026-07-31T16:36:34.590Z",
     "reviewSpawnedAt": "2026-07-31T16:40:05.898Z",
     "scopeDrift": {
@@ -177,6 +178,46 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 464050,
+            "output": 10397,
+            "cacheRead": 1942528,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1563338,
+            "output": 30235,
+            "cacheRead": 3524608,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 1035163,
+            "output": 21251,
+            "cacheRead": 4440064,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1561381,
+            "output": 30654,
+            "cacheRead": 5214208,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 454578,
+            "output": 10111,
+            "cacheRead": 1738752,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1931022,
@@ -188,15 +229,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1931022,
-          "output": 232910,
-          "cacheRead": 103051264,
+          "input": 7009532,
+          "output": 335558,
+          "cacheRead": 119911424,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 68.168042,
-        "pricingAsOf": "2026-07-31T16:40:05.944Z"
+        "usd": 105.070112,
+        "pricingAsOf": "2026-07-31T16:51:32.861Z"
       }
     },
     "merges": [
