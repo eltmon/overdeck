@@ -157,9 +157,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T19:24:41.108Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T19:28Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T19:28:04.964Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T19:28:04Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3357\n\n# Review Synthesis — PAN-3357 — 2026-07-31T19:33:00Z\n\n## Verdict: CHANGES REQUESTED — General agent removal preserves transcript files but drops their only eligibility and issue-linkage record\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/context.json\n- Branch: feature/pan-3357\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357\n- HEAD reviewed: c01c3442cee4e0c92995a120cc54483f205f0f10\n- Cycle number: 4\n- Prior cycle SHA: d47930b7aa187559421c16a3388518ee9baf6532\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] General agent removal drops the only eligibility/linkage record while retaining transcripts — `src/lib/overdeck/agents.ts:868`\n`removeAgent()` routes directory cleanup through `removeAgentStateDir()`, which intentionally leaves a transcript-only directory whenever JSONL files exist, but then unconditionally deletes the canonical agent row. The configured transcript-retention sweep authorizes non-conversation expiry through that row's agent-to-issue/workspace mapping and durable closed-out evidence. Review purge, swarm cleanup, and reset-to-planned can therefore preserve transcript bytes while making them permanently ineligible for configured expiry and unattributable through registry-backed surfaces.\n\nThis finding survives the cycle-4 convergence gate: `removeAgent()` and its unconditional `removeAgentRecordSync()` call were introduced after the prior reviewed SHA. The row must remain while `removeAgentStateDir()` reports `removedDir: false`, matching the condition already implemented in terminal agent GC; tests should cover the affected removal callers through eventual post-close-out transcript expiry and final row removal.\n\n## Non-blocking Findings\n\n### [correctness] Atomic migration promotion can replace a concurrently created empty destination — `src/cli/commands/admin/migrate-legacy-agent-dirs.ts:92`\nThe pre-check and ordinary POSIX directory `rename()` do not form an atomic no-replace operation: an empty destination created between them may be replaced rather than producing `EEXIST` or `ENOTEMPTY`. This is a narrow administrative race and remains advisory, but it conflicts with the command's no-overwrite contract.\n\n### [performance] Hourly agent GC repeatedly traverses permanently retained transcript trees — `src/lib/cloister/agent-gc.ts:66`\nWith `retention.transcript_days` unset by default, terminal transcript-bearing rows remain indefinitely and generic hourly GC recursively revisits their unchanged directory trees every cycle. This produces historical-population-proportional filesystem work; a retained-transcript/tombstone state or row cleanup driven directly by the explicit expiry sweep would avoid recurring traversal.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-c01c3442/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3357 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -229,7 +242,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T19:28:04.062Z",
+  "updated": "2026-07-31T19:28:04.965Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "blocked",
