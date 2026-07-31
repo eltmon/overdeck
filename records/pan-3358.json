@@ -360,10 +360,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T23:44:26.668Z",
+  "updated": "2026-07-31T23:44:57.286Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -371,8 +371,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T23:44:26.651Z",
-    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
+    "updatedAt": "2026-07-31T23:44:57.268Z",
+    "reviewNotes": "[security] Pre-redaction truncation can expose reconstructable credentials to external enrichment providers — `src/lib/secret-redaction.ts:10`",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047",
@@ -461,6 +461,28 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/security.md",
+        "atCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/correctness.md",
+        "atCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047"
+      },
+      "performance": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/performance.md",
+        "atCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/requirements.md",
+        "atCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047"
+      }
     }
   },
   "closeOut": {
@@ -539,7 +561,7 @@
       },
       "costAtCloseOut": {
         "usd": 791.788566,
-        "pricingAsOf": "2026-07-31T23:44:26.664Z"
+        "pricingAsOf": "2026-07-31T23:44:57.278Z"
       }
     },
     "merges": [
