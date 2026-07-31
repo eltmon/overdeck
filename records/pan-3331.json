@@ -217,7 +217,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:11:17.316Z",
+  "updated": "2026-07-31T00:11:20.465Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -370,10 +370,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 88,
-            "output": 21360,
-            "cacheRead": 8327501,
-            "cacheWrite": 222488
+            "input": 90,
+            "output": 22458,
+            "cacheRead": 8549989,
+            "cacheWrite": 223363
           }
         }
       },
@@ -391,15 +391,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 88,
-          "output": 21360,
-          "cacheRead": 8327501,
-          "cacheWrite": 222488
+          "input": 90,
+          "output": 22458,
+          "cacheRead": 8549989,
+          "cacheWrite": 223363
         }
       },
       "costAtCloseOut": {
-        "usd": 183.446388,
-        "pricingAsOf": "2026-07-31T00:11:17.267Z"
+        "usd": 183.504057,
+        "pricingAsOf": "2026-07-31T00:11:20.460Z"
       }
     },
     "merges": [
