@@ -132,9 +132,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T20:11:47.512Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T20:14Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T20:14:11.745Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T20:14:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3356\n\n# Review Synthesis — PAN-3356 — 2026-07-31\n\n## Verdict: CHANGES REQUESTED — correctness and requirements reviewers ended without producing reports\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-6ddf3846/context.json`\n- Branch: `feature/pan-3356`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356`\n- HEAD reviewed: `6ddf3846ac5a458dd66e3a5625387a69fdc29393`\n- Cycle number: 4\n- Prior cycle SHA: `beb7021c23ecfd208894b4849cc74ef3f317a0f2`\n- PR commits: 17; two infrastructure blockers are below the proportionality threshold of 51\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-6ddf3846/security.md` | 0 |\n| correctness | failed | reviewer session ended before writing a report | 1 infrastructure failure |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-6ddf3846/performance.md` | 0 |\n| requirements | failed | reviewer session ended before writing a report | 1 infrastructure failure |\n\n## Blocking Findings\n\n### [correctness] Reviewer infrastructure failure\nThe correctness reviewer session ended before writing a report. `roles/review.md` requires every failed or timed-out reviewer to block approval regardless of scope or cycle-convergence gates, because correctness coverage for the current-cycle changes is absent.\n\n### [requirements] Reviewer infrastructure failure\nThe requirements reviewer session ended before writing a report. Approval is impossible without a readable requirements report confirming that the current cycle restores the protected IssueActionMenu boundary and still satisfies the exact-session cockpit requirements.\n\n## Non-blocking Findings\n\n### [performance] Persistent Now card duplicates parent query observers — `src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx:371`\n`NowPanel` independently subscribes to review status, PR, and activity even though `IssueMissionControl` already owns those results. React Query shares response data, but the extra observers retain polling/focus callbacks and repeat activity/history derivation. This is bounded advisory work, not a blocker.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories. It confirmed that the current cycle restores the shared IssueActionMenu implementation and confines exact-agent cockpit handling to existing non-destructive routes with encoded identifiers and server-side origin validation.\n- Performance found no blocking regressions. It confirmed that the current cycle removes global action-registry invalidation, aligns plan-query freshness, reuses the parent verification model, and keeps phase timing on the shared ticker.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-6ddf3846/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3356 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/dashboard/frontend/src/components/CommandDeck/StatusDot.tsx",
@@ -213,10 +226,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:11:58.259Z",
+  "updated": "2026-07-31T20:14:11.746Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -224,8 +237,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:11:52.200Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed lint",
+    "updatedAt": "2026-07-31T20:14:11.057Z",
+    "reviewNotes": "Correctness and requirements reviewers ended before producing reports",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "beb7021c23ecfd208894b4849cc74ef3f317a0f2",
@@ -307,6 +320,24 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393"
+      }
     }
   },
   "closeOut": {
@@ -314,9 +345,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18621887,
-            "output": 311746,
-            "cacheRead": 123719680,
+            "input": 19116826,
+            "output": 313051,
+            "cacheRead": 126070272,
             "cacheWrite": 0
           }
         },
@@ -363,15 +394,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 33594813,
-          "output": 1142285,
-          "cacheRead": 577585664,
+          "input": 34089752,
+          "output": 1143590,
+          "cacheRead": 579936256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 491.035447,
-        "pricingAsOf": "2026-07-31T20:11:58.256Z"
+        "usd": 494.724588,
+        "pricingAsOf": "2026-07-31T20:14:11.079Z"
       }
     },
     "merges": [
