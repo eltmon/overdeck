@@ -318,10 +318,10 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:38:07.761Z",
+  "updated": "2026-07-31T20:38:09.267Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -329,13 +329,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
-    "updatedAt": "2026-07-31T20:38:06.631Z",
+    "updatedAt": "2026-07-31T20:38:07.824Z",
     "reviewNotes": "abandoned migration claims permanently suppress missing legacy directory recovery",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0",
     "lastVerifiedCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0",
-    "reviewSpawnedAt": "2026-07-31T20:23:34.499Z",
+    "reviewSpawnedAt": "2026-07-31T20:38:07.822Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -501,7 +501,7 @@
       },
       "costAtCloseOut": {
         "usd": 409.376475,
-        "pricingAsOf": "2026-07-31T20:38:06.666Z"
+        "pricingAsOf": "2026-07-31T20:38:08.055Z"
       }
     },
     "merges": [
