@@ -102,6 +102,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-30T23:38:31.559Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-31T14:46:28.312Z"
     }
   ],
   "feedback": [],
@@ -179,10 +184,10 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-31T14:46:26.065Z",
+  "updated": "2026-07-31T14:46:28.335Z",
   "pipeline": {
     "issueId": "PAN-3330",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -190,29 +195,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-31T14:46:26.034Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 1bd80f6 (6 paths): docs/audits/pan-1990-surface-inventory.md, scripts/file-size-allowlist.txt, src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx, …",
-        "detectedAt": "2026-07-31T14:33:29.315Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "1bd80f642f9eb92fdcd3e15a0b16a97611000f62",
-      "detectedAt": "2026-07-31T14:33:29.315Z",
-      "paths": [
-        "docs/audits/pan-1990-surface-inventory.md",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/workspace/WorkspaceView.tsx",
-        "src/dashboard/frontend/src/components/workspace/__tests__/WorkspaceView.test.tsx",
-        "src/dashboard/server/routes/workspace-registry.ts",
-        "tests/unit/lib/overdeck/no-loss-matrix.ts"
-      ]
-    },
+    "updatedAt": "2026-07-31T14:46:27.046Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
     "lastVerifiedCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
-    "reviewSpawnedAt": "2026-07-30T23:38:07.583Z"
+    "reviewSpawnedAt": "2026-07-31T14:46:27.045Z"
   },
   "closeOut": {
     "usage": {
@@ -282,7 +268,7 @@
       },
       "costAtCloseOut": {
         "usd": 236.198098,
-        "pricingAsOf": "2026-07-31T14:46:26.062Z"
+        "pricingAsOf": "2026-07-31T14:46:27.069Z"
       }
     },
     "merges": [
@@ -291,7 +277,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3330",
