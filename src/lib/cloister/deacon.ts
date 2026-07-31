@@ -830,16 +830,14 @@ export {
 export async function cleanupStaleAgentState(): Promise<string[]> {
   const actions: string[] = [];
   const cloisterConfig = loadCloisterConfigSync();
-  // Default retention for work / planning agent state. These are kept for a
-  // short debugging window post-completion; event-driven cleanup in
-  // postMergeLifecycle and executeCloseOut deletes them at the actual event
-  // that renders them obsolete, so this retention is only a safety net.
+  // Default retention for work/planning runtime residue. Fresh-session wipes
+  // and close-out cleanup use removeAgentStateDir at their lifecycle events;
+  // this purge is the safety net, and the shared door preserves all JSONL.
   const retentionDays = cloisterConfig.retention?.agent_state_days ?? 7;
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
-  // Reviewer state is ephemeral by design — it's deleted inside
-  // runParallelReview Phase 6 as soon as the review posts. This 1-day
-  // retention is a safety net for cases where Phase 6 didn't fire
-  // (crash, process killed between post and cleanup).
+  // Reviewer runtime residue has a shorter debugging window. Review restart
+  // and close-out paths use the same deletion door, while this 1-day purge
+  // catches sessions whose event-driven cleanup never ran and preserves JSONL.
   const reviewerRetentionDays = cloisterConfig.retention?.reviewer_state_days ?? 1;
   const reviewerRetentionMs = reviewerRetentionDays * 24 * 60 * 60 * 1000;
   const now = Date.now();

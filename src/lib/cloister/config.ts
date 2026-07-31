@@ -297,16 +297,15 @@ export interface CostLimitsConfig {
  */
 export interface RetentionConfig {
   /**
-   * Days to keep work/planning agent state dirs after their session ends.
-   * Default 7. Event-driven cleanup (postMergeLifecycle, executeCloseOut)
-   * deletes state at the moment it becomes useless; this retention is only
-   * a safety net for cases where those events didn't fire.
+   * Days to keep work/planning agent runtime residue after sessions end.
+   * Default 7. Fresh-session wipes and close-out cleanup use the shared
+   * deletion door, so every JSONL transcript remains in place.
    */
   agent_state_days: number;
   /**
-   * Days to keep reviewer state dirs (review-* prefix). Default 1.
-   * runParallelReview Phase 6 deletes reviewer state immediately after the
-   * review posts; this retention catches crashed-mid-cleanup edge cases.
+   * Days to keep reviewer runtime residue after sessions end. Default 1.
+   * Review restart and close-out paths use the shared deletion door; this
+   * safety-net purge also preserves every JSONL transcript.
    */
   reviewer_state_days?: number;
   /**
