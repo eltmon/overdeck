@@ -318,18 +318,18 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:17:56.030Z",
+  "updated": "2026-07-31T21:17:58.343Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
-    "updatedAt": "2026-07-31T21:17:55.938Z",
+    "updatedAt": "2026-07-31T21:17:56.621Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
@@ -501,7 +501,7 @@
       },
       "costAtCloseOut": {
         "usd": 428.36826,
-        "pricingAsOf": "2026-07-31T21:17:56.008Z"
+        "pricingAsOf": "2026-07-31T21:17:58.338Z"
       }
     },
     "merges": [
