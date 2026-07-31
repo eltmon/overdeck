@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T15:25:38.997Z",
+  "updated": "2026-07-31T15:37:23.057Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "needs-you-slot": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 374885,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:25:38.997Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Rebuilt the cockpit header around the h1, one phase sentence, branch/PR/cost/tracker chips, and conditional Create PR compare link; focused tests and typecheck pass.",
         "releasedAt": "2026-07-31T15:25:27.945Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 374885,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:25:38.997Z",
+        "itemId": "needs-you-slot",
+        "outcome": "completed",
+        "reason": "Added a canonical IssueViewModel operator-signal ladder, a single prioritized amber NeedsYouSlot with registry-backed actions and relocation markers, cockpit wiring, and focused parity tests.",
+        "releasedAt": "2026-07-31T15:37:23.057Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "header-redesign": {
         "reason": "Rebuilt the cockpit header around the h1, one phase sentence, branch/PR/cost/tracker chips, and conditional Create PR compare link; focused tests and typecheck pass.",
         "updatedAt": "2026-07-31T15:25:27.945Z"
+      },
+      "needs-you-slot": {
+        "reason": "Added a canonical IssueViewModel operator-signal ladder, a single prioritized amber NeedsYouSlot with registry-backed actions and relocation markers, cockpit wiring, and focused parity tests.",
+        "updatedAt": "2026-07-31T15:37:23.057Z"
       }
     }
   },
@@ -126,6 +133,11 @@
     "header-redesign.header-redesign.ac2": "completed",
     "header-redesign.header-redesign.ac3": "completed",
     "header-redesign.header-redesign.ac4": "completed",
-    "needs-you-slot": "running"
+    "needs-you-slot": "completed",
+    "needs-you-slot.needs-you-slot.ac1": "completed",
+    "needs-you-slot.needs-you-slot.ac2": "completed",
+    "needs-you-slot.needs-you-slot.ac3": "completed",
+    "needs-you-slot.needs-you-slot.ac4": "completed",
+    "needs-you-slot.needs-you-slot.ac5": "completed"
   }
 }
