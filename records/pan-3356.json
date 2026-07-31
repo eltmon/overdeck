@@ -2,7 +2,7 @@
   "issueId": "PAN-3356",
   "schemaVersion": 2,
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T14:48:31.210Z",
+  "updated": "2026-07-31T14:48:33.714Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3356: Issue cockpit redesign v2: live-run IA — 6 tabs, crew spine, needs-you slot",
       "timestamp": "2026-07-31T14:48:31.210Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
