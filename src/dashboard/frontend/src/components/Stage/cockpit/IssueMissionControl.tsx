@@ -20,16 +20,13 @@ import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../li
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
-import { SpecialistStrip, type SpecialistChip } from '../../issue-detail/SpecialistStrip'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import DrawerActivityRail from '../../drawer/DrawerActivityRail'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
-import { StartAgentCta } from '../../issue-view/StartAgentCta'
 import { TellComposer } from '../../issue-view/TellComposer'
 import { VerificationGates } from '../../issue-view/VerificationGates'
-import type { IssueViewModel } from '../../issue-view/types'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -42,10 +39,9 @@ import { PrdViewer } from '../../PrdViewer'
 import type { XBriefDocument } from '../../xbrief/types'
 import { IssueTreeLane } from './IssueTreeLane'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
-import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
 import { StatusHistoryTab } from './StatusHistoryTab'
-import { HappenedFeed } from './HappenedFeed'
+import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
@@ -415,71 +411,6 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
   )
 }
 
-/** Overview — lifecycle summary, review outcomes, recent activity, and pickup gate. */
-type OverviewTabProps = {
-  issueId: string
-  model: IssueViewModel
-  state: 'live' | 'done' | 'pre-work'
-  hasPlan: boolean
-  workRunning: boolean
-  mergedCommit?: string
-  reviewSummary?: string
-}
-function OverviewTab({ issueId, model, state, hasPlan, workRunning, mergedCommit, reviewSummary }: OverviewTabProps) {
-  if (state === 'pre-work') {
-    return (
-      <section data-testid="overview-pre-work" className="rounded-[var(--radius)] border border-border bg-card p-5">
-        <h2 className="text-[16px] font-medium text-foreground">Start the first agent run</h2>
-        <p className="mt-2 max-w-2xl text-[12.5px] leading-5 text-muted-foreground">
-          Overdeck will create the workspace, read the approved plan, and keep the agent session available here while it works.
-        </p>
-        <div className="mt-4"><StartAgentCta issueId={issueId} density="cockpit" /></div>
-      </section>
-    )
-  }
-
-  if (state === 'done') {
-    return (
-      <section data-testid="overview-done" className="rounded-[var(--radius)] border border-success/32 bg-card p-5">
-        <div className="flex flex-wrap items-center gap-2">
-          <CockpitPill tone="success">Done</CockpitPill>
-          <h2 className="text-[16px] font-medium text-foreground">Merged to main</h2>
-        </div>
-        <div className="mt-3 text-[11px] text-muted-foreground">
-          Merged commit <span className="font-mono text-foreground">{mergedCommit ?? 'unavailable'}</span>
-        </div>
-        <p className="mt-3 text-[12.5px] leading-5 text-foreground">
-          {reviewSummary ?? 'Review and verification completed successfully.'}
-        </p>
-      </section>
-    )
-  }
-
-  const specialists: SpecialistChip[] = model.agents
-    .filter((agent) => agent.type === 'reviewer')
-    .map((agent) => ({
-      id: agent.role ?? agent.sessionId,
-      name: `review.${agent.role ?? agent.label.toLowerCase()}`,
-      status: agent.active ? 'running' : agent.verdict === 'changes_requested' || agent.status === 'error' ? 'failed' : 'done',
-      verdict: agent.verdict === 'approved' ? 'APPROVED' : agent.verdict === 'changes_requested' ? 'CHANGES_REQUESTED' : null,
-      lastLine: agent.verdict === 'approved' ? 'Approved' : agent.verdict === 'changes_requested' ? 'Changes requested' : agent.status,
-      model: agent.model,
-      hasConversation: true,
-    }))
-
-  return (
-    <div data-testid="overview-live" className="space-y-3.5">
-      <section className="rounded-[var(--radius)] border border-border bg-card p-4">
-        <h2 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Current state</h2>
-        <StatusNarrative issueId={issueId} hasPlan={hasPlan} workRunning={workRunning} />
-      </section>
-      <SpecialistStrip specialists={specialists} />
-      <HappenedFeed issueId={issueId} />
-      <div data-section="PickupGateCard"><PickupGateCard issueId={issueId} /></div>
-    </div>
-  )
-}
-
 function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
   if (tab === 'changes' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
@@ -638,7 +569,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       ? 'pre-work'
       : 'live'
   const overviewBody = (
-    <OverviewTab
+    <IssueOverviewTab
       issueId={issueId}
       model={issueView}
       state={overviewState}
