@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T16:33:48.179Z",
+  "updated": "2026-07-31T16:37:04.776Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "activity-tab": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 2791558,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:33:48.179Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -169,6 +161,17 @@
         "outcome": "completed",
         "reason": "Folded Files, Checks, and Artifacts into Changes segments, preserved legacy deep links and protected section markers, and retained the exact zero/failed/running/passed check badge behavior. Typecheck, 38 focused tests, and the 10-test no-loss audit passed.",
         "releasedAt": "2026-07-31T16:33:34.715Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 2791558,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:33:48.179Z",
+        "itemId": "activity-tab",
+        "outcome": "completed",
+        "reason": "Folded Feed and Status history into Activity segments, preserved the legacy Timeline deep link and protected marker, and kept the top-level Activity tab selected while switching. Typecheck, 40 focused tests, and the 10-test no-loss audit passed.",
+        "releasedAt": "2026-07-31T16:37:04.776Z"
       }
     ],
     "statusReasons": {
@@ -203,6 +206,10 @@
       "changes-tab": {
         "reason": "Folded Files, Checks, and Artifacts into Changes segments, preserved legacy deep links and protected section markers, and retained the exact zero/failed/running/passed check badge behavior. Typecheck, 38 focused tests, and the 10-test no-loss audit passed.",
         "updatedAt": "2026-07-31T16:33:34.715Z"
+      },
+      "activity-tab": {
+        "reason": "Folded Feed and Status history into Activity segments, preserved the legacy Timeline deep link and protected marker, and kept the top-level Activity tab selected while switching. Typecheck, 40 focused tests, and the 10-test no-loss audit passed.",
+        "updatedAt": "2026-07-31T16:37:04.776Z"
       }
     }
   },
@@ -243,6 +250,8 @@
     "changes-tab": "completed",
     "changes-tab.changes-tab.ac1": "completed",
     "changes-tab.changes-tab.ac2": "completed",
-    "activity-tab": "running"
+    "activity-tab": "completed",
+    "activity-tab.activity-tab.ac1": "completed",
+    "activity-tab.activity-tab.ac2": "completed"
   }
 }
