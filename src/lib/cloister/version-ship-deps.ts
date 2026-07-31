@@ -1,8 +1,8 @@
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
-import { lstat, mkdtemp, open, readFile, realpath, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, open, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { redactSensitiveText } from '../secret-redaction.js';
 import {
@@ -21,6 +21,9 @@ interface ExecResult {
 const MAX_EXPECT_FILE_BYTES = 1024 * 1024;
 const REGEX_TIMEOUT_MS = 250;
 const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
+const COMMAND_WORKSPACE_BYTES = 1024 * 1024 * 1024;
+const MAX_COMMAND_COPYBACK_FILE_BYTES = 16 * 1024 * 1024;
+const MAX_COMMAND_COPYBACK_TOTAL_BYTES = 64 * 1024 * 1024;
 
 function tokenizeCommand(command: string): string[] {
   const tokens: string[] = [];
@@ -128,11 +131,51 @@ function runDocker(args: string[], cwd: string, timeout: number): Promise<ExecRe
   });
 }
 
+async function copyBackSandboxFile(
+  sandboxRoot: string,
+  projectRoot: string,
+  declaredPath: string,
+  remainingBudget: { bytes: number },
+): Promise<void> {
+  const source = resolve(sandboxRoot, declaredPath);
+  const sourceRelative = relative(sandboxRoot, source);
+  if (sourceRelative === '..' || sourceRelative.startsWith(`..${sep}`) || sourceRelative === '') {
+    throw new VersionShipOperationError('path-validation-failed', `sandbox output path escapes the copyback tree: ${declaredPath}`);
+  }
+
+  let current = sandboxRoot;
+  for (const segment of sourceRelative.split(sep).filter(Boolean)) {
+    current = resolve(current, segment);
+    const info = await lstat(current).catch(() => null);
+    if (!info || info.isSymbolicLink()) {
+      throw new VersionShipOperationError('path-validation-failed', `sandbox output is missing or contains a symlink: ${declaredPath}`);
+    }
+  }
+  const info = await lstat(source);
+  if (!info.isFile() || info.size > MAX_COMMAND_COPYBACK_FILE_BYTES || info.size > remainingBudget.bytes) {
+    throw new VersionShipOperationError('path-validation-failed', `sandbox output exceeds the declared-file budget: ${declaredPath}`);
+  }
+
+  const target = await validateContainedPath(projectRoot, declaredPath, 'file');
+  const sourceHandle = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW);
+  const targetHandle = await open(target, constants.O_WRONLY | constants.O_TRUNC | constants.O_NOFOLLOW);
+  try {
+    const content = await sourceHandle.readFile();
+    await targetHandle.writeFile(content);
+    await targetHandle.sync();
+    remainingBudget.bytes -= content.byteLength;
+  } finally {
+    await sourceHandle.close();
+    await targetHandle.close();
+  }
+}
+
 async function runSandboxedCommand(
   command: string,
   cwd: string,
   projectRoot: string,
   image: string,
+  copyBackPaths: string[],
   runDockerCommand: typeof runDocker = runDocker,
 ): Promise<ExecResult> {
   const [file, ...commandArgs] = tokenizeCommand(command);
@@ -142,12 +185,19 @@ async function runSandboxedCommand(
     : `/workspace/${commandRelative.split(sep).join('/')}`;
   const runtimeDir = await mkdtemp(join(tmpdir(), 'overdeck-version-ship-command-'));
   const cidFile = join(runtimeDir, 'container.cid');
+  const inputRoot = join(runtimeDir, 'input');
+  const copyBackRoot = join(runtimeDir, 'copyback');
   const uid = typeof process.getuid === 'function' ? process.getuid() : 65534;
   const gid = typeof process.getgid === 'function' ? process.getgid() : 65534;
 
   try {
-    return await runDockerCommand([
-      'run', '--rm', '--init',
+    await cp(projectRoot, inputRoot, {
+      recursive: true,
+      dereference: false,
+      filter: source => source === projectRoot || basename(source) !== '.git',
+    });
+    const started = await runDockerCommand([
+      'run', '-d', '--init',
       '--cidfile', cidFile,
       '--pull', 'never',
       '--network', 'none',
@@ -157,16 +207,50 @@ async function runSandboxedCommand(
       '--pids-limit', '256',
       '--memory', '2g',
       '--user', `${uid}:${gid}`,
-      '--mount', `type=bind,src=${projectRoot},dst=/workspace,rw`,
-      '--tmpfs', '/tmp:rw,nosuid,nodev,size=67108864',
-      '--workdir', containerCwd,
+      '--mount', `type=bind,src=${inputRoot},dst=/input,readonly`,
+      '--tmpfs', `/workspace:rw,nosuid,nodev,mode=1777,size=${COMMAND_WORKSPACE_BYTES}`,
+      '--tmpfs', '/tmp:rw,nosuid,nodev,mode=1777,size=67108864',
       '--env', 'CI=1',
       '--env', 'HOME=/tmp',
       '--env', 'TMPDIR=/tmp',
+      '--entrypoint', '/bin/sh',
       image,
-      file,
-      ...commandArgs,
+      '-c',
+      'set -eu; cp -a /input/. /workspace/; touch /tmp/ready; while :; do sleep 3600; done',
+    ], projectRoot, 30_000);
+    if (started.exitCode !== 0) return started;
+
+    const containerId = (await readFile(cidFile, 'utf-8').catch(() => '')).trim();
+    if (!containerId) {
+      throw new VersionShipOperationError('workspace-failed', 'sandbox command started without a container identity');
+    }
+    const ready = await runDockerCommand([
+      'exec', containerId, '/bin/sh', '-c',
+      'while [ ! -f /tmp/ready ]; do sleep 1; done',
+    ], projectRoot, 30_000);
+    if (ready.exitCode !== 0) return ready;
+
+    const result = await runDockerCommand([
+      'exec', '--workdir', containerCwd, containerId, file, ...commandArgs,
     ], projectRoot, COMMAND_TIMEOUT_MS);
+    if (result.exitCode !== 0) return result;
+    const remainingBudget = { bytes: MAX_COMMAND_COPYBACK_TOTAL_BYTES };
+    for (const declaredPath of [...new Set(copyBackPaths)]) {
+      const destination = resolve(copyBackRoot, declaredPath);
+      const destinationRelative = relative(copyBackRoot, destination);
+      if (destinationRelative === '..' || destinationRelative.startsWith(`..${sep}`) || destinationRelative === '') {
+        throw new VersionShipOperationError('path-validation-failed', `sandbox copyback path escapes the output tree: ${declaredPath}`);
+      }
+      await mkdir(dirname(destination), { recursive: true });
+      const containerPath = `/workspace/${declaredPath.split(sep).join('/')}`;
+      const copied = await runDockerCommand(['cp', `${containerId}:${containerPath}`, destination], projectRoot, 30_000);
+      if (copied.exitCode !== 0) {
+        logDiagnostic(`[version-ship] docker cp failed for ${declaredPath}: ${copied.stderr || copied.stdout}`);
+        throw new VersionShipOperationError('path-validation-failed', `sandbox did not produce a declared file: ${declaredPath}`);
+      }
+      await copyBackSandboxFile(copyBackRoot, projectRoot, declaredPath, remainingBudget);
+    }
+    return result;
   } finally {
     const containerId = await readFile(cidFile, 'utf-8').catch(() => '');
     if (containerId.trim()) {
@@ -257,6 +341,32 @@ async function readBoundedRegularFile(path: string): Promise<string> {
   }
 }
 
+async function verifyPreparedRepo(
+  repoRoot: string,
+  expectedHead: string,
+  expectedGitDir: string,
+  allowHeadDescendant: boolean,
+): Promise<void> {
+  const gitDirResult = await execGitResult(['rev-parse', '--absolute-git-dir'], repoRoot);
+  const headResult = await execGitResult(['rev-parse', 'HEAD'], repoRoot);
+  if (gitDirResult.exitCode !== 0 || headResult.exitCode !== 0) {
+    throw new VersionShipOperationError('workspace-failed', 'prepared version ship repository identity is unreadable');
+  }
+  const actualGitDir = await realpath(gitDirResult.stdout.trim()).catch(() => '');
+  const canonicalExpectedGitDir = await realpath(expectedGitDir).catch(() => '');
+  if (!actualGitDir || actualGitDir !== canonicalExpectedGitDir) {
+    throw new VersionShipOperationError('workspace-failed', 'prepared version ship repository metadata changed');
+  }
+
+  const actualHead = headResult.stdout.trim();
+  if (actualHead === expectedHead) return;
+  if (allowHeadDescendant) {
+    const ancestry = await execGitResult(['merge-base', '--is-ancestor', expectedHead, actualHead], repoRoot);
+    if (ancestry.exitCode === 0) return;
+  }
+  throw new VersionShipOperationError('workspace-failed', 'prepared version ship repository head changed unexpectedly');
+}
+
 function testPatternInWorker(pattern: string, content: string): Promise<boolean> {
   return new Promise((resolveResult, reject) => {
     const worker = new Worker(
@@ -293,15 +403,17 @@ export function buildVersionShipDeps(options: BuildVersionShipDepsOptions = {}):
     resolveFile: (root, path) => validateContainedPath(root, path, 'file'),
     resolveDirectory: (root, path) => validateContainedPath(root, path, 'directory'),
     writeVersion: writeJsonStringField,
-    runCommand: (command, cwd, projectRoot, image) => runSandboxedCommand(
+    runCommand: (command, cwd, projectRoot, image, copyBackPaths) => runSandboxedCommand(
       command,
       cwd,
       projectRoot,
       image,
+      copyBackPaths,
       options.runDocker ?? runDocker,
     ),
     readFile: readBoundedRegularFile,
     testPattern: testPatternInWorker,
+    verifyRepo: verifyPreparedRepo,
     hasChanges: async (repoRoot, paths) => {
       const result = await execGitOrThrow(
         ['status', '--porcelain', '--', ...paths],

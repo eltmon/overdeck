@@ -98,6 +98,58 @@ describe('version ship promoted worktree', () => {
     expect(git(source, ['show', 'origin/main:package.json'])).toContain('4.0.0');
   });
 
+  it('refuses privileged Git when prepared worktree metadata changes', async () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'version-ship-identity-test-'));
+    const remote = join(fixture, 'remote.git');
+    const source = join(fixture, 'source');
+    const ambient = join(fixture, 'ambient');
+    tempDirs.push(fixture);
+    git(fixture, ['init', '--bare', remote]);
+    git(fixture, ['clone', remote, source]);
+    git(source, ['switch', '-c', 'main']);
+    git(source, ['config', 'user.name', 'Fixture']);
+    git(source, ['config', 'user.email', 'fixture@example.com']);
+    writeFileSync(join(source, 'package.json'), '{"version":"2.0.0"}\n');
+    git(source, ['add', 'package.json']);
+    git(source, ['commit', '-m', 'promoted merge']);
+    const mergeSha = git(source, ['rev-parse', 'HEAD']);
+    git(source, ['push', '-u', 'origin', 'main']);
+
+    git(fixture, ['init', ambient]);
+    git(ambient, ['config', 'user.name', 'Fixture']);
+    git(ambient, ['config', 'user.email', 'fixture@example.com']);
+    writeFileSync(join(ambient, 'package.json'), '{"version":"ambient"}\n');
+    git(ambient, ['add', 'package.json']);
+    git(ambient, ['commit', '-m', 'ambient']);
+    const ambientHead = git(ambient, ['rev-parse', 'HEAD']);
+
+    const report = await withVersionShipWorkspace([{
+      repoKey: 'fixture',
+      repoPath: source,
+      configPath: '.',
+      mergeSha,
+      targetBranch: 'main',
+    }], workspace => {
+      writeFileSync(join(workspace.projectRoot, '.git'), `gitdir: ${join(ambient, '.git')}\n`);
+      return runVersionShip({
+        projectRoot: workspace.projectRoot,
+        config: {
+          set: [{ path: 'package.json', json_field: 'version' }],
+          expect: [{ path: 'package.json', pattern: '"version":"{version}"' }],
+          push: ['.'],
+        },
+        version: '3.0.0',
+        batchName: 'uat/pan-identity-0731',
+        allowedRepos: workspace.allowedRepos,
+      }, buildVersionShipDeps());
+    });
+
+    expect(report).toMatchObject({ status: 'failed', errorCode: 'workspace-failed' });
+    expect(git(source, ['show', 'origin/main:package.json'])).toContain('2.0.0');
+    expect(git(ambient, ['rev-parse', 'HEAD'])).toBe(ambientHead);
+    expect(readFileSync(join(ambient, 'package.json'), 'utf-8')).toContain('ambient');
+  });
+
   it('recovers when one polyrepo push landed before a later repository rejected', async () => {
     const fixture = mkdtempSync(join(tmpdir(), 'version-ship-polyrepo-retry-'));
     tempDirs.push(fixture);

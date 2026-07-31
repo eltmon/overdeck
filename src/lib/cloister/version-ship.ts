@@ -33,6 +33,10 @@ export interface VersionShipAllowedRepo {
   path: string;
   /** Explicit remote target ref for `git push origin HEAD:<targetBranch>`. */
   targetBranch: string;
+  /** Prepared worktree HEAD before any version mutation. */
+  expectedHead: string;
+  /** Canonical Git directory owned by the prepared linked worktree. */
+  expectedGitDir: string;
 }
 
 export class VersionShipOperationError extends Error {
@@ -55,9 +59,16 @@ export interface VersionShipDeps {
     cwd: string,
     projectRoot: string,
     image: string,
+    copyBackPaths: string[],
   ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
   readFile: (path: string) => Promise<string>;
   testPattern: (pattern: string, content: string) => Promise<boolean>;
+  verifyRepo: (
+    repoRoot: string,
+    expectedHead: string,
+    expectedGitDir: string,
+    allowHeadDescendant: boolean,
+  ) => Promise<void>;
   hasChanges: (repoRoot: string, paths: string[]) => Promise<boolean>;
   commit: (repoRoot: string, paths: string[], message: string) => Promise<void>;
   push: (repoRoot: string, targetBranch: string) => Promise<void>;
@@ -168,9 +179,12 @@ export async function runVersionShip(
           `version_sync.push path is not a registered project repository: ${declaredPath}`,
         );
       }
+      await deps.resolveDirectory(projectRoot, declaredPath);
       return {
-        repoRoot: await deps.resolveDirectory(projectRoot, declaredPath),
+        declaredPath,
         targetBranch: allowed.targetBranch,
+        expectedHead: allowed.expectedHead,
+        expectedGitDir: allowed.expectedGitDir,
       };
     }));
 
@@ -179,7 +193,16 @@ export async function runVersionShip(
     }
 
     if (config.command && commandCwd && config.command_image) {
-      const commandResult = await deps.runCommand(config.command, commandCwd, projectRoot, config.command_image);
+      const commandResult = await deps.runCommand(
+        config.command,
+        commandCwd,
+        projectRoot,
+        config.command_image,
+        [...new Set([
+          ...setTargets.map(target => target.path),
+          ...expectations.map(expectation => expectation.path),
+        ])],
+      );
       if (commandResult.exitCode !== 0) {
         deps.logDiagnostic?.(
           `[version-ship] command exited ${commandResult.exitCode}: ${commandResult.stderr || commandResult.stdout}`,
@@ -195,7 +218,8 @@ export async function runVersionShip(
     }
 
     for (const expectation of expectations) {
-      const content = await deps.readFile(expectation.absolutePath);
+      const postCommandPath = await deps.resolveFile(projectRoot, expectation.path);
+      const content = await deps.readFile(postCommandPath);
       const pattern = expandPlaceholders(expectation.pattern, version);
       const ok = await deps.testPattern(pattern, content);
       paths.push({
@@ -210,17 +234,21 @@ export async function runVersionShip(
       config.commit_message ?? 'chore: bump version to {version}',
       version,
     );
-    const declaredAbsolutePaths = [
-      ...setTargets.map(target => target.absolutePath),
-      ...expectations.map(expectation => expectation.absolutePath),
-    ];
+    const declaredAbsolutePaths = await Promise.all([
+      ...setTargets.map(target => deps.resolveFile(projectRoot, target.path)),
+      ...expectations.map(expectation => deps.resolveFile(projectRoot, expectation.path)),
+    ]);
 
     for (const target of pushTargets) {
-      const declaredPaths = pathsWithinRepo(target.repoRoot, declaredAbsolutePaths);
-      if (declaredPaths.length > 0 && await deps.hasChanges(target.repoRoot, declaredPaths)) {
-        await deps.commit(target.repoRoot, declaredPaths, commitMessage);
+      const repoRoot = await deps.resolveDirectory(projectRoot, target.declaredPath);
+      const declaredPaths = pathsWithinRepo(repoRoot, declaredAbsolutePaths);
+      await deps.verifyRepo(repoRoot, target.expectedHead, target.expectedGitDir, false);
+      if (declaredPaths.length > 0 && await deps.hasChanges(repoRoot, declaredPaths)) {
+        await deps.verifyRepo(repoRoot, target.expectedHead, target.expectedGitDir, false);
+        await deps.commit(repoRoot, declaredPaths, commitMessage);
       }
-      await deps.push(target.repoRoot, target.targetBranch);
+      await deps.verifyRepo(repoRoot, target.expectedHead, target.expectedGitDir, true);
+      await deps.push(repoRoot, target.targetBranch);
     }
 
     return { status, version, batch: batchName, paths, at };

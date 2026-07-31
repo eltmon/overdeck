@@ -67,7 +67,13 @@ describe('GET /api/projects/:projectKey/version-sync payload', () => {
 
   it('returns configured version_sync and a conservative all-member outcome', async () => {
     const older: PanIssueShipRecord = {
-      status: 'partial', version: '48.7.0', batch: 'uat/pan-ember-0731', paths: [], at: '2026-07-31T01:00:00Z',
+      status: 'partial',
+      version: '48.7.0',
+      batch: 'uat/pan-ember-0731',
+      paths: [],
+      error: 'operator-safe internal detail',
+      reason: 'internal settlement reason',
+      at: '2026-07-31T01:00:00Z',
     };
     const newest: PanIssueShipRecord = {
       status: 'passed', version: '48.8.0', batch: 'uat/pan-ember-0731', paths: [], at: '2026-07-31T02:00:00Z',
@@ -76,7 +82,19 @@ describe('GET /api/projects/:projectKey/version-sync payload', () => {
       generation: promotedGeneration(),
       outcomes: { 'PAN-1': older, 'PAN-2': newest },
     }));
-    expect(result).toEqual({ status: 200, body: { config: CONFIG, lastOutcome: older } });
+    expect(result).toEqual({
+      status: 200,
+      body: {
+        config: CONFIG,
+        lastOutcome: {
+          status: 'partial',
+          version: '48.7.0',
+          batch: 'uat/pan-ember-0731',
+          paths: [],
+          at: '2026-07-31T01:00:00Z',
+        },
+      },
+    });
   });
 });
 

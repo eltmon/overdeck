@@ -371,18 +371,23 @@ The fields are deliberately small:
   the command runs.
 - `command` is optional; `command_cwd` is relative to the project root and
   `command_image` is required with it. The operator-owned image must already be
-  present locally. The command runs without host credentials in a read-only,
-  capability-dropped container with only the prepared project tree writable,
-  no network, and a five-minute hard timeout; the credentialed push remains in
-  hook-disabled trusted parent code.
+  present locally and provide `/bin/sh` plus `cp`. Commands are filesystem-only:
+  Overdeck removes every `.git`
+  entry from a read-only export, copies that export into a 1 GiB container tmpfs,
+  and runs without host credentials, network, or capabilities under a five-minute
+  hard timeout. After success, only declared `set` and `expect` regular files are
+  copied back through no-follow validation, capped at 16 MiB per file and 64 MiB
+  total. Commands cannot inspect or commit Git metadata; the credentialed commit
+  and push remain in hook-disabled trusted parent code after repository identity
+  is revalidated.
 - `expect[].pattern` is a regular expression checked after propagation.
   `{version}` expands to the complete version such as `48.8.0`, while
   `{majorMinor}` expands to `48.8`. Patterns are limited to 512 characters,
   expectation files to 1 MiB, and matching runs in a worker with a 250 ms
   deadline so project configuration cannot block the dashboard event loop.
-- `commit_message` defaults to `chore: bump version to {version}`. The runner
-  stages only paths declared by `set` or `expect`; if the command already
-  committed them, the runner correctly has nothing left to commit.
+- `commit_message` defaults to `chore: bump version to {version}`. The trusted
+  parent stages only paths declared by `set` or `expect`; sandbox commands never
+  receive Git metadata and cannot self-commit.
 - `push[]` lists repository paths relative to the project root; `.` means the
   project root itself.
 
@@ -395,7 +400,10 @@ cannot pass close-out until the version is shipped. The promoted batch then
 stays on the card with a **Ship version** action, which runs the same runner and
 rewrites every member's verdict. Promoted `pending`, `partial`, and `failed`
 batches remain visible with their current outcome and retry action; only a
-conservative all-member `passed` aggregate removes the card. Terminal-only operators can call
+conservative all-member `passed` aggregate removes the card. Promote-time and
+deferred requests share one per-generation mutex, so concurrent requests cannot
+interleave side effects or overwrite a successful settlement with a racing
+failure. Terminal-only operators can call
 `POST /api/merge-train/generations/:name/ship` with `{ "version": "48.8.0" }`;
 there is no separate `pan ship` command.
 

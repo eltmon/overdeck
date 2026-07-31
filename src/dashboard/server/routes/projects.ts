@@ -24,7 +24,11 @@ import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { readIssueRecordSync, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
 import { setProjectVersionSync } from '../../../lib/projects-writer.js';
-import { aggregateGenerationShipStatus, loadShipRecords } from '../../../lib/cloister/ship-status.js';
+import {
+  aggregateGenerationShipStatus,
+  loadShipRecords,
+  publicShipStatus,
+} from '../../../lib/cloister/ship-status.js';
 import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
@@ -816,7 +820,9 @@ export async function getProjectVersionSyncPayload(
   if (!project) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
 
   const generation = deps.listPromotedGenerations(project.path)[0];
-  const lastOutcome = generation ? await deps.readOutcome(project, generation) : null;
+  const lastOutcome = generation
+    ? publicShipStatus(await deps.readOutcome(project, generation))
+    : null;
   return { status: 200, body: { config: project.version_sync ?? null, lastOutcome } };
 }
 

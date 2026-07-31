@@ -63,6 +63,7 @@ import {
   executeVersionShipForGeneration,
   persistPendingShipRecords,
   persistShipRecords,
+  withGenerationShipLock,
 } from '../../../lib/cloister/ship-record.js';
 import {
   aggregateGenerationShipStatus,
@@ -800,23 +801,26 @@ export async function postUatGenerationPromotePayload(
     recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
     ...(projectConfig?.version_sync
       ? {
-          runShip: async (generation: UatGeneration, requestedVersion: string | undefined) => {
-            // Establish durable batch membership before any command, worktree, or
-            // Git operation can fail. Deferred recovery and the DoD gate then
-            // remain blocking even when propagation never starts.
-            await persistPendingShipRecords(
-              generation,
-              requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
-            );
-            if (!requestedVersion) return;
+          runShip: (generation: UatGeneration, requestedVersion: string | undefined) => withGenerationShipLock(
+            generation.name,
+            async () => {
+              // Establish durable batch membership before any command, worktree, or
+              // Git operation can fail. Deferred recovery and the DoD gate then
+              // remain blocking even when propagation never starts.
+              await persistPendingShipRecords(
+                generation,
+                requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
+              );
+              if (!requestedVersion) return;
 
-            const report = await executeVersionShipForGeneration({
-              generation,
-              project: projectConfig,
-              version: requestedVersion,
-            });
-            await persistShipRecords(generation, report);
-          },
+              const report = await executeVersionShipForGeneration({
+                generation,
+                project: projectConfig,
+                version: requestedVersion,
+              });
+              await persistShipRecords(generation, report);
+            },
+          ),
         }
       : {}),
     log: (msg) => console.log(msg),

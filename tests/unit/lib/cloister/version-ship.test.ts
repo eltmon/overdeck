@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   runVersionShip,
@@ -37,12 +37,22 @@ function fakeDeps(overrides: Partial<VersionShipDeps> = {}): FakeDeps {
     runCommand: vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' })),
     readFile: vi.fn(async () => '"version": "1.2.3"'),
     testPattern: vi.fn(async (pattern: string, content: string) => new RegExp(pattern).test(content)),
+    verifyRepo: vi.fn(async () => {}),
     hasChanges: vi.fn(async () => true),
     commit: vi.fn(async () => {}),
     push: vi.fn(async () => {}),
     logDiagnostic: vi.fn(),
     ...overrides,
   } as FakeDeps;
+}
+
+function allowedRepo(path: string, targetBranch = 'main') {
+  return {
+    path,
+    targetBranch,
+    expectedHead: 'prepared-head',
+    expectedGitDir: `/git/${path}`,
+  };
 }
 
 function config(overrides: Partial<VersionSyncConfig> = {}): VersionSyncConfig {
@@ -70,7 +80,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(deps.writeVersion).toHaveBeenCalledWith('/repo/frontend/package.json', 'version', '1.2.3');
@@ -79,6 +89,7 @@ describe('runVersionShip', () => {
       '/repo/frontend',
       '/repo',
       'myn-version-sync:latest',
+      ['frontend/package.json'],
     );
     expect(deps.commit).toHaveBeenCalledWith(
       '/repo/frontend',
@@ -110,7 +121,7 @@ describe('runVersionShip', () => {
       }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report.status).toBe('partial');
@@ -133,7 +144,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report).toMatchObject({
@@ -162,7 +173,7 @@ describe('runVersionShip', () => {
       }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(deps.hasChanges).toHaveBeenCalledWith('/repo/frontend', [
@@ -176,7 +187,7 @@ describe('runVersionShip', () => {
     );
   });
 
-  it('skips a no-op commit but still pushes a command that self-committed', async () => {
+  it('skips a no-op commit but still verifies the explicit target push', async () => {
     const deps = fakeDeps({ hasChanges: vi.fn(async () => false) });
 
     const report = await runVersionShip({
@@ -184,7 +195,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report.status).toBe('passed');
@@ -202,7 +213,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report).toMatchObject({
@@ -220,7 +231,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report).toMatchObject({
@@ -239,7 +250,7 @@ describe('runVersionShip', () => {
       config: config({ command_image: undefined }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report).toMatchObject({
@@ -258,7 +269,7 @@ describe('runVersionShip', () => {
       config: config({ push: ['elsewhere'] }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
-      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('frontend')],
     }, deps);
 
     expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
@@ -278,7 +289,7 @@ describe('runVersionShip', () => {
       config: { set: [{ path: 'package.json', json_field: 'version' }], push: ['.'] },
       version: '1.2.3',
       batchName: 'uat/pan-ember-0731',
-      allowedRepos: [{ path: '.', targetBranch: 'main' }],
+      allowedRepos: [allowedRepo('.')],
     }, buildVersionShipDeps());
 
     expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
@@ -322,28 +333,106 @@ describe('version ship command sandbox', () => {
     const cwd = join(root, 'frontend');
     tempDirs.push(root);
     mkdirSync(cwd);
-    const runDocker = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
+    writeFileSync(join(cwd, 'package.json'), '{"version":"1.2.3"}\n');
+    const runDocker = vi.fn(async (args: string[]) => {
+      if (args[0] === 'run') {
+        const cidIndex = args.indexOf('--cidfile');
+        writeFileSync(args[cidIndex + 1]!, 'sandbox-id\n');
+      } else if (args[0] === 'cp') {
+        const destination = args.at(-1)!;
+        mkdirSync(dirname(destination), { recursive: true });
+        writeFileSync(destination, '{"version":"1.2.3"}\n');
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
     const deps = buildVersionShipDeps({ runDocker });
 
-    await deps.runCommand('pnpm vsync', cwd, root, 'myn-version-sync:latest');
+    await deps.runCommand(
+      'pnpm vsync',
+      cwd,
+      root,
+      'myn-version-sync:latest',
+      ['frontend/package.json'],
+    );
 
-    expect(runDocker).toHaveBeenCalledOnce();
-    const [args, dockerCwd, timeout] = runDocker.mock.calls[0]!;
+    expect(runDocker).toHaveBeenCalledTimes(5);
+    const [args, dockerCwd] = runDocker.mock.calls[0]!;
     expect(args).toEqual(expect.arrayContaining([
       '--pull', 'never',
       '--network', 'none',
       '--read-only',
       '--cap-drop', 'ALL',
       '--security-opt', 'no-new-privileges',
-      '--workdir', '/workspace/frontend',
       '--env', 'CI=1',
       '--env', 'HOME=/tmp',
       'myn-version-sync:latest',
-      'pnpm', 'vsync',
     ]));
     expect(args.some((arg: string) => /TOKEN|PASSWORD|SECRET|SSH_AUTH_SOCK/.test(arg))).toBe(false);
     expect(dockerCwd).toBe(root);
-    expect(timeout).toBe(5 * 60 * 1000);
+    const [commandArgs, commandCwd, commandTimeout] = runDocker.mock.calls[2]!;
+    expect(commandArgs).toEqual([
+      'exec', '--workdir', '/workspace/frontend', 'sandbox-id', 'pnpm', 'vsync',
+    ]);
+    expect(commandCwd).toBe(root);
+    expect(commandTimeout).toBe(5 * 60 * 1000);
+  });
+
+  it('rejects metadata rewrites and symlink copyback before privileged Git runs', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'version-ship-sandbox-attack-'));
+    const repo = join(root, 'repo');
+    const ambient = mkdtempSync(join(tmpdir(), 'version-ship-ambient-'));
+    tempDirs.push(root, ambient);
+    mkdirSync(repo);
+    writeFileSync(join(repo, '.git'), `gitdir: ${join(ambient, '.git')}\n`);
+    writeFileSync(join(repo, 'package.json'), '{"version":"1.0.0"}\n');
+    writeFileSync(join(ambient, 'package.json'), '{"version":"ambient"}\n');
+    let metadataWasExported = true;
+    const runDocker = vi.fn(async (args: string[]) => {
+      if (args[0] === 'run') {
+        const cidIndex = args.indexOf('--cidfile');
+        writeFileSync(args[cidIndex + 1]!, 'sandbox-id\n');
+        const mount = args.find(arg => arg.includes('dst=/input'))!;
+        const inputRoot = /src=([^,]+)/.exec(mount)![1]!;
+        metadataWasExported = existsSync(join(inputRoot, 'repo', '.git'));
+      } else if (args[0] === 'cp') {
+        const destination = args.at(-1)!;
+        rmSync(dirname(destination), { recursive: true, force: true });
+        symlinkSync(ambient, dirname(destination));
+      }
+      return { exitCode: 0, stdout: '', stderr: '' };
+    });
+    const realDeps = buildVersionShipDeps({ runDocker });
+    const deps = {
+      ...realDeps,
+      verifyRepo: vi.fn(realDeps.verifyRepo),
+      hasChanges: vi.fn(realDeps.hasChanges),
+      commit: vi.fn(realDeps.commit),
+      push: vi.fn(realDeps.push),
+    };
+
+    const report = await runVersionShip({
+      projectRoot: root,
+      config: {
+        set: [{ path: 'repo/package.json', json_field: 'version' }],
+        command: 'node sync.js',
+        command_cwd: 'repo',
+        command_image: 'trusted-sync:latest',
+        expect: [{ path: 'repo/package.json', pattern: '"version":"{version}"' }],
+        push: ['repo'],
+      },
+      version: '9.9.9',
+      batchName: 'uat/pan-sandbox-attack',
+      allowedRepos: [allowedRepo('repo')],
+    }, deps);
+
+    expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
+    expect(metadataWasExported).toBe(false);
+    expect(readFileSync(join(repo, '.git'), 'utf-8')).toContain(ambient);
+    expect(readFileSync(join(ambient, 'package.json'), 'utf-8')).toContain('ambient');
+    expect(deps.verifyRepo).not.toHaveBeenCalled();
+    expect(deps.hasChanges).not.toHaveBeenCalled();
+    expect(deps.commit).not.toHaveBeenCalled();
+    expect(deps.push).not.toHaveBeenCalled();
   });
 });
 

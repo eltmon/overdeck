@@ -30,6 +30,25 @@ const defaultRecordDeps: ShipRecordDeps = {
 };
 
 const RECORD_WRITE_ATTEMPTS = 3;
+const generationShipTails = new Map<string, Promise<void>>();
+
+export async function withGenerationShipLock<T>(
+  generationName: string,
+  run: () => Promise<T>,
+): Promise<T> {
+  const previous = generationShipTails.get(generationName) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>(resolveRelease => { release = resolveRelease; });
+  const tail = previous.catch(() => {}).then(() => current);
+  generationShipTails.set(generationName, tail);
+  await previous.catch(() => {});
+  try {
+    return await run();
+  } finally {
+    release();
+    if (generationShipTails.get(generationName) === tail) generationShipTails.delete(generationName);
+  }
+}
 
 export class ShipRecordPersistenceError extends Error {
   constructor(
@@ -222,8 +241,10 @@ export async function shipPromotedBatch(
     );
   }
 
-  await (deps.persistPending ?? persistPendingShipRecords)(generation, 'deferred version ship in progress');
-  const report = await (deps.execute ?? executeVersionShipForGeneration)({ generation, project, version: args.version });
-  await deps.persist(generation, report);
-  return report;
+  return withGenerationShipLock(generation.name, async () => {
+    await (deps.persistPending ?? persistPendingShipRecords)(generation, 'deferred version ship in progress');
+    const report = await (deps.execute ?? executeVersionShipForGeneration)({ generation, project, version: args.version });
+    await deps.persist(generation, report);
+    return report;
+  });
 }

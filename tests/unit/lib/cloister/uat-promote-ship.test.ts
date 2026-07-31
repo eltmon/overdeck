@@ -8,6 +8,7 @@ import {
   persistShipRecords,
   shipPromotedBatch,
   ShipPromotedBatchError,
+  withGenerationShipLock,
 } from '../../../../src/lib/cloister/ship-record.js';
 import { aggregateGenerationShipStatus } from '../../../../src/lib/cloister/ship-status.js';
 import { projectPipeline } from '../../../../src/lib/pan-dir/records.js';
@@ -228,6 +229,45 @@ describe('durable ship records', () => {
 });
 
 describe('shipPromotedBatch', () => {
+  it('serializes a deferred request behind an in-flight promote-time ship', async () => {
+    const order: string[] = [];
+    let releasePromote!: () => void;
+    const promoteGate = new Promise<void>(resolve => { releasePromote = resolve; });
+    const promote = withGenerationShipLock(BATCH, async () => {
+      order.push('promote-start');
+      await promoteGate;
+      order.push('promote-end');
+    });
+    await Promise.resolve();
+
+    const deferred = shipPromotedBatch({
+      generationName: BATCH,
+      projectRoot: PROJECT_ROOT,
+      version: '2.0.0',
+    }, {
+      getGeneration: () => generation('promoted'),
+      findProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT, version_sync: {} }),
+      persistPending: async () => { order.push('deferred-pending'); return []; },
+      execute: async () => {
+        order.push('deferred-execute');
+        return { status: 'passed', version: '2.0.0', batch: BATCH, paths: [], at: '2026-07-31T02:00:00.000Z' };
+      },
+      persist: async () => { order.push('deferred-persist'); return []; },
+    });
+    await Promise.resolve();
+    expect(order).toEqual(['promote-start']);
+
+    releasePromote();
+    await Promise.all([promote, deferred]);
+    expect(order).toEqual([
+      'promote-start',
+      'promote-end',
+      'deferred-pending',
+      'deferred-execute',
+      'deferred-persist',
+    ]);
+  });
+
   it('refuses a generation that is not promoted', async () => {
     await expect(shipPromotedBatch({
       generationName: BATCH,

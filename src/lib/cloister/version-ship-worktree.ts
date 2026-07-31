@@ -84,7 +84,13 @@ export async function withVersionShipWorkspace<T>(
   const wrapperRoot = normalized.length === 1 && normalized[0]!.configPath === '.'
     ? join(tempRoot, 'repo')
     : join(tempRoot, 'project');
-  const prepared: Array<{ sourceRoot: string; worktreePath: string }> = [];
+  const prepared: Array<{
+    sourceRoot: string;
+    worktreePath: string;
+    configPath: string;
+    expectedHead: string;
+    expectedGitDir: string;
+  }> = [];
 
   try {
     if (!(normalized.length === 1 && normalized[0]!.configPath === '.')) {
@@ -105,12 +111,26 @@ export async function withVersionShipWorkspace<T>(
       );
       const targetHead = await runGit(['rev-parse', targetRef], sourceRoot, `could not resolve ${repo.targetBranch} before version ship`);
       await runGit(['worktree', 'add', '--detach', worktreePath, targetHead], sourceRoot, 'could not create the version ship worktree');
-      prepared.push({ sourceRoot, worktreePath });
+      const expectedHead = await runGit(['rev-parse', 'HEAD'], worktreePath, 'could not verify the version ship worktree head');
+      const expectedGitDir = await realpath(await runGit(
+        ['rev-parse', '--absolute-git-dir'],
+        worktreePath,
+        'could not verify the version ship worktree metadata',
+      ));
+      prepared.push({ sourceRoot, worktreePath, configPath: repo.configPath, expectedHead, expectedGitDir });
     }
 
     return await run({
       projectRoot: wrapperRoot,
-      allowedRepos: normalized.map(repo => ({ path: repo.configPath, targetBranch: repo.targetBranch })),
+      allowedRepos: normalized.map(repo => {
+        const identity = prepared.find(candidate => candidate.configPath === repo.configPath)!;
+        return {
+          path: repo.configPath,
+          targetBranch: repo.targetBranch,
+          expectedHead: identity.expectedHead,
+          expectedGitDir: identity.expectedGitDir,
+        };
+      }),
     });
   } finally {
     for (const repo of [...prepared].reverse()) {
