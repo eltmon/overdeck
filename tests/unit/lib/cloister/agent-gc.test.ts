@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { pruneStoppedAgentsForIssue } from '../../../../src/lib/cloister/agent-gc.js';
+import {
+  pruneStoppedAgentsForIssue,
+  pruneTerminalStoppedAgents,
+} from '../../../../src/lib/cloister/agent-gc.js';
+import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agent-tombstones.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 const agent = (id: string, status: AgentState['status'], role: AgentState['role']): AgentState => ({
@@ -31,5 +35,25 @@ describe('PAN-2543 event-driven agent row GC', () => {
 
     expect(result).toEqual({ removed: ['agent-pan-2503', 'planning-pan-2503'], preserved: ['agent-pan-2503-review'] });
     expect(removeRecord.mock.calls.map(call => call[0])).toEqual(result.removed);
+  });
+
+  it('excludes retained-transcript tombstones before terminal issue resolution', async () => {
+    const isTerminalAgent = vi.fn(() => true);
+    const cleanStateDir = vi.fn();
+    const result = await pruneTerminalStoppedAgents([
+      { ...agent('agent-pan-2503', 'stopped', 'work'), phase: RETAINED_TRANSCRIPTS_PHASE },
+    ], {
+      agentsDir: '/agents',
+      cleanStateDir,
+      hasRetainedMarker: vi.fn(async () => true),
+      markRetained: vi.fn(async () => {}),
+      removeRecord: vi.fn(),
+      tombstoneRecord: vi.fn(),
+      isTerminalAgent,
+    });
+
+    expect(result).toEqual({ removed: [], preserved: [] });
+    expect(isTerminalAgent).not.toHaveBeenCalled();
+    expect(cleanStateDir).not.toHaveBeenCalled();
   });
 });

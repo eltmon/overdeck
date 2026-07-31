@@ -35,6 +35,7 @@ const overdeckAgents = sqliteTable('agents', {
   pausedReason: text('paused_reason'),
   troubled: integer('troubled', { mode: 'boolean' }),
   channelsEnabled: integer('channels_enabled', { mode: 'boolean' }),
+  phase: text('phase'),
   consecutiveFailures: integer('consecutive_failures').default(0),
   firstFailureInRunAt: integer('first_failure_in_run_at', { mode: 'timestamp_ms' }),
   lastFailureNextRetryAt: integer('last_failure_next_retry_at', { mode: 'timestamp_ms' }),
@@ -412,7 +413,7 @@ export const AgentWriterLive = Layer.effect(
         };
         yield* Effect.promise(() =>
           db.q.update(overdeckAgents)
-            .set({ status: 'starting', stoppedByUser: false, lastResumeAt: next.lastResumeAt, updatedAt: next.updatedAt })
+            .set({ status: 'starting', stoppedByUser: false, phase: null, lastResumeAt: next.lastResumeAt, updatedAt: next.updatedAt })
             .where(eq(overdeckAgents.id, id))
             .run(),
         );
@@ -860,15 +861,6 @@ export function removeAgentRecordSync(agentId: string): void {
   } catch { /* agents table missing */ }
 }
 
-export function tombstoneAgentRecordSync(agentId: string): void {
-  try {
-    getOverdeckDatabaseSync().prepare(`
-      UPDATE agents
-      SET status = 'stopped', session_id = NULL, updated_at = ?
-      WHERE id = ?
-    `).run(Date.now(), agentId);
-  } catch { /* agents table missing */ }
-}
 
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
   const db = getOverdeckDatabaseSync();

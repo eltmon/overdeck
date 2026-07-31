@@ -70,7 +70,12 @@ describe('canonical agent removal with retained transcripts', () => {
     expect(existsSync(transcriptPath)).toBe(true);
     expect(existsSync(join(agentDir, RETAINED_TRANSCRIPTS_MARKER))).toBe(true);
     expect(listAllAgentsSync()).toEqual([
-      expect.objectContaining({ id: agentId, issueId: 'PAN-3357', status: 'stopped' }),
+      expect.objectContaining({
+        id: agentId,
+        issueId: 'PAN-3357',
+        status: 'stopped',
+        phase: 'retained-transcripts',
+      }),
     ]);
 
     await sweepTranscriptRetention({
@@ -89,5 +94,53 @@ describe('canonical agent removal with retained transcripts', () => {
 
     expect(existsSync(agentDir)).toBe(false);
     expect(listAllAgentsSync()).toEqual([]);
+  });
+
+  it('reconstructs a disk-only review tombstone before deleting state.json', async () => {
+    const agentId = 'agent-pan-3357-review-security';
+    const agentDir = join(testHome, 'agents', agentId);
+    const transcriptPath = join(agentDir, 'sessions', 'review.jsonl');
+    mkdirSync(join(agentDir, 'sessions'), { recursive: true });
+    writeFileSync(transcriptPath, '{}\n');
+    writeFileSync(join(agentDir, 'state.json'), JSON.stringify({
+      id: agentId,
+      issueId: 'PAN-3357',
+      role: 'review',
+      status: 'stopped',
+      workspace: '/workspaces/feature-pan-3357',
+      harness: 'claude-code',
+      model: 'claude',
+    }));
+    getOverdeckDatabaseSync().prepare(`
+      INSERT INTO issues (id, stage, updated_at)
+      VALUES (?, ?, ?)
+    `).run('PAN-3357', 'working', Date.now());
+
+    const cleanup = await removeAgent(agentId);
+
+    expect(cleanup.removedDir).toBe(false);
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(false);
+    expect(existsSync(transcriptPath)).toBe(true);
+    expect(listAllAgentsSync()).toEqual([
+      expect.objectContaining({
+        id: agentId,
+        issueId: 'PAN-3357',
+        status: 'stopped',
+        phase: 'retained-transcripts',
+      }),
+    ]);
+  });
+
+  it('fails closed before cleanup when a disk-only directory has no recoverable identity', async () => {
+    const agentId = 'agent-pan-3357-review-performance';
+    const agentDir = join(testHome, 'agents', agentId);
+    mkdirSync(agentDir, { recursive: true });
+    writeFileSync(join(agentDir, 'state.json'), '{}');
+    writeFileSync(join(agentDir, 'review.jsonl'), '{}\n');
+
+    await expect(removeAgent(agentId)).rejects.toThrow('cannot preserve transcript linkage');
+
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(true);
+    expect(existsSync(join(agentDir, 'review.jsonl'))).toBe(true);
   });
 });

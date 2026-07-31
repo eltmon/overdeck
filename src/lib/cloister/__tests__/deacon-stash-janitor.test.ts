@@ -55,6 +55,7 @@ vi.mock('../../overdeck/agents.js', () => ({
   listAllAgentsSync: vi.fn(() => []),
   removeAgentRecordSync: vi.fn(),
   tombstoneAgentRecordSync: vi.fn(),
+  RETAINED_TRANSCRIPTS_PHASE: 'retained-transcripts',
 }));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
 vi.mock('../../git-utils.js', async (importOriginal) => ({

@@ -1,10 +1,10 @@
 import { join } from 'node:path';
 
 import {
-  listAllAgentsSync,
-  removeAgentRecordSync,
+  RETAINED_TRANSCRIPTS_PHASE,
   tombstoneAgentRecordSync,
-} from '../overdeck/agents.js';
+} from '../overdeck/agent-tombstones.js';
+import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { getOverdeckHome } from '../paths.js';
 import {
@@ -15,7 +15,13 @@ import {
 } from '../agents/state-dir-removal.js';
 
 export interface AgentGcResult { removed: string[]; preserved: string[] }
-export interface AgentGcRow { id: string; issueId: string; status: string; workspace?: string | null }
+export interface AgentGcRow {
+  id: string;
+  issueId: string;
+  status: string;
+  workspace?: string | null;
+  phase?: string | null;
+}
 
 export interface AgentGcDeps {
   agentsDir: string;
@@ -86,6 +92,7 @@ export async function pruneTerminalStoppedAgents(
   agents: AgentGcRow[] = listAllAgentsSync(),
   deps: AgentGcDeps = defaultAgentGcDeps(),
 ): Promise<AgentGcResult> {
-  const terminal = agents.filter(deps.isTerminalAgent);
+  const terminal = agents.filter((agent) =>
+    agent.phase !== RETAINED_TRANSCRIPTS_PHASE && deps.isTerminalAgent(agent));
   return pruneAgentRowsAfterTranscriptCleanup(terminal, deps);
 }

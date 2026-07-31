@@ -1,4 +1,4 @@
-import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -41,17 +41,55 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+const CLAIM_METADATA_GRACE_MS = 30_000;
+
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return !hasErrorCode(error, 'ESRCH');
+  }
+}
+
 async function claimMigrationDestination(
   destination: string,
 ): Promise<(() => Promise<void>) | null> {
   const claimPath = `${destination}.migrate-lock`;
-  try {
-    await mkdir(claimPath);
-  } catch (error) {
-    if (hasErrorCode(error, 'EEXIST')) return null;
-    throw error;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    let handle: Awaited<ReturnType<typeof open>> | undefined;
+    try {
+      handle = await open(claimPath, 'wx');
+      await handle.writeFile(JSON.stringify({ pid: process.pid }));
+      await handle.close();
+      return async () => { await rm(claimPath, { force: true }); };
+    } catch (error) {
+      await handle?.close().catch(() => undefined);
+      if (!hasErrorCode(error, 'EEXIST')) {
+        await rm(claimPath, { recursive: true, force: true });
+        throw error;
+      }
+    }
+
+    let ownerPid: number | null = null;
+    try {
+      const owner = JSON.parse(await readFile(claimPath, 'utf8')) as { pid?: unknown };
+      if (typeof owner.pid === 'number' && Number.isInteger(owner.pid) && owner.pid > 0) {
+        ownerPid = owner.pid;
+      }
+    } catch { /* incomplete or legacy claim; age check below */ }
+    if (ownerPid !== null && isProcessAlive(ownerPid)) return null;
+    if (ownerPid === null) {
+      try {
+        if (Date.now() - (await stat(claimPath)).mtimeMs < CLAIM_METADATA_GRACE_MS) return null;
+      } catch (error) {
+        if (hasErrorCode(error, 'ENOENT')) continue;
+        throw error;
+      }
+    }
+    await rm(claimPath, { recursive: true, force: true });
   }
-  return async () => { await rm(claimPath, { recursive: true, force: true }); };
+  return null;
 }
 
 /**

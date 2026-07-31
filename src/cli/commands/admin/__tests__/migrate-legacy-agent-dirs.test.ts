@@ -85,6 +85,42 @@ describe('migrateLegacyAgentDirs', () => {
     expect(readdirSync(destination)).toEqual([]);
   });
 
+  it('does not steal a destination claim owned by a live process', async () => {
+    const sourceDir = join(legacyHome, 'agents', 'conv-live-claim');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(sourceDir, 'session.jsonl'), 'legacy\n');
+    const currentAgentsDir = join(currentHome, 'agents');
+    mkdirSync(currentAgentsDir, { recursive: true });
+    const claimPath = join(currentAgentsDir, 'conv-live-claim.migrate-lock');
+    writeFileSync(claimPath, JSON.stringify({ pid: process.pid }));
+
+    await expect(migrateLegacyAgentDirs({ legacyHome, currentHome })).resolves.toEqual({
+      copied: 0,
+      skipped: 1,
+    });
+    expect(existsSync(join(currentAgentsDir, 'conv-live-claim'))).toBe(false);
+    expect(existsSync(claimPath)).toBe(true);
+  });
+
+  it('reclaims an abandoned destination claim whose owner is dead', async () => {
+    const sourceDir = join(legacyHome, 'agents', 'conv-abandoned');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(sourceDir, 'session.jsonl'), 'legacy\n');
+    const currentAgentsDir = join(currentHome, 'agents');
+    mkdirSync(currentAgentsDir, { recursive: true });
+    writeFileSync(
+      join(currentAgentsDir, 'conv-abandoned.migrate-lock'),
+      JSON.stringify({ pid: 2_147_483_647 }),
+    );
+
+    await expect(migrateLegacyAgentDirs({ legacyHome, currentHome })).resolves.toEqual({
+      copied: 1,
+      skipped: 0,
+    });
+    expect(existsSync(join(currentAgentsDir, 'conv-abandoned', 'session.jsonl'))).toBe(true);
+    expect(existsSync(join(currentAgentsDir, 'conv-abandoned.migrate-lock'))).toBe(false);
+  });
+
   it('heals a copy interrupted after writing partial temporary data', async () => {
     const sourceDir = join(legacyHome, 'agents', 'conv-interrupted');
     const sourceTranscript = join(sourceDir, 'sessions', 'complete.jsonl');

@@ -474,8 +474,9 @@ Agent-dir deletion goes through `removeAgentStateDir()`, which removes runtime
 residue while preserving every `**/*.jsonl` transcript in place. Transcripts
 are retained forever by default; only an explicit positive
 `retention.transcript_days` enables the ended-agent transcript sweep. Terminal
-registry rows remain while retained JSONLs need their agent-to-issue link; a
-`.retained-transcripts` marker prevents repeated generic-GC walks. Automatic
+registry rows remain in `phase: retained-transcripts` while JSONLs need their
+agent-to-issue link; a `.retained-transcripts` marker prevents repeated generic
+GC reads and walks. Automatic
 cleanup continues to skip `conv-*` dirs entirely.
 
 See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.

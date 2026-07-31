@@ -282,8 +282,11 @@ only JSONL files older than the configured age from ended agent state dirs and
 never touches a live tmux session. Terminal agent GC removes runtime residue
 through the same door but retains the registry row while any JSONL remains; the
 row preserves the agent-to-issue link needed to read the durable closed-out
-verdict on a later sweep. A `.retained-transcripts` marker prevents generic GC
-from repeatedly walking that transcript-only tree. The explicit expiry sweep
+verdict on a later sweep. The row's `phase` becomes `retained-transcripts`, and
+a matching `.retained-transcripts` marker prevents generic GC from resolving
+or walking that transcript-only tree. Disk-only cleanup reconstructs this
+minimal tombstone from `state.json` before removing runtime residue, or fails
+closed when no identity can be recovered. The explicit expiry sweep
 removes the marker, directory, and row after the final JSONL reaches its cutoff.
 When the setting is absent,
 the sweep is not called and does not traverse the filesystem.

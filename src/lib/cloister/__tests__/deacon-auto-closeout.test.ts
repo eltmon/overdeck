@@ -129,6 +129,7 @@ vi.mock('../../overdeck/agents.js', () => ({
   listAllAgentsSync: vi.fn(() => []),
   removeAgentRecordSync: vi.fn(),
   tombstoneAgentRecordSync: vi.fn(),
+  RETAINED_TRANSCRIPTS_PHASE: 'retained-transcripts',
 }));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../lifecycle/workflows.js', async () => {
