@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T16:20:59.241Z",
+  "updated": "2026-07-31T16:22:18.809Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T16:20:59.228Z",
-    "inspectNotes": "Inspecting item version-sync-config-schema"
+    "updatedAt": "2026-07-31T16:22:18.780Z",
+    "inspectNotes": "INSPECTION ERROR — incomplete diff scope, not a code defect. The supplied diff was based at 61f885c881 and showed only scripts/file-size-allowlist.txt (+1 line) from adaa2e5132. The bead's actual implementation — src/lib/projects.ts (VersionSyncConfig, VersionSyncValidationResult, validateVersionSyncConfig, ProjectConfig.version_sync) and tests/unit/lib/projects-version-sync.test.ts, +244 lines in 61f885c881 — was omitted, so ACs 1-4 cannot be adjudicated from what was delivered. Re-run inspect with a diff base of b57f6abd2b (or the range b57f6abd2b..adaa2e5132) so both commits are in scope."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 526650,
-            "output": 22178,
-            "cacheRead": 6872576,
+            "input": 538026,
+            "output": 26341,
+            "cacheRead": 8276992,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 526650,
-          "output": 22178,
-          "cacheRead": 6872576,
+          "input": 538026,
+          "output": 26341,
+          "cacheRead": 8276992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 6.734878,
-        "pricingAsOf": "2026-07-31T16:20:59.233Z"
+        "usd": 7.618856,
+        "pricingAsOf": "2026-07-31T16:22:18.805Z"
       }
     },
     "merges": [],
