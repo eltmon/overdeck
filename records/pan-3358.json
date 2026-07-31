@@ -2,7 +2,7 @@
   "issueId": "PAN-3358",
   "schemaVersion": 2,
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T15:29:27.446Z",
+  "updated": "2026-07-31T15:29:28.607Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3358: Add a 'ship' step: propagate version strings across a project's repos when a batch merges (not publish, not store submission)",
       "timestamp": "2026-07-31T15:29:27.446Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
