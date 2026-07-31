@@ -1,0 +1,1005 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-31T14:56:36Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3356: Issue cockpit redesign v2: live-run IA — 6 tabs, crew spine, needs-you slot",
+    "updated": "2026-07-31T15:05:57.129Z"
+  },
+  "plan": {
+    "id": "pan-3356",
+    "title": "Issue cockpit redesign v2: live-run IA — 6 tabs, crew spine, needs-you slot",
+    "status": "proposed",
+    "uid": "5f6de86f-e2d8-4387-bac5-d5955c11a85f",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-31T14:56:36Z",
+    "updated": "2026-07-31T15:05:57.129Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3356",
+        "label": "PAN-3356",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3356.md",
+        "label": "PRD draft",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/main/docs/design/issue-detail-redesign-mockup-v2.html",
+        "label": "Visual contract (mockup v2)",
+        "type": "design"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "cockpit",
+      "issue-view",
+      "redesign"
+    ],
+    "narratives": {
+      "Problem": "The issue cockpit (IssueMissionControl.tsx) accreted 13 tabs plus a floating Tasks chip, with duplicated surfaces (Files vs Code both render ChangedFilesView; Activity vs Timeline both render ActivityTab), cost shown three times, and a '45 more' actions overflow. The page is not organized around the live run — the thing the operator actually comes to watch.",
+      "Proposal": "Implement the v2 mockup (docs/design/issue-detail-redesign-mockup-v2.html, committed 96a9a9ad42): fold 13 tabs to 6 (Overview, Session, Plan, Changes, Activity, Discussion) with legacy-id deep-link mapping; add a NeedsYouSlot priority banner; restyle AgentsLane into the crew spine; rebuild the right rail (Now / Run details / Gates / Cost / Environment / Recent activity); redesign the header (cost exactly once); give the pipeline band truthful sublabels and live merge progress. Every removed surface is folded into a named new home — never dropped — with inventory.ts relocations and the no-loss test updated in the same change. Full decisions D1–D14, FR-1..13, NFR-1..5 in the PRD.",
+      "NonGoals": "- Console/drawer and rail densities are unchanged except inventory bookkeeping\n- No new endpoints, polling loops, or stores (NFR-4)\n- No changes to IssueActionMenu or the action registry (issueActions.ts)\n- Stage/cockpit/OverviewTab.tsx is dead code — leave it untouched\n- No Mintlify page additions (no Mintlify page documents cockpit tabs; state so in the PR description if still true)\n- The v1 mockup (issue-detail-redesign-mockup.html) must NOT be implemented — it dropped surfaces\n- No changes to the session tree lane collapse default or agent spawn flows"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the canonical PRD on overdeck-state (drafts/pan-3356.md) as the implementation brief instead of authoring a new one, after re-verifying every file/line reference against the current tree.",
+        "rationale": "The issue body designates this PRD as the carrier of glossary, D1–D14, FR/NFR, and WI-1..13; all spot-checked references (TABS:71, ISSUE_DETAIL_TAB_IDS:66, default tab:415, tabBadge:407, header block:508–551, TasksDrawer:662, Pipeline Band:76, ISSUE_ACTION_DEFINITIONS:601, EXPECTED_COCKPIT_SECTIONS:136) verified accurate on 2026-07-31."
+      },
+      {
+        "summary": "Lowered the xBRIEF as 13 items mapping 1:1 to PRD WI-1..13 rather than decomposing further.",
+        "rationale": "Each WI is already one focused, independently reviewable change; finer splits would separate tab removals from their relocation homes and break the same-commit no-loss invariant (D14), which is the audit gate for the whole redesign."
+      },
+      {
+        "summary": "files_scope lists only files each item edits; reused-but-untouched components (ChangedFilesView, PrdViewer, DrawerArtifactsPanel, etc.) are excluded.",
+        "rationale": "Keeps scopes truthful and keeps the plan's projected surface at 20 distinct files — under the 25-file finalize lint — without hiding any real edit."
+      },
+      {
+        "summary": "Plan-tab done/total count is computed from the shared ['plan', issueId] react-query cache (TasksPanel's existing query) instead of the PRD's original 'shared taskTotals rollup' phrasing.",
+        "rationale": "The CommandDeck taskTotals field is not reachable from the cockpit; the plan query cache is already shared, so this satisfies NFR-4 (no new fetching) with zero new plumbing."
+      },
+      {
+        "summary": "Only tab-model-fold carries requiresInspection: true; all other items are false.",
+        "rationale": "tab-model-fold defines the MissionTab ids, LEGACY_TAB_MAP contract, and default-tab rule that five downstream items build on; every other item is a test-gated mechanical fold whose failure surfaces immediately in named component tests."
+      }
+    ],
+    "items": [
+      {
+        "id": "tab-model-fold",
+        "title": "WI-1: Fold tab model 13→6 and add legacy tab-id mapping",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "session-tab",
+            "plan-tab",
+            "changes-tab",
+            "activity-tab",
+            "overview-states"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "IssueMissionControl.test.tsx passes with six-tab, legacy-id-mapping, and default-tab assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2"
+          ],
+          "parallelSafeReason": "Only item touching the tab model; all five dependent tab-body items are edge-blocked until it lands."
+        },
+        "narrative": {
+          "Action": "In IssueMissionControl.tsx replace the MissionTab union and TABS array (line 71) with the six ids overview|session|plan|changes|activity|discussion per PRD WI-1 before/after snippet. Add LEGACY_TAB_MAP exactly as specified in the PRD (conversation→session/conversation, terminal→session/terminal, tasks→plan/tasks, code→changes/checks, files→changes/files, artifacts→changes/artifacts, timeline→activity/history, costs→overview, ship→overview) and apply it when reading the route/tab param. Change the default tab (line 415) to 'session' when any agent session exists else 'overview' (D2). Update ISSUE_DETAIL_TAB_IDS (line 66) to the new binding set. Old tab bodies may render their existing content under placeholder segments in this item — WI-6..9 fill them in; keep the tree compiling and every existing data-section marker present. Extend IssueMissionControl.test.tsx: six tabs render; each legacy id resolves to its mapped tab + sub-view; default-tab rule both ways."
+        },
+        "items": [
+          {
+            "id": "tab-model-fold.ac1",
+            "title": "Cockpit renders exactly six tabs labeled Overview, Session, Plan, Changes, Activity, Discussion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-model-fold.ac2",
+            "title": "Each LEGACY_TAB_MAP id (conversation, terminal, tasks, code, files, artifacts, timeline, costs, ship) resolves to its mapped tab and sub-view in a routing test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "tab-model-fold.ac3",
+            "title": "Default tab selects session when any agent session exists and overview otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "header-redesign",
+        "title": "WI-2: Header redesign — chips, single cost, phase line",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "header test proves one cost occurrence, conditional Create PR link, and tracker href"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D12/WI-2: keep the title h1; replace the three HeaderStats (IssueMissionControl.tsx:522–533) with the chip row — branch chip with copy button, PR chip with a Create PR compare link when pr == null, single cyan tabular cost badge, tracker split button using trackerIssueUrl. StatusNarrative renders its headline as the phase-line sentence and keeps data-section=\"StatusNarrative\". One phase badge with style-guide signal color. IssueActionMenu mode=\"primary-strip\" (line 537) stays untouched. Style per design/style-guide/STYLE-GUIDE.md (tokens only, no pills)."
+        },
+        "items": [
+          {
+            "id": "header-redesign.ac1",
+            "title": "Header DOM contains exactly one '$' cost occurrence (single cyan badge)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-redesign.ac2",
+            "title": "Create PR compare link renders iff no PR exists for the branch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-redesign.ac3",
+            "title": "Tracker split button href resolves from the project tracker config (trackerIssueUrl)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "header-redesign.ac4",
+            "title": "StatusNarrative headline renders as the phase-line sentence with its data-section marker inside the header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "needs-you-slot",
+        "title": "WI-3: NeedsYouSlot kit component with priority ladder",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx",
+            "src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.test.tsx",
+            "src/dashboard/frontend/src/components/issue-view/index.ts",
+            "src/dashboard/frontend/src/components/issue-view/derivations.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/NeedsYouSlot.test.tsx src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "NeedsYouSlot.test.tsx passes; parity test passes unmodified"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "parallelSafeReason": "New component file plus index/derivations — zero files_scope overlap with any other item."
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx per PRD D10/WI-3 and export it from issue-view/index.ts. Source every input from IssueViewModel derivations (awaiting-input, stuck, troubled/paused, stale-review, blocker, pickup gate) — add a derivation to derivations.ts only if a field is missing; never query in the component (NFR-4). Render exactly one highest-priority item per the ladder awaiting-input → stuck → troubled/paused → stale-review → blocker (IssueBlockerSpotlight content) → pickup gate, amber tint 8%/32%, a '+N more' chip when several apply, and null when idle. Action buttons invoke registry entries (recoverAgent, purgeReview, unpause) via the existing action invocation helpers — no surface-local actions. Render the absorbed markers (Stale-review warning, IssueBlockerSpotlight, PickupGateCard escalation) as conditional data-section attributes. Wire the slot into the cockpit between header and pipeline band (one-line mount; the cockpit layout edit lands with the tab items). Write NeedsYouSlot.test.tsx covering ladder ordering, single-item rendering, +N count, null-when-idle, and registry-sourced actions."
+        },
+        "items": [
+          {
+            "id": "needs-you-slot.ac1",
+            "title": "Given multiple active operator items, renders only the highest-priority one per the ladder (awaiting-input → stuck → troubled/paused → stale-review → blocker → pickup gate)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-slot.ac2",
+            "title": "Renders a '+N more' chip counting the additional active items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-slot.ac3",
+            "title": "Renders null when nothing needs the operator",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-slot.ac4",
+            "title": "Action buttons invoke registry entries through the shared action helpers (parity test passes unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "needs-you-slot.ac5",
+            "title": "NeedsYouSlot renders the absorbed banner markers (Stale-review warning, IssueBlockerSpotlight, PickupGateCard) as conditional data-section attributes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-band-states",
+        "title": "WI-4: Pipeline band truthful sublabels + live merge progress",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetailShell.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssuePhaseRail.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-detail"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "phase rail tests prove done/running/skip sublabels and Ship-step merge progress"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D13/WI-4: extend the Pipeline Band rendered at IssueDetailShell.tsx:76 (phase rail component IssuePhaseRail.tsx) with per-step sublabels — date + duration when the step is done, a live counter while running, and explicit skip reasons ('Skipped · no suite configured' linking to test configuration) instead of '—'. Skipped steps render a dashed node; the active step gets a blue node + live counter. The Ship step embeds ShipProgress compact while ship.state is active. Add or extend the phase rail test file for each state. Any retry/delay assertion uses vi.useFakeTimers() + advanceTimersByTimeAsync — never real setTimeout."
+        },
+        "items": [
+          {
+            "id": "pipeline-band-states.ac1",
+            "title": "Done steps render date + duration sublabels; the running step renders a live counter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-band-states.ac2",
+            "title": "Skipped test step renders 'Skipped · no suite configured' with a link when the project has no test suite configured",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-band-states.ac3",
+            "title": "Ship step displays ShipProgress compact while a merge is active",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "crew-spine",
+        "title": "WI-5: Crew spine — AgentsLane restyle + CrewStage merge",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.test.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/CrewStage.tsx",
+            "src/dashboard/frontend/src/components/issue-view/AgentStepRow.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/AgentsLane.test.tsx src/components/issue-view/AgentStepRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "AgentsLane and AgentStepRow tests pass with all ten agent-row-* markers asserting"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Touches AgentsLane/CrewStage/AgentStepRow only — disjoint from every IssueMissionControl.tsx item."
+        },
+        "narrative": {
+          "Action": "Per PRD D9/WI-5: restyle AgentsLane rows per the mockup — single status dot (blue running / purple review-live / emerald done / hollow idle), role name, model + duration meta, cost right-aligned in mono; review convoy sessions nest under the review row with a left border. Preserve every agent-row-* data-section marker in AgentStepRow.tsx (SECTIONS constants, used across lines ~650–873; ten markers registered in inventory.ts:104–113). Merge CrewStage's who-is-doing-what content into the spine and move data-section=\"CrewStage\" to the spine presence header; delete CrewStage.tsx's standalone card only after its content renders in the spine. Row selection drives the Session tab (the Session tab consumes the selection in session-tab; the spine exposes the selected session id through the existing lane props)."
+        },
+        "items": [
+          {
+            "id": "crew-spine.ac1",
+            "title": "The restyled spine preserves all ten agent-row-* data-section markers (asserted in AgentStepRow/AgentsLane tests)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-spine.ac2",
+            "title": "The spine renders review convoy sessions nested under the review row with a left border",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-spine.ac3",
+            "title": "The spine presence header displays the data-section=\"CrewStage\" marker and the standalone CrewStage card is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "crew-spine.ac4",
+            "title": "Each row renders status dot, role name, model + duration meta, and right-aligned mono cost per the mockup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "session-tab",
+        "title": "WI-6: Session tab — Conversation ⇄ Terminal + TellComposer",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/issue-view/TellComposer.tsx",
+            "src/dashboard/frontend/src/components/issue-view/ActiveAgentPanel.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx src/components/issue-view/ActiveAgentPanel.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "segmented toggle and composer submit tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D3/D4/WI-6: build the Session tab body in IssueMissionControl.tsx — a segmented control (Conversation | Terminal) rendering IssueDetail density=\"page\" showTabs={false} with the mapped activeTab; blue live dot on the tab while a session streams. Extract the tell form from issue-view/ActiveAgentPanel.tsx (marker active-agent-panel-tell, line 194) into a new kit component issue-view/TellComposer.tsx, wire it to the existing tell mutation, keep the data-section=\"active-agent-panel-tell\" marker on the composer in both locations, and pin it below the transcript on the Session tab. IMPLEMENTATION CHECKPOINT (PRD): confirm the tell mutation posts through the existing delivery route; if the composer needs an agent id the Session tab does not have, take it from the spine selection. Fallback: render ActiveAgentPanel's existing form unextracted below the transcript and note the deferred extraction in the commit message."
+        },
+        "items": [
+          {
+            "id": "session-tab.ac1",
+            "title": "Segmented Conversation ⇄ Terminal toggle updates the IssueDetail activeTab and preserves the selected cockpit tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tab.ac2",
+            "title": "TellComposer pinned below the transcript submits through the existing tell mutation (mutation mock receives the payload)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "session-tab.ac3",
+            "title": "data-section=\"active-agent-panel-tell\" marker renders in both ActiveAgentPanel and the Session tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "plan-tab",
+        "title": "WI-7: Plan tab — Tasks ⇄ Map ⇄ PRD with count, chip removal",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/Stage/cockpit/TasksDrawer.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "Plan tab count, segment rendering, and fullscreen promotion tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D5/WI-7: build the Plan tab body — segmented Tasks | Map | PRD rendering TasksPanel, PlanMapCard/XBriefViewer (DAG keeps its fullscreen promotion via openXbriefViewer), and PrdViewer. Compute the done/total count for the tab label from the shared ['plan', issueId] react-query cache (the query TasksPanel.tsx:56 already uses — do not add a new fetch, NFR-4). Remove the floating sticky Tasks chip and the TasksDrawer slide-over (IssueMissionControl.tsx lines ~573–586 and 662–669); keep data-section=\"TasksRail / TasksTab\" on the Plan-tab Tasks view. TasksDrawer.tsx is deleted only if nothing else imports it — check before deleting."
+        },
+        "items": [
+          {
+            "id": "plan-tab.ac1",
+            "title": "Plan tab label renders the done/total task count from the shared plan query data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-tab.ac2",
+            "title": "The Plan tab renders TasksPanel, PlanMapCard/XBriefViewer, and PrdViewer in its Tasks, Map, and PRD segments respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-tab.ac3",
+            "title": "The Map view opens the xBRIEF fullscreen promotion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "plan-tab.ac4",
+            "title": "Sticky Tasks chip and TasksDrawer no longer render; data-section=\"TasksRail / TasksTab\" survives on the Plan-tab Tasks view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "changes-tab",
+        "title": "WI-8: Changes tab — Files ⇄ Checks ⇄ Artifacts + badge migration",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "badge state and segment rendering tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D6/WI-8: build the Changes tab body in IssueMissionControl.tsx — segmented Files | Checks | Artifacts rendering ChangedFilesView, the local GitHubCiPanel (line 256), and DrawerArtifactsPanel. Migrate tabBadge() (line 407) onto the Changes tab unchanged (! failed / … running / ✓ passed, suppressed when zero checks). The separate Files/Code/Artifacts tabs are gone (folded by tab-model-fold); keep the data-section markers per the WI-12 mapping."
+        },
+        "items": [
+          {
+            "id": "changes-tab.ac1",
+            "title": "The Changes tab renders ChangedFilesView, GitHubCiPanel, and DrawerArtifactsPanel in its Files, Checks, and Artifacts segments respectively",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "changes-tab.ac2",
+            "title": "Changes tab badge shows '!' on failed, '…' on running, '✓' on passed checks, and renders nothing when there are zero checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "activity-tab",
+        "title": "WI-9: Activity tab — Feed ⇄ Status history",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "both segments render their canonical components in tests"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D7/WI-9: build the Activity tab body in IssueMissionControl.tsx — segmented Feed | Status history rendering ActivityTab and StatusHistoryTab. The Timeline tab is gone as a tab (folded by tab-model-fold); both renderers survive here."
+        },
+        "items": [
+          {
+            "id": "activity-tab.ac1",
+            "title": "Feed segment renders ActivityTab and Status history segment renders StatusHistoryTab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "activity-tab.ac2",
+            "title": "Switching segments preserves the selected cockpit tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "right-rail",
+        "title": "WI-10: Right rail — six cards incl. RunDetailsCard and cost rollup link",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx",
+            "src/dashboard/frontend/src/components/issue-view/RunDetailsCard.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "six rail cards render in tests and both links navigate"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D11/WI-10: rebuild the right rail (keep data-section=\"Awareness rail\" on the wrapper and existing member markers) with six cards — Now (local NowPanel, line 336), Run details (new kit issue-view/RunDetailsCard.tsx reading IssueViewModel.header/agents: agent role, model, harness, started, workspace + PanOpenInPicker), Gates (VerificationGates), Cost (useIssueCostsQuery, with 'All costs →' opening the full per-model rollup — relocate the CostsTab content into a slide-over reusing the existing drawer pattern), Environment (UatEnvironmentPanel), Recent activity (DrawerActivityRail excerpt with 'All activity →' selecting the Activity tab)."
+        },
+        "items": [
+          {
+            "id": "right-rail.ac1",
+            "title": "Rail renders Now, Run details, Gates, Cost, Environment, and Recent activity cards under data-section=\"Awareness rail\"",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-rail.ac2",
+            "title": "'All costs →' opens the full per-model cost rollup (relocated CostsTab content)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-rail.ac3",
+            "title": "'All activity →' routes to the Activity tab",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "right-rail.ac4",
+            "title": "Run details card renders agent role, model, harness, started, workspace, and PanOpenInPicker from IssueViewModel data",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "overview-states",
+        "title": "WI-11: Overview tab + done/pre-work lifecycle states",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/Stage/cockpit/IssueMissionControl.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "three lifecycle-state tests pass against the mockup structure"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D9/D12/WI-11: build the Overview tab body (the live OverviewTab is the LOCAL one at IssueMissionControl.tsx:390–404 — Stage/cockpit/OverviewTab.tsx is dead code, do not touch it): StatusNarrative summary, SpecialistStrip review outcomes, HappenedFeed, PickupGateCard. Done state per FR-12: emerald Done badge, merged commit in mono, review summary. Pre-work state: teaching empty state with StartAgentCta — its model/harness overrides already exist, do not remove them."
+        },
+        "items": [
+          {
+            "id": "overview-states.ac1",
+            "title": "Live state renders StatusNarrative summary, SpecialistStrip results, HappenedFeed, and PickupGateCard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-states.ac2",
+            "title": "Done state renders the emerald Done badge, merged commit in mono, and review summary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "overview-states.ac3",
+            "title": "Pre-work state renders the teaching empty state with StartAgentCta and preserves its model/harness overrides",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "inventory-bookkeeping",
+        "title": "WI-12: Inventory / no-loss / parity bookkeeping (22 cockpit sections, total 54)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-view/inventory.ts",
+            "src/dashboard/frontend/src/components/issue-view/densitySections.ts",
+            "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/frontend/issue-view-no-loss.test.ts",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/issue-view/IssueView.test.tsx src/lib/__tests__/issueActions.parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "issue-view-no-loss.test.ts passes with the 22-section cockpit list and total 54",
+            "IssueView.test.tsx and the parity test pass (parity test file unmodified)"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1",
+            "NFR-2",
+            "FR-13",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD D14/WI-12: update issue-view/inventory.ts (lines 21–113) and densitySections.ts to the new 22-section cockpit list — Header bar, NeedsYouSlot, Stale-review warning, StatusNarrative, Pipeline Band, AgentsLane, SessionPanel, StackDrawer, Detail Tabs, CrewStage, UatEnvironmentPanel, HappenedFeed, NowPanel, PickupGateCard, PlanMapCard, IssueBlockerSpotlight, Session tab (was Conversation / Files / Terminal tabs), Changes tab (was Code tab), Plan / Activity / Discussion tabs (was PRD / Timeline / Discussion tabs), Cost / Artifacts / Ship homes (was Costs / Artifacts / Ship tabs), TasksRail / TasksTab, Awareness rail — and update EXPECTED_COCKPIT_SECTIONS (issue-view-no-loss.test.ts:136) plus the total count (line 201, 53 → 54) in the SAME commit. Record every rename/relocation in the inventory the way PAN-2499 records action-renderer relocations. The dual edit (manifest + test hardcoded lists) is the gate's intended review signal, not a workaround. Land this item last, after every relocated surface renders at its new home."
+        },
+        "items": [
+          {
+            "id": "inventory-bookkeeping.ac1",
+            "title": "issue-view-no-loss.test.ts passes with EXPECTED_COCKPIT_SECTIONS at the 22-section list and inventory total 54",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-bookkeeping.ac2",
+            "title": "inventory.ts records a relocation entry (PAN-2499 pattern) for each folded surface: Session, Changes, Plan/Activity/Discussion, Cost/Artifacts/Ship homes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-bookkeeping.ac3",
+            "title": "issue-actions-surface-parity.test.tsx passes with zero modifications to the test file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "inventory-bookkeeping.ac4",
+            "title": "IssueView.test.tsx passes with the updated densitySections",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "WI-13: Documentation — ISSUE-VIEW.md cockpit section + module header",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T14:56:36Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3356",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ISSUE-VIEW.md",
+            "src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "grep -n 'issue-detail-redesign-mockup-v2' docs/ISSUE-VIEW.md"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ISSUE-VIEW.md links the v2 mockup and describes the six-tab cockpit"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-13: rewrite docs/ISSUE-VIEW.md §Cockpit layout for the six-tab structure, crew spine, needs-you slot, and right rail; repoint the mockup link to design/issue-detail-redesign-mockup-v2.html. Update the IssueMissionControl.tsx module header (the PAN-2908 comment at line 68 describes the old binding) to cite PAN-3356. No Mintlify page documents the cockpit tab structure (verified 2026-07-15) — re-check at implementation time; if still true, state it in the PR description rather than adding a page."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "docs/ISSUE-VIEW.md §Cockpit layout covers the six-tab structure, crew spine, needs-you slot, and right rail, and links design/issue-detail-redesign-mockup-v2.html",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "IssueMissionControl.tsx module header cites PAN-3356 and records the six-tab binding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "tab-model-fold",
+        "to": "session-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-model-fold",
+        "to": "plan-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-model-fold",
+        "to": "changes-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-model-fold",
+        "to": "activity-tab",
+        "type": "blocks"
+      },
+      {
+        "from": "tab-model-fold",
+        "to": "overview-states",
+        "type": "blocks"
+      },
+      {
+        "from": "crew-spine",
+        "to": "session-tab",
+        "type": "informs"
+      },
+      {
+        "from": "tab-model-fold",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "header-redesign",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "needs-you-slot",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "pipeline-band-states",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "crew-spine",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "session-tab",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "plan-tab",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "changes-tab",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "activity-tab",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "right-rail",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "overview-states",
+        "to": "inventory-bookkeeping",
+        "type": "blocks"
+      },
+      {
+        "from": "inventory-bookkeeping",
+        "to": "docs-update",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-07-31-PAN-3356-issue-cockpit-redesign-v2-live-run-ia-6-tabs-crew-spine-needs-you-slot.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
