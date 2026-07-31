@@ -287,18 +287,19 @@
     "recordedAt": "2026-07-31T00:44:52.353Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T01:13:41.768Z",
+  "updated": "2026-07-31T14:29:34.794Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:45:42.315Z",
-    "updatedAt": "2026-07-31T01:13:41.739Z",
+    "updatedAt": "2026-07-31T14:29:34.423Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-5 blocking finding: the failed-fetch warning is now sticky per workspace path. fetchFailedByPath sits alongside the attempt/success clocks, only a successful fetch or pull clears it, and withFreshness projects it into non-fetching poll responses — five fake-timer route tests cover the 30s poll, the throttled fetch=1, recovery after a later success, per-path isolation, and pull clearing it; the first two fail without the sticky state. Also closed the demoted countAheadBehind finding since it is the same defect class: a failed rev-list probe (and, as the test exposed, no comparison ref at all) no longer renders as 'up to date' — ahead/behind are number|null end to end and the card says 'sync state unknown'. The remaining demoted item, sessionExists mapping a tmux probe failure to absence, is filed as PAN-3355 rather than widened into this diff, because the fix changes shared tmux semantics for every caller. 2087 frontend + 818 server tests pass; typecheck, lint, and all guards green.",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
@@ -442,10 +443,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 322,
-            "output": 74106,
-            "cacheRead": 35212747,
-            "cacheWrite": 527502
+            "input": 328,
+            "output": 76555,
+            "cacheRead": 36128201,
+            "cacheWrite": 530189
           }
         }
       },
@@ -463,15 +464,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 322,
-          "output": 74106,
-          "cacheRead": 35212747,
-          "cacheWrite": 527502
+          "input": 328,
+          "output": 76555,
+          "cacheRead": 36128201,
+          "cacheWrite": 530189
         }
       },
       "costAtCloseOut": {
-        "usd": 291.36814499999997,
-        "pricingAsOf": "2026-07-31T01:13:41.756Z"
+        "usd": 291.582455,
+        "pricingAsOf": "2026-07-31T14:29:34.553Z"
       }
     },
     "merges": [
