@@ -303,18 +303,18 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T22:34:01.026Z",
+  "updated": "2026-07-31T22:48:02.576Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T22:34:00.241Z",
+    "updatedAt": "2026-07-31T22:48:02.460Z",
     "reviewNotes": "[security] Opaque command output can inject unreviewed code into the default branch — `src/lib/cloister/version-ship.ts:195`",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -404,28 +404,6 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-570d4777/security.md",
-        "atCommit": "570d4777eafb71d76305c693b07cf1226aa50fe8"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-570d4777/correctness.md",
-        "atCommit": "570d4777eafb71d76305c693b07cf1226aa50fe8"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-570d4777/performance.md",
-        "atCommit": "570d4777eafb71d76305c693b07cf1226aa50fe8"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-570d4777/requirements.md",
-        "atCommit": "570d4777eafb71d76305c693b07cf1226aa50fe8"
-      }
     }
   },
   "closeOut": {
@@ -473,38 +451,38 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 282,
-            "output": 60625,
-            "cacheRead": 31127492,
-            "cacheWrite": 512112
+            "input": 506,
+            "output": 95131,
+            "cacheRead": 56079840,
+            "cacheWrite": 611909
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 9211663,
-            "output": 885703,
-            "cacheRead": 402761728,
+            "input": 9796447,
+            "output": 944632,
+            "cacheRead": 416218112,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 44044982,
-          "output": 1853713,
-          "cacheRead": 600907264,
+          "input": 44629766,
+          "output": 1912642,
+          "cacheRead": 614363648,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 282,
-          "output": 60625,
-          "cacheRead": 31127492,
-          "cacheWrite": 512112
+          "input": 506,
+          "output": 95131,
+          "cacheRead": 56079840,
+          "cacheWrite": 611909
         }
       },
       "costAtCloseOut": {
-        "usd": 584.402526,
-        "pricingAsOf": "2026-07-31T22:34:00.246Z"
+        "usd": 601.4079839999999,
+        "pricingAsOf": "2026-07-31T22:48:02.519Z"
       }
     },
     "merges": [
