@@ -279,8 +279,12 @@ new direct agent-directory removals outside that door.
 Transcripts are retained forever by default. A positive
 `retention.transcript_days` enables the dedicated Deacon sweep, which deletes
 only JSONL files older than the configured age from ended agent state dirs and
-never touches a live tmux session. When the setting is absent, the sweep is not
-called and does not traverse the filesystem.
+never touches a live tmux session. Terminal agent GC removes runtime residue
+through the same door but retains the registry row while any JSONL remains; the
+row preserves the agent-to-issue link needed to read the durable closed-out
+verdict on a later sweep. After expiry empties the directory, GC removes both the
+now-empty directory and the row. When the setting is absent,
+the sweep is not called and does not traverse the filesystem.
 
 `conv-*` directories remain excluded from automatic agent-state cleanup because
 they are the canonical transcript home for Codex and Pi conversations. The

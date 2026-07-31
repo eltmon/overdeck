@@ -36,7 +36,6 @@ export function isTranscriptRetentionTerminalAgent(
   readRecord: ReadClosedOutRecord = readIssueRecordForWorkspaceSync,
 ): boolean {
   if (agent.status !== 'stopped' || !agent.workspace) return false;
-  if (agent.paused === true || agent.troubled === true || agent.stoppedByUser === true) return false;
   return readRecord(agent.workspace, agent.issueId)?.pipeline?.closedOut === true;
 }
 
@@ -96,7 +95,22 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
 
 function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
   try {
-    return new Map(deps.listAgents().map((agent) => [agent.id, deps.isTerminalAgent(agent)]));
+    const eligible = new Map<string, boolean>();
+    const terminalByIssue = new Map<string, boolean>();
+    for (const agent of deps.listAgents()) {
+      if (agent.status !== 'stopped' || !agent.workspace) {
+        eligible.set(agent.id, false);
+        continue;
+      }
+      const issueKey = `${agent.workspace}\0${agent.issueId}`;
+      let terminal = terminalByIssue.get(issueKey);
+      if (terminal === undefined) {
+        terminal = deps.isTerminalAgent(agent);
+        terminalByIssue.set(issueKey, terminal);
+      }
+      eligible.set(agent.id, terminal);
+    }
+    return eligible;
   } catch {
     return null;
   }

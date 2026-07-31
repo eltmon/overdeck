@@ -53,7 +53,7 @@ vi.mock('../../agents/agent-state.js', () => ({
 
 vi.mock('../../overdeck/agents.js', () => ({
   listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
-  removeAgentSync: vi.fn(),
+  removeAgent: vi.fn(async () => {}),
 }));
 
 vi.mock('../../tmux.js', () => ({

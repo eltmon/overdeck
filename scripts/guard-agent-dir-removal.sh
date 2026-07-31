@@ -25,7 +25,7 @@ collect_candidates() {
         $line_number++;
         if ($content =~ /\b(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/) {
           my ($name, $rhs) = ($1, $2);
-          my $is_tainted = $rhs =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
+          my $is_tainted = $rhs =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(|\bgetOverdeckHome\s*\(.*["\x27]agents["\x27]/;
           for my $tainted (keys %tainted) {
             $is_tainted = 1 if $rhs =~ /\b\Q$tainted\E\b/;
           }
@@ -33,7 +33,7 @@ collect_candidates() {
         }
 
         next unless $content =~ /\b(?:rm|rmSync|rmdir|rmdirSync)\s*\(/;
-        my $is_candidate = $content =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
+        my $is_candidate = $content =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(|\bgetOverdeckHome\s*\(.*["\x27]agents["\x27]/;
         for my $tainted (keys %tainted) {
           $is_candidate = 1 if $content =~ /\b\Q$tainted\E\b/;
         }
@@ -70,6 +70,9 @@ is_allowlisted() {
       ;;
     src/lib/cloister/deacon.ts)
       [[ "$content" == *'rmSync(sessionFile)'* ]]
+      ;;
+    src/lib/overdeck/conversation-runtime.ts)
+      [[ "$content" == *'rm(sessionIdPath'* ]]
       ;;
     *)
       return 1

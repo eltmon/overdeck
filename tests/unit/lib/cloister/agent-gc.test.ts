@@ -7,16 +7,26 @@ const agent = (id: string, status: AgentState['status'], role: AgentState['role'
 });
 
 describe('PAN-2543 event-driven agent row GC', () => {
-  it('prunes stopped rows for every role and preserves live/non-stopped rows', () => {
-    const remove = vi.fn();
-    const result = pruneStoppedAgentsForIssue('PAN-2503', [
+  it('prunes stopped rows only after their transcript-preserving cleanup is complete', async () => {
+    const removeRecord = vi.fn();
+    const cleanStateDir = vi.fn(async () => ({
+      removedFiles: 1,
+      preservedTranscripts: 0,
+      removedDir: true,
+    }));
+    const result = await pruneStoppedAgentsForIssue('PAN-2503', [
       agent('agent-pan-2503', 'stopped', 'work'),
       agent('planning-pan-2503', 'stopped', 'plan'),
       agent('agent-pan-2503-review', 'running', 'review'),
       { ...agent('agent-pan-9999', 'stopped', 'work'), issueId: 'PAN-9999' },
-    ], remove);
+    ], {
+      agentsDir: '/agents',
+      cleanStateDir,
+      removeRecord,
+      isTerminalAgent: vi.fn(() => true),
+    });
 
     expect(result).toEqual({ removed: ['agent-pan-2503', 'planning-pan-2503'], preserved: ['agent-pan-2503-review'] });
-    expect(remove.mock.calls.map(call => call[0])).toEqual(result.removed);
+    expect(removeRecord.mock.calls.map(call => call[0])).toEqual(result.removed);
   });
 });

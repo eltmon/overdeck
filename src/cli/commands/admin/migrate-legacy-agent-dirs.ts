@@ -1,12 +1,24 @@
-import { cp, lstat, mkdir, readdir } from 'node:fs/promises';
+import { cp, lstat, mkdir, mkdtemp, readdir, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { getLegacyHome, getOverdeckHome } from '../../../lib/paths.js';
 
+interface LegacyAgentDirMigrationDeps {
+  copy: (
+    source: string,
+    destination: string,
+    options: { recursive: true; force: false; errorOnExist: true; preserveTimestamps: true },
+  ) => Promise<void>;
+  makeTempDir: (prefix: string) => Promise<string>;
+  rename: (source: string, destination: string) => Promise<void>;
+  remove: (path: string, options: { recursive: true; force: true }) => Promise<void>;
+}
+
 export interface LegacyAgentDirMigrationOptions {
   legacyHome: string;
   currentHome: string;
+  deps?: Partial<LegacyAgentDirMigrationDeps>;
 }
 
 export interface LegacyAgentDirMigrationResult {
@@ -37,6 +49,13 @@ export async function migrateLegacyAgentDirs(
 ): Promise<LegacyAgentDirMigrationResult> {
   const legacyAgentsDir = join(options.legacyHome, 'agents');
   const currentAgentsDir = join(options.currentHome, 'agents');
+  const deps: LegacyAgentDirMigrationDeps = {
+    copy: cp,
+    makeTempDir: mkdtemp,
+    rename,
+    remove: rm,
+    ...options.deps,
+  };
   let entries;
   try {
     entries = await readdir(legacyAgentsDir, { withFileTypes: true });
@@ -61,20 +80,24 @@ export async function migrateLegacyAgentDirs(
       continue;
     }
 
+    const temporaryRoot = await deps.makeTempDir(join(currentAgentsDir, `.${entry.name}.migrate-`));
+    const temporaryDestination = join(temporaryRoot, entry.name);
     try {
-      await cp(source, destination, {
+      await deps.copy(source, temporaryDestination, {
         recursive: true,
         force: false,
         errorOnExist: true,
         preserveTimestamps: true,
       });
-      copied++;
-    } catch (error) {
-      if (hasErrorCode(error, 'EEXIST')) {
+      try {
+        await deps.rename(temporaryDestination, destination);
+        copied++;
+      } catch (error) {
+        if (!hasErrorCode(error, 'EEXIST') && !hasErrorCode(error, 'ENOTEMPTY')) throw error;
         skipped++;
-        continue;
       }
-      throw error;
+    } finally {
+      await deps.remove(temporaryRoot, { recursive: true, force: true });
     }
   }
 

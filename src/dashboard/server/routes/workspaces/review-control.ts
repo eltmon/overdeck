@@ -443,8 +443,8 @@ const postReviewResyncRoute = HttpRouter.add(
 // COMPLETE review reset. Tears down the issue's entire review fleet — the
 // agent-<id>-review parent PLUS any leftover extended-review (convoy) sub-reviewers
 // (-correctness/-security/-performance/-requirements) — by killing their tmux sessions
-// and removing each agent via removeAgentSync (overdeck.db row + state dir, never the
-// JSONL transcript), then resets review_status (the pipeline verdict block re-derives
+// and removing each agent through the transcript-preserving removal path, then resets
+// review_status (the pipeline verdict block re-derives
 // from it). Use this to clear stale review ghosts left by a prior cycle so a fresh
 // review runs clean. Destructive to review-agent state only; confirmed via a dialog.
 

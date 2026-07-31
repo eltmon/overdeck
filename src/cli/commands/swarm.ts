@@ -29,7 +29,7 @@ import { appendOperatorInterventionEvent } from '../../lib/operator-intervention
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
-import { removeAgentSync } from '../../lib/overdeck/agents.js';
+import { removeAgent } from '../../lib/overdeck/agents.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 
 const execAsync = promisify(exec);
@@ -335,7 +335,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
-  removeAgentSync: (agentId: string) => void;
+  removeAgent: (agentId: string) => Promise<void>;
 }
 
 const defaultResetDeps: SwarmResetCommandDeps = {
@@ -345,7 +345,7 @@ const defaultResetDeps: SwarmResetCommandDeps = {
   clearAllSlotAssignments,
   clearFailedMergeBlock,
   getFailedMergeBlocks,
-  removeAgentSync,
+  removeAgent,
 };
 
 /**
@@ -450,7 +450,7 @@ export async function swarmResetCommand(
     }
     if (agent.status === 'running' || agent.status === 'starting') continue;
 
-    deps.removeAgentSync(agent.agentId);
+    await deps.removeAgent(agent.agentId);
     retiredAgents.push(agent.agentId);
   }
 

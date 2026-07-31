@@ -3130,7 +3130,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   }
   // Retention needs the canonical registry row to prove terminal state before
   // agent GC removes that evidence. Both run on the same 60-cycle cadence.
-  if (state.patrolCycle % 60 === 0) for (const id of pruneTerminalStoppedAgents().removed) actions.push(`[agents-gc] pruned ${id}`);
+  if (state.patrolCycle % 60 === 0) for (const id of (await pruneTerminalStoppedAgents()).removed) actions.push(`[agents-gc] pruned ${id}`);
 
   // Periodic abandoned-feedback sweep — safety net for workspaces where the
   // event-driven cleanup (new review cycle / merge / close-out) never fired.

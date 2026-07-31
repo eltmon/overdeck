@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -62,6 +62,35 @@ describe('migrateLegacyAgentDirs', () => {
 
     expect(second).toEqual({ copied: 0, skipped: 1 });
     expect(statSync(join(destinationDir, 'session.jsonl')).size).toBe('current\n'.length);
+  });
+
+  it('heals a copy interrupted after writing partial temporary data', async () => {
+    const sourceDir = join(legacyHome, 'agents', 'conv-interrupted');
+    const sourceTranscript = join(sourceDir, 'sessions', 'complete.jsonl');
+    mkdirSync(join(sourceDir, 'sessions'), { recursive: true });
+    writeFileSync(sourceTranscript, 'complete\n');
+
+    await expect(migrateLegacyAgentDirs({
+      legacyHome,
+      currentHome,
+      deps: {
+        copy: async (_source, destination) => {
+          mkdirSync(destination, { recursive: true });
+          writeFileSync(join(destination, 'partial.jsonl'), 'partial\n');
+          throw new Error('copy interrupted');
+        },
+      },
+    })).rejects.toThrow('copy interrupted');
+
+    const currentAgentsDir = join(currentHome, 'agents');
+    expect(existsSync(join(currentAgentsDir, 'conv-interrupted'))).toBe(false);
+    expect(readdirSync(currentAgentsDir)).toEqual([]);
+
+    await expect(migrateLegacyAgentDirs({ legacyHome, currentHome })).resolves.toEqual({
+      copied: 1,
+      skipped: 0,
+    });
+    expect(existsSync(join(currentAgentsDir, 'conv-interrupted', 'sessions', 'complete.jsonl'))).toBe(true);
   });
 
   it('exits as a no-op when the legacy agents dir is absent', async () => {

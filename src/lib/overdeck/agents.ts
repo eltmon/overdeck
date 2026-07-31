@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -11,6 +11,7 @@ import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js
 import { IssueId } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
+import { removeAgentStateDir } from '../agents/state-dir-removal.js';
 import type { AgentState } from '../agents.js';
 export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
@@ -853,23 +854,21 @@ export function listAgentIdsByPrefixSync(prefix: string): string[] {
   return [...ids];
 }
 
-/**
- * Canonical full removal of a single agent. Drops the overdeck.db row (this module IS
- * the agents write door) AND removes the on-disk state dir ~/.overdeck/agents/<id>/.
- * NEVER touches Claude JSONL transcripts — those live under ~/.claude/projects, not the
- * agent dir. Tmux teardown is the caller's responsibility (kept separate so this stays
- * sync + dependency-free).
- *
- * Fills the gap that let orphan ghost rows accumulate: backfillAgentsSync only upserts,
- * and the deacon's cleanup rmSync'd dirs but left the rows behind.
- */
-export function removeAgentSync(agentId: string): void {
+/** Remove one canonical agent registry row without touching its state directory. */
+export function removeAgentRecordSync(agentId: string): void {
   try {
     getOverdeckDatabaseSync().prepare(`DELETE FROM agents WHERE id = ?`).run(agentId);
   } catch { /* agents table missing */ }
-  try {
-    rmSync(join(getOverdeckHome(), 'agents', agentId), { recursive: true, force: true });
-  } catch { /* state dir already gone */ }
+}
+
+/**
+ * Remove an agent row and runtime residue while retaining every JSONL transcript.
+ * A transcript-only state directory may remain after the canonical row is removed.
+ */
+export async function removeAgent(agentId: string): Promise<void> {
+  const agentsDir = join(getOverdeckHome(), 'agents');
+  await removeAgentStateDir(join(agentsDir, agentId), agentsDir);
+  removeAgentRecordSync(agentId);
 }
 
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
