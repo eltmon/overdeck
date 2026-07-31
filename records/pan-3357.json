@@ -17,9 +17,22 @@
       "timestamp": "2026-07-31T16:35:44.855Z",
       "reason": "end",
       "note": "No tests skipped or failing. No Mintlify page currently documents Cloister retention, so no user-site page was added. Deviations: the new guard found three additional agent-dir deletion paths omitted from the xBRIEF (close-out, closed-issue residue reaping, and legacy startup migration); all were routed through the deletion door. The PRD named a stale database conversation reader, so the sweep uses the enforced overdeck conversations read door. Added the transcript-preserving deletion door, routed cleanup sites, CI guard, opt-in transcript_days sweep, legacy conv-dir migration command, regression coverage, and docs. Full npm test, typecheck, and lint pass."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T17:06Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T17:06:48.737Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T17:06:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3357\n\n# Review Synthesis — PAN-3357 — 2026-07-31T17:06:00Z\n\n## Verdict: CHANGES REQUESTED — correctness reviewer timed out; two reviewed blockers also remain\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-de30049d/context.json\n- Branch: feature/pan-3357\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357\n- HEAD reviewed: de30049d5b12ff6467078cd49f43407e6511f3f5\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR base: b57f6abd2b6db50f62960203563a6f3b7dadd7d5\n- PR commits: 6\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-de30049d/security.md | 1 |\n| correctness | timeout | — | infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-de30049d/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-de30049d/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Reviewer timed out — infrastructure failure\nThe correctness reviewer remained running past its deadline and produced no usable terminal report. Review policy forbids approval when any reviewer fails or times out, so correctness coverage is incomplete for this cycle.\n\n### [security] Agent-state cleanup follows a root symlink and can delete arbitrary user files — `src/lib/agents/state-dir-removal.ts:22`\n`removeAgentStateDir()` calls `readdir()` on its input without first rejecting a symbolic-link root or enforcing containment beneath `AGENTS_DIR`. Node follows a directory symlink for `readdir()`, so an agent-state path replaced with a symlink can cause routine lifecycle cleanup to traverse the target and delete every non-JSONL file writable by the Overdeck account. This behavior is introduced by the PR's new deletion door and survives the mandatory PR-scope gate. The door must fail closed on links, unlink nested links rather than traverse them, enforce canonical-root containment, and add root/nested symlink regression tests.\n\n### [requirements] Configured retention cannot resolve normal `conv-*` directories to ended conversation rows — `src/lib/cloister/transcript-retention.ts:136`\nThe new sweep passes the directory name, such as `conv-mine`, to `getConversationByName()`, whose query matches the database `name` field exactly, such as `mine`. Normal ended or archived conversations are therefore treated as unknown and skipped forever when `retention.transcript_days` is enabled. This finding is explicitly classified `Scope: in_pr_scope` and blocks FR-4. The sweep needs a canonical read-door lookup that maps tmux/directory names to conversation rows while including archived rows, plus an adapter-boundary test using the real `name: \"ended\"` / `conv-ended` convention.\n\n## Non-blocking Findings\n\n### [performance] Serial liveness and conversation lookups per agent directory — `src/lib/cloister/transcript-retention.ts:127`\nThe opt-in hourly sweep performs one awaited tmux probe per directory and synchronous conversation lookups for `conv-*` entries. The reviewer measured 1.61 seconds for the tmux pass across 651 directories before database and filesystem work. A single live-session census and batched or cached conversation eligibility map would avoid this N+1 janitor cost.\n\n### [performance] Lint guard launches one Perl process per source file — `scripts/guard-agent-dir-removal.sh:10`\nThe guard spawned Perl for 2,420 files and added 5.34 seconds to lint in the reviewer's measurement. Passing the candidate set through one scanner process would retain the mechanical gate without per-file process startup overhead.\n\n## Clean Sub-roles\nNone. Performance found no blockers but reported two advisories; security and requirements each found a blocker, and correctness timed out.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-de30049d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3357 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -89,7 +102,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T17:06:47.965Z",
+  "updated": "2026-07-31T17:06:48.737Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "blocked",
