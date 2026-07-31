@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:10:42.830Z",
+  "updated": "2026-07-31T16:10:59.119Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "migrate-legacy-agent-dirs": {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 767083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:10:59.119Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -157,6 +165,7 @@
     "transcript-days-sweep.transcript-days-sweep.ac1": "completed",
     "transcript-days-sweep.transcript-days-sweep.ac2": "completed",
     "transcript-days-sweep.transcript-days-sweep.ac3": "completed",
-    "transcript-days-sweep.transcript-days-sweep.ac4": "completed"
+    "transcript-days-sweep.transcript-days-sweep.ac4": "completed",
+    "migrate-legacy-agent-dirs": "running"
   }
 }
