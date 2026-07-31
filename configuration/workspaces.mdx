@@ -29,6 +29,71 @@ Workspaces are reachable from three places in the dashboard:
   timeline). Issue-kind workspaces additionally show the xBRIEF plan and
   verification gates.
 
+## Creating a workspace from the dashboard
+
+Click the **+** in the sidebar's **Workspaces** header, run **New workspace…**
+from Cmd-K / Ctrl-K, or use **New workspace** on a project's overview (which
+preselects that project). All three open the same dialog.
+
+The dialog asks for a name, a project, a mode, and a target directory:
+
+- **Shared directory** (the default) points the workspace at a directory it
+  does not own — the project's primary path, another registered target from the
+  dropdown, or anything you pick with **Browse…**.
+- **Isolated worktree** creates a dedicated git worktree at
+  `workspaces/scratch-<name>` on a `scratch/<name>` branch. It derives its own
+  path, so the target-directory field is disabled in this mode.
+- **Advanced** reveals a parent-branch override; leave it alone and Overdeck
+  infers the project's current branch, shown in the field's placeholder.
+
+<Note>
+  **The preview is the point.** As you type, the panel below the fields shows
+  the resolved outcome — the final path, the branch that will be created or the
+  one already there, the parent branch (marked `inferred` when Overdeck guessed
+  it), whether the target is a git repository, and whether a worktree gets
+  made. That preview comes from the server running the *same* resolution the
+  real create runs, so confirming never produces a surprise.
+</Note>
+
+Names are validated by that same resolution, not by a separate rule in the
+browser: an invalid name, a missing directory, or an ambiguous project appears
+as a message beside the offending field, and **Create** stays disabled until
+the preview is clean. On success the new workspace appears in the rail
+immediately and opens.
+
+This is the dashboard equivalent of `pan workspace new` below — both call the
+same code, so a workspace created either way is identical.
+
+### The routes behind the dialog
+
+The dashboard drives these; they are listed so you can reach them directly or
+recognize them in logs.
+
+| Route | What it does |
+| --- | --- |
+| `POST /api/workspace-registry/resolve` | Dry-runs the intent and returns the resolved outcome plus any validation findings. Writes nothing — this is what the live preview calls. |
+| `POST /api/workspace-registry` | Creates the workspace. Returns `422` with the findings when the intent is invalid, otherwise `201 {id}`. |
+| `POST /api/workspace-registry/:id/relocate` | Body `{path, force?}`. Re-points a workspace; `409` carries the refusal message when the rules below say no. |
+| `GET /api/workspace-registry/project-targets?project=<key>` | The project's primary path plus its registered targets — the target-directory dropdown. |
+
+The three `POST` routes require the dashboard's mutation token; the `GET` is a
+plain read like the rest of the registry's reads.
+
+## Managing a workspace
+
+Open a workspace's view (`/workspace/:id`) and its header carries:
+
+- **Favorite** — pins it to the top of the rail.
+- **Relocate** — pick a new directory, confirm the resolved path. Relocating
+  the **main** workspace additionally asks you to type its name, because that
+  diverges the row from `projects.yaml`.
+- **Archive** — removes it from the rail. Files, branch, and memory are left
+  untouched, and it is reversible.
+
+Issue workspaces show none of these: Overdeck's pipeline owns their worktree.
+Deleting a workspace and purging its memory stay CLI-only
+(`pan workspace destroy`), behind their typed confirmations.
+
 ## CLI
 
 ```bash

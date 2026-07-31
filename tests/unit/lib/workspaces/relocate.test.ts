@@ -5,7 +5,7 @@
  * refused, kind=main requires --force) plus the memory-home metadata.json
  * rewrite, and the CLI-level divergence warning and `memoryHome` line.
  */
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -184,5 +184,36 @@ describe('workspaceRelocateCommand + workspaceGetCommand (PAN-3286 WI-2 CLI surf
 
     expect(exitSpy).toHaveBeenCalledWith(1);
     expect(getWorkspaceById(id)!.path).toBe(oldDir);
+  });
+});
+
+describe('relocateWorkspace path validation (PAN-3330 review)', () => {
+  it('refuses a path that does not exist, leaving the row untouched', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: oldDir });
+
+    await expect(relocateWorkspace(id, join(newDir, 'does-not-exist'))).rejects.toThrow(/existing directory/);
+
+    expect(getWorkspaceById(id)?.path).toBe(oldDir);
+  });
+
+  it('refuses a regular file, leaving the row untouched', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: oldDir });
+    const filePath = join(newDir, 'not-a-dir.txt');
+    writeFileSync(filePath, 'x', 'utf-8');
+
+    await expect(relocateWorkspace(id, filePath)).rejects.toThrow(/existing directory/);
+
+    expect(getWorkspaceById(id)?.path).toBe(oldDir);
+  });
+
+  it('stores a relative path as its resolved absolute form', async () => {
+    const projectId = seedProject();
+    const id = await createWorkspace({ projectId, kind: 'scratch', name: 'scratch', path: oldDir });
+
+    await relocateWorkspace(id, '.');
+
+    expect(getWorkspaceById(id)?.path).toBe(process.cwd());
   });
 });
