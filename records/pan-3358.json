@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T18:34:00.405Z",
+  "updated": "2026-07-31T18:49:06.582Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "project-settings-version-sync": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 835756,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T18:34:00.405Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -146,6 +138,16 @@
         "itemId": "batch-card-version-input",
         "outcome": "completed",
         "releasedAt": "2026-07-31T18:33:30.351Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 835756,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T18:34:00.405Z",
+        "itemId": "project-settings-version-sync",
+        "outcome": "completed",
+        "releasedAt": "2026-07-31T18:49:06.582Z"
       }
     ],
     "statusReasons": {
@@ -203,6 +205,10 @@
     "batch-card-version-input.batch-card-version-input.ac2": "completed",
     "batch-card-version-input.batch-card-version-input.ac3": "completed",
     "batch-card-version-input.batch-card-version-input.ac4": "completed",
-    "project-settings-version-sync": "running"
+    "project-settings-version-sync": "completed",
+    "project-settings-version-sync.project-settings-version-sync.ac1": "completed",
+    "project-settings-version-sync.project-settings-version-sync.ac2": "completed",
+    "project-settings-version-sync.project-settings-version-sync.ac3": "completed",
+    "project-settings-version-sync.project-settings-version-sync.ac4": "completed"
   }
 }
