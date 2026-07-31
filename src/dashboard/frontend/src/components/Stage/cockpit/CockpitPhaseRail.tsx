@@ -84,7 +84,7 @@ export function CockpitPhaseRail({
   agents: AgentRowModel[];
   ship: IssueShipModel;
   testStatus?: string;
-  onSelectPhase: (phase: Phase) => void;
+  onSelectPhase: (phase: Phase, sessionId?: string) => void;
 }) {
   const now = useSharedTick();
   const rail = useMemo(() => phaseRailState(pipelineState), [pipelineState]);
@@ -123,7 +123,7 @@ export function CockpitPhaseRail({
             <span className={cn('absolute inset-x-0 top-0 h-0.5', skipped ? 'border-t-2 border-dashed border-muted-foreground/50' : ACCENT[state])} />
             <button
               type="button"
-              onClick={() => onSelectPhase(phase)}
+              onClick={() => onSelectPhase(phase, agent?.sessionId)}
               className="block w-full min-w-0 text-left hover:text-foreground"
             >
               <span className={cn('flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.08em]', NAME_TONE[state])}>

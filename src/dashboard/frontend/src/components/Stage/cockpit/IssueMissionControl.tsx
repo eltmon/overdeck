@@ -31,8 +31,9 @@ import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
 import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDrawerData'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
+import { deriveShip } from '../../issue-view/derivations'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
-import { VerificationGates } from '../../issue-view/VerificationGates'
+import { VerificationGatesGrid } from '../../issue-view/VerificationGates'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -171,6 +172,10 @@ function githubCompareUrl(issueUrl: string | null, branch: string): string | nul
   if (!issueUrl) return null
   const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/issues\/\d+$/.exec(issueUrl)
   return match ? `${match[1]}/compare/main...${encodeURIComponent(branch)}?expand=1` : null
+}
+
+function mergeCommitOid(mergeCommit: { oid?: string } | string | null | undefined): string | undefined {
+  return typeof mergeCommit === 'string' ? mergeCommit : mergeCommit?.oid
 }
 
 function IssueTreeContextPanel({
@@ -487,6 +492,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       (candidate) => candidate.identifier === issueId,
     ),
   )
+  const preferredReviewStatus = reviewSnapshot ?? review.data
+  const cockpitShip = useMemo(
+    () => deriveShip(preferredReviewStatus as ReviewStatusData | undefined, issueView.ship.log),
+    [issueView.ship.log, preferredReviewStatus],
+  )
+  const cockpitIssueView = useMemo(
+    () => ({ ...issueView, ship: cockpitShip }),
+    [cockpitShip, issueView],
+  )
   // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
   // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
   // no bespoke phase re-derivation on this surface.
@@ -501,12 +515,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const hasLiveSession = issueAgents.some((agent) => agent.status === 'running' || agent.status === 'starting')
     || treeSessions.some((session) => session.presence === 'active')
   const pipelineState = derivePipelineState({
-    reviewStatus: (reviewSnapshot ?? review.data ?? null),
+    reviewStatus: preferredReviewStatus ?? null,
     agent: primaryAgent,
     hasPlan: headerActions.state.hasPlan,
     hasTasks: tasksRollup.total > 0,
     issueCanonicalState: issueRecord?.state ?? issueRecord?.status ?? null,
-    isMerged: (reviewSnapshot ?? review.data)?.mergeStatus === 'merged',
+    isMerged: preferredReviewStatus?.mergeStatus === 'merged',
   })
   const currentPhaseKey = currentPhase(pipelineState)
   const phase = currentPhaseKey
@@ -561,7 +575,12 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (session) { selectSessionFromTree(session); return true }
     return false
   }
-  const selectPipelinePhase = (selectedPhase: Phase) => {
+  const selectPipelinePhase = (selectedPhase: Phase, sessionId?: string) => {
+    if (sessionId) {
+      const session = treeSessions.find((candidate) => candidate.sessionId === sessionId)
+      if (session) selectSessionFromTree(session)
+      return
+    }
     if (selectedPhase === 'plan') {
       selectTab('plan', 'map')
       return
@@ -592,10 +611,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const overviewBody = (
     <IssueOverviewTab
       issueId={issueId}
-      model={issueView}
+      model={cockpitIssueView}
       state={overviewState}
       hasPlan={headerActions.state.hasPlan}
       workRunning={workAgentRunning}
+      mergedCommit={mergeCommitOid(pr.data?.pr?.mergeCommit)}
       reviewSummary={review.data?.reviewNotes ?? review.data?.mergeNotes}
     />
   )
@@ -696,8 +716,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       <CockpitPhaseRail
         pipelineState={pipelineState}
         agents={issueView.agents}
-        ship={issueView.ship}
-        testStatus={(reviewSnapshot ?? review.data)?.testStatus}
+        ship={cockpitShip}
+        testStatus={preferredReviewStatus?.testStatus}
         onSelectPhase={selectPipelinePhase}
       />
 
@@ -910,7 +930,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           <RunDetailsCard model={issueView} />
           <section data-testid="right-rail-gates" className="rounded-[var(--radius)] border border-border bg-card p-3">
             <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Gates</h3>
-            <VerificationGates issueId={issueId} />
+            <VerificationGatesGrid verification={issueView.verification} />
           </section>
           <section data-testid="right-rail-cost" data-section="Cost / Artifacts / Ship homes" className="rounded-[var(--radius)] border border-border bg-card p-3">
             <div className="flex items-start justify-between gap-3">

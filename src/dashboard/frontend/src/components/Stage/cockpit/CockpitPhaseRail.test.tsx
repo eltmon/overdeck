@@ -47,6 +47,22 @@ describe('CockpitPhaseRail', () => {
     expect(within(review).getByText(/Started Jul 31/)).toHaveAttribute('datetime', reviewer.startedAt);
   });
 
+  it('passes the exact displayed session through phase clicks', () => {
+    const onSelectPhase = vi.fn();
+    render(
+      <CockpitPhaseRail
+        pipelineState="in_review_reviewers_running"
+        agents={[reviewer]}
+        ship={ship}
+        onSelectPhase={onSelectPhase}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Review/ }));
+
+    expect(onSelectPhase).toHaveBeenCalledWith('review', reviewer.sessionId);
+  });
+
   it('renders skipped-test guidance, embedded ship progress, and phase navigation', () => {
     const onSelectPhase = vi.fn();
     const { container } = render(
@@ -67,6 +83,6 @@ describe('CockpitPhaseRail', () => {
     expect(container.querySelector('[data-section="ship-progress-compact"]')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Plan/ }));
-    expect(onSelectPhase).toHaveBeenCalledWith('plan');
+    expect(onSelectPhase).toHaveBeenCalledWith('plan', undefined);
   });
 });

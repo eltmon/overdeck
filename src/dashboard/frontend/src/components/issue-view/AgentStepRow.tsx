@@ -655,7 +655,7 @@ export function AgentStepRow({
 
   const renderCockpitDot = () => (
     <span className={cockpitStyles.dotSlot} data-section={SECTIONS.icon}>
-      <StatusDot status={cockpitDotStatus} size="md" title={statusTitle} />
+      <StatusDot status={cockpitDotStatus} size="md" title={statusTitle} variant="cockpit" />
     </span>
   );
 

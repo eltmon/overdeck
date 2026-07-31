@@ -73,13 +73,13 @@ export function IssueOverviewTab({
   const specialists: SpecialistChip[] = model.agents
     .filter((agent) => agent.type === 'reviewer')
     .map((agent) => ({
-      id: agent.role ?? agent.sessionId,
+      id: agent.sessionId,
       name: `review.${agent.role ?? agent.label.toLowerCase()}`,
       status: agent.active ? 'running' : agent.verdict === 'changes_requested' || agent.status === 'error' ? 'failed' : 'done',
       verdict: agent.verdict === 'approved' ? 'APPROVED' : agent.verdict === 'changes_requested' ? 'CHANGES_REQUESTED' : null,
       lastLine: agent.verdict === 'approved' ? 'Approved' : agent.verdict === 'changes_requested' ? 'Changes requested' : agent.status,
       model: agent.model,
-      hasConversation: true,
+      hasConversation: false,
     }));
 
   return (

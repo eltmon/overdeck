@@ -14,7 +14,7 @@ The kit currently owns these reusable pieces:
 - `AgentStepRow` renders work, review, test, and ship sessions with the same status, model, cost, verdict, and operator affordances.
 - `ActiveAgentPanel` renders selected-agent metadata plus resume and message actions; the rich transcript stays in the Session surface.
 - `TellComposer` is the shared message form used by `ActiveAgentPanel`; the Session transcript keeps its own selected-agent composer inside `IssueDetail`, so one visible conversation cannot send to another agent.
-- `NeedsYouSlot` prioritizes one operator decision and invokes actions from the shared registry.
+- `NeedsYouSlot` prioritizes one operator decision and invokes actions from the shared registry. Agent-scoped alerts resolve registry enablement and endpoints against the alert's exact session id rather than the issue's primary agent.
 - `RunDetailsCard` presents the active role, model, harness, start time, and workspace from `IssueViewModel`.
 - `ShipProgress` renders compact and full merge/verification progress.
 - `VerificationGates` renders the current verification cycle and gate results.
@@ -29,7 +29,7 @@ The kit currently owns these reusable pieces:
 
 ### Cockpit layout
 
-The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick. It is cockpit-only: the console/drawer `IssuePhaseRail` keeps its frozen layout and behavior. The persistent tab band has exactly six destinations:
+The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick; clicking an occupied phase opens that exact session id. It is cockpit-only: the console/drawer `IssuePhaseRail` and the default filled idle `StatusDot` keep their frozen behavior, while cockpit rows opt into the hollow idle and outcome colors. The persistent tab band has exactly six destinations:
 
 - **Overview** — lifecycle summary, review-specialist outcomes, recent events, pickup state, and the full Ship progress/log surface. It has explicit live, merged, and pre-work teaching states.
 - **Session** — Conversation and Terminal segments backed by the shared page-density `IssueDetail`; that component owns both selected-agent state and the single transcript composer.

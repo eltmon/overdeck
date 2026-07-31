@@ -29,7 +29,7 @@ beforeEach(() => {
   queryMocks.prQuery.data.pr = { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
   queryMocks.workspaceQuery.data = null
-  useDashboardStore.setState({ agentsById: {} })
+  useDashboardStore.setState({ agentsById: {}, reviewStatusByIssueId: {} })
   Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, {
     number: 1661,
     url: 'https://github.com/eltmon/overdeck/pull/1661',
@@ -121,7 +121,7 @@ const queryMocks = vi.hoisted(() => {
   const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
   const prQuery: {
     data: {
-      pr: { number: number; url: string; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string } | null
+      pr: { number: number; url: string; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string; mergeCommit?: { oid?: string } | string | null } | null
     }
   } = { data: { pr: { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
   const reviewStatusQuery = {
@@ -457,6 +457,19 @@ describe('IssueMissionControl', () => {
     expect(container.querySelector('[data-section="active-agent-panel-tell"]')).toBeNull()
   })
 
+  it('opens the exact actor displayed by the pipeline rail', () => {
+    queryMocks.activityQuery.data.sections = [
+      { type: 'work', sessionId: 'agent-pan-1661-slot-1', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 30 },
+      { type: 'work', sessionId: 'agent-pan-1661-slot-2', model: 'gpt-5.5', status: 'running', startedAt: '2026-06-07T00:01:00Z', duration: null },
+    ]
+    const { container } = renderMissionControl()
+    const pipeline = container.querySelector('[data-section="Pipeline Band"]') as HTMLElement
+
+    fireEvent.click(within(pipeline).getByRole('button', { name: /Work/ }))
+
+    expect(screen.getByTestId('session-panel')).toHaveTextContent('agent-pan-1661-slot-2')
+  })
+
   it('uses Overview as the default when the issue has no agent sessions', () => {
     queryMocks.activityQuery.data.sections = []
     queryMocks.issueActionState.hasPlan = false
@@ -739,6 +752,27 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
 
+  it('derives pipeline state and Ship progress from the same preferred review snapshot', () => {
+    useDashboardStore.setState({
+      reviewStatusByIssueId: {
+        'PAN-1661': {
+          issueId: 'PAN-1661',
+          reviewStatus: 'passed',
+          testStatus: 'passed',
+          mergeStatus: 'merging',
+          verificationStatus: 'passed',
+          readyForMerge: false,
+          updatedAt: '2026-06-07T00:02:00Z',
+        },
+      },
+    } as Parameters<typeof useDashboardStore.setState>[0])
+    const { container } = renderMissionControl()
+    const shipPhase = container.querySelector('[data-section="Pipeline Band"] [data-phase="ship"]')
+
+    expect(shipPhase).toHaveAttribute('data-state', 'current')
+    expect(within(shipPhase as HTMLElement).getByTestId('ship-door-row')).toHaveTextContent('Ship')
+  })
+
   it('renders the live Overview summary, specialist results, feed, and pickup gate', () => {
     queryMocks.activityQuery.data.sections.push({
       type: 'reviewer',
@@ -760,7 +794,9 @@ describe('IssueMissionControl', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     const overview = screen.getByTestId('overview-live')
     expect(within(overview).getByTestId('status-narrative')).toHaveTextContent('The reviewer found problems')
-    expect(within(overview).getByText('review.security')).toBeInTheDocument()
+    const specialist = within(overview).getByText('review.security').closest('button')
+    expect(specialist).toHaveAttribute('data-specialist', 'agent-pan-1661-review-security')
+    expect(specialist).toBeDisabled()
     expect(within(overview).getAllByText('Approved')).toHaveLength(2)
     expect(within(overview).getByText('What just happened')).toBeInTheDocument()
     expect(within(overview).getByText('Pickup gate')).toBeInTheDocument()
@@ -774,12 +810,13 @@ describe('IssueMissionControl', () => {
       reviewNotes: 'Security, correctness, and performance approved.',
       readyForMerge: false,
     })
+    Object.assign(queryMocks.prQuery.data.pr!, { mergeCommit: { oid: 'mergeabc123' } })
     renderMissionControl()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     const done = screen.getByTestId('overview-done')
     expect(within(done).getByText('Done')).toHaveClass('text-success-foreground')
-    expect(within(done).getByText('unavailable')).toHaveClass('font-mono')
+    expect(within(done).getByText('mergeabc123')).toHaveClass('font-mono')
     expect(within(done).getByText('Security, correctness, and performance approved.')).toBeInTheDocument()
   })
 

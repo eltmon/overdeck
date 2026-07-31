@@ -71,6 +71,9 @@ export function NeedsYouSlot({ model, actions }: {
   const copy = COPY[active.kind];
   const actionKey = ACTION_KEY[active.kind];
   const action = actionKey ? actions.find((candidate) => candidate.action.key === actionKey) : undefined;
+  const targetedAction = active.sessionId && action?.forAgent
+    ? action.forAgent(active.sessionId)
+    : action;
   const additionalCount = items.length - 1;
 
   return (
@@ -91,12 +94,12 @@ export function NeedsYouSlot({ model, actions }: {
             +{additionalCount} more
           </span>
         ) : null}
-        {action ? (
+        {action && targetedAction ? (
           <button
             type="button"
-            onClick={action.invoke}
-            disabled={!action.enabled || action.isPending}
-            title={!action.enabled ? action.disabledReason : action.action.description}
+            onClick={targetedAction.invoke}
+            disabled={!targetedAction.enabled || targetedAction.isPending}
+            title={!targetedAction.enabled ? targetedAction.disabledReason : action.action.description}
             className="shrink-0 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5 text-[11px] font-medium text-foreground transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
           >
             {action.action.label}

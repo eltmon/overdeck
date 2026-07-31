@@ -139,6 +139,29 @@ describe('NeedsYouSlot', () => {
     expect(invoke).toHaveBeenCalledOnce();
   });
 
+  it('resolves enablement and invocation against the affected session', () => {
+    const primaryInvoke = vi.fn();
+    const targetedInvoke = vi.fn();
+    const forAgent = vi.fn(() => ({
+      enabled: true,
+      isPending: false,
+      invoke: targetedInvoke,
+    }));
+    const action = { ...actionView('unpause', 'Unpause agent', primaryInvoke), forAgent };
+    render(
+      <NeedsYouSlot
+        model={modelWith([{ kind: 'paused', sessionId: 'agent-pan-3356-review-security' }])}
+        actions={[action]}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Unpause agent' }));
+
+    expect(forAgent).toHaveBeenCalledWith('agent-pan-3356-review-security');
+    expect(targetedInvoke).toHaveBeenCalledOnce();
+    expect(primaryInvoke).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['stale_review', 'Stale-review warning'],
     ['blocker', 'IssueBlockerSpotlight'],
