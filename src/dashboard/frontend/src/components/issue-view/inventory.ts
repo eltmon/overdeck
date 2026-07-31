@@ -57,7 +57,7 @@ export const ISSUE_VIEW_INVENTORY: readonly IssueViewInventoryEntry[] = [
   { section: 'NeedsYouSlot', view: 'cockpit', home: 'src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx' },
   { section: 'Stale-review warning', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx' },
   { section: 'StatusNarrative', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/StatusNarrative.tsx' },
-  { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/issue-detail/IssueDetailShell.tsx' },
+  { section: 'Pipeline Band', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/CockpitPhaseRail.tsx' },
   { section: 'AgentsLane', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },
   { section: 'SessionPanel', view: 'cockpit', home: 'src/dashboard/frontend/src/components/CommandDeck/SessionView/SessionPanel.tsx' },
   { section: 'StackDrawer', view: 'cockpit', home: 'src/dashboard/frontend/src/components/Stage/cockpit/AgentsLane.tsx' },

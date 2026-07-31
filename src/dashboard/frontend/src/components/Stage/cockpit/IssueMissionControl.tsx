@@ -24,7 +24,7 @@ import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
-import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
+import { currentPhase, phaseLabel, type Phase } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
 import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
@@ -32,7 +32,6 @@ import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDr
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
 import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
-import { TellComposer } from '../../issue-view/TellComposer'
 import { VerificationGates } from '../../issue-view/VerificationGates'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
@@ -47,6 +46,7 @@ import type { XBriefDocument } from '../../xbrief/types'
 import { IssueTreeLane } from './IssueTreeLane'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { ChangedFilesView } from './ChangedFilesView'
+import { CockpitPhaseRail } from './CockpitPhaseRail'
 import { StatusHistoryTab } from './StatusHistoryTab'
 import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
@@ -498,20 +498,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
     [issueAgents],
   )
-  const sessionTarget = useMemo(
-    () => treeSessions.find((session) => session.presence === 'active')
-      ?? treeSessions.find((session) => !session.sessionId.endsWith('-planning-state'))
-      ?? null,
-    [treeSessions],
-  )
-  const sessionTargetAgent = useMemo(
-    () => issueAgents.find((agent) => agent.id === sessionTarget?.sessionId) ?? primaryAgent,
-    [issueAgents, primaryAgent, sessionTarget?.sessionId],
-  )
-  const sessionComposerAgentId = sessionTargetAgent?.id ?? sessionTarget?.sessionId ?? null
-  const sessionComposerIsLive = sessionTargetAgent
-    ? sessionTargetAgent.status === 'running' || sessionTargetAgent.status === 'starting'
-    : sessionTarget?.presence === 'active'
   const hasLiveSession = issueAgents.some((agent) => agent.status === 'running' || agent.status === 'starting')
     || treeSessions.some((session) => session.presence === 'active')
   const pipelineState = derivePipelineState({
@@ -528,7 +514,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     : pipelineState === 'merged' || pipelineState === 'done'
       ? phaseLabel('done')
       : '—'
-  const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const cost = issueView.header.cost
   const trackerHref = trackerIssueUrl(issueId, issueRecord?.url)
   const createPrHref = pr.data?.pr ? null : githubCompareUrl(trackerHref, branch)
   const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
@@ -575,6 +561,17 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (session) { selectSessionFromTree(session); return true }
     return false
   }
+  const selectPipelinePhase = (selectedPhase: Phase) => {
+    if (selectedPhase === 'plan') {
+      selectTab('plan', 'map')
+      return
+    }
+    if (selectedPhase === 'work' || selectedPhase === 'review' || selectedPhase === 'test') {
+      if (!openAgentByType(selectedPhase)) selectTab('session', 'conversation')
+      return
+    }
+    selectTab('overview')
+  }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
     setSelectedTreeSession((current) => {
@@ -599,7 +596,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       state={overviewState}
       hasPlan={headerActions.state.hasPlan}
       workRunning={workAgentRunning}
-      mergedCommit={checks.data?.pr?.headRefOid ?? pr.data?.pr?.headRefOid}
       reviewSummary={review.data?.reviewNotes ?? review.data?.mergeNotes}
     />
   )
@@ -643,7 +639,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
 
               {pr.data?.pr ? (
                 <a
-                  href={checks.data?.pr?.url}
+                  href={pr.data.pr.url}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-foreground hover:bg-accent"
@@ -662,10 +658,10 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
 
               <span
                 data-testid="header-cost-chip"
-                aria-label={`Cost ${cost > 0 ? `$${cost.toFixed(2)}` : 'unavailable'}`}
+                aria-label={`Cost ${cost ?? 'unavailable'}`}
                 className="inline-flex h-7 items-center rounded-[var(--radius-sm)] border badge-border-signal-cost badge-bg-signal-cost px-2 font-mono text-[11px] font-medium tabular-nums text-signal-cost-foreground"
               >
-                {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+                {cost ?? '—'}
               </span>
 
               {trackerHref ? (
@@ -696,6 +692,14 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       </header>
 
       <NeedsYouSlot model={issueView} actions={headerActions.all} />
+
+      <CockpitPhaseRail
+        pipelineState={pipelineState}
+        agents={issueView.agents}
+        ship={issueView.ship}
+        testStatus={(reviewSnapshot ?? review.data)?.testStatus}
+        onSelectPhase={selectPipelinePhase}
+      />
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
         {TABS.map((tab) => {
@@ -807,13 +811,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   reviewStatus={reviewSnapshot}
                   className={activeTab === 'session' ? 'min-h-0 flex-1' : undefined}
                 />
-                {activeTab === 'session' && activeSubView === 'conversation' && sessionComposerAgentId ? (
-                  <TellComposer
-                    agentId={sessionComposerAgentId}
-                    isEffectivelyLive={sessionComposerIsLive}
-                    className="shrink-0 border-t border-border bg-card/70 px-3 pb-3"
-                  />
-                ) : null}
               </div>
             )}
             {activeTab === 'plan' && (
@@ -920,7 +917,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               <div>
                 <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cost</h3>
                 <div className="mt-1 font-mono text-[18px] tabular-nums text-signal-cost-foreground">
-                  {cost > 0 ? `$${cost.toFixed(2)}` : '—'}
+                  {cost ?? '—'}
                 </div>
                 <div className="mt-1 font-mono text-[10px] text-muted-foreground">
                   {costs.data?.totalTokens ? `${costs.data.totalTokens.toLocaleString()} tokens` : 'No token data'}

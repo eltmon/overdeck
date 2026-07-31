@@ -471,7 +471,17 @@ function deriveOperator(
   if (reviewStatus?.stuck) {
     items.push({ kind: 'stuck', reason: reviewStatus.stuckReason ?? reviewStatus.stuckDetails });
   }
-  if (sessions.some((session) => session.type === 'reviewer')) {
+  const hasActiveReview = sessions.some(
+    (session) => (session.type === 'review' || session.type === 'reviewer') && session.presence === 'active',
+  );
+  const hasEndedReviewer = sessions.some(
+    (session) => session.type === 'reviewer' && session.presence === 'ended',
+  );
+  if (
+    hasEndedReviewer &&
+    !hasActiveReview &&
+    (reviewStatus?.reviewStatus === 'pending' || reviewStatus?.reviewStatus === 'failed')
+  ) {
     items.push({ kind: 'stale_review', reason: 'Leftover review specialist sessions must be cleared before a clean review can run.' });
   }
   if (reviewStatus?.blockerReasons?.[0]) {
@@ -488,12 +498,8 @@ function deriveOperator(
     items.push({ kind: 'pickup_gate', reason: 'The plan is ready, but work cannot be picked up until an operator releases it.' });
   }
 
-  const needsYouItems = sortOperatorNeeds(items);
   if (readyForMerge(reviewStatus)) {
-    return { needsYou: { kind: 'ready_for_merge' }, needsYouItems };
-  }
-  if (needsYouItems[0]) {
-    return { needsYou: needsYouItems[0], needsYouItems };
+    items.push({ kind: 'ready_for_merge' });
   }
 
   const work = sessions.find((s) => s.type === 'work' || s.type === 'strike');
@@ -502,10 +508,11 @@ function deriveOperator(
     !isAgentRunning(work, findAgentForSession(work, agentsById)) &&
     reviewStatus?.mergeStatus !== 'merged'
   ) {
-    return { needsYou: { kind: 'stopped', sessionId: work.sessionId }, needsYouItems };
+    items.push({ kind: 'stopped', sessionId: work.sessionId });
   }
 
-  return { needsYou: null, needsYouItems };
+  const needsYouItems = sortOperatorNeeds(items);
+  return { needsYou: needsYouItems[0] ?? null, needsYouItems };
 }
 
 export function buildIssueViewModel(

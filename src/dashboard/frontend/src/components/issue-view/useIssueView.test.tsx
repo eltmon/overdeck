@@ -360,6 +360,9 @@ describe('buildIssueViewModel', () => {
     );
     expect(model.operator.needsYou?.kind).toBe('stopped');
     expect(model.operator.needsYou?.sessionId).toBe('agent-pan-2499-slot-2');
+    expect(model.operator.needsYouItems).toEqual([
+      { kind: 'stopped', sessionId: 'agent-pan-2499-slot-2' },
+    ]);
   });
 
   it('prefers ready_for_merge operator state over stopped', () => {
@@ -376,6 +379,51 @@ describe('buildIssueViewModel', () => {
       {},
     );
     expect(model.operator.needsYou?.kind).toBe('ready_for_merge');
+    expect(model.operator.needsYouItems.map((item) => item.kind)).toEqual([
+      'ready_for_merge',
+      'stopped',
+    ]);
+  });
+
+  it('does not classify an active review convoy as stale', () => {
+    const sessions = [
+      makeSession({ type: 'review', sessionId: 'review-parent', status: 'running', presence: 'active' }),
+      makeSession({ type: 'reviewer', sessionId: 'review-security', status: 'running', presence: 'active', role: 'security' }),
+    ];
+    const model = buildIssueViewModel(
+      'PAN-2499',
+      undefined,
+      undefined,
+      undefined,
+      makeReviewStatus({ reviewStatus: 'reviewing' }),
+      undefined,
+      undefined,
+      makeActivity(sessions),
+      {},
+    );
+
+    expect(model.operator.needsYouItems).toEqual([]);
+    expect(model.operator.needsYou).toBeNull();
+  });
+
+  it('classifies ended reviewers as stale only while a fresh review is pending', () => {
+    const sessions = [
+      makeSession({ type: 'reviewer', sessionId: 'review-security', status: 'stopped', presence: 'ended', role: 'security' }),
+    ];
+    const model = buildIssueViewModel(
+      'PAN-2499',
+      undefined,
+      undefined,
+      undefined,
+      makeReviewStatus({ reviewStatus: 'pending' }),
+      undefined,
+      undefined,
+      makeActivity(sessions),
+      {},
+    );
+
+    expect(model.operator.needsYou?.kind).toBe('stale_review');
+    expect(model.operator.needsYouItems[0]?.kind).toBe('stale_review');
   });
 
   it('marks pipeline steps done/active based on sessions and review status', () => {

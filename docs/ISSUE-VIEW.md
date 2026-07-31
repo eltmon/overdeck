@@ -13,7 +13,7 @@ The kit currently owns these reusable pieces:
 - `IssueView` is the semantic boundary used by all three shells. `IssueViewFullscreenButton` and `RailShipProgress` provide the shared promotion and compact ship controls.
 - `AgentStepRow` renders work, review, test, and ship sessions with the same status, model, cost, verdict, and operator affordances.
 - `ActiveAgentPanel` renders selected-agent metadata plus resume and message actions; the rich transcript stays in the Session surface.
-- `TellComposer` is the shared message form used by `ActiveAgentPanel` and below the cockpit transcript.
+- `TellComposer` is the shared message form used by `ActiveAgentPanel`; the Session transcript keeps its own selected-agent composer inside `IssueDetail`, so one visible conversation cannot send to another agent.
 - `NeedsYouSlot` prioritizes one operator decision and invokes actions from the shared registry.
 - `RunDetailsCard` presents the active role, model, harness, start time, and workspace from `IssueViewModel`.
 - `ShipProgress` renders compact and full merge/verification progress.
@@ -29,16 +29,16 @@ The kit currently owns these reusable pieces:
 
 ### Cockpit layout
 
-The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. The persistent tab band has exactly six destinations:
+The cockpit is organized around the live run. Its header carries one phase sentence plus branch, PR, cost, tracker, and shared issue actions; a prioritized `NeedsYouSlot` appears immediately below it when the operator must answer or intervene. `CockpitPhaseRail` follows with live actor, model, harness, start-time, and duration metadata driven by the shared reactive tick. It is cockpit-only: the console/drawer `IssuePhaseRail` keeps its frozen layout and behavior. The persistent tab band has exactly six destinations:
 
-- **Overview** — lifecycle summary, review-specialist outcomes, recent events, and pickup state. It has explicit live, merged, and pre-work teaching states.
-- **Session** — Conversation and Terminal segments backed by the shared page-density `IssueDetail`, with `TellComposer` pinned below the transcript.
+- **Overview** — lifecycle summary, review-specialist outcomes, recent events, pickup state, and the full Ship progress/log surface. It has explicit live, merged, and pre-work teaching states.
+- **Session** — Conversation and Terminal segments backed by the shared page-density `IssueDetail`; that component owns both selected-agent state and the single transcript composer.
 - **Plan** — Tasks, dependency Map, and PRD segments. The tab owns the task count and the map retains its full-screen xBRIEF promotion; there is no floating Tasks chip or task drawer.
 - **Changes** — Files, Checks, and Artifacts segments, with the existing check-state badge on the parent tab.
 - **Activity** — Feed and Status history segments.
 - **Discussion** — the canonical discussion surface.
 
-Legacy `?tab=` values for Conversation, Terminal, Tasks, Code, Files, Artifacts, Timeline, Costs, and Ship normalize into those six destinations, so old links keep working. When no route selection is present, an issue with any session opens Session; an issue without a run opens Overview.
+Legacy `?tab=` values for Conversation, Terminal, Tasks, Code, Files, Artifacts, Timeline, Costs, and Ship normalize into those six destinations, so old links keep working. Costs opens Overview with the persistent cost rail available, while Ship opens Overview with the full merge progress and live log visible. When no route selection is present, an issue with any session opens Session; an issue without a run opens Overview.
 
 The body uses a collapsible crew spine, a main tab workspace, and a persistent awareness rail. The crew spine nests review specialists beneath Review and uses one semantic status signal per row. The awareness rail keeps Now, Run details, Gates, Cost, Environment, and Recent activity visible; its links promote the full cost rollup or switch to Activity. On narrower containers the rail reflows below the spine and main workspace rather than disappearing. See the [cockpit redesign v2 mockup](../design/issue-detail-redesign-mockup-v2.html).
 

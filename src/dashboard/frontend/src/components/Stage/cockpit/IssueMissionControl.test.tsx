@@ -26,10 +26,17 @@ beforeEach(() => {
     reviewNotes: 'Security blocker',
     readyForMerge: false,
   })
-  queryMocks.prQuery.data.pr = { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
+  queryMocks.prQuery.data.pr = { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
   queryMocks.workspaceQuery.data = null
   useDashboardStore.setState({ agentsById: {} })
+  Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, {
+    number: 1661,
+    url: 'https://github.com/eltmon/overdeck/pull/1661',
+    headRefName: 'feature/pan-1661',
+    mergeable: 'MERGEABLE',
+    statusCheckRollup: [],
+  })
   Object.assign(queryMocks.issueCheckRunsQuery.data.summary, {
     total: 1,
     passed: 1,
@@ -114,9 +121,9 @@ const queryMocks = vi.hoisted(() => {
   const planningQuery = { data: { prd: '# PRD', state: '# STATE' }, isLoading: false }
   const prQuery: {
     data: {
-      pr: { number: number; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string } | null
+      pr: { number: number; url: string; additions: number; deletions: number; changedFiles: number; isDraft: boolean; state: string } | null
     }
-  } = { data: { pr: { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
+  } = { data: { pr: { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' } } }
   const reviewStatusQuery = {
     data: {
       issueId: 'PAN-1661',
@@ -145,6 +152,10 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
   useIssueCostsQuery: () => queryMocks.issueCostsQuery,
   useWorkspaceQuery: () => queryMocks.workspaceQuery,
   useShipLogQuery: () => queryMocks.shipLogQuery,
+}))
+
+vi.mock('../../../lib/useSharedTick', () => ({
+  useSharedTick: () => new Date('2026-06-07T00:05:00Z'),
 }))
 
 vi.mock('../../../lib/issueActions', () => ({
@@ -264,7 +275,9 @@ vi.mock('../../issue-detail/IssueDetail', () => ({
       data-density={props.density}
       data-tab={props.tab}
       data-show-tabs={String(props.showTabs ?? true)}
-    />
+    >
+      {props.tab === 'conversation' ? <div data-testid="issue-detail-composer" /> : null}
+    </div>
   ),
 }))
 
@@ -301,11 +314,10 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl();
     // A known session makes Session the default: route chrome + the ONE
     // IssueDetail at page density.
-    for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'Session tab']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'Pipeline Band', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'Session tab']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
-    // The pipeline band is inside IssueDetail now — no duplicate shell in the header.
-    expect(container.querySelector('[data-section="Pipeline Band"]')).toBeNull();
+    expect(container.querySelectorAll('[data-section="Pipeline Band"]')).toHaveLength(1);
     // Task progress lives inside Plan rather than in a floating tab-band chip.
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Issue cockpit tabs' })).getByRole('button', { name: 'Plan' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }));
@@ -367,7 +379,17 @@ describe('IssueMissionControl', () => {
     )
   })
 
-  it('mounts the needs-you slot between the header and tab band', () => {
+  it('uses the canonical PR query URL for the header chip', () => {
+    Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, { url: 'https://github.com/eltmon/overdeck/pull/9999' })
+    renderMissionControl()
+
+    expect(screen.getByRole('link', { name: /PR #1661/ })).toHaveAttribute(
+      'href',
+      'https://github.com/eltmon/overdeck/pull/1661',
+    )
+  })
+
+  it('mounts the needs-you slot before the pipeline band and tabs', () => {
     Object.assign(queryMocks.activityQuery.data.sections[0]!, {
       awaitingInput: true,
       awaitingInputPrompt: 'Choose the persistence location',
@@ -375,10 +397,12 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl()
     const header = container.querySelector('[data-section="Header bar"]')
     const slot = screen.getByTestId('needs-you-slot')
+    const pipeline = container.querySelector('[data-section="Pipeline Band"]')
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
 
     expect(header?.nextElementSibling).toBe(slot)
-    expect(slot.nextElementSibling).toBe(nav)
+    expect(slot.nextElementSibling).toBe(pipeline)
+    expect(pipeline?.nextElementSibling).toBe(nav)
     expect(slot).toHaveAttribute('data-section', 'NeedsYouSlot')
     expect(slot).toHaveTextContent('Choose the persistence location')
     expect(screen.getByRole('button', { name: 'Tell agent' })).toBeInTheDocument()
@@ -386,11 +410,11 @@ describe('IssueMissionControl', () => {
 
   it('lifts the detail tabs between the header and body without wrapping', () => {
     const { container } = renderMissionControl()
-    const header = container.querySelector('[data-section="Header bar"]')
+    const pipeline = container.querySelector('[data-section="Pipeline Band"]')
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
 
     expect(container.querySelectorAll('[data-section="Detail Tabs"]')).toHaveLength(1)
-    expect(header?.nextElementSibling).toBe(nav)
+    expect(pipeline?.nextElementSibling).toBe(nav)
     expect(nav.nextElementSibling?.querySelector('main')).toBeInTheDocument()
     expect(nav.closest('main')).toBeNull()
     expect(nav).toHaveClass('flex-nowrap', 'overflow-x-auto')
@@ -424,27 +448,13 @@ describe('IssueMissionControl', () => {
     expect(terminal).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('shows a blue live signal and sends from the transcript composer through the tell route', async () => {
+  it('shows a blue live signal and leaves composer ownership with IssueDetail', () => {
     queryMocks.activityQuery.data.sections[0]!.status = 'running'
     const { container } = renderMissionControl()
 
     expect(screen.getByTestId('session-live-dot')).toHaveClass('bg-info')
-    expect(container.querySelector('[data-section="active-agent-panel-tell"]')).toBeInTheDocument()
-
-    fireEvent.change(screen.getByLabelText('Tell agent-pan-1661'), {
-      target: { value: 'Keep going' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
-
-    await waitFor(() => {
-      expect(window.fetch).toHaveBeenCalledWith(
-        '/api/agents/agent-pan-1661/tell',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ message: 'Keep going' }),
-        }),
-      )
-    })
+    expect(screen.getAllByTestId('issue-detail-composer')).toHaveLength(1)
+    expect(container.querySelector('[data-section="active-agent-panel-tell"]')).toBeNull()
   })
 
   it('uses Overview as the default when the issue has no agent sessions', () => {
@@ -486,6 +496,9 @@ describe('IssueMissionControl', () => {
     expect(main).toHaveAttribute('data-active-tab', expectedTab)
     if (expectedSubView) expect(main).toHaveAttribute('data-active-subview', expectedSubView)
     else expect(main).not.toHaveAttribute('data-active-subview')
+    if (legacyTab === 'ship') {
+      expect(main?.querySelector('[data-section="ship-progress-full"]')).toBeInTheDocument()
+    }
   })
 
   it('treats the new plan deep link as the plan map sub-view', () => {
@@ -753,7 +766,7 @@ describe('IssueMissionControl', () => {
     expect(within(overview).getByText('Pickup gate')).toBeInTheDocument()
   })
 
-  it('renders the done Overview with an emerald badge, merged commit, and review summary', () => {
+  it('renders the done Overview with an emerald badge, truthful merge metadata, and review summary', () => {
     Object.assign(queryMocks.reviewStatusQuery.data, {
       reviewStatus: 'passed',
       testStatus: 'passed',
@@ -761,13 +774,12 @@ describe('IssueMissionControl', () => {
       reviewNotes: 'Security, correctness, and performance approved.',
       readyForMerge: false,
     })
-    Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, { headRefOid: 'abc1234def5678' })
     renderMissionControl()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     const done = screen.getByTestId('overview-done')
     expect(within(done).getByText('Done')).toHaveClass('text-success-foreground')
-    expect(within(done).getByText('abc1234def5678')).toHaveClass('font-mono')
+    expect(within(done).getByText('unavailable')).toHaveClass('font-mono')
     expect(within(done).getByText('Security, correctness, and performance approved.')).toBeInTheDocument()
   })
 

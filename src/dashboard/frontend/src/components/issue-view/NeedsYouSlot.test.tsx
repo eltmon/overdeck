@@ -72,7 +72,7 @@ describe('NeedsYouSlot', () => {
     expect(screen.queryByText('This issue is stuck')).toBeNull();
   });
 
-  it('receives every ladder signal from the shared IssueViewModel derivation', () => {
+  it('prioritizes simultaneous valid signals without classifying a blocked review as stale', () => {
     const derived = buildIssueViewModel(
       'PAN-3356',
       'Cockpit redesign',
@@ -120,7 +120,6 @@ describe('NeedsYouSlot', () => {
       'stuck',
       'troubled',
       'paused',
-      'stale_review',
       'blocker',
       'pickup_gate',
     ]);
