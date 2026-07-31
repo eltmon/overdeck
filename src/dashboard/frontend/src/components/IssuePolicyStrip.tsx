@@ -224,6 +224,13 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
         }
         toast.error('Failed to save issue policy', { description });
       }
+    } catch (error) {
+      const description = error instanceof Error && error.message
+        ? error.message
+        : typeof error === 'string' && error
+          ? error
+          : 'Request failed';
+      toast.error('Failed to save issue policy', { description });
     } finally {
       setSaving(false);
     }

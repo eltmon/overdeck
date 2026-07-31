@@ -1,9 +1,10 @@
 import { Effect } from 'effect';
-import { HttpRouter, HttpServerRequest, HttpServerResponse } from 'effect/unstable/http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { INTERNAL_TOKEN_HEADER, _resetInternalTokenCacheForTests } from '../../../../../lib/internal-token.js';
 
 const routeMocks = vi.hoisted(() => ({
-  rejectUnsafeDashboardMutationRequest: vi.fn(),
   getProjectPath: vi.fn(),
   getWorkspaceInfoForIssue: vi.fn(),
   setReviewStatus: vi.fn(),
@@ -22,10 +23,6 @@ const routeMocks = vi.hoisted(() => ({
   pushDashboardReviewBranch: vi.fn(),
   resolveProjectForIssue: vi.fn(),
   updateIssueRecord: vi.fn(),
-}));
-
-vi.mock('../../dashboard-auth.js', () => ({
-  rejectUnsafeDashboardMutationRequest: routeMocks.rejectUnsafeDashboardMutationRequest,
 }));
 
 vi.mock('../../workspaces.js', async (importOriginal) => {
@@ -102,8 +99,9 @@ async function requestReviewTrigger(init: RequestInit = {}): Promise<{ status: n
 }
 
 beforeEach(() => {
+  process.env.OVERDECK_INTERNAL_TOKEN = 'test-internal-token';
+  _resetInternalTokenCacheForTests();
   for (const mock of Object.values(routeMocks)) mock.mockReset();
-  routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(null);
   routeMocks.getProjectPath.mockReturnValue('/repo');
   routeMocks.getWorkspaceInfoForIssue.mockReturnValue({
     exists: true,
@@ -118,15 +116,16 @@ beforeEach(() => {
   routeMocks.pushLocalReviewBranches.mockImplementation(() => new Promise<void>(() => {}));
 });
 
+afterEach(() => {
+  delete process.env.OVERDECK_INTERNAL_TOKEN;
+  _resetInternalTokenCacheForTests();
+});
+
 describe('POST /api/review/:issueId/trigger reviewMode', () => {
   it('rejects an unsafe mutation before reading or mutating issue state', async () => {
-    routeMocks.rejectUnsafeDashboardMutationRequest.mockReturnValue(
-      HttpServerResponse.text('Invalid CSRF token', { status: 403 }),
-    );
-
     const result = await requestReviewTrigger({ method: 'POST' });
 
-    expect(result.status).toBe(403);
+    expect(result.status).toBe(401);
     expect(routeMocks.getWorkspaceInfoForIssue).not.toHaveBeenCalled();
     expect(routeMocks.resolveProjectForIssue).not.toHaveBeenCalled();
     expect(routeMocks.updateIssueRecord).not.toHaveBeenCalled();
@@ -138,7 +137,10 @@ describe('POST /api/review/:issueId/trigger reviewMode', () => {
 
     const result = await requestReviewTrigger({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      },
       body: JSON.stringify({ reviewMode: 'full' }),
     });
 
@@ -155,13 +157,15 @@ describe('POST /api/review/:issueId/trigger reviewMode', () => {
 
     const result = await requestReviewTrigger({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      },
       body: JSON.stringify({ reviewMode: 'full' }),
     });
 
     expect(result.status).toBe(200);
     expect(result.body).toMatchObject({ success: true });
-    expect(routeMocks.rejectUnsafeDashboardMutationRequest).toHaveBeenCalledOnce();
     expect(routeMocks.updateIssueRecord).toHaveBeenCalledWith(project, 'PAN-3340', expect.any(Function));
     expect(routeMocks.pushLocalReviewBranches).toHaveBeenCalledOnce();
     expect(routeMocks.updateIssueRecord.mock.invocationCallOrder[0])
@@ -173,7 +177,10 @@ describe('POST /api/review/:issueId/trigger reviewMode', () => {
 
     const result = await requestReviewTrigger({
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        [INTERNAL_TOKEN_HEADER]: 'test-internal-token',
+      },
       body: JSON.stringify({ reviewMode: 'none' }),
     });
 

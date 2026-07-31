@@ -129,6 +129,26 @@ describe('IssuePolicyStrip', () => {
     expect(quick).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('reports a transport-level mode save failure and preserves the displayed mode', async () => {
+    fixtures.review.override.reviewMode = 'full';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    const modeControl = screen.getByLabelText('Review mode for this issue');
+    const full = within(modeControl).getByRole('button', { name: 'Full' });
+    const quick = within(modeControl).getByRole('button', { name: 'Quick' });
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+
+    vi.mocked(global.fetch).mockRejectedValue(new Error('Network unavailable'));
+    fireEvent.click(quick);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to save issue policy', {
+      description: 'Network unavailable',
+    }));
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+    expect(quick).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('uses the effective review mode to decide whether re-review is available', async () => {
     fixtures.review.override.reviewMode = 'quick';
     render(<IssuePolicyStrip issueId="PAN-2681" />);
