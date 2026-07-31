@@ -167,6 +167,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T20:35:28.723Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-31T20:44:28.479Z"
     }
   ],
   "feedback": [],
@@ -248,10 +253,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:44:26.061Z",
+  "updated": "2026-07-31T20:44:28.480Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -259,13 +264,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:44:26.029Z",
+    "updatedAt": "2026-07-31T20:44:26.737Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
     "lastVerifiedCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
-    "reviewSpawnedAt": "2026-07-31T20:35:03.149Z",
+    "reviewSpawnedAt": "2026-07-31T20:44:26.736Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/CommandDeck/StatusDot.tsx",
@@ -420,7 +425,7 @@
       },
       "costAtCloseOut": {
         "usd": 549.202294,
-        "pricingAsOf": "2026-07-31T20:44:26.056Z"
+        "pricingAsOf": "2026-07-31T20:44:26.880Z"
       }
     },
     "merges": [
