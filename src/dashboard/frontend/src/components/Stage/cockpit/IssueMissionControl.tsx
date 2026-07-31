@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Copy, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
@@ -30,10 +31,11 @@ import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
 import { trackerIssueUrl } from '../../../lib/issueLinks'
 import { taskStatusRollup } from '../../../lib/taskStatus'
+import { TasksPanel } from '../../TasksPanel'
+import { PrdViewer } from '../../PrdViewer'
+import type { XBriefDocument } from '../../xbrief/types'
 import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
 import { IssueTreeLane } from './IssueTreeLane'
-import { useTasksQuery } from './TasksRail'
-import { TasksDrawer } from './TasksDrawer'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
 import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
@@ -60,11 +62,11 @@ export interface IssueMissionControlProps {
 }
 
 type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion'
-type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'files' | 'checks' | 'artifacts' | 'feed' | 'history'
+type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'files' | 'checks' | 'artifacts' | 'feed' | 'history'
 type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
 /** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
-const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'plan', 'changes', 'activity'])
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'changes', 'activity'])
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -106,7 +108,6 @@ function resolveTabSelection(tabId: string | null): TabSelection | null {
 function issueDetailTabFor(tab: MissionTab | null, subView: MissionSubView | undefined): string | null {
   if (!tab || !ISSUE_DETAIL_TAB_IDS.has(tab)) return null
   if (tab === 'session') return subView === 'terminal' ? 'terminal' : 'conversation'
-  if (tab === 'plan') return subView === 'tasks' ? 'tasks' : 'plan'
   if (tab === 'changes') return subView === 'artifacts' ? 'artifacts' : subView === 'checks' ? null : 'files'
   if (tab === 'activity') return subView === 'history' ? null : 'activity'
   return null
@@ -452,14 +453,21 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
-  const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false)
   // Operator decision (#2962): the session-tree lane starts collapsed behind a
   // toggle (persisted preference honored).
   const [spineCollapsed, setSpineCollapsed] = useState(
     () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) !== 'false',
   )
-  const tasksQuery = useTasksQuery(issueId)
-  const tasksRollup = taskStatusRollup(tasksQuery.data?.tasks ?? [])
+  const planQuery = useQuery<XBriefDocument | null>({
+    queryKey: ['plan', issueId],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${issueId}/plan`)
+      if (!response.ok) return null
+      return response.json() as Promise<XBriefDocument>
+    },
+    staleTime: 60_000,
+  })
+  const tasksRollup = taskStatusRollup(planQuery.data?.plan?.items ?? [])
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
@@ -674,6 +682,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               key={tab.id}
               type="button"
               aria-selected={activeTab === tab.id}
+              aria-label={tab.id === 'plan' ? tab.label : undefined}
               onClick={() => selectTab(tab.id)}
               className={`flex shrink-0 items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12px] font-medium transition-colors ${
                 activeTab === tab.id
@@ -685,24 +694,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 <span data-testid="session-live-dot" className="h-[7px] w-[7px] rounded-full bg-info" aria-hidden="true" />
               ) : null}
               {tab.label}
+              {tab.id === 'plan' && tasksRollup.total > 0 ? (
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground" aria-hidden="true">
+                  {tasksRollup.done}/{tasksRollup.total}
+                </span>
+              ) : null}
               {badge && <CockpitPill tone={badge.tone} className="px-[5px] py-0 text-[9px]">{badge.label}</CockpitPill>}
             </button>
           )
         })}
-        <button
-          type="button"
-          data-section="TasksRail / TasksTab"
-          aria-expanded={tasksDrawerOpen}
-          aria-label={`Tasks: ${tasksRollup.done} of ${tasksRollup.total} complete. Open plan progress`}
-          onClick={() => setTasksDrawerOpen(true)}
-          className="sticky right-0 ml-auto flex shrink-0 items-center gap-2 rounded-[9px] border badge-border-primary badge-bg-primary px-3 py-2 text-[12px] font-medium text-primary shadow-[-10px_0_14px_var(--card)] transition-colors hover:bg-primary/15"
-        >
-          <span>Tasks</span>
-          <span className="tabular-nums">{tasksRollup.done}/{tasksRollup.total}</span>
-          <span className="h-1 w-12 overflow-hidden rounded-[var(--radius-sm)] bg-border" aria-hidden="true">
-            <span className="block h-full bg-primary" style={{ width: `${tasksRollup.percentDone}%` }} />
-          </span>
-        </button>
       </nav>
 
       <div
@@ -794,6 +794,33 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 ) : null}
               </div>
             )}
+            {activeTab === 'plan' && (
+              <div className="space-y-3.5">
+                <div role="tablist" aria-label="Plan views" className="flex gap-1 border-b border-border pb-2">
+                  {(['tasks', 'map', 'prd'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('plan', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'tasks' ? 'Tasks' : subView === 'map' ? 'Map' : 'PRD'}
+                    </button>
+                  ))}
+                </div>
+                {activeSubView === 'tasks' ? (
+                  <div data-section="TasksRail / TasksTab"><TasksPanel issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'map' ? <PlanMapCard issueId={issueId} /> : null}
+                {activeSubView === 'prd' ? <PrdViewer issueId={issueId} onClose={() => selectTab('plan', 'map')} /> : null}
+              </div>
+            )}
             {activeTab === 'overview' && (
               <div data-section="Awareness rail" className="space-y-3.5">
                 <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} />
@@ -825,14 +852,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           </div>
         </main>
       </div>
-      <TasksDrawer
-        issueId={issueId}
-        open={tasksDrawerOpen}
-        query={tasksQuery}
-        rollup={tasksRollup}
-        onClose={() => setTasksDrawerOpen(false)}
-        onOpenFull={() => selectTab('plan', 'tasks')}
-      />
     </IssueView>
   )
 }

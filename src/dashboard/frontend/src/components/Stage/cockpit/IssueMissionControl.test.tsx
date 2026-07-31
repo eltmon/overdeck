@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
+import { useDashboardStore } from '../../../lib/store'
 
 const actionInvoke = vi.fn()
 let queryClient: QueryClient | undefined
@@ -11,6 +12,7 @@ beforeEach(() => {
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
   actionInvoke.mockClear()
+  useDashboardStore.setState({ xbriefViewerIssueId: null })
   queryMocks.issueActionState.hasPlan = true
   queryMocks.issueActionState.hasTasks = true
   queryMocks.activityQuery.data.sections = [
@@ -33,7 +35,17 @@ beforeEach(() => {
       return Response.json([])
     }
     if (url === '/api/workspaces/PAN-1661/plan') {
-      return Response.json({ plan: { items: [] } })
+      return Response.json({
+        plan: {
+          items: [
+            { id: 'done-1', title: 'Done one', status: 'completed' },
+            { id: 'done-2', title: 'Done two', status: 'completed' },
+            { id: 'working', title: 'Working', status: 'running' },
+            { id: 'upcoming-1', title: 'Upcoming one', status: 'planned' },
+            { id: 'upcoming-2', title: 'Upcoming two', status: 'pending' },
+          ],
+        },
+      })
     }
     if (url === '/api/issues/PAN-1661/tasks') {
       return Response.json({
@@ -172,6 +184,8 @@ vi.mock('../../CommandDeck/ZoneCOverviewTabs/PrDiffTab', () => ({
   statusColor: () => ({ bg: 'transparent', fg: 'currentColor', label: 'pass' }),
 }))
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/XBriefTab', () => ({ XBriefTab: () => <div>xBRIEF tab</div> }))
+vi.mock('../../TasksPanel', () => ({ TasksPanel: ({ issueId }: { issueId: string }) => <div data-testid="tasks-panel">Tasks for {issueId}</div> }))
+vi.mock('../../PrdViewer', () => ({ PrdViewer: ({ issueId }: { issueId: string }) => <div data-testid="prd-viewer">PRD for {issueId}</div> }))
 vi.mock('../../CommandDeck/SessionView/SessionPanel', () => ({
   SessionPanel: ({ session }: { session: { sessionId: string } }) => <div data-testid="session-panel">{session.sessionId}</div>,
 }))
@@ -260,11 +274,15 @@ describe('IssueMissionControl', () => {
     const { container } = renderMissionControl();
     // A known session makes Session the default: route chrome + the ONE
     // IssueDetail at page density.
-    for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'ReviewPolicyControl', 'IssueDetail page body']) {
+    for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'ReviewPolicyControl', 'IssueDetail page body']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
     // The pipeline band is inside IssueDetail now — no duplicate shell in the header.
     expect(container.querySelector('[data-section="Pipeline Band"]')).toBeNull();
+    // Task progress lives inside Plan rather than in a floating tab-band chip.
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Issue cockpit tabs' })).getByRole('button', { name: 'Plan' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Tasks' }));
+    expect(container.querySelector('[data-section="TasksRail / TasksTab"]')).toBeInTheDocument();
     // The cockpit's own overview sections render on its (appended) Overview tab.
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }));
     for (const section of ['Awareness rail', 'UatEnvironmentPanel', 'NowPanel', 'PickupGateCard']) {
@@ -282,7 +300,7 @@ describe('IssueMissionControl', () => {
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
     const buttons = Array.from(nav.querySelectorAll('button[aria-selected]'))
     expect(buttons).toHaveLength(6)
-    expect(buttons.map((button) => button.textContent)).toEqual([
+    expect(buttons.map((button) => button.textContent?.replace(/\d+\/\d+$/, ''))).toEqual([
       'Overview',
       'Session',
       'Plan',
@@ -424,8 +442,6 @@ describe('IssueMissionControl', () => {
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
     fireEvent.click(within(nav).getByRole('button', { name: /Changes/ }))
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'files')
-    fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'plan')
     fireEvent.click(within(nav).getByRole('button', { name: 'Activity' }))
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'activity')
   })
@@ -456,25 +472,32 @@ describe('IssueMissionControl', () => {
 
     expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'plan')
     expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'map')
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'plan')
+    expect(screen.getByTestId('plan-map-card')).toBeInTheDocument()
   })
 
-  it('shows the shared task rollup in an always-visible tab-band chip', async () => {
+  it('moves task progress into Plan and renders Tasks, Map, PRD, and fullscreen promotion', async () => {
     const { container } = renderMissionControl()
-    const chip = await screen.findByRole('button', {
-      name: 'Tasks: 2 of 5 complete. Open plan progress',
-    })
+    const cockpitTabs = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    const planTab = within(cockpitTabs).getByRole('button', { name: 'Plan' })
 
-    expect(chip).toHaveAttribute('data-section', 'TasksRail / TasksTab')
-    expect(chip).toHaveTextContent('Tasks')
-    expect(chip).toHaveTextContent('2/5')
-    expect(chip).toHaveClass('sticky', 'right-0', 'ml-auto', 'badge-bg-primary', 'badge-border-primary')
-    expect(chip).not.toHaveClass('rounded-full')
-    expect(chip.querySelector('[style="width: 40%;"]')).toBeInTheDocument()
+    await waitFor(() => expect(planTab).toHaveTextContent('2/5'))
+    expect(screen.queryByRole('button', { name: /Open plan progress/ })).toBeNull()
+    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
 
-    const missionBody = container.querySelector('main')?.parentElement
-    expect(missionBody?.children).toHaveLength(2)
-    expect(screen.queryByTestId('tasks-rail')).toBeNull()
+    fireEvent.click(planTab)
+    const planViews = screen.getByRole('tablist', { name: 'Plan views' })
+    expect(screen.getByTestId('plan-map-card')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Expand xBRIEF full screen' }))
+    expect(useDashboardStore.getState().xbriefViewerIssueId).toBe('PAN-1661')
+
+    fireEvent.click(within(planViews).getByRole('tab', { name: 'Tasks' }))
+    expect(container.querySelector('[data-section="TasksRail / TasksTab"]')).toBeInTheDocument()
+    expect(screen.getByTestId('tasks-panel')).toHaveTextContent('Tasks for PAN-1661')
+
+    fireEvent.click(within(planViews).getByRole('tab', { name: 'PRD' }))
+    expect(screen.getByTestId('prd-viewer')).toHaveTextContent('PRD for PAN-1661')
+    expect(within(cockpitTabs).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true')
   })
 
   it('persists the collapsible agent spine and defaults to collapsed without a saved choice (#2962)', () => {
@@ -544,30 +567,6 @@ describe('IssueMissionControl', () => {
     expect(screen.getByRole('button', {
       name: 'Stale review state: 1 leftover review agent. Expand agent spine for details and reset.',
     })).toBeVisible()
-  })
-
-  it('opens task progress in a drawer and preserves every close and full-view path', async () => {
-    renderMissionControl()
-    const chip = await screen.findByRole('button', {
-      name: 'Tasks: 2 of 5 complete. Open plan progress',
-    })
-
-    fireEvent.click(chip)
-    expect(screen.getByRole('dialog', { name: 'Plan progress' })).toBeInTheDocument()
-    expect(screen.getByTestId('tasks-rail')).toBeInTheDocument()
-    expect(chip).toHaveAttribute('aria-expanded', 'true')
-
-    fireEvent.keyDown(window, { key: 'Escape' })
-    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
-
-    fireEvent.click(chip)
-    fireEvent.click(screen.getByRole('button', { name: 'Close plan progress' }))
-    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
-
-    fireEvent.click(chip)
-    fireEvent.click(screen.getByRole('button', { name: 'Open full tasks view' }))
-    expect(screen.queryByRole('dialog', { name: 'Plan progress' })).toBeNull()
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'tasks')
   })
 
   it('renders the status narrative in place of the chip and gate rows (PAN-2398, C-VOCAB)', () => {
