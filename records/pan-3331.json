@@ -217,7 +217,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:11:06.624Z",
+  "updated": "2026-07-31T00:11:09.004Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "pending",
@@ -227,7 +227,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T00:11:06.583Z",
+    "updatedAt": "2026-07-31T00:11:06.652Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-3 blocking finding: run-session names are now unique per workspace. runSessionName kept only the first eight sanitized id characters, so ws-main-1234abcd and ws-main-1234ffff shared ws-run-wsmain12 and could stop or restart each other's process; the suffix is now a sha256 prefix of the full id (deterministic, unique, valid tmux name). Three regression tests cover truncation collision, punctuation collision, and name validity — the first two fail against the old derivation. Also took three non-blocking items: dirty-tree refusal now fails closed when git status cannot be read (with maxBuffer raised and a rename counted once), the palette no longer renders a duplicate Run row in the default scope, and the doc route counts are corrected. 2082 frontend + 806 server tests pass; typecheck, lint, and all guards green.",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
@@ -399,7 +399,7 @@
       },
       "costAtCloseOut": {
         "usd": 183.393987,
-        "pricingAsOf": "2026-07-31T00:11:06.617Z"
+        "pricingAsOf": "2026-07-31T00:11:09.000Z"
       }
     },
     "merges": [
