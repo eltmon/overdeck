@@ -156,9 +156,10 @@ export async function uatFrontendUrl(gen: UatGeneration, deps: Partial<UatStackD
       if (hostMatch?.[1]) return `https://${hostMatch[1]}`;
     } catch { /* fall through to convention */ }
   }
-  // Resolve project config to get DNS domain (PAN-1696)
+  // Resolve project config to get DNS domain (PAN-1696). Keep the fallback
+  // neutral so a missing project domain cannot fabricate a branded dead link.
   const project = findProjectByPathSync(gen.projectRoot);
-  const domain = project?.workspace?.dns?.domain ?? 'pan.localhost';
+  const domain = project?.workspace?.dns?.domain ?? 'localhost';
   return `https://${folder}.${domain}`;
 }
 
