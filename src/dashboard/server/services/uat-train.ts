@@ -58,10 +58,17 @@ import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-ord
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
-import { readIssueRecordSync, resolveProjectForIssue, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
-import { persistPendingShipRecords, persistShipRecords } from '../../../lib/cloister/ship-record.js';
-import { buildVersionShipDeps } from '../../../lib/cloister/version-ship-deps.js';
-import { runVersionShip } from '../../../lib/cloister/version-ship.js';
+import type { PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
+import {
+  executeVersionShipForGeneration,
+  persistPendingShipRecords,
+  persistShipRecords,
+} from '../../../lib/cloister/ship-record.js';
+import {
+  aggregateGenerationShipStatus,
+  loadShipRecords,
+  publicShipStatus,
+} from '../../../lib/cloister/ship-status.js';
 import {
   resolveConfiguredReposSync,
   resolveProjectReposFromResolvedIssueSync,
@@ -531,7 +538,8 @@ export interface UatGenerationPayload {
   heldOut: UatGeneration['heldOut'];
   resolutions: UatGeneration['resolutions'];
   versionSyncConfigured: boolean;
-  shipStatus: PanIssueShipRecord | null;
+  /** Public aggregate omits operational error/reason detail. */
+  shipStatus: Omit<PanIssueShipRecord, 'error' | 'reason'> | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -624,27 +632,22 @@ async function loadAcceptanceCriteriaCache(
   return cache;
 }
 
-function generationShipStatus(generation: UatGeneration): PanIssueShipRecord | null {
-  const records = generation.members.flatMap(member => {
-    const project = resolveProjectForIssue(member.issueId);
-    const ship = project ? readIssueRecordSync(project, member.issueId)?.pipeline.ship : undefined;
-    return ship?.batch === generation.name ? [ship] : [];
-  });
-  return records.sort((left, right) => right.at.localeCompare(left.at))[0] ?? null;
-}
-
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
   // PAN-1696: no flywheel-run requirement — list generations directly from store.
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
-  const versionSyncConfigured = Boolean(findProjectByPathSync(root)?.version_sync);
+  const project = findProjectByPathSync(root);
+  const versionSyncConfigured = Boolean(project?.version_sync);
   const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
+  const [acCache, shipRecords] = await Promise.all([
+    loadAcceptanceCriteriaCache(memberIssueIds, root),
+    project && versionSyncConfigured ? loadShipRecords(project, chain) : Promise.resolve(new Map()),
+  ]);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -672,7 +675,9 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
       versionSyncConfigured,
-      shipStatus: generationShipStatus(gen),
+      shipStatus: publicShipStatus(
+        versionSyncConfigured ? aggregateGenerationShipStatus(gen, shipRecords) : null,
+      ),
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
@@ -796,16 +801,20 @@ export async function postUatGenerationPromotePayload(
     ...(projectConfig?.version_sync
       ? {
           runShip: async (generation: UatGeneration, requestedVersion: string | undefined) => {
-            if (!requestedVersion) {
-              await persistPendingShipRecords(generation, 'no version supplied at promote time');
-              return;
-            }
-            const report = await runVersionShip({
-              projectRoot: root,
-              config: projectConfig.version_sync!,
+            // Establish durable batch membership before any command, worktree, or
+            // Git operation can fail. Deferred recovery and the DoD gate then
+            // remain blocking even when propagation never starts.
+            await persistPendingShipRecords(
+              generation,
+              requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
+            );
+            if (!requestedVersion) return;
+
+            const report = await executeVersionShipForGeneration({
+              generation,
+              project: projectConfig,
               version: requestedVersion,
-              batchName: generation.name,
-            }, buildVersionShipDeps());
+            });
             await persistShipRecords(generation, report);
           },
         }

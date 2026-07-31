@@ -19,6 +19,7 @@ import {
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import { listUatGenerationsSync } from '../overdeck/merge-sync.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
@@ -157,6 +158,7 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
 interface ShipRowDeps {
   readProject: (ctx: LifecycleContext) => ReturnType<typeof resolveProjectForIssue>;
   readPipeline: (ctx: LifecycleContext) => Promise<PanIssuePipelineRecord | null>;
+  findPromotedBatch: (ctx: LifecycleContext) => { name: string } | null;
 }
 
 const defaultShipRowDeps: ShipRowDeps = {
@@ -164,6 +166,11 @@ const defaultShipRowDeps: ShipRowDeps = {
   readPipeline: async ctx => {
     const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
     return (await readIssueRecord(project, ctx.issueId))?.pipeline ?? null;
+  },
+  findPromotedBatch: ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    return listUatGenerationsSync({ projectRoot: resolve(project.path), statuses: ['promoted'] })
+      .find(generation => generation.members.some(member => member.issueId.toUpperCase() === ctx.issueId.toUpperCase())) ?? null;
   },
 };
 
@@ -662,6 +669,14 @@ export async function checkShipRow(
   const pipeline = await deps.readPipeline(ctx);
   const ship = pipeline?.ship;
   if (!ship) {
+    const promotedBatch = deps.findPromotedBatch(ctx);
+    if (promotedBatch) {
+      return result(
+        'ship',
+        'miss',
+        `batch ${promotedBatch.name} includes this issue but no durable ship settlement was recorded`,
+      );
+    }
     return result('ship', 'skip', 'merged outside a batch; ship is batch-scoped');
   }
   if (ship.status === 'passed') {
@@ -689,7 +704,7 @@ export async function checkShipRow(
   return result(
     'ship',
     'miss',
-    `batch ${ship.batch} version ship failed: ${ship.error ?? ship.reason ?? 'unknown error'}`,
+    `batch ${ship.batch} version ship failed (${ship.errorCode ?? 'unknown-failure'}): ${ship.error ?? ship.reason ?? 'inspect the local dashboard log'}`,
   );
 }
 

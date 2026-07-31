@@ -178,6 +178,17 @@ describe('validateVersionSyncConfig', () => {
     });
   });
 
+  it('rejects an expectation pattern longer than the bounded evaluator accepts', () => {
+    const result = validateVersionSyncConfig({
+      expect: [{ path: 'frontend/package.json', pattern: 'a'.repeat(513) }],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ['version_sync.expect[0].pattern must be at most 512 characters'],
+    });
+  });
+
   it('rejects a path that escapes above the project root', () => {
     const result = validateVersionSyncConfig({
       set: [{ path: '../outside/package.json', json_field: 'version' }],

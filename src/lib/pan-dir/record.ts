@@ -152,6 +152,8 @@ export interface PanIssueShipRecord {
   version?: string;
   batch: string;
   paths?: Array<{ path: string; ok: boolean; detail: string }>;
+  errorCode?: import('../cloister/version-ship.js').ShipFailureCode;
+  /** Redacted operator-safe summary only; never raw command or Git output. */
   error?: string;
   reason?: string;
   at: string;

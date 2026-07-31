@@ -129,7 +129,11 @@ export interface UatPromoteDeps {
    */
   memberEligibility(issueId: string): { eligible: boolean; reason?: string };
   recordVerification?: (generation: UatGeneration, mergeSha: string) => void;
-  runShip?: (generation: UatGeneration, shipVersion: string | undefined) => Promise<void>;
+  runShip?: (
+    generation: UatGeneration,
+    shipVersion: string | undefined,
+    promotedRepos: readonly UatGenerationRepo[],
+  ) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -627,18 +631,40 @@ async function finishPromote(
     }
   }
 
-  deps.store.update(gen.name, { status: 'promoted' });
+  const promotedAt = (deps.now?.() ?? new Date()).toISOString();
+  const promotedRepos: UatGenerationRepo[] = isPolyrepoGeneration
+    ? (gen.repos ?? [])
+    : [{
+        ...(gen.repos?.[0] ?? {
+          repoKey: projectRoot.replace(/\/+$/, '').split('/').pop() || projectRoot,
+          repoPath: projectRoot,
+          branch: gen.name,
+          baseSha: gen.baseSha,
+          targetBranch: 'main',
+          worktreePath: gen.worktreePath,
+          mergeOrder: 0,
+        }),
+        repoPath: projectRoot,
+        targetBranch: 'main',
+        promotedAt,
+        mergeSha,
+      }];
+  const promotedGeneration: UatGeneration = { ...gen, status: 'promoted', repos: promotedRepos };
+
+  // Persist the exact landed refs before any ship work. Deferred ship must root
+  // its worktrees at these commits rather than the ambient primary checkout.
+  deps.store.update(gen.name, { status: 'promoted', repos: promotedRepos });
   try {
-    deps.recordVerification?.(gen, mergeSha);
+    deps.recordVerification?.(promotedGeneration, mergeSha);
   } catch (err) {
     log(`[uat-promote] ${gen.name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
   }
   try {
-    await deps.runShip?.(gen, shipVersion);
+    await deps.runShip?.(promotedGeneration, shipVersion, promotedRepos);
   } catch (err) {
-    log(`[uat-promote] ${gen.name}: version ship failed after merge: ${err instanceof Error ? err.message : String(err)}`);
+    log(`[uat-promote] ${gen.name}: version ship settlement failed after merge: ${err instanceof Error ? err.message : String(err)}`);
   }
-  await deps.teardownStack(gen).catch((err) => {
+  await deps.teardownStack(promotedGeneration).catch((err) => {
     log(`[uat-promote] ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
   });
 
@@ -665,7 +691,7 @@ async function finishPromote(
   // a subset, which would advance every member's lifecycle having proven only
   // some of the repos their work landed in.
   const verifiedMergedRepos = isPolyrepoGeneration
-    ? (gen.repos ?? []).map((r) => ({
+    ? (promotedGeneration.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         repoPath: r.repoPath,
         mergeSha: r.mergeSha!,

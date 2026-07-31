@@ -1,10 +1,23 @@
-import { resolve } from 'node:path';
-import { findProjectByPathSync, type ProjectConfig } from '../projects.js';
+import { relative, resolve } from 'node:path';
+import {
+  findProjectByPathSync,
+  listProjectsSync,
+  type ProjectConfig,
+} from '../projects.js';
+import { resolveConfiguredReposSync } from '../project-repos.js';
 import { getUatGenerationSync, type UatGeneration } from '../overdeck/merge-sync.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
 import { resolveProjectForIssue, type PanIssueShipRecord } from '../pan-dir/record.js';
 import { buildVersionShipDeps } from './version-ship-deps.js';
-import { runVersionShip, type ShipReport } from './version-ship.js';
+import {
+  runVersionShip,
+  VersionShipOperationError,
+  type ShipReport,
+} from './version-ship.js';
+import {
+  withVersionShipWorkspace,
+  type VersionShipSourceRepo,
+} from './version-ship-worktree.js';
 
 interface ShipRecordDeps {
   resolveProject: (issueId: string) => ProjectConfig | null;
@@ -16,21 +29,49 @@ const defaultRecordDeps: ShipRecordDeps = {
   updateRecord: updateIssueRecord,
 };
 
+const RECORD_WRITE_ATTEMPTS = 3;
+
+export class ShipRecordPersistenceError extends Error {
+  constructor(
+    readonly failedIssueIds: string[],
+    readonly persistedIssueIds: string[],
+  ) {
+    super(`could not persist ship settlement for: ${failedIssueIds.join(', ')}`);
+    this.name = 'ShipRecordPersistenceError';
+  }
+}
+
 async function persistRecordForMembers(
   generation: UatGeneration,
   ship: PanIssueShipRecord,
   deps: ShipRecordDeps,
 ): Promise<string[]> {
-  const persisted: string[] = [];
-  for (const member of generation.members) {
-    const project = deps.resolveProject(member.issueId);
-    if (!project) throw new Error(`Could not resolve project for ${member.issueId}`);
-    await deps.updateRecord(project, member.issueId, record => {
-      record.pipeline.ship = ship;
-    });
-    persisted.push(member.issueId);
+  const persisted = new Set<string>();
+  let pending = generation.members.map(member => member.issueId);
+
+  for (let attempt = 1; attempt <= RECORD_WRITE_ATTEMPTS && pending.length > 0; attempt += 1) {
+    const retry: string[] = [];
+    // State writes share one git-backed write door, so keep them serialized while
+    // continuing past one failure; the next round retries every failed member.
+    for (const issueId of pending) {
+      try {
+        const project = deps.resolveProject(issueId);
+        if (!project) throw new Error('project resolution failed');
+        await deps.updateRecord(project, issueId, record => {
+          record.pipeline.ship = ship;
+        });
+        persisted.add(issueId);
+      } catch {
+        retry.push(issueId);
+      }
+    }
+    pending = retry;
   }
-  return persisted;
+
+  if (pending.length > 0) {
+    throw new ShipRecordPersistenceError(pending, [...persisted]);
+  }
+  return [...persisted];
 }
 
 export async function persistShipRecords(
@@ -43,6 +84,7 @@ export async function persistShipRecords(
     version: report.version,
     batch: report.batch,
     paths: report.paths,
+    errorCode: report.errorCode,
     error: report.error,
     at: report.at,
   }, deps);
@@ -61,6 +103,77 @@ export async function persistPendingShipRecords(
   }, deps);
 }
 
+function registeredSourceRepos(
+  generation: UatGeneration,
+  project: ProjectConfig,
+): VersionShipSourceRepo[] {
+  const entry = listProjectsSync().find(candidate => resolve(candidate.config.path) === resolve(project.path));
+  if (!entry) {
+    throw new VersionShipOperationError('workspace-failed', 'project is not present in the registered project catalog');
+  }
+  const configured = resolveConfiguredReposSync(entry.key, project.path, project, `${entry.key}-ship`)
+    .filter(repo => repo.required);
+
+  return (generation.repos ?? []).map(repo => {
+    const registered = configured.find(candidate => resolve(candidate.repoPath) === resolve(repo.repoPath));
+    if (!registered) {
+      throw new VersionShipOperationError('workspace-failed', `generation repository is not registered for ship: ${repo.repoKey}`);
+    }
+    if (!repo.mergeSha) {
+      throw new VersionShipOperationError('workspace-failed', `generation repository has no promoted merge reference: ${repo.repoKey}`);
+    }
+    const configPath = relative(resolve(project.path), resolve(registered.repoPath)) || '.';
+    return {
+      repoKey: registered.repoKey,
+      repoPath: registered.repoPath,
+      configPath,
+      mergeSha: repo.mergeSha,
+      targetBranch: repo.targetBranch || registered.targetBranch,
+    };
+  });
+}
+
+interface ExecuteVersionShipDeps {
+  prepare: typeof withVersionShipWorkspace;
+  runShip: typeof runVersionShip;
+}
+
+const defaultExecuteDeps: ExecuteVersionShipDeps = {
+  prepare: withVersionShipWorkspace,
+  runShip: runVersionShip,
+};
+
+export async function executeVersionShipForGeneration(
+  args: {
+    generation: UatGeneration;
+    project: ProjectConfig;
+    version: string;
+  },
+  deps: ExecuteVersionShipDeps = defaultExecuteDeps,
+): Promise<ShipReport> {
+  try {
+    const sourceRepos = registeredSourceRepos(args.generation, args.project);
+    return await deps.prepare(sourceRepos, workspace => deps.runShip({
+      projectRoot: workspace.projectRoot,
+      config: args.project.version_sync!,
+      version: args.version,
+      batchName: args.generation.name,
+      allowedRepos: workspace.allowedRepos,
+    }, buildVersionShipDeps()));
+  } catch (error) {
+    const operation = error instanceof VersionShipOperationError ? error : null;
+    return {
+      status: 'failed',
+      version: args.version,
+      batch: args.generation.name,
+      paths: [],
+      errorCode: operation?.code ?? 'workspace-failed',
+      error: operation?.safeMessage ?? 'could not prepare the promoted batch for version ship',
+      at: new Date().toISOString(),
+    };
+  }
+}
+
 export type ShipPromotedBatchFailure = 'not-found' | 'wrong-status' | 'not-configured';
 
 export class ShipPromotedBatchError extends Error {
@@ -73,14 +186,16 @@ export class ShipPromotedBatchError extends Error {
 interface ShipPromotedBatchDeps {
   getGeneration: (name: string) => UatGeneration | null;
   findProject: (path: string) => ProjectConfig | null;
-  runShip: typeof runVersionShip;
+  execute?: typeof executeVersionShipForGeneration;
+  persistPending?: typeof persistPendingShipRecords;
   persist: typeof persistShipRecords;
 }
 
 const defaultPromotedBatchDeps: ShipPromotedBatchDeps = {
   getGeneration: getUatGenerationSync,
   findProject: findProjectByPathSync,
-  runShip: runVersionShip,
+  execute: executeVersionShipForGeneration,
+  persistPending: persistPendingShipRecords,
   persist: persistShipRecords,
 };
 
@@ -107,12 +222,8 @@ export async function shipPromotedBatch(
     );
   }
 
-  const report = await deps.runShip({
-    projectRoot: args.projectRoot,
-    config: project.version_sync,
-    version: args.version,
-    batchName: generation.name,
-  }, buildVersionShipDeps());
+  await (deps.persistPending ?? persistPendingShipRecords)(generation, 'deferred version ship in progress');
+  const report = await (deps.execute ?? executeVersionShipForGeneration)({ generation, project, version: args.version });
   await deps.persist(generation, report);
   return report;
 }

@@ -24,6 +24,7 @@ function pipeline(ship?: PanIssuePipelineRecord['ship']): PanIssuePipelineRecord
 function shipDeps(
   versionSyncConfigured: boolean,
   ship?: PanIssuePipelineRecord['ship'],
+  promotedBatch?: string,
 ) {
   return {
     readProject: () => ({
@@ -32,6 +33,7 @@ function shipDeps(
       ...(versionSyncConfigured ? { version_sync: {} } : {}),
     }),
     readPipeline: async () => pipeline(ship),
+    findPromotedBatch: () => promotedBatch ? { name: promotedBatch } : null,
   };
 }
 
@@ -47,6 +49,13 @@ describe('checkShipRow', () => {
     expect(await checkShipRow(ctx, shipDeps(true))).toMatchObject({
       status: 'skip',
       observed: 'merged outside a batch; ship is batch-scoped',
+    });
+  });
+
+  it('misses when promoted batch membership exists but durable settlement is missing', async () => {
+    expect(await checkShipRow(ctx, shipDeps(true, undefined, 'uat/pan-ember-0731'))).toMatchObject({
+      status: 'miss',
+      observed: 'batch uat/pan-ember-0731 includes this issue but no durable ship settlement was recorded',
     });
   });
 

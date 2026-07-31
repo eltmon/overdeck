@@ -24,6 +24,7 @@ import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
 import { readIssueRecordSync, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
 import { setProjectVersionSync } from '../../../lib/projects-writer.js';
+import { aggregateGenerationShipStatus, loadShipRecords } from '../../../lib/cloister/ship-status.js';
 import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
@@ -788,7 +789,7 @@ interface ProjectVersionSyncRouteDeps {
   getProject: (key: string) => ProjectConfig | null;
   listProjectKeys: () => string[];
   listPromotedGenerations: (projectRoot: string) => UatGeneration[];
-  readShip: (project: ProjectConfig, issueId: string) => PanIssueShipRecord | null;
+  readOutcome: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
   writeVersionSync: typeof setProjectVersionSync;
 }
 
@@ -800,7 +801,10 @@ const defaultProjectVersionSyncRouteDeps: ProjectVersionSyncRouteDeps = {
     statuses: ['promoted'],
     limit: 1,
   }),
-  readShip: (project, issueId) => readIssueRecordSync(project, issueId)?.pipeline.ship ?? null,
+  readOutcome: async (project, generation) => aggregateGenerationShipStatus(
+    generation,
+    await loadShipRecords(project, [generation]),
+  ),
   writeVersionSync: setProjectVersionSync,
 };
 
@@ -812,11 +816,7 @@ export async function getProjectVersionSyncPayload(
   if (!project) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
 
   const generation = deps.listPromotedGenerations(project.path)[0];
-  const outcomes = generation?.members.flatMap(member => {
-    const ship = deps.readShip(project, member.issueId);
-    return ship?.batch === generation.name ? [ship] : [];
-  }) ?? [];
-  const lastOutcome = outcomes.sort((left, right) => right.at.localeCompare(left.at))[0] ?? null;
+  const lastOutcome = generation ? await deps.readOutcome(project, generation) : null;
   return { status: 200, body: { config: project.version_sync ?? null, lastOutcome } };
 }
 

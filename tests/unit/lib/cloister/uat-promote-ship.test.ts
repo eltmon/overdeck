@@ -75,6 +75,11 @@ describe('promote ship ordering', () => {
 
     expect(result.success).toBe(true);
     expect(order).toEqual(['verification', 'ship', 'post:PAN-1', 'post:PAN-2']);
+    expect(deps.store.get(BATCH)?.repos?.[0]).toMatchObject({
+      repoPath: PROJECT_ROOT,
+      mergeSha: 'merge-sha',
+      targetBranch: 'main',
+    });
   });
 
   it('keeps promotion successful when ship throws and fans out every member', async () => {
@@ -89,7 +94,7 @@ describe('promote ship ordering', () => {
       success: true,
       postMergeStarted: ['PAN-1', 'PAN-2'],
     });
-    expect(logs).toContain(`[uat-promote] ${BATCH}: version ship failed after merge: push rejected`);
+    expect(logs).toContain(`[uat-promote] ${BATCH}: version ship settlement failed after merge: push rejected`);
   });
 });
 
@@ -142,6 +147,28 @@ describe('durable ship records', () => {
       expect.objectContaining({ status: 'passed', version: '1.2.3' }),
       expect.objectContaining({ status: 'passed', version: '1.2.3' }),
     ]);
+  });
+
+  it('continues past a member write failure and retries every unsettled member', async () => {
+    const records = new Map(generation().members.map(member => [member.issueId, record(member.issueId)]));
+    const attempts = new Map<string, number>();
+    const deps = {
+      resolveProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
+      updateRecord: vi.fn(async (_project: unknown, issueId: string, mutator: (record: PanIssueRecord) => void | Promise<void>) => {
+        const count = (attempts.get(issueId) ?? 0) + 1;
+        attempts.set(issueId, count);
+        if (issueId === 'PAN-1' && count === 1) throw new Error('transient write failure');
+        const current = records.get(issueId)!;
+        await mutator(current);
+        records.set(issueId, current);
+        return current;
+      }),
+    } as never;
+
+    await persistPendingShipRecords(generation(), 'version ship in progress', deps);
+
+    expect(attempts).toEqual(new Map([['PAN-1', 2], ['PAN-2', 1]]));
+    expect([...records.values()].map(value => value.pipeline.ship?.status)).toEqual(['pending', 'pending']);
   });
 
   it('preserves pipeline.ship when the ordinary record projection runs later', () => {

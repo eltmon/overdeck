@@ -187,6 +187,10 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
           errors.push(`version_sync.expect[${index}].pattern must be a non-empty string`);
           return;
         }
+        if (entry.pattern.length > 512) {
+          errors.push(`version_sync.expect[${index}].pattern must be at most 512 characters`);
+          return;
+        }
         try {
           new RegExp(entry.pattern);
         } catch {

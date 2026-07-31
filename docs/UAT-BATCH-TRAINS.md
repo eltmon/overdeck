@@ -301,6 +301,13 @@ and pushes configured repositories. It does **not** publish npm packages,
 submit App Store or Play builds, deploy production, generate release notes, or
 create Git tags; those remain separate operator actions.
 
+Ship never runs in the ambient project checkout. Promotion records the exact
+merge SHA and target branch for every participating repository, then ship creates
+temporary detached worktrees at those promoted SHAs. Commits are pushed with an
+explicit `HEAD:<targetBranch>` ref, and the temporary worktrees are removed after
+the run, so an operator's primary checkout remains untouched even when it is
+stale or dirty.
+
 A project opts in through `version_sync` in `~/.overdeck/projects.yaml`. Mind
 Your Now uses one canonical JSON field plus its existing propagation command:
 
@@ -360,7 +367,9 @@ The fields are deliberately small:
 - `command` is optional; `command_cwd` is relative to the project root.
 - `expect[].pattern` is a regular expression checked after propagation.
   `{version}` expands to the complete version such as `48.8.0`, while
-  `{majorMinor}` expands to `48.8`.
+  `{majorMinor}` expands to `48.8`. Patterns are limited to 512 characters,
+  expectation files to 1 MiB, and matching runs in a worker with a 250 ms
+  deadline so project configuration cannot block the dashboard event loop.
 - `commit_message` defaults to `chore: bump version to {version}`. The runner
   stages only paths declared by `set` or `expect`; if the command already
   committed them, the runner correctly has nothing left to commit.
@@ -386,15 +395,19 @@ reads each member's durable `pipeline.ship` record:
 | `passed` | Passes, naming the version, batch, and number of verified paths. |
 | `pending` | Misses because the batch merged without a version; use **Ship version** on that promoted batch. |
 | `partial` | Misses and names every declared path that did not report the requested version. |
-| `failed` | Misses and shows the command, commit, or push error recorded by the runner. |
+| `failed` | Misses and shows the runner's fixed failure code and redacted operator-safe summary. |
 | No `version_sync` | Skips explicitly because ship does not apply to that project. |
-| No ship record | Skips explicitly because the issue merged outside a batch and ship is batch-scoped. |
+| No ship record, promoted batch member | Misses because durable settlement was lost or never written. |
+| No ship record, direct merge | Skips explicitly because ship is batch-scoped. |
 
 A `partial` verdict is the guard against silent propagation failures: the
 command may exit successfully while an old regex edits nothing. The failing
 paths appear in the ship row's observed text and in **Project settings →
 Version ship**. A `pending` promoted batch also remains visible on the batch
-card until the operator ships a version.
+card until the operator ships a version. Batch and settings API payloads omit
+operational `error` and `reason` text; they expose the status, fixed failure
+code, version, batch, timestamp, and path evidence needed by the UI, while raw
+command and Git diagnostics stay in credential-redacted local logs.
 
 Configure the block by hand in `projects.yaml` or through **Project settings →
 Version ship**. Both surfaces use that file as the single store; dashboard

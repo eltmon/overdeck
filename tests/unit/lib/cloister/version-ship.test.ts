@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   runVersionShip,
+  VersionShipOperationError,
   type VersionShipDeps,
 } from '../../../../src/lib/cloister/version-ship.js';
 import type { VersionSyncConfig } from '../../../../src/lib/projects.js';
+import { buildVersionShipDeps } from '../../../../src/lib/cloister/version-ship-deps.js';
 
 const PROJECT_ROOT = '/repo';
 const NOW = '2026-07-31T12:00:00.000Z';
@@ -20,17 +22,22 @@ interface FakeDeps extends VersionShipDeps {
   hasChanges: ReturnType<typeof vi.fn>;
   commit: ReturnType<typeof vi.fn>;
   push: ReturnType<typeof vi.fn>;
+  logDiagnostic: ReturnType<typeof vi.fn>;
 }
 
 function fakeDeps(overrides: Partial<VersionShipDeps> = {}): FakeDeps {
   return {
     now: () => NOW,
+    resolveFile: vi.fn(async (root: string, path: string) => resolve(root, path)),
+    resolveDirectory: vi.fn(async (root: string, path: string) => resolve(root, path)),
     writeVersion: vi.fn(async () => {}),
     runCommand: vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' })),
     readFile: vi.fn(async () => '"version": "1.2.3"'),
+    testPattern: vi.fn(async (pattern: string, content: string) => new RegExp(pattern).test(content)),
     hasChanges: vi.fn(async () => true),
     commit: vi.fn(async () => {}),
     push: vi.fn(async () => {}),
+    logDiagnostic: vi.fn(),
     ...overrides,
   } as FakeDeps;
 }
@@ -59,6 +66,7 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
     expect(deps.writeVersion).toHaveBeenCalledWith('/repo/frontend/package.json', 'version', '1.2.3');
@@ -68,7 +76,7 @@ describe('runVersionShip', () => {
       ['package.json'],
       'chore: bump version to 1.2.3',
     );
-    expect(deps.push).toHaveBeenCalledWith('/repo/frontend');
+    expect(deps.push).toHaveBeenCalledWith('/repo/frontend', 'main');
     expect(report).toEqual({
       status: 'passed',
       version: '1.2.3',
@@ -93,6 +101,7 @@ describe('runVersionShip', () => {
       }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
     expect(report.status).toBe('partial');
@@ -104,8 +113,8 @@ describe('runVersionShip', () => {
     expect(deps.push).toHaveBeenCalledOnce();
   });
 
-  it('returns failed with the stderr tail and never commits when the command fails', async () => {
-    const stderr = `${'old output\n'.repeat(300)}final command failure`;
+  it('keeps raw command stderr local and persists only a fixed failure summary', async () => {
+    const stderr = 'registry token=secret-value final command failure';
     const deps = fakeDeps({
       runCommand: vi.fn(async () => ({ exitCode: 2, stdout: '', stderr })),
     });
@@ -115,11 +124,16 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
-    expect(report.status).toBe('failed');
-    expect(report.error).toContain('final command failure');
-    expect(report.error?.length).toBeLessThanOrEqual(2_000);
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'command-failed',
+      error: 'version sync command failed (exit 2); inspect the local dashboard log',
+    });
+    expect(report.error).not.toContain('secret-value');
+    expect(deps.logDiagnostic).toHaveBeenCalledWith(expect.stringContaining('secret-value'));
     expect(deps.hasChanges).not.toHaveBeenCalled();
     expect(deps.commit).not.toHaveBeenCalled();
     expect(deps.push).not.toHaveBeenCalled();
@@ -139,6 +153,7 @@ describe('runVersionShip', () => {
       }),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
     expect(deps.hasChanges).toHaveBeenCalledWith('/repo/frontend', [
@@ -160,16 +175,17 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
     expect(report.status).toBe('passed');
     expect(deps.commit).not.toHaveBeenCalled();
-    expect(deps.push).toHaveBeenCalledWith('/repo/frontend');
+    expect(deps.push).toHaveBeenCalledWith('/repo/frontend', 'main');
   });
 
-  it('returns failed when the tracked-upstream push is rejected', async () => {
+  it('returns a redacted failure when the explicit target push is rejected', async () => {
     const deps = fakeDeps({
-      push: vi.fn(async () => { throw new Error('non-fast-forward'); }),
+      push: vi.fn(async () => { throw new VersionShipOperationError('push-failed', 'could not push version commit to main'); }),
     });
 
     const report = await runVersionShip({
@@ -177,9 +193,14 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2.3',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
-    expect(report).toMatchObject({ status: 'failed', error: 'non-fast-forward' });
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'push-failed',
+      error: 'could not push version commit to main',
+    });
   });
 
   it('rejects a malformed version before changing files or running commands', async () => {
@@ -190,14 +211,50 @@ describe('runVersionShip', () => {
       config: config(),
       version: '1.2',
       batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
     }, deps);
 
     expect(report).toMatchObject({
       status: 'failed',
-      error: 'invalid version "1.2"; expected X.Y.Z',
+      errorCode: 'invalid-version',
+      error: 'version must look like 48.8.0',
     });
     expect(deps.writeVersion).not.toHaveBeenCalled();
     expect(deps.runCommand).not.toHaveBeenCalled();
+  });
+
+  it('rejects a push path that is not one of the registered project repositories', async () => {
+    const deps = fakeDeps();
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({ push: ['elsewhere'] }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+    }, deps);
+
+    expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
+    expect(deps.writeVersion).not.toHaveBeenCalled();
+    expect(deps.push).not.toHaveBeenCalled();
+  });
+
+  it('rejects a set target whose path traverses a symlink', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'version-ship-symlink-'));
+    const outside = mkdtempSync(join(tmpdir(), 'version-ship-outside-'));
+    tempDirs.push(root, outside);
+    writeFileSync(join(outside, 'package.json'), '{"version":"1.0.0"}\n');
+    symlinkSync(join(outside, 'package.json'), join(root, 'package.json'));
+
+    const report = await runVersionShip({
+      projectRoot: root,
+      config: { set: [{ path: 'package.json', json_field: 'version' }], push: ['.'] },
+      version: '1.2.3',
+      batchName: 'uat/pan-ember-0731',
+      allowedRepos: [{ path: '.', targetBranch: 'main' }],
+    }, buildVersionShipDeps());
+
+    expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
+    expect(readFileSync(join(outside, 'package.json'), 'utf-8')).toContain('1.0.0');
   });
 });
 

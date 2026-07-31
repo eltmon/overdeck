@@ -6,6 +6,7 @@ import {
 import type { ProjectConfig, VersionSyncConfig } from '../../../../lib/projects.js';
 import type { PanIssueShipRecord } from '../../../../lib/pan-dir/record.js';
 import type { UatGeneration } from '../../../../lib/overdeck/merge-sync.js';
+import { aggregateGenerationShipStatus } from '../../../../lib/cloister/ship-status.js';
 
 const CONFIG = {
   set: [{ path: 'package.json', json_field: 'version' }],
@@ -49,7 +50,11 @@ function deps(options: {
     getProject: vi.fn(() => options.config === undefined ? project() : options.config),
     listProjectKeys: vi.fn(() => ['overdeck', 'myn']),
     listPromotedGenerations: vi.fn(() => options.generation ? [options.generation] : []),
-    readShip: vi.fn((_project: ProjectConfig, issueId: string) => options.outcomes?.[issueId] ?? null),
+    readOutcome: vi.fn(async (_project: ProjectConfig, generation: UatGeneration) =>
+      aggregateGenerationShipStatus(
+        generation,
+        new Map(generation.members.map(member => [member.issueId, options.outcomes?.[member.issueId] ?? null])),
+      )),
     writeVersionSync: vi.fn(async () => {}),
   };
 }
@@ -60,7 +65,7 @@ describe('GET /api/projects/:projectKey/version-sync payload', () => {
     expect(result).toEqual({ status: 200, body: { config: null, lastOutcome: null } });
   });
 
-  it('returns configured version_sync and the newest matching member outcome', async () => {
+  it('returns configured version_sync and a conservative all-member outcome', async () => {
     const older: PanIssueShipRecord = {
       status: 'partial', version: '48.7.0', batch: 'uat/pan-ember-0731', paths: [], at: '2026-07-31T01:00:00Z',
     };
@@ -71,7 +76,7 @@ describe('GET /api/projects/:projectKey/version-sync payload', () => {
       generation: promotedGeneration(),
       outcomes: { 'PAN-1': older, 'PAN-2': newest },
     }));
-    expect(result).toEqual({ status: 200, body: { config: CONFIG, lastOutcome: newest } });
+    expect(result).toEqual({ status: 200, body: { config: CONFIG, lastOutcome: older } });
   });
 });
 
