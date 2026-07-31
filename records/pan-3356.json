@@ -128,7 +128,7 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T18:31:21.707Z",
+  "updated": "2026-07-31T18:31:25.175Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -138,7 +138,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T18:30:51.260Z",
+    "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
+    "updatedAt": "2026-07-31T18:31:21.697Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3356-review",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
@@ -222,17 +223,16 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2507260,
-            "output": 90341,
-            "cacheRead": 29318144,
+            "input": 2556529,
+            "output": 98004,
+            "cacheRead": 32852480,
             "cacheWrite": 0
           }
         },
@@ -279,15 +279,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 15487106,
-          "output": 785525,
-          "cacheRead": 377046016,
+          "input": 15536375,
+          "output": 793188,
+          "cacheRead": 380580352,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 289.524288,
-        "pricingAsOf": "2026-07-31T18:30:57.280Z"
+        "usd": 291.767691,
+        "pricingAsOf": "2026-07-31T18:31:25.171Z"
       }
     },
     "merges": [
