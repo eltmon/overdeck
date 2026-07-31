@@ -102,10 +102,10 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T17:06:54.338Z",
+  "updated": "2026-07-31T17:07:03.498Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -113,8 +113,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T17:06:54.323Z",
-    "reviewNotes": "Correctness reviewer timed out; root-symlink deletion and conversation retention lookup also block.",
+    "updatedAt": "2026-07-31T17:07:03.447Z",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "de30049d5b12ff6467078cd49f43407e6511f3f5",
@@ -194,9 +193,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 734732,
-            "output": 12715,
-            "cacheRead": 3709952,
+            "input": 741552,
+            "output": 16814,
+            "cacheRead": 4308480,
             "cacheWrite": 0
           }
         },
@@ -243,15 +242,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7280214,
-          "output": 337876,
-          "cacheRead": 121678848,
+          "input": 7287034,
+          "output": 341975,
+          "cacheRead": 122277376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 107.376774,
-        "pricingAsOf": "2026-07-31T17:06:54.331Z"
+        "usd": 107.833108,
+        "pricingAsOf": "2026-07-31T17:07:03.492Z"
       }
     },
     "merges": [
