@@ -161,19 +161,19 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T18:43:25.639Z",
+  "updated": "2026-07-31T19:25:52.488Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T18:43:24.962Z",
-    "reviewNotes": "[correctness] Needs You actions can operate on a different agent than the alert names — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:67`",
+    "updatedAt": "2026-07-31T19:25:52.419Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a",
@@ -255,28 +255,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-e488f902/security.md",
-        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-e488f902/correctness.md",
-        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-e488f902/performance.md",
-        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-e488f902/requirements.md",
-        "atCommit": "e488f9026e6166c241e7298047e5eb33dbb2060a"
-      }
     }
   },
   "closeOut": {
@@ -324,24 +302,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6386287,
-            "output": 577834,
-            "cacheRead": 329992192,
+            "input": 6940201,
+            "output": 618695,
+            "cacheRead": 378689024,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 16420463,
-          "output": 848939,
-          "cacheRead": 408901632,
+          "input": 16974377,
+          "output": 889800,
+          "cacheRead": 457598464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 312.021301,
-        "pricingAsOf": "2026-07-31T18:43:24.966Z"
+        "usd": 340.365117,
+        "pricingAsOf": "2026-07-31T19:25:52.480Z"
       }
     },
     "merges": [
