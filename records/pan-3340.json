@@ -123,17 +123,18 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:13:54.749Z",
+  "updated": "2026-07-31T14:29:36.948Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T00:13:51.650Z",
+    "updatedAt": "2026-07-31T14:29:34.582Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3340-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -190,9 +191,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9770706,
-            "output": 124591,
-            "cacheRead": 35589120,
+            "input": 9773976,
+            "output": 124827,
+            "cacheRead": 36046848,
             "cacheWrite": 0
           }
         },
@@ -239,15 +240,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18610688,
-          "output": 438043,
-          "cacheRead": 154793472,
+          "input": 18613958,
+          "output": 438279,
+          "cacheRead": 155251200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 183.591466,
-        "pricingAsOf": "2026-07-31T00:13:54.745Z"
+        "usd": 183.84376,
+        "pricingAsOf": "2026-07-31T14:29:34.738Z"
       }
     },
     "merges": [
