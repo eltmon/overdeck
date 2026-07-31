@@ -343,7 +343,7 @@
     "recordedAt": "2026-07-31T21:40:59.710Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:42:13.740Z",
+  "updated": "2026-07-31T21:42:15.889Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -353,7 +353,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T21:41:10.148Z",
+    "panDoneRecoveredAt": "2026-07-31T21:42:13.245Z",
+    "updatedAt": "2026-07-31T21:42:13.732Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "testNotes": "typecheck PASSED. lint FAILED at lint:circular: new circular dependency introduced by new file src/lib/agents/removal.ts (part of route-deletion-sites WI-2, commit 73e23449f6): read-model.ts > issue-service-singleton.ts > issue-data-service.ts > review-status.ts > cloister/review-agent.ts > agents/removal.ts > overdeck/agent-state-sync.ts > agents.ts > agents/spawn.ts > cloister/merge-agent.ts > issue-lifecycle.ts > domain-services.ts. Guard requires the cycle be removed, not baselined (scripts/lint-circular-deps.sh). No dashboard/UI changes in scope so UAT not required.",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
@@ -463,8 +464,7 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T21:40:59.710Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T21:42:13.245Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -519,18 +519,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7059854,
-            "output": 750629,
-            "cacheRead": 355095040,
+            "input": 7062382,
+            "output": 750931,
+            "cacheRead": 355457536,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 42089689,
-          "output": 1416730,
-          "cacheRead": 482141184,
+          "input": 42092217,
+          "output": 1417032,
+          "cacheRead": 482503680,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -541,8 +541,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 494.80544100000003,
-        "pricingAsOf": "2026-07-31T21:41:10.167Z"
+        "usd": 495.008389,
+        "pricingAsOf": "2026-07-31T21:42:15.886Z"
       }
     },
     "merges": [
