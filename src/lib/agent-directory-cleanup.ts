@@ -226,7 +226,7 @@ async function cleanupAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      await removeAgentStateDir(dir.path);
+      await removeAgentStateDir(dir.path, agentsDir);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.
@@ -406,6 +406,7 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
   nowMs?: number;
   graceMs?: number;
 }): Promise<ClosedIssueAgentCleanupResult> {
+  const agentsDir = options.agentsDir ?? AGENTS_DIR;
   const candidates = await findClosedIssueAgentDirsPromise(options);
   const protectedDirs = candidates.filter((dir) => dir.hasRunningSession || dir.containsJsonl);
   const removable = candidates.filter((dir) => !dir.hasRunningSession && !dir.containsJsonl);
@@ -427,7 +428,7 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      await removeAgentStateDir(dir.path);
+      await removeAgentStateDir(dir.path, agentsDir);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.

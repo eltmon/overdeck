@@ -38,30 +38,41 @@ describe('sweepTranscriptRetention', () => {
   it('deletes only jsonl older than N days for ended agents', async () => {
     const endedDir = join(agentsDir, 'conv-ended', 'sessions');
     const activeDir = join(agentsDir, 'conv-active', 'sessions');
+    const archivedDir = join(agentsDir, 'conv-archived', 'sessions');
     mkdirSync(endedDir, { recursive: true });
     mkdirSync(activeDir, { recursive: true });
+    mkdirSync(archivedDir, { recursive: true });
 
     const oldEnded = join(endedDir, 'old.jsonl');
     const newEnded = join(endedDir, 'new.jsonl');
     const oldActive = join(activeDir, 'old.jsonl');
+    const oldArchived = join(archivedDir, 'old.jsonl');
     writeFileSync(oldEnded, '{}\n');
     writeFileSync(newEnded, '{}\n');
     writeFileSync(oldActive, '{}\n');
+    writeFileSync(oldArchived, '{}\n');
     const oldTime = new Date(NOW.getTime() - 3 * DAY_MS);
     const newTime = new Date(NOW.getTime() - DAY_MS);
     utimesSync(oldEnded, oldTime, oldTime);
     utimesSync(newEnded, newTime, newTime);
     utimesSync(oldActive, oldTime, oldTime);
+    utimesSync(oldArchived, oldTime, oldTime);
+    const listSessionNames = vi.fn(async () => []);
+    const listConversations = vi.fn(() => [
+      { name: 'ended', status: 'ended' as const, archivedAt: null },
+      { name: 'active', status: 'active' as const, archivedAt: null },
+    ]);
+    const listArchivedConversations = vi.fn(() => [
+      { name: 'archived', status: 'ended' as const, archivedAt: '2026-07-30T00:00:00.000Z' },
+    ]);
 
     const actions = await sweepTranscriptRetention({
       transcriptDays: 2,
       agentsDir,
       deps: {
-        sessionExists: vi.fn(async () => false),
-        getConversationByName: vi.fn((name: string) => ({
-          status: name === 'conv-ended' ? 'ended' : 'active',
-          archivedAt: null,
-        })),
+        listSessionNames,
+        listConversations,
+        listArchivedConversations,
         log: vi.fn(),
       },
     });
@@ -69,8 +80,12 @@ describe('sweepTranscriptRetention', () => {
     expect(existsSync(oldEnded)).toBe(false);
     expect(existsSync(newEnded)).toBe(true);
     expect(existsSync(oldActive)).toBe(true);
+    expect(existsSync(oldArchived)).toBe(false);
+    expect(listSessionNames).toHaveBeenCalledTimes(1);
+    expect(listConversations).toHaveBeenCalledTimes(1);
+    expect(listArchivedConversations).toHaveBeenCalledTimes(1);
     expect(actions).toHaveLength(1);
-    expect(actions[0]).toContain('deleted 1 transcript file');
+    expect(actions[0]).toContain('deleted 2 transcript files');
   });
 
   it('never touches dirs with a live tmux session', async () => {
@@ -80,20 +95,21 @@ describe('sweepTranscriptRetention', () => {
     writeFileSync(transcriptPath, '{}\n');
     const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
     utimesSync(transcriptPath, oldTime, oldTime);
-    const getConversationByName = vi.fn();
+    const listConversations = vi.fn();
 
     const actions = await sweepTranscriptRetention({
       transcriptDays: 2,
       agentsDir,
       deps: {
-        sessionExists: vi.fn(async () => true),
-        getConversationByName,
+        listSessionNames: vi.fn(async () => ['agent-pan-3357']),
+        listConversations,
+        listArchivedConversations: vi.fn(),
         log: vi.fn(),
       },
     });
 
     expect(existsSync(transcriptPath)).toBe(true);
-    expect(getConversationByName).not.toHaveBeenCalled();
+    expect(listConversations).not.toHaveBeenCalled();
     expect(actions[0]).toContain('deleted 0 transcript files');
   });
 });

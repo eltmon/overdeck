@@ -7,36 +7,42 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 collect_candidates() {
-  while IFS= read -r -d '' file; do
-    [[ "$file" == 'src/lib/agents/state-dir-removal.ts' ]] && continue
-
-    perl -ne '
-      if (/\b(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/) {
-        my ($name, $rhs) = ($1, $2);
-        my $is_tainted = $rhs =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
-        for my $tainted (keys %tainted) {
-          $is_tainted = 1 if $rhs =~ /\b\Q$tainted\E\b/;
+  find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \) \
+    ! -path '*/__tests__/*' \
+    ! -name '*.test.ts' \
+    ! -name '*.test.tsx' \
+    ! -name '*.test.js' \
+    -print0 |
+    perl -0ne '
+      chomp;
+      my $file = $_;
+      next if $file eq "src/lib/agents/state-dir-removal.ts";
+      open my $source, "<", $file or die "cannot read $file: $!";
+      local $/ = "\n";
+      my %tainted;
+      my $line_number = 0;
+      while (my $content = <$source>) {
+        $line_number++;
+        if ($content =~ /\b(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/) {
+          my ($name, $rhs) = ($1, $2);
+          my $is_tainted = $rhs =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
+          for my $tainted (keys %tainted) {
+            $is_tainted = 1 if $rhs =~ /\b\Q$tainted\E\b/;
+          }
+          $tainted{$name} = 1 if $is_tainted;
         }
-        $tainted{$name} = 1 if $is_tainted;
-      }
 
-      next unless /\b(?:rm|rmSync|rmdir|rmdirSync)\s*\(/;
-      my $is_candidate = /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
-      for my $tainted (keys %tainted) {
-        $is_candidate = 1 if /\b\Q$tainted\E\b/;
+        next unless $content =~ /\b(?:rm|rmSync|rmdir|rmdirSync)\s*\(/;
+        my $is_candidate = $content =~ /\bAGENTS_DIR\b|\bgetAgentDir\s*\(/;
+        for my $tainted (keys %tainted) {
+          $is_candidate = 1 if $content =~ /\b\Q$tainted\E\b/;
+        }
+        $is_candidate = 1
+          if $file eq "src/lib/cloister/review-convoy.ts" && $content =~ /rm\(outputPath/;
+        print "$file:$line_number:$content" if $is_candidate;
       }
-      $is_candidate = 1
-        if $ARGV eq "src/lib/cloister/review-convoy.ts" && /rm\(outputPath/;
-      print "$ARGV:$.:$_" if $is_candidate;
-    ' "$file"
-  done < <(
-    find src -type f \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' \) \
-      ! -path '*/__tests__/*' \
-      ! -name '*.test.ts' \
-      ! -name '*.test.tsx' \
-      ! -name '*.test.js' \
-      -print0
-  )
+      close $source;
+    '
 }
 
 is_allowlisted() {

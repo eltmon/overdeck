@@ -1,21 +1,39 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../../paths.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../paths.js')>();
+  return {
+    ...actual,
+    get AGENTS_DIR() {
+      return process.env.TEST_AGENTS_DIR ?? actual.AGENTS_DIR;
+    },
+  };
+});
 
 import { removeAgentStateDir } from '../state-dir-removal.js';
 
 let tempRoot: string;
+let outsideDir: string;
 let agentDir: string;
+let previousAgentsDir: string | undefined;
 
 beforeEach(() => {
   tempRoot = mkdtempSync(join(tmpdir(), 'state-dir-removal-'));
+  outsideDir = mkdtempSync(join(tmpdir(), 'state-dir-removal-outside-'));
   agentDir = join(tempRoot, 'agent-pan-3357');
   mkdirSync(agentDir);
+  previousAgentsDir = process.env.TEST_AGENTS_DIR;
+  process.env.TEST_AGENTS_DIR = tempRoot;
 });
 
 afterEach(() => {
+  if (previousAgentsDir === undefined) delete process.env.TEST_AGENTS_DIR;
+  else process.env.TEST_AGENTS_DIR = previousAgentsDir;
   rmSync(tempRoot, { recursive: true, force: true });
+  rmSync(outsideDir, { recursive: true, force: true });
 });
 
 describe('removeAgentStateDir', () => {
@@ -70,6 +88,42 @@ describe('removeAgentStateDir', () => {
     });
     expect(readFileSync(join(agentDir, 'run-20260731.jsonl'), 'utf8')).toBe('{"role":"work"}\n');
     expect(existsSync(join(agentDir, 'runtime'))).toBe(false);
+  });
+
+  it('rejects a symbolic-link agent root without touching its target', async () => {
+    const outsideFile = join(outsideDir, 'keep.txt');
+    writeFileSync(outsideFile, 'keep');
+    rmSync(agentDir, { recursive: true, force: true });
+    symlinkSync(outsideDir, agentDir, 'dir');
+
+    await expect(removeAgentStateDir(agentDir)).rejects.toThrow('refusing symbolic-link root');
+    expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
+  });
+
+  it('unlinks nested symbolic links without traversing their targets', async () => {
+    const outsideFile = join(outsideDir, 'keep.txt');
+    const outsideTranscript = join(outsideDir, 'keep.jsonl');
+    writeFileSync(outsideFile, 'keep');
+    writeFileSync(outsideTranscript, '{}\n');
+    const linkPath = join(agentDir, 'linked-runtime.jsonl');
+    symlinkSync(outsideDir, linkPath, 'dir');
+
+    await expect(removeAgentStateDir(agentDir)).resolves.toEqual({
+      removedFiles: 1,
+      preservedTranscripts: 0,
+      removedDir: true,
+    });
+    expect(existsSync(linkPath)).toBe(false);
+    expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
+    expect(readFileSync(outsideTranscript, 'utf8')).toBe('{}\n');
+  });
+
+  it('rejects paths outside AGENTS_DIR', async () => {
+    const outsideFile = join(outsideDir, 'keep.txt');
+    writeFileSync(outsideFile, 'keep');
+
+    await expect(removeAgentStateDir(outsideDir)).rejects.toThrow('path escapes AGENTS_DIR');
+    expect(readFileSync(outsideFile, 'utf8')).toBe('keep');
   });
 
   it('is idempotent on an already-pruned dir', async () => {
