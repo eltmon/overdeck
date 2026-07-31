@@ -12,7 +12,8 @@ regressions), not a mistake to "fix" back to codex.
 
 Claude-code + CLIProxy for GPT/kimi models is **supported** when configured: the PAN-1865
 "200k-window illusion" deadlock is mitigated by PAN-2441 — launchers export
-`CLAUDE_CODE_AUTO_COMPACT_WINDOW=<model window>` (150000 for gpt-5.6 family) for every
+`CLAUDE_CODE_AUTO_COMPACT_WINDOW=<model window>` (372000 for the gpt-5.6 family per
+PAN-3057, `CLIPROXY_GPT56_CONTEXT_WINDOW` in `src/lib/model-context-windows.ts`) for every
 non-Anthropic model, in both agent and conversation spawns. Do not cite PAN-1865 as a reason
 to reroute; if a claude-code+CLIProxy session stalls while the dashboard is healthy, capture
 pane + transcript + `~/.overdeck/cliproxy/cliproxy.log` as NEW evidence instead (2026-07-16
