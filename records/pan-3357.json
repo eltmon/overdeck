@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:42:51.107Z",
+  "updated": "2026-07-31T15:43:06.676Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "guard-agent-dir-removal": {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 2078495,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:43:06.676Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -118,6 +126,7 @@
     "route-deletion-sites.route-deletion-sites.ac1": "completed",
     "route-deletion-sites.route-deletion-sites.ac2": "completed",
     "route-deletion-sites.route-deletion-sites.ac3": "completed",
-    "route-deletion-sites.route-deletion-sites.ac4": "completed"
+    "route-deletion-sites.route-deletion-sites.ac4": "completed",
+    "guard-agent-dir-removal": "running"
   }
 }
