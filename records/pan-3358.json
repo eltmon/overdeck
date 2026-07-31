@@ -239,15 +239,7 @@
       "timestamp": "2026-07-31T23:08:53.189Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-31T23:08:53Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3358\n\n# Review Synthesis — PAN-3358 — 2026-07-31T23:10:00Z\n\n## Verdict: CHANGES REQUESTED — version-token validation authorizes unrelated dependency changes\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/context.json\n- Branch: feature/pan-3358\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\n- HEAD reviewed: 7c900897d99c79932ed10d30dd63e16694b2c7cb\n- Cycle number: 6\n- Prior cycle SHA: 570d4777eafb71d76305c693b07cf1226aa50fe8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Version-token validation authorizes unrelated dependency changes — `src/lib/cloister/version-ship.ts:96`\nThe new cycle's output validator accepts any existing semver-shaped token changed to the requested release version, even when the configured expectation does not identify that span. A repository-controlled propagation command can therefore update the intended application version and an unrelated dependency, plugin, image, or build-tool version in the same expectation-only file; Overdeck then commits and pushes both changes directly to the target branch. Require explicit declarative mutation spans or captures and reject every change outside them. This blocker is promotable in cycle 6 because the permissive token validator was introduced after the prior synthesis as the attempted fix for opaque command output.\n\n### [correctness] The shared lock still permits stale whole-file writers to erase `version_sync` — `src/lib/projects.ts:965`\nThe current cycle wraps `saveProjectsConfig()` in the new lock, but whole-file callers still load and transform the registry before lock acquisition. A rename, registration, removal, or policy update can read stale content, wait while `setProjectVersionSync()` saves successfully, and then overwrite that save after acquiring the lock. The reviewer cited the caller at line 998; the cycle-diff defect is the new lock boundary at line 965, which serializes only the final write rather than the complete read/modify/write transaction. Move all registry mutations behind a shared transform-under-lock primitive. This blocker is promotable because the incomplete shared-lock implementation was added in this cycle.\n\n### [correctness] Updating `version_sync` still deletes operator comments inside the block — `src/lib/projects-writer.ts:38`\nThe new `inlineComment()` repair keeps only the last inline comment and deliberately ignores standalone comments, while replacing the complete old block through its value range. Saving settings can therefore delete warnings and maintenance notes attached to earlier `set`, `expect`, or `push` entries. Preserve every comment and its ordering by mutating the parsed node losslessly, or reject edits that cannot be preserved. This blocker is promotable because the lossy comment-selection algorithm was introduced in this cycle as the fix for the prior trailing-comment defect.\n\n## Non-blocking Findings\n\n### [correctness] A process crash leaves a permanent projects-config lock — `src/lib/projects-config-write.ts:97`\nThe lock file has no recoverable owner identity and is removed only by in-process `finally` blocks, so a crash can leave every later registry mutation failing until manual cleanup. Use an OS-backed lock or safely reclaim a lock whose recorded owner is confirmed dead. This remains advisory because registry contents stay durable and the failure is loud rather than silently corrupting state.\n\n## Clean Sub-roles\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-7c900897/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3358 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/commit-msg",
@@ -333,10 +325,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T23:35:52.861Z",
+  "updated": "2026-07-31T23:35:57.210Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -344,14 +336,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T23:35:50.817Z",
+    "updatedAt": "2026-07-31T23:35:57.157Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "7c900897d99c79932ed10d30dd63e16694b2c7cb",
     "lastVerifiedCommit": "570d4777eafb71d76305c693b07cf1226aa50fe8",
-    "reviewSpawnedAt": "2026-07-31T22:59:04.187Z",
+    "reviewSpawnedAt": "2026-07-31T23:35:57.155Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/commit-msg",
@@ -490,18 +482,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 10812974,
-            "output": 1117750,
-            "cacheRead": 473787904,
+            "input": 10813816,
+            "output": 1117860,
+            "cacheRead": 474247680,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 58983029,
-          "output": 2285371,
-          "cacheRead": 703988224,
+          "input": 58983871,
+          "output": 2285481,
+          "cacheRead": 704448000,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -512,8 +504,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 729.303988,
-        "pricingAsOf": "2026-07-31T23:35:52.858Z"
+        "usd": 729.541386,
+        "pricingAsOf": "2026-07-31T23:35:57.187Z"
       }
     },
     "merges": [
