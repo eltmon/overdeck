@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T18:49:33.295Z",
+  "updated": "2026-07-31T18:54:52.353Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-version-ship": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 2196474,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T18:49:33.295Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -156,6 +148,16 @@
         "itemId": "project-settings-version-sync",
         "outcome": "completed",
         "releasedAt": "2026-07-31T18:49:06.582Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 2196474,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T18:49:33.295Z",
+        "itemId": "docs-version-ship",
+        "outcome": "completed",
+        "releasedAt": "2026-07-31T18:54:52.352Z"
       }
     ],
     "statusReasons": {
@@ -218,6 +220,9 @@
     "project-settings-version-sync.project-settings-version-sync.ac2": "completed",
     "project-settings-version-sync.project-settings-version-sync.ac3": "completed",
     "project-settings-version-sync.project-settings-version-sync.ac4": "completed",
-    "docs-version-ship": "running"
+    "docs-version-ship": "completed",
+    "docs-version-ship.docs-version-ship.ac1": "completed",
+    "docs-version-ship.docs-version-ship.ac2": "completed",
+    "docs-version-ship.docs-version-ship.ac3": "completed"
   }
 }
