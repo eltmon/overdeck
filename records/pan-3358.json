@@ -148,19 +148,19 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T20:29:49.794Z",
+  "updated": "2026-07-31T21:09:15.896Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T20:29:49.766Z",
-    "reviewNotes": "Version-ship retries cannot recover after a prior push, and batch settlement can still split across members",
+    "updatedAt": "2026-07-31T21:09:15.862Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (646485ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\u001b[39m\n\n \u001b[31m❯\u001b[39m src/components/Stage/ProjectHome.test.tsx \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 1151\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m passes the launcher query into the created agent conversation\u001b[32m 59\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders conversation creation errors inline without opening a pane\u001b[32m 25\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m suppresses repeated submissions while creation is pending\u001b[32m 13\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m clears the previous error on retry and opens the successful conversation\u001b[32m 21\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m renders project settings in the sparse layout for a registered project\u001b[39m\u001b[33m 1025\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m omits project settings and settings requests without a project key\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Pipeline/PipelineView.test.tsx \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1132\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/drawer/IssueDrawer.test.tsx \u001b[2m(\u001b[22m\u001b[2m29 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1374\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m routes reset stop and merge requests through the shared action controls \u001b[33m 374\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/lib/__tests__/issue-actions-surface-parity.test.tsx \u001b[2m(\u001b[22m\u001b[2m38 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1872\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/lib/__tests__/issueActions.parity.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 912\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx \u001b[2m(\u001b[22m\u001b[2m62 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 983\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders session utilities under This session with their existing conditions \u001b[33m 313\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/IssueActionMe\n…(612582 chars elided)…\n\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/agent-gc.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/work-agent-prompt-new-repo.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/agents/__tests__/runtime-command-effort.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/projects-swarm.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/start-conflicting-work.test\n...(truncated)",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -256,9 +256,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4488398,
-            "output": 270079,
-            "cacheRead": 49047040,
+            "input": 4506113,
+            "output": 280939,
+            "cacheRead": 50925568,
             "cacheWrite": 0
           }
         },
@@ -296,24 +296,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6999163,
-            "output": 557535,
-            "cacheRead": 236432896,
+            "input": 7763765,
+            "output": 650306,
+            "cacheRead": 287740416,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 19311045,
-          "output": 1049692,
-          "cacheRead": 307008000,
+          "input": 20093362,
+          "output": 1153323,
+          "cacheRead": 360194048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 281.549985,
-        "pricingAsOf": "2026-07-31T20:29:49.785Z"
+        "usd": 315.163524,
+        "pricingAsOf": "2026-07-31T21:09:15.891Z"
       }
     },
     "merges": [
