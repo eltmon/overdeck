@@ -227,7 +227,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:28:36.770Z",
+  "updated": "2026-07-31T00:28:40.573Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "reviewing",
@@ -238,7 +238,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:11:39.871Z",
-    "updatedAt": "2026-07-31T00:28:35.387Z",
+    "updatedAt": "2026-07-31T00:28:40.536Z",
     "reviewNotes": "Agent re-review request (3/25): Fixed the cycle-4 blocking finding: an unreadable working-tree status is no longer rendered as 'clean'. WorkspaceGitState.dirtyFiles is number|null end to end (module, route DTO, component) and the card shows 'status unknown'; zero still renders 'clean'. Coverage at all three levels the finding asked for, and the component test fails against the old '?? 0' projection. While the state model was widened I also took the demoted fetch-failure finding the reviewer asked to handle alongside it: a requested fetch that fails sets fetchFailed and the card says the remote could not be reached rather than letting stale counts look freshly confirmed. Not addressed and unchanged this cycle: sessionExists() maps a tmux probe failure to absence — pre-existing tmux-lib behavior affecting every caller, which belongs in its own issue. 2086 frontend + 812 server tests pass; typecheck, lint, and all guards green.",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
@@ -410,7 +410,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.456453,
-        "pricingAsOf": "2026-07-31T00:28:36.768Z"
+        "pricingAsOf": "2026-07-31T00:28:40.547Z"
       }
     },
     "merges": [
