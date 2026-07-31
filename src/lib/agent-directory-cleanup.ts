@@ -20,8 +20,8 @@
  *   - Any other non-standard name
  */
 
-import { existsSync, readdirSync, rmSync } from 'fs';
-import { access, readdir, rm } from 'node:fs/promises';
+import { existsSync, readdirSync } from 'fs';
+import { access, readdir } from 'node:fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { AGENTS_DIR } from './paths.js';
@@ -29,6 +29,7 @@ import { listSessionNames } from './tmux.js';
 import { parseIssueIdSync } from './issue-id.js';
 import { FsError } from './errors.js';
 import { getAgentStateSync } from './agents.js';
+import { removeAgentStateDir } from './agents/state-dir-removal.js';
 
 export const CLOSED_ISSUE_AGENT_DIR_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -225,7 +226,7 @@ async function cleanupAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      rmSync(dir.path, { recursive: true, force: true });
+      await removeAgentStateDir(dir.path);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.
@@ -426,7 +427,7 @@ async function cleanupClosedIssueAgentDirectoriesPromise(options: {
 
   for (const dir of removable) {
     try {
-      await rm(dir.path, { recursive: true, force: true });
+      await removeAgentStateDir(dir.path);
       result.removed.push(dir.name);
     } catch {
       // Non-fatal — directory may have already been removed or permissions changed.
@@ -455,8 +456,8 @@ export const findOrphanedAgentDirs = (
 
 /**
  * Effect-native variant of cleanupAgentDirectories. Fails with FsError if the
- * orphan scan fails. Individual rm failures are still swallowed internally so
- * a partial cleanup is the worst case (matches the Promise contract).
+ * orphan scan fails. Individual removal failures are still swallowed internally
+ * so a partial cleanup is the worst case (matches the Promise contract).
  */
 export const cleanupAgentDirectories = (options: {
   dryRun?: boolean;

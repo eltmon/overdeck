@@ -124,6 +124,12 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   COSTS_DIR: '/tmp/test-costs',
   packageRoot: '/tmp/test-package-root',
 }));
+const mockRemoveAgentStateDir = vi.hoisted(() => vi.fn());
+vi.mock('../../agents/state-dir-removal.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../agents/state-dir-removal.js')>();
+  mockRemoveAgentStateDir.mockImplementation(actual.removeAgentStateDir);
+  return { ...actual, removeAgentStateDir: mockRemoveAgentStateDir };
+});
 vi.mock('fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('fs')>();
   return {
@@ -884,8 +890,15 @@ describe('checkInspectAgentTimeouts', () => {
 // describe MUST stay last in the file: it overrides the shared fs mock
 // implementations, which vi.clearAllMocks does not restore.
 describe('cleanupStaleAgentState conv-* preservation', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    actualFs.rmSync('/tmp/test-agents', { recursive: true, force: true });
+  });
+
+  afterEach(async () => {
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    actualFs.rmSync('/tmp/test-agents', { recursive: true, force: true });
   });
 
   it('purges a stale agent-* dir but never a conv-* dir', async () => {
@@ -907,9 +920,35 @@ describe('cleanupStaleAgentState conv-* preservation', () => {
     const { cleanupStaleAgentState } = await import('../deacon.js');
     const actions = await cleanupStaleAgentState();
 
-    const removed = vi.mocked(fs.rmSync).mock.calls.map((c) => String(c[0]));
-    expect(removed.some((p) => p.includes('agent-pan-9999'))).toBe(true);
-    expect(removed.some((p) => p.includes('conv-'))).toBe(false);
+    expect(mockRemoveAgentStateDir).toHaveBeenCalledWith('/tmp/test-agents/agent-pan-9999');
+    expect(mockRemoveAgentStateDir).not.toHaveBeenCalledWith(expect.stringContaining('conv-'));
     expect(actions.some((a) => a.includes('conv-'))).toBe(false);
+  });
+
+  it('preserves jsonl transcripts when purging stale agent state', async () => {
+    const fs = await import('fs');
+    const actualFs = await vi.importActual<typeof import('node:fs')>('node:fs');
+    const agentDir = '/tmp/test-agents/agent-pan-9998';
+    const transcriptPath = `${agentDir}/codex-home/sessions/x.jsonl`;
+    actualFs.mkdirSync(`${agentDir}/codex-home/sessions`, { recursive: true });
+    actualFs.writeFileSync(transcriptPath, '{"event":"kept"}\n');
+    actualFs.writeFileSync(`${agentDir}/state.json`, '{}');
+
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockImplementation((path: any, opts?: any) => {
+      if (String(path).endsWith('test-agents') && opts && (opts as any).withFileTypes) {
+        return [{ isDirectory: () => true, name: 'agent-pan-9998' }] as any;
+      }
+      return [] as any;
+    });
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true, mtimeMs: 0 } as any);
+
+    const { cleanupStaleAgentState } = await import('../deacon.js');
+    const actions = await cleanupStaleAgentState();
+
+    expect(actualFs.existsSync(transcriptPath)).toBe(true);
+    expect(actualFs.existsSync(`${agentDir}/state.json`)).toBe(false);
+    expect(actions).toHaveLength(1);
+    expect(actions[0]).toMatch(/^Purged stale agent state: agent-pan-9998 \(\d+ days old; 1 transcript file preserved\)$/);
   });
 });

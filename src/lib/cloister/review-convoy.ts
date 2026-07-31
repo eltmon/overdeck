@@ -149,6 +149,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
     const reviewerDir = join(AGENTS_DIR, reviewerAgentId(opts.issueId, opts.subRole));
 
     await mkdir(dirname(outputPath), { recursive: true });
+    // PAN-3357: not a dir removal — these are named runtime marker files below the agent-dir deletion door.
     await rm(outputPath, { force: true });
     await rm(join(reviewerDir, 'reviewer-signaled'), { force: true });
     await rm(join(reviewerDir, 'reviewer-launcher.pid'), { force: true });
