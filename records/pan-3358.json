@@ -262,9 +262,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T23:37:51.932Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T23:42Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T23:42:14.839Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T23:42:14Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3358\n\n# Review Synthesis — PAN-3358 — 2026-07-31T23:45:00Z\n\n## Verdict: CHANGES REQUESTED — concurrent stale-lock reclaimers can both enter the projects-config critical section\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/context.json\n- Branch: feature/pan-3358\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\n- HEAD reviewed: 0ad9598e6081572f0410400dc4d0a2dee1c8f047\n- Cycle number: 7\n- Prior cycle SHA: 7c900897d99c79932ed10d30dd63e16694b2c7cb\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness / requirements] Concurrent stale-lock reclaimers can both enter the projects-config critical section — `src/lib/projects-config-write.ts:149`\nBoth lock-acquisition paths inspect a dead-owner lock and then unconditionally remove the shared pathname. Two processes can inspect the same stale inode; after the first removes it and creates a live replacement, the second can delete that replacement under its earlier stale-owner decision and create another lock. Both writers then execute concurrent read/modify/write transactions, and either release path can remove the other writer's visible lock. This defeats NFR-4 and can silently discard a valid `version_sync` save or another project-registry mutation. Stale takeover and release must atomically prove that the pathname still identifies the inspected or owned lock, with a synchronized multi-process regression test. This blocker is promotable in cycle 7 because stale-owner reclamation and its non-atomic unlink logic were introduced after the prior synthesis.\n\n## Non-blocking Findings\n\n### [security] Pre-redaction truncation can expose reconstructable credentials to external enrichment providers — `src/lib/secret-redaction.ts:10`\n**[demoted: previously reviewed, not promotable]** The head/tail splice can split a credential across the truncation seam before redaction, leaving reconstructable fragments in a full-transcript enrichment prompt. The redactor and enrichment call sites were already present and reviewed before the prior synthesis SHA; no cycle-7 change touched this behavior. It cannot block this convergence cycle, but it should be tracked separately because the reported disclosure path is concrete.\n\n### [performance] Dashboard project-setting mutations perform synchronous durable filesystem transactions on the event loop — `src/lib/projects-config-write.ts:249`\n**[demoted: previously reviewed, not promotable]** Dashboard routes already reached synchronous config setters backed by locking, atomic replacement, and fsync at the prior reviewed SHA. Cycle 7 strengthens transaction scope and lock ownership but does not newly introduce the server-reachable synchronous persistence model that the finding challenges. Under the cycle-7 convergence gate this remains advisory rather than blocking.\n\n### [correctness] A directory-setup failure permanently wedges the in-process async write queue — `src/lib/projects-config-write.ts:263`\nThe async queue publishes an unresolved tail before `mkdir()`, while queue release begins only inside the later `try/finally`. A directory-setup rejection therefore leaves later async writers waiting indefinitely. Keep all operations after queue insertion under a release `finally` and add a recovery test.\n\n### [correctness] A failed version-sync load is rendered as the explicit skip state — `src/dashboard/frontend/src/components/CommandDeck/ProjectSettingsDisclosure.tsx:129`\nA failed GET leaves `data` undefined and falls through to the same UI used for a successful `config: null` response, allowing an operator to begin an empty replacement form without seeing the existing configuration. Render an explicit load error and suppress mutation controls until a successful read establishes the state.\n\n## Clean Sub-roles\nNone. Security and performance have findings that were demoted by the cycle-7 convergence gate; correctness and requirements share the surviving lock-reclamation blocker.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-0ad9598e/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3358 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/commit-msg",
@@ -350,7 +363,7 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T23:42:14.165Z",
+  "updated": "2026-07-31T23:42:14.839Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "blocked",
