@@ -1,4 +1,3 @@
-import { readFile } from 'node:fs/promises';
 import { isMap, parseDocument, stringify, type Pair, type YAMLMap } from 'yaml';
 import {
   PROJECTS_CONFIG_FILE,
@@ -6,7 +5,7 @@ import {
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from './projects.js';
-import { atomicWriteProjectsConfig, withProjectsConfigWrite } from './projects-config-write.js';
+import { updateProjectsConfigText } from './projects-config-write.js';
 
 function keyValue(pair: Pair): string | undefined {
   const value = pair.key && typeof pair.key === 'object' && 'value' in pair.key
@@ -35,17 +34,12 @@ function keyIndent(content: string, pair: Pair): string {
   return indent;
 }
 
-function inlineComment(
-  content: string,
-  value: unknown,
-): { suffix: string; standalone: string } | null {
-  if (typeof value !== 'object' || value === null || !('srcToken' in value)) return null;
-  const range = nodeRange(value);
-  if (!range) return null;
-
-  const comments: Array<{ offset: number; source: string }> = [];
+function containsCommentBetween(value: unknown, start: number, end: number): boolean {
+  if (typeof value !== 'object' || value === null || !('srcToken' in value)) return false;
   const seen = new Set<object>();
+  let found = false;
   const visit = (candidate: unknown): void => {
+    if (found) return;
     if (Array.isArray(candidate)) {
       for (const item of candidate) visit(item);
       return;
@@ -56,27 +50,16 @@ function inlineComment(
     if (
       record.type === 'comment'
       && typeof record.offset === 'number'
-      && typeof record.source === 'string'
-      && record.offset >= range[0]
-      && record.offset < range[1]
+      && record.offset >= start
+      && record.offset < end
     ) {
-      comments.push({ offset: record.offset, source: record.source });
+      found = true;
+      return;
     }
     for (const nested of Object.values(record)) visit(nested);
   };
   visit((value as { srcToken: unknown }).srcToken);
-
-  const comment = comments.sort((a, b) => b.offset - a.offset)[0];
-  if (!comment) return null;
-  const start = lineStart(content, comment.offset);
-  const beforeComment = content.slice(start, comment.offset);
-  if (beforeComment.trim().length === 0) return null;
-  const spacing = /[ \t]*$/.exec(beforeComment)?.[0] ?? ' ';
-  const indentation = /^[ \t]*/.exec(beforeComment)?.[0] ?? '';
-  return {
-    suffix: `${spacing}${comment.source}`,
-    standalone: `${indentation}${comment.source}\n`,
-  };
+  return found;
 }
 
 function renderVersionSync(block: VersionSyncConfig, indent: string): string {
@@ -84,14 +67,11 @@ function renderVersionSync(block: VersionSyncConfig, indent: string): string {
   return `${rendered.split('\n').map(line => `${indent}${line}`).join('\n')}\n`;
 }
 
-async function setProjectVersionSyncUnlocked(
+function updateProjectVersionSyncContent(
+  content: string,
   projectKey: string,
   block: VersionSyncConfig | null,
-): Promise<void> {
-  const content = await readFile(PROJECTS_CONFIG_FILE, 'utf-8').catch(error => {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 'projects: {}\n';
-    throw error;
-  });
+): string {
   const doc = parseDocument(content, { keepSourceTokens: true });
   if (doc.errors.length > 0) {
     throw new Error(`Could not parse projects.yaml: ${doc.errors.map(error => error.message).join('; ')}`);
@@ -133,19 +113,19 @@ async function setProjectVersionSyncUnlocked(
     const keyRange = nodeRange(versionPair.key);
     const valueRange = nodeRange(versionPair.value);
     if (!keyRange || !valueRange) throw new Error(`Could not locate ${projectKey}.version_sync in projects.yaml`);
-    const preservedInlineComment = inlineComment(content, versionPair.value);
-    if (preservedInlineComment) {
-      replacement = block === null
-        ? preservedInlineComment.standalone
-        : `${replacement.trimEnd()}${preservedInlineComment.suffix}\n`;
+    const start = lineStart(content, keyRange[0]);
+    if (containsCommentBetween(versionPair, start, valueRange[1])) {
+      throw new Error(
+        `Project ${projectKey} has comments inside version_sync; edit projects.yaml directly to preserve them`,
+      );
     }
-    let start = lineStart(content, keyRange[0]);
-    if (block === null && valueRange[1] === content.length && !content.endsWith('\n') && start > 0 && content[start - 1] === '\n') {
-      start -= 1;
+    let spliceStart = start;
+    if (block === null && valueRange[1] === content.length && !content.endsWith('\n') && spliceStart > 0 && content[spliceStart - 1] === '\n') {
+      spliceStart -= 1;
     }
-    updated = content.slice(0, start) + replacement + content.slice(valueRange[1]);
+    updated = content.slice(0, spliceStart) + replacement + content.slice(valueRange[1]);
   } else if (block === null) {
-    return;
+    return content;
   } else {
     if (!project.range) throw new Error(`Could not locate project ${projectKey} in projects.yaml`);
     const offset = project.range[1];
@@ -154,15 +134,16 @@ async function setProjectVersionSyncUnlocked(
     updated = content.slice(0, offset) + insertion + content.slice(offset);
   }
 
-  await atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, updated);
-  invalidateProjectsConfigCache();
+  return updated;
 }
 
 export async function setProjectVersionSync(
   projectKey: string,
   block: VersionSyncConfig | null,
 ): Promise<void> {
-  return withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
-    setProjectVersionSyncUnlocked(projectKey, block)
-  ));
+  await updateProjectsConfigText(PROJECTS_CONFIG_FILE, 'projects: {}\n', content => ({
+    content: updateProjectVersionSyncContent(content, projectKey, block),
+    result: undefined,
+  }));
+  invalidateProjectsConfigCache();
 }

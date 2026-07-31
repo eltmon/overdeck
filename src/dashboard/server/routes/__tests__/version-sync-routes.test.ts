@@ -10,6 +10,13 @@ import { aggregateGenerationShipStatus } from '../../../../lib/cloister/ship-sta
 
 const CONFIG = {
   set: [{ path: 'package.json', json_field: 'version' }],
+  replace: [{
+    path: 'app/build.gradle',
+    pattern: 'versionName "(?<version>\\d+\\.\\d+)"',
+    value: '{majorMinor}',
+  }],
+  command: 'sync-version',
+  command_image: 'version-sync:latest',
   expect: [{ path: 'package.json', pattern: '"version": "{version}"' }],
   push: ['.'],
 } satisfies VersionSyncConfig;

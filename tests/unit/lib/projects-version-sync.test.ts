@@ -25,11 +25,29 @@ import {
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from '../../../src/lib/projects.js';
+import { updateProjectsConfigText } from '../../../src/lib/projects-config-write.js';
 import { setProjectVersionSync } from '../../../src/lib/projects-writer.js';
 
 const MYN_VERSION_SYNC = {
   set: [
     { path: 'frontend/package.json', json_field: 'version' },
+  ],
+  replace: [
+    {
+      path: 'api/src/main/java/com/myn/config/Version.java',
+      pattern: 'String version = "(?<version>\\d+\\.\\d+\\.\\d+)\\.git "',
+      value: '{version}',
+    },
+    {
+      path: 'frontend/ios/App/App/Info.plist',
+      pattern: 'CFBundleShortVersionString</key>\\s*<string>(?<version>\\d+\\.\\d+)</string>',
+      value: '{majorMinor}',
+    },
+    {
+      path: 'frontend/android/app/build.gradle',
+      pattern: 'versionName "(?<version>\\d+\\.\\d+)"',
+      value: '{majorMinor}',
+    },
   ],
   command: 'pnpm vsync',
   command_cwd: 'frontend',
@@ -47,6 +65,11 @@ const COMMENT_VERSION_SYNC = {
   expect: [{ path: 'package.json', pattern: 'version' }],
   push: ['.'],
 } satisfies VersionSyncConfig;
+
+function processStartTime(pid: number): string {
+  const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
+  return stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/)[19]!;
+}
 
 beforeEach(() => {
   mkdirSync(TEST_HOME, { recursive: true });
@@ -148,17 +171,34 @@ describe('setProjectVersionSync', () => {
     );
   });
 
-  it('preserves an inline final-entry comment while updating and removing the block', async () => {
+  it('rejects updates and removal when an inline comment inside the block cannot be preserved', async () => {
     const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n    version_sync:\n      expect:\n        - path: package.json\n          pattern: version\n      push:\n        - . # keep inline\n    auto_merge_default: hold\n`;
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
 
-    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
+    await expect(setProjectVersionSync('alpha', COMMENT_VERSION_SYNC)).rejects.toThrow(
+      'Project alpha has comments inside version_sync; edit projects.yaml directly to preserve them',
+    );
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
 
-    await setProjectVersionSync('alpha', null);
-    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(
-      `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n        # keep inline\n    auto_merge_default: hold\n`,
+    await expect(setProjectVersionSync('alpha', null)).rejects.toThrow(
+      'Project alpha has comments inside version_sync; edit projects.yaml directly to preserve them',
     );
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
+  it('rejects a block containing multiple standalone and inline comments without changing any bytes', async () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n    version_sync: # block warning\n      # before expectations\n      expect:\n        - path: package.json # manifest note\n          pattern: version\n      # before push\n      push:\n        - . # repository note\n    auto_merge_default: hold\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await expect(setProjectVersionSync('alpha', COMMENT_VERSION_SYNC)).rejects.toThrow(
+      'Project alpha has comments inside version_sync; edit projects.yaml directly to preserve them',
+    );
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+
+    await expect(setProjectVersionSync('alpha', null)).rejects.toThrow(
+      'Project alpha has comments inside version_sync; edit projects.yaml directly to preserve them',
+    );
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
   });
 
   it('serializes concurrent version_sync updates and leaves no lock or temporary files', async () => {
@@ -179,16 +219,68 @@ describe('setProjectVersionSync', () => {
     expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml']);
   });
 
+  it('holds the lock across read and transform so a queued save reads the renamed project', async () => {
+    writeFileSync(
+      PROJECTS_CONFIG_FILE,
+      `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`,
+      'utf-8',
+    );
+    let transformStarted!: () => void;
+    const started = new Promise<void>(resolve => {
+      transformStarted = resolve;
+    });
+    let releaseTransform!: () => void;
+    const blocked = new Promise<void>(resolve => {
+      releaseTransform = resolve;
+    });
+
+    const rename = updateProjectsConfigText(PROJECTS_CONFIG_FILE, 'projects: {}\n', async content => {
+      transformStarted();
+      await blocked;
+      return { content: content.replace('name: Alpha', 'name: Renamed Alpha'), result: undefined };
+    });
+    await started;
+    let versionSaveFinished = false;
+    const versionSave = setProjectVersionSync('alpha', COMMENT_VERSION_SYNC).then(() => {
+      versionSaveFinished = true;
+    });
+    await Promise.resolve();
+    expect(versionSaveFinished).toBe(false);
+
+    releaseTransform();
+    await Promise.all([rename, versionSave]);
+
+    const parsed = loadProjectsConfigSync();
+    expect(parsed.projects.alpha?.name).toBe('Renamed Alpha');
+    expect(parsed.projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
+  });
+
   it('leaves the durable registry intact when another writer owns the shared lock', () => {
     const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
-    writeFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'owned elsewhere\n', 'utf-8');
+    const owner = `${JSON.stringify({ pid: process.pid, startTime: processStartTime(process.pid) })}\n`;
+    writeFileSync(`${PROJECTS_CONFIG_FILE}.lock`, owner, 'utf-8');
 
     expect(() => saveProjectsConfigSync({
       projects: { beta: { name: 'Beta', path: '/repo/beta' } },
     })).toThrow('projects.yaml is already being modified');
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
-    expect(readFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'utf-8')).toBe('owned elsewhere\n');
+    expect(readFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'utf-8')).toBe(owner);
+  });
+
+  it('reclaims a stale projects-config lock only after confirming its owner is dead', async () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+    writeFileSync(
+      `${PROJECTS_CONFIG_FILE}.lock`,
+      `${JSON.stringify({ pid: 999_999_999, startTime: 'dead-owner' })}\n`,
+      'utf-8',
+    );
+
+    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
+
+    expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
+    expect(readdirSync(TEST_HOME)).toEqual(['projects.yaml']);
   });
 
   it('rejects a flow-style project without changing the file', async () => {
@@ -232,6 +324,36 @@ describe('validateVersionSyncConfig', () => {
     ]],
   ])('rejects a no-op operational shape %#', (config, errors) => {
     expect(validateVersionSyncConfig(config)).toEqual({ ok: false, errors });
+  });
+
+  it('requires each generated-text replacement to name its exact version capture', () => {
+    const result = validateVersionSyncConfig({
+      command: 'sync-version',
+      command_image: 'version-sync:latest',
+      replace: [{ path: 'build.gradle', pattern: 'versionName "\\d+\\.\\d+"', value: '{majorMinor}' }],
+      expect: [{ path: 'build.gradle', pattern: 'versionName "{majorMinor}"' }],
+      push: ['.'],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ['version_sync.replace[0].pattern must contain exactly one named capture (?<version>...)'],
+    });
+  });
+
+  it('rejects a generated-text replacement without an allowed version value', () => {
+    const result = validateVersionSyncConfig({
+      command: 'sync-version',
+      command_image: 'version-sync:latest',
+      replace: [{ path: 'build.gradle', pattern: 'versionName "(?<version>\\d+\\.\\d+)"', value: '{buildNumber}' }],
+      expect: [{ path: 'build.gradle', pattern: 'versionName "{majorMinor}"' }],
+      push: ['.'],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ['version_sync.replace[0].value must be {version} or {majorMinor}'],
+    });
   });
 
   it('rejects an expect entry with a missing pattern', () => {

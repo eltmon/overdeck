@@ -6,6 +6,7 @@ import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
 
 interface VersionSyncConfig {
   set?: Array<{ path: string; json_field: string }>;
+  replace?: Array<{ path: string; pattern: string; value: '{version}' | '{majorMinor}' }>;
   command?: string;
   command_cwd?: string;
   command_image?: string;
@@ -30,6 +31,7 @@ interface VersionSyncPayload {
 
 interface VersionSyncDraft {
   set: Array<{ path: string; json_field: string }>;
+  replace: Array<{ path: string; pattern: string; value: '{version}' | '{majorMinor}' }>;
   command: string;
   command_cwd: string;
   command_image: string;
@@ -40,6 +42,7 @@ interface VersionSyncDraft {
 
 const emptyVersionSyncDraft = (): VersionSyncDraft => ({
   set: [],
+  replace: [],
   command: '',
   command_cwd: '',
   command_image: '',
@@ -51,6 +54,7 @@ const emptyVersionSyncDraft = (): VersionSyncDraft => ({
 function versionSyncDraft(config: VersionSyncConfig | null): VersionSyncDraft {
   return {
     set: config?.set?.map(entry => ({ ...entry })) ?? [],
+    replace: config?.replace?.map(entry => ({ ...entry })) ?? [],
     command: config?.command ?? '',
     command_cwd: config?.command_cwd ?? '',
     command_image: config?.command_image ?? '',
@@ -63,6 +67,7 @@ function versionSyncDraft(config: VersionSyncConfig | null): VersionSyncDraft {
 function compactVersionSyncDraft(draft: VersionSyncDraft): VersionSyncConfig {
   return {
     ...(draft.set.length > 0 ? { set: draft.set.map(entry => ({ path: entry.path.trim(), json_field: entry.json_field.trim() })) } : {}),
+    ...(draft.replace.length > 0 ? { replace: draft.replace.map(entry => ({ path: entry.path.trim(), pattern: entry.pattern, value: entry.value })) } : {}),
     ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
     ...(draft.command_cwd.trim() ? { command_cwd: draft.command_cwd.trim() } : {}),
     ...(draft.command_image.trim() ? { command_image: draft.command_image.trim() } : {}),
@@ -221,6 +226,21 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
           </div>
 
           <div>
+            <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Generated text replacements</span><button type="button" onClick={() => setDraft({ ...draft, replace: [...draft.replace, { path: '', pattern: '', value: '{version}' }] })} className="text-[10px] text-primary hover:underline">Add replacement</button></div>
+            {fieldError('replace')}
+            <div className="mt-1 space-y-1.5">
+              {draft.replace.map((entry, index) => (
+                <div key={index} className="grid grid-cols-[0.7fr_1fr_0.45fr_auto] gap-1.5">
+                  <div><input aria-label={`Replace path ${index + 1}`} className={inputClass} value={entry.path} onChange={event => setDraft({ ...draft, replace: draft.replace.map((item, itemIndex) => itemIndex === index ? { ...item, path: event.target.value } : item) })} placeholder="app/build.gradle" />{fieldError(`replace.${index}.path`)}</div>
+                  <div><input aria-label={`Replace pattern ${index + 1}`} className={inputClass} value={entry.pattern} onChange={event => setDraft({ ...draft, replace: draft.replace.map((item, itemIndex) => itemIndex === index ? { ...item, pattern: event.target.value } : item) })} placeholder={'versionName "(?<version>\\d+\\.\\d+)"'} />{fieldError(`replace.${index}.pattern`)}</div>
+                  <div><select aria-label={`Replace value ${index + 1}`} className={inputClass} value={entry.value} onChange={event => setDraft({ ...draft, replace: draft.replace.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value as '{version}' | '{majorMinor}' } : item) })}><option value="{version}">{'{version}'}</option><option value="{majorMinor}">{'{majorMinor}'}</option></select>{fieldError(`replace.${index}.value`)}</div>
+                  <button type="button" aria-label={`Remove replacement ${index + 1}`} onClick={() => setDraft({ ...draft, replace: draft.replace.filter((_, itemIndex) => itemIndex !== index) })} className="px-1 text-muted-foreground hover:text-foreground">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Expected version strings</span><button type="button" onClick={() => setDraft({ ...draft, expect: [...draft.expect, { path: '', pattern: '' }] })} className="text-[10px] text-primary hover:underline">Add expectation</button></div>
             {fieldError('expect')}
             <div className="mt-1 space-y-1.5">
@@ -258,6 +278,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
           <div className="rounded border border-border bg-muted/20 p-2 font-mono text-[10.5px] text-muted-foreground">
             {data.config.command && <div>command: <span className="text-foreground">{data.config.command}</span>{data.config.command_cwd ? ` (cwd ${data.config.command_cwd})` : ''}{data.config.command_image ? ` in ${data.config.command_image}` : ''}</div>}
             {(data.config.set ?? []).map(entry => <div key={`${entry.path}:${entry.json_field}`}>set: <span className="text-foreground">{entry.path} → {entry.json_field}</span></div>)}
+            {(data.config.replace ?? []).map(entry => <div key={`${entry.path}:${entry.pattern}`}>replace: <span className="text-foreground">{entry.path} / {entry.pattern} → {entry.value}</span></div>)}
             {(data.config.expect ?? []).map(entry => <div key={`${entry.path}:${entry.pattern}`}>expect: <span className="text-foreground">{entry.path} / {entry.pattern}</span></div>)}
             {(data.config.push ?? []).map(path => <div key={path}>push: <span className="text-foreground">{path}</span></div>)}
             {data.config.commit_message && <div>commit: <span className="text-foreground">{data.config.commit_message}</span></div>}

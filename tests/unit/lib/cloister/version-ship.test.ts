@@ -36,6 +36,16 @@ function fakeDeps(overrides: Partial<VersionShipDeps> = {}): FakeDeps {
     writeVersion: vi.fn(async () => {}),
     runCommand: vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' })),
     readFile: vi.fn(async () => '"version": "1.2.3"'),
+    replaceVersionCapture: vi.fn(async (pattern: string, content: string, replacement: string) => {
+      let replacements = 0;
+      const updated = content.replace(new RegExp(pattern, 'g'), (...args: unknown[]) => {
+        const groups = args.at(-1) as Record<string, string> | undefined;
+        if (!groups?.version) return String(args[0]);
+        replacements += 1;
+        return String(args[0]).replace(groups.version, replacement);
+      });
+      return { content: updated, replacements };
+    }),
     testPattern: vi.fn(async (pattern: string, content: string) => new RegExp(pattern).test(content)),
     verifyRepo: vi.fn(async () => {}),
     hasChanges: vi.fn(async () => true),
@@ -159,7 +169,7 @@ describe('runVersionShip', () => {
     expect(deps.push).not.toHaveBeenCalled();
   });
 
-  it('rejects command output that preserves the version while injecting unrelated code', async () => {
+  it('rejects command output that changes an unrelated dependency version', async () => {
     const readsByPath = new Map<string, number>();
     const deps = fakeDeps({
       readFile: vi.fn(async (path: string) => {
@@ -167,17 +177,22 @@ describe('runVersionShip', () => {
         readsByPath.set(path, read + 1);
         if (path.endsWith('package.json')) return '"version": "1.2.3"';
         return read === 0
-          ? 'export const version = "1.1.0";\n'
-          : 'export const version = "1.2.3";\nexport const postinstall = "malicious";\n';
+          ? 'appVersion = "1.1.0"\ndependencyVersion = "7.4.2"\n'
+          : 'appVersion = "1.2.3"\ndependencyVersion = "1.2.3"\n';
       }),
     });
 
     const report = await runVersionShip({
       projectRoot: PROJECT_ROOT,
       config: config({
+        replace: [{
+          path: 'frontend/generated.ts',
+          pattern: 'appVersion = "(?<version>\\d+\\.\\d+\\.\\d+)"',
+          value: '{version}',
+        }],
         expect: [
           { path: 'frontend/package.json', pattern: '"version": "{version}"' },
-          { path: 'frontend/generated.ts', pattern: 'version = "{version}"' },
+          { path: 'frontend/generated.ts', pattern: 'appVersion = "{version}"' },
         ],
       }),
       version: '1.2.3',
@@ -188,7 +203,7 @@ describe('runVersionShip', () => {
     expect(report).toMatchObject({
       status: 'failed',
       errorCode: 'command-failed',
-      error: 'version sync command changed content outside declared version tokens: frontend/generated.ts',
+      error: 'version sync command changed content outside declared captures: frontend/generated.ts',
     });
     expect(deps.commit).not.toHaveBeenCalled();
     expect(deps.push).not.toHaveBeenCalled();
@@ -208,6 +223,11 @@ describe('runVersionShip', () => {
     const report = await runVersionShip({
       projectRoot: PROJECT_ROOT,
       config: config({
+        replace: [{
+          path: 'frontend/build.gradle',
+          pattern: 'versionName "(?<version>\\d+\\.\\d+)"',
+          value: '{majorMinor}',
+        }],
         expect: [
           { path: 'frontend/package.json', pattern: '"version": "{version}"' },
           { path: 'frontend/build.gradle', pattern: 'versionName "{majorMinor}"' },
@@ -232,6 +252,11 @@ describe('runVersionShip', () => {
       projectRoot: PROJECT_ROOT,
       config: config({
         set: [{ path: 'frontend/package.json', json_field: 'version' }],
+        replace: [{
+          path: 'frontend/generated.txt',
+          pattern: 'generated (?<version>\\d+\\.\\d+\\.\\d+)',
+          value: '{version}',
+        }],
         expect: [{ path: 'frontend/generated.txt', pattern: '{version}' }],
         push: ['frontend'],
       }),
@@ -454,6 +479,20 @@ function runCommitGuard(subject: string): ReturnType<typeof spawnSync> {
 }
 
 describe('version ship command sandbox', () => {
+  it('derives expected command output from only the declared named capture', async () => {
+    const deps = buildVersionShipDeps();
+    const transformed = await deps.replaceVersionCapture(
+      'appVersion = "(?<version>\\d+\\.\\d+\\.\\d+)"',
+      'appVersion = "1.1.0"\ndependencyVersion = "7.4.2"\n',
+      '1.2.3',
+    );
+
+    expect(transformed).toEqual({
+      content: 'appVersion = "1.2.3"\ndependencyVersion = "7.4.2"\n',
+      replacements: 1,
+    });
+  });
+
   it('runs the configured command without host credentials, network, hooks, or an unbounded lifetime', async () => {
     const root = mkdtempSync(join(tmpdir(), 'version-ship-sandbox-'));
     const cwd = join(root, 'frontend');

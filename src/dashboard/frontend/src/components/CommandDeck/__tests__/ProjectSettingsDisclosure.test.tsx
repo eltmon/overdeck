@@ -302,6 +302,10 @@ describe('ProjectSettingsDisclosure', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add target' }));
     fireEvent.change(screen.getByLabelText('Set path 1'), { target: { value: 'frontend/package.json' } });
     fireEvent.change(screen.getByLabelText('Set JSON field 1'), { target: { value: 'version' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add replacement' }));
+    fireEvent.change(screen.getByLabelText('Replace path 1'), { target: { value: 'frontend/android/app/build.gradle' } });
+    fireEvent.change(screen.getByLabelText('Replace pattern 1'), { target: { value: 'versionName "(?<version>\\d+\\.\\d+)"' } });
+    fireEvent.change(screen.getByLabelText('Replace value 1'), { target: { value: '{majorMinor}' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add expectation' }));
     fireEvent.change(screen.getByLabelText('Expect path 1'), { target: { value: 'frontend/package.json' } });
     fireEvent.change(screen.getByLabelText('Expect pattern 1'), { target: { value: '"version": "{version}"' } });
@@ -314,6 +318,11 @@ describe('ProjectSettingsDisclosure', () => {
       command_cwd: 'frontend',
       command_image: 'myn-version-sync:latest',
       set: [{ path: 'frontend/package.json', json_field: 'version' }],
+      replace: [{
+        path: 'frontend/android/app/build.gradle',
+        pattern: 'versionName "(?<version>\\d+\\.\\d+)"',
+        value: '{majorMinor}',
+      }],
       expect: [{ path: 'frontend/package.json', pattern: '"version": "{version}"' }],
       push: ['frontend'],
     }));

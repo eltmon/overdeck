@@ -410,6 +410,50 @@ async function verifyPreparedRepo(
   throw new VersionShipOperationError('workspace-failed', 'prepared version ship repository head changed unexpectedly');
 }
 
+function replaceVersionCaptureInWorker(
+  pattern: string,
+  content: string,
+  replacement: string,
+): Promise<{ content: string; replacements: number }> {
+  return new Promise((resolveResult, reject) => {
+    const worker = new Worker(
+      `const { parentPort, workerData } = require('node:worker_threads');\n` +
+      `try {\n` +
+      `  const regex = new RegExp(workerData.pattern, 'gd');\n` +
+      `  const pieces = []; let offset = 0; let replacements = 0; let match;\n` +
+      `  while ((match = regex.exec(workerData.content)) !== null) {\n` +
+      `    const span = match.indices && match.indices.groups && match.indices.groups.version;\n` +
+      `    if (!span) throw new Error('missing version capture');\n` +
+      `    pieces.push(workerData.content.slice(offset, span[0]), workerData.replacement);\n` +
+      `    offset = span[1]; replacements += 1;\n` +
+      `    if (match[0].length === 0) regex.lastIndex += 1;\n` +
+      `  }\n` +
+      `  pieces.push(workerData.content.slice(offset));\n` +
+      `  parentPort.postMessage({ ok: true, content: pieces.join(''), replacements });\n` +
+      `} catch (error) { parentPort.postMessage({ ok: false, error: error instanceof Error ? error.message : String(error) }); }`,
+      { eval: true, workerData: { pattern, content, replacement } },
+    );
+    const timer = setTimeout(() => {
+      void worker.terminate();
+      reject(new VersionShipOperationError('path-validation-failed', 'version_sync replacement exceeded the evaluation time limit'));
+    }, REGEX_TIMEOUT_MS);
+    worker.once('message', (result: { ok: boolean; content?: string; replacements?: number }) => {
+      clearTimeout(timer);
+      void worker.terminate();
+      if (result.ok && typeof result.content === 'string' && typeof result.replacements === 'number') {
+        resolveResult({ content: result.content, replacements: result.replacements });
+      } else {
+        reject(new VersionShipOperationError('path-validation-failed', 'version_sync replacement could not be evaluated'));
+      }
+    });
+    worker.once('error', error => {
+      clearTimeout(timer);
+      logDiagnostic(`[version-ship] replacement worker failed: ${error.message}`);
+      reject(new VersionShipOperationError('path-validation-failed', 'version_sync replacement could not be evaluated'));
+    });
+  });
+}
+
 function testPatternInWorker(pattern: string, content: string): Promise<boolean> {
   return new Promise((resolveResult, reject) => {
     const worker = new Worker(
@@ -455,6 +499,7 @@ export function buildVersionShipDeps(options: BuildVersionShipDepsOptions = {}):
       options.runDocker ?? runDocker,
     ),
     readFile: readBoundedRegularFile,
+    replaceVersionCapture: replaceVersionCaptureInWorker,
     testPattern: testPatternInWorker,
     verifyRepo: verifyPreparedRepo,
     hasChanges: async (repoRoot, paths) => {

@@ -62,6 +62,11 @@ export interface VersionShipDeps {
     copyBackPaths: string[],
   ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
   readFile: (path: string) => Promise<string>;
+  replaceVersionCapture: (
+    pattern: string,
+    content: string,
+    replacement: string,
+  ) => Promise<{ content: string; replacements: number }>;
   testPattern: (pattern: string, content: string) => Promise<boolean>;
   verifyRepo: (
     repoRoot: string,
@@ -77,39 +82,6 @@ export interface VersionShipDeps {
 }
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
-const VERSION_TOKEN_PATTERN = /\d+\.\d+(?:\.\d+)?/g;
-
-function splitVersionTokens(content: string): { literals: string[]; tokens: string[] } {
-  const literals: string[] = [];
-  const tokens: string[] = [];
-  let offset = 0;
-  for (const match of content.matchAll(VERSION_TOKEN_PATTERN)) {
-    const index = match.index;
-    literals.push(content.slice(offset, index));
-    tokens.push(match[0]);
-    offset = index + match[0].length;
-  }
-  literals.push(content.slice(offset));
-  return { literals, tokens };
-}
-
-function isVersionTokenOnlyTransform(before: string, after: string, version: string): boolean {
-  if (before === after) return true;
-  const previous = splitVersionTokens(before);
-  const next = splitVersionTokens(after);
-  if (
-    previous.tokens.length !== next.tokens.length
-    || previous.literals.length !== next.literals.length
-    || previous.literals.some((literal, index) => literal !== next.literals[index])
-  ) {
-    return false;
-  }
-
-  const allowed = new Set([version, version.split('.').slice(0, 2).join('.')]);
-  return previous.tokens.every((token, index) => (
-    token === next.tokens[index] || allowed.has(next.tokens[index]!)
-  ));
-}
 
 function failedReport(
   version: string,
@@ -195,6 +167,28 @@ export async function runVersionShip(
       'version_sync.push must contain at least one repository',
     );
   }
+  if (config.replace?.length && !config.command) {
+    return failedReport(
+      version,
+      batchName,
+      at,
+      'path-validation-failed',
+      'version_sync.command is required when version_sync.replace is set',
+    );
+  }
+  const invalidReplacement = config.replace?.find(replacement => (
+    (replacement.pattern.match(/\(\?<version>/g) ?? []).length !== 1
+    || (replacement.value !== '{version}' && replacement.value !== '{majorMinor}')
+  ));
+  if (invalidReplacement) {
+    return failedReport(
+      version,
+      batchName,
+      at,
+      'path-validation-failed',
+      `version_sync.replace must declare one named version capture and an allowed value: ${invalidReplacement.path}`,
+    );
+  }
 
   try {
     // Resolve and validate every configured path before the first mutation. The
@@ -202,6 +196,10 @@ export async function runVersionShip(
     const setTargets = await Promise.all((config.set ?? []).map(async target => ({
       ...target,
       absolutePath: await deps.resolveFile(projectRoot, target.path),
+    })));
+    const replacements = await Promise.all((config.replace ?? []).map(async replacement => ({
+      ...replacement,
+      absolutePath: await deps.resolveFile(projectRoot, replacement.path),
     })));
     const expectations = await Promise.all((config.expect ?? []).map(async expectation => ({
       ...expectation,
@@ -239,7 +237,7 @@ export async function runVersionShip(
         expectedGitDir: allowed.expectedGitDir,
       };
     }));
-    for (const output of [...setTargets, ...expectations]) {
+    for (const output of [...setTargets, ...replacements, ...expectations]) {
       const owners = pushTargets.filter(target => {
         const repoRelativePath = relative(target.repoRoot, output.absolutePath);
         return repoRelativePath !== ''
@@ -256,6 +254,15 @@ export async function runVersionShip(
       }
     }
 
+    const structuredTargetPaths = new Set(setTargets.map(target => target.absolutePath));
+    const overlappingReplacement = replacements.find(replacement => structuredTargetPaths.has(replacement.absolutePath));
+    if (overlappingReplacement) {
+      throw new VersionShipOperationError(
+        'path-validation-failed',
+        `version_sync path cannot be both set and replace: ${overlappingReplacement.path}`,
+      );
+    }
+
     for (const target of setTargets) {
       await deps.writeVersion(target.absolutePath, target.json_field, version);
     }
@@ -263,13 +270,27 @@ export async function runVersionShip(
     if (config.command && commandCwd && config.command_image) {
       const commandPaths = [...new Set([
         ...setTargets.map(target => target.path),
-        ...expectations.map(expectation => expectation.path),
+        ...replacements.map(replacement => replacement.path),
       ])];
-      const trustedSetPaths = new Set(setTargets.map(target => target.path));
-      const preCommandContents = new Map<string, string>();
+      const expectedContents = new Map<string, string>();
       for (const declaredPath of commandPaths) {
         const absolutePath = await deps.resolveFile(projectRoot, declaredPath);
-        preCommandContents.set(declaredPath, await deps.readFile(absolutePath));
+        expectedContents.set(declaredPath, await deps.readFile(absolutePath));
+      }
+      for (const replacement of replacements) {
+        const current = expectedContents.get(replacement.path)!;
+        const transformed = await deps.replaceVersionCapture(
+          replacement.pattern,
+          current,
+          expandMessage(replacement.value, version),
+        );
+        if (transformed.replacements === 0) {
+          throw new VersionShipOperationError(
+            'path-validation-failed',
+            `version_sync.replace pattern did not match a version capture: ${replacement.path}`,
+          );
+        }
+        expectedContents.set(replacement.path, transformed.content);
       }
 
       const commandResult = await deps.runCommand(
@@ -294,19 +315,15 @@ export async function runVersionShip(
 
       for (const declaredPath of commandPaths) {
         const absolutePath = await deps.resolveFile(projectRoot, declaredPath);
-        const before = preCommandContents.get(declaredPath)!;
-        const after = await deps.readFile(absolutePath);
-        const valid = trustedSetPaths.has(declaredPath)
-          ? before === after
-          : isVersionTokenOnlyTransform(before, after, version);
-        if (!valid) {
-          deps.logDiagnostic?.(`[version-ship] command changed undeclared content in ${declaredPath}`);
+        const actual = await deps.readFile(absolutePath);
+        if (actual !== expectedContents.get(declaredPath)) {
+          deps.logDiagnostic?.(`[version-ship] command changed content outside declared captures in ${declaredPath}`);
           return failedReport(
             version,
             batchName,
             at,
             'command-failed',
-            `version sync command changed content outside declared version tokens: ${declaredPath}`,
+            `version sync command changed content outside declared captures: ${declaredPath}`,
           );
         }
       }
@@ -331,6 +348,7 @@ export async function runVersionShip(
     );
     const declaredAbsolutePaths = await Promise.all([
       ...setTargets.map(target => deps.resolveFile(projectRoot, target.path)),
+      ...replacements.map(replacement => deps.resolveFile(projectRoot, replacement.path)),
       ...expectations.map(expectation => deps.resolveFile(projectRoot, expectation.path)),
     ]);
 
