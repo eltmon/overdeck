@@ -21,6 +21,8 @@ import { derivePipelineState, type PipelineState } from '../../../lib/issuePipel
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
 import { IssueView } from '../../issue-view/IssueView'
+import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
+import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
@@ -464,6 +466,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
+  const issueView = useIssueView(issueId, { title, branch, projectName })
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
     (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string; url?: string }> | undefined)?.find(
@@ -645,6 +648,8 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         {/* PAN-2908 C-DETAIL: the pipeline band lives inside IssueDetail now —
             the cockpit route renders the ONE component, no duplicate shell. */}
       </header>
+
+      <NeedsYouSlot model={issueView} actions={headerActions.all} />
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
         {TABS.map((tab) => {

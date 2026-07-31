@@ -321,6 +321,22 @@ describe('IssueMissionControl', () => {
     )
   })
 
+  it('mounts the needs-you slot between the header and tab band', () => {
+    Object.assign(queryMocks.activityQuery.data.sections[0]!, {
+      awaitingInput: true,
+      awaitingInputPrompt: 'Choose the persistence location',
+    })
+    const { container } = renderMissionControl()
+    const header = container.querySelector('[data-section="Header bar"]')
+    const slot = screen.getByTestId('needs-you-slot')
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+
+    expect(header?.nextElementSibling).toBe(slot)
+    expect(slot.nextElementSibling).toBe(nav)
+    expect(slot).toHaveTextContent('Choose the persistence location')
+    expect(screen.getByRole('button', { name: 'Tell agent' })).toBeInTheDocument()
+  })
+
   it('lifts the detail tabs between the header and body without wrapping', () => {
     const { container } = renderMissionControl()
     const header = container.querySelector('[data-section="Header bar"]')

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
-import { useDashboardStore } from '../../lib/store';
+import { selectIssues, useDashboardStore } from '../../lib/store';
 import {
   useActivityQuery,
   useIssueCostsQuery,
@@ -14,7 +14,7 @@ import {
   type ShipLogData,
   type WorkspaceData,
 } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import { deriveShip, isAgentRunning, readyForMerge } from './derivations';
+import { deriveShip, isAgentRunning, readyForMerge, sortOperatorNeeds } from './derivations';
 import type {
   AgentRowModel,
   IssueActivityModel,
@@ -28,6 +28,7 @@ import type {
   OperatorNeedsYou,
   VerificationGateModel,
 } from './types';
+import type { Issue } from '../../types';
 
 const MODEL_PLACEHOLDERS = new Set(['', 'unknown', 'specialist', 'planning', 'idle', 'none']);
 
@@ -435,43 +436,75 @@ function deriveOperator(
   sessions: SessionNode[],
   agentsById: Record<string, AgentSnapshot>,
   reviewStatus: ReviewStatusData | undefined,
+  issue?: Issue,
 ): IssueOperatorModel {
-  if (readyForMerge(reviewStatus)) {
-    return { needsYou: { kind: 'ready_for_merge' } };
-  }
+  const items: OperatorNeedsYou[] = [];
 
   for (const session of sessions) {
     const agent = findAgentForSession(session, agentsById);
+    if (session.awaitingInput || hasPendingInput(agent)) {
+      items.push({
+        kind: 'awaiting_input',
+        sessionId: session.sessionId,
+        prompt: session.awaitingInputPrompt ?? agent?.pendingQuestionPrompt ?? agent?.pendingAskUserQuestion?.questions[0]?.question,
+        reason: session.awaitingInputReason ?? agent?.pendingQuestionReason,
+      });
+    }
     if (session.troubled || agent?.troubled) {
       const agentTroubledReason = (agent as (AgentSnapshot & { troubledReason?: string }) | undefined)?.troubledReason;
-      const needsYou: OperatorNeedsYou = {
+      items.push({
         kind: 'troubled',
         sessionId: session.sessionId,
-        reason: session.troubledReason ?? agentTroubledReason,
-      };
-      return { needsYou };
+        reason: session.troubledReason ?? agentTroubledReason ?? agent?.lastFailureReason,
+      });
     }
     if (session.paused || agent?.paused) {
-      const needsYou: OperatorNeedsYou = {
+      items.push({
         kind: 'paused',
         sessionId: session.sessionId,
         reason: session.pausedReason ?? agent?.pausedReason,
-      };
-      return { needsYou };
+      });
     }
+  }
+
+  if (reviewStatus?.stuck) {
+    items.push({ kind: 'stuck', reason: reviewStatus.stuckReason ?? reviewStatus.stuckDetails });
+  }
+  if (sessions.some((session) => session.type === 'reviewer')) {
+    items.push({ kind: 'stale_review', reason: 'Leftover review specialist sessions must be cleared before a clean review can run.' });
+  }
+  if (reviewStatus?.blockerReasons?.[0]) {
+    items.push({
+      kind: 'blocker',
+      reason: reviewStatus.blockerReasons[0].details ?? reviewStatus.blockerReasons[0].summary,
+    });
+  }
+
+  const labels = new Set((issue?.labels ?? []).map((label) => label.toLowerCase()));
+  const needsRelease = issue?.hasPlan === true && labels.has('ready') && !labels.has('released') &&
+    !labels.has('parked') && !labels.has('vetoed') && !labels.has('objection');
+  if (needsRelease) {
+    items.push({ kind: 'pickup_gate', reason: 'The plan is ready, but work cannot be picked up until an operator releases it.' });
+  }
+
+  const needsYouItems = sortOperatorNeeds(items);
+  if (readyForMerge(reviewStatus)) {
+    return { needsYou: { kind: 'ready_for_merge' }, needsYouItems };
+  }
+  if (needsYouItems[0]) {
+    return { needsYou: needsYouItems[0], needsYouItems };
   }
 
   const work = sessions.find((s) => s.type === 'work' || s.type === 'strike');
   if (
     work &&
     !isAgentRunning(work, findAgentForSession(work, agentsById)) &&
-    reviewStatus?.mergeStatus !== 'merged' &&
-    !readyForMerge(reviewStatus)
+    reviewStatus?.mergeStatus !== 'merged'
   ) {
-    return { needsYou: { kind: 'stopped', sessionId: work.sessionId } };
+    return { needsYou: { kind: 'stopped', sessionId: work.sessionId }, needsYouItems };
   }
 
-  return { needsYou: null };
+  return { needsYou: null, needsYouItems };
 }
 
 export function buildIssueViewModel(
@@ -485,6 +518,7 @@ export function buildIssueViewModel(
   activity: ActivityResponse | undefined,
   agentsById: Record<string, AgentSnapshot>,
   shipLog?: ShipLogData | undefined,
+  issue?: Issue,
 ): IssueViewModel {
   const sessions = (activity?.sections ?? []).map(toSessionNode);
   const agents = sessions.map((session) => buildAgentRow(session, agentsById, costs));
@@ -498,7 +532,7 @@ export function buildIssueViewModel(
     ship: deriveShip(reviewStatus, toShipLogModel(shipLog)),
     activity: deriveActivity(activity),
     resources: deriveResources(workspace),
-    operator: deriveOperator(sessions, agentsById, reviewStatus),
+    operator: deriveOperator(sessions, agentsById, reviewStatus, issue),
   };
 }
 
@@ -516,6 +550,11 @@ export function useIssueView(
   const activity = useActivityQuery(issueId);
   const shipLog = useShipLogQuery(issueId);
   const agentsById = useDashboardStore((s) => s.agentsById);
+  const issues = (useDashboardStore(selectIssues) as Issue[] | undefined) ?? [];
+  const issue = useMemo(
+    () => issues.find((candidate) => candidate.identifier.toLowerCase() === issueId.toLowerCase()),
+    [issueId, issues],
+  );
 
   return useMemo(
     () =>
@@ -530,6 +569,7 @@ export function useIssueView(
         activity.data,
         agentsById,
         shipLog.data,
+        issue,
       ),
     [
       issueId,
@@ -542,6 +582,7 @@ export function useIssueView(
       activity.data,
       agentsById,
       shipLog.data,
+      issue,
     ],
   );
 }
