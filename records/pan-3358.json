@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:47:30.244Z",
+  "updated": "2026-07-31T17:51:41.835Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T17:47:30.214Z",
-    "inspectNotes": "NFR-4 (byte-lossless write door) violated: src/lib/projects-writer.ts:29 renderVersionSync() hardcodes a 4-space indent prefix, so the splice is only correct for a projects.yaml whose project fields sit at column 4. Verified by running the exact range/splice logic against real fixtures: (a) 4-space-indented file -> the block lands as a SIBLING of the project under 'projects:', producing a phantom top-level project key 'version_sync' while the target project never gets the block, and the clear round-trip cannot restore the original bytes; (b) 3-space-indented file -> output is unparseable ('All mapping items must start at the same column'), which makes loadProjectsConfigSync (src/lib/projects.ts:401) fall back to {projects:{}} and drop EVERY project from the runtime view; (c) flow-style project value ('alpha: {name: Alpha}') -> src/lib/projects-writer.ts:79 splices block YAML directly after the closing brace on the same line, also unparseable. All three fail silently: setProjectVersionSync resolves successfully and writes the corrupted file. Required fixes: (1) derive the indent from the file itself (column of an existing sibling key inside the target project map, e.g. project.items[0].key range offset minus its line start) instead of the literal '    ' at src/lib/projects-writer.ts:29; (2) at src/lib/projects-writer.ts:54/79, detect a flow-style or non-block project value and throw without writing rather than splicing block YAML into it (the current !isMap check also mislabels this case as 'Unknown project key'); (3) extend the round-trip fixture in tests/unit/lib/projects-version-sync.test.ts with 4-space, 3-space, and flow-style projects.yaml fixtures so the losslessness property is locked, not just the 2-space happy path. Everything else on this bead checks out: both routes registered in projectsRouteLayer, GET guarded by rejectUnauthorizedDashboardRequest and returning {config:null,lastOutcome:null} when unset, PUT guarded by rejectUnsafeDashboardMutationRequest with 400+errors and no write on invalid input and 404 naming known keys, cache invalidated after write, and comment-before-next-key / trailing-comment / blank-line cases confirmed byte-preserved on the 2-space path."
+    "updatedAt": "2026-07-31T17:51:41.819Z",
+    "inspectNotes": "Inspecting item version-sync-write-door-api"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1537610,
-            "output": 228676,
-            "cacheRead": 97406464,
+            "input": 1569089,
+            "output": 236459,
+            "cacheRead": 104275968,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1537610,
-          "output": 228676,
-          "cacheRead": 97406464,
+          "input": 1569089,
+          "output": 236459,
+          "cacheRead": 104275968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 63.251562,
-        "pricingAsOf": "2026-07-31T17:47:30.241Z"
+        "usd": 67.077199,
+        "pricingAsOf": "2026-07-31T17:51:41.827Z"
       }
     },
     "merges": [],
