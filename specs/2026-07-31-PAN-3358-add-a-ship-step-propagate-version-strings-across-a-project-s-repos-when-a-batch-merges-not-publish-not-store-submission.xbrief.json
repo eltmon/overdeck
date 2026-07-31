@@ -4,17 +4,17 @@
     "created": "2026-07-31T15:57:52Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3358: Add a 'ship' step: propagate version strings across a project's repos when a batch merges (not publish, not store submission)",
-    "updated": "2026-07-31T16:14:54.249Z"
+    "updated": "2026-07-31T16:15:16.079Z"
   },
   "plan": {
     "id": "pan-3358",
     "title": "Add a 'ship' step: propagate version strings across a project's repos when a batch merges (not publish, not store submission)",
-    "status": "proposed",
+    "status": "running",
     "uid": "a0a9d695-5832-4555-8e76-c7ffe53610a5",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-07-31T15:57:52Z",
-    "updated": "2026-07-31T16:14:54.249Z",
+    "updated": "2026-07-31T16:15:16.079Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3358",
@@ -736,5 +736,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
