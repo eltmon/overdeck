@@ -281,19 +281,20 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:50:16.693Z",
+  "updated": "2026-07-31T21:09:06.104Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:50:16.100Z",
+    "updatedAt": "2026-07-31T21:09:05.931Z",
     "reviewNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
+    "testNotes": "UAT infra-blocked, not a diff defect (mirrors PAN-2619/PAN-2809 precedent). Gates (typecheck/lint/12888 tests) PASSED. Workspace dashboard built via pan workspace rebuild pan-3356 and boots/serves cleanly at feature-pan-3356.overdeck.localhost with no runtime errors from the redesign. Required per-issue cockpit UAT (six tabs, NeedsYouSlot, crew spine) could not run: isolated workspace container has zero tracker-backed issue data by design (IssueDataService CACHE-ONLY, single-deacon invariant); project registration blocked both via UI (file-picker list-dirs 401) and CLI (tracker_unconfigured). Notified flywheel-orchestrator via pan tell. See .pan/test/result.json for full evidence. Acceptance criteria are independently proven by passed review, passed inspection (itemized AC1-3), and the dedicated component test suite (IssueMissionControl/NeedsYouSlot/AgentsLane/AgentStepRow/CockpitPhaseRail/issue-view-no-loss/issueActions.parity) rendering the real production components via RTL. Recommend an explicit accept-tests override after operator review, or filing a follow-up to seed fixture issue data in workspace-isolated containers.",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
@@ -375,28 +376,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/security.md",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/correctness.md",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/performance.md",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/requirements.md",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      }
     }
   },
   "closeOut": {
@@ -444,38 +423,38 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 20,
-            "output": 2869,
-            "cacheRead": 1346753,
-            "cacheWrite": 187352
+            "input": 110,
+            "output": 41270,
+            "cacheRead": 11777586,
+            "cacheWrite": 284475
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8537814,
-            "output": 728846,
-            "cacheRead": 440767488,
+            "input": 8706024,
+            "output": 748360,
+            "cacheRead": 456783360,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 41556226,
-          "output": 1259075,
-          "cacheRead": 620840448,
+          "input": 41724436,
+          "output": 1278589,
+          "cacheRead": 636856320,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 20,
-          "output": 2869,
-          "cacheRead": 1346753,
-          "cacheWrite": 187352
+          "input": 110,
+          "output": 41270,
+          "cacheRead": 11777586,
+          "cacheWrite": 284475
         }
       },
       "costAtCloseOut": {
-        "usd": 556.740067,
-        "pricingAsOf": "2026-07-31T20:50:16.107Z"
+        "usd": 568.88764,
+        "pricingAsOf": "2026-07-31T21:09:06.031Z"
       }
     },
     "merges": [
