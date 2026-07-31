@@ -45,7 +45,8 @@ import { promisify } from 'util';
 import { Effect } from 'effect';
 import { killSession, listSessionNames, isPaneDead } from '../tmux.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { removeAgentSync, listAgentIdsByPrefixSync } from '../overdeck/agents.js';
+import { removeAgent } from '../agents/removal.js';
+import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
@@ -958,8 +959,8 @@ export function isExtendedReviewEnabled(issueId?: string): boolean {
 /**
  * Tear down an issue's entire review fleet — the `agent-<id>-review` parent plus any
  * extended-mode sub-reviewers. Kills every review tmux session, then removes each agent
- * via the canonical removeAgentSync (overdeck.db row + state dir, never the JSONL
- * transcript). Does NOT reset review_status — the caller composes that (see the
+ * through the canonical transcript-preserving removal path. Does NOT reset review_status —
+ * the caller composes that (see the
  * POST /api/review/:id/purge route). Returns what was killed and removed.
  */
 export async function purgeReviewAgentsForIssue(
@@ -969,7 +970,7 @@ export async function purgeReviewAgentsForIssue(
   const killResult = await killAllReviewerSessionsPromise(projectKey, issueId);
   const removed: string[] = [];
   for (const agentId of listAgentIdsByPrefixSync(`agent-${issueId.toLowerCase()}-review`)) {
-    removeAgentSync(agentId);
+    await removeAgent(agentId);
     removed.push(agentId);
   }
   return { killed: killResult.killed, removed };

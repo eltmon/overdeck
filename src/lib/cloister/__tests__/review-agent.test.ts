@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getAgentStateSync: vi.fn(),
   getAgentStateFileSync: vi.fn(),
   listAgentIdsByPrefixSync: vi.fn(),
+  removeAgent: vi.fn(),
   getLatestSessionIdSync: vi.fn(),
   resumeAgent: vi.fn(),
   wipeAgentStateDirs: vi.fn(),
@@ -53,7 +54,10 @@ vi.mock('../../agents/agent-state.js', () => ({
 
 vi.mock('../../overdeck/agents.js', () => ({
   listAgentIdsByPrefixSync: mocks.listAgentIdsByPrefixSync,
-  removeAgentSync: vi.fn(),
+}));
+
+vi.mock('../../agents/removal.js', () => ({
+  removeAgent: mocks.removeAgent,
 }));
 
 vi.mock('../../tmux.js', () => ({
@@ -103,7 +107,7 @@ vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
 }));
 
-import { spawnReviewRoleForIssue } from '../review-agent.js';
+import { purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-agent.js';
 
 describe('spawnReviewRoleForIssue', () => {
   beforeEach(() => {
@@ -129,6 +133,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.getAgentStateSync.mockReturnValue(undefined);
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
+    mocks.removeAgent.mockResolvedValue({ removedDir: false, preservedTranscripts: 1 });
     mocks.getLatestSessionIdSync.mockReturnValue(undefined);
     mocks.resumeAgent.mockResolvedValue({ success: false, reason: 'no session' });
     mocks.wipeAgentStateDirs.mockResolvedValue(undefined);
@@ -238,5 +243,22 @@ describe('spawnReviewRoleForIssue', () => {
     expect(result.success).toBe(true);
     expect(mocks.killSession).toHaveBeenCalledWith('agent-pan-1194-review');
     expect(mocks.spawnRun).toHaveBeenCalled();
+  });
+
+  it('purges every reviewer through canonical transcript-preserving removal', async () => {
+    mocks.listAgentIdsByPrefixSync.mockReturnValue([
+      'agent-pan-1194-review',
+      'agent-pan-1194-review-correctness',
+    ]);
+
+    const result = await purgeReviewAgentsForIssue(undefined, 'PAN-1194');
+
+    expect(mocks.removeAgent).toHaveBeenCalledTimes(2);
+    expect(mocks.removeAgent).toHaveBeenCalledWith('agent-pan-1194-review');
+    expect(mocks.removeAgent).toHaveBeenCalledWith('agent-pan-1194-review-correctness');
+    expect(result.removed).toEqual([
+      'agent-pan-1194-review',
+      'agent-pan-1194-review-correctness',
+    ]);
   });
 });

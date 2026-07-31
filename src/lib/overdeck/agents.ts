@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
 
@@ -35,11 +35,51 @@ const overdeckAgents = sqliteTable('agents', {
   pausedReason: text('paused_reason'),
   troubled: integer('troubled', { mode: 'boolean' }),
   channelsEnabled: integer('channels_enabled', { mode: 'boolean' }),
+  phase: text('phase'),
   consecutiveFailures: integer('consecutive_failures').default(0),
   firstFailureInRunAt: integer('first_failure_in_run_at', { mode: 'timestamp_ms' }),
   lastFailureNextRetryAt: integer('last_failure_next_retry_at', { mode: 'timestamp_ms' }),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' }).notNull(),
 });
+
+export const RETAINED_TRANSCRIPTS_PHASE = 'retained-transcripts';
+
+export interface AgentTombstoneIdentity {
+  id: string;
+  issueId: string;
+  role: string;
+  workspace: string;
+  harness: string;
+  model: string;
+}
+
+export function tombstoneAgentRecordSync(agentId: string): void {
+  try {
+    getOverdeckDatabaseSync().prepare(`
+      UPDATE agents
+      SET status = 'stopped', session_id = NULL, phase = ?, updated_at = ?
+      WHERE id = ?
+    `).run(RETAINED_TRANSCRIPTS_PHASE, Date.now(), agentId);
+  } catch { /* agents table missing */ }
+}
+
+export function ensureAgentTombstoneSync(identity: AgentTombstoneIdentity): void {
+  getOverdeckDatabaseSync().prepare(`
+    INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, phase, updated_at)
+    VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?)
+    ON CONFLICT(id) DO UPDATE SET
+      status = 'stopped', session_id = NULL, phase = excluded.phase, updated_at = excluded.updated_at
+  `).run(
+    identity.id,
+    identity.issueId,
+    identity.role,
+    identity.workspace,
+    identity.harness,
+    identity.model,
+    RETAINED_TRANSCRIPTS_PHASE,
+    Date.now(),
+  );
+}
 
 const overdeckHealthEvents = sqliteTable('health_events', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -412,7 +452,7 @@ export const AgentWriterLive = Layer.effect(
         };
         yield* Effect.promise(() =>
           db.q.update(overdeckAgents)
-            .set({ status: 'starting', stoppedByUser: false, lastResumeAt: next.lastResumeAt, updatedAt: next.updatedAt })
+            .set({ status: 'starting', stoppedByUser: false, phase: null, lastResumeAt: next.lastResumeAt, updatedAt: next.updatedAt })
             .where(eq(overdeckAgents.id, id))
             .run(),
         );
@@ -853,24 +893,13 @@ export function listAgentIdsByPrefixSync(prefix: string): string[] {
   return [...ids];
 }
 
-/**
- * Canonical full removal of a single agent. Drops the overdeck.db row (this module IS
- * the agents write door) AND removes the on-disk state dir ~/.overdeck/agents/<id>/.
- * NEVER touches Claude JSONL transcripts — those live under ~/.claude/projects, not the
- * agent dir. Tmux teardown is the caller's responsibility (kept separate so this stays
- * sync + dependency-free).
- *
- * Fills the gap that let orphan ghost rows accumulate: backfillAgentsSync only upserts,
- * and the deacon's cleanup rmSync'd dirs but left the rows behind.
- */
-export function removeAgentSync(agentId: string): void {
+/** Remove one canonical agent registry row without touching its state directory. */
+export function removeAgentRecordSync(agentId: string): void {
   try {
     getOverdeckDatabaseSync().prepare(`DELETE FROM agents WHERE id = ?`).run(agentId);
   } catch { /* agents table missing */ }
-  try {
-    rmSync(join(getOverdeckHome(), 'agents', agentId), { recursive: true, force: true });
-  } catch { /* state dir already gone */ }
 }
+
 
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {
   const db = getOverdeckDatabaseSync();

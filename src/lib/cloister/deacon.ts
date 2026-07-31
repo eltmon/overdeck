@@ -43,6 +43,8 @@ import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHear
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
+import { removeAgentStateDir } from '../agents/state-dir-removal.js';
+import { sweepTranscriptRetention } from './transcript-retention.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
@@ -828,16 +830,14 @@ export {
 export async function cleanupStaleAgentState(): Promise<string[]> {
   const actions: string[] = [];
   const cloisterConfig = loadCloisterConfigSync();
-  // Default retention for work / planning agent state. These are kept for a
-  // short debugging window post-completion; event-driven cleanup in
-  // postMergeLifecycle and executeCloseOut deletes them at the actual event
-  // that renders them obsolete, so this retention is only a safety net.
+  // Default retention for work/planning runtime residue. Fresh-session wipes
+  // and close-out cleanup use removeAgentStateDir at their lifecycle events;
+  // this purge is the safety net, and the shared door preserves all JSONL.
   const retentionDays = cloisterConfig.retention?.agent_state_days ?? 7;
   const retentionMs = retentionDays * 24 * 60 * 60 * 1000;
-  // Reviewer state is ephemeral by design — it's deleted inside
-  // runParallelReview Phase 6 as soon as the review posts. This 1-day
-  // retention is a safety net for cases where Phase 6 didn't fire
-  // (crash, process killed between post and cleanup).
+  // Reviewer runtime residue has a shorter debugging window. Review restart
+  // and close-out paths use the same deletion door, while this 1-day purge
+  // catches sessions whose event-driven cleanup never ran and preserves JSONL.
   const reviewerRetentionDays = cloisterConfig.retention?.reviewer_state_days ?? 1;
   const reviewerRetentionMs = reviewerRetentionDays * 24 * 60 * 60 * 1000;
   const now = Date.now();
@@ -906,9 +906,10 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
         // Safe to remove
         const ageDays = Math.round(ageMs / (24 * 60 * 60 * 1000));
         const tag = isReviewer ? 'reviewer' : 'agent';
-        rmSync(agentDir, { recursive: true, force: true });
-        actions.push(`Purged stale ${tag} state: ${dir.name} (${ageDays} days old)`);
-        console.log(`[deacon] Purged stale ${tag} state: ${dir.name} (${ageDays} days old)`);
+        const removal = await removeAgentStateDir(agentDir);
+        const transcriptLabel = `transcript file${removal.preservedTranscripts === 1 ? '' : 's'} preserved`;
+        actions.push(`Purged stale ${tag} state: ${dir.name} (${ageDays} days old; ${removal.preservedTranscripts} ${transcriptLabel})`);
+        console.log(`[deacon] Purged stale ${tag} state: ${dir.name} (${ageDays} days old; ${removal.preservedTranscripts} ${transcriptLabel})`);
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);
         console.error(`[deacon] Error cleaning up agent ${dir.name}:`, msg);
@@ -3093,7 +3094,6 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...apiErrorActions);
   for (const a of apiErrorActions) addLog('action', a, state.patrolCycle);
   if (state.patrolCycle % 10 === 0) for (const action of await reconcilePipelineLabelsPatrol()) { actions.push(action); addLog('action', action, state.patrolCycle); }
-  if (state.patrolCycle % 60 === 0) for (const id of pruneTerminalStoppedAgents().removed) actions.push(`[agents-gc] pruned ${id}`);
   // PAN-1625: reap orphaned dashboard-server processes. Low cadence (~10 min).
   // Never touches the live server, port owner, or workspace-container server.
   const serverReaperEveryCycles = Math.max(1, Math.round((10 * 60 * 1000) / config.patrolIntervalMs));
@@ -3120,7 +3120,17 @@ export async function runPatrol(): Promise<PatrolResult> {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
+
+    const transcriptDays = loadCloisterConfigSync().retention?.transcript_days;
+    if (typeof transcriptDays === 'number' && Number.isFinite(transcriptDays) && transcriptDays > 0) {
+      const transcriptActions = await sweepTranscriptRetention({ transcriptDays });
+      actions.push(...transcriptActions);
+      for (const a of transcriptActions) addLog('action', a, state.patrolCycle);
+    }
   }
+  // Retention needs the canonical registry row to prove terminal state before
+  // agent GC removes that evidence. Both run on the same 60-cycle cadence.
+  if (state.patrolCycle % 60 === 0) for (const id of (await pruneTerminalStoppedAgents()).removed) actions.push(`[agents-gc] pruned ${id}`);
 
   // Periodic abandoned-feedback sweep — safety net for workspaces where the
   // event-driven cleanup (new review cycle / merge / close-out) never fired.
@@ -3407,7 +3417,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     // Delete session.id so resumeAgent won't --resume the corrupted session
     const sessionFile = join(AGENTS_DIR, agentId, 'session.id');
     if (existsSync(sessionFile)) {
-      try { rmSync(sessionFile); } catch { /* non-fatal */ }
+      try { rmSync(sessionFile); } catch { /* non-fatal; PAN-3357: not a dir removal */ }
     }
 
     // Mark agent as stopped
