@@ -135,7 +135,7 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T20:28:32.333Z",
+  "updated": "2026-07-31T20:28:38.366Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "failed",
@@ -283,24 +283,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6993115,
-            "output": 555672,
-            "cacheRead": 235890688,
+            "input": 6999163,
+            "output": 557535,
+            "cacheRead": 236432896,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18773865,
-          "output": 1044662,
-          "cacheRead": 301314048,
+          "input": 18779913,
+          "output": 1046525,
+          "cacheRead": 301856256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 275.866209,
-        "pricingAsOf": "2026-07-31T20:28:32.327Z"
+        "usd": 276.223443,
+        "pricingAsOf": "2026-07-31T20:28:38.363Z"
       }
     },
     "merges": [
