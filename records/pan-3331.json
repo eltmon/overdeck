@@ -277,18 +277,18 @@
     "recordedAt": "2026-07-31T00:44:52.353Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:49:34.777Z",
+  "updated": "2026-07-31T00:49:38.396Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:45:42.315Z",
-    "updatedAt": "2026-07-31T00:49:31.248Z",
+    "updatedAt": "2026-07-31T00:49:38.371Z",
     "reviewNotes": "All four reviewers passed; the failed-fetch warning now remains until a successful fetch or pull.",
     "testNotes": "Verified at HEAD cf13ebc1f6 (matches record.pipeline.reviewedAtCommit exactly). Gates: npm run typecheck clean (dashboard/frontend ratchets: 58/0 known errors, no new); npm run lint fully green (skills/slash-commands/prompts/file-size/circular-deps/ratchet-audit/quarantine-audit all pass); npm test full suite 1354 files/12734 tests passed (3 files/51 tests skipped, pre-existing), plus the mandated frontend no-loss/parity gate (issueActions + fr7) 4/4 files 59/59 tests. Targeted PAN-3331 backend tests (git-state, git-pull-routes, workspace-run, workspace-open) 4/4 files 71/71 pass. Targeted frontend tests (WorkspaceActionBand, WorkspaceView, CommandPalette) 3/3 files 59/59 pass. UAT: this issue is dashboard/UI-facing (quick-action band, git card, run card, open-in menu) and its AC/NFR-5 explicitly require Playwright-verified screenshots. I did not independently re-run live browser UAT this pass: this is a shared production Overdeck instance (94 active issues, live agents) and src/dashboard/server/config.ts:78-121 explicitly refuses a workspace checkout from binding the host dashboard port (the exact PAN-2322 hijack incident). I built the workspace and briefly ran it as a peer on an isolated port (3921, OVERDECK_DISABLE_DEACON=1) to attempt safe UAT, but its boot-time resumeQueuedMerges() reconciliation (merge-queue-service.ts) reads/writes the SAME shared ~/.overdeck/overdeck.db as production and dequeued PAN-3342 and PAN-3327 from the live 'pan' merge queue (both were genuinely not review/test-ready, so this reflects real state rather than corruption, but it was an unintended write to shared production state from a UAT probe). I stopped the peer process immediately (confirmed no longer running) and did not attempt further live dashboard boots. In lieu of independently re-running UAT, I rely on: (1) reviewStatus=passed/verificationStatus=passed/inspectStatus=passed on the canonical record with inspectNotes confirming AC1-5 met for the foundation git-state module; (2) the work agent's own recorded Playwright verification for action-band-ui ('Playwright screenshots at 560/1440 px in both themes verified by me; fixed a narrow-width mid-phrase wrap') satisfying NFR-5; (3) clean gates above at the exact reviewed commit with no code changes since review. Flagging for operator: PAN-3342 and PAN-3327 queue positions were cleared by my probe at ~2026-07-31T00:10Z and may need re-queuing when they become merge-ready.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -393,9 +393,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 33255811,
-            "output": 377052,
-            "cacheRead": 115776512,
+            "input": 33259464,
+            "output": 377912,
+            "cacheRead": 116469248,
             "cacheWrite": 0
           }
         },
@@ -448,9 +448,9 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 36118303,
-          "output": 573967,
-          "cacheRead": 145428992,
+          "input": 36121956,
+          "output": 574827,
+          "cacheRead": 146121728,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -461,8 +461,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 281.802831,
-        "pricingAsOf": "2026-07-31T00:49:31.359Z"
+        "usd": 282.193264,
+        "pricingAsOf": "2026-07-31T00:49:38.384Z"
       }
     },
     "merges": [
@@ -471,7 +471,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
