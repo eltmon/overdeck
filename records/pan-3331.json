@@ -217,10 +217,10 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:12:34.374Z",
+  "updated": "2026-07-31T00:13:21.841Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "passed",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -228,8 +228,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:11:39.871Z",
-    "updatedAt": "2026-07-31T00:11:40.237Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-3 blocking finding: run-session names are now unique per workspace. runSessionName kept only the first eight sanitized id characters, so ws-main-1234abcd and ws-main-1234ffff shared ws-run-wsmain12 and could stop or restart each other's process; the suffix is now a sha256 prefix of the full id (deterministic, unique, valid tmux name). Three regression tests cover truncation collision, punctuation collision, and name validity — the first two fail against the old derivation. Also took three non-blocking items: dirty-tree refusal now fails closed when git status cannot be read (with maxBuffer raised and a rename counted once), the palette no longer renders a duplicate Run row in the default scope, and the doc route counts are corrected. 2082 frontend + 806 server tests pass; typecheck, lint, and all guards green.",
+    "updatedAt": "2026-07-31T00:13:21.804Z",
+    "reviewNotes": "unreadable working-tree status is rendered as clean",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
@@ -316,6 +316,24 @@
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
       "recordedAt": "2026-07-31T00:11:01.762Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
+      }
     }
   },
   "closeOut": {
@@ -331,9 +349,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18647655,
-            "output": 279085,
-            "cacheRead": 79003648,
+            "input": 18752183,
+            "output": 297149,
+            "cacheRead": 84657664,
             "cacheWrite": 0
           }
         },
@@ -386,9 +404,9 @@
           "cacheWrite": 158564
         },
         "openai/gpt-5.6-sol": {
-          "input": 21510147,
-          "output": 476000,
-          "cacheRead": 108656128,
+          "input": 21614675,
+          "output": 494064,
+          "cacheRead": 114310144,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -399,8 +417,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 187.436609,
-        "pricingAsOf": "2026-07-31T00:11:42.538Z"
+        "usd": 191.328177,
+        "pricingAsOf": "2026-07-31T00:13:21.830Z"
       }
     },
     "merges": [
@@ -409,7 +427,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
