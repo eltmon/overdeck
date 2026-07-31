@@ -73,6 +73,15 @@ pan workspace list [--kind <main|issue|scratch>] [--archived] [--json] [--all]
   (ambiguous names across projects error out asking for the id). Refuses
   `kind=issue` (pipeline-owned) and archived workspaces; `kind=main` requires
   `--force` since it diverges the row from projects.yaml's primary path.
+- **The dashboard does the same thing through the same code (PAN-3330).** The
+  New Workspace dialog (sidebar WORKSPACES `+`, the `New workspace…` palette
+  action, or a project overview's button) and `new`/`main` both call
+  `src/lib/workspaces/create.ts`, so a workspace created either way is
+  identical. The dialog's live preview is a server-side dry run of that same
+  resolution — the UI equivalent of `--dry-run`. `WorkspaceView`'s header
+  offers Favorite/Relocate/Archive for `main` and `scratch`, matching
+  `relocate`/`archive` and their refusals; destroying a workspace and purging
+  memory stay CLI-only.
 - `list --kind <kind>` reads through the resolver the same way the dashboard does;
   add `--archived` to include archived rows (only meaningful together with `--kind`).
 

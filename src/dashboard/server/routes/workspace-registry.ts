@@ -14,9 +14,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
 import { httpHandler } from './http-handler.js';
 import { rejectUnauthorizedDashboardRequest, rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
-import { getWorkspaceById, listWorkspaces } from '../../../lib/workspaces/resolver.js';
+import { getWorkspaceById, listProjectTargets, listWorkspaces } from '../../../lib/workspaces/resolver.js';
 import {
   archiveWorkspace,
+  relocateWorkspace,
   setWorkspaceFavorite,
   setWorkspaceRunCommand,
   touchWorkspaceAccessed,
@@ -24,7 +25,12 @@ import {
   updateWorkspaceLayout,
 } from '../../../lib/workspaces/writer.js';
 import { createSession, sessionExists } from '../../../lib/tmux.js';
-import { getProjectSync } from '../../../lib/projects.js';
+import { getProjectSync, listProjectsAsync } from '../../../lib/projects.js';
+import {
+  performWorkspaceCreate,
+  resolveWorkspaceCreateIntent,
+  type WorkspaceCreateInput,
+} from '../../../lib/workspaces/create.js';
 import { openInEditor, openPath } from '../../../lib/browser.js';
 import { getOpenInEditorCommand } from '../../../lib/config-yaml/load.js';
 import * as NodeChildProcessSpawner from '@effect/platform-node/NodeChildProcessSpawner';
@@ -129,6 +135,128 @@ const listWorkspaceRegistryRoute = HttpRouter.add(
     return jsonResponse({ workspaces: workspaces.map((workspace, index) => toListRow(workspace, memoryPhases[index] ?? null)) });
   })),
 );
+
+
+/**
+ * Read the creation-intent fields out of a request body. Everything is
+ * optional at this layer — the shared core is the single validator, so an
+ * absent or wrong-typed field becomes a finding rather than a 400 here.
+ */
+function toCreateInput(body: Record<string, unknown>): WorkspaceCreateInput {
+  const str = (value: unknown): string | undefined => (typeof value === 'string' && value ? value : undefined);
+  return {
+    name: str(body.name),
+    kind: body.bootstrapMain === true ? 'main' : 'scratch',
+    projectKey: str(body.project),
+    targetPath: str(body.targetPath),
+    isolated: body.isolated === true,
+    parentBranch: str(body.parentBranch),
+  };
+}
+
+// ─── GET /api/workspace-registry/project-targets ────────────────────────────
+// Registered BEFORE the `/:id` detail route: `project-targets` is a literal
+// that would otherwise be captured as an id.
+
+const getWorkspaceRegistryProjectTargetsRoute = HttpRouter.add(
+  'GET',
+  '/api/workspace-registry/project-targets',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const projectKey = new URL(request.url, 'http://localhost').searchParams.get('project') ?? '';
+    if (!projectKey) return jsonResponse({ error: 'project is required' }, { status: 400 });
+    // Resolved from projects.yaml, not the `projects` table: that row is only
+    // seeded on a project's first create, so a freshly registered project
+    // would otherwise 400 here and the dialog would offer no primary path at
+    // exactly the moment it is most needed. listProjectTargets stays a table
+    // read — no row simply means no extra targets yet.
+    const projects = yield* Effect.promise(() => listProjectsAsync());
+    const project = projects.find((candidate) => candidate.key === projectKey);
+    if (!project) return jsonResponse({ error: `No project registered with key '${projectKey}'` }, { status: 400 });
+    return jsonResponse({ primaryPath: project.config.path, targets: listProjectTargets(projectKey) });
+  })),
+);
+
+
+// ─── POST /api/workspace-registry/resolve ───────────────────────────────────
+
+/**
+ * Dry-run the creation intent. A POST because it carries a JSON body, but it
+ * MUST stay write-free — the dialog calls it on every settled keystroke, and
+ * its whole value is that the preview is produced by the same code the real
+ * create runs (PAN-3330 D-2/NFR-6).
+ */
+const postWorkspaceRegistryResolveRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/resolve',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = (yield* readJsonBody) as Record<string, unknown> | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    const intent = yield* Effect.promise(() => resolveWorkspaceCreateIntent(toCreateInput(body)));
+    return jsonResponse(intent);
+  })),
+);
+
+// ─── POST /api/workspace-registry ───────────────────────────────────────────
+
+const postWorkspaceRegistryCreateRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = (yield* readJsonBody) as Record<string, unknown> | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    // Resolved server-side from the raw intent — never from a client-supplied
+    // resolved intent, which could otherwise name any path on the box.
+    // `refreshParentBranch` bypasses the preview memo so the branch written to
+    // the row is read fresh, not inherited from a stale preview.
+    const intent = yield* Effect.promise(() =>
+      resolveWorkspaceCreateIntent({ ...toCreateInput(body), refreshParentBranch: true }));
+    if (intent.findings.length > 0) return jsonResponse({ findings: intent.findings }, { status: 422 });
+    // A create can still be refused past validation — the main-singleton check
+    // and `git worktree add` both throw. Surface the message as a conflict
+    // rather than letting it escape as an opaque 500.
+    const created = yield* Effect.promise(() =>
+      performWorkspaceCreate(intent)
+        .then((result) => ({ ok: true as const, ...result }))
+        .catch((err: unknown) => ({ ok: false as const, error: err instanceof Error ? err.message : String(err) })));
+    if (!created.ok) return jsonResponse({ error: created.error }, { status: 409 });
+    return jsonResponse({ id: created.id }, { status: 201 });
+  })),
+);
+
+// ─── POST /api/workspace-registry/:id/relocate ──────────────────────────────
+
+const postWorkspaceRegistryRelocateRoute = HttpRouter.add(
+  'POST',
+  '/api/workspace-registry/:id/relocate',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const id = (yield* HttpRouter.params)['id'] ?? '';
+    const workspace = getWorkspaceById(id);
+    if (!workspace) return jsonResponse({ error: `Workspace not found: ${id}` }, { status: 404 });
+    const body = (yield* readJsonBody) as { path?: unknown; force?: unknown } | undefined;
+    if (body === undefined) return jsonResponse({ error: 'Malformed JSON body' }, { status: 400 });
+    if (typeof body.path !== 'string' || !body.path) return jsonResponse({ error: 'path is required' }, { status: 400 });
+    // The writer owns the refusal rules (archived, issue-kind, main without
+    // force); surface its message as a 409 rather than restating them here.
+    const failure = yield* Effect.promise(() =>
+      relocateWorkspace(id, body.path as string, { force: body.force === true })
+        .then(() => null)
+        .catch((err: unknown) => (err instanceof Error ? err.message : String(err))),
+    );
+    if (failure) return jsonResponse({ error: failure }, { status: 409 });
+    return jsonResponse({ ok: true });
+  })),
+);
+
 
 // ─── GET /api/workspace-registry/:id ────────────────────────────────────────
 
@@ -563,6 +691,11 @@ const putWorkspaceRegistryLayoutRoute = HttpRouter.add(
 
 export const workspaceRegistryRouteLayer = Layer.mergeAll(
   listWorkspaceRegistryRoute,
+  // Literal-path routes precede `/:id`, which would otherwise capture them.
+  getWorkspaceRegistryProjectTargetsRoute,
+  postWorkspaceRegistryResolveRoute,
+  postWorkspaceRegistryCreateRoute,
+  postWorkspaceRegistryRelocateRoute,
   getWorkspaceRegistryDetailRoute,
   getWorkspaceRegistryMemoryRoute,
   getWorkspaceRegistryGitRoute,

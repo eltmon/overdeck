@@ -456,3 +456,35 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
     await waitFor(() => expect(onSelectWorkspace).toHaveBeenCalledWith('ws-issue'));
   });
 });
+
+describe('CommandPalette new-workspace action (PAN-3330 FR-6b)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useDashboardStore.setState({ issuesRaw: [], agentsById: {} } as Parameters<typeof useDashboardStore.setState>[0]);
+  });
+
+  it('opens the dialog through the callback rather than calling an API', () => {
+    const onNewWorkspace = vi.fn();
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} onNewWorkspace={onNewWorkspace} />);
+
+    selectPaletteResult(getOptionByValue('new-workspace'));
+
+    expect(onNewWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the action visible under both the Actions and Workspaces scope chips', () => {
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} onNewWorkspace={vi.fn()} />);
+
+    for (const scope of ['Actions', 'Workspaces']) {
+      fireEvent.click(screen.getByRole('button', { name: scope }));
+      expect(getOptionByValue('new-workspace')).toBeDefined();
+    }
+  });
+
+  it('omits the action entirely when no handler is supplied', () => {
+    render(<CommandPalette isOpen onClose={vi.fn()} onNavigate={vi.fn()} />);
+
+    expect(getOptionByValue('pan-flywheel')).toBeDefined();
+    expect(document.querySelector('[role="option"][data-value="new-workspace"]')).toBeNull();
+  });
+});

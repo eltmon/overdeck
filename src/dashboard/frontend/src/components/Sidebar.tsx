@@ -139,6 +139,8 @@ interface SidebarProps {
   onSelectProject?: (projectName: string) => void;
   /** PAN-1970: open the New Project modal. */
   onNewProject?: () => void;
+  /** Opens the New Workspace dialog (PAN-3330 FR-6a). */
+  onNewWorkspace?: () => void;
   /** Open the shared updater dialog from the version affordance. */
   onOpenUpdater?: () => void;
   /** PAN-1990: open a workspace's view from the Workspaces rail. */
@@ -197,7 +199,7 @@ export function sortWorkspaces(rows: WorkspaceRegistryRow[]): WorkspaceRegistryR
   });
 }
 
-export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onOpenUpdater, onSelectWorkspace }: SidebarProps) {
+export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject = null, onSelectProject, onNewProject, onNewWorkspace, onOpenUpdater, onSelectWorkspace }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
   const [collapsed, setCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
@@ -581,17 +583,30 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                 <p className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
                   Workspaces
                 </p>
-                {visibleWorkspaces.length > 0 && (
-                  <button
-                    data-testid="sidebar-workspaces-toggle-grouped"
-                    onClick={toggleWorkspacesGrouped}
-                    title={workspacesGrouped ? 'Show as flat list' : 'Group by project'}
-                    className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                  >
-                    {workspacesGrouped ? 'Flat' : 'Group'}
-                  </button>
-                )}
+                <div className="flex items-center gap-2">
+                  {visibleWorkspaces.length > 0 && (
+                    <button
+                      data-testid="sidebar-workspaces-toggle-grouped"
+                      onClick={toggleWorkspacesGrouped}
+                      title={workspacesGrouped ? 'Show as flat list' : 'Group by project'}
+                      className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      {workspacesGrouped ? 'Flat' : 'Group'}
+                    </button>
+                  )}
+                  {onNewWorkspace && (
+                    <button
+                      data-testid="sidebar-new-workspace"
+                      onClick={() => onNewWorkspace()}
+                      title="New workspace"
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 1 }}
+                    >
+                      +
+                    </button>
+                  )}
+                </div>
               </div>
               {activeWorkspaces.length === 0 ? (
                 <p className="px-3 py-1.5 text-xs text-muted-foreground/70">No workspaces</p>
