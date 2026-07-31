@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T16:13:42.974Z",
+  "updated": "2026-07-31T16:20:28.075Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "session-tab": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 908748,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:13:42.974Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Merged the standalone crew summary into AgentsLane, added semantic status dots and right-aligned costs, nested selectable review specialists, preserved all protected row and no-loss markers, and passed typecheck plus 69 focused tests.",
         "releasedAt": "2026-07-31T16:13:32.616Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 908748,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:13:42.974Z",
+        "itemId": "session-tab",
+        "outcome": "completed",
+        "reason": "Added Session-local Conversation and Terminal controls, a blue live-session indicator, and a shared TellComposer extracted from ActiveAgentPanel. The composer targets the active spine session and preserves the existing /tell versus /resume delivery behavior. Typecheck and 41 focused tests passed.",
+        "releasedAt": "2026-07-31T16:20:28.075Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "crew-spine": {
         "reason": "Merged the standalone crew summary into AgentsLane, added semantic status dots and right-aligned costs, nested selectable review specialists, preserved all protected row and no-loss markers, and passed typecheck plus 69 focused tests.",
         "updatedAt": "2026-07-31T16:13:32.616Z"
+      },
+      "session-tab": {
+        "reason": "Added Session-local Conversation and Terminal controls, a blue live-session indicator, and a shared TellComposer extracted from ActiveAgentPanel. The composer targets the active spine session and preserves the existing /tell versus /resume delivery behavior. Typecheck and 41 focused tests passed.",
+        "updatedAt": "2026-07-31T16:20:28.075Z"
       }
     }
   },
@@ -186,6 +193,9 @@
     "crew-spine.crew-spine.ac2": "completed",
     "crew-spine.crew-spine.ac3": "completed",
     "crew-spine.crew-spine.ac4": "completed",
-    "session-tab": "running"
+    "session-tab": "completed",
+    "session-tab.session-tab.ac1": "completed",
+    "session-tab.session-tab.ac2": "completed",
+    "session-tab.session-tab.ac3": "completed"
   }
 }
