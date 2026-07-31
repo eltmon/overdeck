@@ -273,6 +273,26 @@ describe('dirty-status failures fail closed', () => {
     rmSync(root, { recursive: true, force: true });
   });
 
+  it('reports dirtyFiles as null — not zero — when the status cannot be read', async () => {
+    const state = await getWorkspaceGitState(notARepo);
+
+    // Zero would render as "clean" and claim something never established.
+    expect(state.dirtyFiles).toBeNull();
+  });
+
+  it('reports a requested fetch that failed instead of implying fresh counts', async () => {
+    const state = await getWorkspaceGitState(notARepo, { fetch: true });
+
+    expect(state.fetchFailed).toBe(true);
+    expect(state.fetchedAt).toBeNull();
+  });
+
+  it('does not flag fetchFailed when no fetch was requested', async () => {
+    const state = await getWorkspaceGitState(notARepo);
+
+    expect(state.fetchFailed).toBe(false);
+  });
+
   it('refuses the pull when the working-tree status cannot be read', async () => {
     // A directory that is not a git repository makes every git command fail,
     // which is the same shape as an unreadable index or overflowed output.
@@ -295,5 +315,16 @@ describe('dirty-status failures fail closed', () => {
     const state = await getWorkspaceGitState(repo);
 
     expect(state.dirtyFiles).toBe(1);
+  });
+
+  it('reports a clean readable tree as zero, distinct from unknown', async () => {
+    const repo = join(root, 'clean-repo');
+    execFileSync('git', ['init', '-q', '-b', 'main', repo], { encoding: 'utf-8' });
+    configureIdentity(repo);
+    commit(repo, 'file.txt', 'contents\n', 'init');
+
+    const state = await getWorkspaceGitState(repo);
+
+    expect(state.dirtyFiles).toBe(0);
   });
 });

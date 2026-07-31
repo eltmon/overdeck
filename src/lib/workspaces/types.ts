@@ -57,8 +57,12 @@ export interface WorkspaceGitState {
   /** Branch name, or null when HEAD is detached. */
   branch: string | null;
   detached: boolean;
-  /** Count of `git status --porcelain` entries. */
-  dirtyFiles: number;
+  /**
+   * Count of `git status --porcelain` entries, or null when git could not tell
+   * us. Null is NOT zero: rendering an unreadable status as "clean" claims
+   * something that was never established, and the pull guard refuses on it.
+   */
+  dirtyFiles: number | null;
   /** Commits on HEAD that the comparison ref lacks. */
   ahead: number;
   /** Commits on the comparison ref that HEAD lacks. */
@@ -70,6 +74,12 @@ export interface WorkspaceGitState {
   recentRemoteCommits: RemoteCommit[];
   /** Epoch ms of the fetch this call performed, or null when it did not fetch. */
   fetchedAt: number | null;
+  /**
+   * True when a fetch was asked for and did not succeed. The counts below are
+   * then whatever the local refs already said, so the card must not present
+   * them as freshly confirmed.
+   */
+  fetchFailed: boolean;
 }
 
 /** Why a fast-forward pull was refused. Returned, never thrown. */

@@ -96,6 +96,7 @@ function gitState(overrides: Partial<WorkspaceGitState> = {}): WorkspaceGitState
     upstreamRef: 'origin/main',
     recentRemoteCommits: [],
     fetchedAt: null,
+    fetchFailed: false,
     ...overrides,
   };
 }
@@ -239,6 +240,26 @@ describe('GET /api/workspace-registry/:id/git (FR-2)', () => {
     await call('GET', '/api/workspace-registry/ws-b/git?fetch=1');
 
     expect(routeMocks.getWorkspaceGitState.mock.calls[1]![1]).toEqual({ fetch: true });
+  });
+});
+
+describe('unknown state passes through the route (review cycle 4)', () => {
+  it('returns dirtyFiles null rather than zero when git could not read the status', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: uniquePath() }));
+    routeMocks.getWorkspaceGitState.mockResolvedValue(gitState({ dirtyFiles: null }));
+
+    const response = await call('GET', '/api/workspace-registry/ws-main/git');
+
+    expect((response.body.git as WorkspaceGitState).dirtyFiles).toBeNull();
+  });
+
+  it('returns fetchFailed so the card can say the counts were not refreshed', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: uniquePath() }));
+    routeMocks.getWorkspaceGitState.mockResolvedValue(gitState({ fetchFailed: true, fetchedAt: null }));
+
+    const response = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    expect((response.body.git as WorkspaceGitState).fetchFailed).toBe(true);
   });
 });
 

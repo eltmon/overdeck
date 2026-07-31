@@ -20,6 +20,7 @@ function gitState(overrides: Partial<WorkspaceGitState> = {}): WorkspaceGitState
     upstreamRef: 'origin/main',
     recentRemoteCommits: [],
     fetchedAt: 1,
+    fetchFailed: false,
     ...overrides,
   };
 }
@@ -100,6 +101,37 @@ describe('git card (ac1)', () => {
     expect(await screen.findByTestId('workspace-band-git-behind')).toHaveTextContent('3');
     expect(await screen.findByTestId('workspace-band-git-ahead')).toHaveTextContent('2');
     expect(await screen.findByTestId('workspace-band-git-dirty')).toHaveTextContent('4 uncommitted');
+  });
+
+  // Review cycle 4: an unreadable status used to be projected to zero and
+  // rendered as "clean", claiming something never established — and Pull
+  // refuses on exactly that state, so the card contradicted the action.
+  it('says the status is unknown rather than clean when git could not read it', async () => {
+    renderBand({ git: gitState({ dirtyFiles: null }) });
+
+    const dirty = await screen.findByTestId('workspace-band-git-dirty');
+    expect(dirty).toHaveTextContent('status unknown');
+    expect(dirty).not.toHaveTextContent('clean');
+  });
+
+  it('still says clean for a readable, genuinely clean tree', async () => {
+    renderBand({ git: gitState({ dirtyFiles: 0 }) });
+
+    expect(await screen.findByTestId('workspace-band-git-dirty')).toHaveTextContent('clean');
+  });
+
+  it('says the remote could not be reached when a requested fetch failed', async () => {
+    renderBand({ git: gitState({ fetchFailed: true, fetchedAt: null }) });
+
+    expect(await screen.findByTestId('workspace-band-git-fetch-failed'))
+      .toHaveTextContent('Could not reach the remote');
+  });
+
+  it('shows no fetch-failure note when the fetch succeeded', async () => {
+    renderBand({ git: gitState() });
+
+    await screen.findByTestId('workspace-band-git-dirty');
+    expect(screen.queryByTestId('workspace-band-git-fetch-failed')).toBeNull();
   });
 
   it('shows a detached-HEAD chip instead of the Pull action', async () => {

@@ -166,12 +166,16 @@ export async function getWorkspaceGitState(
   const upstream = branch ? await resolveUpstream(workspacePath, branch) : null;
 
   let fetchedAt: number | null = null;
+  let fetchFailed = false;
   if (options.fetch) {
     const args = upstream
       ? ['fetch', upstream.remote, upstream.remoteBranch]
       : ['fetch', 'origin'];
     const fetched = await git(workspacePath, args, FETCH_TIMEOUT_MS);
     if (fetched.ok) fetchedAt = Date.now();
+    // The counts below still come back, but from refs nobody just refreshed —
+    // the card has to say so rather than imply they are current.
+    else fetchFailed = true;
   }
 
   const comparisonRef = upstream?.ref ?? (await originHeadRef(workspacePath));
@@ -185,15 +189,17 @@ export async function getWorkspaceGitState(
   return {
     branch,
     detached,
-    // The card has no honest way to render "unknown", and it is only a display
-    // number here — the pull guard reads the raw value and refuses on null.
-    dirtyFiles: dirtyFiles ?? 0,
+    // Passed through as null when git could not tell us. Projecting it to zero
+    // here would make the card say "clean" about a tree whose cleanliness was
+    // never established.
+    dirtyFiles,
     ahead: counts.ahead,
     behind: counts.behind,
     hasUpstream: upstream !== null,
     upstreamRef: comparisonRef,
     recentRemoteCommits,
     fetchedAt,
+    fetchFailed,
   };
 }
 

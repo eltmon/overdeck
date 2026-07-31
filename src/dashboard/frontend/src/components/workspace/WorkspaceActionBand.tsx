@@ -27,13 +27,16 @@ export interface RemoteCommit {
 export interface WorkspaceGitState {
   branch: string | null;
   detached: boolean;
-  dirtyFiles: number;
+  /** null when git could not read the status — not the same as zero. */
+  dirtyFiles: number | null;
   ahead: number;
   behind: number;
   hasUpstream: boolean;
   upstreamRef: string | null;
   recentRemoteCommits: RemoteCommit[];
   fetchedAt: number | null;
+  /** A requested fetch did not succeed, so the counts are not freshly confirmed. */
+  fetchFailed: boolean;
 }
 
 export interface WorkspaceActionBandProps {
@@ -305,12 +308,23 @@ export function WorkspaceActionBand({
                   {git.ahead > 0 && <span data-testid="workspace-band-git-ahead">↑{git.ahead} ahead</span>}
                   {git.behind === 0 && git.ahead === 0 && <span data-testid="workspace-band-git-even">up to date</span>}
                 </span>
+                {/* null means git could not read the status. Saying "clean"
+                    there would claim something nobody established — and Pull
+                    refuses on it, so the card and the action must agree. */}
                 <span className="whitespace-nowrap" data-testid="workspace-band-git-dirty">
-                  {git.dirtyFiles === 0 ? 'clean' : `${git.dirtyFiles} uncommitted`}
+                  {git.dirtyFiles === null
+                    ? 'status unknown'
+                    : git.dirtyFiles === 0 ? 'clean' : `${git.dirtyFiles} uncommitted`}
                 </span>
               </>
             )}
           </div>
+
+          {git?.fetchFailed && (
+            <p className="text-[11px] text-muted-foreground" data-testid="workspace-band-git-fetch-failed">
+              Could not reach the remote — counts are from the last successful fetch.
+            </p>
+          )}
 
           <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70 min-w-0">
             {git && (

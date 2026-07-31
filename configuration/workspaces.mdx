@@ -104,6 +104,11 @@ fetches when you open the view and when you press **Refresh** (at most once
 every 30 seconds per checkout); the background poll only re-reads what that
 fetch left behind. **Incoming (n)** expands the list of commits waiting for you.
 
+When something can't be determined the card says so instead of guessing in your
+favour: a working tree git can't read reads **status unknown**, never "clean",
+and a fetch that can't reach the remote says so rather than letting stale counts
+look freshly confirmed.
+
 **Pull** is fast-forward only, and it tells you plainly when it will not run:
 an uncommitted file, a merge or rebase already in progress, a branch that has
 diverged, no upstream, or a detached HEAD each come back as that specific

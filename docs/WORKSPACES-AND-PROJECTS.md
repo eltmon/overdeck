@@ -196,6 +196,14 @@ stale refs, throttled to one fetch per 30 s per path in the route; a throttled
 read still reports the last fetch time in `fetchedAt`. The frontend asks for
 `fetch=1` on mount and on Refresh, and polls every 30 s without forcing one.
 
+**Unknown is a first-class state, never rendered as good news.** `dirtyFiles` is
+`number | null` — null means git could not read the working tree (an unreadable
+index, output overflowing the buffer), and the card says "status unknown" rather
+than "clean". Pull refuses on the same null, so the card and the action always
+agree. `fetchFailed` is true when a fetch was asked for and did not succeed; the
+counts are then whatever the local refs already said, and the card says the
+remote could not be reached instead of implying the numbers were just confirmed.
+
 The throttle keeps two clocks and coalesces. `lastFetchAttemptByPath` is claimed
 *before* the fetch is awaited, so two requests arriving in the same tick cannot
 each start a `git fetch`; concurrent callers share one in-flight promise per
