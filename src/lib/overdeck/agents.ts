@@ -11,7 +11,6 @@ import { Db, EventBus, Records, Tmux, getOverdeckDatabaseSync } from './infra.js
 import { IssueId } from './issues.js';
 import { getOverdeckHome } from '../paths.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
-import { removeAgentStateDir } from '../agents/state-dir-removal.js';
 import type { AgentState } from '../agents.js';
 export { getIssueStageSync, isTerminalIssueStage } from './issue-stage-sync.js';
 
@@ -861,14 +860,14 @@ export function removeAgentRecordSync(agentId: string): void {
   } catch { /* agents table missing */ }
 }
 
-/**
- * Remove an agent row and runtime residue while retaining every JSONL transcript.
- * A transcript-only state directory may remain after the canonical row is removed.
- */
-export async function removeAgent(agentId: string): Promise<void> {
-  const agentsDir = join(getOverdeckHome(), 'agents');
-  await removeAgentStateDir(join(agentsDir, agentId), agentsDir);
-  removeAgentRecordSync(agentId);
+export function tombstoneAgentRecordSync(agentId: string): void {
+  try {
+    getOverdeckDatabaseSync().prepare(`
+      UPDATE agents
+      SET status = 'stopped', session_id = NULL, updated_at = ?
+      WHERE id = ?
+    `).run(Date.now(), agentId);
+  } catch { /* agents table missing */ }
 }
 
 export function backfillAgentsSync(options?: BackfillAgentsSyncOptions): BackfillAgentsSyncResult {

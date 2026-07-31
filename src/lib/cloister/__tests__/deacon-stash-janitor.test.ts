@@ -51,7 +51,11 @@ vi.mock('../../../lib/review-status.js', () => ({
 
 vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.fn(), clearWorkspaceStuck: vi.fn() }));
 vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
-vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
+vi.mock('../../overdeck/agents.js', () => ({
+  listAllAgentsSync: vi.fn(() => []),
+  removeAgentRecordSync: vi.fn(),
+  tombstoneAgentRecordSync: vi.fn(),
+}));
 vi.mock('../../shadow-state.js', () => ({ getShadowState: vi.fn(async () => null) }));
 vi.mock('../../git-utils.js', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../git-utils.js')>()),

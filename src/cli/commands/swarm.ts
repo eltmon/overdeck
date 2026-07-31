@@ -29,7 +29,7 @@ import { appendOperatorInterventionEvent } from '../../lib/operator-intervention
 import { listSlotAgents } from '../../lib/agents/slot-reconcile.js';
 import { stopAgentSync } from '../../lib/agents.js';
 import { listSessionNamesSync } from '../../lib/tmux.js';
-import { removeAgent } from '../../lib/overdeck/agents.js';
+import { removeAgent } from '../../lib/agents/removal.js';
 import { acknowledgeRecoveryTrip } from '../../lib/cloister/recovery-trip.js';
 
 const execAsync = promisify(exec);
@@ -335,7 +335,7 @@ export interface SwarmResetCommandDeps extends SwarmStopCommandDeps {
   clearAllSlotAssignments: typeof clearAllSlotAssignments;
   clearFailedMergeBlock: typeof clearFailedMergeBlock;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
-  removeAgent: (agentId: string) => Promise<void>;
+  removeAgent: (agentId: string) => Promise<unknown>;
 }
 
 const defaultResetDeps: SwarmResetCommandDeps = {

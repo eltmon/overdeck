@@ -3,7 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { removeAgentStateDir } from '../../agents/state-dir-removal.js';
+import {
+  hasRetainedTranscriptsMarker,
+  markRetainedTranscripts,
+  removeAgentStateDir,
+} from '../../agents/state-dir-removal.js';
 import { pruneTerminalStoppedAgents } from '../agent-gc.js';
 import { DEFAULT_CLOISTER_CONFIG } from '../config.js';
 import {
@@ -154,6 +158,7 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
+        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -193,6 +198,7 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => []),
         listAgents,
         isTerminalAgent,
+        removeAgentRecord: vi.fn(),
         listConversations: vi.fn(),
         listArchivedConversations: vi.fn(),
         log: vi.fn(),
@@ -220,36 +226,42 @@ describe('sweepTranscriptRetention', () => {
       workspace: '/tmp/feature-pan-3357',
       paused: true,
     };
+    const removeRecord = vi.fn();
     const retentionDeps = {
       listSessionNames: vi.fn(async () => []),
       listAgents: vi.fn(() => [agent]),
       isTerminalAgent: vi.fn(() => true),
       listConversations: vi.fn(),
       listArchivedConversations: vi.fn(),
+      removeAgentRecord: removeRecord,
       now: () => Date.now(),
       log: vi.fn(),
     };
-    const removeRecord = vi.fn();
+    const cleanStateDir = vi.fn(removeAgentStateDir);
     const gcDeps = {
       agentsDir,
-      cleanStateDir: removeAgentStateDir,
+      cleanStateDir,
+      hasRetainedMarker: hasRetainedTranscriptsMarker,
+      markRetained: markRetainedTranscripts,
       removeRecord,
+      tombstoneRecord: vi.fn(),
       isTerminalAgent: vi.fn(() => true),
     };
 
     await sweepTranscriptRetention({ transcriptDays: 2, agentsDir, deps: retentionDeps });
     const firstGc = await pruneTerminalStoppedAgents([agent], gcDeps);
+    const repeatedGc = await pruneTerminalStoppedAgents([agent], gcDeps);
 
     expect(firstGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
+    expect(repeatedGc).toEqual({ removed: [], preserved: ['agent-pan-3357'] });
+    expect(cleanStateDir).toHaveBeenCalledTimes(1);
     expect(existsSync(transcriptPath)).toBe(true);
     expect(removeRecord).not.toHaveBeenCalled();
 
     await vi.advanceTimersByTimeAsync(2 * DAY_MS);
     await sweepTranscriptRetention({ transcriptDays: 2, agentsDir, deps: retentionDeps });
-    const secondGc = await pruneTerminalStoppedAgents([agent], gcDeps);
 
     expect(existsSync(transcriptPath)).toBe(false);
-    expect(secondGc).toEqual({ removed: ['agent-pan-3357'], preserved: [] });
     expect(removeRecord).toHaveBeenCalledWith('agent-pan-3357');
   });
 

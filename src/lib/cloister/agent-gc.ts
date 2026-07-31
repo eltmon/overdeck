@@ -1,9 +1,15 @@
 import { join } from 'node:path';
 
-import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
+import {
+  listAllAgentsSync,
+  removeAgentRecordSync,
+  tombstoneAgentRecordSync,
+} from '../overdeck/agents.js';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { getOverdeckHome } from '../paths.js';
 import {
+  hasRetainedTranscriptsMarker,
+  markRetainedTranscripts,
   removeAgentStateDir,
   type RemoveAgentStateDirResult,
 } from '../agents/state-dir-removal.js';
@@ -14,7 +20,10 @@ export interface AgentGcRow { id: string; issueId: string; status: string; works
 export interface AgentGcDeps {
   agentsDir: string;
   cleanStateDir: (dirPath: string, agentsDir: string) => Promise<RemoveAgentStateDirResult>;
+  hasRetainedMarker: (dirPath: string) => Promise<boolean>;
+  markRetained: (dirPath: string) => Promise<void>;
   removeRecord: (id: string) => void;
+  tombstoneRecord: (id: string) => void;
   isTerminalAgent: (agent: AgentGcRow) => boolean;
 }
 
@@ -22,7 +31,10 @@ function defaultAgentGcDeps(): AgentGcDeps {
   return {
     agentsDir: join(getOverdeckHome(), 'agents'),
     cleanStateDir: removeAgentStateDir,
+    hasRetainedMarker: hasRetainedTranscriptsMarker,
+    markRetained: markRetainedTranscripts,
     removeRecord: removeAgentRecordSync,
+    tombstoneRecord: tombstoneAgentRecordSync,
     isTerminalAgent: (agent) => Boolean(agent.status === 'stopped' && agent.workspace
       && readIssueRecordForWorkspaceSync(agent.workspace, agent.issueId)?.pipeline?.closedOut === true),
   };
@@ -36,8 +48,15 @@ export async function pruneAgentRowsAfterTranscriptCleanup(
   const preserved: string[] = [];
   for (const agent of agents) {
     try {
-      const result = await deps.cleanStateDir(join(deps.agentsDir, agent.id), deps.agentsDir);
+      const agentDir = join(deps.agentsDir, agent.id);
+      if (await deps.hasRetainedMarker(agentDir)) {
+        preserved.push(agent.id);
+        continue;
+      }
+      const result = await deps.cleanStateDir(agentDir, deps.agentsDir);
       if (!result.removedDir) {
+        await deps.markRetained(agentDir);
+        deps.tombstoneRecord(agent.id);
         preserved.push(agent.id);
         continue;
       }

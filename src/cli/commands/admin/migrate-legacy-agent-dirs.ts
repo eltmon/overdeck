@@ -11,6 +11,7 @@ interface LegacyAgentDirMigrationDeps {
     options: { recursive: true; force: false; errorOnExist: true; preserveTimestamps: true },
   ) => Promise<void>;
   makeTempDir: (prefix: string) => Promise<string>;
+  claimDestination: (destination: string) => Promise<(() => Promise<void>) | null>;
   rename: (source: string, destination: string) => Promise<void>;
   remove: (path: string, options: { recursive: true; force: true }) => Promise<void>;
 }
@@ -40,6 +41,19 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
+async function claimMigrationDestination(
+  destination: string,
+): Promise<(() => Promise<void>) | null> {
+  const claimPath = `${destination}.migrate-lock`;
+  try {
+    await mkdir(claimPath);
+  } catch (error) {
+    if (hasErrorCode(error, 'EEXIST')) return null;
+    throw error;
+  }
+  return async () => { await rm(claimPath, { recursive: true, force: true }); };
+}
+
 /**
  * Copy pre-rebrand conversation agent dirs into the current Overdeck home.
  * The legacy side is read-only; existing destinations are always skipped.
@@ -52,6 +66,7 @@ export async function migrateLegacyAgentDirs(
   const deps: LegacyAgentDirMigrationDeps = {
     copy: cp,
     makeTempDir: mkdtemp,
+    claimDestination: claimMigrationDestination,
     rename,
     remove: rm,
     ...options.deps,
@@ -89,12 +104,22 @@ export async function migrateLegacyAgentDirs(
         errorOnExist: true,
         preserveTimestamps: true,
       });
-      try {
-        await deps.rename(temporaryDestination, destination);
-        copied++;
-      } catch (error) {
-        if (!hasErrorCode(error, 'EEXIST') && !hasErrorCode(error, 'ENOTEMPTY')) throw error;
+      const releaseClaim = await deps.claimDestination(destination);
+      if (releaseClaim === null) {
         skipped++;
+      } else {
+        try {
+          if (await pathExists(destination)) skipped++;
+          else {
+            await deps.rename(temporaryDestination, destination);
+            copied++;
+          }
+        } catch (error) {
+          if (!hasErrorCode(error, 'EEXIST') && !hasErrorCode(error, 'ENOTEMPTY')) throw error;
+          skipped++;
+        } finally {
+          await releaseClaim();
+        }
       }
     } finally {
       await deps.remove(temporaryRoot, { recursive: true, force: true });

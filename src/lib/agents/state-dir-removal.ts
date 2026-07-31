@@ -1,4 +1,4 @@
-import { lstat, readdir, realpath, rmdir, unlink } from 'node:fs/promises';
+import { lstat, readdir, realpath, rmdir, unlink, writeFile } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 import { AGENTS_DIR } from '../paths.js';
@@ -9,6 +9,8 @@ export interface RemoveAgentStateDirResult {
   /** true when the dir was fully removed (no transcripts existed) */
   removedDir: boolean;
 }
+
+export const RETAINED_TRANSCRIPTS_MARKER = '.retained-transcripts';
 
 function hasErrorCode(error: unknown, code: string): boolean {
   return (error as NodeJS.ErrnoException).code === code;
@@ -88,6 +90,22 @@ async function cleanDirectory(
       return { removedFiles, preservedTranscripts, removedDir: false };
     }
     throw error;
+  }
+}
+
+export async function hasRetainedTranscriptsMarker(dirPath: string): Promise<boolean> {
+  try {
+    return (await lstat(join(dirPath, RETAINED_TRANSCRIPTS_MARKER))).isFile();
+  } catch {
+    return false;
+  }
+}
+
+export async function markRetainedTranscripts(dirPath: string): Promise<void> {
+  try {
+    await writeFile(join(dirPath, RETAINED_TRANSCRIPTS_MARKER), '', { flag: 'wx' });
+  } catch (error) {
+    if (!hasErrorCode(error, 'EEXIST') && !hasErrorCode(error, 'ENOENT')) throw error;
   }
 }
 

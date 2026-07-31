@@ -17,7 +17,7 @@ import { initTrackerConfigCache } from '../../dashboard/server/services/tracker-
 import { resolveProjectForIssue } from '../../lib/pan-dir/record.js';
 import { updateIssueRecord } from '../../lib/pan-dir/record-update.js';
 import { clearTaskProgress } from '../../lib/pan-dir/reset-task-progress.js';
-import { removeAgent } from '../../lib/overdeck/agents.js';
+import { removeAgent } from '../../lib/agents/removal.js';
 
 export interface ResetToPlannedOptions { dryRun?: boolean }
 

@@ -22,7 +22,10 @@ describe('PAN-2543 event-driven agent row GC', () => {
     ], {
       agentsDir: '/agents',
       cleanStateDir,
+      hasRetainedMarker: vi.fn(async () => false),
+      markRetained: vi.fn(async () => {}),
       removeRecord,
+      tombstoneRecord: vi.fn(),
       isTerminalAgent: vi.fn(() => true),
     });
 

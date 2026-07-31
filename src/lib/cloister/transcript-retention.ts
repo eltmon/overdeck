@@ -4,7 +4,8 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
-import { listAllAgentsSync } from '../overdeck/agents.js';
+import { RETAINED_TRANSCRIPTS_MARKER } from '../agents/state-dir-removal.js';
+import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { AGENTS_DIR } from '../paths.js';
@@ -44,6 +45,7 @@ export interface TranscriptRetentionDeps {
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
+  removeAgentRecord(agentId: string): void;
   listSessionNames(): Promise<readonly string[]>;
   listAgents(): readonly TranscriptRetentionAgent[];
   isTerminalAgent(agent: TranscriptRetentionAgent): boolean;
@@ -64,6 +66,7 @@ const defaultDeps: TranscriptRetentionDeps = {
   stat,
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
+  removeAgentRecord: removeAgentRecordSync,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
   listAgents: listAllAgentsSync,
   isTerminalAgent: isTranscriptRetentionTerminalAgent,
@@ -120,23 +123,27 @@ async function pruneTranscriptFiles(
   dirPath: string,
   cutoffMs: number,
   deps: TranscriptRetentionDeps,
-): Promise<{ deletedFiles: number; prunedDirs: number }> {
+): Promise<{ deletedFiles: number; prunedDirs: number; remainingTranscripts: number; removedDir: boolean }> {
   let entries: Dirent[];
   try {
     entries = await deps.readDir(dirPath);
   } catch (error) {
-    if (hasErrorCode(error, 'ENOENT')) return { deletedFiles: 0, prunedDirs: 0 };
+    if (hasErrorCode(error, 'ENOENT')) {
+      return { deletedFiles: 0, prunedDirs: 0, remainingTranscripts: 0, removedDir: true };
+    }
     throw error;
   }
 
   let deletedFiles = 0;
   let prunedDirs = 0;
+  let remainingTranscripts = 0;
   for (const entry of entries) {
     const entryPath = join(dirPath, entry.name);
     if (entry.isDirectory()) {
       const nested = await pruneTranscriptFiles(entryPath, cutoffMs, deps);
       deletedFiles += nested.deletedFiles;
       prunedDirs += nested.prunedDirs;
+      remainingTranscripts += nested.remainingTranscripts;
       continue;
     }
     if (!entry.isFile() || !entry.name.endsWith('.jsonl')) continue;
@@ -148,24 +155,26 @@ async function pruneTranscriptFiles(
       if (hasErrorCode(error, 'ENOENT')) continue;
       throw error;
     }
-    if (fileStat.mtimeMs >= cutoffMs) continue;
+    if (fileStat.mtimeMs >= cutoffMs) {
+      remainingTranscripts++;
+      continue;
+    }
 
     await deps.removeFile(entryPath);
     deletedFiles++;
   }
 
+  let removedDir = false;
   try {
     await deps.removeDir(dirPath);
     prunedDirs++;
+    removedDir = true;
   } catch (error) {
-    if (!hasErrorCode(error, 'ENOENT') &&
-        !hasErrorCode(error, 'ENOTEMPTY') &&
-        !hasErrorCode(error, 'EEXIST')) {
-      throw error;
-    }
+    if (hasErrorCode(error, 'ENOENT')) removedDir = true;
+    else if (!hasErrorCode(error, 'ENOTEMPTY') && !hasErrorCode(error, 'EEXIST')) throw error;
   }
 
-  return { deletedFiles, prunedDirs };
+  return { deletedFiles, prunedDirs, remainingTranscripts, removedDir };
 }
 
 /**
@@ -211,7 +220,8 @@ export async function sweepTranscriptRetention(
   for (const entry of agentEntries) {
     if (!entry.isDirectory() || liveSessions.has(entry.name)) continue;
 
-    if (isConversationDirectory(entry.name)) {
+    const conversation = isConversationDirectory(entry.name);
+    if (conversation) {
       if (!conversationEligibilityLoaded) {
         conversationEligibilityMap = conversationEligibility(deps);
         conversationEligibilityLoaded = true;
@@ -228,9 +238,26 @@ export async function sweepTranscriptRetention(
     }
 
     eligibleDirs++;
-    const result = await pruneTranscriptFiles(join(agentsDir, entry.name), cutoffMs, deps);
+    const agentDir = join(agentsDir, entry.name);
+    const result = await pruneTranscriptFiles(agentDir, cutoffMs, deps);
     deletedFiles += result.deletedFiles;
     prunedDirs += result.prunedDirs;
+
+    if (!conversation && result.remainingTranscripts === 0) {
+      let removedDir = result.removedDir;
+      if (!removedDir) {
+        await deps.removeFile(join(agentDir, RETAINED_TRANSCRIPTS_MARKER));
+        try {
+          await deps.removeDir(agentDir);
+          prunedDirs++;
+          removedDir = true;
+        } catch (error) {
+          if (hasErrorCode(error, 'ENOENT')) removedDir = true;
+          else if (!hasErrorCode(error, 'ENOTEMPTY') && !hasErrorCode(error, 'EEXIST')) throw error;
+        }
+      }
+      if (removedDir) deps.removeAgentRecord(entry.name);
+    }
   }
 
   const fileLabel = `transcript file${deletedFiles === 1 ? '' : 's'}`;

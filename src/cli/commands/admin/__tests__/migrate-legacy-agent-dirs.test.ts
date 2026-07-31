@@ -64,6 +64,27 @@ describe('migrateLegacyAgentDirs', () => {
     expect(statSync(join(destinationDir, 'session.jsonl')).size).toBe('current\n'.length);
   });
 
+  it('preserves an empty destination created immediately before promotion', async () => {
+    const sourceDir = join(legacyHome, 'agents', 'conv-race');
+    mkdirSync(sourceDir, { recursive: true });
+    writeFileSync(join(sourceDir, 'session.jsonl'), 'legacy\n');
+    const destination = join(currentHome, 'agents', 'conv-race');
+
+    const result = await migrateLegacyAgentDirs({
+      legacyHome,
+      currentHome,
+      deps: {
+        claimDestination: async () => {
+          mkdirSync(destination, { recursive: true });
+          return async () => {};
+        },
+      },
+    });
+
+    expect(result).toEqual({ copied: 0, skipped: 1 });
+    expect(readdirSync(destination)).toEqual([]);
+  });
+
   it('heals a copy interrupted after writing partial temporary data', async () => {
     const sourceDir = join(legacyHome, 'agents', 'conv-interrupted');
     const sourceTranscript = join(sourceDir, 'sessions', 'complete.jsonl');
