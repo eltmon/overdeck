@@ -129,10 +129,10 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T17:44:04.690Z",
+  "updated": "2026-07-31T17:46:46.912Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -140,8 +140,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T17:42:07.339Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: deletion door now fails closed on root symlinks and path escapes, nested links are unlinked, conv-* retention uses batched active+archived conversation reads with correct name mapping, tmux liveness is one census, and the guard uses one Perl process.",
+    "updatedAt": "2026-07-31T17:46:46.881Z",
+    "reviewNotes": "Transcript retention can delete resumable work-agent history.",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "de30049d5b12ff6467078cd49f43407e6511f3f5",
@@ -214,6 +214,24 @@
         "src/lib/lifecycle/teardown-workspace.ts"
       ],
       "recordedAt": "2026-07-31T16:35:34.622Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "ac143ee6680c29d605a67ee5cd030aa05732238b"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "ac143ee6680c29d605a67ee5cd030aa05732238b"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "ac143ee6680c29d605a67ee5cd030aa05732238b"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "ac143ee6680c29d605a67ee5cd030aa05732238b"
+      }
     }
   },
   "closeOut": {
@@ -221,9 +239,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 749444,
-            "output": 17384,
-            "cacheRead": 5040640,
+            "input": 7007244,
+            "output": 158387,
+            "cacheRead": 18917376,
             "cacheWrite": 0
           }
         },
@@ -270,15 +288,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8072870,
-          "output": 516419,
-          "cacheRead": 159506432,
+          "input": 14330670,
+          "output": 657422,
+          "cacheRead": 173383168,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 135.610136,
-        "pricingAsOf": "2026-07-31T17:42:07.350Z"
+        "usd": 178.067594,
+        "pricingAsOf": "2026-07-31T17:46:46.903Z"
       }
     },
     "merges": [
