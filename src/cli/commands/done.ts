@@ -42,6 +42,7 @@ import { compileGlob } from '../../lib/xbrief/dag.js';
 import type { ScopeDriftRecord } from '../../lib/xbrief/continue-state.js';
 import type { XBriefDocument } from '../../lib/xbrief/types.js';
 import { hasOnlyPipelineStateChangesSinceCommit } from '../../lib/pipeline-state-paths.js';
+import { postDoneDashboardJson } from './done-dashboard-client.js';
 import { persistDoneReviewIntent } from './done-review-intent.js';
 import { recordStrikeBypassVerdicts, verifyStrikeBranchMergedIntoMain } from './strike-merge-verification.js';
 const childProcessLayer = NodeChildProcessSpawner.layer.pipe(
@@ -948,28 +949,6 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
         }
       };
 
-      const postJson = async (path: string): Promise<any> => {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5000);
-        try {
-          const res = await fetch(`${dashboardUrl}${path}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-            signal: controller.signal,
-          });
-          clearTimeout(timer);
-          try {
-            return await res.json();
-          } catch {
-            return { success: false, error: 'Invalid response' };
-          }
-        } catch (err: any) {
-          clearTimeout(timer);
-          throw err;
-        }
-      };
-
       // PAN-1988: aggressively retry reaching the dashboard — a mid-reload restart is the most
       // common reason this trigger is dropped, which strands the issue. Up to 10 attempts with
       // exponential backoff (0.5s → capped 8s, ~47s total). The durable `reviewRequestedAt` intent
@@ -980,17 +959,17 @@ export async function doneCommand(id: string, options: DoneOptions = {}): Promis
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         if (await checkDashboard()) {
           console.log(chalk.dim(`Auto-triggering review & test${attempt > 1 ? ` (attempt ${attempt}/${MAX_ATTEMPTS})` : ''}...`));
-          let result = await postJson(`/api/review/${issueId}/trigger`);
+          let result = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/trigger`);
 
           // Self-healing: if issue was previously reviewed (blocked/failed) or merged, auto-reset and retry.
           // This is the normal flow when a work agent fixes review issues and re-signals done.
           if (!result.success && (result.alreadyMerged || result.alreadyReviewed)) {
             const reason = result.alreadyMerged ? 'previously merged' : 'prior review blocked/failed';
             console.log(chalk.yellow(`  ⚠ Issue was ${reason}. Resetting specialist states for re-review...`));
-            const resetResult = await postJson(`/api/review/${issueId}/reset`);
+            const resetResult = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/reset`);
             if (resetResult.success) {
               console.log(chalk.green(`  ✓ Specialist states reset`));
-              result = await postJson(`/api/review/${issueId}/trigger`);
+              result = await postDoneDashboardJson(dashboardUrl, `/api/review/${issueId}/trigger`);
             } else {
               console.log(chalk.red(`  ✗ Failed to reset: ${resetResult.error || resetResult.message || 'Unknown error'}`));
             }

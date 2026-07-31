@@ -2,9 +2,9 @@
  * PAN-1990 dashboard-workspace-view: /workspace/:id renders terminals,
  * workspace-filtered conversations, and the memory surface.
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../../XTerminal', () => ({
   XTerminal: ({ sessionName }: { sessionName: string }) => <div data-testid="xterm" data-session={sessionName} />,
@@ -43,6 +43,7 @@ vi.mock('../../../lib/store', () => ({
 }));
 
 import { WorkspaceView } from '../WorkspaceView';
+import { rememberRunSession } from '../WorkspaceActionBand';
 
 const CONVERSATIONS = [
   { id: 1, name: 'conv-in-workspace', tmuxSession: 'conv-in-workspace', status: 'active', cwd: '/repo/workspaces/feature-pan-9001', issueId: null, createdAt: '', endedAt: null, lastAttachedAt: null, sessionAlive: true },
@@ -202,5 +203,153 @@ describe('WorkspaceView (ac4)', () => {
     fireEvent.click(await screen.findByText('conv-in-workspace'));
 
     expect(await screen.findByTestId('conversation-panel')).toHaveAttribute('data-conversation', 'conv-in-workspace');
+  });
+});
+
+// PAN-3331 review finding: the run session used to be once-seeded local state.
+// The router swaps `workspaceId` on the SAME component instance, so workspace
+// A's run terminal appeared inside workspace B.
+describe('WorkspaceView run terminal (PAN-3331)', () => {
+  afterEach(() => {
+    rememberRunSession('ws-a', null);
+    rememberRunSession('ws-b', null);
+  });
+
+  function renderForWorkspace(workspaceId: string) {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === `/api/workspace-registry/${workspaceId}`) {
+        return Response.json({
+          id: workspaceId, projectId: 'overdeck', kind: 'scratch', name: workspaceId,
+          path: `/repo/${workspaceId}`, issueId: null, layoutConfig: null, title: null, pipeline: null,
+        });
+      }
+      if (url.startsWith('/api/workspace-registry/')) return Response.json({ headline: null, status: null, observations: [] });
+      if (url === '/api/conversations') return Response.json([]);
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    return render(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId={workspaceId} />
+      </QueryClientProvider>,
+    );
+  }
+
+  it('shows the run session belonging to the workspace currently on screen', async () => {
+    rememberRunSession('ws-a', 'ws-run-aaaa');
+
+    const { rerender } = renderForWorkspace('ws-a');
+    const terminal = await screen.findByTestId('workspace-view-run-terminal');
+    expect(terminal).toBeInTheDocument();
+    expect(screen.getByTestId('xterm')).toHaveAttribute('data-session', 'ws-run-aaaa');
+
+    // Same instance, different workspace — B has no run session.
+    rerender(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <WorkspaceView workspaceId="ws-b" />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId('workspace-view-run-terminal')).toBeNull());
+  });
+
+  it('mounts a terminal for a run started elsewhere, such as from the palette', async () => {
+    renderForWorkspace('ws-a');
+    await screen.findByTestId('conversation-list');
+    expect(screen.queryByTestId('workspace-view-run-terminal')).toBeNull();
+
+    act(() => { rememberRunSession('ws-a', 'ws-run-aaaa'); });
+
+    const terminal = await screen.findByTestId('workspace-view-run-terminal');
+    expect(terminal).toBeInTheDocument();
+  });
+});
+
+// PAN-3331 review cycle 2: the band holds workspace-scoped state (the
+// first-fetch ref, expander, error text, and the run-command edit draft) and
+// this view is NOT remounted when the route changes workspace id. With both
+// workspaces' detail data cached there is no loading gap to reset it, so the
+// band must be keyed by workspace id.
+describe('WorkspaceView band state across cached navigation (PAN-3331)', () => {
+  const WORKSPACES: Record<string, Record<string, unknown>> = {
+    'ws-a': {
+      id: 'ws-a', projectId: 'overdeck', kind: 'scratch', name: 'alpha', path: '/repo/alpha',
+      issueId: null, layoutConfig: null, title: null, pipeline: null,
+      isGitRepository: true, runCommand: 'alpha-command', runCommandDefault: null,
+      runCommandOptions: [], openInEditorConfigured: false,
+    },
+    'ws-b': {
+      id: 'ws-b', projectId: 'overdeck', kind: 'scratch', name: 'bravo', path: '/repo/bravo',
+      issueId: null, layoutConfig: null, title: null, pipeline: null,
+      isGitRepository: true, runCommand: 'bravo-command', runCommandDefault: null,
+      runCommandOptions: [], openInEditorConfigured: false,
+    },
+  };
+
+  function renderCachedPair() {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+    // Seed BOTH details so navigation never passes through a loading state —
+    // the exact condition under which stale band state would survive.
+    for (const [id, data] of Object.entries(WORKSPACES)) client.setQueryData(['workspace-registry', id], data);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('/git')) {
+        return Response.json({
+          git: {
+            branch: 'main', detached: false, dirtyFiles: 0, ahead: 0, behind: 0,
+            hasUpstream: true, upstreamRef: 'origin/main', recentRemoteCommits: [], fetchedAt: 1,
+          },
+        });
+      }
+      if (url.endsWith('/memory')) return Response.json({ headline: null, status: null, observations: [] });
+      if (url === '/api/conversations') return Response.json([]);
+      const detail = Object.entries(WORKSPACES).find(([id]) => url === `/api/workspace-registry/${id}`);
+      if (detail) return Response.json(detail[1]);
+      return Response.json({});
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const view = render(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId="ws-a" />
+      </QueryClientProvider>,
+    );
+    const toBravo = () => view.rerender(
+      <QueryClientProvider client={client}>
+        <WorkspaceView workspaceId="ws-b" />
+      </QueryClientProvider>,
+    );
+    return { fetchMock, toBravo };
+  }
+
+  it('drops an edit draft opened in one workspace instead of carrying it into the next', async () => {
+    const { toBravo } = renderCachedPair();
+
+    fireEvent.click(await screen.findByTestId('workspace-band-run-edit'));
+    fireEvent.change(screen.getByTestId('workspace-band-run-input'), { target: { value: 'DRAFT-FROM-ALPHA' } });
+    expect(screen.getByTestId('workspace-band-run-input')).toHaveValue('DRAFT-FROM-ALPHA');
+
+    toBravo();
+
+    // No open editor, and the command shown is bravo's own — a carried draft
+    // would have been saved onto bravo's run_command.
+    await waitFor(() => expect(screen.queryByTestId('workspace-band-run-input')).toBeNull());
+    expect(screen.getByTestId('workspace-band-run-command')).toHaveTextContent('bravo-command');
+  });
+
+  it('performs the initial fetching read for the workspace navigated to', async () => {
+    const { fetchMock, toBravo } = renderCachedPair();
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map(String)).toContainEqual(expect.stringContaining('/ws-a/git?fetch=1')));
+
+    toBravo();
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.map((call) => String(call[0])))
+        .toContainEqual('/api/workspace-registry/ws-b/git?fetch=1'));
   });
 });

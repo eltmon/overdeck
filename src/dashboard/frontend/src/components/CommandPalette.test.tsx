@@ -315,6 +315,9 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
       if (method === 'GET' && url === '/api/workspace-registry') return Response.json({ workspaces: WORKSPACES });
       if (method === 'POST' && url === '/api/workspace-registry/ws-issue/activate') return Response.json({});
+      if (method === 'POST' && url === '/api/workspace-registry/ws-issue/run') {
+        return Response.json({ sessionName: 'ws-run-wsissue', command: 'npm run dev' });
+      }
       return undefined;
     });
   });
@@ -364,5 +367,92 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
       '/api/workspace-registry/ws-issue/activate',
       expect.objectContaining({ method: 'POST' }),
     );
+  });
+
+  // PAN-3331 D-10 / FR-8. Review cycle 3: it used to emit BOTH group rows
+  // unconditionally, so the default `all` view listed the action twice.
+  it('offers exactly one run-workspace-command row in the default scope', async () => {
+    renderPaletteWithWorkspace();
+
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+    expect(document.querySelectorAll('[role="option"][data-value^="run-workspace-command"]')).toHaveLength(1);
+    // Names the workspace it would act on, so the target is never a guess.
+    expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001');
+  });
+
+  it('moves the action under Workspaces when the operator filters to that scope, still as one row', async () => {
+    renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+
+    // The scope chips are buttons labelled with the scope name.
+    fireEvent.click(screen.getByRole('button', { name: 'Workspaces' }));
+
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-workspaces')).toBeInTheDocument());
+    expect(document.querySelectorAll('[role="option"][data-value^="run-workspace-command"]')).toHaveLength(1);
+  });
+
+  // Review finding: the target used to be visibleWorkspaceRows[0], which sorts
+  // favorites first and hides collapsed issue worktrees.
+  it('targets the newest workspace even when an older one is favorited', async () => {
+    renderPaletteWithWorkspace();
+
+    // ws-issue (lastAccessedAt 200) is newer than the favorited ws-fav (50).
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001'));
+  });
+
+  it('still offers the action when every row is a collapsed pipeline worktree', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') {
+        return Response.json({
+          workspaces: [
+            { id: 'ws-hidden', projectId: 'overdeck', kind: 'issue', name: 'feature-pan-9002', issueId: 'PAN-9002', isFavorite: false, isArchived: false, title: null, lastAccessedAt: 300 },
+          ],
+        });
+      }
+      if (method === 'POST' && url === '/api/workspace-registry/ws-hidden/run') {
+        return Response.json({ sessionName: 'ws-run-wshidden', command: 'npm run dev' });
+      }
+      return undefined;
+    });
+    renderPaletteWithWorkspace();
+
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9002'));
+  });
+
+  it('ignores archived workspaces when picking the target', async () => {
+    fetchControl = installStrictFetchMock(({ method, url }) => {
+      if (method === 'GET' && url === '/api/palette/commands') return Response.json({ commands: [] });
+      if (method === 'GET' && url === '/api/workspace-registry') {
+        return Response.json({
+          workspaces: [
+            { id: 'ws-archived', projectId: 'overdeck', kind: 'scratch', name: 'archived-scratch', issueId: null, isFavorite: false, isArchived: true, title: null, lastAccessedAt: 900 },
+            { id: 'ws-live', projectId: 'overdeck', kind: 'scratch', name: 'live-scratch', issueId: null, isFavorite: false, isArchived: false, title: null, lastAccessedAt: 100 },
+          ],
+        });
+      }
+      return undefined;
+    });
+    renderPaletteWithWorkspace();
+
+    await waitFor(() =>
+      expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('live-scratch'));
+  });
+
+  it('starts the run command for the most recently used workspace and opens its view', async () => {
+    const { onSelectWorkspace } = renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+
+    fireEvent.click(getOptionByValue('run-workspace-command-actions'));
+
+    await waitFor(() => {
+      expect(fetchControl.fetchMock).toHaveBeenCalledWith(
+        '/api/workspace-registry/ws-issue/run',
+        expect.objectContaining({ method: 'POST' }),
+      );
+    });
+    await waitFor(() => expect(onSelectWorkspace).toHaveBeenCalledWith('ws-issue'));
   });
 });

@@ -1,7 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { toast } from 'sonner';
 
 import { IssuePolicyStrip } from './IssuePolicyStrip';
+
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn() },
+}));
 
 function response(body: unknown): Response {
   return { ok: true, json: async () => body } as Response;
@@ -21,6 +26,7 @@ describe('IssuePolicyStrip', () => {
   let fixtures = structuredClone(defaults);
 
   beforeEach(() => {
+    vi.clearAllMocks();
     fixtures = structuredClone(defaults);
     global.fetch = vi.fn(async (input: RequestInfo | URL) => {
       const url = input.toString();
@@ -90,6 +96,57 @@ describe('IssuePolicyStrip', () => {
       method: 'POST',
       body: JSON.stringify({ value: { mode: 'always' } }),
     })));
+  });
+
+  it('reports a failed mode save and preserves the displayed mode', async () => {
+    fixtures.review.override.reviewMode = 'full';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    const modeControl = screen.getByLabelText('Review mode for this issue');
+    const full = within(modeControl).getByRole('button', { name: 'Full' });
+    const quick = within(modeControl).getByRole('button', { name: 'Quick' });
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+
+    vi.mocked(global.fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (input.toString() === '/api/review/PAN-2681/config' && init?.method === 'POST') {
+        return {
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: async () => ({ error: 'State branch push failed' }),
+        } as Response;
+      }
+      return response({});
+    });
+
+    fireEvent.click(quick);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to save issue policy', {
+      description: 'State branch push failed',
+    }));
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+    expect(quick).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('reports a transport-level mode save failure and preserves the displayed mode', async () => {
+    fixtures.review.override.reviewMode = 'full';
+    render(<IssuePolicyStrip issueId="PAN-2681" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
+
+    const modeControl = screen.getByLabelText('Review mode for this issue');
+    const full = within(modeControl).getByRole('button', { name: 'Full' });
+    const quick = within(modeControl).getByRole('button', { name: 'Quick' });
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+
+    vi.mocked(global.fetch).mockRejectedValue(new Error('Network unavailable'));
+    fireEvent.click(quick);
+
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('Failed to save issue policy', {
+      description: 'Network unavailable',
+    }));
+    expect(full).toHaveAttribute('aria-pressed', 'true');
+    expect(quick).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('uses the effective review mode to decide whether re-review is available', async () => {

@@ -29,12 +29,71 @@ export interface WorkspaceRow {
   isGitRepository: boolean;
   issueId: string | null;
   layoutConfig: string | null;
+  /** Operator-set run command for the quick-action band; null falls back to project service config. */
+  runCommand: string | null;
   isFavorite: boolean;
   isArchived: boolean;
   title: string | null;
   createdAt: number;
   lastAccessedAt: number;
 }
+
+/** One commit present on the comparison ref but not on HEAD (PAN-3331). */
+export interface RemoteCommit {
+  sha: string;
+  subject: string;
+  author: string;
+  /** ISO 8601 author date. */
+  date: string;
+}
+
+/**
+ * Git state for one workspace checkout, compared against the checked-out
+ * branch's OWN upstream (`@{u}`) rather than unconditionally against
+ * `origin/HEAD` — see PAN-3331. When no upstream is configured the counts fall
+ * back to `origin/HEAD` and `hasUpstream` is false so the UI can say so.
+ */
+export interface WorkspaceGitState {
+  /** Branch name, or null when HEAD is detached. */
+  branch: string | null;
+  detached: boolean;
+  /**
+   * Count of `git status --porcelain` entries, or null when git could not tell
+   * us. Null is NOT zero: rendering an unreadable status as "clean" claims
+   * something that was never established, and the pull guard refuses on it.
+   */
+  dirtyFiles: number | null;
+  /** Commits on HEAD that the comparison ref lacks; null when the probe failed. */
+  ahead: number | null;
+  /** Commits on the comparison ref that HEAD lacks; null when the probe failed. */
+  behind: number | null;
+  /** True when the branch has its own configured upstream. */
+  hasUpstream: boolean;
+  /** The ref the counts were computed against (`origin/main`, `origin/HEAD`), or null when none resolved. */
+  upstreamRef: string | null;
+  recentRemoteCommits: RemoteCommit[];
+  /** Epoch ms of the fetch this call performed, or null when it did not fetch. */
+  fetchedAt: number | null;
+  /**
+   * True when a fetch was asked for and did not succeed. The counts below are
+   * then whatever the local refs already said, so the card must not present
+   * them as freshly confirmed.
+   */
+  fetchFailed: boolean;
+}
+
+/** Why a fast-forward pull was refused. Returned, never thrown. */
+export type PullRefusalReason =
+  | 'dirty'
+  | 'operation-in-progress'
+  | 'not-fast-forward'
+  | 'no-upstream'
+  | 'detached'
+  | 'error';
+
+export type PullResult =
+  | { ok: true; state: WorkspaceGitState }
+  | { ok: false; reason: PullRefusalReason; detail: string };
 
 export interface ProjectTargetRow {
   projectId: string;

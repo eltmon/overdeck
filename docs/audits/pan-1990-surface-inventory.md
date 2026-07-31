@@ -185,3 +185,55 @@ it. `--dry-run` writes nothing.
 - **SessionStart briefing.** The SessionStart hook response now carries a rendered
   briefing that the local hook script emits as `additionalContext`, at most once
   per session id. Every failure path returns the previous response unchanged.
+
+### 9.7 Additive: the workspace quick-action band (PAN-3331)
+
+The band adds surfaces above the WorkspaceView panels; it removes none. Audit of
+what existed before and where it is now:
+
+| Pre-PAN-3331 surface | After |
+| --- | --- |
+| Header bar (back, title, kind) | Unchanged, still first in the view |
+| Issue-panels block (`workspace-view-issue-panels`) | Unchanged, still `kind='issue'` only, now below the band |
+| Terminal panel showing the workspace agent's session | Unchanged; a run session renders **beside** it in the same panel, never in place of it |
+| `workspace-view-no-terminal` empty state | Still shown when there is neither an agent terminal nor a run session |
+| Conversations and Memory panels | Unchanged |
+| Layout persistence via `PUT /:id/layout` | Unchanged — the run command got its own `run_command` column precisely so `layout_config` stays owned by the panels library |
+| `GET /api/workspace-registry/:id` fields | All preserved; `runCommandDefault`, `runCommandOptions`, and `openInEditorConfigured` were added alongside |
+| Issue-workspace sync-main (`POST /api/issues/:id/sync-main`) | Unchanged and still the only path for `kind='issue'`; the new ff-only pull route refuses issue rows with 409 |
+
+New routes, all additive: `GET /:id/git`, `POST /:id/pull`,
+`PUT /:id/run-command`, `POST /:id/run`, `POST /:id/open`.
+
+The Cmd-K palette gains one action ("Run workspace command") listed under both
+the Actions and Workspaces groups; no existing palette row changed.
+
+### 9.8 Review-cycle amendment (PAN-3331 cycle 1)
+
+Two entries in 9.7 changed as a result of review; both are tightenings, and
+neither drops an affordance:
+
+| Surface | 9.7 said | Now |
+| --- | --- | --- |
+| `GET /api/workspace-registry` fields | all preserved plus additions | all preserved **except `runCommand`**, which is executable text and is served only over authenticated reads. Every other field, including the PAN-3286 `memoryPhase`, is unchanged and locked by the no-loss assertion in `workspace-registry-memory-phase.test.ts`. |
+| `GET /api/workspace-registry/:id` and `/:id/git` | unguarded like sibling reads | `rejectUnauthorizedDashboardRequest` — the detail read returns command text, and `?fetch=1` reaches the network and rewrites remote-tracking refs. Same-origin dashboard requests carry the session cookie, so no UI affordance is lost. |
+
+### 9.9 Review-cycle amendment (PAN-3331 cycle 2)
+
+One shared surface outside the PAN-3331 routes changed. It is a widening, not a
+removal:
+
+| Surface | Before | Now |
+| --- | --- | --- |
+| `DELETE /api/terminals/:name` (PAN-1545 terminal drawer) | `killSession` unconditionally; a session that had already exited produced a 500 | returns `{ok: true, alreadyStopped: true}` when the session is gone, and kills it otherwise. A real kill failure still 500s. |
+
+No caller depended on the old error: the terminal drawer only deletes sessions
+it is currently showing, and the workspace band — which remembers a session name
+across a process that may exit on its own — was the surface the old behavior
+stranded. DELETE being idempotent is the standard HTTP contract, and the
+behavior is locked by `tests/unit/dashboard/terminals-delete-idempotent.test.ts`.
+
+`WorkspaceActionBand` is now mounted with `key={workspaceId}`. That is a
+lifecycle change with no surface change: every control, prop, and route is
+identical, but the band's workspace-scoped state resets on navigation instead of
+following the component instance.
