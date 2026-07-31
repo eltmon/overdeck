@@ -54,15 +54,7 @@
       "timestamp": "2026-07-31T20:29:44.141Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-31T20:29:44Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3358\n\n# Review Synthesis — PAN-3358 — 2026-07-31T20:28:30Z\n\n## Verdict: CHANGES REQUESTED — version-ship retries cannot recover after a prior push, and batch settlement can still split across members\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/context.json`\n- Branch: `feature/pan-3358`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358`\n- HEAD reviewed: `61eec0f1069764348d0e42dbaa8289f60277a968`\n- Cycle number: 2\n- Prior cycle SHA: `10b87191ace512116ee736707a0365e8587af4fc`\n- PR base: `b57f6abd2b6db50f62960203563a6f3b7dadd7d5`\n- PR commits: 17\n- Cycle commits: 1\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/security.md` | 1 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/correctness.md` | 2 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/requirements.md` | 2 |\n\n## Blocking Findings\n\n### [correctness] A retry cannot recover after a version commit reached the remote — `src/lib/cloister/version-ship-worktree.ts:95`\nEach retry fetches the target branch but recreates its detached worktree at the original promoted merge SHA. If an earlier attempt pushed a version commit and then record persistence failed, produced a pushed partial result, or pushed an earlier repository before a later polyrepo repository failed, the next attempt creates a sibling commit from the old merge and its explicit `HEAD:<targetBranch>` push is rejected non-fast-forward. After fetching, verify the promoted SHA is an ancestor of the remote target and root the new worktree at the fetched target head; retain the promoted SHA as ancestry evidence and keep explicit pushes so concurrent advances fail safely and a fresh retry can recover. Add retry coverage for successful-push/failed-record-persistence and multi-repository partial push.\n\n### [correctness] Failed and partial ships disappear from the only dashboard retry surface — `src/dashboard/frontend/src/components/merge-train/MergeTrainView.tsx:175`\nThe batch view includes promoted generations only when their aggregate ship status is `pending`. A `partial` or `failed` outcome still blocks every member's ship DoD row, but immediately removes the promoted batch and its **Ship version** action; project settings shows the result without a retry action, and the feature deliberately has no CLI ship command. Keep every configured promoted generation visible for all non-passed statuses, label the current outcome, and hide it only after the conservative aggregate is `passed`. Add component coverage for partial and failed retry states.\n\n### [requirements] Terminal record persistence can split one batch into passing and pending DoD rows — `src/lib/cloister/ship-record.ts:44`\nFR-6 and FR-7 require one durable settlement across every batch member. `persistRecordForMembers()` commits successful member writes immediately, retries only failed members, and throws after three attempts while preserving the successful terminal records. The UI aggregate remains conservative, but `checkShipRow()` reads the current issue's individual record, so a member written as `passed` can close while another remains `pending` or missing. Make the DoD row consume the conservative generation aggregate, or use a durable generation-level commit protocol that prevents any member from observing `passed` until every member is settled. Add a persistent partial-write regression proving all members remain blocked.\n\n### [security] Promoted repository code executes with dashboard-host privileges — `src/lib/cloister/version-ship-worktree.ts:97`\nTemporary worktrees protect the ambient checkout, but ship-owned Git operations and `version_sync.command` still execute repository-controlled hooks and scripts on the host with the dashboard process's environment, credential helpers, filesystem access, and network access. A promoted batch can alter a tracked Husky hook, a hook dependency, or the configured propagation script and gain code execution as the dashboard OS user during worktree, commit, push, or command execution. Disable hooks for every trusted Git invocation with `-c core.hooksPath=/dev/null` and a sanitized environment. Run the configured command in a real project sandbox/container with only prepared worktrees mounted, a minimal allowlisted environment, restricted network access, and a hard process-group timeout; keep credentialed hook-disabled push in trusted parent code. If this isolation is unavailable, remove repository-defined command execution and provide trusted propagation implementations.\n\n## Non-blocking Findings\n\n### [security] Local diagnostic redaction misses standalone credential formats — `src/lib/cloister/version-ship-deps.ts:58`\nThe denylist redacts labelled values, Bearer tokens, and basic-auth URLs but misses common standalone GitHub, GitLab, npm, JWT, AWS, and PEM credential formats. Avoid logging untrusted command output, or route it through the centralized secret scanner before local persistence.\n\n## Resolved From Prior Cycle\n- The stale ambient-checkout failure is fixed for the first ship attempt by exact promoted-SHA temporary worktrees and explicit target-branch pushes.\n- The synchronous N+1 polling-route reads are replaced by deduplicated asynchronous reads with bounded concurrency.\n- Public aggregate payloads no longer expose raw command or Git errors.\n- Configured filesystem paths reject symlink traversal and use no-follow regular-file access; push roots are restricted to registered repositories.\n- Missing promoted-batch settlement now blocks rather than being mistaken for a direct merge.\n\n## Clean Sub-roles\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-61eec0f1/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3358 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/commit-msg",
@@ -148,10 +140,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T21:09:18.560Z",
+  "updated": "2026-07-31T21:10:03.848Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -159,13 +151,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T21:09:16.444Z",
+    "updatedAt": "2026-07-31T21:10:03.791Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "verificationNotes": "Verification FAILED at test (646485ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\u001b[39m\n\n \u001b[31m❯\u001b[39m src/components/Stage/ProjectHome.test.tsx \u001b[2m(\u001b[22m\u001b[2m6 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m1 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 1151\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m passes the launcher query into the created agent conversation\u001b[32m 59\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders conversation creation errors inline without opening a pane\u001b[32m 25\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m suppresses repeated submissions while creation is pending\u001b[32m 13\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m clears the previous error on retry and opens the successful conversation\u001b[32m 21\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m renders project settings in the sparse layout for a registered project\u001b[39m\u001b[33m 1025\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m omits project settings and settings requests without a project key\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/Pipeline/PipelineView.test.tsx \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1132\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/drawer/IssueDrawer.test.tsx \u001b[2m(\u001b[22m\u001b[2m29 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1374\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m routes reset stop and merge requests through the shared action controls \u001b[33m 374\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/lib/__tests__/issue-actions-surface-parity.test.tsx \u001b[2m(\u001b[22m\u001b[2m38 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1872\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/lib/__tests__/issueActions.parity.test.tsx \u001b[2m(\u001b[22m\u001b[2m10 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 912\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx \u001b[2m(\u001b[22m\u001b[2m62 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 983\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders session utilities under This session with their existing conditions \u001b[33m 313\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m src/components/IssueActionMe\n…(612582 chars elided)…\n\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/agent-gc.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/work-agent-prompt-new-repo.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/remote/__tests__/remote-state-gate.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/agents/__tests__/runtime-command-effort.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/projects-swarm.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/cli/commands/start-conflicting-work.test\n...(truncated)",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "61eec0f1069764348d0e42dbaa8289f60277a968",
-    "reviewSpawnedAt": "2026-07-31T20:28:07.086Z",
+    "reviewSpawnedAt": "2026-07-31T21:10:03.789Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/commit-msg",
@@ -296,24 +288,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7769945,
-            "output": 651619,
-            "cacheRead": 288925696,
+            "input": 7773620,
+            "output": 652899,
+            "cacheRead": 290116096,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 20099542,
-          "output": 1154636,
-          "cacheRead": 361379328,
+          "input": 20103217,
+          "output": 1155916,
+          "cacheRead": 362569728,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 315.826454,
-        "pricingAsOf": "2026-07-31T21:09:18.557Z"
+        "usd": 316.478429,
+        "pricingAsOf": "2026-07-31T21:10:03.819Z"
       }
     },
     "merges": [
