@@ -291,7 +291,7 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:19:50.793Z",
+  "updated": "2026-07-31T20:19:55.087Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -301,7 +301,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:19:50.790Z",
+    "updatedAt": "2026-07-31T20:19:55.036Z",
     "reviewNotes": "[correctness] General agent removal drops the only eligibility/linkage record while retaining transcripts — `src/lib/overdeck/agents.ts:868`",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
@@ -457,24 +457,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5847265,
-            "output": 673551,
-            "cacheRead": 272178176,
+            "input": 5853953,
+            "output": 674755,
+            "cacheRead": 274398208,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 26451140,
-          "output": 1137932,
-          "cacheRead": 357156352,
+          "input": 26457828,
+          "output": 1139136,
+          "cacheRead": 359376384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 344.971836,
-        "pricingAsOf": "2026-07-31T20:19:25.195Z"
+        "usd": 346.151412,
+        "pricingAsOf": "2026-07-31T20:19:55.072Z"
       }
     },
     "merges": [
