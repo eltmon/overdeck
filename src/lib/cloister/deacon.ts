@@ -44,6 +44,7 @@ import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithD
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { removeAgentStateDir } from '../agents/state-dir-removal.js';
+import { sweepTranscriptRetention } from './transcript-retention.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
@@ -3122,6 +3123,13 @@ export async function runPatrol(): Promise<PatrolResult> {
     const cleanupActions = await cleanupStaleAgentState();
     actions.push(...cleanupActions);
     for (const a of cleanupActions) addLog('action', a, state.patrolCycle);
+
+    const transcriptDays = loadCloisterConfigSync().retention?.transcript_days;
+    if (typeof transcriptDays === 'number' && Number.isFinite(transcriptDays) && transcriptDays > 0) {
+      const transcriptActions = await sweepTranscriptRetention({ transcriptDays });
+      actions.push(...transcriptActions);
+      for (const a of transcriptActions) addLog('action', a, state.patrolCycle);
+    }
   }
 
   // Periodic abandoned-feedback sweep — safety net for workspaces where the

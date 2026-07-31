@@ -309,6 +309,12 @@ export interface RetentionConfig {
    * review posts; this retention catches crashed-mid-cleanup edge cases.
    */
   reviewer_state_days?: number;
+  /**
+   * Days to keep transcript artifacts (`**\/*.jsonl`) inside ended agents' state
+   * dirs. UNSET (default) = retain forever; the sweep does not run. This is the
+   * only mechanism that may delete transcript artifacts.
+   */
+  transcript_days?: number;
   health_staleness_hours: number; // Hours before hiding stale agents in health API (default: 24)
 }
 
