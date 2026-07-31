@@ -39,9 +39,22 @@ interface GitResult {
   stderr: string;
 }
 
+/**
+ * `git status` on a checkout with a large untracked tree (a stray node_modules,
+ * a build output directory) can far exceed execFile's 1 MB default, and an
+ * overflowed buffer surfaces as a command failure. That must not be mistaken
+ * for a clean tree — see countDirtyFiles.
+ */
+const MAX_GIT_OUTPUT_BYTES = 16 * 1024 * 1024;
+
 async function git(cwd: string, args: string[], timeout = GIT_TIMEOUT_MS): Promise<GitResult> {
   try {
-    const { stdout, stderr } = await execFileAsync('git', args, { cwd, encoding: 'utf-8', timeout });
+    const { stdout, stderr } = await execFileAsync('git', args, {
+      cwd,
+      encoding: 'utf-8',
+      timeout,
+      maxBuffer: MAX_GIT_OUTPUT_BYTES,
+    });
     return { ok: true, stdout: stdout.trim(), stderr: stderr.trim() };
   } catch (error) {
     const err = error as { stdout?: string; stderr?: string; message?: string };
@@ -84,9 +97,21 @@ async function originHeadRef(cwd: string): Promise<string | null> {
   return result.ok && result.stdout ? 'origin/HEAD' : null;
 }
 
-async function countDirtyFiles(cwd: string): Promise<number> {
+/**
+ * Dirty-file count, or null when git could not tell us. The distinction
+ * matters: the pull guard must refuse on "unknown" rather than assume clean,
+ * or a checkout whose status output failed — an overflowed buffer, a broken
+ * index — would sail past the dirty-tree refusal the whole feature advertises.
+ *
+ * Line-counted rather than NUL-delimited on purpose. `--porcelain` C-quotes any
+ * path with a special character, so no literal newline ever reaches this
+ * output, and one line is one entry — whereas `-z` emits a rename as two
+ * NUL-separated paths and would count it twice.
+ */
+async function countDirtyFiles(cwd: string): Promise<number | null> {
   const status = await git(cwd, ['status', '--porcelain']);
-  if (!status.ok || !status.stdout) return 0;
+  if (!status.ok) return null;
+  if (!status.stdout) return 0;
   return status.stdout.split('\n').filter((line) => line.length > 0).length;
 }
 
@@ -160,7 +185,9 @@ export async function getWorkspaceGitState(
   return {
     branch,
     detached,
-    dirtyFiles,
+    // The card has no honest way to render "unknown", and it is only a display
+    // number here — the pull guard reads the raw value and refuses on null.
+    dirtyFiles: dirtyFiles ?? 0,
     ahead: counts.ahead,
     behind: counts.behind,
     hasUpstream: upstream !== null,
@@ -193,6 +220,16 @@ export async function pullWorkspaceFastForward(workspacePath: string): Promise<P
   }
 
   const dirtyFiles = await countDirtyFiles(workspacePath);
+  // Fail closed on "git could not tell us". Treating an unreadable status as
+  // clean would fast-forward over uncommitted work — the exact thing the dirty
+  // refusal exists to prevent.
+  if (dirtyFiles === null) {
+    return {
+      ok: false,
+      reason: 'dirty',
+      detail: 'Could not read the working tree status — refusing to pull over possible uncommitted work.',
+    };
+  }
   if (dirtyFiles > 0) {
     return {
       ok: false,

@@ -94,8 +94,9 @@ worth knowing when you are reasoning about workspace state:
   require dashboard auth. A `run_command` you set from the CLI or the dashboard
   is not visible to an unauthenticated caller.
 - **Run** launches the workspace's run command in a tmux session named
-  `ws-run-<8 chars of workspace id>` (visible under `tmux -L overdeck
-  list-sessions`). The command is the `run_command` column when set, otherwise
+  `ws-run-<sha256 prefix of the workspace id>` (visible under `tmux -L overdeck
+  list-sessions`). The hash keeps the name unique per workspace — a truncated id
+  prefix collided, letting one workspace stop another's process. The command is the `run_command` column when set, otherwise
   the project's first `workspace.services[].start_command`. One live session per
   workspace: a second Run re-focuses rather than spawning a duplicate, while
   Restart kills the session and starts a fresh one under the same name.

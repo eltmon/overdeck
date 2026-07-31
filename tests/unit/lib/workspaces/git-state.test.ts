@@ -255,3 +255,45 @@ describe('git-state', () => {
     });
   });
 });
+
+// Review cycle 3 (non-blocking finding): countDirtyFiles used to map a failed
+// `git status` to zero, so a checkout whose status could not be read would sail
+// past the dirty-tree refusal that guards the pull.
+describe('dirty-status failures fail closed', () => {
+  let root: string;
+  let notARepo: string;
+
+  beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'pan-3331-dirty-fail-'));
+    notARepo = join(root, 'plain-dir');
+    execFileSync('mkdir', ['-p', notARepo]);
+  });
+
+  afterEach(() => {
+    rmSync(root, { recursive: true, force: true });
+  });
+
+  it('refuses the pull when the working-tree status cannot be read', async () => {
+    // A directory that is not a git repository makes every git command fail,
+    // which is the same shape as an unreadable index or overflowed output.
+    const result = await pullWorkspaceFastForward(notARepo);
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected a refusal');
+    // Detached is checked first and is itself a refusal, so the pull never
+    // proceeds; what matters is that no code path reaches `git pull`.
+    expect(['detached', 'dirty', 'no-upstream']).toContain(result.reason);
+  });
+
+  it('counts a rename as one dirty entry, not two', async () => {
+    const repo = join(root, 'repo');
+    execFileSync('git', ['init', '-q', '-b', 'main', repo], { encoding: 'utf-8' });
+    configureIdentity(repo);
+    commit(repo, 'original.txt', 'contents\n', 'init');
+    git(repo, 'mv', 'original.txt', 'renamed.txt');
+
+    const state = await getWorkspaceGitState(repo);
+
+    expect(state.dirtyFiles).toBe(1);
+  });
+});

@@ -342,6 +342,37 @@ describe('POST /api/workspace-registry/:id/run (FR-5)', () => {
     expect(String(first.body.sessionName)).toMatch(/^ws-run-[a-zA-Z0-9]+$/);
   });
 
+  // Review cycle 3: the name used to be the first eight sanitized characters of
+  // the id, so two workspaces could share one session and stop or restart each
+  // other's dev server.
+  it('gives distinct session names to ids that share their first eight sanitized characters', async () => {
+    routeMocks.getWorkspaceById.mockImplementation((id: string) => baseWorkspace({ id, runCommand: 'npm run dev' }));
+
+    const first = await call('POST', '/api/workspace-registry/ws-main-1234abcd/run');
+    const second = await call('POST', '/api/workspace-registry/ws-main-1234ffff/run');
+
+    // Both collapse to "wsmain12" under the old prefix-truncation scheme.
+    expect(first.body.sessionName).not.toBe(second.body.sessionName);
+  });
+
+  it('gives distinct session names to ids that differ only in punctuation', async () => {
+    routeMocks.getWorkspaceById.mockImplementation((id: string) => baseWorkspace({ id, runCommand: 'npm run dev' }));
+
+    // Stripping non-alphanumerics is not injective: these two collapse together.
+    const hyphenated = await call('POST', '/api/workspace-registry/ws-a-b/run');
+    const plain = await call('POST', '/api/workspace-registry/wsab/run');
+
+    expect(hyphenated.body.sessionName).not.toBe(plain.body.sessionName);
+  });
+
+  it('keeps the session name a valid tmux name', async () => {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ id: 'a5f1c0de-9b2e-4c77-8f3a-1e6d0b4a9c22', runCommand: 'npm run dev' }));
+
+    const response = await call('POST', '/api/workspace-registry/a5f1c0de-9b2e-4c77-8f3a-1e6d0b4a9c22/run');
+
+    expect(String(response.body.sessionName)).toMatch(/^[a-zA-Z0-9._-]+$/);
+  });
+
   it('re-focuses the live session instead of spawning a second one', async () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ runCommand: 'npm run dev' }));
     routeMocks.sessionExists.mockReturnValue(Effect.succeed(true));

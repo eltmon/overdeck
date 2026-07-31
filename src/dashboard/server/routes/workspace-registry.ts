@@ -8,6 +8,7 @@
  * `src/lib/workspaces/resolver.ts`, writes through `src/lib/workspaces/writer.ts`
  * — no direct SQL here (scripts/guard-workspace-doors.sh enforces this).
  */
+import { createHash } from 'node:crypto';
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { jsonResponse } from '../http-helpers.js';
@@ -334,9 +335,19 @@ function resolveRunCommand(workspace: WorkspaceRow): string | null {
   return runCommandOptionsFor(workspace)[0]?.command ?? null;
 }
 
-/** Deterministic per workspace, so a reload finds the live session instead of spawning a second one. */
+/**
+ * Deterministic per workspace, so a reload finds the live session instead of
+ * spawning a second one — and UNIQUE per workspace, so one workspace can never
+ * re-focus, stop, or kill another's process.
+ *
+ * A sanitized prefix of the id is not safe for this: stripping characters is
+ * not injective (`ws-a-b` and `wsab` collapse together) and truncating makes
+ * collisions likely, so two ids sharing their first eight alphanumerics used to
+ * share one session. A sha256 prefix is injective enough at 64 bits, fixed
+ * length, and stable across restarts.
+ */
 function runSessionName(workspaceId: string): string {
-  return `ws-run-${workspaceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8)}`;
+  return `ws-run-${createHash('sha256').update(workspaceId).digest('hex').slice(0, 16)}`;
 }
 
 const putWorkspaceRegistryRunCommandRoute = HttpRouter.add(

@@ -647,22 +647,22 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
       },
     }));
 
-    // PAN-3331 D-10. Listed under both group headings on purpose: the group is
-    // what maps a row to a scope chip, so one entry each keeps the action
-    // reachable whether the operator has filtered to Actions or to Workspaces.
+    // PAN-3331 D-10 — ONE visible row. The group is what maps a row to a scope
+    // chip, so the action normally lives under Actions and moves to Workspaces
+    // only while that scope is the filter. Emitting both unconditionally put two
+    // identical rows in the default `all` view.
     if (runTargetWorkspace) {
       const runLabel = runTargetWorkspace.title ?? runTargetWorkspace.name;
-      for (const group of ['Actions', 'Workspaces'] as const) {
-        actions.push({
-          id: `run-workspace-command-${group.toLowerCase()}`,
-          label: 'Run workspace command',
-          description: `Start the run command for ${runLabel}`,
-          icon: Play,
-          group,
-          keywords: ['run', 'start', 'dev server', 'command', runTargetWorkspace.name],
-          onSelect: () => void runWorkspaceCommand(runTargetWorkspace.id),
-        });
-      }
+      const group = scope === 'workspaces' ? 'Workspaces' : 'Actions';
+      actions.push({
+        id: `run-workspace-command-${group.toLowerCase()}`,
+        label: 'Run workspace command',
+        description: `Start the run command for ${runLabel}`,
+        icon: Play,
+        group,
+        keywords: ['run', 'start', 'dev server', 'command', runTargetWorkspace.name],
+        onSelect: () => void runWorkspaceCommand(runTargetWorkspace.id),
+      });
     }
 
     if (!pipelineWorkspacesExpanded && hiddenPipelineWorkspaces.length > 0) {
@@ -691,7 +691,7 @@ export function CommandPalette({ isOpen, onClose, onNavigate, onOpenConversation
     }
 
     return actions;
-  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand]);
+  }, [visibleWorkspaceRows, hiddenPipelineWorkspaces, pipelineWorkspacesExpanded, onSelectWorkspace, runTargetWorkspace, runWorkspaceCommand, scope]);
 
   // ─── Dynamic: pan commands ────────────────────────────────────────────────
 

@@ -369,14 +369,26 @@ describe('CommandPalette workspaces switcher (PAN-1990)', () => {
     );
   });
 
-  // PAN-3331 D-10 / FR-8
-  it('offers the run-workspace-command action under both the Actions and Workspaces scopes', async () => {
+  // PAN-3331 D-10 / FR-8. Review cycle 3: it used to emit BOTH group rows
+  // unconditionally, so the default `all` view listed the action twice.
+  it('offers exactly one run-workspace-command row in the default scope', async () => {
     renderPaletteWithWorkspace();
 
     await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
-    expect(getOptionByValue('run-workspace-command-workspaces')).toBeInTheDocument();
+    expect(document.querySelectorAll('[role="option"][data-value^="run-workspace-command"]')).toHaveLength(1);
     // Names the workspace it would act on, so the target is never a guess.
     expect(getOptionByValue('run-workspace-command-actions')).toHaveTextContent('feature-pan-9001');
+  });
+
+  it('moves the action under Workspaces when the operator filters to that scope, still as one row', async () => {
+    renderPaletteWithWorkspace();
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-actions')).toBeInTheDocument());
+
+    // The scope chips are buttons labelled with the scope name.
+    fireEvent.click(screen.getByRole('button', { name: 'Workspaces' }));
+
+    await waitFor(() => expect(getOptionByValue('run-workspace-command-workspaces')).toBeInTheDocument());
+    expect(document.querySelectorAll('[role="option"][data-value^="run-workspace-command"]')).toHaveLength(1);
   });
 
   // Review finding: the target used to be visibleWorkspaceRows[0], which sorts

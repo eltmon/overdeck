@@ -172,7 +172,8 @@ phase and its confidence.
 ## Quick-action band (PAN-3331)
 
 `WorkspaceView` renders `WorkspaceActionBand` between its header and its panels
-for every kind. Three cards, three routes:
+for every kind. Three cards over five routes — git state, pull, run-command,
+run, and open:
 
 **Authentication.** Every mutating route below carries
 `rejectUnsafeDashboardMutationRequest`. Two *reads* additionally carry
@@ -219,9 +220,13 @@ field, writes through `setWorkspaceRunCommand`. When null, the effective command
 falls back to the project's first `workspace.services[].start_command`; the
 detail route exposes `runCommandDefault` and `runCommandOptions` for the
 placeholder and the service picker. `POST /:id/run` spawns
-`createSession('ws-run-<8 chars of id>', workspace.path, command)`; the name is
-derived from the workspace id so a second Run finds the live session and answers
-409 instead of stacking a second dev server on the same port. Both routes refuse
+`createSession('ws-run-<sha256(id) prefix>', workspace.path, command)`; the name
+is derived from the workspace id so a second Run finds the live session and
+answers 409 instead of stacking a second dev server on the same port. The
+derivation is a hash rather than a sanitized prefix of the id because stripping
+characters is not injective and truncating collides — two ids sharing their
+first eight alphanumerics would otherwise share one session and stop or restart
+each other's process. Both routes refuse
 a command containing a newline or backtick, or longer than 500 characters — the
 async `createSession` performs no validation of its own, unlike the deprecated
 sync variant.
@@ -260,7 +265,8 @@ its own; without idempotency a crashed dev server left Stop *and* Restart
 permanently failing at their stop step. A genuine failure (tmux unreachable)
 still surfaces.
 
-The two open routes await the opener's exit rather than returning at spawn, so
+The open route awaits the opener's exit — for either target — rather than
+returning at spawn, so
 "editor not found" reaches the operator instead of a silent 200. `Effect.timeout`
 is the wrong tool for bounding that: it interrupts the effect and would kill the
 child the operator just asked for. If a template ever names a foreground
