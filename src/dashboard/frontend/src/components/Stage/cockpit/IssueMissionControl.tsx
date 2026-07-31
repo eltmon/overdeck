@@ -1,3 +1,9 @@
+/**
+ * PAN-3356 issue cockpit: six durable top-level tabs around the live agent run.
+ * Legacy tab ids normalize into Session, Plan, Changes, Activity, Overview, or
+ * Discussion; the crew spine, needs-you slot, and awareness rail stay outside
+ * tab bodies so navigation never hides live operator context.
+ */
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronDown, Copy, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react'
