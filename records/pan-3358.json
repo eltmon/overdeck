@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:18:12.426Z",
+  "updated": "2026-07-31T17:28:13.810Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "dod-ship-row": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 3387933,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T17:18:12.426Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -114,6 +106,17 @@
         "outcome": "completed",
         "reason": "Threaded operator-supplied versions through promote, ran ship after verification before fan-out, persisted pending/passed/partial/failed per-member ship records, added deferred ship route and generation payload state, preserved ship records across ordinary writes, and added route/orchestrator tests; typecheck, lint, and promotion regressions pass.",
         "releasedAt": "2026-07-31T17:17:58.888Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 3387933,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T17:18:12.426Z",
+        "itemId": "dod-ship-row",
+        "outcome": "completed",
+        "reason": "Inserted ship as DoD row 7, renumbered deploy/teardown, added durable ship verdict semantics and generated --accept-ship coverage, updated the canonical DoD table, and passed all 179 lifecycle tests plus typecheck.",
+        "releasedAt": "2026-07-31T17:28:13.810Z"
       }
     ],
     "statusReasons": {
@@ -128,6 +131,10 @@
       "promote-ship-hook": {
         "reason": "Threaded operator-supplied versions through promote, ran ship after verification before fan-out, persisted pending/passed/partial/failed per-member ship records, added deferred ship route and generation payload state, preserved ship records across ordinary writes, and added route/orchestrator tests; typecheck, lint, and promotion regressions pass.",
         "updatedAt": "2026-07-31T17:17:58.888Z"
+      },
+      "dod-ship-row": {
+        "reason": "Inserted ship as DoD row 7, renumbered deploy/teardown, added durable ship verdict semantics and generated --accept-ship coverage, updated the canonical DoD table, and passed all 179 lifecycle tests plus typecheck.",
+        "updatedAt": "2026-07-31T17:28:13.810Z"
       }
     }
   },
@@ -148,6 +155,10 @@
     "promote-ship-hook.promote-ship-hook.ac3": "completed",
     "promote-ship-hook.promote-ship-hook.ac4": "completed",
     "promote-ship-hook.promote-ship-hook.ac5": "completed",
-    "dod-ship-row": "running"
+    "dod-ship-row": "completed",
+    "dod-ship-row.dod-ship-row.ac1": "completed",
+    "dod-ship-row.dod-ship-row.ac2": "completed",
+    "dod-ship-row.dod-ship-row.ac3": "completed",
+    "dod-ship-row.dod-ship-row.ac4": "completed"
   }
 }
