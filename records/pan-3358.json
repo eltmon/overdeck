@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T17:53:35.327Z",
+  "updated": "2026-07-31T17:58:29.374Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T17:53:35.260Z",
-    "inspectNotes": "Indentation fix verified good — I replayed the new logic against the live 401-line ~/.overdeck/projects.yaml (read-only, no writes to the real file) for all 12 project keys and every one round-trips byte-identical with no phantom top-level key; 4-space, 3-space, comment-before-first-field, dangling-comment-inside-project, trailing-doc-comment, nested-last-field, CRLF, and comment-after-version_sync fixtures all pass, and flow-style plus empty-project values now throw without writing. One remaining NFR-4 violation of the same class as the last round: the insert branch at src/lib/projects-writer.ts:96 assumes content[project.range[1]] is a line boundary, which is false when projects.yaml has no trailing newline and the edited project is the last one in the file. Repro: content 'projects:\\n  alpha:\\n    name: Alpha\\n    path: /a' (no final newline), setProjectVersionSync('alpha', block) yields 'projects:\\n  alpha:\\n    name: Alpha\\n    path: /a    version_sync:\\n      push:\\n        - .\\n' — the block is spliced onto the end of the 'path: /a' line, the file is unparseable ('Nested mappings are not allowed in compact mappings'), the write succeeds silently, and every subsequent read falls into the catch at src/lib/projects.ts:401 so loadProjectsConfigSync returns {projects:{}} and ALL projects vanish from the runtime view until an operator hand-repairs the file. A no-final-newline projects.yaml is an ordinary hand-edited-file shape (VS Code does not add one by default), so this is reachable without any exotic YAML. Required fix: at src/lib/projects-writer.ts:96, when the insertion offset is not at the start of a line (content[project.range[1] - 1] !== '\\n'), prefix the replacement with a newline so the block starts on its own line — and add a fixture to tests/unit/lib/projects-version-sync.test.ts covering a projects.yaml with no trailing newline whose LAST project is edited, asserting loadProjectsConfigSync sees the block and the clear round-trip restores the original bytes exactly (a trailing-newline-present fixture will not catch this). Note also, non-blocking: the rendered block always uses LF line endings, so editing a CRLF projects.yaml leaves mixed endings inside the edited key; the round-trip is still byte-clean outside it. Everything else on this bead remains satisfied — routes registered and auth-guarded, GET null/config+lastOutcome, PUT 400-with-errors-and-no-write, PUT 404 naming known keys."
+    "updatedAt": "2026-07-31T17:58:29.354Z",
+    "inspectNotes": "Inspecting item version-sync-write-door-api"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1572609,
-            "output": 236791,
-            "cacheRead": 105601024,
+            "input": 1594493,
+            "output": 244022,
+            "cacheRead": 110607872,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1572609,
-          "output": 236791,
-          "cacheRead": 105601024,
+          "input": 1594493,
+          "output": 244022,
+          "cacheRead": 110607872,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.767287,
-        "pricingAsOf": "2026-07-31T17:53:35.281Z"
+        "usd": 70.597061,
+        "pricingAsOf": "2026-07-31T17:58:29.364Z"
       }
     },
     "merges": [],
