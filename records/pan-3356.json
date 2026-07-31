@@ -263,10 +263,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:47:06.179Z",
+  "updated": "2026-07-31T20:47:11.234Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -274,7 +274,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:47:04.223Z",
+    "updatedAt": "2026-07-31T20:47:10.569Z",
+    "reviewNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "reviewedAtCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
@@ -356,6 +357,28 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/security.md",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/correctness.md",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/performance.md",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "requirements": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3356/.pan/review/agent-pan-3356-review-a8ac81d0/requirements.md",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      }
     }
   },
   "closeOut": {
@@ -434,7 +457,7 @@
       },
       "costAtCloseOut": {
         "usd": 553.881498,
-        "pricingAsOf": "2026-07-31T20:47:06.172Z"
+        "pricingAsOf": "2026-07-31T20:47:10.576Z"
       }
     },
     "merges": [
