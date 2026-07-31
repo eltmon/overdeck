@@ -215,7 +215,7 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T21:58:15.843Z",
+  "updated": "2026-07-31T21:58:21.741Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "reviewing",
@@ -226,7 +226,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T21:58:13.957Z",
+    "updatedAt": "2026-07-31T21:58:21.691Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -363,10 +363,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 66,
-            "output": 8239,
-            "cacheRead": 5385864,
-            "cacheWrite": 204270
+            "input": 70,
+            "output": 8567,
+            "cacheRead": 5794717,
+            "cacheWrite": 204818
           }
         },
         "work": {
@@ -386,15 +386,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 66,
-          "output": 8239,
-          "cacheRead": 5385864,
-          "cacheWrite": 204270
+          "input": 70,
+          "output": 8567,
+          "cacheRead": 5794717,
+          "cacheWrite": 204818
         }
       },
       "costAtCloseOut": {
-        "usd": 467.650765,
-        "pricingAsOf": "2026-07-31T21:58:15.719Z"
+        "usd": 467.737194,
+        "pricingAsOf": "2026-07-31T21:58:21.707Z"
       }
     },
     "merges": [
