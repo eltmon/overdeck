@@ -238,18 +238,18 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:34:19.423Z",
+  "updated": "2026-07-31T20:34:21.768Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:34:19.384Z",
+    "updatedAt": "2026-07-31T20:34:20.228Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
@@ -379,24 +379,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8150981,
-            "output": 706763,
-            "cacheRead": 430166016,
+            "input": 8155013,
+            "output": 707179,
+            "cacheRead": 430718976,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 34616169,
-          "output": 1160252,
-          "cacheRead": 588819968,
+          "input": 34620201,
+          "output": 1160668,
+          "cacheRead": 589372928,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 502.298389,
-        "pricingAsOf": "2026-07-31T20:34:19.414Z"
+        "usd": 502.607509,
+        "pricingAsOf": "2026-07-31T20:34:21.765Z"
       }
     },
     "merges": [
