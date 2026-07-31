@@ -12,12 +12,13 @@ import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
 import {
-  useActivityQuery,
   useIssueCheckRunsQuery,
   useIssueCostsQuery,
   usePrQuery,
   useReviewStatusQuery,
+  type ActivitySection,
   type IssueCheckRun,
+  type PullRequestData,
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
@@ -368,13 +369,7 @@ function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; mod
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
  * Agents lane, and the beads rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
-function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
-  const review = useReviewStatusQuery(issueId)
-  const pr = usePrQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const rs = review.data
-  const p = pr.data?.pr
-  const sections = activity.data?.sections ?? []
+function NowPanel({ reviewStatus: rs, pr: p, sections, onTab, onOpenAgent }: { reviewStatus: ReviewStatusData | undefined; pr: PullRequestData | null | undefined; sections: readonly ActivitySection[]; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
   const active = sections.find((s) => s.status === 'running' || s.status === 'active' || s.status === 'starting')
   const hasWork = sections.some((s) => s.type === 'work')
   const now = deriveNow(rs, active)
@@ -932,7 +927,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         </main>
         <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">
           <section data-testid="right-rail-now" className="rounded-[var(--radius)] border border-border bg-card p-3">
-            <div data-section="NowPanel"><NowPanel issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
+            <div data-section="NowPanel"><NowPanel reviewStatus={review.data} pr={pr.data?.pr} sections={issueView.activity.sections} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
           </section>
           <RunDetailsCard model={issueView} />
           <section data-testid="right-rail-gates" className="rounded-[var(--radius)] border border-border bg-card p-3">
