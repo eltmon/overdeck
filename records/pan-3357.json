@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:43:06.676Z",
+  "updated": "2026-07-31T15:56:48.307Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "guard-agent-dir-removal": {
-        "writerId": "agent-pan-3357",
-        "agentId": "agent-pan-3357",
-        "pid": 2078495,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:43:06.676Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -103,6 +95,17 @@
         "outcome": "completed",
         "reason": "Routed wipe, retention, orphan, and teardown agent-dir cleanup through removeAgentStateDir; retained marker-file exemptions; added stale purge JSONL preservation coverage and preserved-count logging.",
         "releasedAt": "2026-07-31T15:42:51.107Z"
+      },
+      {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 2078495,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:43:06.676Z",
+        "itemId": "guard-agent-dir-removal",
+        "outcome": "completed",
+        "reason": "Added lint-integrated guard that rejects direct agent-dir removals and requires comments on named-file exemptions; guard discovery also routed omitted close-out, residue-reaper, and legacy-migration directory deletions through the shared door.",
+        "releasedAt": "2026-07-31T15:56:48.307Z"
       }
     ],
     "statusReasons": {
@@ -113,6 +116,10 @@
       "route-deletion-sites": {
         "reason": "Routed wipe, retention, orphan, and teardown agent-dir cleanup through removeAgentStateDir; retained marker-file exemptions; added stale purge JSONL preservation coverage and preserved-count logging.",
         "updatedAt": "2026-07-31T15:42:51.107Z"
+      },
+      "guard-agent-dir-removal": {
+        "reason": "Added lint-integrated guard that rejects direct agent-dir removals and requires comments on named-file exemptions; guard discovery also routed omitted close-out, residue-reaper, and legacy-migration directory deletions through the shared door.",
+        "updatedAt": "2026-07-31T15:56:48.307Z"
       }
     }
   },
@@ -127,6 +134,9 @@
     "route-deletion-sites.route-deletion-sites.ac2": "completed",
     "route-deletion-sites.route-deletion-sites.ac3": "completed",
     "route-deletion-sites.route-deletion-sites.ac4": "completed",
-    "guard-agent-dir-removal": "running"
+    "guard-agent-dir-removal": "completed",
+    "guard-agent-dir-removal.guard-agent-dir-removal.ac1": "completed",
+    "guard-agent-dir-removal.guard-agent-dir-removal.ac2": "completed",
+    "guard-agent-dir-removal.guard-agent-dir-removal.ac3": "completed"
   }
 }
