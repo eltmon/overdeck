@@ -12,6 +12,11 @@
       "timestamp": "2026-07-31T15:26:35.239Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-07-31T16:35:44.855Z",
+      "reason": "end",
+      "note": "No tests skipped or failing. No Mintlify page currently documents Cloister retention, so no user-site page was added. Deviations: the new guard found three additional agent-dir deletion paths omitted from the xBRIEF (close-out, closed-issue residue reaping, and legacy startup migration); all were routed through the deletion door. The PRD named a stale database conversation reader, so the sweep uses the enforced overdeck conversations read door. Added the transcript-preserving deletion door, routed cleanup sites, CI guard, opt-in transcript_days sweep, legacy conv-dir migration command, regression coverage, and docs. Full npm test, typecheck, and lint pass."
     }
   ],
   "feedback": [],
@@ -84,7 +89,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:35:43.427Z",
+  "updated": "2026-07-31T16:35:44.855Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
