@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T16:26:21.720Z",
+  "updated": "2026-07-31T16:27:15.835Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T16:26:21.706Z",
-    "inspectNotes": "Inspecting item version-sync-config-schema"
+    "updatedAt": "2026-07-31T16:27:15.803Z",
+    "inspectNotes": "AC1, AC2 and the three rejection clauses of AC3 are met. AC3's final clause is not: it requires the validator to accept the PRD's myn example block VERBATIM, but tests/unit/lib/projects-version-sync.test.ts:29-43 uses a rewritten fixture. Four of its five fields deviate from drafts/pan-3358.md lines 43-64: expect[0].pattern is '\"version\":\\\\s*\"{version}\"' vs PRD '\"version\": \"{version}\"'; expect[1].pattern is 'VERSION\\\\s*=\\\\s*\"{version}\"' vs PRD 'String version = \"{version}\\\\.git \"'; expect[2] is '<string>{version}</string>' vs PRD 'CFBundleShortVersionString</key>\\\\s*<string>{majorMinor}</string>'; expect[3] is 'versionName\\\\s+\"{version}\"' vs PRD 'versionName \"{majorMinor}\"'; and commit_message is added, which the PRD myn block does not declare. The {majorMinor} placeholder in particular is never exercised. FIX (test-only, implementation is correct): replace the MYN_VERSION_SYNC fixture at tests/unit/lib/projects-version-sync.test.ts:29-43 with the PRD block verbatim, so the assertion at line 84 proves the shipped example is accepted; keep the current variant as an extra case if desired. Verified independently by running validateVersionSyncConfig on the PRD-verbatim myn block: it returns ok:true, so this is a fixture fidelity gap, not a validator defect. Not adjudicated here: AC4 typecheck (verification gate's job)."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 629318,
-            "output": 59377,
-            "cacheRead": 13555200,
+            "input": 633584,
+            "output": 59515,
+            "cacheRead": 13844992,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 629318,
-          "output": 59377,
-          "cacheRead": 13555200,
+          "input": 633584,
+          "output": 59515,
+          "cacheRead": 13844992,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.7055,
-        "pricingAsOf": "2026-07-31T16:26:21.713Z"
+        "usd": 11.875866,
+        "pricingAsOf": "2026-07-31T16:27:15.827Z"
       }
     },
     "merges": [],
