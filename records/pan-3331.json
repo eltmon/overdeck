@@ -169,15 +169,7 @@
       "timestamp": "2026-07-31T00:35:36.508Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-31T00:35:36Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3331\n\n# Review Synthesis — PAN-3331 — 2026-07-31T00:35:02Z\n\n## Verdict: CHANGES REQUESTED — failed-fetch warning is forgotten by the next background poll\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/context.json\n- Branch: feature/pan-3331\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331\n- HEAD reviewed: 798fb13b4beacdfb40633f44b569713824f230c0\n- Cycle number: 5\n- Prior cycle SHA: 41c30af07928fb81def06eaafef88bea21e72e10\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Failed-fetch warning is forgotten by the next background poll — `src/lib/workspaces/git-state.ts:169`\nThis cycle introduced `fetchFailed`, but it describes only the current helper invocation: every `fetch: false` read initializes it to `false`. `WorkspaceActionBand` deliberately follows a fetching read with non-fetching 30-second polls, and `withFreshness()` in `src/dashboard/server/routes/workspace-registry.ts:214` preserves only the last successful `fetchedAt`, not the unresolved failed-fetch outcome. After an initial or manual fetch fails, the card shows the warning once, then the first background poll removes it even though no later fetch succeeded; stale local counts can again appear as freshly credible “up to date” state.\n\nThis blocker survives the cycle-5 convergence gate because the ephemeral `fetchFailed` state and its `false` default were introduced in the current `41c30af0..798fb13b` cycle diff. Persist the last fetch outcome per workspace path alongside the existing attempt/success clocks, clear failure only after a successful fetch, and project it into non-fetching poll responses. Add route or fake-timer component coverage proving the warning remains after the next 30-second non-fetching poll.\n\n## Non-blocking Findings\n\n### Correctness\n- `~` **[demoted: previously reviewed]** `countAheadBehind()` maps a failed `git rev-list` probe to zero/zero, which can render as “up to date.” That code did not change in the current cycle and was part of the previously reviewed Git-state implementation, so it is not promotable in cycle 5.\n- `~` **[demoted: previously reviewed]** Terminal DELETE uses `sessionExists()`, which maps every tmux probe failure to absence and may report `alreadyStopped` when liveness could not be checked. `src/dashboard/server/routes/terminals.ts` did not change this cycle.\n\n### Performance\n- `~` **[demoted: previously reviewed]** A foreground `ui.open_in_editor_command` retains its HTTP request until the editor exits. The relevant browser/open-route code did not change this cycle.\n\n### Requirements\n- The manifest's `commitsOpen` stub heuristic remains a false positive: the Incoming/Hide incoming control writes the state and displays populated commit data.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3331 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -260,10 +252,10 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:43:56.158Z",
+  "updated": "2026-07-31T00:44:01.864Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -271,13 +263,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:11:39.871Z",
-    "updatedAt": "2026-07-31T00:43:54.747Z",
+    "updatedAt": "2026-07-31T00:44:01.826Z",
     "reviewNotes": "Agent re-review request (4/25): Fixed the cycle-5 blocking finding: the failed-fetch warning is now sticky per workspace path. fetchFailedByPath sits alongside the attempt/success clocks, only a successful fetch or pull clears it, and withFreshness projects it into non-fetching poll responses — five fake-timer route tests cover the 30s poll, the throttled fetch=1, recovery after a later success, per-path isolation, and pull clearing it; the first two fail without the sticky state. Also closed the demoted countAheadBehind finding since it is the same defect class: a failed rev-list probe (and, as the test exposed, no comparison ref at all) no longer renders as 'up to date' — ahead/behind are number|null end to end and the card says 'sync state unknown'. The remaining demoted item, sessionExists mapping a tmux probe failure to absence, is filed as PAN-3355 rather than widened into this diff, because the fix changes shared tmux semantics for every caller. 2087 frontend + 818 server tests pass; typecheck, lint, and all guards green.",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "798fb13b4beacdfb40633f44b569713824f230c0",
     "lastVerifiedCommit": "798fb13b4beacdfb40633f44b569713824f230c0",
-    "reviewSpawnedAt": "2026-07-31T00:28:35.387Z",
+    "reviewSpawnedAt": "2026-07-31T00:44:01.825Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -442,7 +434,7 @@
       },
       "costAtCloseOut": {
         "usd": 241.626579,
-        "pricingAsOf": "2026-07-31T00:43:56.156Z"
+        "pricingAsOf": "2026-07-31T00:44:01.849Z"
       }
     },
     "merges": [
