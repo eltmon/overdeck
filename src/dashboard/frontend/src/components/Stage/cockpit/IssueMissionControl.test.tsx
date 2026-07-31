@@ -21,6 +21,15 @@ beforeEach(() => {
   queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
   queryMocks.prQuery.data.pr = { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
+  Object.assign(queryMocks.issueCheckRunsQuery.data.summary, {
+    total: 1,
+    passed: 1,
+    failed: 0,
+    running: 0,
+    skipped: 0,
+    pending: 0,
+    cancelled: 0,
+  })
   unexpectedRequests = []
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async (input, init) => {
     const url = input instanceof Request ? input.url : String(input)
@@ -440,8 +449,6 @@ describe('IssueMissionControl', () => {
     expect(detail).toHaveAttribute('data-show-tabs', 'false')
 
     const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
-    fireEvent.click(within(nav).getByRole('button', { name: /Changes/ }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'files')
     fireEvent.click(within(nav).getByRole('button', { name: 'Activity' }))
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'activity')
   })
@@ -498,6 +505,40 @@ describe('IssueMissionControl', () => {
     fireEvent.click(within(planViews).getByRole('tab', { name: 'PRD' }))
     expect(screen.getByTestId('prd-viewer')).toHaveTextContent('PRD for PAN-1661')
     expect(within(cockpitTabs).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('renders Files, Checks, and Artifacts inside the Changes tab', () => {
+    const { container } = renderMissionControl()
+    const cockpitTabs = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    fireEvent.click(within(cockpitTabs).getByRole('button', { name: /Changes/ }))
+
+    const changeViews = screen.getByRole('tablist', { name: 'Change views' })
+    expect(screen.getByText('Changed files')).toBeInTheDocument()
+    expect(container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')).toBeInTheDocument()
+
+    fireEvent.click(within(changeViews).getByRole('tab', { name: 'Checks' }))
+    expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
+    expect(container.querySelector('[data-section="Code tab"]')).toBeInTheDocument()
+
+    fireEvent.click(within(changeViews).getByRole('tab', { name: 'Artifacts' }))
+    expect(screen.getByText('Artifacts panel')).toBeInTheDocument()
+    expect(container.querySelector('[data-section="Costs / Artifacts / Ship tabs"]')).toBeInTheDocument()
+    expect(within(cockpitTabs).getByRole('button', { name: /Changes/ })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it.each([
+    [{ total: 1, passed: 0, failed: 1, running: 0 }, '!'],
+    [{ total: 1, passed: 0, failed: 0, running: 1 }, '…'],
+    [{ total: 1, passed: 1, failed: 0, running: 0 }, '✓'],
+    [{ total: 0, passed: 0, failed: 0, running: 0 }, null],
+  ] as const)('shows the truthful Changes badge for check summary %j', (summary, expectedBadge) => {
+    Object.assign(queryMocks.issueCheckRunsQuery.data.summary, summary)
+    renderMissionControl()
+
+    const changes = within(screen.getByRole('navigation', { name: 'Issue cockpit tabs' }))
+      .getByRole('button', { name: /Changes/ })
+    expect(changes).toHaveTextContent(expectedBadge ? `Changes${expectedBadge}` : 'Changes')
+    if (!expectedBadge) expect(changes.textContent).toBe('Changes')
   })
 
   it('persists the collapsible agent spine and defaults to collapsed without a saved choice (#2962)', () => {
@@ -684,14 +725,20 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('1/1 pass').length).toBeGreaterThan(0)
   })
 
-  it.each([
-    ['files', 'changes', 'files'],
-    ['terminal', 'session', 'terminal'],
-  ] as const)('keeps the legacy %s surface reachable in %s', (legacyTab, expectedTab, expectedDetailTab) => {
-    window.history.replaceState(null, '', `/?tab=${legacyTab}`)
+  it('keeps the legacy Files surface reachable inside Changes', () => {
+    window.history.replaceState(null, '', '/?tab=files')
     const { container } = renderMissionControl()
 
-    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', expectedTab)
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', expectedDetailTab)
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'changes')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'files')
+    expect(screen.getByText('Changed files')).toBeInTheDocument()
+  })
+
+  it('keeps the legacy Terminal surface reachable inside Session', () => {
+    window.history.replaceState(null, '', '/?tab=terminal')
+    const { container } = renderMissionControl()
+
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'session')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
   })
 })

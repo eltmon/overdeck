@@ -21,6 +21,7 @@ import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../li
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
 import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
+import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
 import { TellComposer } from '../../issue-view/TellComposer'
@@ -66,7 +67,7 @@ type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'f
 type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
 /** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
-const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'changes', 'activity'])
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'activity'])
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -108,7 +109,6 @@ function resolveTabSelection(tabId: string | null): TabSelection | null {
 function issueDetailTabFor(tab: MissionTab | null, subView: MissionSubView | undefined): string | null {
   if (!tab || !ISSUE_DETAIL_TAB_IDS.has(tab)) return null
   if (tab === 'session') return subView === 'terminal' ? 'terminal' : 'conversation'
-  if (tab === 'changes') return subView === 'artifacts' ? 'artifacts' : subView === 'checks' ? null : 'files'
   if (tab === 'activity') return subView === 'history' ? null : 'activity'
   return null
 }
@@ -830,10 +830,35 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 </div>
               </div>
             )}
-            {activeTab === 'changes' && activeSubView === 'checks' && (
-              <div data-section="Code tab" className="space-y-3.5">
-                <GitHubCiPanel issueId={issueId} />
-                <ChangedFilesView issueId={issueId} />
+            {activeTab === 'changes' && (
+              <div className="space-y-3.5">
+                <div role="tablist" aria-label="Change views" className="flex gap-1 border-b border-border pb-2">
+                  {(['files', 'checks', 'artifacts'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('changes', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'files' ? 'Files' : subView === 'checks' ? 'Checks' : 'Artifacts'}
+                    </button>
+                  ))}
+                </div>
+                {activeSubView === 'files' ? (
+                  <div data-section="Conversation / Files / Terminal tabs"><ChangedFilesView issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'checks' ? (
+                  <div data-section="Code tab"><GitHubCiPanel issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'artifacts' ? (
+                  <div data-section="Costs / Artifacts / Ship tabs"><DrawerArtifactsPanel issueId={issueId} /></div>
+                ) : null}
               </div>
             )}
             {activeTab === 'activity' && activeSubView === 'history' && (
