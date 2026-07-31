@@ -248,18 +248,18 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:41:50.739Z",
+  "updated": "2026-07-31T20:41:57.772Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:41:48.691Z",
+    "updatedAt": "2026-07-31T20:41:57.747Z",
     "reviewNotes": "Current-cycle observer reuse is clean; late findings were outside the cycle diff",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
@@ -343,24 +343,6 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
-      }
     }
   },
   "closeOut": {
@@ -368,9 +350,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 25673626,
-            "output": 388278,
-            "cacheRead": 147769856,
+            "input": 25682022,
+            "output": 391913,
+            "cacheRead": 149330944,
             "cacheWrite": 0
           }
         },
@@ -417,15 +399,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 41166629,
-          "output": 1233959,
-          "cacheRead": 609508352,
+          "input": 41175025,
+          "output": 1237594,
+          "cacheRead": 611069440,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 547.606091,
-        "pricingAsOf": "2026-07-31T20:41:48.775Z"
+        "usd": 548.537665,
+        "pricingAsOf": "2026-07-31T20:41:57.760Z"
       }
     },
     "merges": [
@@ -434,7 +416,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3356",
