@@ -29,8 +29,9 @@ export interface WorkspaceGitState {
   detached: boolean;
   /** null when git could not read the status — not the same as zero. */
   dirtyFiles: number | null;
-  ahead: number;
-  behind: number;
+  /** null when the ahead/behind probe failed — not the same as zero. */
+  ahead: number | null;
+  behind: number | null;
   hasUpstream: boolean;
   upstreamRef: string | null;
   recentRemoteCommits: RemoteCommit[];
@@ -298,15 +299,23 @@ export function WorkspaceActionBand({
           <div className="flex items-center gap-3 flex-wrap text-[11px] text-muted-foreground min-w-0">
             {git && (
               <>
+                {/* Same rule as the dirty count: a failed rev-list probe is
+                    unknown, and 0/0 would render as "up to date". */}
                 <span className="whitespace-nowrap" data-testid="workspace-band-git-counts">
-                  {git.behind > 0 && (
-                    <span className="text-warning-foreground" data-testid="workspace-band-git-behind">
-                      ↓{git.behind} behind
-                    </span>
+                  {git.ahead === null || git.behind === null ? (
+                    <span data-testid="workspace-band-git-counts-unknown">sync state unknown</span>
+                  ) : (
+                    <>
+                      {git.behind > 0 && (
+                        <span className="text-warning-foreground" data-testid="workspace-band-git-behind">
+                          ↓{git.behind} behind
+                        </span>
+                      )}
+                      {git.behind > 0 && git.ahead > 0 && ' · '}
+                      {git.ahead > 0 && <span data-testid="workspace-band-git-ahead">↑{git.ahead} ahead</span>}
+                      {git.behind === 0 && git.ahead === 0 && <span data-testid="workspace-band-git-even">up to date</span>}
+                    </>
                   )}
-                  {git.behind > 0 && git.ahead > 0 && ' · '}
-                  {git.ahead > 0 && <span data-testid="workspace-band-git-ahead">↑{git.ahead} ahead</span>}
-                  {git.behind === 0 && git.ahead === 0 && <span data-testid="workspace-band-git-even">up to date</span>}
                 </span>
                 {/* null means git could not read the status. Saying "clean"
                     there would claim something nobody established — and Pull

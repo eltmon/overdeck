@@ -63,10 +63,10 @@ export interface WorkspaceGitState {
    * something that was never established, and the pull guard refuses on it.
    */
   dirtyFiles: number | null;
-  /** Commits on HEAD that the comparison ref lacks. */
-  ahead: number;
-  /** Commits on the comparison ref that HEAD lacks. */
-  behind: number;
+  /** Commits on HEAD that the comparison ref lacks; null when the probe failed. */
+  ahead: number | null;
+  /** Commits on the comparison ref that HEAD lacks; null when the probe failed. */
+  behind: number | null;
   /** True when the branch has its own configured upstream. */
   hasUpstream: boolean;
   /** The ref the counts were computed against (`origin/main`, `origin/HEAD`), or null when none resolved. */

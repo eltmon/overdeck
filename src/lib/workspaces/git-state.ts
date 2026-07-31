@@ -115,9 +115,14 @@ async function countDirtyFiles(cwd: string): Promise<number | null> {
   return status.stdout.split('\n').filter((line) => line.length > 0).length;
 }
 
-async function countAheadBehind(cwd: string, ref: string): Promise<{ ahead: number; behind: number }> {
+/**
+ * Ahead/behind counts, or null when the probe failed. Null is not zero: 0/0
+ * renders as "up to date", which is the same "unknown presented as good news"
+ * mistake the dirty-status count already avoids.
+ */
+async function countAheadBehind(cwd: string, ref: string): Promise<{ ahead: number; behind: number } | null> {
   const result = await git(cwd, ['rev-list', '--left-right', '--count', `HEAD...${ref}`]);
-  if (!result.ok) return { ahead: 0, behind: 0 };
+  if (!result.ok) return null;
   const [left, right] = result.stdout.split(/\s+/);
   return {
     ahead: Number.parseInt(left ?? '0', 10) || 0,
@@ -182,7 +187,10 @@ export async function getWorkspaceGitState(
 
   const [dirtyFiles, counts, recentRemoteCommits] = await Promise.all([
     countDirtyFiles(workspacePath),
-    comparisonRef ? countAheadBehind(workspacePath, comparisonRef) : Promise.resolve({ ahead: 0, behind: 0 }),
+    // Null with no comparison ref as well as on a failed probe: a checkout with
+    // no remote to compare against is not "up to date" with anything, and 0/0
+    // is exactly how the card renders that claim.
+    comparisonRef ? countAheadBehind(workspacePath, comparisonRef) : Promise.resolve(null),
     comparisonRef ? listRemoteCommits(workspacePath, comparisonRef) : Promise.resolve([]),
   ]);
 
@@ -193,8 +201,8 @@ export async function getWorkspaceGitState(
     // here would make the card say "clean" about a tree whose cleanliness was
     // never established.
     dirtyFiles,
-    ahead: counts.ahead,
-    behind: counts.behind,
+    ahead: counts?.ahead ?? null,
+    behind: counts?.behind ?? null,
     hasUpstream: upstream !== null,
     upstreamRef: comparisonRef,
     recentRemoteCommits,

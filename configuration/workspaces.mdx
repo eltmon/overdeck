@@ -105,9 +105,11 @@ every 30 seconds per checkout); the background poll only re-reads what that
 fetch left behind. **Incoming (n)** expands the list of commits waiting for you.
 
 When something can't be determined the card says so instead of guessing in your
-favour: a working tree git can't read reads **status unknown**, never "clean",
-and a fetch that can't reach the remote says so rather than letting stale counts
-look freshly confirmed.
+favour: a working tree git can't read reads **status unknown**, never "clean";
+a comparison that couldn't run reads **sync state unknown**, never "up to date";
+and a fetch that can't reach the remote keeps saying so — through the background
+polls, until a fetch actually succeeds — rather than letting stale counts look
+freshly confirmed after one refresh.
 
 **Pull** is fast-forward only, and it tells you plainly when it will not run:
 an uncommitted file, a merge or rebase already in progress, a branch that has

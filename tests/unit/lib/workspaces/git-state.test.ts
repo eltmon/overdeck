@@ -280,6 +280,14 @@ describe('dirty-status failures fail closed', () => {
     expect(state.dirtyFiles).toBeNull();
   });
 
+  it('reports ahead/behind as null when the comparison probe fails', async () => {
+    const state = await getWorkspaceGitState(notARepo);
+
+    // 0/0 would render as "up to date" about a comparison that never ran.
+    expect(state.ahead).toBeNull();
+    expect(state.behind).toBeNull();
+  });
+
   it('reports a requested fetch that failed instead of implying fresh counts', async () => {
     const state = await getWorkspaceGitState(notARepo, { fetch: true });
 

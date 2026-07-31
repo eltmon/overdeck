@@ -263,6 +263,93 @@ describe('unknown state passes through the route (review cycle 4)', () => {
   });
 });
 
+describe('failed-fetch warning is sticky (review cycle 5)', () => {
+  /** A fetching read that fails, then a non-fetching poll, on one path. */
+  function failingThenPolling(path: string) {
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path }));
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) =>
+      gitState({ fetchedAt: null, fetchFailed: options.fetch === true }));
+  }
+
+  it('keeps the warning through the next background poll, which does not fetch', async () => {
+    vi.useFakeTimers();
+    const path = uniquePath();
+    failingThenPolling(path);
+
+    const failed = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    expect((failed.body.git as WorkspaceGitState).fetchFailed).toBe(true);
+
+    // The band polls every 30s WITHOUT forcing a fetch; the helper reports
+    // fetchFailed:false for that read, so only sticky route state can hold it.
+    vi.advanceTimersByTime(30_000);
+    const polled = await call('GET', '/api/workspace-registry/ws-main/git?fetch=0');
+
+    expect((polled.body.git as WorkspaceGitState).fetchFailed).toBe(true);
+  });
+
+  it('keeps the warning on a fetch=1 read the throttle skips', async () => {
+    vi.useFakeTimers();
+    const path = uniquePath();
+    failingThenPolling(path);
+
+    await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    vi.advanceTimersByTime(5_000);
+    const throttled = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    expect((throttled.body.git as WorkspaceGitState).fetchFailed).toBe(true);
+  });
+
+  it('clears the warning only once a fetch succeeds, and keeps it cleared', async () => {
+    vi.useFakeTimers();
+    const path = uniquePath();
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path }));
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) =>
+      gitState({ fetchedAt: null, fetchFailed: options.fetch === true }));
+
+    await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    // The remote comes back; the next due fetch succeeds.
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) =>
+      gitState({ fetchedAt: options.fetch ? Date.now() : null, fetchFailed: false }));
+    vi.advanceTimersByTime(30_000);
+    const recovered = await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+    expect((recovered.body.git as WorkspaceGitState).fetchFailed).toBe(false);
+
+    const polled = await call('GET', '/api/workspace-registry/ws-main/git?fetch=0');
+    expect((polled.body.git as WorkspaceGitState).fetchFailed).toBe(false);
+  });
+
+  it('does not leak one path failure onto another workspace', async () => {
+    vi.useFakeTimers();
+    const failingPath = uniquePath();
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: failingPath }));
+    routeMocks.getWorkspaceGitState.mockImplementation(async (_path: string, options: { fetch?: boolean }) =>
+      gitState({ fetchedAt: null, fetchFailed: options.fetch === true }));
+    await call('GET', '/api/workspace-registry/ws-a/git?fetch=1');
+
+    routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: uniquePath() }));
+    routeMocks.getWorkspaceGitState.mockResolvedValue(gitState({ fetchedAt: 99, fetchFailed: false }));
+    const other = await call('GET', '/api/workspace-registry/ws-b/git?fetch=1');
+
+    expect((other.body.git as WorkspaceGitState).fetchFailed).toBe(false);
+  });
+
+  it('clears the warning after a successful pull', async () => {
+    vi.useFakeTimers();
+    const path = uniquePath();
+    failingThenPolling(path);
+    await call('GET', '/api/workspace-registry/ws-main/git?fetch=1');
+
+    routeMocks.pullWorkspaceFastForward.mockResolvedValue({ ok: true, state: gitState({ behind: 0 }) });
+    const pulled = await call('POST', '/api/workspace-registry/ws-main/pull');
+    expect((pulled.body.git as WorkspaceGitState).fetchFailed).toBe(false);
+
+    routeMocks.getWorkspaceGitState.mockResolvedValue(gitState({ fetchedAt: null, fetchFailed: false }));
+    const polled = await call('GET', '/api/workspace-registry/ws-main/git?fetch=0');
+    expect((polled.body.git as WorkspaceGitState).fetchFailed).toBe(false);
+  });
+});
+
 describe('GET /api/workspace-registry/:id/git authentication', () => {
   it('rejects an unauthenticated read before fetching, since fetch=1 rewrites remote refs', async () => {
     routeMocks.getWorkspaceById.mockReturnValue(baseWorkspace({ path: uniquePath() }));

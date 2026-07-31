@@ -202,6 +202,14 @@ const getWorkspaceRegistryMemoryRoute = HttpRouter.add(
  */
 const lastFetchAttemptByPath = new Map<string, number>();
 const lastFetchSuccessByPath = new Map<string, number>();
+/**
+ * Paths whose most recent fetch attempt failed with no success since. The
+ * module's own `fetchFailed` describes one invocation, so it is false on every
+ * non-fetching read — and the band follows a fetching read with 30s
+ * non-fetching polls, which would erase the warning while the remote was still
+ * unreachable and let stale counts read as freshly credible again.
+ */
+const fetchFailedByPath = new Set<string>();
 /** In-flight fetches, so concurrent callers share one `git fetch` per path. */
 const inFlightFetchByPath = new Map<string, Promise<WorkspaceGitState>>();
 const FETCH_MIN_INTERVAL_MS = 30_000;
@@ -211,8 +219,24 @@ function fetchIsDue(path: string, now: number): boolean {
   return last === undefined || now - last >= FETCH_MIN_INTERVAL_MS;
 }
 
+/** Record the outcome of an attempted fetch. Only a success clears the failure. */
+function recordFetchOutcome(path: string, state: WorkspaceGitState): void {
+  if (state.fetchedAt !== null) {
+    lastFetchSuccessByPath.set(path, state.fetchedAt);
+    fetchFailedByPath.delete(path);
+  } else {
+    fetchFailedByPath.add(path);
+  }
+}
+
 function withFreshness(state: WorkspaceGitState, path: string): WorkspaceGitState {
-  return { ...state, fetchedAt: state.fetchedAt ?? lastFetchSuccessByPath.get(path) ?? null };
+  return {
+    ...state,
+    fetchedAt: state.fetchedAt ?? lastFetchSuccessByPath.get(path) ?? null,
+    // Sticky until a fetch succeeds, so a background poll cannot quietly
+    // upgrade unreachable-remote counts back to confident ones.
+    fetchFailed: state.fetchFailed || fetchFailedByPath.has(path),
+  };
 }
 
 /**
@@ -233,7 +257,7 @@ async function readGitState(path: string, wantFetch: boolean): Promise<Workspace
       lastFetchAttemptByPath.set(path, Date.now());
       const run = getWorkspaceGitState(path, { fetch: true })
         .then((state) => {
-          if (state.fetchedAt !== null) lastFetchSuccessByPath.set(path, state.fetchedAt);
+          recordFetchOutcome(path, state);
           return state;
         })
         .finally(() => { inFlightFetchByPath.delete(path); });
@@ -294,11 +318,13 @@ const postWorkspaceRegistryPullRoute = HttpRouter.add(
         { status: result.reason === 'error' ? 500 : 409 },
       );
     }
-    // The pull itself contacted the remote, so it counts as a fetch.
+    // The pull itself contacted the remote successfully, so it counts as a
+    // fetch — and clears any standing failed-fetch warning.
     const pulledAt = Date.now();
     lastFetchAttemptByPath.set(workspace.path, pulledAt);
     lastFetchSuccessByPath.set(workspace.path, pulledAt);
-    return jsonResponse({ git: { ...result.state, fetchedAt: pulledAt } });
+    fetchFailedByPath.delete(workspace.path);
+    return jsonResponse({ git: { ...result.state, fetchedAt: pulledAt, fetchFailed: false } });
   })),
 );
 

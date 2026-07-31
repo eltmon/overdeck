@@ -134,6 +134,13 @@ describe('git card (ac1)', () => {
     expect(screen.queryByTestId('workspace-band-git-fetch-failed')).toBeNull();
   });
 
+  it('says the sync state is unknown rather than up to date when the probe failed', async () => {
+    renderBand({ git: gitState({ ahead: null, behind: null }) });
+
+    expect(await screen.findByTestId('workspace-band-git-counts-unknown')).toHaveTextContent('sync state unknown');
+    expect(screen.queryByTestId('workspace-band-git-even')).toBeNull();
+  });
+
   it('shows a detached-HEAD chip instead of the Pull action', async () => {
     renderBand({ git: gitState({ branch: null, detached: true }) });
 

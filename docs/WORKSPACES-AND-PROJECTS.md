@@ -196,13 +196,23 @@ stale refs, throttled to one fetch per 30 s per path in the route; a throttled
 read still reports the last fetch time in `fetchedAt`. The frontend asks for
 `fetch=1` on mount and on Refresh, and polls every 30 s without forcing one.
 
-**Unknown is a first-class state, never rendered as good news.** `dirtyFiles` is
-`number | null` — null means git could not read the working tree (an unreadable
-index, output overflowing the buffer), and the card says "status unknown" rather
-than "clean". Pull refuses on the same null, so the card and the action always
-agree. `fetchFailed` is true when a fetch was asked for and did not succeed; the
-counts are then whatever the local refs already said, and the card says the
-remote could not be reached instead of implying the numbers were just confirmed.
+**Unknown is a first-class state, never rendered as good news.** Three fields
+carry it:
+
+- `dirtyFiles: number | null` — null when git could not read the working tree
+  (an unreadable index, output overflowing the buffer). The card says "status
+  unknown", not "clean", and Pull refuses on the same null, so the card and the
+  action always agree.
+- `ahead`/`behind: number | null` — null when the `rev-list` probe failed, and
+  also when there is no ref to compare against at all. A checkout with no
+  remote is not "up to date" with anything, and 0/0 is exactly how the card
+  would render that claim. It shows "sync state unknown" instead.
+- `fetchFailed: boolean` — a fetch was asked for and did not succeed, so the
+  counts are whatever the local refs already said. **The route makes this
+  sticky per path**: the module's flag describes one call and is false on every
+  non-fetching read, so the band's 30-second poll would otherwise erase the
+  warning while the remote was still unreachable. `fetchFailedByPath` clears
+  only on a successful fetch or pull.
 
 The throttle keeps two clocks and coalesces. `lastFetchAttemptByPath` is claimed
 *before* the fetch is awaited, so two requests arriving in the same tick cannot
