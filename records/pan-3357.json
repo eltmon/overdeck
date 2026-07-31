@@ -291,7 +291,7 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:19:55.087Z",
+  "updated": "2026-07-31T20:19:58.011Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -301,7 +301,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:19:55.036Z",
+    "updatedAt": "2026-07-31T20:19:55.141Z",
     "reviewNotes": "[correctness] General agent removal drops the only eligibility/linkage record while retaining transcripts — `src/lib/overdeck/agents.ts:868`",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
@@ -474,7 +474,7 @@
       },
       "costAtCloseOut": {
         "usd": 346.151412,
-        "pricingAsOf": "2026-07-31T20:19:55.072Z"
+        "pricingAsOf": "2026-07-31T20:19:58.007Z"
       }
     },
     "merges": [
