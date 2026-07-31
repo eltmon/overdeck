@@ -291,7 +291,7 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:20:00.148Z",
+  "updated": "2026-07-31T20:20:05.558Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -307,7 +307,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "c01c3442cee4e0c92995a120cc54483f205f0f10",
     "lastVerifiedCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
-    "reviewRequestedAt": "2026-07-31T20:19:50.790Z",
+    "reviewRequestedAt": "2026-07-31T20:20:05.006Z",
     "reviewSpawnedAt": "2026-07-31T20:09:05.725Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -410,7 +410,8 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T20:19:49.432Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z"
   },
   "closeOut": {
     "usage": {
