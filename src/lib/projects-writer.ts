@@ -88,12 +88,19 @@ export async function setProjectVersionSync(
     const keyRange = nodeRange(versionPair.key);
     const valueRange = nodeRange(versionPair.value);
     if (!keyRange || !valueRange) throw new Error(`Could not locate ${projectKey}.version_sync in projects.yaml`);
-    updated = content.slice(0, lineStart(content, keyRange[0])) + replacement + content.slice(valueRange[2]);
+    let start = lineStart(content, keyRange[0]);
+    if (block === null && valueRange[2] === content.length && !content.endsWith('\n') && start > 0 && content[start - 1] === '\n') {
+      start -= 1;
+    }
+    updated = content.slice(0, start) + replacement + content.slice(valueRange[2]);
   } else if (block === null) {
     return;
   } else {
     if (!project.range) throw new Error(`Could not locate project ${projectKey} in projects.yaml`);
-    updated = content.slice(0, project.range[1]) + replacement + content.slice(project.range[1]);
+    const offset = project.range[1];
+    const atLineBoundary = offset === 0 || content[offset - 1] === '\n';
+    const insertion = atLineBoundary ? replacement : `\n${replacement.trimEnd()}`;
+    updated = content.slice(0, offset) + insertion + content.slice(offset);
   }
 
   await writeFile(PROJECTS_CONFIG_FILE, updated, 'utf-8');

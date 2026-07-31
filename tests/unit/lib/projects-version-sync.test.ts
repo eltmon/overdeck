@@ -118,6 +118,17 @@ describe('setProjectVersionSync', () => {
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
   });
 
+  it('inserts after a last project with no trailing newline and clears byte-exactly', async () => {
+    const fixture = 'projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha';
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await setProjectVersionSync('alpha', MYN_VERSION_SYNC);
+    expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(MYN_VERSION_SYNC);
+
+    await setProjectVersionSync('alpha', null);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
   it('rejects a flow-style project without changing the file', async () => {
     const fixture = 'projects:\n  alpha: { name: Alpha, path: /repo/alpha }\n';
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
