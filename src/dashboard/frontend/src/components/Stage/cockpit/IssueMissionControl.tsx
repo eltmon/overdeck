@@ -535,6 +535,14 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setActiveSubView('conversation')
   }, [issueAgents.length])
 
+  const applySessionSelection = useCallback((session: SessionNode) => {
+    tabSelectionLocked.current = true
+    setSelectedTreeSession(session)
+    setTreeContext(null)
+    setActiveTab(null)
+    setActiveSubView(undefined)
+  }, [])
+  const { queue: queuePhaseSession, cancel: cancelPhaseSession } = useDeferredSessionSelection(treeSessions, applySessionSelection)
   const toggleSpine = () => {
     setSpineCollapsed((collapsed) => {
       const next = !collapsed
@@ -543,6 +551,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     })
   }
   const selectTab = (tab: MissionTab, subView: MissionSubView | undefined = DEFAULT_SUB_VIEW[tab]) => {
+    cancelPhaseSession()
     tabSelectionLocked.current = true
     setActiveTab(tab)
     setActiveSubView(subView)
@@ -550,6 +559,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setSelectedTreeSession(null)
   }
   const selectIssueFromTree = () => {
+    cancelPhaseSession()
     tabSelectionLocked.current = true
     setTreeContext('issue')
     setSelectedTreeSession(null)
@@ -557,14 +567,10 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     setActiveSubView(undefined)
   }
   const selectSessionFromTree = (session: SessionNode) => {
-    tabSelectionLocked.current = true
-    setSelectedTreeSession(session)
-    setTreeContext(null)
-    setActiveTab(null)
-    setActiveSubView(undefined)
+    cancelPhaseSession()
+    applySessionSelection(session)
   }
-  const resolveNeedsYouAgentAction = useCockpitNeedsYouActions(treeSessions, selectSessionFromTree)
-  const queuePhaseSession = useDeferredSessionSelection(treeSessions, selectSessionFromTree)
+  const resolveNeedsYouAction = useCockpitNeedsYouActions(issueId, treeSessions, selectSessionFromTree)
   // Open an agent's conversation by session type (work/review/test/…). Shared by
   // the pipeline phases (#4) and the Overview "Now" links (#9).
   const openAgentByType = (type: string): boolean => {
@@ -712,7 +718,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       <NeedsYouSlot
         model={issueView}
         actions={headerActions.all}
-        resolveAgentAction={resolveNeedsYouAgentAction}
+        resolveAction={resolveNeedsYouAction}
       />
 
       <CockpitPhaseRail

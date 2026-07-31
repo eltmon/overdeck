@@ -14,7 +14,7 @@ The kit currently owns these reusable pieces:
 - `AgentStepRow` renders work, review, test, and ship sessions with the same status, model, cost, verdict, and operator affordances.
 - `ActiveAgentPanel` renders selected-agent metadata plus resume and message actions; the rich transcript stays in the Session surface.
 - `TellComposer` is the shared message form used by `ActiveAgentPanel`; the Session transcript keeps its own selected-agent composer inside `IssueDetail`, so one visible conversation cannot send to another agent.
-- `NeedsYouSlot` prioritizes one operator decision. Issue-level decisions use the shared registry; agent-scoped cockpit alerts resolve through the existing exact-agent simple actions, leaving the protected `IssueActionMenu` subsystem unchanged.
+- `NeedsYouSlot` prioritizes one operator decision. Shared issue actions use the registry; cockpit-specific alerts use the existing exact-agent and review-unstick simple actions, leaving the protected `IssueActionMenu` subsystem unchanged.
 - `RunDetailsCard` presents the active role, model, harness, start time, and workspace from `IssueViewModel`.
 - `ShipProgress` renders compact and full merge/verification progress.
 - `VerificationGates` renders the current verification cycle and gate results.

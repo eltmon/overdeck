@@ -26,6 +26,8 @@ beforeEach(() => {
     verificationStatus: 'passed',
     reviewNotes: 'Security blocker',
     readyForMerge: false,
+    stuck: false,
+    stuckReason: undefined,
   })
   queryMocks.prQuery.data.pr = { number: 1661, url: 'https://github.com/eltmon/overdeck/pull/1661', additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
@@ -464,6 +466,21 @@ describe('IssueMissionControl', () => {
     expect(queryMocks.exactAgentActions.unpause.mutate).toHaveBeenCalledWith({
       agentId: 'agent-pan-1661-review-security',
     })
+  })
+
+  it('clears review-stuck state through the issue unstick action', () => {
+    Object.assign(queryMocks.reviewStatusQuery.data, {
+      stuck: true,
+      stuckReason: 'Review is not converging',
+    })
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear stuck gate' }))
+
+    expect(queryMocks.exactAgentActions.unstick.mutate).toHaveBeenCalledWith({
+      issueId: 'PAN-1661',
+    })
+    expect(queryMocks.exactAgentActions.recover.mutate).not.toHaveBeenCalled()
   })
 
   it('lifts the detail tabs between the header and body without wrapping', () => {

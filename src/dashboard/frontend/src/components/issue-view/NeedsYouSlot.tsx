@@ -45,7 +45,6 @@ const COPY: Record<OperatorNeedsYou['kind'], { title: string; fallback: string }
 
 const ACTION_KEY: Partial<Record<OperatorNeedsYou['kind'], string>> = {
   awaiting_input: 'tell',
-  stuck: 'recoverAgent',
   troubled: 'untroubled',
   paused: 'unpause',
   stale_review: 'purgeReview',
@@ -76,10 +75,10 @@ export interface NeedsYouResolvedAction {
   invoke: () => void;
 }
 
-export function NeedsYouSlot({ model, actions, resolveAgentAction }: {
+export function NeedsYouSlot({ model, actions, resolveAction }: {
   model: IssueViewModel;
   actions: readonly IssueActionView[];
-  resolveAgentAction?: (item: OperatorNeedsYou) => NeedsYouResolvedAction | undefined;
+  resolveAction?: (item: OperatorNeedsYou) => NeedsYouResolvedAction | undefined;
 }) {
   const items = sortOperatorNeeds(model.operator.needsYouItems);
   const active = items[0];
@@ -87,10 +86,10 @@ export function NeedsYouSlot({ model, actions, resolveAgentAction }: {
 
   const copy = COPY[active.kind];
   const usesExactAgent = !!active.sessionId && AGENT_SCOPED_KINDS.has(active.kind);
-  const agentAction = usesExactAgent ? resolveAgentAction?.(active) : undefined;
-  const actionKey = usesExactAgent ? undefined : ACTION_KEY[active.kind];
+  const customAction = resolveAction?.(active);
+  const actionKey = customAction || usesExactAgent ? undefined : ACTION_KEY[active.kind];
   const registryAction = actionKey ? actions.find((candidate) => candidate.action.key === actionKey) : undefined;
-  const resolvedAction: NeedsYouResolvedAction | undefined = agentAction ?? (registryAction ? {
+  const resolvedAction: NeedsYouResolvedAction | undefined = customAction ?? (registryAction ? {
     label: registryAction.action.label,
     description: registryAction.action.description,
     enabled: registryAction.enabled,

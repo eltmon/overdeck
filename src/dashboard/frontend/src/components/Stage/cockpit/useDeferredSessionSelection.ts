@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { SessionNode } from '@overdeck/contracts';
 
 export function useDeferredSessionSelection(
@@ -15,5 +15,8 @@ export function useDeferredSessionSelection(
     setPendingSessionId(null);
   }, [onSelectSession, pendingSessionId, sessions]);
 
-  return setPendingSessionId;
+  const queue = useCallback((sessionId: string) => setPendingSessionId(sessionId), []);
+  const cancel = useCallback(() => setPendingSessionId(null), []);
+
+  return { queue, cancel };
 }

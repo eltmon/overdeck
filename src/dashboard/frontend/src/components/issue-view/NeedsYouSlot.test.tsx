@@ -142,7 +142,7 @@ describe('NeedsYouSlot', () => {
   it('resolves agent-scoped actions outside the protected issue action menu', () => {
     const registryInvoke = vi.fn();
     const targetedInvoke = vi.fn();
-    const resolveAgentAction = vi.fn(() => ({
+    const resolveAction = vi.fn(() => ({
       label: 'Unpause agent',
       description: 'Unpause this exact agent.',
       enabled: true,
@@ -153,15 +153,43 @@ describe('NeedsYouSlot', () => {
       <NeedsYouSlot
         model={modelWith([{ kind: 'paused', sessionId: 'agent-pan-3356-review-security' }])}
         actions={[actionView('unpause', 'Unpause agent', registryInvoke)]}
-        resolveAgentAction={resolveAgentAction}
+        resolveAction={resolveAction}
       />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Unpause agent' }));
 
-    expect(resolveAgentAction).toHaveBeenCalledWith({
+    expect(resolveAction).toHaveBeenCalledWith({
       kind: 'paused',
       sessionId: 'agent-pan-3356-review-security',
+    });
+    expect(targetedInvoke).toHaveBeenCalledOnce();
+    expect(registryInvoke).not.toHaveBeenCalled();
+  });
+
+  it('resolves issue-scoped stuck actions before registry fallback', () => {
+    const registryInvoke = vi.fn();
+    const targetedInvoke = vi.fn();
+    const resolveAction = vi.fn(() => ({
+      label: 'Clear stuck gate',
+      description: 'Clear the review-convergence gate.',
+      enabled: true,
+      isPending: false,
+      invoke: targetedInvoke,
+    }));
+    render(
+      <NeedsYouSlot
+        model={modelWith([{ kind: 'stuck', reason: 'Review is not converging' }])}
+        actions={[actionView('recoverAgent', 'Recover agent', registryInvoke)]}
+        resolveAction={resolveAction}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear stuck gate' }));
+
+    expect(resolveAction).toHaveBeenCalledWith({
+      kind: 'stuck',
+      reason: 'Review is not converging',
     });
     expect(targetedInvoke).toHaveBeenCalledOnce();
     expect(registryInvoke).not.toHaveBeenCalled();
