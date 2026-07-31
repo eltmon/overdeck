@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:24:33.663Z",
+  "updated": "2026-07-31T16:29:04.625Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "transcript-retention-docs": {
-        "writerId": "agent-pan-3357",
-        "agentId": "agent-pan-3357",
-        "pid": 1740775,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:24:33.663Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Added idempotent pan admin migrate-legacy-agent-dirs command that copies only missing conv-* dirs from ~/.panopticon to ~/.overdeck with timestamps preserved, never overwrites or mutates legacy data, and reports copied/skipped counts.",
         "releasedAt": "2026-07-31T16:24:10.061Z"
+      },
+      {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 1740775,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:24:33.663Z",
+        "itemId": "transcript-retention-docs",
+        "outcome": "completed",
+        "reason": "Documented retain-forever defaults, the shared deletion door, opt-in transcript_days sweep, and conv-* invariant; replaced stale Phase 6 comments with current lifecycle owners. No Mintlify page currently documents Cloister retention.",
+        "releasedAt": "2026-07-31T16:29:04.625Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "migrate-legacy-agent-dirs": {
         "reason": "Added idempotent pan admin migrate-legacy-agent-dirs command that copies only missing conv-* dirs from ~/.panopticon to ~/.overdeck with timestamps preserved, never overwrites or mutates legacy data, and reports copied/skipped counts.",
         "updatedAt": "2026-07-31T16:24:10.061Z"
+      },
+      "transcript-retention-docs": {
+        "reason": "Documented retain-forever defaults, the shared deletion door, opt-in transcript_days sweep, and conv-* invariant; replaced stale Phase 6 comments with current lifecycle owners. No Mintlify page currently documents Cloister retention.",
+        "updatedAt": "2026-07-31T16:29:04.625Z"
       }
     }
   },
@@ -185,6 +192,9 @@
     "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac1": "completed",
     "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac2": "completed",
     "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac3": "completed",
-    "transcript-retention-docs": "running"
+    "transcript-retention-docs": "completed",
+    "transcript-retention-docs.transcript-retention-docs.ac1": "completed",
+    "transcript-retention-docs.transcript-retention-docs.ac2": "completed",
+    "transcript-retention-docs.transcript-retention-docs.ac3": "completed"
   }
 }
