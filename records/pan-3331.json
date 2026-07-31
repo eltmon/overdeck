@@ -222,10 +222,10 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:19:13.882Z",
+  "updated": "2026-07-31T00:19:15.338Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "blocked",
+    "reviewStatus": "reviewing",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -233,14 +233,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:11:39.871Z",
-    "updatedAt": "2026-07-31T00:19:13.107Z",
+    "updatedAt": "2026-07-31T00:19:13.909Z",
     "reviewNotes": "unreadable working-tree status is rendered as clean",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "41c30af07928fb81def06eaafef88bea21e72e10",
     "lastVerifiedCommit": "41c30af07928fb81def06eaafef88bea21e72e10",
     "reviewRequestedAt": "2026-07-31T00:11:39.871Z",
-    "reviewSpawnedAt": "2026-07-31T00:10:03.411Z",
+    "reviewSpawnedAt": "2026-07-31T00:19:13.908Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -405,7 +405,7 @@
       },
       "costAtCloseOut": {
         "usd": 192.456453,
-        "pricingAsOf": "2026-07-31T00:19:13.131Z"
+        "pricingAsOf": "2026-07-31T00:19:14.035Z"
       }
     },
     "merges": [
