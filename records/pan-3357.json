@@ -116,7 +116,7 @@
     {
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-31T18:45:05.227Z"
+      "timestamp": "2026-07-31T18:45:06.459Z"
     }
   ],
   "feedback": [],
@@ -189,10 +189,10 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T18:45:05.228Z",
+  "updated": "2026-07-31T18:45:06.460Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -200,13 +200,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T18:45:02.610Z",
+    "updatedAt": "2026-07-31T18:45:04.024Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
     "lastVerifiedCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
-    "reviewSpawnedAt": "2026-07-31T18:33:05.535Z",
+    "reviewSpawnedAt": "2026-07-31T18:45:04.024Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -338,7 +338,7 @@
       },
       "costAtCloseOut": {
         "usd": 234.393994,
-        "pricingAsOf": "2026-07-31T18:45:02.636Z"
+        "pricingAsOf": "2026-07-31T18:45:04.285Z"
       }
     },
     "merges": [
