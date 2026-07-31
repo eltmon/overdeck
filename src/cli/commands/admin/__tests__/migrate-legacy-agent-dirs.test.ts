@@ -1,22 +1,27 @@
 import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { homedir, tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   migrateLegacyAgentDirs,
+  resolveLegacyAgentDirMigrationHomes,
   runMigrateLegacyAgentDirsCommand,
 } from '../migrate-legacy-agent-dirs.js';
 
 let legacyHome: string;
 let currentHome: string;
+let previousOverdeckHome: string | undefined;
 
 beforeEach(() => {
   legacyHome = mkdtempSync(join(tmpdir(), 'legacy-agent-home-'));
   currentHome = mkdtempSync(join(tmpdir(), 'current-agent-home-'));
+  previousOverdeckHome = process.env.OVERDECK_HOME;
 });
 
 afterEach(() => {
+  if (previousOverdeckHome === undefined) delete process.env.OVERDECK_HOME;
+  else process.env.OVERDECK_HOME = previousOverdeckHome;
   rmSync(legacyHome, { recursive: true, force: true });
   rmSync(currentHome, { recursive: true, force: true });
 });
@@ -65,5 +70,14 @@ describe('migrateLegacyAgentDirs', () => {
       skipped: 0,
     });
     expect(existsSync(join(currentHome, 'agents'))).toBe(false);
+  });
+
+  it('resolves the configured Overdeck home dynamically', () => {
+    process.env.OVERDECK_HOME = currentHome;
+
+    expect(resolveLegacyAgentDirMigrationHomes()).toEqual({
+      legacyHome: join(homedir(), '.panopticon'),
+      currentHome,
+    });
   });
 });

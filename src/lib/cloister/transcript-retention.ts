@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { Effect } from 'effect';
 
 import { isConversationDirectory } from '../agent-directory-cleanup.js';
+import { listAllAgentsSync } from '../overdeck/agents.js';
 import { listArchivedConversations, listConversations } from '../overdeck/conversations.js';
+import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { AGENTS_DIR } from '../paths.js';
 import { listSessionNames } from '../tmux.js';
 
@@ -14,12 +16,38 @@ interface TranscriptRetentionConversation {
   archivedAt: string | null;
 }
 
+export interface TranscriptRetentionAgent {
+  id: string;
+  issueId: string;
+  status: string;
+  workspace?: string | null;
+  paused?: boolean | null;
+  troubled?: boolean | null;
+  stoppedByUser?: boolean | null;
+}
+
+type ReadClosedOutRecord = (
+  workspace: string,
+  issueId: string,
+) => { pipeline?: { closedOut?: boolean } } | null;
+
+export function isTranscriptRetentionTerminalAgent(
+  agent: TranscriptRetentionAgent,
+  readRecord: ReadClosedOutRecord = readIssueRecordForWorkspaceSync,
+): boolean {
+  if (agent.status !== 'stopped' || !agent.workspace) return false;
+  if (agent.paused === true || agent.troubled === true || agent.stoppedByUser === true) return false;
+  return readRecord(agent.workspace, agent.issueId)?.pipeline?.closedOut === true;
+}
+
 export interface TranscriptRetentionDeps {
   readDir(path: string): Promise<Dirent[]>;
   stat(path: string): Promise<Stats>;
   removeFile(path: string): Promise<void>;
   removeDir(path: string): Promise<void>;
   listSessionNames(): Promise<readonly string[]>;
+  listAgents(): readonly TranscriptRetentionAgent[];
+  isTerminalAgent(agent: TranscriptRetentionAgent): boolean;
   listConversations(): readonly TranscriptRetentionConversation[];
   listArchivedConversations(): readonly TranscriptRetentionConversation[];
   now(): number;
@@ -38,6 +66,8 @@ const defaultDeps: TranscriptRetentionDeps = {
   removeFile: async (path) => { await rm(path, { force: true }); },
   removeDir: rmdir,
   listSessionNames: () => Effect.runPromise(listSessionNames()),
+  listAgents: listAllAgentsSync,
+  isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
   now: Date.now,
@@ -59,6 +89,14 @@ function conversationEligibility(deps: TranscriptRetentionDeps): Map<string, boo
       if (!eligible.has(conversation.name)) eligible.set(conversation.name, true);
     }
     return eligible;
+  } catch {
+    return null;
+  }
+}
+
+function agentEligibility(deps: TranscriptRetentionDeps): Map<string, boolean> | null {
+  try {
+    return new Map(deps.listAgents().map((agent) => [agent.id, deps.isTerminalAgent(agent)]));
   } catch {
     return null;
   }
@@ -148,8 +186,10 @@ export async function sweepTranscriptRetention(
   }
 
   const cutoffMs = deps.now() - transcriptDays * 24 * 60 * 60 * 1000;
-  let eligibility: Map<string, boolean> | null = null;
-  let eligibilityLoaded = false;
+  let conversationEligibilityMap: Map<string, boolean> | null = null;
+  let conversationEligibilityLoaded = false;
+  let agentEligibilityMap: Map<string, boolean> | null = null;
+  let agentEligibilityLoaded = false;
   let eligibleDirs = 0;
   let deletedFiles = 0;
   let prunedDirs = 0;
@@ -158,13 +198,19 @@ export async function sweepTranscriptRetention(
     if (!entry.isDirectory() || liveSessions.has(entry.name)) continue;
 
     if (isConversationDirectory(entry.name)) {
-      if (!eligibilityLoaded) {
-        eligibility = conversationEligibility(deps);
-        eligibilityLoaded = true;
+      if (!conversationEligibilityLoaded) {
+        conversationEligibilityMap = conversationEligibility(deps);
+        conversationEligibilityLoaded = true;
       }
-      if (eligibility === null) continue;
+      if (conversationEligibilityMap === null) continue;
       const conversationName = entry.name.slice('conv-'.length);
-      if (eligibility.get(conversationName) !== true) continue;
+      if (conversationEligibilityMap.get(conversationName) !== true) continue;
+    } else {
+      if (!agentEligibilityLoaded) {
+        agentEligibilityMap = agentEligibility(deps);
+        agentEligibilityLoaded = true;
+      }
+      if (agentEligibilityMap === null || agentEligibilityMap.get(entry.name) !== true) continue;
     }
 
     eligibleDirs++;

@@ -1,7 +1,8 @@
 import { cp, lstat, mkdir, readdir } from 'node:fs/promises';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Command } from 'commander';
+
+import { getLegacyHome, getOverdeckHome } from '../../../lib/paths.js';
 
 export interface LegacyAgentDirMigrationOptions {
   legacyHome: string;
@@ -80,6 +81,13 @@ export async function migrateLegacyAgentDirs(
   return { copied, skipped };
 }
 
+export function resolveLegacyAgentDirMigrationHomes(): LegacyAgentDirMigrationOptions {
+  return {
+    legacyHome: getLegacyHome(),
+    currentHome: getOverdeckHome(),
+  };
+}
+
 export async function runMigrateLegacyAgentDirsCommand(
   options: LegacyAgentDirMigrationOptions,
   log: (message: string) => void = console.log,
@@ -92,11 +100,8 @@ export async function runMigrateLegacyAgentDirsCommand(
 export function registerMigrateLegacyAgentDirsCommand(admin: Command): void {
   admin
     .command('migrate-legacy-agent-dirs')
-    .description('Copy pre-rebrand conv-* agent dirs into ~/.overdeck without overwriting')
+    .description('Copy pre-rebrand conv-* agent dirs into the configured Overdeck home without overwriting')
     .action(async () => {
-      await runMigrateLegacyAgentDirsCommand({
-        legacyHome: join(homedir(), '.panopticon'),
-        currentHome: join(homedir(), '.overdeck'),
-      });
+      await runMigrateLegacyAgentDirsCommand(resolveLegacyAgentDirMigrationHomes());
     });
 }

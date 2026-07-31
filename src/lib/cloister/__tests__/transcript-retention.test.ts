@@ -4,7 +4,10 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { DEFAULT_CLOISTER_CONFIG } from '../config.js';
-import { sweepTranscriptRetention } from '../transcript-retention.js';
+import {
+  isTranscriptRetentionTerminalAgent,
+  sweepTranscriptRetention,
+} from '../transcript-retention.js';
 
 const NOW = new Date('2026-07-31T12:00:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -96,6 +99,7 @@ describe('sweepTranscriptRetention', () => {
     const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
     utimesSync(transcriptPath, oldTime, oldTime);
     const listConversations = vi.fn();
+    const listAgents = vi.fn();
 
     const actions = await sweepTranscriptRetention({
       transcriptDays: 2,
@@ -104,12 +108,119 @@ describe('sweepTranscriptRetention', () => {
         listSessionNames: vi.fn(async () => ['agent-pan-3357']),
         listConversations,
         listArchivedConversations: vi.fn(),
+        listAgents,
         log: vi.fn(),
       },
     });
 
     expect(existsSync(transcriptPath)).toBe(true);
     expect(listConversations).not.toHaveBeenCalled();
+    expect(listAgents).not.toHaveBeenCalled();
+    expect(actions[0]).toContain('deleted 0 transcript files');
+  });
+
+  it('deletes expired transcripts only after terminal agent state is established', async () => {
+    const sessionDir = join(agentsDir, 'agent-pan-3357', 'sessions');
+    mkdirSync(sessionDir, { recursive: true });
+    const transcriptPath = join(sessionDir, 'old.jsonl');
+    writeFileSync(transcriptPath, '{}\n');
+    const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
+    utimesSync(transcriptPath, oldTime, oldTime);
+    const agent = {
+      id: 'agent-pan-3357',
+      issueId: 'PAN-3357',
+      status: 'stopped',
+      workspace: '/tmp/feature-pan-3357',
+      paused: false,
+      troubled: false,
+      stoppedByUser: false,
+    };
+
+    const listAgents = vi.fn(() => [agent]);
+    const isTerminalAgent = vi.fn((candidate) => isTranscriptRetentionTerminalAgent(
+      candidate,
+      () => ({ pipeline: { closedOut: true } }),
+    ));
+    expect(isTerminalAgent(agent)).toBe(true);
+
+    const actions = await sweepTranscriptRetention({
+      transcriptDays: 2,
+      agentsDir,
+      deps: {
+        listSessionNames: vi.fn(async () => []),
+        listAgents,
+        isTerminalAgent,
+        listConversations: vi.fn(),
+        listArchivedConversations: vi.fn(),
+        log: vi.fn(),
+      },
+    });
+
+    expect(existsSync(transcriptPath)).toBe(false);
+    expect(actions[0]).toContain('deleted 1 transcript file');
+  });
+
+  it('retains transcripts for a registered paused agent without a live session', async () => {
+    const sessionDir = join(agentsDir, 'agent-pan-3357', 'sessions');
+    mkdirSync(sessionDir, { recursive: true });
+    const transcriptPath = join(sessionDir, 'old.jsonl');
+    writeFileSync(transcriptPath, '{}\n');
+    const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
+    utimesSync(transcriptPath, oldTime, oldTime);
+    const listAgents = vi.fn(() => [{
+      id: 'agent-pan-3357',
+      issueId: 'PAN-3357',
+      status: 'stopped',
+      workspace: '/tmp/feature-pan-3357',
+      paused: true,
+      troubled: false,
+      stoppedByUser: false,
+    }]);
+    const isTerminalAgent = vi.fn((agent) => isTranscriptRetentionTerminalAgent(
+      agent,
+      () => ({ pipeline: { closedOut: true } }),
+    ));
+
+    const actions = await sweepTranscriptRetention({
+      transcriptDays: 2,
+      agentsDir,
+      deps: {
+        listSessionNames: vi.fn(async () => []),
+        listAgents,
+        isTerminalAgent,
+        listConversations: vi.fn(),
+        listArchivedConversations: vi.fn(),
+        log: vi.fn(),
+      },
+    });
+
+    expect(existsSync(transcriptPath)).toBe(true);
+    expect(listAgents).toHaveBeenCalledTimes(1);
+    expect(isTerminalAgent).toHaveBeenCalledTimes(1);
+    expect(actions[0]).toContain('deleted 0 transcript files');
+  });
+
+  it('fails closed when the canonical agent registry cannot be read', async () => {
+    const sessionDir = join(agentsDir, 'agent-pan-3357', 'sessions');
+    mkdirSync(sessionDir, { recursive: true });
+    const transcriptPath = join(sessionDir, 'old.jsonl');
+    writeFileSync(transcriptPath, '{}\n');
+    const oldTime = new Date(NOW.getTime() - 30 * DAY_MS);
+    utimesSync(transcriptPath, oldTime, oldTime);
+
+    const actions = await sweepTranscriptRetention({
+      transcriptDays: 2,
+      agentsDir,
+      deps: {
+        listSessionNames: vi.fn(async () => []),
+        listAgents: vi.fn(() => { throw new Error('registry unavailable'); }),
+        listConversations: vi.fn(),
+        listArchivedConversations: vi.fn(),
+        log: vi.fn(),
+      },
+    });
+
+    expect(existsSync(transcriptPath)).toBe(true);
     expect(actions[0]).toContain('deleted 0 transcript files');
   });
 });
