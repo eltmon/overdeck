@@ -1,6 +1,7 @@
 /** Cloister completion marker fallback seam. */
 import { existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { AGENTS_DIR } from '../paths.js';
 
 export interface CompletionHost {
@@ -84,7 +85,10 @@ export async function checkCompletionMarkers(host: CompletionHost): Promise<void
           try {
             const res = await fetch(`${host.getDashboardApiUrl()}/api/review/${issueId}/trigger`, {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: {
+                'Content-Type': 'application/json',
+                [INTERNAL_TOKEN_HEADER]: ensureInternalTokenSync(),
+              },
               body: JSON.stringify({}),
               signal: controller.signal,
             });
