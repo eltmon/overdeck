@@ -343,7 +343,7 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:32:51.361Z",
+  "updated": "2026-07-31T21:40:56.009Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -353,7 +353,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
     "updatedAt": "2026-07-31T21:32:51.233Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "testNotes": "typecheck PASSED. lint FAILED at lint:circular: new circular dependency introduced by new file src/lib/agents/removal.ts (part of route-deletion-sites WI-2, commit 73e23449f6): read-model.ts > issue-service-singleton.ts > issue-data-service.ts > review-status.ts > cloister/review-agent.ts > agents/removal.ts > overdeck/agent-state-sync.ts > agents.ts > agents/spawn.ts > cloister/merge-agent.ts > issue-lifecycle.ts > domain-services.ts. Guard requires the cycle be removed, not baselined (scripts/lint-circular-deps.sh). No dashboard/UI changes in scope so UAT not required.",
