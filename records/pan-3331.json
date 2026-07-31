@@ -162,9 +162,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T00:32:52.991Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-07-31T00:35Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-07-31T00:35:36.508Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-07-31T00:35:36Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3331\n\n# Review Synthesis — PAN-3331 — 2026-07-31T00:35:02Z\n\n## Verdict: CHANGES REQUESTED — failed-fetch warning is forgotten by the next background poll\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/context.json\n- Branch: feature/pan-3331\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331\n- HEAD reviewed: 798fb13b4beacdfb40633f44b569713824f230c0\n- Cycle number: 5\n- Prior cycle SHA: 41c30af07928fb81def06eaafef88bea21e72e10\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Failed-fetch warning is forgotten by the next background poll — `src/lib/workspaces/git-state.ts:169`\nThis cycle introduced `fetchFailed`, but it describes only the current helper invocation: every `fetch: false` read initializes it to `false`. `WorkspaceActionBand` deliberately follows a fetching read with non-fetching 30-second polls, and `withFreshness()` in `src/dashboard/server/routes/workspace-registry.ts:214` preserves only the last successful `fetchedAt`, not the unresolved failed-fetch outcome. After an initial or manual fetch fails, the card shows the warning once, then the first background poll removes it even though no later fetch succeeded; stale local counts can again appear as freshly credible “up to date” state.\n\nThis blocker survives the cycle-5 convergence gate because the ephemeral `fetchFailed` state and its `false` default were introduced in the current `41c30af0..798fb13b` cycle diff. Persist the last fetch outcome per workspace path alongside the existing attempt/success clocks, clear failure only after a successful fetch, and project it into non-fetching poll responses. Add route or fake-timer component coverage proving the warning remains after the next 30-second non-fetching poll.\n\n## Non-blocking Findings\n\n### Correctness\n- `~` **[demoted: previously reviewed]** `countAheadBehind()` maps a failed `git rev-list` probe to zero/zero, which can render as “up to date.” That code did not change in the current cycle and was part of the previously reviewed Git-state implementation, so it is not promotable in cycle 5.\n- `~` **[demoted: previously reviewed]** Terminal DELETE uses `sessionExists()`, which maps every tmux probe failure to absence and may report `alreadyStopped` when liveness could not be checked. `src/dashboard/server/routes/terminals.ts` did not change this cycle.\n\n### Performance\n- `~` **[demoted: previously reviewed]** A foreground `ui.open_in_editor_command` retains its HTTP request until the editor exits. The relevant browser/open-route code did not change this cycle.\n\n### Requirements\n- The manifest's `commitsOpen` stub heuristic remains a false positive: the Incoming/Hide incoming control writes the state and displays populated commit data.\n\n## Clean Sub-roles\n- security\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3331/.pan/review/agent-pan-3331-review-798fb13b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3331 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -247,7 +260,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:35:35.867Z",
+  "updated": "2026-07-31T00:35:36.508Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "blocked",
