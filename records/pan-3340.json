@@ -57,11 +57,6 @@
       "reason": "feedback",
       "note": "[2026-07-30T23:33Z] review-agent → CHANGES-REQUESTED — seq 3",
       "timestamp": "2026-07-30T23:33:52.905Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-07-31T00:10:10.198Z"
     }
   ],
   "feedback": [],
@@ -108,22 +103,22 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:10:10.199Z",
+  "updated": "2026-07-31T00:10:11.663Z",
   "pipeline": {
     "issueId": "PAN-3340",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T00:09:41.201Z",
+    "updatedAt": "2026-07-31T00:10:09.073Z",
     "reviewNotes": "the new trigger-route guard rejects existing internal review-dispatch callers",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b",
     "reviewRequestedAt": "2026-07-31T00:06:38.713Z",
-    "reviewSpawnedAt": "2026-07-30T23:20:39.275Z",
+    "reviewSpawnedAt": "2026-07-31T00:10:09.073Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/cli/commands/__tests__/done-dashboard-client.test.ts",
@@ -229,7 +224,7 @@
       },
       "costAtCloseOut": {
         "usd": 148.369171,
-        "pricingAsOf": "2026-07-31T00:09:41.261Z"
+        "pricingAsOf": "2026-07-31T00:10:09.081Z"
       }
     },
     "merges": [
