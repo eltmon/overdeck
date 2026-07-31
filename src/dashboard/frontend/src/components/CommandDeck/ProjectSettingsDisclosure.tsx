@@ -1,8 +1,273 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import { shortName, useMergeTrainData } from '../merge-train/MergeTrainView';
+
+interface VersionSyncConfig {
+  set?: Array<{ path: string; json_field: string }>;
+  command?: string;
+  command_cwd?: string;
+  expect?: Array<{ path: string; pattern: string }>;
+  commit_message?: string;
+  push?: string[];
+}
+
+interface VersionShipOutcome {
+  status: 'pending' | 'passed' | 'partial' | 'failed';
+  version?: string;
+  batch: string;
+  paths?: Array<{ path: string; ok: boolean; detail: string }>;
+  error?: string;
+  reason?: string;
+  at: string;
+}
+
+interface VersionSyncPayload {
+  config: VersionSyncConfig | null;
+  lastOutcome: VersionShipOutcome | null;
+}
+
+interface VersionSyncDraft {
+  set: Array<{ path: string; json_field: string }>;
+  command: string;
+  command_cwd: string;
+  expect: Array<{ path: string; pattern: string }>;
+  commit_message: string;
+  push: string[];
+}
+
+const emptyVersionSyncDraft = (): VersionSyncDraft => ({
+  set: [],
+  command: '',
+  command_cwd: '',
+  expect: [],
+  commit_message: '',
+  push: [],
+});
+
+function versionSyncDraft(config: VersionSyncConfig | null): VersionSyncDraft {
+  return {
+    set: config?.set?.map(entry => ({ ...entry })) ?? [],
+    command: config?.command ?? '',
+    command_cwd: config?.command_cwd ?? '',
+    expect: config?.expect?.map(entry => ({ ...entry })) ?? [],
+    commit_message: config?.commit_message ?? '',
+    push: [...(config?.push ?? [])],
+  };
+}
+
+function compactVersionSyncDraft(draft: VersionSyncDraft): VersionSyncConfig {
+  return {
+    ...(draft.set.length > 0 ? { set: draft.set.map(entry => ({ path: entry.path.trim(), json_field: entry.json_field.trim() })) } : {}),
+    ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
+    ...(draft.command_cwd.trim() ? { command_cwd: draft.command_cwd.trim() } : {}),
+    ...(draft.expect.length > 0 ? { expect: draft.expect.map(entry => ({ path: entry.path.trim(), pattern: entry.pattern })) } : {}),
+    ...(draft.commit_message.trim() ? { commit_message: draft.commit_message.trim() } : {}),
+    ...(draft.push.length > 0 ? { push: draft.push.map(path => path.trim()) } : {}),
+  };
+}
+
+class VersionSyncSaveError extends Error {
+  constructor(readonly errors: string[]) {
+    super(errors[0] ?? 'Failed to save version sync');
+  }
+}
+
+function versionSyncFieldErrors(errors: string[]): Record<string, string> {
+  const result: Record<string, string> = {};
+  for (const error of errors) {
+    const field = /^version_sync\.([^\s]+)\s/.exec(error)?.[1]?.replace(/\[(\d+)\]/g, '.$1') ?? '_form';
+    result[field] = error;
+  }
+  return result;
+}
+
+function VersionShipOutcomeView({ outcome }: { outcome: VersionShipOutcome | null }) {
+  if (!outcome) return <p className="text-[11px] text-muted-foreground">No batch version ship has been recorded yet.</p>;
+  if (outcome.status === 'passed') {
+    return (
+      <p className="text-[11px] text-emerald-400">
+        Version {outcome.version ?? 'unknown'} shipped for {shortName(outcome.batch)} at {new Date(outcome.at).toLocaleString()}.
+      </p>
+    );
+  }
+  if (outcome.status === 'pending') {
+    return (
+      <p className="text-[11px] text-amber-400">
+        batch {shortName(outcome.batch)} merged without a version — ship one from the batch card&apos;s Ship version action.
+      </p>
+    );
+  }
+  if (outcome.status === 'partial') {
+    const failed = outcome.paths?.filter(path => !path.ok) ?? [];
+    return (
+      <div className="text-[11px] text-amber-400">
+        <p>Partial propagation — these paths do not report {outcome.version ?? 'the requested version'}:</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-4 font-mono text-[10.5px]">
+          {failed.map(path => <li key={path.path}>{path.path}</li>)}
+        </ul>
+      </div>
+    );
+  }
+  return (
+    <p className="text-[11px] text-red-400">
+      Version ship failed for {shortName(outcome.batch)}: {outcome.error ?? outcome.reason ?? 'unknown error'}
+    </p>
+  );
+}
+
+function VersionShipSettings({ projectKey }: { projectKey: string }) {
+  const queryClient = useQueryClient();
+  const queryKey = ['project-version-sync', projectKey] as const;
+  const { data, isLoading } = useQuery({
+    queryKey,
+    queryFn: async (): Promise<VersionSyncPayload> => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/version-sync`);
+      const payload = await res.json().catch(() => ({})) as Partial<VersionSyncPayload> & { error?: string };
+      if (!res.ok) throw new Error(payload.error ?? 'Failed to load version sync');
+      return { config: payload.config ?? null, lastOutcome: payload.lastOutcome ?? null };
+    },
+    enabled: !!projectKey,
+  });
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<VersionSyncDraft>(emptyVersionSyncDraft);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+
+  const mutation = useMutation({
+    mutationFn: async (config: VersionSyncConfig | null) => {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/version-sync`, {
+        method: 'PUT',
+        headers: await dashboardMutationJsonHeaders(),
+        body: JSON.stringify({ config }),
+      });
+      const payload = await res.json().catch(() => ({})) as { config?: VersionSyncConfig | null; errors?: string[]; error?: string };
+      if (!res.ok) throw new VersionSyncSaveError(payload.errors ?? [payload.error ?? 'Failed to save version sync']);
+      return payload.config ?? null;
+    },
+    onSuccess: (config) => {
+      queryClient.setQueryData<VersionSyncPayload>(queryKey, current => ({
+        config,
+        lastOutcome: current?.lastOutcome ?? null,
+      }));
+      setEditing(false);
+      setFieldErrors({});
+    },
+    onError: (error) => {
+      setFieldErrors(versionSyncFieldErrors(error instanceof VersionSyncSaveError ? error.errors : [String(error)]));
+    },
+  });
+
+  const beginEditing = () => {
+    setDraft(versionSyncDraft(data?.config ?? null));
+    setFieldErrors({});
+    setEditing(true);
+  };
+  const fieldError = (field: string) => fieldErrors[field]
+    ? <p className="mt-0.5 text-[10px] text-red-400">{fieldErrors[field]}</p>
+    : null;
+  const inputClass = 'w-full rounded border border-input bg-background px-2 py-1.5 font-mono text-[11px] text-foreground outline-none focus:border-primary';
+
+  return (
+    <section className="mt-2 border-t border-border pt-3" data-testid="version-ship-settings">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-[13px] font-semibold text-foreground">Version ship</h4>
+          <p className="text-[10.5px] text-muted-foreground">Propagates version strings after a tested batch merges. It does not publish, deploy, tag, or submit stores.</p>
+        </div>
+        {!editing && data?.config && (
+          <button type="button" onClick={beginEditing} className="text-[11px] font-medium text-primary hover:underline">Edit</button>
+        )}
+      </div>
+
+      {isLoading ? (
+        <p className="mt-2 text-[11px] text-muted-foreground">Loading version ship…</p>
+      ) : editing ? (
+        <div className="mt-3 space-y-3">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <label className="text-[10.5px] text-muted-foreground">Command
+              <input aria-label="Version sync command" className={inputClass} value={draft.command} onChange={event => setDraft({ ...draft, command: event.target.value })} placeholder="pnpm vsync" />
+              {fieldError('command')}
+            </label>
+            <label className="text-[10.5px] text-muted-foreground">Command working directory
+              <input aria-label="Version sync command cwd" className={inputClass} value={draft.command_cwd} onChange={event => setDraft({ ...draft, command_cwd: event.target.value })} placeholder="frontend" />
+              {fieldError('command_cwd')}
+            </label>
+          </div>
+          <label className="block text-[10.5px] text-muted-foreground">Commit message
+            <input aria-label="Version sync commit message" className={inputClass} value={draft.commit_message} onChange={event => setDraft({ ...draft, commit_message: event.target.value })} placeholder="chore: bump version to {version}" />
+            {fieldError('commit_message')}
+          </label>
+
+          <div>
+            <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">JSON fields to set</span><button type="button" onClick={() => setDraft({ ...draft, set: [...draft.set, { path: '', json_field: 'version' }] })} className="text-[10px] text-primary hover:underline">Add target</button></div>
+            <div className="mt-1 space-y-1.5">
+              {draft.set.map((entry, index) => (
+                <div key={index} className="grid grid-cols-[1fr_0.7fr_auto] gap-1.5">
+                  <div><input aria-label={`Set path ${index + 1}`} className={inputClass} value={entry.path} onChange={event => setDraft({ ...draft, set: draft.set.map((item, itemIndex) => itemIndex === index ? { ...item, path: event.target.value } : item) })} placeholder="package.json" />{fieldError(`set.${index}.path`)}</div>
+                  <div><input aria-label={`Set JSON field ${index + 1}`} className={inputClass} value={entry.json_field} onChange={event => setDraft({ ...draft, set: draft.set.map((item, itemIndex) => itemIndex === index ? { ...item, json_field: event.target.value } : item) })} placeholder="version" />{fieldError(`set.${index}.json_field`)}</div>
+                  <button type="button" aria-label={`Remove set target ${index + 1}`} onClick={() => setDraft({ ...draft, set: draft.set.filter((_, itemIndex) => itemIndex !== index) })} className="px-1 text-muted-foreground hover:text-foreground">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Expected version strings</span><button type="button" onClick={() => setDraft({ ...draft, expect: [...draft.expect, { path: '', pattern: '' }] })} className="text-[10px] text-primary hover:underline">Add expectation</button></div>
+            <div className="mt-1 space-y-1.5">
+              {draft.expect.map((entry, index) => (
+                <div key={index} className="grid grid-cols-[0.8fr_1fr_auto] gap-1.5">
+                  <div><input aria-label={`Expect path ${index + 1}`} className={inputClass} value={entry.path} onChange={event => setDraft({ ...draft, expect: draft.expect.map((item, itemIndex) => itemIndex === index ? { ...item, path: event.target.value } : item) })} placeholder="package.json" />{fieldError(`expect.${index}.path`)}</div>
+                  <div><input aria-label={`Expect pattern ${index + 1}`} className={inputClass} value={entry.pattern} onChange={event => setDraft({ ...draft, expect: draft.expect.map((item, itemIndex) => itemIndex === index ? { ...item, pattern: event.target.value } : item) })} placeholder={'"version": "{version}"'} />{fieldError(`expect.${index}.pattern`)}</div>
+                  <button type="button" aria-label={`Remove expectation ${index + 1}`} onClick={() => setDraft({ ...draft, expect: draft.expect.filter((_, itemIndex) => itemIndex !== index) })} className="px-1 text-muted-foreground hover:text-foreground">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between"><span className="text-[10.5px] font-semibold text-foreground">Repositories to push</span><button type="button" onClick={() => setDraft({ ...draft, push: [...draft.push, ''] })} className="text-[10px] text-primary hover:underline">Add repository</button></div>
+            <div className="mt-1 space-y-1.5">
+              {draft.push.map((path, index) => (
+                <div key={index} className="grid grid-cols-[1fr_auto] gap-1.5">
+                  <div><input aria-label={`Push repository ${index + 1}`} className={inputClass} value={path} onChange={event => setDraft({ ...draft, push: draft.push.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })} placeholder="frontend" />{fieldError(`push.${index}`)}</div>
+                  <button type="button" aria-label={`Remove push repository ${index + 1}`} onClick={() => setDraft({ ...draft, push: draft.push.filter((_, itemIndex) => itemIndex !== index) })} className="px-1 text-muted-foreground hover:text-foreground">×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {fieldError('_form')}
+          <div className="flex items-center gap-2">
+            <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate(compactVersionSyncDraft(draft))} className="rounded bg-primary px-3 py-1.5 text-[11px] font-semibold text-primary-foreground disabled:opacity-50">{mutation.isPending ? 'Saving…' : 'Save'}</button>
+            <button type="button" disabled={mutation.isPending} onClick={() => { setEditing(false); setFieldErrors({}); }} className="text-[11px] text-muted-foreground hover:text-foreground">Cancel</button>
+          </div>
+        </div>
+      ) : data?.config ? (
+        <div className="mt-2 space-y-2">
+          <div className="rounded border border-border bg-muted/20 p-2 font-mono text-[10.5px] text-muted-foreground">
+            {data.config.command && <div>command: <span className="text-foreground">{data.config.command}</span>{data.config.command_cwd ? ` (cwd ${data.config.command_cwd})` : ''}</div>}
+            {(data.config.set ?? []).map(entry => <div key={`${entry.path}:${entry.json_field}`}>set: <span className="text-foreground">{entry.path} → {entry.json_field}</span></div>)}
+            {(data.config.expect ?? []).map(entry => <div key={`${entry.path}:${entry.pattern}`}>expect: <span className="text-foreground">{entry.path} / {entry.pattern}</span></div>)}
+            {(data.config.push ?? []).map(path => <div key={path}>push: <span className="text-foreground">{path}</span></div>)}
+            {data.config.commit_message && <div>commit: <span className="text-foreground">{data.config.commit_message}</span></div>}
+          </div>
+          <button type="button" disabled={mutation.isPending} onClick={() => mutation.mutate(null)} className="text-[11px] text-red-400 hover:underline disabled:opacity-50">Remove version sync</button>
+        </div>
+      ) : (
+        <div className="mt-2">
+          <p className="text-[11px] text-muted-foreground">This project skips ship: no version_sync is declared, so batch promotes will not touch version strings.</p>
+          <button type="button" onClick={beginEditing} className="mt-1 text-[11px] font-medium text-primary hover:underline">Configure version sync</button>
+        </div>
+      )}
+
+      <div className="mt-3 border-t border-border pt-2">
+        <div className="mb-1 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Latest outcome</div>
+        <VersionShipOutcomeView outcome={data?.lastOutcome ?? null} />
+      </div>
+    </section>
+  );
+}
 
 /** PAN-1693/1695: per-project settings in the cockpit — currently the auto-merge default. */
 function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
@@ -140,6 +405,7 @@ function ProjectSettingsSection({ projectKey }: { projectKey: string }) {
         </span>
       )}
       </div>
+      <VersionShipSettings projectKey={projectKey} />
       <MergeTrainSummary projectKey={projectKey} />
     </div>
   );

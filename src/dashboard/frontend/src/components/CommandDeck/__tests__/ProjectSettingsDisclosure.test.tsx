@@ -11,6 +11,23 @@ let mergeTrainValue: 'enabled' | 'disabled' | null;
 let mergeTrainEffective: boolean;
 let mergeTrainQueue: unknown[];
 let mergeTrainGenerations: Array<{ name: string; status: string }>;
+let versionSyncConfig: {
+  set?: Array<{ path: string; json_field: string }>;
+  command?: string;
+  command_cwd?: string;
+  expect?: Array<{ path: string; pattern: string }>;
+  commit_message?: string;
+  push?: string[];
+} | null;
+let versionShipOutcome: {
+  status: 'pending' | 'passed' | 'partial' | 'failed';
+  version?: string;
+  batch: string;
+  paths?: Array<{ path: string; ok: boolean; detail: string }>;
+  error?: string;
+  at: string;
+} | null;
+let versionSyncValidationErrors: string[] | null;
 /** The server-computed effective flag on the aggregate payloads. */
 let mergeTrainAggregateEnabled: boolean;
 
@@ -29,6 +46,9 @@ describe('ProjectSettingsDisclosure', () => {
     mergeTrainEffective = true;
     mergeTrainQueue = [];
     mergeTrainGenerations = [];
+    versionSyncConfig = null;
+    versionShipOutcome = null;
+    versionSyncValidationErrors = null;
     mergeTrainAggregateEnabled = true;
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
@@ -54,7 +74,15 @@ describe('ProjectSettingsDisclosure', () => {
         mergeTrainValue = (JSON.parse(String(init?.body)) as { value: 'enabled' | 'disabled' | null }).value;
         return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
-      if (method === 'GET' && url === '/api/dashboard/session') {
+      if (method === 'GET' && url === '/api/projects/overdeck/version-sync') {
+        return Response.json({ config: versionSyncConfig, lastOutcome: versionShipOutcome });
+      }
+      if (method === 'PUT' && url === '/api/projects/overdeck/version-sync') {
+        if (versionSyncValidationErrors) return Response.json({ errors: versionSyncValidationErrors }, { status: 400 });
+        versionSyncConfig = (JSON.parse(String(init?.body)) as { config: typeof versionSyncConfig }).config;
+        return Response.json({ config: versionSyncConfig });
+      }
+      if (method === 'POST' && url.endsWith('/api/dashboard/session')) {
         return Response.json({ csrfToken: 'test-csrf-token' });
       }
       // PAN-1696 ac3: the cockpit merge-train summary reads the aggregate endpoints.
@@ -252,5 +280,87 @@ describe('ProjectSettingsDisclosure', () => {
         }),
       );
     });
+  });
+
+  it('shows the explicit ship skip posture when version_sync is absent', async () => {
+    renderDisclosure();
+
+    expect(await screen.findByText(
+      'This project skips ship: no version_sync is declared, so batch promotes will not touch version strings.',
+    )).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Configure version sync' })).toBeInTheDocument();
+  });
+
+  it('edits and saves the structured version_sync block explicitly', async () => {
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure version sync' }));
+
+    fireEvent.change(screen.getByLabelText('Version sync command'), { target: { value: 'pnpm vsync' } });
+    fireEvent.change(screen.getByLabelText('Version sync command cwd'), { target: { value: 'frontend' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add target' }));
+    fireEvent.change(screen.getByLabelText('Set path 1'), { target: { value: 'frontend/package.json' } });
+    fireEvent.change(screen.getByLabelText('Set JSON field 1'), { target: { value: 'version' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add expectation' }));
+    fireEvent.change(screen.getByLabelText('Expect path 1'), { target: { value: 'frontend/package.json' } });
+    fireEvent.change(screen.getByLabelText('Expect pattern 1'), { target: { value: '"version": "{version}"' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add repository' }));
+    fireEvent.change(screen.getByLabelText('Push repository 1'), { target: { value: 'frontend' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(versionSyncConfig).toEqual({
+      command: 'pnpm vsync',
+      command_cwd: 'frontend',
+      set: [{ path: 'frontend/package.json', json_field: 'version' }],
+      expect: [{ path: 'frontend/package.json', pattern: '"version": "{version}"' }],
+      push: ['frontend'],
+    }));
+    expect(await screen.findByText(/frontend\/package.json → version/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
+  });
+
+  it('renders a server validation error beside the offending pattern', async () => {
+    versionSyncValidationErrors = ['version_sync.expect[0].pattern must be a valid regular expression'];
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('button', { name: 'Configure version sync' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add expectation' }));
+    fireEvent.change(screen.getByLabelText('Expect path 1'), { target: { value: 'package.json' } });
+    fireEvent.change(screen.getByLabelText('Expect pattern 1'), { target: { value: '[' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('version_sync.expect[0].pattern must be a valid regular expression')).toBeInTheDocument();
+    expect(screen.getByText('version_sync.expect[0].pattern must be a valid regular expression').closest('div'))
+      .toContainElement(screen.getByLabelText('Expect pattern 1'));
+  });
+
+  it('shows partial propagation with each failing path', async () => {
+    versionSyncConfig = { set: [{ path: 'package.json', json_field: 'version' }] };
+    versionShipOutcome = {
+      status: 'partial',
+      version: '48.8.0',
+      batch: 'uat/pan-otter-0731',
+      at: '2026-07-31T12:00:00.000Z',
+      paths: [
+        { path: 'package.json', ok: true, detail: 'matched' },
+        { path: 'apps/desktop/package.json', ok: false, detail: 'not matched' },
+        { path: 'packages/contracts/package.json', ok: false, detail: 'not matched' },
+      ],
+    };
+    renderDisclosure();
+
+    expect(await screen.findByText('Partial propagation — these paths do not report 48.8.0:')).toBeInTheDocument();
+    expect(screen.getByText('apps/desktop/package.json')).toBeInTheDocument();
+    expect(screen.getByText('packages/contracts/package.json')).toBeInTheDocument();
+  });
+
+  it('removes version_sync and returns to the explicit skip state', async () => {
+    versionSyncConfig = { command: 'pnpm vsync' };
+    renderDisclosure();
+    fireEvent.click(await screen.findByRole('button', { name: 'Remove version sync' }));
+
+    await waitFor(() => expect(versionSyncConfig).toBeNull());
+    expect(await screen.findByText(/This project skips ship: no version_sync is declared/)).toBeInTheDocument();
+    const put = fetchControl.fetchMock.mock.calls.find(([url, init]) =>
+      url === '/api/projects/overdeck/version-sync' && (init as RequestInit | undefined)?.method === 'PUT');
+    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({ config: null });
   });
 });
