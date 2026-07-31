@@ -333,23 +333,23 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:28:20.283Z",
+  "updated": "2026-07-31T20:38:06.676Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
-    "updatedAt": "2026-07-31T20:28:19.508Z",
+    "updatedAt": "2026-07-31T20:38:06.631Z",
     "reviewNotes": "abandoned migration claims permanently suppress missing legacy directory recovery",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0",
-    "lastVerifiedCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
+    "lastVerifiedCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0",
     "reviewSpawnedAt": "2026-07-31T20:23:34.499Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -452,24 +452,6 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T20:19:49.432Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "73e23449f6bed443d40c5bc1d772822efc0a2df0"
-      }
     }
   },
   "closeOut": {
@@ -517,24 +499,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5863345,
-            "output": 675703,
-            "cacheRead": 276904448,
+            "input": 6010686,
+            "output": 721093,
+            "cacheRead": 311553024,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 32909476,
-          "output": 1208335,
-          "cacheRead": 378312704,
+          "input": 33056817,
+          "output": 1253725,
+          "cacheRead": 412961280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 389.953782,
-        "pricingAsOf": "2026-07-31T20:28:19.535Z"
+        "usd": 409.376475,
+        "pricingAsOf": "2026-07-31T20:38:06.666Z"
       }
     },
     "merges": [
