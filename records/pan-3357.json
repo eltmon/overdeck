@@ -291,19 +291,18 @@
     "recordedAt": "2026-07-31T20:19:13.579Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:19:19.215Z",
+  "updated": "2026-07-31T20:19:20.840Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:19:18.821Z",
+    "updatedAt": "2026-07-31T20:19:19.281Z",
     "reviewNotes": "[correctness] General agent removal drops the only eligibility/linkage record while retaining transcripts — `src/lib/overdeck/agents.ts:868`",
-    "verificationNotes": "Verification FAILED at test (1329411ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/src/dashboard/frontend\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357\u001b[39m\n\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/deacon-stuck-skip.test.ts \u001b[2m(\u001b[22m\u001b[2m0 test\u001b[22m\u001b[2m)\u001b[22m\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/deacon-auto-closeout.test.ts \u001b[2m(\u001b[22m\u001b[2m0 test\u001b[22m\u001b[2m)\u001b[22m\n \u001b[31m❯\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/cloister/__tests__/deacon-stash-janitor.test.ts \u001b[2m(\u001b[22m\u001b[2m0 test\u001b[22m\u001b[2m)\u001b[22m\n \u001b[32m✓\u001b[39m src/components/CommandDeck/ProjectTree/FeatureItem.test.tsx \u001b[2m(\u001b[22m\u001b[2m62 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1112\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/lib/__tests__/agents-spawn-supervisor.test.ts\u001b[2m > \u001b[22m\u001b[2mspawnAgent PTY supervisor wiring\u001b[2m > \u001b[22m\u001b[2mdecides supervisor eligibility from Docker and harness only\n\u001b[22m\u001b[39m[agent-pan-1405] supervisor:eligible\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:docker-not-supported-yet\n[agent-pan-1405] supervisor:ineligible:harness-pi\n\n \u001b[32m✓\u001b[39m src/components/Pipeline/PipelineView.test.tsx \u001b[2m(\u001b[22m\u001b[2m24 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 1610\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders empty-state card when no issues match the active phase filter \u001b[33m 371\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mrenders terminal container with settings button\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b[2m > \u001b[22m\u001b[2mkeeps padding off the measured terminal host (PAN-2619)\n\u001b[22m\u001b[39mXTerminal: Creating terminal, container size: \u001b[33m800\u001b[39m x \u001b[33m600\u001b[39m\n\n\u001b[90mstdout\u001b[2m | src/components/XTerminal.test.tsx\u001b[2m > \u001b[22m\u001b[2mXTerminal\u001b\n…(727987 chars elided)…\nmplete.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/fixtures/synced-skills.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 4\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/pan-dir/__tests__/reset-task-progress.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/cli/commands/__tests__/release-state-snapshot.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/dashboard/dashboard-listening.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 5\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/migrated-workspace-commit-gates.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n...(truncated)",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "c01c3442cee4e0c92995a120cc54483f205f0f10",
@@ -475,7 +474,7 @@
       },
       "costAtCloseOut": {
         "usd": 344.971836,
-        "pricingAsOf": "2026-07-31T20:19:18.845Z"
+        "pricingAsOf": "2026-07-31T20:19:20.834Z"
       }
     },
     "merges": [
