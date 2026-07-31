@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:57:06.673Z",
+  "updated": "2026-07-31T16:10:42.830Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "transcript-days-sweep": {
-        "writerId": "agent-pan-3357",
-        "agentId": "agent-pan-3357",
-        "pid": 3671132,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:57:06.673Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -114,6 +106,17 @@
         "outcome": "completed",
         "reason": "Added lint-integrated guard that rejects direct agent-dir removals and requires comments on named-file exemptions; guard discovery also routed omitted close-out, residue-reaper, and legacy-migration directory deletions through the shared door.",
         "releasedAt": "2026-07-31T15:56:48.307Z"
+      },
+      {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 3671132,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:57:06.673Z",
+        "itemId": "transcript-days-sweep",
+        "outcome": "completed",
+        "reason": "Added opt-in retention.transcript_days with no default, a fail-closed async sweep using the canonical conversations read door, live-session protection, age-based JSONL deletion, empty-dir pruning, and fake-timer regression tests.",
+        "releasedAt": "2026-07-31T16:10:42.829Z"
       }
     ],
     "statusReasons": {
@@ -128,6 +131,10 @@
       "guard-agent-dir-removal": {
         "reason": "Added lint-integrated guard that rejects direct agent-dir removals and requires comments on named-file exemptions; guard discovery also routed omitted close-out, residue-reaper, and legacy-migration directory deletions through the shared door.",
         "updatedAt": "2026-07-31T15:56:48.307Z"
+      },
+      "transcript-days-sweep": {
+        "reason": "Added opt-in retention.transcript_days with no default, a fail-closed async sweep using the canonical conversations read door, live-session protection, age-based JSONL deletion, empty-dir pruning, and fake-timer regression tests.",
+        "updatedAt": "2026-07-31T16:10:42.829Z"
       }
     }
   },
@@ -146,6 +153,10 @@
     "guard-agent-dir-removal.guard-agent-dir-removal.ac1": "completed",
     "guard-agent-dir-removal.guard-agent-dir-removal.ac2": "completed",
     "guard-agent-dir-removal.guard-agent-dir-removal.ac3": "completed",
-    "transcript-days-sweep": "running"
+    "transcript-days-sweep": "completed",
+    "transcript-days-sweep.transcript-days-sweep.ac1": "completed",
+    "transcript-days-sweep.transcript-days-sweep.ac2": "completed",
+    "transcript-days-sweep.transcript-days-sweep.ac3": "completed",
+    "transcript-days-sweep.transcript-days-sweep.ac4": "completed"
   }
 }
