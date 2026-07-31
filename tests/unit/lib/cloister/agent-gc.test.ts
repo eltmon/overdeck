@@ -3,7 +3,7 @@ import {
   pruneStoppedAgentsForIssue,
   pruneTerminalStoppedAgents,
 } from '../../../../src/lib/cloister/agent-gc.js';
-import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agent-tombstones.js';
+import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agents.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 
 const agent = (id: string, status: AgentState['status'], role: AgentState['role']): AgentState => ({

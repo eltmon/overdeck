@@ -16,6 +16,7 @@
 1016 src/lib/agents/runtime-command.ts # PAN-1837
 1463 src/lib/model-capabilities.ts # PAN-1837
 1088 src/lib/overdeck/conversation-runtime.ts # PAN-1837
+1142 src/lib/overdeck/agents.ts # PAN-3357
 1052 src/lib/overdeck/memory.ts # PAN-1990
 849 src/lib/overdeck/planning-promotion.ts # PAN-3229
 1004 src/dashboard/server/routes/agents/lifecycle-restart.ts # PAN-1837

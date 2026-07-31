@@ -8,9 +8,10 @@ import {
 import { getAgentStateSync } from './agent-state.js';
 import {
   ensureAgentTombstoneSync,
+  listAllAgentsSync,
+  removeAgentRecordSync,
   type AgentTombstoneIdentity,
-} from '../overdeck/agent-tombstones.js';
-import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
+} from '../overdeck/agents.js';
 import { getOverdeckHome } from '../paths.js';
 
 function resolveTombstoneIdentity(agentId: string): AgentTombstoneIdentity | null {

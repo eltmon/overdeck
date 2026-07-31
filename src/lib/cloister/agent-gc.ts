@@ -1,10 +1,11 @@
 import { join } from 'node:path';
 
 import {
+  listAllAgentsSync,
+  removeAgentRecordSync,
   RETAINED_TRANSCRIPTS_PHASE,
   tombstoneAgentRecordSync,
-} from '../overdeck/agent-tombstones.js';
-import { listAllAgentsSync, removeAgentRecordSync } from '../overdeck/agents.js';
+} from '../overdeck/agents.js';
 import { readIssueRecordForWorkspaceSync } from '../pan-dir/record.js';
 import { getOverdeckHome } from '../paths.js';
 import {
