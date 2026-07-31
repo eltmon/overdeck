@@ -191,18 +191,18 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:06:27.799Z",
+  "updated": "2026-07-31T20:06:30.633Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:06:27.414Z",
+    "updatedAt": "2026-07-31T20:06:28.239Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint",
     "verificationNotes": "Verification FAILED at lint (888952ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 prelint:skills\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts\n…(41289 chars elided)…\n           0.10 kB │ gzip:   0.10 kB\nℹ dist/flywheel-D3-bhUoe.js                             0.09 kB │ gzip:   0.09 kB\nℹ dist/search-yQlnaEnW.js                               0.09 kB │ gzip:   0.09 kB\nℹ dist/sync-DTAJ4B4f.js                                 0.08 kB │ gzip:   0.08 kB\nℹ dist/index.d.ts                                      73.21 kB │ gzip:  20.60 kB\nℹ dist/acp-host.d.ts                                   10.74 kB │ gzip:   2.36 kB\nℹ dist/codex-app-server-host.d.ts                       3.16 kB │ gzip:   1.09 kB\nℹ dist/pty-supervisor.d.ts                              2.20 kB │ gzip:   0.97 kB\nℹ dist/cli/index.d.ts                                   0.01 kB │ gzip:   0.03 kB\nℹ dist/lib/memory/fts-worker.d.ts                       0.01 kB │ gzip:   0.03 kB\nℹ dist/supervisor/server.d.ts                           0.01 kB │ gzip:   0.03 kB\nℹ dist/verification-worker.d.ts                         0.01 kB │ gzip:   0.03 kB\nℹ 485 files, total: 16.58 MB\n✔ Build \n...(truncated)",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
@@ -333,24 +333,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7627550,
-            "output": 689055,
-            "cacheRead": 422327296,
+            "input": 7633486,
+            "output": 692049,
+            "cacheRead": 422924288,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 26933310,
-          "output": 1076762,
-          "cacheRead": 548753408,
+          "input": 26939246,
+          "output": 1079756,
+          "cacheRead": 549350400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 441.346114,
-        "pricingAsOf": "2026-07-31T20:06:27.558Z"
+        "usd": 441.76411,
+        "pricingAsOf": "2026-07-31T20:06:30.626Z"
       }
     },
     "merges": [
