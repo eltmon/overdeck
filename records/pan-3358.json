@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T16:15:48.384Z",
+  "updated": "2026-07-31T16:20:40.377Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "version-sync-config-schema": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3358",
         "agentId": "agent-pan-3358",
         "pid": 1037044,
         "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:15:48.383Z"
+        "claimedAt": "2026-07-31T16:15:48.383Z",
+        "itemId": "version-sync-config-schema",
+        "outcome": "completed",
+        "reason": "Added typed version_sync configuration, validation for path/regex/command safety, and isolated loader/validator tests; targeted tests and typecheck pass.",
+        "releasedAt": "2026-07-31T16:20:40.377Z"
+      }
+    ],
+    "statusReasons": {
+      "version-sync-config-schema": {
+        "reason": "Added typed version_sync configuration, validation for path/regex/command safety, and isolated loader/validator tests; targeted tests and typecheck pass.",
+        "updatedAt": "2026-07-31T16:20:40.377Z"
       }
     }
   },
   "statusOverrides": {
-    "version-sync-config-schema": "running"
+    "version-sync-config-schema": "completed",
+    "version-sync-config-schema.version-sync-config-schema.ac1": "completed",
+    "version-sync-config-schema.version-sync-config-schema.ac2": "completed",
+    "version-sync-config-schema.version-sync-config-schema.ac3": "completed",
+    "version-sync-config-schema.version-sync-config-schema.ac4": "completed"
   }
 }
