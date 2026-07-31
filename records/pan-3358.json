@@ -100,23 +100,24 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T20:12:31.579Z",
+  "updated": "2026-07-31T20:12:34.920Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:12:31.577Z",
+    "updatedAt": "2026-07-31T20:12:34.797Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (791222ms):\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\u001b[39m\n\n\n\u001b[1m\u001b[30m\u001b[46m RUN \u001b[49m\u001b[39m\u001b[22m \u001b[36mv4.1.6 \u001b[39m\u001b[90m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/src/dashboard/frontend\u001b[39m\n\n \u001b[31m❯\u001b[39m src/components/CommandDeck/__tests__/ProjectOverview.test.tsx \u001b[2m(\u001b[22m\u001b[2m29 tests\u001b[22m\u001b[2m | \u001b[22m\u001b[31m3 failed\u001b[39m\u001b[2m)\u001b[22m\u001b[33m 371\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets stuck issues by the stuck flag\u001b[32m 10\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets non-progress pipeline failures and blockers as stuck\u001b[32m 1\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets blocker reasons as stuck\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets active merge statuses as merging\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets ready-for-merge issues as awaitingMerge\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets verifying issues as awaiting close-out instead of awaiting merge\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets merged work that needs close-out in the ship lane\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets testing issues as tests\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets active reviews as review\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets running verification as buildGate\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets active work-agent issues without review status as working\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m does not bucket stopped or suspended agents as working\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets planned issues without work sessions as planning using SessionNode.type\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m does not bucket planned issues with a work session as planning\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m buckets issues with no active signals as idle\u001b[32m 0\u001b[2mms\u001b[22m\u001b[39m\n\u001b[31m     \u001b[31m×\u001b[31m labels the card \"pipeline overview\" without duplicating the project name or pencil\u001b[39m\u001b[32m 99\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[32m✓\u001b[39m renders a project-scoped five-tile hero b\n…(616749 chars elided)…\nm\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/briefing-assembler.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/deacon-review-status-completed.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/dashboard/settings-api-model-ids.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/agents-barrel-exports.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m src/lib/__tests__/migrated-workspace-commit-gates.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\u001b[39m tests/unit/lib/cloister/flywheel-membership.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 3\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m✓\u001b[39m \u001b[30m\u001b[42m root \u001b[49m\n...(truncated)",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "10b87191ace512116ee736707a0365e8587af4fc",
-    "reviewSpawnedAt": "2026-07-31T19:23:03.488Z",
+    "reviewRequestedAt": "2026-07-31T20:12:31.577Z",
+    "reviewSpawnedAt": "2026-07-31T20:12:34.796Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/commit-msg",
@@ -200,8 +201,7 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
-    },
-    "reviewRequestedAt": "2026-07-31T20:12:31.577Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -248,24 +248,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6234562,
-            "output": 509868,
-            "cacheRead": 196077056,
+            "input": 6968615,
+            "output": 549801,
+            "cacheRead": 233872896,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 14629088,
-          "output": 759046,
-          "cacheRead": 225452544,
+          "input": 15363141,
+          "output": 798979,
+          "cacheRead": 263248384,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 208.643092,
-        "pricingAsOf": "2026-07-31T19:41:25.464Z"
+        "usd": 232.409267,
+        "pricingAsOf": "2026-07-31T20:12:34.822Z"
       }
     },
     "merges": [
