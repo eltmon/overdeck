@@ -72,6 +72,8 @@ never `execSync`, never shell-string interpolation of branch names).
 | Union lint (Flyway migration version collisions) | [`src/lib/cloister/uat-union-lint.ts`](../src/lib/cloister/uat-union-lint.ts) |
 | Reconciler (auto-assemble on ready-set change, invalidate stale) | [`src/lib/cloister/uat-reconciler.ts`](../src/lib/cloister/uat-reconciler.ts) |
 | Batch promotion (merge tested branch to main, per-member post-merge once) | [`src/lib/cloister/uat-promote.ts`](../src/lib/cloister/uat-promote.ts) |
+| Version propagation + verification | [`src/lib/cloister/version-ship.ts`](../src/lib/cloister/version-ship.ts) and [`version-ship-deps.ts`](../src/lib/cloister/version-ship-deps.ts) |
+| Durable per-member ship verdict + deferred ship | [`src/lib/cloister/ship-record.ts`](../src/lib/cloister/ship-record.ts) |
 | Live UAT stack lifecycle (max 2, mandatory teardown) | [`src/lib/cloister/uat-stack.ts`](../src/lib/cloister/uat-stack.ts) |
 | Service wiring + reconciler interval + route payloads | [`src/dashboard/server/services/uat-train.ts`](../src/dashboard/server/services/uat-train.ts) |
 | UAT batches card | [`src/dashboard/frontend/src/components/flywheel/MergeQueueCard.tsx`](../src/dashboard/frontend/src/components/flywheel/MergeQueueCard.tsx) |
@@ -124,6 +126,15 @@ promoted before this write path existed are healed from the stored generation
 record, so the verification row uses recorded evidence instead of an operator
 override. The promoted generation is reaped; all other live generations
 invalidate (main moved) and the reconciler rebuilds.
+
+When the project declares `version_sync`, promotion can also run **version
+ship**: after the merge lands and its verification verdict is recorded, but
+before member post-merge fan-out, the runner propagates the operator-supplied
+version, verifies every declared target, commits only declared paths, and
+pushes the configured repositories. Every member receives the same durable
+`pipeline.ship` verdict. A ship failure never rolls back or blocks the already-
+landed batch; it records a `partial` or `failed` verdict that must be settled
+before close-out.
 
 A polyrepo generation promotes through a two-phase variant of this — every repo
 is trial-merged before anything is pushed — described under
@@ -254,10 +265,11 @@ routes were deleted, not aliased.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /api/merge-train/generations` | One entry per tracked project — `{ projectKey, projectName, enabled, generations }` — where `generations` is that project's chain newest-first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, and live-stack `{status, frontendUrl, downServices?, serviceErrors?, probeError?}` (`status` is `running` \| `degraded` \| `unknown` \| `absent` — see [Live stacks](#live-stacks--the-hard-cap)). |
+| `GET /api/merge-train/generations` | One entry per tracked project — `{ projectKey, projectName, enabled, generations }` — where `generations` is that project's chain newest-first: per generation the members (with PR links and **per-member acceptance criteria** from the shared xBRIEF extractor `src/lib/xbrief/acceptance-criteria.ts` — the same source as the AwaitingMerge UAT plan, no second parser), held-out reasons, conflict resolutions, `versionSyncConfigured`, latest `shipStatus`, and live-stack `{status, frontendUrl, downServices?, serviceErrors?, probeError?}` (`status` is `running` \| `degraded` \| `unknown` \| `absent` — see [Live stacks](#live-stacks--the-hard-cap)). |
 | `GET /api/merge-train/queues` | One entry per tracked project — `{ projectKey, projectName, enabled, queue }` — the ready set as reference data, each row carrying `branchName` and `prUrl`. A project with the merge train off reports `enabled: false` and an empty queue rather than being omitted, so "off" and "nothing ready" stay distinguishable. |
 | `POST /api/merge-train/generations/:name/stack` | Ensure the generation's live stack (idempotent); returns the frontend URL and any evicted stacks. |
-| `POST /api/merge-train/generations/:name/promote` | Promote (merge) the tested generation to main — into the generation's **own** project repo, resolved from its stored `projectRoot`. |
+| `POST /api/merge-train/generations/:name/promote` | Promote (merge) the tested generation to main — into the generation's **own** project repo, resolved from its stored `projectRoot`. Optional body `{ shipVersion: "48.8.0" }` runs version ship after the merge. |
+| `POST /api/merge-train/generations/:name/ship` | Run deferred version ship for an already-promoted generation. Body `{ version: "48.8.0" }`; returns 409 unless the generation is promoted and 422 when the project has no `version_sync`. |
 | `POST /api/merge-train/assemble` | Force a reconcile/rebuild. Body `{ project }` rebuilds one project; an empty body reconciles every merge-train-enabled project and returns a per-project result. |
 | `POST /api/merge-train/merge-next` | The single-feature escape hatch — body `{ n, project }` merges N of that project's ready set to main one at a time, stopping on first failure. An unknown project key is a 4xx, never a silent no-op. |
 
@@ -279,6 +291,123 @@ matching [`design/pan-1737-uat-batch-trains.html`](./design/pan-1737-uat-batch-t
 
 Every merge action confirms through `useConfirm()` naming the exact members and
 consequences. The string "Ship batch" no longer appears anywhere in the frontend.
+
+## Version ship (PAN-3358)
+
+**Version ship** makes a promoted batch's declared version strings agree with an
+operator-chosen `X.Y.Z` version. It sets configured JSON fields, optionally runs
+a project command, verifies every expected file, commits only declared paths,
+and pushes configured repositories. It does **not** publish npm packages,
+submit App Store or Play builds, deploy production, generate release notes, or
+create Git tags; those remain separate operator actions.
+
+A project opts in through `version_sync` in `~/.overdeck/projects.yaml`. Mind
+Your Now uses one canonical JSON field plus its existing propagation command:
+
+```yaml
+projects:
+  mind-your-now:
+    version_sync:
+      set:
+        - path: frontend/package.json
+          json_field: version
+      command: pnpm vsync
+      command_cwd: frontend
+      expect:
+        - path: frontend/package.json
+          pattern: '"version": "{version}"'
+        - path: api/src/main/java/com/myn/config/Version.java
+          pattern: 'String version = "{version}\.git "'
+        - path: frontend/ios/App/App/Info.plist
+          pattern: 'CFBundleShortVersionString</key>\s*<string>{majorMinor}</string>'
+        - path: frontend/android/app/build.gradle
+          pattern: 'versionName "{majorMinor}"'
+      push:
+        - frontend
+        - api
+```
+
+Overdeck needs no propagation command; it keeps three package manifests in
+lockstep and verifies all three before committing:
+
+```yaml
+projects:
+  panopticon-cli:
+    version_sync:
+      set:
+        - path: package.json
+          json_field: version
+        - path: apps/desktop/package.json
+          json_field: version
+        - path: packages/contracts/package.json
+          json_field: version
+      expect:
+        - path: package.json
+          pattern: '"version": "{version}"'
+        - path: apps/desktop/package.json
+          pattern: '"version": "{version}"'
+        - path: packages/contracts/package.json
+          pattern: '"version": "{version}"'
+      commit_message: "chore: bump version to {version}"
+      push:
+        - .
+```
+
+The fields are deliberately small:
+
+- `set[].path` and `set[].json_field` identify JSON string fields written before
+  the command runs.
+- `command` is optional; `command_cwd` is relative to the project root.
+- `expect[].pattern` is a regular expression checked after propagation.
+  `{version}` expands to the complete version such as `48.8.0`, while
+  `{majorMinor}` expands to `48.8`.
+- `commit_message` defaults to `chore: bump version to {version}`. The runner
+  stages only paths declared by `set` or `expect`; if the command already
+  committed them, the runner correctly has nothing left to commit.
+- `push[]` lists repository paths relative to the project root; `.` means the
+  project root itself.
+
+### Promotion and deferred ship
+
+For a configured project, **Merge batch** first offers a version field. A valid
+version is sent as `shipVersion` with promotion. Leaving it empty is allowed:
+the batch still merges, but every member receives a `pending` ship verdict and
+cannot pass close-out until the version is shipped. The promoted batch then
+stays on the card with a **Ship version** action, which runs the same runner and
+rewrites every member's verdict. Terminal-only operators can call
+`POST /api/merge-train/generations/:name/ship` with `{ "version": "48.8.0" }`;
+there is no separate `pan ship` command.
+
+The **ship row** in the Definition-of-Done gate is the close-out check that
+reads each member's durable `pipeline.ship` record:
+
+| Recorded state | Ship row result |
+| --- | --- |
+| `passed` | Passes, naming the version, batch, and number of verified paths. |
+| `pending` | Misses because the batch merged without a version; use **Ship version** on that promoted batch. |
+| `partial` | Misses and names every declared path that did not report the requested version. |
+| `failed` | Misses and shows the command, commit, or push error recorded by the runner. |
+| No `version_sync` | Skips explicitly because ship does not apply to that project. |
+| No ship record | Skips explicitly because the issue merged outside a batch and ship is batch-scoped. |
+
+A `partial` verdict is the guard against silent propagation failures: the
+command may exit successfully while an old regex edits nothing. The failing
+paths appear in the ship row's observed text and in **Project settings →
+Version ship**. A `pending` promoted batch also remains visible on the batch
+card until the operator ships a version.
+
+Configure the block by hand in `projects.yaml` or through **Project settings →
+Version ship**. Both surfaces use that file as the single store; dashboard
+saves preserve comments, quoting, formatting, and unrelated projects outside
+the edited `version_sync` block. An unset project says plainly that it skips
+ship rather than showing an empty form, and the section displays the latest
+`passed`, `pending`, `partial`, or `failed` outcome.
+
+Enabling this for Overdeck means the three `package.json` files on main can show
+a version ahead of the most recent npm release. That is intentional and
+harmless: version ship records what the merged batch belongs to, while
+`pan release stable --version X.Y.Z` explicitly rewrites all release versions
+when the operator later publishes.
 
 ## Operating it
 
