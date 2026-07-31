@@ -2,7 +2,7 @@
   "issueId": "PAN-3357",
   "schemaVersion": 2,
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:11:50.149Z",
+  "updated": "2026-07-31T15:11:51.252Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3357: Deacon stale-state purge deleted conv-* transcript dirs — 258 conversations shown as 'Transcript missing'",
       "timestamp": "2026-07-31T15:11:50.148Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
