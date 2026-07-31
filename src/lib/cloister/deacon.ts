@@ -3409,7 +3409,7 @@ async function checkThinkingSignatureCorruption(): Promise<string[]> {
     // Delete session.id so resumeAgent won't --resume the corrupted session
     const sessionFile = join(AGENTS_DIR, agentId, 'session.id');
     if (existsSync(sessionFile)) {
-      try { rmSync(sessionFile); } catch { /* non-fatal */ }
+      try { rmSync(sessionFile); } catch { /* non-fatal; PAN-3357: not a dir removal */ }
     }
 
     // Mark agent as stopped

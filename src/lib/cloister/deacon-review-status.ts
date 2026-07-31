@@ -901,8 +901,8 @@ export async function checkMissingReviewStatuses(): Promise<string[]> {
       // PAN-1496: if the issue is closed, reap the stale markers.
       try {
         if (await isIssueClosed(issueId)) {
-          try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort */ }
-          try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort */ }
+          try { if (existsSync(completedFile)) rmSync(completedFile); } catch { /* best-effort; PAN-3357: not a dir removal */ }
+          try { if (existsSync(processedFile)) rmSync(processedFile); } catch { /* best-effort; PAN-3357: not a dir removal */ }
           actions.push(`Reaped stale completion markers for CLOSED ${issueId} (no review re-dispatch)`);
           continue;
         }

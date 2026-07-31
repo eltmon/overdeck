@@ -8,6 +8,7 @@ import { isBranchMerged } from '../close-out.js';
 import { AGENTS_DIR } from '../paths.js';
 import { killSession, listSessionNames } from '../tmux.js';
 import { teardownWorkspaceDockerByNamePromise } from '../workspace-manager/docker.js';
+import { removeAgentStateDir } from '../agents/state-dir-removal.js';
 
 const execAsync = promisify(exec);
 
@@ -98,8 +99,9 @@ export async function reapIssueResidue(projectPath: string, issueId: string): Pr
     const agentDir = join(AGENTS_DIR, agentDirName);
     if (!existsSync(agentDir)) continue;
     try {
-      rmSync(agentDir, { recursive: true, force: true });
-      actions.push(`removed agent state ${agentDirName}`);
+      const result = await removeAgentStateDir(agentDir);
+      const transcriptLabel = `transcript file${result.preservedTranscripts === 1 ? '' : 's'} preserved`;
+      actions.push(`cleaned agent state ${agentDirName} (${result.preservedTranscripts} ${transcriptLabel})`);
     } catch {
       // Already gone or inaccessible.
     }
