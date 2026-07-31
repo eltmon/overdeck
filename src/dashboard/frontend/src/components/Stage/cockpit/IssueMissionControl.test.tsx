@@ -18,7 +18,14 @@ beforeEach(() => {
   queryMocks.activityQuery.data.sections = [
     { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
   ]
-  queryMocks.reviewStatusQuery.data.verificationStatus = 'passed'
+  Object.assign(queryMocks.reviewStatusQuery.data, {
+    reviewStatus: 'blocked',
+    testStatus: 'pending',
+    mergeStatus: 'pending',
+    verificationStatus: 'passed',
+    reviewNotes: 'Security blocker',
+    readyForMerge: false,
+  })
   queryMocks.prQuery.data.pr = { number: 1661, additions: 4, deletions: 1, changedFiles: 2, isDraft: false, state: 'OPEN' }
   queryMocks.issueCostsQuery.data.totalCost = 1.23
   queryMocks.workspaceQuery.data = null
@@ -181,7 +188,11 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
 
 vi.mock('../../MergeButton', () => ({ MergeButton: () => <div>Merge button</div> }))
 vi.mock('../../ReviewPolicyControl', () => ({ ReviewPolicyControl: () => <div>Review policy</div> }))
-vi.mock('../../issue-view/StartAgentCta', () => ({ StartAgentCta: () => <div>Start agent</div> }))
+vi.mock('../../issue-view/StartAgentCta', () => ({
+  StartAgentCta: ({ issueId, density }: { issueId: string; density: string }) => (
+    <div data-testid="start-agent-cta" data-issue-id={issueId} data-density={density}>Start work agent · Overrides · model · harness</div>
+  ),
+}))
 vi.mock('../../drawer/DrawerReviewSpecialists', () => ({ default: () => <div>Review specialists</div> }))
 vi.mock('../../drawer/DrawerArtifactsPanel', () => ({ default: () => <div>Artifacts panel</div> }))
 vi.mock('../../drawer/DrawerActivityRail', () => ({ default: ({ compact, limit }: { compact?: boolean; limit?: number }) => <div data-testid="drawer-activity-rail">Activity rail · {String(compact)} · {limit}</div> }))
@@ -323,7 +334,7 @@ describe('IssueMissionControl', () => {
     ])
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
-    expect(screen.getByText('Blocker spotlight')).toBeTruthy()
+    expect(screen.getByTestId('overview-live')).toBeInTheDocument()
   })
 
   it('renders one cost chip, the tracker link, and the narrative phase sentence in the header', () => {
@@ -711,14 +722,71 @@ describe('IssueMissionControl', () => {
     expect(screen.getAllByText('Issues').length).toBeGreaterThan(0)
   })
 
-  it('keeps the Overview faithful to the current cockpit summary', () => {
+  it('renders the live Overview summary, specialist results, feed, and pickup gate', () => {
+    queryMocks.activityQuery.data.sections.push({
+      type: 'reviewer',
+      role: 'security',
+      sessionId: 'agent-pan-1661-review-security',
+      model: 'claude-sonnet-5',
+      status: 'completed',
+      startedAt: '2026-06-07T00:01:00Z',
+      duration: 30,
+      roundMetadata: {
+        roundCount: 1,
+        latestRound: 1,
+        latestReviewResult: 'APPROVED',
+        history: [],
+      },
+    })
     renderMissionControl()
 
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
-    expect(screen.getByText('Blocker spotlight')).toBeTruthy()
-    expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
-    fireEvent.click(screen.getByTestId('issue-action-overflow-button'))
-    expect(screen.getByTestId('issue-action-disabled-merge')).toBeInTheDocument()
+    const overview = screen.getByTestId('overview-live')
+    expect(within(overview).getByTestId('status-narrative')).toHaveTextContent('The reviewer found problems')
+    expect(within(overview).getByText('review.security')).toBeInTheDocument()
+    expect(within(overview).getAllByText('Approved')).toHaveLength(2)
+    expect(within(overview).getByText('What just happened')).toBeInTheDocument()
+    expect(within(overview).getByText('Pickup gate')).toBeInTheDocument()
+  })
+
+  it('renders the done Overview with an emerald badge, merged commit, and review summary', () => {
+    Object.assign(queryMocks.reviewStatusQuery.data, {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      mergeStatus: 'merged',
+      reviewNotes: 'Security, correctness, and performance approved.',
+      readyForMerge: false,
+    })
+    Object.assign(queryMocks.issueCheckRunsQuery.data.pr!, { headRefOid: 'abc1234def5678' })
+    renderMissionControl()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
+    const done = screen.getByTestId('overview-done')
+    expect(within(done).getByText('Done')).toHaveClass('text-success-foreground')
+    expect(within(done).getByText('abc1234def5678')).toHaveClass('font-mono')
+    expect(within(done).getByText('Security, correctness, and performance approved.')).toBeInTheDocument()
+  })
+
+  it('renders a teaching pre-work Overview with the configurable StartAgentCta', () => {
+    queryMocks.activityQuery.data.sections = []
+    queryMocks.issueActionState.hasPlan = false
+    queryMocks.issueActionState.hasTasks = false
+    Object.assign(queryMocks.reviewStatusQuery.data, {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      mergeStatus: 'pending',
+      verificationStatus: 'pending',
+      reviewNotes: undefined,
+      readyForMerge: false,
+    })
+    renderMissionControl()
+
+    const empty = screen.getByTestId('overview-pre-work')
+    expect(within(empty).getByText('Start the first agent run')).toBeInTheDocument()
+    expect(within(empty).getByText(/create the workspace, read the approved plan/)).toBeInTheDocument()
+    const start = within(empty).getByTestId('start-agent-cta')
+    expect(start).toHaveAttribute('data-density', 'cockpit')
+    expect(start).toHaveTextContent('Overrides · model · harness')
   })
 
   it('shows a selected session, then relocates the conversation cards below the issue overview', () => {
@@ -733,7 +801,7 @@ describe('IssueMissionControl', () => {
 
     const conversation = container.querySelector('[data-section="Conversation / Files / Terminal tabs"]')
     expect(conversation).toBeInTheDocument()
-    expect(conversation?.previousElementSibling).toHaveTextContent('Blocker spotlight')
+    expect(conversation?.previousElementSibling).toHaveTextContent('Current state')
     expect(container.querySelector('[data-section="Awareness rail"]')).toHaveTextContent('Review blocked — awaiting the work agent')
     expect(conversation).toHaveTextContent('Launcher')
     expect(conversation).toHaveTextContent('Agent dock')
