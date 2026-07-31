@@ -219,19 +219,19 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T19:20:44.157Z",
+  "updated": "2026-07-31T19:20:49.563Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T19:20:41.833Z",
-    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
+    "updatedAt": "2026-07-31T19:20:42.518Z",
+    "reviewNotes": "[correctness] Terminal-agent GC deletes retained transcripts immediately and then erases their expiration proof — `src/lib/cloister/deacon.ts:3131`",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
@@ -351,24 +351,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5053089,
-            "output": 552660,
-            "cacheRead": 211023872,
+            "input": 5053525,
+            "output": 552770,
+            "cacheRead": 211471360,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18891440,
-          "output": 918614,
-          "cacheRead": 271526912,
+          "input": 18891876,
+          "output": 918724,
+          "cacheRead": 271974400,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 257.779076,
-        "pricingAsOf": "2026-07-31T19:20:41.893Z"
+        "usd": 258.0083,
+        "pricingAsOf": "2026-07-31T19:20:48.556Z"
       }
     },
     "merges": [
