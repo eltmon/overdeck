@@ -343,17 +343,17 @@
     "recordedAt": "2026-07-31T21:40:59.710Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T21:40:59.711Z",
+  "updated": "2026-07-31T21:41:01.017Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
-    "testStatus": "failed",
-    "verificationStatus": "failed",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T21:32:51.233Z",
+    "updatedAt": "2026-07-31T21:41:01.015Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "testNotes": "typecheck PASSED. lint FAILED at lint:circular: new circular dependency introduced by new file src/lib/agents/removal.ts (part of route-deletion-sites WI-2, commit 73e23449f6): read-model.ts > issue-service-singleton.ts > issue-data-service.ts > review-status.ts > cloister/review-agent.ts > agents/removal.ts > overdeck/agent-state-sync.ts > agents.ts > agents/spawn.ts > cloister/merge-agent.ts > issue-lifecycle.ts > domain-services.ts. Guard requires the cycle be removed, not baselined (scripts/lint-circular-deps.sh). No dashboard/UI changes in scope so UAT not required.",
     "verificationNotes": "Verification FAILED at lint (117113ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n\n--- stderr ---\n✗ direct agents-table mutation outside the audited agent write doors:\nsrc/lib/overdeck/agent-tombstones.ts:17:      UPDATE agents\nsrc/lib/overdeck/agent-tombstones.ts:26:    INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, phase, updated_at)\nRoute status writes through AgentWriter or agent-projection; audit rebuild exceptions here.\n",
@@ -462,8 +462,9 @@
         "tests/unit/lib/cloister/agent-gc.test.ts",
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
-      "recordedAt": "2026-07-31T20:19:49.432Z"
-    }
+      "recordedAt": "2026-07-31T21:40:59.710Z"
+    },
+    "reviewRequestedAt": "2026-07-31T21:41:01.015Z"
   },
   "closeOut": {
     "usage": {
