@@ -291,7 +291,7 @@
     "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:20:05.558Z",
+  "updated": "2026-07-31T20:20:07.981Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -301,7 +301,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T20:19:59.793Z",
+    "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z",
+    "updatedAt": "2026-07-31T20:20:05.536Z",
     "reviewNotes": "[correctness] General agent removal drops the only eligibility/linkage record while retaining transcripts — `src/lib/overdeck/agents.ts:868`",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
@@ -410,8 +411,7 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T20:19:49.432Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T20:20:05.006Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -458,24 +458,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5853953,
-            "output": 674755,
-            "cacheRead": 274398208,
+            "input": 5856121,
+            "output": 675025,
+            "cacheRead": 274954240,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 26457828,
-          "output": 1139136,
-          "cacheRead": 359376384,
+          "input": 26459996,
+          "output": 1139406,
+          "cacheRead": 359932416,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 346.151412,
-        "pricingAsOf": "2026-07-31T20:19:59.811Z"
+        "usd": 346.448368,
+        "pricingAsOf": "2026-07-31T20:20:07.976Z"
       }
     },
     "merges": [
