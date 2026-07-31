@@ -89,7 +89,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:35:46.554Z",
+  "updated": "2026-07-31T16:35:50.301Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -99,7 +99,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T16:35:44.896Z",
+    "updatedAt": "2026-07-31T16:35:50.243Z",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewRequestedAt": "2026-07-31T16:35:40.065Z",
@@ -177,24 +177,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1916162,
-            "output": 230848,
-            "cacheRead": 100747264,
+            "input": 1922808,
+            "output": 232067,
+            "cacheRead": 102186496,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1916162,
-          "output": 230848,
-          "cacheRead": 100747264,
+          "input": 1922808,
+          "output": 232067,
+          "cacheRead": 102186496,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 66.879882,
-        "pricingAsOf": "2026-07-31T16:35:46.547Z"
+        "usd": 67.669298,
+        "pricingAsOf": "2026-07-31T16:35:50.263Z"
       }
     },
     "merges": [
