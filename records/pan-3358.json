@@ -12,22 +12,9 @@
       "timestamp": "2026-07-31T16:15:19.327Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-07-31T19:28Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-07-31T19:28:12.212Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-07-31T19:28:12Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3358\n\n# Review Synthesis — PAN-3358 — 2026-07-31T19:40:00Z\n\n## Verdict: CHANGES REQUESTED — version ship mutates a stale checkout and can leave batch members without durable blocking settlement\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/context.json`\n- Branch: `feature/pan-3358`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358`\n- HEAD reviewed: `10b87191ace512116ee736707a0365e8587af4fc`\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR base: `b57f6abd2b6db50f62960203563a6f3b7dadd7d5`\n- PR commits: 16\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/security.md` | 2 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/performance.md` | 1 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [correctness] Version ship commits from the stale primary checkout after promotion — `src/dashboard/server/services/uat-train.ts:803`\n`buildUatPromoteGitDeps()` lands the batch from a detached temporary worktree and pushes that worktree's `HEAD:main`, leaving the ambient project checkout unchanged. The new promote callback then runs `runVersionShip()` against that unchanged project root, so its propagation command and version commit are based on the pre-promotion tree. A normal push then diverges from the newly advanced remote main and fails non-fast-forward, potentially leaving an unpushed local commit. Run ship from a dedicated worktree rooted at the exact promoted merge SHA and push an explicit target ref; thread the promoted merge reference and target branch through monorepo and polyrepo paths.\n\n### [requirements] A rejected or partially persisted ship leaves no durable blocking batch settlement — `src/lib/cloister/uat-promote.ts:636`\nFR-6, FR-7, and NFR-1 require every configured batch member to retain a durable pending, partial, or failed settlement when ship cannot complete. `finishPromote()` catches any `runShip` rejection and logs it, while per-member record writes are sequential and may fail partway. A member with no `pipeline.ship` is then classified by the DoD gate as a direct non-batch merge and skipped, so close-out can pass despite a batch ship failure; mixed member records can also hide the deferred recovery action. Establish durable batch membership before fallible ship work, make failure settlement retriable for every member, and derive aggregate generation state from all member records rather than the newest single record.\n\n### [performance] Ship-status enrichment adds synchronous N+1 record reads to a 15-second polling route — `src/dashboard/server/services/uat-train.ts:627`\nEvery generation member now calls synchronous project resolution and `readIssueRecordSync()` while `GET /api/merge-train/generations` is polled every 15 seconds. Across tracked projects and up to ten generations per project, the Node event loop performs `projects × generations × members` synchronous filesystem reads and JSON parses, blocking unrelated HTTP, RPC, and terminal traffic. Resolve each project once, load unique issue records asynchronously with bounded concurrency, build an `issueId -> ship record` map, and reuse the helper for the project-settings outcome endpoint.\n\n### [security] Raw ship-command stderr is exposed through aggregate API responses and durable records — `src/dashboard/server/services/uat-train.ts:651`\nThe runner copies up to 2,000 characters of raw stderr into `ShipReport.error`, persists it into each member's git-backed record, and projects the complete record through the unauthenticated merge-train generations endpoint. Package, registry, Git, or malicious merged commands can print tokens, authenticated URLs, or signing credentials, exposing them to dashboard clients and permanent state history. Replace raw output with fixed error codes and redacted allowlisted summaries, keep any detailed diagnostics local with credential redaction, omit operational error detail from the aggregate DTO, and authenticate endpoints that expose sensitive diagnostics.\n\n### [security] Symlink traversal can redirect ship writes and Git operations outside the project — `src/lib/cloister/version-ship.ts:100`\nConfiguration validation proves only lexical containment. At execution time, set and expect files, command working directories, and push repositories follow symlinks from the newly promoted tree without `realpath`, `lstat`, regular-file checks, or no-follow writes. A promoted change can redirect version writes, command execution, commits, or pushes into another accessible path or repository under the dashboard process credentials. Canonicalize and revalidate every path immediately before use, reject symlink components, require regular files or contained directories as appropriate, use no-follow write semantics, and restrict push roots to registered project repositories.\n\n## Non-blocking Findings\n\n### [correctness] Partial member-record writes can hide deferred recovery — `src/lib/cloister/ship-record.ts:19`\nThis is subsumed by the blocking requirements settlement finding above. The current newest-record aggregation can report a generation as passed after only some members were updated.\n\n### [security] Operator-supplied expectation regexes can monopolize the server event loop — `src/lib/cloister/version-ship.ts:115`\nPatterns are checked only for compilation and are evaluated synchronously against unbounded file contents. Use a linear-time engine or reject unsafe patterns, cap input size, and run bounded evaluation outside the dashboard event loop.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-10b87191/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3358 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/commit-msg",
@@ -103,10 +90,10 @@
     "recordedAt": "2026-07-31T19:20:24.350Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T19:28:12.212Z",
+  "updated": "2026-07-31T19:28:16.716Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -114,10 +101,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T19:21:11.714Z",
-    "updatedAt": "2026-07-31T19:23:05.770Z",
+    "updatedAt": "2026-07-31T19:28:11.518Z",
+    "reviewNotes": "Version ship mutates a stale checkout and can leave batch members without durable blocking settlement",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
-    "reviewRequestedAt": "2026-07-31T19:21:11.714Z",
     "reviewSpawnedAt": "2026-07-31T19:23:03.488Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -192,11 +179,69 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T19:20:24.350Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "10b87191ace512116ee736707a0365e8587af4fc"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "10b87191ace512116ee736707a0365e8587af4fc"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "10b87191ace512116ee736707a0365e8587af4fc"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "10b87191ace512116ee736707a0365e8587af4fc"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 548027,
+            "output": 21037,
+            "cacheRead": 6994944,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1979052,
+            "output": 54789,
+            "cacheRead": 6540800,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 967764,
+            "output": 19756,
+            "cacheRead": 4730880,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 2946239,
+            "output": 54012,
+            "cacheRead": 3211264,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1930429,
+            "output": 93521,
+            "cacheRead": 7045120,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 5235048,
@@ -208,15 +253,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 5235048,
-          "output": 371363,
-          "cacheRead": 158931456,
+          "input": 13606559,
+          "output": 614478,
+          "cacheRead": 187454464,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 116.781858,
-        "pricingAsOf": "2026-07-31T19:23:09.568Z"
+        "usd": 180.194367,
+        "pricingAsOf": "2026-07-31T19:28:11.567Z"
       }
     },
     "merges": [
