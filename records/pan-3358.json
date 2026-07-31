@@ -90,7 +90,7 @@
     "recordedAt": "2026-07-31T19:20:24.350Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T19:21:12.087Z",
+  "updated": "2026-07-31T19:21:14.407Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -100,7 +100,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T19:20:37.796Z",
+    "panDoneRecoveredAt": "2026-07-31T19:21:11.714Z",
+    "updatedAt": "2026-07-31T19:21:12.079Z",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewRequestedAt": "2026-07-31T19:21:11.714Z",
@@ -177,8 +178,7 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T19:20:24.350Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T19:21:11.714Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -202,7 +202,7 @@
       },
       "costAtCloseOut": {
         "usd": 116.781858,
-        "pricingAsOf": "2026-07-31T19:20:37.812Z"
+        "pricingAsOf": "2026-07-31T19:21:14.402Z"
       }
     },
     "merges": [
