@@ -193,10 +193,10 @@
     "recordedAt": "2026-07-30T23:25:58.701Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:10:04.657Z",
+  "updated": "2026-07-31T00:10:08.689Z",
   "pipeline": {
     "issueId": "PAN-3331",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -204,13 +204,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:26:45.850Z",
-    "updatedAt": "2026-07-31T00:10:02.650Z",
+    "updatedAt": "2026-07-31T00:10:03.413Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed the cycle-3 blocking finding: run-session names are now unique per workspace. runSessionName kept only the first eight sanitized id characters, so ws-main-1234abcd and ws-main-1234ffff shared ws-run-wsmain12 and could stop or restart each other's process; the suffix is now a sha256 prefix of the full id (deterministic, unique, valid tmux name). Three regression tests cover truncation collision, punctuation collision, and name validity — the first two fail against the old derivation. Also took three non-blocking items: dirty-tree refusal now fails closed when git status cannot be read (with maxBuffer raised and a rename counted once), the palette no longer renders a duplicate Run row in the default scope, and the doc route counts are corrected. 2082 frontend + 806 server tests pass; typecheck, lint, and all guards green.",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
     "reviewedAtCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
     "lastVerifiedCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
-    "reviewSpawnedAt": "2026-07-31T00:04:04.663Z",
+    "reviewSpawnedAt": "2026-07-31T00:10:03.411Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "drizzle/overdeck/0000_overdeck_init.sql",
@@ -342,10 +342,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 76,
-            "output": 17358,
-            "cacheRead": 7018720,
-            "cacheWrite": 216022
+            "input": 78,
+            "output": 17626,
+            "cacheRead": 7234742,
+            "cacheWrite": 216221
           }
         }
       },
@@ -363,15 +363,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 76,
-          "output": 17358,
-          "cacheRead": 7018720,
-          "cacheWrite": 216022
+          "input": 78,
+          "output": 17626,
+          "cacheRead": 7234742,
+          "cacheWrite": 216221
         }
       },
       "costAtCloseOut": {
-        "usd": 143.78426,
-        "pricingAsOf": "2026-07-31T00:10:04.428Z"
+        "usd": 143.830646,
+        "pricingAsOf": "2026-07-31T00:10:08.682Z"
       }
     },
     "merges": [
@@ -380,7 +380,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3331",
