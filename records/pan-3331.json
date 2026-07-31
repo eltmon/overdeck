@@ -230,7 +230,7 @@
     "recordedAt": "2026-07-31T00:11:01.762Z"
   },
   "created": "2026-07-30T13:53:18.572Z",
-  "updated": "2026-07-31T00:13:22.449Z",
+  "updated": "2026-07-31T00:13:28.030Z",
   "pipeline": {
     "issueId": "PAN-3331",
     "reviewStatus": "blocked",
@@ -241,11 +241,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:11:39.871Z",
-    "updatedAt": "2026-07-31T00:13:21.804Z",
+    "updatedAt": "2026-07-31T00:13:28.019Z",
     "reviewNotes": "unreadable working-tree status is rendered as clean",
     "inspectNotes": "AC1-5 met: @{u}-based ahead/behind with origin/HEAD fallback and hasUpstream/upstreamRef; detached detected; all five refusal reasons returned as typed values (verified ensureSyncGitQuiescent(path,false) throws on MERGE_HEAD and never aborts); ff-only pull test asserts behind:0 after; RemoteCommit shape capped at 10; every git call routes through one execFileAsync argv helper, no shell, no execSync. Non-blocking: dirty check precedes the quiescence probe, so a conflicted in-flight merge reports reason 'dirty' with 'commit or discard' guidance instead of 'operation-in-progress' — safe refusal either way, but worth reordering.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3352",
-    "reviewedAtCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
+    "reviewedAtCommit": "41c30af07928fb81def06eaafef88bea21e72e10",
     "lastVerifiedCommit": "cf13ebc1f625a0132aaf9c42a9da96fef2155bea",
     "reviewRequestedAt": "2026-07-31T00:11:39.871Z",
     "reviewSpawnedAt": "2026-07-31T00:10:03.411Z",
@@ -329,24 +329,6 @@
         "tests/unit/lib/workspaces/git-state.test.ts"
       ],
       "recordedAt": "2026-07-31T00:11:01.762Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "41c30af07928fb81def06eaafef88bea21e72e10"
-      }
     }
   },
   "closeOut": {
@@ -431,7 +413,7 @@
       },
       "costAtCloseOut": {
         "usd": 191.328177,
-        "pricingAsOf": "2026-07-31T00:13:21.830Z"
+        "pricingAsOf": "2026-07-31T00:13:28.025Z"
       }
     },
     "merges": [
