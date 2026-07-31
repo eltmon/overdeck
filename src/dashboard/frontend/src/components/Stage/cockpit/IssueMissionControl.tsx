@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
 import { ShipTab } from './ShipTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
@@ -55,34 +55,58 @@ export interface IssueMissionControlProps {
   onOpenPane: (paneType: PaneType) => void
 }
 
-type MissionTab =
-  // PRD binding tab set — rendered by the ONE IssueDetail at page density.
-  | 'conversation' | 'plan' | 'tasks' | 'terminal' | 'activity' | 'files' | 'artifacts'
-  // Cockpit's own overview (richer than the drawer's) and the appended
-  // cockpit-only tabs (operator decision, #2962).
-  | 'overview' | 'code' | 'timeline' | 'discussion' | 'costs' | 'ship';
+type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion'
+type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'files' | 'checks' | 'artifacts' | 'feed' | 'history'
+type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
-/** Tabs whose bodies come from the ONE IssueDetail component. */
-const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['conversation', 'plan', 'tasks', 'terminal', 'activity', 'files', 'artifacts']);
+/** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'plan', 'changes', 'activity'])
 
-// PAN-2908 C-DETAIL (operator decision, #2962): the cockpit route renders the
-// one IssueDetail at page density for the binding set; the cockpit's own
-// overview plus its unique tabs append after. Conversation is the default.
 const TABS: Array<{ id: MissionTab; label: string }> = [
-  { id: 'conversation', label: 'Conversation' },
   { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan map' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'terminal', label: 'Terminal' },
+  { id: 'session', label: 'Session' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'changes', label: 'Changes' },
   { id: 'activity', label: 'Activity' },
-  { id: 'files', label: 'Files' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'code', label: 'Code' },
-  { id: 'timeline', label: 'Timeline' },
   { id: 'discussion', label: 'Discussion' },
-  { id: 'costs', label: 'Costs' },
-  { id: 'ship', label: 'Ship' },
 ]
+
+// Legacy cockpit tab ids → { tab, subView }. Applied when reading the route/tab param.
+const LEGACY_TAB_MAP: Record<string, TabSelection> = {
+  conversation: { tab: 'session', subView: 'conversation' },
+  terminal: { tab: 'session', subView: 'terminal' },
+  tasks: { tab: 'plan', subView: 'tasks' },
+  code: { tab: 'changes', subView: 'checks' },
+  files: { tab: 'changes', subView: 'files' },
+  artifacts: { tab: 'changes', subView: 'artifacts' },
+  timeline: { tab: 'activity', subView: 'history' },
+  costs: { tab: 'overview' },
+  ship: { tab: 'overview' },
+}
+
+const DEFAULT_SUB_VIEW: Partial<Record<MissionTab, MissionSubView>> = {
+  session: 'conversation',
+  plan: 'map',
+  changes: 'files',
+  activity: 'feed',
+}
+
+function resolveTabSelection(tabId: string | null): TabSelection | null {
+  if (!tabId) return null
+  const legacy = LEGACY_TAB_MAP[tabId]
+  if (legacy) return legacy
+  const tab = TABS.find((candidate) => candidate.id === tabId)?.id
+  return tab ? { tab, subView: DEFAULT_SUB_VIEW[tab] } : null
+}
+
+function issueDetailTabFor(tab: MissionTab | null, subView: MissionSubView | undefined): string | null {
+  if (!tab || !ISSUE_DETAIL_TAB_IDS.has(tab)) return null
+  if (tab === 'session') return subView === 'terminal' ? 'terminal' : 'conversation'
+  if (tab === 'plan') return subView === 'tasks' ? 'tasks' : 'plan'
+  if (tab === 'changes') return subView === 'artifacts' ? 'artifacts' : subView === 'checks' ? null : 'files'
+  if (tab === 'activity') return subView === 'history' ? null : 'activity'
+  return null
+}
 
 type IssueTreeContext = 'issue'
 
@@ -163,7 +187,7 @@ function IssueTreeContextPanel({
   actionDock: ReactNode
   timeline: ReactNode
   onBackToIssue: () => void
-  onTab: (tab: MissionTab) => void
+  onTab: (tab: MissionTab, subView?: MissionSubView) => void
   onOpenAgent: (type: string) => void
 }) {
   const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
@@ -333,7 +357,7 @@ function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; mod
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
  * Agents lane, and the beads rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
-function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
+function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const activity = useActivityQuery(issueId)
@@ -366,14 +390,14 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {hasWork && <button type="button" className={lk} onClick={() => onOpenAgent('work')}>Open work agent ↗</button>}
-        {p && <button type="button" className={lk} onClick={() => onTab('code')}>Open diff →</button>}
+        {p && <button type="button" className={lk} onClick={() => onTab('changes', 'checks')}>Open diff →</button>}
         {p?.url && <a className={lk} href={p.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
       </div>
       {recent.length > 0 && (
         <div className="mt-3.5">
           <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
             <span>Recent activity</span>
-            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('timeline')}>→ Timeline</button>
+            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('activity', 'history')}>→ Timeline</button>
           </div>
           {recent.map((h, i) => (
             <div key={`${h.type}-${h.timestamp}-${i}`} className="flex items-baseline gap-2.5 py-1 text-[12.5px]">
@@ -389,7 +413,7 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
 }
 
 /** Overview — crew, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
-type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
+type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
 function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
   return (
     <div className="space-y-3.5">
@@ -405,14 +429,26 @@ function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }:
 }
 
 function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
-  if (tab === 'code' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
+  if (tab === 'changes' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
 }
 
 export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline }: IssueMissionControlProps) {
-  // PAN-2908 C-DETAIL (operator decision, #2962): Conversation is the default
-  // tab — same conversation-first law as the drawer.
-  const [activeTab, setActiveTab] = useState<MissionTab | null>('conversation')
+  const allAgents = useDashboardStore(selectAgents) as Agent[]
+  const issueAgents = useMemo(
+    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
+    [allAgents, issueId],
+  )
+  const routeSelection = useMemo(
+    () => resolveTabSelection(typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('tab')),
+    [],
+  )
+  const initialTab = routeSelection?.tab ?? (issueAgents.length > 0 ? 'session' : 'overview')
+  const [activeTab, setActiveTab] = useState<MissionTab | null>(initialTab)
+  const [activeSubView, setActiveSubView] = useState<MissionSubView | undefined>(
+    routeSelection?.subView ?? DEFAULT_SUB_VIEW[initialTab],
+  )
+  const tabSelectionLocked = useRef(Boolean(routeSelection) || issueAgents.length > 0)
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
@@ -429,16 +465,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
-  const allAgents = useDashboardStore(selectAgents) as Agent[]
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
     (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string }> | undefined)?.find(
       (candidate) => candidate.identifier === issueId,
     ),
-  )
-  const issueAgents = useMemo(
-    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
-    [allAgents, issueId],
   )
   // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
   // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
@@ -466,6 +497,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       ? phaseLabel('done')
       : '—'
   const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
+
+  useEffect(() => {
+    if (tabSelectionLocked.current || issueAgents.length === 0) return
+    tabSelectionLocked.current = true
+    setActiveTab('session')
+    setActiveSubView('conversation')
+  }, [issueAgents.length])
+
   const toggleSpine = () => {
     setSpineCollapsed((collapsed) => {
       const next = !collapsed
@@ -473,20 +513,26 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       return next
     })
   }
-  const selectTab = (tab: MissionTab) => {
+  const selectTab = (tab: MissionTab, subView: MissionSubView | undefined = DEFAULT_SUB_VIEW[tab]) => {
+    tabSelectionLocked.current = true
     setActiveTab(tab)
+    setActiveSubView(subView)
     setTreeContext(null)
     setSelectedTreeSession(null)
   }
   const selectIssueFromTree = () => {
+    tabSelectionLocked.current = true
     setTreeContext('issue')
     setSelectedTreeSession(null)
     setActiveTab(null)
+    setActiveSubView(undefined)
   }
   const selectSessionFromTree = (session: SessionNode) => {
+    tabSelectionLocked.current = true
     setSelectedTreeSession(session)
     setTreeContext(null)
     setActiveTab(null)
+    setActiveSubView(undefined)
   }
   // Open an agent's conversation by session type (work/review/test/…). Shared by
   // the pipeline phases (#4) and the Overview "Now" links (#9).
@@ -501,6 +547,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       if (!current) return current
       return sessions.find((session) => session.sessionId === current.sessionId) ?? current
     })
+    if (!tabSelectionLocked.current && sessions.length > 0) {
+      tabSelectionLocked.current = true
+      setActiveTab('session')
+      setActiveSubView('conversation')
+    }
   }, [])
 
   return (
@@ -601,7 +652,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           onSessionsChange={recordTreeSessions}
           onOpenVerification={() => selectTab('overview')}
         /></div>
-        <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
+        <main
+          className="min-w-0 rounded-[20px] border border-border bg-card/30"
+          data-active-tab={activeTab ?? undefined}
+          data-active-subview={activeSubView}
+        >
           <div className="p-4">
             {(treeContext || selectedTreeSession) && (
               <div data-section="SessionPanel"><IssueTreeContextPanel
@@ -618,30 +673,40 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 onOpenAgent={openAgentByType}
               /></div>
             )}
-            {/* PAN-2908 C-DETAIL (operator decision, #2962): the binding tabs
-                are the ONE IssueDetail at page density — the cockpit nav drives
-                its tab, the shell inside it drives its conversations. */}
-            {ISSUE_DETAIL_TAB_IDS.has(activeTab as MissionTab) && (
+            {/* The six cockpit tabs fold the legacy surfaces into sub-views while
+                preserving the ONE IssueDetail page-density renderer. */}
+            {issueDetailTab && (
               <div data-section="IssueDetail page body" className="h-[calc(100vh-340px)] min-h-[520px]">
                 <IssueDetail
                   issueId={issueId}
                   density="page"
                   showTabs={false}
-                  tab={activeTab as MissionTab}
-                  onSelectTab={(tab) => selectTab(tab as MissionTab)}
+                  tab={issueDetailTab}
+                  onSelectTab={(tab) => {
+                    const selection = resolveTabSelection(tab)
+                    if (selection) selectTab(selection.tab, selection.subView)
+                  }}
                   agents={issueAgents}
                   reviewStatus={reviewSnapshot}
                 />
               </div>
             )}
-            {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
-            {activeTab === 'code' && (
+            {activeTab === 'overview' && (
+              <div data-section="Awareness rail" className="space-y-3.5">
+                <OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} />
+                <div data-section="Costs / Artifacts / Ship tabs" className="space-y-3.5">
+                  <CostsTab issueId={issueId} />
+                  <ShipTab issueId={issueId} />
+                </div>
+              </div>
+            )}
+            {activeTab === 'changes' && activeSubView === 'checks' && (
               <div data-section="Code tab" className="space-y-3.5">
                 <GitHubCiPanel issueId={issueId} />
                 <ChangedFilesView issueId={issueId} />
               </div>
             )}
-            {activeTab === 'timeline' && (
+            {activeTab === 'activity' && activeSubView === 'history' && (
               <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
                 <div>
                   <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Status history</h3>
@@ -654,8 +719,6 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               </div>
             )}
             {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
-            {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
-            {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
           </div>
         </main>
       </div>
@@ -665,7 +728,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         query={tasksQuery}
         rollup={tasksRollup}
         onClose={() => setTasksDrawerOpen(false)}
-        onOpenFull={() => selectTab('tasks')}
+        onOpenFull={() => selectTab('plan', 'tasks')}
       />
     </IssueView>
   )

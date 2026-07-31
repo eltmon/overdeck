@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
@@ -9,7 +9,10 @@ let unexpectedRequests: string[] = []
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.history.replaceState(null, '', '/')
   actionInvoke.mockClear()
+  queryMocks.issueActionState.hasPlan = true
+  queryMocks.issueActionState.hasTasks = true
   queryMocks.activityQuery.data.sections = [
     { type: 'work', sessionId: 'agent-pan-1661', model: 'gpt-5.5', status: 'completed', startedAt: '2026-06-07T00:00:00Z', duration: 1 },
   ]
@@ -92,7 +95,8 @@ const queryMocks = vi.hoisted(() => {
   const issueCostsQuery = { data: { totalCost: 1.23, totalTokens: 1000, byModel: {}, sessions: [] } }
   const workspaceQuery = { data: null, isLoading: false }
   const shipLogQuery = { data: null, isLoading: false }
-  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery }
+  const issueActionState = { hasPlan: true, hasTasks: true }
+  return { activityQuery, issueCheckRunsQuery, planningQuery, prQuery, reviewStatusQuery, issueCostsQuery, workspaceQuery, shipLogQuery, issueActionState }
 })
 
 vi.mock('../../CommandDeck/ZoneCOverviewTabs/queries', () => ({
@@ -139,7 +143,7 @@ vi.mock('../../IssueActionMenu/useIssueActions', () => ({
       secondary: all.slice(2, 4),
       overflow: all.slice(4),
       phase: 'WORK_RUNNING',
-      state: { hasPlan: true, hasBeads: true },
+      state: { ...queryMocks.issueActionState, hasBeads: queryMocks.issueActionState.hasTasks },
       activeDialog: null,
     }
   },
@@ -247,8 +251,8 @@ function renderMissionControl(extra?: { onOpenPane?: (pane: string) => void }) {
 describe('IssueMissionControl', () => {
   it('renders cockpit inventory markers on the real overview shell', () => {
     const { container } = renderMissionControl();
-    // Default view (Conversation — operator decision, #2962): route chrome +
-    // the ONE IssueDetail at page density.
+    // A known session makes Session the default: route chrome + the ONE
+    // IssueDetail at page density.
     for (const section of ['Header bar', 'StatusNarrative', 'AgentsLane', 'Detail Tabs', 'TasksRail / TasksTab', 'ReviewPolicyControl', 'IssueDetail page body']) {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
@@ -260,16 +264,26 @@ describe('IssueMissionControl', () => {
       expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
     }
   });
-  it('renders the mission header, issue tree, and persistent top tabs', () => {
+  it('renders the mission header, issue tree, and six persistent top tabs', () => {
     renderMissionControl()
 
     expect(screen.getByRole('heading', { name: 'Mission control' })).toBeTruthy()
     expect(screen.getAllByText('PAN-1661').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Issue tree')).toBeTruthy()
     expect(screen.getByTestId('status-narrative')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Conversation' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /Code/ }).length).toBeGreaterThan(0)
+
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    const buttons = Array.from(nav.querySelectorAll('button[aria-selected]'))
+    expect(buttons).toHaveLength(6)
+    expect(buttons.map((button) => button.textContent)).toEqual([
+      'Overview',
+      'Session',
+      'Plan',
+      'Changes✓',
+      'Activity',
+      'Discussion',
+    ])
+
     fireEvent.click(screen.getByRole('button', { name: 'Overview' }))
     expect(screen.getByText('Blocker spotlight')).toBeTruthy()
   })
@@ -287,23 +301,29 @@ describe('IssueMissionControl', () => {
     expect(nav).not.toHaveClass('flex-wrap')
   })
 
-  it('renders every detail tab and badge with the pill treatment', () => {
-    renderMissionControl()
-    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
-    const buttons = Array.from(nav.querySelectorAll('button[aria-selected]'))
+  it('uses Session as the default when the issue has any historical or live session', () => {
+    const { container } = renderMissionControl()
+    const sessionTab = screen.getByRole('button', { name: 'Session' })
 
-    // PRD binding set first, cockpit extras appended (operator decision, #2962).
-    expect(buttons).toHaveLength(13)
-    for (const label of ['Conversation', 'Overview', 'Plan map', 'Tasks', 'Terminal', 'Activity', 'Files', 'Artifacts', 'Code', 'Timeline', 'Discussion', 'Costs', 'Ship']) {
-      expect(buttons.some((button) => button.textContent?.includes(label)), label).toBe(true)
-    }
-    // Conversation is the default tab and carries the active styling.
-    expect(screen.getByRole('button', { name: 'Conversation' })).toHaveClass('rounded-[9px]', 'font-medium', 'bg-primary/9', 'text-primary')
-    expect(screen.getByRole('button', { name: /Code/ })).toHaveTextContent('✓')
-    for (const button of buttons) expect(button).not.toHaveClass('font-semibold')
+    expect(sessionTab).toHaveClass('rounded-[9px]', 'font-medium', 'bg-primary/9', 'text-primary')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'session')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'conversation')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
   })
 
-  it('the binding tabs mount the ONE IssueDetail at page density, Conversation by default', () => {
+  it('uses Overview as the default when the issue has no agent sessions', () => {
+    queryMocks.activityQuery.data.sections = []
+    queryMocks.issueActionState.hasPlan = false
+    queryMocks.issueActionState.hasTasks = false
+
+    const { container } = renderMissionControl()
+
+    expect(screen.getByRole('button', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'overview')
+    expect(container.querySelector('main')).not.toHaveAttribute('data-active-subview')
+  })
+
+  it('the folded binding tabs keep the ONE IssueDetail at page density', () => {
     renderMissionControl()
     const detail = screen.getByTestId('issue-detail-page-mock')
     expect(detail).toHaveAttribute('data-density', 'page')
@@ -311,11 +331,41 @@ describe('IssueMissionControl', () => {
     expect(detail).toHaveAttribute('data-issue-id', 'PAN-1661')
     expect(detail).toHaveAttribute('data-show-tabs', 'false')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
+    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    fireEvent.click(within(nav).getByRole('button', { name: /Changes/ }))
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'files')
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal' }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
-    fireEvent.click(screen.getByRole('button', { name: 'Plan map' }))
+    fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'plan')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Activity' }))
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'activity')
+  })
+
+  it.each([
+    ['conversation', 'session', 'conversation'],
+    ['terminal', 'session', 'terminal'],
+    ['tasks', 'plan', 'tasks'],
+    ['code', 'changes', 'checks'],
+    ['files', 'changes', 'files'],
+    ['artifacts', 'changes', 'artifacts'],
+    ['timeline', 'activity', 'history'],
+    ['costs', 'overview', undefined],
+    ['ship', 'overview', undefined],
+  ] as const)('maps the legacy %s deep link to %s/%s', (legacyTab, expectedTab, expectedSubView) => {
+    window.history.replaceState(null, '', `/?tab=${legacyTab}`)
+    const { container } = renderMissionControl()
+    const main = container.querySelector('main')
+
+    expect(main).toHaveAttribute('data-active-tab', expectedTab)
+    if (expectedSubView) expect(main).toHaveAttribute('data-active-subview', expectedSubView)
+    else expect(main).not.toHaveAttribute('data-active-subview')
+  })
+
+  it('treats the new plan deep link as the plan map sub-view', () => {
+    window.history.replaceState(null, '', '/?tab=plan')
+    const { container } = renderMissionControl()
+
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'plan')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'map')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'plan')
   })
 
@@ -503,8 +553,8 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('session-panel')).toBeTruthy()
     expect(screen.getByText('Issue overview')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Overview' }).getAttribute('aria-selected')).toBe('false')
-    // Conversation exists as a tab now (#2962) — it is just not the selected one.
-    expect(screen.getByRole('button', { name: 'Conversation' }).getAttribute('aria-selected')).toBe('false')
+    // Session remains visible while the tree-driven panel owns the body.
+    expect(screen.getByRole('button', { name: 'Session' }).getAttribute('aria-selected')).toBe('false')
 
     fireEvent.click(screen.getByRole('button', { name: 'Issue overview' }))
     expect(screen.getByText('Review blocked — awaiting the work agent')).toBeTruthy()
@@ -536,27 +586,23 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('issue-action-disabled-wipe')).toHaveAttribute('title', 'Wipe is unavailable.')
   })
 
-  it('shows first-class CI checks from the Code tab', () => {
+  it('keeps first-class CI checks reachable through the legacy Code deep link', () => {
+    window.history.replaceState(null, '', '/?tab=code')
     renderMissionControl()
-
-    const codeTab = screen.getAllByRole('button', { name: /Code/ }).at(-1)
-    expect(codeTab).toBeTruthy()
-    fireEvent.click(codeTab!)
 
     expect(screen.getAllByText('GitHub CI/CD').length).toBeGreaterThan(0)
     expect(screen.getByText('lint')).toBeTruthy()
     expect(screen.getAllByText('1/1 pass').length).toBeGreaterThan(0)
   })
 
-  it('keeps file and terminal surfaces reachable through top tabs', () => {
-    renderMissionControl()
+  it.each([
+    ['files', 'changes', 'files'],
+    ['terminal', 'session', 'terminal'],
+  ] as const)('keeps the legacy %s surface reachable in %s', (legacyTab, expectedTab, expectedDetailTab) => {
+    window.history.replaceState(null, '', `/?tab=${legacyTab}`)
+    const { container } = renderMissionControl()
 
-    // PAN-2908 C-DETAIL: Files and Terminal are binding tabs rendered by the
-    // ONE IssueDetail — no more pane-redirect cards.
-    fireEvent.click(screen.getByRole('button', { name: 'Files' }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'files')
-
-    fireEvent.click(screen.getByRole('button', { name: 'Terminal' }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', expectedTab)
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', expectedDetailTab)
   })
 })
