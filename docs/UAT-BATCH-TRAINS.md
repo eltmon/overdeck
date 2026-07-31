@@ -372,8 +372,10 @@ The fields are deliberately small. An active block must declare at least one
 without a push target are rejected. Removing `version_sync` is the only way to
 select the explicit skip state.
 
-- `set[].path` and `set[].json_field` identify JSON string fields written before
-  the command runs.
+- `set[].path` and `set[].json_field` identify top-level own JSON string fields
+  written before the command runs. Ship parses the document, updates that exact
+  top-level source range without reformatting the file, reparses it, and verifies
+  the selected property. A same-named nested field is never a setter target.
 - `command` is optional; `command_cwd` is relative to the project root and
   `command_image` is required with it. The operator-owned image must already be
   present locally and provide `/bin/sh` plus `cp`. Commands are filesystem-only:
@@ -382,9 +384,14 @@ select the explicit skip state.
   and runs without host credentials, network, or capabilities under a five-minute
   hard timeout. After success, only declared `set` and `expect` regular files are
   copied back through no-follow validation, capped at 16 MiB per file and 64 MiB
-  total. Commands cannot inspect or commit Git metadata; the credentialed commit
-  and push remain in hook-disabled trusted parent code after repository identity
-  is revalidated.
+  total. Before command execution, the trusted parent snapshots every declared
+  output. A configured JSON `set` file must remain byte-identical to the trusted
+  setter's result, while any other output may change only by replacing existing
+  `X.Y` or `X.Y.Z` tokens with the requested full or major-minor version. Added
+  lines, removed lines, formatting changes, scripts, and every other opaque edit
+  fail before commit or push. Commands cannot inspect or commit Git metadata; the
+  credentialed commit and push remain in hook-disabled trusted parent code after
+  repository identity is revalidated.
 - `expect[].pattern` is a regular expression checked after propagation.
   `{version}` expands to the complete version such as `48.8.0`, while
   `{majorMinor}` expands to `48.8`. Patterns are limited to 512 characters,
@@ -443,7 +450,11 @@ and stay only in local logs.
 Configure the block by hand in `projects.yaml` or through **Project settings →
 Version ship**. Both surfaces use that file as the single store; dashboard
 saves preserve comments, quoting, formatting, and unrelated projects outside
-the edited `version_sync` block. An unset project says plainly that it skips
+the edited `version_sync` block, including comments attached to the block's
+final entry. The shared writer serializes the complete read/modify/write sequence
+and replaces `projects.yaml` through a flushed same-directory temporary file and
+atomic rename, so concurrent saves cannot overwrite each other and an interrupted
+write cannot truncate the registry. An unset project says plainly that it skips
 ship rather than showing an empty form, and the section displays the latest
 `passed`, `pending`, `partial`, or `failed` outcome.
 

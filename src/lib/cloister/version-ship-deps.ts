@@ -4,6 +4,7 @@ import { cp, lstat, mkdir, mkdtemp, open, readFile, realpath, rm } from 'node:fs
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { isMap, isScalar, parseDocument } from 'yaml';
 import { redactSensitiveText } from '../secret-redaction.js';
 import {
   VersionShipOperationError,
@@ -257,10 +258,6 @@ async function runSandboxedCommand(
   }
 }
 
-function escapeRegex(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
 async function validateContainedPath(
   projectRoot: string,
   declaredPath: string,
@@ -306,11 +303,60 @@ async function writeJsonStringField(path: string, jsonField: string, version: st
     const info = await handle.stat();
     if (!info.isFile()) throw new VersionShipOperationError('path-validation-failed', 'version_sync set target is not a regular file');
     const content = await handle.readFile('utf-8');
-    const fieldPattern = new RegExp(`("${escapeRegex(jsonField)}"\\s*:\\s*")([^"]*)(")`);
-    if (!fieldPattern.test(content)) {
-      throw new VersionShipOperationError('path-validation-failed', `JSON string field was not found: ${jsonField}`);
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      throw new VersionShipOperationError('path-validation-failed', 'version_sync set target is not valid JSON');
     }
-    const updated = content.replace(fieldPattern, `$1${version}$3`);
+    if (
+      parsed === null
+      || typeof parsed !== 'object'
+      || Array.isArray(parsed)
+      || !Object.prototype.hasOwnProperty.call(parsed, jsonField)
+      || typeof (parsed as Record<string, unknown>)[jsonField] !== 'string'
+    ) {
+      throw new VersionShipOperationError(
+        'path-validation-failed',
+        `top-level JSON string field was not found: ${jsonField}`,
+      );
+    }
+
+    const document = parseDocument(content, { keepSourceTokens: true, uniqueKeys: true });
+    if (document.errors.length > 0 || !isMap(document.contents)) {
+      throw new VersionShipOperationError('path-validation-failed', 'version_sync set target is not a JSON object');
+    }
+    const matchingPairs = document.contents.items.filter(pair => (
+      isScalar(pair.key) && pair.key.value === jsonField
+    ));
+    const value = matchingPairs.length === 1 ? matchingPairs[0]?.value : null;
+    if (!isScalar(value) || typeof value.value !== 'string' || !value.range) {
+      throw new VersionShipOperationError(
+        'path-validation-failed',
+        `top-level JSON string field was not found: ${jsonField}`,
+      );
+    }
+
+    const updated = content.slice(0, value.range[0])
+      + JSON.stringify(version)
+      + content.slice(value.range[1]);
+    let verified: unknown;
+    try {
+      verified = JSON.parse(updated);
+    } catch {
+      throw new VersionShipOperationError('path-validation-failed', 'version_sync produced invalid JSON');
+    }
+    if (
+      verified === null
+      || typeof verified !== 'object'
+      || Array.isArray(verified)
+      || !Object.prototype.hasOwnProperty.call(verified, jsonField)
+      || (verified as Record<string, unknown>)[jsonField] !== version
+    ) {
+      throw new VersionShipOperationError('path-validation-failed', `could not update top-level JSON field: ${jsonField}`);
+    }
+
     if (updated !== content) {
       await handle.truncate(0);
       await handle.write(updated, 0, 'utf-8');

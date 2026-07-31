@@ -4,13 +4,19 @@
  * Maps Linear team prefixes and labels to project paths for workspace creation.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
-import { mkdir, readFile, stat, writeFile } from 'fs/promises';
+import { existsSync, readFileSync, statSync } from 'fs';
+import { readFile, stat } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
 import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
+import {
+  atomicWriteProjectsConfig,
+  atomicWriteProjectsConfigSync,
+  withProjectsConfigWrite,
+  withProjectsConfigWriteSync,
+} from './projects-config-write.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
@@ -434,13 +440,10 @@ export function loadProjectsConfigSync(): ProjectsConfig {
  * Save projects configuration
  */
 export function saveProjectsConfigSync(config: ProjectsConfig): void {
-  const dir = OVERDECK_HOME;
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
   const yaml = stringifyYaml(config, { indent: 2 });
-  writeFileSync(PROJECTS_CONFIG_FILE, yaml, 'utf-8');
+  withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
+    atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, yaml);
+  });
   _projectsCache = null;
 }
 
@@ -822,12 +825,11 @@ projects:
   #   linear_team: PAN
 `;
 
-  const dir = OVERDECK_HOME;
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  writeFileSync(PROJECTS_CONFIG_FILE, exampleYaml, 'utf-8');
+  withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
+    if (!existsSync(PROJECTS_CONFIG_FILE)) {
+      atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, exampleYaml);
+    }
+  });
   console.log(`Created example projects config at ${PROJECTS_CONFIG_FILE}`);
 }
 
@@ -959,12 +961,10 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
 export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: async () => {
-      const dir = OVERDECK_HOME;
-      if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
-      }
       const out = stringifyYaml(config, { indent: 2 });
-      await writeFile(PROJECTS_CONFIG_FILE, out, 'utf-8');
+      await withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
+        atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, out)
+      ));
       _projectsCache = null;
     },
     catch: (cause) =>

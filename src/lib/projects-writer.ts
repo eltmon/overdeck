@@ -1,4 +1,4 @@
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { isMap, parseDocument, stringify, type Pair, type YAMLMap } from 'yaml';
 import {
   PROJECTS_CONFIG_FILE,
@@ -6,6 +6,7 @@ import {
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from './projects.js';
+import { atomicWriteProjectsConfig, withProjectsConfigWrite } from './projects-config-write.js';
 
 function keyValue(pair: Pair): string | undefined {
   const value = pair.key && typeof pair.key === 'object' && 'value' in pair.key
@@ -34,12 +35,56 @@ function keyIndent(content: string, pair: Pair): string {
   return indent;
 }
 
+function inlineComment(
+  content: string,
+  value: unknown,
+): { suffix: string; standalone: string } | null {
+  if (typeof value !== 'object' || value === null || !('srcToken' in value)) return null;
+  const range = nodeRange(value);
+  if (!range) return null;
+
+  const comments: Array<{ offset: number; source: string }> = [];
+  const seen = new Set<object>();
+  const visit = (candidate: unknown): void => {
+    if (Array.isArray(candidate)) {
+      for (const item of candidate) visit(item);
+      return;
+    }
+    if (typeof candidate !== 'object' || candidate === null || seen.has(candidate)) return;
+    seen.add(candidate);
+    const record = candidate as Record<string, unknown>;
+    if (
+      record.type === 'comment'
+      && typeof record.offset === 'number'
+      && typeof record.source === 'string'
+      && record.offset >= range[0]
+      && record.offset < range[1]
+    ) {
+      comments.push({ offset: record.offset, source: record.source });
+    }
+    for (const nested of Object.values(record)) visit(nested);
+  };
+  visit((value as { srcToken: unknown }).srcToken);
+
+  const comment = comments.sort((a, b) => b.offset - a.offset)[0];
+  if (!comment) return null;
+  const start = lineStart(content, comment.offset);
+  const beforeComment = content.slice(start, comment.offset);
+  if (beforeComment.trim().length === 0) return null;
+  const spacing = /[ \t]*$/.exec(beforeComment)?.[0] ?? ' ';
+  const indentation = /^[ \t]*/.exec(beforeComment)?.[0] ?? '';
+  return {
+    suffix: `${spacing}${comment.source}`,
+    standalone: `${indentation}${comment.source}\n`,
+  };
+}
+
 function renderVersionSync(block: VersionSyncConfig, indent: string): string {
   const rendered = stringify({ version_sync: block }, { indent: 2, lineWidth: 120 }).trimEnd();
   return `${rendered.split('\n').map(line => `${indent}${line}`).join('\n')}\n`;
 }
 
-export async function setProjectVersionSync(
+async function setProjectVersionSyncUnlocked(
   projectKey: string,
   block: VersionSyncConfig | null,
 ): Promise<void> {
@@ -88,11 +133,17 @@ export async function setProjectVersionSync(
     const keyRange = nodeRange(versionPair.key);
     const valueRange = nodeRange(versionPair.value);
     if (!keyRange || !valueRange) throw new Error(`Could not locate ${projectKey}.version_sync in projects.yaml`);
+    const preservedInlineComment = inlineComment(content, versionPair.value);
+    if (preservedInlineComment) {
+      replacement = block === null
+        ? preservedInlineComment.standalone
+        : `${replacement.trimEnd()}${preservedInlineComment.suffix}\n`;
+    }
     let start = lineStart(content, keyRange[0]);
-    if (block === null && valueRange[2] === content.length && !content.endsWith('\n') && start > 0 && content[start - 1] === '\n') {
+    if (block === null && valueRange[1] === content.length && !content.endsWith('\n') && start > 0 && content[start - 1] === '\n') {
       start -= 1;
     }
-    updated = content.slice(0, start) + replacement + content.slice(valueRange[2]);
+    updated = content.slice(0, start) + replacement + content.slice(valueRange[1]);
   } else if (block === null) {
     return;
   } else {
@@ -103,6 +154,15 @@ export async function setProjectVersionSync(
     updated = content.slice(0, offset) + insertion + content.slice(offset);
   }
 
-  await writeFile(PROJECTS_CONFIG_FILE, updated, 'utf-8');
+  await atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, updated);
   invalidateProjectsConfigCache();
+}
+
+export async function setProjectVersionSync(
+  projectKey: string,
+  block: VersionSyncConfig | null,
+): Promise<void> {
+  return withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
+    setProjectVersionSyncUnlocked(projectKey, block)
+  ));
 }

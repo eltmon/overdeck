@@ -159,6 +159,70 @@ describe('runVersionShip', () => {
     expect(deps.push).not.toHaveBeenCalled();
   });
 
+  it('rejects command output that preserves the version while injecting unrelated code', async () => {
+    const readsByPath = new Map<string, number>();
+    const deps = fakeDeps({
+      readFile: vi.fn(async (path: string) => {
+        const read = readsByPath.get(path) ?? 0;
+        readsByPath.set(path, read + 1);
+        if (path.endsWith('package.json')) return '"version": "1.2.3"';
+        return read === 0
+          ? 'export const version = "1.1.0";\n'
+          : 'export const version = "1.2.3";\nexport const postinstall = "malicious";\n';
+      }),
+    });
+
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({
+        expect: [
+          { path: 'frontend/package.json', pattern: '"version": "{version}"' },
+          { path: 'frontend/generated.ts', pattern: 'version = "{version}"' },
+        ],
+      }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [allowedRepo('frontend')],
+    }, deps);
+
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'command-failed',
+      error: 'version sync command changed content outside declared version tokens: frontend/generated.ts',
+    });
+    expect(deps.commit).not.toHaveBeenCalled();
+    expect(deps.push).not.toHaveBeenCalled();
+  });
+
+  it('accepts command output that changes only existing version tokens', async () => {
+    const readsByPath = new Map<string, number>();
+    const deps = fakeDeps({
+      readFile: vi.fn(async (path: string) => {
+        const read = readsByPath.get(path) ?? 0;
+        readsByPath.set(path, read + 1);
+        if (path.endsWith('package.json')) return '"version": "1.2.3"';
+        return read === 0 ? 'versionName "1.1"\n' : 'versionName "1.2"\n';
+      }),
+    });
+
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({
+        expect: [
+          { path: 'frontend/package.json', pattern: '"version": "{version}"' },
+          { path: 'frontend/build.gradle', pattern: 'versionName "{majorMinor}"' },
+        ],
+      }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [allowedRepo('frontend')],
+    }, deps);
+
+    expect(report.status).toBe('passed');
+    expect(deps.commit).toHaveBeenCalledOnce();
+    expect(deps.push).toHaveBeenCalledOnce();
+  });
+
   it('stages only declared set and expect paths relative to each repo', async () => {
     const deps = fakeDeps({
       readFile: vi.fn(async () => 'generated 1.2.3'),
@@ -319,6 +383,24 @@ describe('runVersionShip', () => {
     expect(report).toMatchObject({ status: 'failed', errorCode: 'path-validation-failed' });
     expect(deps.writeVersion).not.toHaveBeenCalled();
     expect(deps.push).not.toHaveBeenCalled();
+  });
+
+  it('updates only the configured top-level JSON string field', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'version-ship-json-field-'));
+    tempDirs.push(root);
+    const manifest = join(root, 'package.json');
+    writeFileSync(manifest, '{"plugin":{"version":"1.0.0"},"version":"1.0.0"}\n');
+    const deps = buildVersionShipDeps();
+
+    await deps.writeVersion(manifest, 'version', '2.0.0');
+
+    const content = readFileSync(manifest, 'utf-8');
+    expect(content).toBe('{"plugin":{"version":"1.0.0"},"version":"2.0.0"}\n');
+    expect(await deps.testPattern('"version":"2\\.0\\.0"', content)).toBe(true);
+    expect(JSON.parse(content)).toEqual({
+      plugin: { version: '1.0.0' },
+      version: '2.0.0',
+    });
   });
 
   it('rejects a set target whose path traverses a symlink', async () => {

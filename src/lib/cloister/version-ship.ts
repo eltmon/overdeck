@@ -77,6 +77,39 @@ export interface VersionShipDeps {
 }
 
 const VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+const VERSION_TOKEN_PATTERN = /\d+\.\d+(?:\.\d+)?/g;
+
+function splitVersionTokens(content: string): { literals: string[]; tokens: string[] } {
+  const literals: string[] = [];
+  const tokens: string[] = [];
+  let offset = 0;
+  for (const match of content.matchAll(VERSION_TOKEN_PATTERN)) {
+    const index = match.index;
+    literals.push(content.slice(offset, index));
+    tokens.push(match[0]);
+    offset = index + match[0].length;
+  }
+  literals.push(content.slice(offset));
+  return { literals, tokens };
+}
+
+function isVersionTokenOnlyTransform(before: string, after: string, version: string): boolean {
+  if (before === after) return true;
+  const previous = splitVersionTokens(before);
+  const next = splitVersionTokens(after);
+  if (
+    previous.tokens.length !== next.tokens.length
+    || previous.literals.length !== next.literals.length
+    || previous.literals.some((literal, index) => literal !== next.literals[index])
+  ) {
+    return false;
+  }
+
+  const allowed = new Set([version, version.split('.').slice(0, 2).join('.')]);
+  return previous.tokens.every((token, index) => (
+    token === next.tokens[index] || allowed.has(next.tokens[index]!)
+  ));
+}
 
 function failedReport(
   version: string,
@@ -228,15 +261,23 @@ export async function runVersionShip(
     }
 
     if (config.command && commandCwd && config.command_image) {
+      const commandPaths = [...new Set([
+        ...setTargets.map(target => target.path),
+        ...expectations.map(expectation => expectation.path),
+      ])];
+      const trustedSetPaths = new Set(setTargets.map(target => target.path));
+      const preCommandContents = new Map<string, string>();
+      for (const declaredPath of commandPaths) {
+        const absolutePath = await deps.resolveFile(projectRoot, declaredPath);
+        preCommandContents.set(declaredPath, await deps.readFile(absolutePath));
+      }
+
       const commandResult = await deps.runCommand(
         config.command,
         commandCwd,
         projectRoot,
         config.command_image,
-        [...new Set([
-          ...setTargets.map(target => target.path),
-          ...expectations.map(expectation => expectation.path),
-        ])],
+        commandPaths,
       );
       if (commandResult.exitCode !== 0) {
         deps.logDiagnostic?.(
@@ -249,6 +290,25 @@ export async function runVersionShip(
           'command-failed',
           `version sync command failed (exit ${commandResult.exitCode}); inspect the local dashboard log`,
         );
+      }
+
+      for (const declaredPath of commandPaths) {
+        const absolutePath = await deps.resolveFile(projectRoot, declaredPath);
+        const before = preCommandContents.get(declaredPath)!;
+        const after = await deps.readFile(absolutePath);
+        const valid = trustedSetPaths.has(declaredPath)
+          ? before === after
+          : isVersionTokenOnlyTransform(before, after, version);
+        if (!valid) {
+          deps.logDiagnostic?.(`[version-ship] command changed undeclared content in ${declaredPath}`);
+          return failedReport(
+            version,
+            batchName,
+            at,
+            'command-failed',
+            `version sync command changed content outside declared version tokens: ${declaredPath}`,
+          );
+        }
       }
     }
 

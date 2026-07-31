@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 
 const { TEST_HOME } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -41,6 +41,11 @@ const MYN_VERSION_SYNC = {
     { path: 'frontend/android/app/build.gradle', pattern: 'versionName "{majorMinor}"' },
   ],
   push: ['frontend', 'api'],
+} satisfies VersionSyncConfig;
+
+const COMMENT_VERSION_SYNC = {
+  expect: [{ path: 'package.json', pattern: 'version' }],
+  push: ['.'],
 } satisfies VersionSyncConfig;
 
 beforeEach(() => {
@@ -128,6 +133,62 @@ describe('setProjectVersionSync', () => {
 
     await setProjectVersionSync('alpha', null);
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
+  it('preserves an attached trailing comment while updating and removing the block', async () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n    version_sync:\n      expect:\n        - path: package.json\n          pattern: version\n      push:\n        - .\n      # keep this operator note\n    auto_merge_default: hold\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+
+    await setProjectVersionSync('alpha', null);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(
+      `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n      # keep this operator note\n    auto_merge_default: hold\n`,
+    );
+  });
+
+  it('preserves an inline final-entry comment while updating and removing the block', async () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n    version_sync:\n      expect:\n        - path: package.json\n          pattern: version\n      push:\n        - . # keep inline\n    auto_merge_default: hold\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+
+    await setProjectVersionSync('alpha', null);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(
+      `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n        # keep inline\n    auto_merge_default: hold\n`,
+    );
+  });
+
+  it('serializes concurrent version_sync updates and leaves no lock or temporary files', async () => {
+    writeFileSync(
+      PROJECTS_CONFIG_FILE,
+      `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n  beta:\n    name: Beta\n    path: /repo/beta\n`,
+      'utf-8',
+    );
+
+    await Promise.all([
+      setProjectVersionSync('alpha', COMMENT_VERSION_SYNC),
+      setProjectVersionSync('beta', COMMENT_VERSION_SYNC),
+    ]);
+
+    const parsed = loadProjectsConfigSync();
+    expect(parsed.projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
+    expect(parsed.projects.beta?.version_sync).toEqual(COMMENT_VERSION_SYNC);
+    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml']);
+  });
+
+  it('leaves the durable registry intact when another writer owns the shared lock', () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+    writeFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'owned elsewhere\n', 'utf-8');
+
+    expect(() => saveProjectsConfigSync({
+      projects: { beta: { name: 'Beta', path: '/repo/beta' } },
+    })).toThrow('projects.yaml is already being modified');
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+    expect(readFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'utf-8')).toBe('owned elsewhere\n');
   });
 
   it('rejects a flow-style project without changing the file', async () => {
