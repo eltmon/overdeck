@@ -123,20 +123,21 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:10:35.708Z",
+  "updated": "2026-07-31T00:11:59.404Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T00:10:09.073Z",
+    "updatedAt": "2026-07-31T00:11:59.359Z",
     "reviewNotes": "the new trigger-route guard rejects existing internal review-dispatch callers",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b",
+    "lastVerifiedCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91",
     "reviewRequestedAt": "2026-07-31T00:06:38.713Z",
     "reviewSpawnedAt": "2026-07-31T00:10:09.073Z",
     "scopeDrift": {
@@ -187,9 +188,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4444863,
-            "output": 87371,
-            "cacheRead": 20636160,
+            "input": 9718887,
+            "output": 118144,
+            "cacheRead": 30467072,
             "cacheWrite": 0
           }
         },
@@ -236,15 +237,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 13284845,
-          "output": 400823,
-          "cacheRead": 139840512,
+          "input": 18558869,
+          "output": 431596,
+          "cacheRead": 149671424,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 148.369171,
-        "pricingAsOf": "2026-07-31T00:10:09.081Z"
+        "usd": 180.577937,
+        "pricingAsOf": "2026-07-31T00:11:59.387Z"
       }
     },
     "merges": [
