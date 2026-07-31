@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T15:32:53.948Z",
+  "updated": "2026-07-31T15:42:51.107Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "route-deletion-sites": {
-        "writerId": "agent-pan-3357",
-        "agentId": "agent-pan-3357",
-        "pid": 894230,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T15:32:53.948Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Added async transcript-preserving agent state deletion door with four regression tests covering nested Codex rollouts, root Pi JSONL, full removal, and idempotence.",
         "releasedAt": "2026-07-31T15:31:09.359Z"
+      },
+      {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 894230,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T15:32:53.948Z",
+        "itemId": "route-deletion-sites",
+        "outcome": "completed",
+        "reason": "Routed wipe, retention, orphan, and teardown agent-dir cleanup through removeAgentStateDir; retained marker-file exemptions; added stale purge JSONL preservation coverage and preserved-count logging.",
+        "releasedAt": "2026-07-31T15:42:51.107Z"
       }
     ],
     "statusReasons": {
       "deletion-door-module": {
         "reason": "Added async transcript-preserving agent state deletion door with four regression tests covering nested Codex rollouts, root Pi JSONL, full removal, and idempotence.",
         "updatedAt": "2026-07-31T15:31:09.359Z"
+      },
+      "route-deletion-sites": {
+        "reason": "Routed wipe, retention, orphan, and teardown agent-dir cleanup through removeAgentStateDir; retained marker-file exemptions; added stale purge JSONL preservation coverage and preserved-count logging.",
+        "updatedAt": "2026-07-31T15:42:51.107Z"
       }
     }
   },
@@ -107,6 +114,10 @@
     "deletion-door-module.deletion-door-module.ac2": "completed",
     "deletion-door-module.deletion-door-module.ac3": "completed",
     "deletion-door-module.deletion-door-module.ac4": "completed",
-    "route-deletion-sites": "running"
+    "route-deletion-sites": "completed",
+    "route-deletion-sites.route-deletion-sites.ac1": "completed",
+    "route-deletion-sites.route-deletion-sites.ac2": "completed",
+    "route-deletion-sites.route-deletion-sites.ac3": "completed",
+    "route-deletion-sites.route-deletion-sites.ac4": "completed"
   }
 }
