@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T16:28:51.153Z",
+  "updated": "2026-07-31T17:02:02.443Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "version-ship-runner": {
-        "writerId": "agent-pan-3358",
-        "agentId": "agent-pan-3358",
-        "pid": 2260740,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:28:51.153Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3358",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Added typed version_sync configuration, validation for path/regex/command safety, and isolated loader/validator tests; targeted tests and typecheck pass.",
         "releasedAt": "2026-07-31T16:20:40.377Z"
+      },
+      {
+        "writerId": "agent-pan-3358",
+        "agentId": "agent-pan-3358",
+        "pid": 2260740,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:28:51.153Z",
+        "itemId": "version-ship-runner",
+        "outcome": "completed",
+        "reason": "Added the pure version ship orchestrator and async execFile-backed dependencies, partial/failure reporting, declared-path commits and tracked-upstream pushes, commit-msg support, and nine focused tests; typecheck and shell syntax pass.",
+        "releasedAt": "2026-07-31T17:02:02.443Z"
       }
     ],
     "statusReasons": {
       "version-sync-config-schema": {
         "reason": "Added typed version_sync configuration, validation for path/regex/command safety, and isolated loader/validator tests; targeted tests and typecheck pass.",
         "updatedAt": "2026-07-31T16:20:40.377Z"
+      },
+      "version-ship-runner": {
+        "reason": "Added the pure version ship orchestrator and async execFile-backed dependencies, partial/failure reporting, declared-path commits and tracked-upstream pushes, commit-msg support, and nine focused tests; typecheck and shell syntax pass.",
+        "updatedAt": "2026-07-31T17:02:02.443Z"
       }
     }
   },
@@ -107,6 +114,10 @@
     "version-sync-config-schema.version-sync-config-schema.ac2": "completed",
     "version-sync-config-schema.version-sync-config-schema.ac3": "completed",
     "version-sync-config-schema.version-sync-config-schema.ac4": "completed",
-    "version-ship-runner": "running"
+    "version-ship-runner": "completed",
+    "version-ship-runner.version-ship-runner.ac1": "completed",
+    "version-ship-runner.version-ship-runner.ac2": "completed",
+    "version-ship-runner.version-ship-runner.ac3": "completed",
+    "version-ship-runner.version-ship-runner.ac4": "completed"
   }
 }
