@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T15:16:38.298Z",
+  "updated": "2026-07-31T15:18:08.711Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T15:16:38.286Z",
-    "inspectNotes": "Inspecting item tab-model-fold"
+    "updatedAt": "2026-07-31T15:18:08.662Z",
+    "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 543636,
-            "output": 96664,
-            "cacheRead": 17496576,
+            "input": 545948,
+            "output": 96888,
+            "cacheRead": 17829376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 543636,
-          "output": 96664,
-          "cacheRead": 17496576,
+          "input": 545948,
+          "output": 96888,
+          "cacheRead": 17829376,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.366388,
-        "pricingAsOf": "2026-07-31T15:16:38.292Z"
+        "usd": 14.551067999999999,
+        "pricingAsOf": "2026-07-31T15:18:08.698Z"
       }
     },
     "merges": [],
