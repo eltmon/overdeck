@@ -42,6 +42,7 @@ import { coordinateSwarmSlots } from './deacon-swarm.js';
 import { recoverOrphanedAgents as recoverOrphanedAgentsWithDeps, handleAgentHeartbeatDeadEvent as handleAgentHeartbeatDeadEventWithDeps, handleAgentStoppedEvent as handleAgentStoppedEventWithDeps, autoResumeStoppedWorkAgents as autoResumeStoppedWorkAgentsWithDeps, reconcileAgentLiveness as reconcileAgentLivenessWithDeps, nudgeStalledResumeWorkAgents, redeliverUndeliveredKickoffs, nudgeIdleWorkAgentsWithOpenBeads, cleanupOrphanedPlanningSessions as cleanupOrphanedPlanningSessionsWithDeps } from './deacon-auto-resume.js';
 import { applyBootReconciliationDecision as applyBootReconciliationDecisionWithDeps, type BootReconciliationApplyOptions, type BootReconciliationApplyResult } from './boot-reconciliation-apply.js';
 import { listFeatureWorkspaces } from './deacon-workspaces.js';
+import { isConversationDirectory } from '../agent-directory-cleanup.js';
 import { createInFlightGuard } from './in-flight-guard.js';
 import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
 import { isContextOverflowTail } from '../context-overflow.js';
@@ -850,6 +851,11 @@ export async function cleanupStaleAgentState(): Promise<string[]> {
       .filter(d => d.isDirectory());
 
     for (const dir of dirs) {
+      // conv-* dirs are the canonical transcript home for non-claude harnesses
+      // (ohmypi sessions/*.jsonl, codex codex-home/sessions/ rollouts). Purging
+      // them permanently destroys conversation history — same invariant as
+      // findOrphanedAgentDirs (2026-07-05 transcript-loss incident).
+      if (isConversationDirectory(dir.name)) continue;
       const agentDir = join(AGENTS_DIR, dir.name);
       const isReviewer = dir.name.startsWith('review-');
       const effectiveRetentionMs = isReviewer ? reviewerRetentionMs : retentionMs;

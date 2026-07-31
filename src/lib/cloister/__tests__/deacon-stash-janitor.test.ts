@@ -875,3 +875,41 @@ describe('checkInspectAgentTimeouts', () => {
     );
   });
 });
+
+// PAN-154 stale-state purge × conv-* transcript preservation. conv-* dirs under
+// ~/.overdeck/agents/ are the canonical transcript home for non-claude harnesses
+// (ohmypi sessions/*.jsonl, codex codex-home/sessions/ rollouts); the 2026-07-05
+// incident guard covered findOrphanedAgentDirs but this purge path kept deleting
+// them at the 7-day retention (258 conversations lost by 2026-07-31). This
+// describe MUST stay last in the file: it overrides the shared fs mock
+// implementations, which vi.clearAllMocks does not restore.
+describe('cleanupStaleAgentState conv-* preservation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('purges a stale agent-* dir but never a conv-* dir', async () => {
+    const fs = await import('fs');
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+    vi.mocked(fs.readdirSync).mockImplementation((path: any, opts?: any) => {
+      if (String(path).endsWith('test-agents') && opts && (opts as any).withFileTypes) {
+        return [
+          { isDirectory: () => true, name: 'conv-20260714-3489' },
+          { isDirectory: () => true, name: 'agent-pan-9999' },
+        ] as any;
+      }
+      return [] as any;
+    });
+    // mtimeMs 0 → every dir is far past the 7-day retention and the completed
+    // marker (existsSync true) is far past its 7-day grace.
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true, mtimeMs: 0 } as any);
+
+    const { cleanupStaleAgentState } = await import('../deacon.js');
+    const actions = await cleanupStaleAgentState();
+
+    const removed = vi.mocked(fs.rmSync).mock.calls.map((c) => String(c[0]));
+    expect(removed.some((p) => p.includes('agent-pan-9999'))).toBe(true);
+    expect(removed.some((p) => p.includes('conv-'))).toBe(false);
+    expect(actions.some((a) => a.includes('conv-'))).toBe(false);
+  });
+});
