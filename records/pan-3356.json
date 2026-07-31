@@ -208,10 +208,10 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:11:40.246Z",
+  "updated": "2026-07-31T20:11:45.454Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -219,7 +219,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:11:40.207Z",
+    "updatedAt": "2026-07-31T20:11:44.624Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed lint",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
@@ -366,7 +366,7 @@
       },
       "costAtCloseOut": {
         "usd": 491.035447,
-        "pricingAsOf": "2026-07-31T20:11:40.233Z"
+        "pricingAsOf": "2026-07-31T20:11:44.643Z"
       }
     },
     "merges": [
