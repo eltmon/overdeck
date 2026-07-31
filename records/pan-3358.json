@@ -210,22 +210,23 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T21:46:51.266Z",
+  "updated": "2026-07-31T21:50:56.474Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T21:42:03.071Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-31T21:50:56.400Z",
+    "reviewNotes": "Current-cycle sandbox isolation and ship serialization fixes pass; later findings are previously reviewed and non-promotable in cycle 4",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
-    "reviewedAtCommit": "03da4c20ef6b9fe1cfea2242f01d79c3899bcea7",
+    "reviewedAtCommit": "616a8497519809b68aa355e2f8f8bfd755e4f3f9",
     "lastVerifiedCommit": "03da4c20ef6b9fe1cfea2242f01d79c3899bcea7",
     "reviewSpawnedAt": "2026-07-31T21:42:03.069Z",
     "scopeDrift": {
@@ -311,6 +312,24 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "616a8497519809b68aa355e2f8f8bfd755e4f3f9"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "616a8497519809b68aa355e2f8f8bfd755e4f3f9"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "616a8497519809b68aa355e2f8f8bfd755e4f3f9"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "616a8497519809b68aa355e2f8f8bfd755e4f3f9"
+      }
     }
   },
   "closeOut": {
@@ -318,9 +337,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10673412,
-            "output": 478788,
-            "cacheRead": 99043840,
+            "input": 17380811,
+            "output": 593781,
+            "cacheRead": 135064064,
             "cacheWrite": 0
           }
         },
@@ -358,24 +377,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8272855,
-            "output": 793759,
-            "cacheRead": 342363136,
+            "input": 8274059,
+            "output": 794491,
+            "cacheRead": 343491584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 26769751,
-          "output": 1494625,
-          "cacheRead": 462935040,
+          "input": 33478354,
+          "output": 1610350,
+          "cacheRead": 500083712,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 410.155025,
-        "pricingAsOf": "2026-07-31T21:42:03.096Z"
+        "usd": 465.744126,
+        "pricingAsOf": "2026-07-31T21:50:56.450Z"
       }
     },
     "merges": [
