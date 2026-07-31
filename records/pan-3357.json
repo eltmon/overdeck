@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:17:06.525Z",
+  "updated": "2026-07-31T16:24:10.061Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "migrate-legacy-agent-dirs": {
-        "writerId": "agent-pan-3357",
-        "agentId": "agent-pan-3357",
-        "pid": 767083,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:10:59.119Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3357",
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Added opt-in retention.transcript_days with no default, a fail-closed async sweep using the canonical conversations read door, live-session protection, age-based JSONL deletion, empty-dir pruning, and fake-timer regression tests.",
         "releasedAt": "2026-07-31T16:10:42.829Z"
+      },
+      {
+        "writerId": "agent-pan-3357",
+        "agentId": "agent-pan-3357",
+        "pid": 767083,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:10:59.119Z",
+        "itemId": "migrate-legacy-agent-dirs",
+        "outcome": "completed",
+        "reason": "Added idempotent pan admin migrate-legacy-agent-dirs command that copies only missing conv-* dirs from ~/.panopticon to ~/.overdeck with timestamps preserved, never overwrites or mutates legacy data, and reports copied/skipped counts.",
+        "releasedAt": "2026-07-31T16:24:10.061Z"
       }
     ],
     "statusReasons": {
@@ -143,6 +146,10 @@
       "transcript-days-sweep": {
         "reason": "Added opt-in retention.transcript_days with no default, a fail-closed async sweep using the canonical conversations read door, live-session protection, age-based JSONL deletion, empty-dir pruning, and fake-timer regression tests.",
         "updatedAt": "2026-07-31T16:10:42.829Z"
+      },
+      "migrate-legacy-agent-dirs": {
+        "reason": "Added idempotent pan admin migrate-legacy-agent-dirs command that copies only missing conv-* dirs from ~/.panopticon to ~/.overdeck with timestamps preserved, never overwrites or mutates legacy data, and reports copied/skipped counts.",
+        "updatedAt": "2026-07-31T16:24:10.061Z"
       }
     }
   },
@@ -166,6 +173,9 @@
     "transcript-days-sweep.transcript-days-sweep.ac2": "completed",
     "transcript-days-sweep.transcript-days-sweep.ac3": "completed",
     "transcript-days-sweep.transcript-days-sweep.ac4": "completed",
-    "migrate-legacy-agent-dirs": "running"
+    "migrate-legacy-agent-dirs": "completed",
+    "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac1": "completed",
+    "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac2": "completed",
+    "migrate-legacy-agent-dirs.migrate-legacy-agent-dirs.ac3": "completed"
   }
 }
