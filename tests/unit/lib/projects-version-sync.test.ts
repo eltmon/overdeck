@@ -33,12 +33,11 @@ const MYN_VERSION_SYNC = {
   command: 'pnpm vsync',
   command_cwd: 'frontend',
   expect: [
-    { path: 'frontend/package.json', pattern: '"version":\\s*"{version}"' },
-    { path: 'api/src/main/java/com/myn/config/Version.java', pattern: 'VERSION\\s*=\\s*"{version}"' },
-    { path: 'frontend/ios/App/App/Info.plist', pattern: '<string>{version}</string>' },
-    { path: 'frontend/android/app/build.gradle', pattern: 'versionName\\s+"{version}"' },
+    { path: 'frontend/package.json', pattern: '"version": "{version}"' },
+    { path: 'api/src/main/java/com/myn/config/Version.java', pattern: 'String version = "{version}\\.git "' },
+    { path: 'frontend/ios/App/App/Info.plist', pattern: 'CFBundleShortVersionString</key>\\s*<string>{majorMinor}</string>' },
+    { path: 'frontend/android/app/build.gradle', pattern: 'versionName "{majorMinor}"' },
   ],
-  commit_message: 'chore: bump version to {version}',
   push: ['frontend', 'api'],
 } satisfies VersionSyncConfig;
 
