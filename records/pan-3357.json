@@ -89,7 +89,7 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T16:36:35.029Z",
+  "updated": "2026-07-31T16:36:37.789Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
@@ -99,7 +99,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-07-31T16:35:50.243Z",
+    "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
+    "updatedAt": "2026-07-31T16:36:35.021Z",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewRequestedAt": "2026-07-31T16:36:34.590Z",
@@ -170,32 +171,31 @@
         "src/lib/lifecycle/teardown-workspace.ts"
       ],
       "recordedAt": "2026-07-31T16:35:34.622Z"
-    },
-    "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1922808,
-            "output": 232067,
-            "cacheRead": 102186496,
+            "input": 1931022,
+            "output": 232910,
+            "cacheRead": 103051264,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1922808,
-          "output": 232067,
-          "cacheRead": 102186496,
+          "input": 1931022,
+          "output": 232910,
+          "cacheRead": 103051264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.669298,
-        "pricingAsOf": "2026-07-31T16:35:50.263Z"
+        "usd": 68.168042,
+        "pricingAsOf": "2026-07-31T16:36:37.784Z"
       }
     },
     "merges": [
