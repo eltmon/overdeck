@@ -466,6 +466,161 @@ describe('resource-discovery terminal issue filtering', () => {
   });
 });
 
+describe('resource-discovery membership-aware state labels', () => {
+  const project = {
+    name: 'overdeck',
+    path: '/tmp/overdeck',
+    issue_prefix: 'PAN',
+    github_repo: 'eltmon/overdeck',
+  };
+
+  it('labels post-merge limbo with stale PRD residue as needing close-out', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3341', title: 'Merged work without cached tracker state' },
+    ]);
+    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+      path: '/state/drafts/PAN-3341.md',
+      format: 'pan-draft',
+      status: 'draft',
+    }));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-3341',
+      inPipeline: true,
+      bucket: 'post_merge_limbo',
+      reasons: ['merged but never closed out'],
+      labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: 'planning' },
+    }]);
+
+    await refreshResourceAllocatedProjects([project]);
+
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-3341',
+        hasPrd: true,
+        stateLabel: 'Merged — Needs Close-Out',
+      }),
+    ]);
+  });
+
+  it('lets post-merge limbo outrank a stale ready-for-merge flag', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3342', title: 'Merged work with stale review state', state: 'in_progress' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3342']));
+    mocks.loadReadyForMergeFlags.mockReturnValue(new Map([['PAN-3342', true]]));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-3342',
+      inPipeline: true,
+      bucket: 'post_merge_limbo',
+      reasons: ['merged but never closed out'],
+      labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: 'in_review' },
+    }]);
+
+    await refreshResourceAllocatedProjects([project]);
+
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({
+        issueId: 'PAN-3342',
+        readyForMerge: true,
+        stateLabel: 'Merged — Needs Close-Out',
+      }),
+    ]);
+  });
+
+  it('labels tracker-closed clean-terminal residue without tmux as done', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3343', title: 'Closed work with Docker residue', state: 'closed' },
+    ]);
+    mocks.execFile.mockImplementation((command: string, args: string[], _options: unknown, callback: (error: Error | null, result?: { stdout: string }) => void) => {
+      if (command === 'docker') {
+        callback(null, { stdout: 'overdeck-feature-pan-3343-server-1\n' });
+        return;
+      }
+      if (command === 'gh' && args[0] === 'pr') {
+        callback(null, { stdout: JSON.stringify(mocks.openPullRequests) });
+        return;
+      }
+      callback(null, { stdout: '' });
+    });
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-3343',
+      inPipeline: false,
+      bucket: 'clean_terminal',
+      reasons: ['tracker closed and branch merged'],
+      labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: null },
+    }]);
+
+    await refreshResourceAllocatedProjects([project]);
+
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({ issueId: 'PAN-3343', stateLabel: 'Done' }),
+    ]);
+  });
+
+  it('labels tracker-closed clean-terminal residue with tmux as closed', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3344', title: 'Closed work with a surviving session', state: 'closed' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3344']));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-3344',
+      inPipeline: false,
+      bucket: 'clean_terminal',
+      reasons: ['tracker closed and branch merged'],
+      labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: false, L4_phaseLabel: null },
+    }]);
+
+    await refreshResourceAllocatedProjects([project]);
+
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({ issueId: 'PAN-3344', stateLabel: 'Closed' }),
+    ]);
+  });
+
+  it('does not label an open clean-terminal issue as done', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3345', title: 'Open work without pipeline residue', state: 'open' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3345']));
+    mocks.getPipelineMembershipForProjects.mockResolvedValue([{
+      issueId: 'PAN-3345',
+      inPipeline: false,
+      bucket: 'clean_terminal',
+      reasons: ['open issue never started'],
+      labelDrift: null,
+      lenses: { L1_openPr: false, L2_unmergedBranch: false, L3_issueOpen: true, L4_phaseLabel: null },
+    }]);
+
+    await refreshResourceAllocatedProjects([project]);
+
+    const issue = (await getCachedResourceAllocatedIssues())[0];
+    expect(issue).toMatchObject({ issueId: 'PAN-3345' });
+    expect(issue?.stateLabel).not.toBe('Done');
+  });
+
+  it('preserves artifact heuristics when membership is unavailable', async () => {
+    mocks.issueService.getIssues.mockReturnValue([
+      { identifier: 'PAN-3346', title: 'Planning work without membership' },
+    ]);
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-3346']));
+    mocks.findDraftPrd.mockReturnValue(Effect.succeed({
+      path: '/state/drafts/PAN-3346.md',
+      format: 'pan-draft',
+      status: 'draft',
+    }));
+
+    await refreshResourceAllocatedProjects([project], { refreshMembership: false });
+
+    await expect(getCachedResourceAllocatedIssues()).resolves.toEqual([
+      expect.objectContaining({ issueId: 'PAN-3346', stateLabel: 'Planning' }),
+    ]);
+  });
+});
+
 describe('resource-discovery planned backlog annotation', () => {
   it('marks only spec-lens planned backlog rows as spec-only planned', async () => {
     mocks.issueService.getIssues.mockReturnValue([

@@ -333,7 +333,7 @@ export function useIssueActions(issueId: string): UseIssueActionsResult {
       hasTranscripts: false,
       hasDiscussions: false,
       issueCanonicalState: issue?.state ?? STATUS_LABELS[issue?.status ?? ''] ?? issue?.status ?? null,
-      isMerged: reviewStatus?.mergeStatus === 'merged' || issue?.mergeStatus === 'merged',
+      isMerged: reviewStatus?.mergeStatus === 'merged' || issue?.mergeStatus === 'merged' || issue?.pipelineMembership?.bucket === 'post_merge_limbo',
       hasPr: Boolean(reviewStatus?.readyForMerge || reviewStatus?.prUrl),
       prUrl: reviewStatus?.prUrl ?? null,
       hasPendingInput: agent?.hasPendingQuestion === true,
