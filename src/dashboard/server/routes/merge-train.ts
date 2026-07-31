@@ -221,6 +221,33 @@ function uatGenerationNameFromParam(param: string): string {
   return decoded.startsWith('uat/') ? decoded : `uat/${decoded}`;
 }
 
+export async function postMergeTrainGenerationShipPayload(
+  name: string,
+  version: string,
+): Promise<{ status: number; body: unknown }> {
+  const { getUatGenerationSync } = await import('../../../lib/overdeck/merge-sync.js');
+  const generation = getUatGenerationSync(name);
+  if (!generation) return { status: 404, body: { error: `No UAT generation named ${name}` } };
+
+  const { shipPromotedBatch, ShipPromotedBatchError } = await import('../../../lib/cloister/ship-record.js');
+  try {
+    return {
+      status: 200,
+      body: await shipPromotedBatch({
+        generationName: name,
+        projectRoot: generation.projectRoot,
+        version,
+      }),
+    };
+  } catch (error) {
+    if (error instanceof ShipPromotedBatchError) {
+      const status = error.reason === 'not-found' ? 404 : error.reason === 'wrong-status' ? 409 : 422;
+      return { status, body: { error: error.message } };
+    }
+    throw error;
+  }
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 const getMergeTrainQueuesRoute = HttpRouter.add(
@@ -262,16 +289,53 @@ const postMergeTrainGenerationPromoteRoute = HttpRouter.add(
     const request = yield* HttpServerRequest.HttpServerRequest;
     const authError = rejectUnsafeDashboardMutationRequest(request);
     if (authError) return authError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    if (!isJsonObject(parsed.body)) {
+      return jsonResponse({ error: 'body must be a JSON object: { shipVersion? }' }, { status: 400 });
+    }
+    const rawShipVersion = parsed.body['shipVersion'];
+    if (rawShipVersion !== undefined && (typeof rawShipVersion !== 'string' || !/^\d+\.\d+\.\d+$/.test(rawShipVersion))) {
+      return jsonResponse({ error: 'shipVersion must look like 48.8.0' }, { status: 400 });
+    }
     const params = yield* HttpRouter.params;
     const name = uatGenerationNameFromParam(params['name'] ?? '');
     const { postUatGenerationPromotePayload } = yield* Effect.promise(() => import('../services/uat-train.js'));
     const { firePostMergeLifecycle } = yield* Effect.promise(() => import('./specialists.js'));
-    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(name, firePostMergeLifecycle));
+    const result = yield* Effect.promise(() => postUatGenerationPromotePayload(
+      name,
+      firePostMergeLifecycle,
+      rawShipVersion,
+    ));
     if (!result.success) {
       const status = result.reason === 'not-found' ? 404 : result.reason === 'merge-failed' ? 500 : 409;
       return jsonResponse(result, { status });
     }
     return jsonResponse(result);
+  })),
+);
+
+const postMergeTrainGenerationShipRoute = HttpRouter.add(
+  'POST',
+  '/api/merge-train/generations/:name/ship',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const parsed = yield* readUnknownJsonBody;
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, { status: 400 });
+    if (!isJsonObject(parsed.body)) {
+      return jsonResponse({ error: 'version must look like 48.8.0' }, { status: 400 });
+    }
+    const version = parsed.body['version'];
+    if (typeof version !== 'string' || !/^\d+\.\d+\.\d+$/.test(version)) {
+      return jsonResponse({ error: 'version must look like 48.8.0' }, { status: 400 });
+    }
+
+    const params = yield* HttpRouter.params;
+    const name = uatGenerationNameFromParam(params['name'] ?? '');
+    const result = yield* Effect.promise(() => postMergeTrainGenerationShipPayload(name, version));
+    return jsonResponse(result.body, { status: result.status });
   })),
 );
 
@@ -313,6 +377,7 @@ export const mergeTrainRouteLayer = Layer.mergeAll(
   getMergeTrainGenerationsRoute,
   postMergeTrainGenerationStackRoute,
   postMergeTrainGenerationPromoteRoute,
+  postMergeTrainGenerationShipRoute,
   postMergeTrainAssembleRoute,
   postMergeTrainMergeNextRoute,
 );

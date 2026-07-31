@@ -58,6 +58,10 @@ import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-ord
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import { readIssueRecordSync, resolveProjectForIssue, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
+import { persistPendingShipRecords, persistShipRecords } from '../../../lib/cloister/ship-record.js';
+import { buildVersionShipDeps } from '../../../lib/cloister/version-ship-deps.js';
+import { runVersionShip } from '../../../lib/cloister/version-ship.js';
 import {
   resolveConfiguredReposSync,
   resolveProjectReposFromResolvedIssueSync,
@@ -526,6 +530,8 @@ export interface UatGenerationPayload {
   members: UatGenerationMemberPayload[];
   heldOut: UatGeneration['heldOut'];
   resolutions: UatGeneration['resolutions'];
+  versionSyncConfigured: boolean;
+  shipStatus: PanIssueShipRecord | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -618,12 +624,22 @@ async function loadAcceptanceCriteriaCache(
   return cache;
 }
 
+function generationShipStatus(generation: UatGeneration): PanIssueShipRecord | null {
+  const records = generation.members.flatMap(member => {
+    const project = resolveProjectForIssue(member.issueId);
+    const ship = project ? readIssueRecordSync(project, member.issueId)?.pipeline.ship : undefined;
+    return ship?.batch === generation.name ? [ship] : [];
+  });
+  return records.sort((left, right) => right.at.localeCompare(left.at))[0] ?? null;
+}
+
 /** The generation chain, newest first, enriched for the UAT batches card. */
 export async function getUatGenerationsPayload(projectRootOverride?: string): Promise<UatGenerationPayload[]> {
   // PAN-1696: no flywheel-run requirement — list generations directly from store.
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
+  const versionSyncConfigured = Boolean(findProjectByPathSync(root)?.version_sync);
   const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
@@ -655,6 +671,8 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       members,
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
+      versionSyncConfigured,
+      shipStatus: generationShipStatus(gen),
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
@@ -716,6 +734,7 @@ export async function postUatGenerationPromotePayload(
   // signature is what let the per-repo evidence be dropped by the forwarding
   // layer without a type error.
   firePostMerge: UatPromoteDeps['firePostMerge'],
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
@@ -774,8 +793,25 @@ export async function postUatGenerationPromotePayload(
     firePostMerge,
     memberEligibility: reviewRecordEligibility,
     recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
+    ...(projectConfig?.version_sync
+      ? {
+          runShip: async (generation: UatGeneration, requestedVersion: string | undefined) => {
+            if (!requestedVersion) {
+              await persistPendingShipRecords(generation, 'no version supplied at promote time');
+              return;
+            }
+            const report = await runVersionShip({
+              projectRoot: root,
+              config: projectConfig.version_sync!,
+              version: requestedVersion,
+              batchName: generation.name,
+            }, buildVersionShipDeps());
+            await persistShipRecords(generation, report);
+          },
+        }
+      : {}),
     log: (msg) => console.log(msg),
-  });
+  }, { shipVersion });
   await notifyFlywheelOfUatPromote(result).catch(() => {});
   return result;
 }

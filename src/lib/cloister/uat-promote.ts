@@ -129,6 +129,7 @@ export interface UatPromoteDeps {
    */
   memberEligibility(issueId: string): { eligible: boolean; reason?: string };
   recordVerification?: (generation: UatGeneration, mergeSha: string) => void;
+  runShip?: (generation: UatGeneration, shipVersion: string | undefined) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -161,6 +162,7 @@ export async function promoteUatGeneration(
   name: string,
   projectRoot: string,
   deps: UatPromoteDeps,
+  options: { shipVersion?: string } = {},
 ): Promise<PromoteResult> {
   const log = deps.log ?? (() => {});
 
@@ -191,7 +193,7 @@ export async function promoteUatGeneration(
   }
 
   if (deps.polyrepoGit) {
-    return promotePolyrepo(gen, projectRoot, deps, deps.polyrepoGit, log);
+    return promotePolyrepo(gen, projectRoot, deps, deps.polyrepoGit, log, options.shipVersion);
   }
 
   const mainSha = await deps.git.fetchMain();
@@ -237,7 +239,7 @@ export async function promoteUatGeneration(
 
   // The batch is on main: this generation is done, every other live
   // generation is stale by definition (main moved).
-  return finishPromote(gen, projectRoot, deps, mergeSha, log);
+  return finishPromote(gen, projectRoot, deps, mergeSha, log, false, options.shipVersion);
 }
 
 /**
@@ -336,6 +338,7 @@ async function promotePolyrepo(
   deps: UatPromoteDeps,
   repoGit: ReadonlyMap<string, PolyrepoRepoPromoteGit>,
   log: (msg: string) => void,
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   const allRepos = [...(gen.repos ?? [])].sort((a, b) => a.mergeOrder - b.mergeOrder);
   if (allRepos.length === 0) {
@@ -442,7 +445,15 @@ async function promotePolyrepo(
     // would leave a fully-published batch permanently unfinalizable: never
     // promoted, no verdicts recorded, no stack teardown, no post-merge.
     log(`[uat-promote] ${gen.name}: every repo already published — finalizing`);
-    return finishPromote(withRepos(gen, recovered), projectRoot, deps, landedMergeRef(recovered), log, true);
+    return finishPromote(
+      withRepos(gen, recovered),
+      projectRoot,
+      deps,
+      landedMergeRef(recovered),
+      log,
+      true,
+      shipVersion,
+    );
   }
 
   const missing = pending.filter((r) => !repoGit.has(r.repoKey));
@@ -579,7 +590,7 @@ async function promotePolyrepo(
     })),
   };
 
-  return finishPromote(promotedGen, projectRoot, deps, mergeSha, log, true);
+  return finishPromote(promotedGen, projectRoot, deps, mergeSha, log, true, shipVersion);
 }
 
 /**
@@ -594,6 +605,7 @@ async function finishPromote(
   mergeSha: string,
   log: (msg: string) => void,
   isPolyrepoGeneration = false,
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   // The one place a generation becomes terminal, so the completeness invariant
   // is enforced here rather than at each caller: a polyrepo batch is finalized
@@ -620,6 +632,11 @@ async function finishPromote(
     deps.recordVerification?.(gen, mergeSha);
   } catch (err) {
     log(`[uat-promote] ${gen.name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  try {
+    await deps.runShip?.(gen, shipVersion);
+  } catch (err) {
+    log(`[uat-promote] ${gen.name}: version ship failed after merge: ${err instanceof Error ? err.message : String(err)}`);
   }
   await deps.teardownStack(gen).catch((err) => {
     log(`[uat-promote] ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
