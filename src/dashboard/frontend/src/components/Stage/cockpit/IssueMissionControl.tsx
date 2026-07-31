@@ -22,6 +22,7 @@ import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
 import { IssueView } from '../../issue-view/IssueView'
 import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
+import { TellComposer } from '../../issue-view/TellComposer'
 import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
@@ -482,6 +483,22 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
     [issueAgents],
   )
+  const sessionTarget = useMemo(
+    () => treeSessions.find((session) => session.presence === 'active')
+      ?? treeSessions.find((session) => !session.sessionId.endsWith('-planning-state'))
+      ?? null,
+    [treeSessions],
+  )
+  const sessionTargetAgent = useMemo(
+    () => issueAgents.find((agent) => agent.id === sessionTarget?.sessionId) ?? primaryAgent,
+    [issueAgents, primaryAgent, sessionTarget?.sessionId],
+  )
+  const sessionComposerAgentId = sessionTargetAgent?.id ?? sessionTarget?.sessionId ?? null
+  const sessionComposerIsLive = sessionTargetAgent
+    ? sessionTargetAgent.status === 'running' || sessionTargetAgent.status === 'starting'
+    : sessionTarget?.presence === 'active'
+  const hasLiveSession = issueAgents.some((agent) => agent.status === 'running' || agent.status === 'starting')
+    || treeSessions.some((session) => session.presence === 'active')
   const pipelineState = derivePipelineState({
     reviewStatus: (reviewSnapshot ?? review.data ?? null),
     agent: primaryAgent,
@@ -664,6 +681,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
+              {tab.id === 'session' && hasLiveSession ? (
+                <span data-testid="session-live-dot" className="h-[7px] w-[7px] rounded-full bg-info" aria-hidden="true" />
+              ) : null}
               {tab.label}
               {badge && <CockpitPill tone={badge.tone} className="px-[5px] py-0 text-[9px]">{badge.label}</CockpitPill>}
             </button>
@@ -724,7 +744,34 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {/* The six cockpit tabs fold the legacy surfaces into sub-views while
                 preserving the ONE IssueDetail page-density renderer. */}
             {issueDetailTab && (
-              <div data-section="IssueDetail page body" className="h-[calc(100vh-340px)] min-h-[520px]">
+              <div
+                data-section="IssueDetail page body"
+                className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}
+              >
+                {activeTab === 'session' ? (
+                  <div
+                    role="tablist"
+                    aria-label="Session views"
+                    className="flex shrink-0 gap-1 border-b border-border px-3 py-2"
+                  >
+                    {(['conversation', 'terminal'] as const).map((subView) => (
+                      <button
+                        key={subView}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeSubView === subView}
+                        onClick={() => selectTab('session', subView)}
+                        className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                          activeSubView === subView
+                            ? 'bg-primary/9 text-primary'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {subView === 'conversation' ? 'Conversation' : 'Terminal'}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <IssueDetail
                   issueId={issueId}
                   density="page"
@@ -736,7 +783,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   }}
                   agents={issueAgents}
                   reviewStatus={reviewSnapshot}
+                  className={activeTab === 'session' ? 'min-h-0 flex-1' : undefined}
                 />
+                {activeTab === 'session' && activeSubView === 'conversation' && sessionComposerAgentId ? (
+                  <TellComposer
+                    agentId={sessionComposerAgentId}
+                    isEffectivelyLive={sessionComposerIsLive}
+                    className="shrink-0 border-t border-border bg-card/70 px-3 pb-3"
+                  />
+                ) : null}
               </div>
             )}
             {activeTab === 'overview' && (

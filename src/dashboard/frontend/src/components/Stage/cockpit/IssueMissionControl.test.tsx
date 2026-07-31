@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { PaneType } from '../../../lib/panesStore'
 
@@ -25,6 +25,7 @@ beforeEach(() => {
     const method = init?.method ?? (input instanceof Request ? input.method : 'GET')
     if (method !== 'GET') {
       if (url.includes('/api/dashboard/session')) return Response.json({ csrfToken: 'test-csrf' })
+      if (/\/api\/agents\/[^/]+\/(tell|resume)$/.test(url)) return Response.json({ messageDelivered: true })
       unexpectedRequests.push(`${method} ${url}`)
       return Response.json({}, { status: 500 })
     }
@@ -358,6 +359,46 @@ describe('IssueMissionControl', () => {
     expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'session')
     expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'conversation')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
+  })
+
+  it('switches Conversation and Terminal inside Session without leaving the top-level tab', () => {
+    const { container } = renderMissionControl()
+    const sessionViews = screen.getByRole('tablist', { name: 'Session views' })
+    const conversation = within(sessionViews).getByRole('tab', { name: 'Conversation' })
+    const terminal = within(sessionViews).getByRole('tab', { name: 'Terminal' })
+
+    expect(conversation).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
+
+    fireEvent.click(terminal)
+
+    expect(screen.getByRole('button', { name: 'Session' })).toHaveAttribute('aria-selected', 'true')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'terminal')
+    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
+    expect(terminal).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('shows a blue live signal and sends from the transcript composer through the tell route', async () => {
+    queryMocks.activityQuery.data.sections[0]!.status = 'running'
+    const { container } = renderMissionControl()
+
+    expect(screen.getByTestId('session-live-dot')).toHaveClass('bg-info')
+    expect(container.querySelector('[data-section="active-agent-panel-tell"]')).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('Tell agent-pan-1661'), {
+      target: { value: 'Keep going' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => {
+      expect(window.fetch).toHaveBeenCalledWith(
+        '/api/agents/agent-pan-1661/tell',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ message: 'Keep going' }),
+        }),
+      )
+    })
   })
 
   it('uses Overview as the default when the issue has no agent sessions', () => {
