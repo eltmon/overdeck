@@ -189,42 +189,24 @@
     "recordedAt": "2026-07-30T23:35:42.094Z"
   },
   "created": "2026-07-30T13:34:52.867Z",
-  "updated": "2026-07-31T14:57:59.954Z",
+  "updated": "2026-07-31T14:58:05.796Z",
   "pipeline": {
     "issueId": "PAN-3330",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:36:29.596Z",
-    "updatedAt": "2026-07-31T14:57:59.005Z",
+    "updatedAt": "2026-07-31T14:58:05.773Z",
     "reviewNotes": "Cycle-5 merge changes do not alter the previously reviewed archive behavior; all in-PR requirements remain complete",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3350",
     "reviewedAtCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96",
     "lastVerifiedCommit": "15c104c5711d4149293fafa12abe973b59ad210e",
-    "reviewSpawnedAt": "2026-07-31T14:53:58.675Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "43738144dfba9060ca7ed4b1537c2ba7356c9f96"
-      }
-    }
+    "reviewSpawnedAt": "2026-07-31T14:53:58.675Z"
   },
   "closeOut": {
     "usage": {
@@ -239,9 +221,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18991281,
-            "output": 422657,
-            "cacheRead": 114777600,
+            "input": 19004933,
+            "output": 426684,
+            "cacheRead": 115521536,
             "cacheWrite": 0
           }
         },
@@ -286,15 +268,15 @@
           "cacheWrite": 142719
         },
         "openai/gpt-5.6-sol": {
-          "input": 48709406,
-          "output": 1146368,
-          "cacheRead": 299046400,
+          "input": 48723058,
+          "output": 1150395,
+          "cacheRead": 299790336,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 433.232408,
-        "pricingAsOf": "2026-07-31T14:57:59.048Z"
+        "usd": 433.793446,
+        "pricingAsOf": "2026-07-31T14:58:05.783Z"
       }
     },
     "merges": [
@@ -303,7 +285,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-opus-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3330",
