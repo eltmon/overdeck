@@ -123,18 +123,18 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T14:29:48.752Z",
+  "updated": "2026-07-31T14:29:55.156Z",
   "pipeline": {
     "issueId": "PAN-3340",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "skipped",
+    "mergeStep": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T14:29:48.453Z",
+    "updatedAt": "2026-07-31T14:29:48.805Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3340-review",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -248,7 +248,7 @@
       },
       "costAtCloseOut": {
         "usd": 183.84376,
-        "pricingAsOf": "2026-07-31T14:29:48.618Z"
+        "pricingAsOf": "2026-07-31T14:29:51.559Z"
       }
     },
     "merges": [
