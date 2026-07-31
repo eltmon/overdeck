@@ -141,18 +141,18 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T18:36:41.237Z",
+  "updated": "2026-07-31T18:38:14.878Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T18:36:41.214Z",
+    "updatedAt": "2026-07-31T18:38:14.842Z",
     "reviewNotes": "Needs You actions and pipeline clicks can target a different agent than the one displayed",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
@@ -243,9 +243,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2680388,
-            "output": 127239,
-            "cacheRead": 46853120,
+            "input": 2697786,
+            "output": 132789,
+            "cacheRead": 48167424,
             "cacheWrite": 0
           }
         },
@@ -283,24 +283,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5643456,
-            "output": 556868,
-            "cacheRead": 316985856,
+            "input": 6297677,
+            "output": 564221,
+            "cacheRead": 320937984,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 15660234,
-          "output": 822423,
-          "cacheRead": 394580992,
+          "input": 16331853,
+          "output": 835326,
+          "cacheRead": 399847424,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 300.264356,
-        "pricingAsOf": "2026-07-31T18:36:41.228Z"
+        "usd": 306.642757,
+        "pricingAsOf": "2026-07-31T18:38:14.866Z"
       }
     },
     "merges": [
