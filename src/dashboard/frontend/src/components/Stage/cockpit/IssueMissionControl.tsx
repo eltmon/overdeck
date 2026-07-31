@@ -1,43 +1,61 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+/**
+ * PAN-3356 issue cockpit: six durable top-level tabs around the live agent run.
+ * Legacy tab ids normalize into Session, Plan, Changes, Activity, Overview, or
+ * Discussion; the crew spine, needs-you slot, and awareness rail stay outside
+ * tab bodies so navigation never hides live operator context.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronDown, Copy, ExternalLink, GitBranch, GitPullRequest } from 'lucide-react'
 import { ActivityTab } from '../../CommandDeck/ZoneCOverviewTabs/ActivityTab'
-import { ShipTab } from './ShipTab'
 import { CostsTab } from '../../CommandDeck/ZoneCOverviewTabs/CostsTab'
 import { DiscussionsTab } from '../../CommandDeck/ZoneCOverviewTabs/DiscussionsTab'
 import { statusColor } from '../../CommandDeck/ZoneCOverviewTabs/PrDiffTab'
 import {
-  useActivityQuery,
   useIssueCheckRunsQuery,
   useIssueCostsQuery,
   usePrQuery,
   useReviewStatusQuery,
+  type ActivitySection,
   type IssueCheckRun,
+  type PullRequestData,
   type ReviewStatusData,
 } from '../../CommandDeck/ZoneCOverviewTabs/queries'
 import { IssueActionMenu } from '../../IssueActionMenu/IssueActionMenu'
 import { useIssueActions } from '../../IssueActionMenu/useIssueActions'
 import { selectAgents, selectReviewStatus, useDashboardStore } from '../../../lib/store'
 import { derivePipelineState, type PipelineState } from '../../../lib/issuePipelineState'
-import { currentPhase, phaseLabel } from '../../../lib/simple/phases'
+import { currentPhase, phaseLabel, type Phase } from '../../../lib/simple/phases'
 import { IssueDetail } from '../../issue-detail/IssueDetail'
+import DrawerArtifactsPanel from '../../drawer/DrawerArtifactsPanel'
+import { DrawerActivityRailView } from '../../drawer/DrawerActivityRail'
+import type { DrawerActivityItem, DrawerActivityPhase } from '../../drawer/useDrawerData'
 import { IssueView } from '../../issue-view/IssueView'
+import { NeedsYouSlot } from '../../issue-view/NeedsYouSlot'
+import { deriveShip } from '../../issue-view/derivations'
+import { RunDetailsCard } from '../../issue-view/RunDetailsCard'
+import { VerificationGatesGrid } from '../../issue-view/VerificationGates'
+import { useIssueView } from '../../issue-view/useIssueView'
 import { SessionPanel } from '../../CommandDeck/SessionView/SessionPanel'
 import { MissionConversationTab } from './MissionConversationTab'
 import type { PaneType } from '../../../lib/panesStore'
 import { formatRelativeTime } from '../../../lib/formatRelativeTime'
+import { trackerIssueUrl } from '../../../lib/issueLinks'
 import { taskStatusRollup } from '../../../lib/taskStatus'
-import { IssueBlockerSpotlight } from './IssueBlockerSpotlight'
+import { TasksPanel } from '../../TasksPanel'
+import { PrdViewer } from '../../PrdViewer'
+import type { XBriefDocument } from '../../xbrief/types'
 import { IssueTreeLane } from './IssueTreeLane'
-import { useTasksQuery } from './TasksRail'
-import { TasksDrawer } from './TasksDrawer'
 import { UatEnvironmentPanel } from '../../CommandDeck/UatEnvironmentPanel'
-import { PickupGateCard } from './PickupGateCard'
 import { ChangedFilesView } from './ChangedFilesView'
+import { CockpitPhaseRail } from './CockpitPhaseRail'
 import { StatusHistoryTab } from './StatusHistoryTab'
-import { CrewStage } from './CrewStage'
-import { HappenedFeed } from './HappenedFeed'
+import { IssueOverviewTab } from './IssueOverviewTab'
 import { PlanMapCard } from './PlanMapCard'
 import { StatusNarrative } from './StatusNarrative'
 import { CockpitCard, CockpitPill, type CockpitTone } from './CockpitCard'
+import { useCockpitNeedsYouActions } from './useCockpitNeedsYouActions'
+import { useDeferredSessionSelection } from './useDeferredSessionSelection'
 import type { SessionNode } from '@overdeck/contracts'
 import type { Agent } from '../../../types'
 import styles from './cockpitBody.module.css'
@@ -55,34 +73,55 @@ export interface IssueMissionControlProps {
   onOpenPane: (paneType: PaneType) => void
 }
 
-type MissionTab =
-  // PRD binding tab set — rendered by the ONE IssueDetail at page density.
-  | 'conversation' | 'plan' | 'tasks' | 'terminal' | 'activity' | 'files' | 'artifacts'
-  // Cockpit's own overview (richer than the drawer's) and the appended
-  // cockpit-only tabs (operator decision, #2962).
-  | 'overview' | 'code' | 'timeline' | 'discussion' | 'costs' | 'ship';
+type MissionTab = 'overview' | 'session' | 'plan' | 'changes' | 'activity' | 'discussion'
+type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'files' | 'checks' | 'artifacts' | 'feed' | 'history'
+type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
-/** Tabs whose bodies come from the ONE IssueDetail component. */
-const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['conversation', 'plan', 'tasks', 'terminal', 'activity', 'files', 'artifacts']);
+/** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session'])
 
-// PAN-2908 C-DETAIL (operator decision, #2962): the cockpit route renders the
-// one IssueDetail at page density for the binding set; the cockpit's own
-// overview plus its unique tabs append after. Conversation is the default.
 const TABS: Array<{ id: MissionTab; label: string }> = [
-  { id: 'conversation', label: 'Conversation' },
   { id: 'overview', label: 'Overview' },
-  { id: 'plan', label: 'Plan map' },
-  { id: 'tasks', label: 'Tasks' },
-  { id: 'terminal', label: 'Terminal' },
+  { id: 'session', label: 'Session' },
+  { id: 'plan', label: 'Plan' },
+  { id: 'changes', label: 'Changes' },
   { id: 'activity', label: 'Activity' },
-  { id: 'files', label: 'Files' },
-  { id: 'artifacts', label: 'Artifacts' },
-  { id: 'code', label: 'Code' },
-  { id: 'timeline', label: 'Timeline' },
   { id: 'discussion', label: 'Discussion' },
-  { id: 'costs', label: 'Costs' },
-  { id: 'ship', label: 'Ship' },
 ]
+
+// Legacy cockpit tab ids → { tab, subView }. Applied when reading the route/tab param.
+const LEGACY_TAB_MAP: Record<string, TabSelection> = {
+  conversation: { tab: 'session', subView: 'conversation' },
+  terminal: { tab: 'session', subView: 'terminal' },
+  tasks: { tab: 'plan', subView: 'tasks' },
+  code: { tab: 'changes', subView: 'checks' },
+  files: { tab: 'changes', subView: 'files' },
+  artifacts: { tab: 'changes', subView: 'artifacts' },
+  timeline: { tab: 'activity', subView: 'history' },
+  costs: { tab: 'overview' },
+  ship: { tab: 'overview' },
+}
+
+const DEFAULT_SUB_VIEW: Partial<Record<MissionTab, MissionSubView>> = {
+  session: 'conversation',
+  plan: 'map',
+  changes: 'files',
+  activity: 'feed',
+}
+
+function resolveTabSelection(tabId: string | null): TabSelection | null {
+  if (!tabId) return null
+  const legacy = LEGACY_TAB_MAP[tabId]
+  if (legacy) return legacy
+  const tab = TABS.find((candidate) => candidate.id === tabId)?.id
+  return tab ? { tab, subView: DEFAULT_SUB_VIEW[tab] } : null
+}
+
+function issueDetailTabFor(tab: MissionTab | null, subView: MissionSubView | undefined): string | null {
+  if (!tab || !ISSUE_DETAIL_TAB_IDS.has(tab)) return null
+  if (tab === 'session') return subView === 'terminal' ? 'terminal' : 'conversation'
+  return null
+}
 
 type IssueTreeContext = 'issue'
 
@@ -130,15 +169,14 @@ function nextAction(rs: ReviewStatusData | undefined): string {
   return 'awaiting pipeline'
 }
 
+function githubCompareUrl(issueUrl: string | null, branch: string): string | null {
+  if (!issueUrl) return null
+  const match = /^(https:\/\/github\.com\/[^/]+\/[^/]+)\/issues\/\d+$/.exec(issueUrl)
+  return match ? `${match[1]}/compare/main...${encodeURIComponent(branch)}?expand=1` : null
+}
 
-
-function HeaderStat({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-px text-right">
-      <div className="text-[9px] uppercase tracking-[0.06em] text-muted-foreground">{label}</div>
-      <div className="text-[11.5px] text-foreground">{value}</div>
-    </div>
-  )
+function mergeCommitOid(mergeCommit: { oid?: string } | string | null | undefined): string | undefined {
+  return typeof mergeCommit === 'string' ? mergeCommit : mergeCommit?.oid
 }
 
 function IssueTreeContextPanel({
@@ -150,9 +188,8 @@ function IssueTreeContextPanel({
   agentDock,
   actionDock,
   timeline,
+  overview,
   onBackToIssue,
-  onTab,
-  onOpenAgent,
 }: {
   context: IssueTreeContext
   issueId: string
@@ -162,9 +199,8 @@ function IssueTreeContextPanel({
   agentDock: ReactNode
   actionDock: ReactNode
   timeline: ReactNode
+  overview: ReactNode
   onBackToIssue: () => void
-  onTab: (tab: MissionTab) => void
-  onOpenAgent: (type: string) => void
 }) {
   const copy: Record<IssueTreeContext, { title: string; summary: string }> = {
     issue: { title: issueId, summary: 'Issue overview from the tree. Workspace tabs stay visible above this pane.' },
@@ -184,8 +220,8 @@ function IssueTreeContextPanel({
     }
     if (context === 'issue') return (
       <div className="space-y-3.5">
-        <OverviewTab issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} />
-        <div data-section="Conversation / Files / Terminal tabs">
+        {overview}
+        <div data-section="Session tab">
           <MissionConversationTab launcher={launcher} agentDock={agentDock} actionDock={actionDock} timeline={timeline} sessions={treeSessions} />
         </div>
       </div>
@@ -333,13 +369,7 @@ function deriveNow(rs: ReviewStatusData | undefined, active: { type: string; mod
 /** Lean Overview "Now" panel (PAN-1991 #9) — only what the header gates, the
  * Agents lane, and the beads rail don't already show: what's happening, the next
  * action, the diff size, and the last few status events. No status grid. */
-function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void }) {
-  const review = useReviewStatusQuery(issueId)
-  const pr = usePrQuery(issueId)
-  const activity = useActivityQuery(issueId)
-  const rs = review.data
-  const p = pr.data?.pr
-  const sections = activity.data?.sections ?? []
+function NowPanel({ reviewStatus: rs, pr: p, sections, onTab, onOpenAgent }: { reviewStatus: ReviewStatusData | undefined; pr: PullRequestData | null | undefined; sections: readonly ActivitySection[]; onTab: (tab: MissionTab, subView?: MissionSubView) => void; onOpenAgent: (type: string) => void }) {
   const active = sections.find((s) => s.status === 'running' || s.status === 'active' || s.status === 'starting')
   const hasWork = sections.some((s) => s.type === 'work')
   const now = deriveNow(rs, active)
@@ -366,14 +396,14 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {hasWork && <button type="button" className={lk} onClick={() => onOpenAgent('work')}>Open work agent ↗</button>}
-        {p && <button type="button" className={lk} onClick={() => onTab('code')}>Open diff →</button>}
+        {p && <button type="button" className={lk} onClick={() => onTab('changes', 'checks')}>Open diff →</button>}
         {p?.url && <a className={lk} href={p.url} target="_blank" rel="noreferrer">Open PR ↗</a>}
       </div>
       {recent.length > 0 && (
         <div className="mt-3.5">
           <div className="mb-1.5 flex items-center justify-between text-[10px] uppercase tracking-[0.06em] text-muted-foreground">
             <span>Recent activity</span>
-            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('timeline')}>→ Timeline</button>
+            <button type="button" className="text-[10px] normal-case tracking-normal text-muted-foreground hover:text-foreground" onClick={() => onTab('activity', 'history')}>→ Timeline</button>
           </div>
           {recent.map((h, i) => (
             <div key={`${h.type}-${h.timestamp}-${i}`} className="flex items-baseline gap-2.5 py-1 text-[12.5px]">
@@ -388,57 +418,83 @@ function NowPanel({ issueId, onTab, onOpenAgent }: { issueId: string; onTab: (ta
   )
 }
 
-/** Overview — crew, feed, plan map, blocker spotlight, Now panel (PAN-2398). */
-type OverviewTabProps = { issueId: string; onTab: (tab: MissionTab) => void; onOpenAgent: (type: string) => void; sessions?: readonly SessionNode[]; onSelectSession?: (session: SessionNode) => void }
-function OverviewTab({ issueId, onTab, onOpenAgent, sessions, onSelectSession }: OverviewTabProps) {
-  return (
-    <div className="space-y-3.5">
-      {sessions && onSelectSession && <CrewStage sessions={sessions} onSelectSession={onSelectSession} />}
-      <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
-      <HappenedFeed issueId={issueId} />
-      <PlanMapCard issueId={issueId} />
-      <IssueBlockerSpotlight issueId={issueId} />
-      <div data-section="NowPanel"><NowPanel issueId={issueId} onTab={onTab} onOpenAgent={onOpenAgent} /></div>
-      <div data-section="PickupGateCard"><PickupGateCard issueId={issueId} /></div>
-    </div>
-  )
+function drawerActivityPhase(type: string, status: string): DrawerActivityPhase {
+  if (status === 'completed' || status === 'passed' || status === 'merged') return 'done'
+  if (type === 'review' || type === 'reviewer') return 'review'
+  if (type === 'ship' || type === 'merge') return 'ship'
+  if (type === 'work' || type === 'strike') return 'work'
+  return 'info'
 }
 
 function tabBadge(tab: MissionTab, checks: ReturnType<typeof useIssueCheckRunsQuery>['data']): { label: string; tone: CockpitTone } | null {
-  if (tab === 'code' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
+  if (tab === 'changes' && checks?.summary.total) return { label: checks.summary.failed ? '!' : checks.summary.running || checks.summary.pending ? '…' : '✓', tone: checks.summary.failed ? 'destructive' : checks.summary.running || checks.summary.pending ? 'info' : 'success' }
   return null
 }
 
 export function IssueMissionControl({ issueId, title, branch, projectName, launcher, agentDock, actionDock, timeline }: IssueMissionControlProps) {
-  // PAN-2908 C-DETAIL (operator decision, #2962): Conversation is the default
-  // tab — same conversation-first law as the drawer.
-  const [activeTab, setActiveTab] = useState<MissionTab | null>('conversation')
+  const allAgents = useDashboardStore(selectAgents) as Agent[]
+  const issueAgents = useMemo(
+    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
+    [allAgents, issueId],
+  )
+  const routeSelection = useMemo(
+    () => resolveTabSelection(typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('tab')),
+    [],
+  )
+  const initialTab = routeSelection?.tab ?? (issueAgents.length > 0 ? 'session' : 'overview')
+  const [activeTab, setActiveTab] = useState<MissionTab | null>(initialTab)
+  const [activeSubView, setActiveSubView] = useState<MissionSubView | undefined>(
+    routeSelection?.subView ?? DEFAULT_SUB_VIEW[initialTab],
+  )
+  const tabSelectionLocked = useRef(Boolean(routeSelection) || issueAgents.length > 0)
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
-  const [tasksDrawerOpen, setTasksDrawerOpen] = useState(false)
+  const [costsOpen, setCostsOpen] = useState(false)
   // Operator decision (#2962): the session-tree lane starts collapsed behind a
   // toggle (persisted preference honored).
   const [spineCollapsed, setSpineCollapsed] = useState(
     () => typeof window !== 'undefined' && window.localStorage.getItem(SPINE_COLLAPSED_KEY) !== 'false',
   )
-  const tasksQuery = useTasksQuery(issueId)
-  const tasksRollup = taskStatusRollup(tasksQuery.data?.tasks ?? [])
+  const planQuery = useQuery<XBriefDocument | null>({
+    queryKey: ['plan', issueId],
+    queryFn: async () => {
+      const response = await fetch(`/api/workspaces/${issueId}/plan`)
+      if (!response.ok) return null
+      return response.json() as Promise<XBriefDocument>
+    },
+    staleTime: 60_000,
+  })
+  const tasksRollup = taskStatusRollup(planQuery.data?.plan?.items ?? [])
   const review = useReviewStatusQuery(issueId)
   const pr = usePrQuery(issueId)
   const checks = useIssueCheckRunsQuery(issueId)
   const costs = useIssueCostsQuery(issueId)
   const headerActions = useIssueActions(issueId)
-  const allAgents = useDashboardStore(selectAgents) as Agent[]
+  const issueView = useIssueView(issueId, { title, branch, projectName })
+  const recentActivity = useMemo<DrawerActivityItem[]>(
+    () => issueView.activity.sections.map((section, index) => ({
+      id: `${section.sessionId}-${section.status}-${index}`,
+      phase: drawerActivityPhase(section.type, section.status),
+      message: `${section.role ?? section.type} ${section.status}`,
+      when: section.startedAt,
+    })),
+    [issueView.activity.sections],
+  )
   const reviewSnapshot = useDashboardStore(selectReviewStatus(issueId))
   const issueRecord = useDashboardStore((s) =>
-    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string }> | undefined)?.find(
+    (s.issuesRaw as Array<{ identifier: string; state?: string; status?: string; url?: string }> | undefined)?.find(
       (candidate) => candidate.identifier === issueId,
     ),
   )
-  const issueAgents = useMemo(
-    () => allAgents.filter((a) => a.issueId?.toLowerCase() === issueId.toLowerCase()),
-    [allAgents, issueId],
+  const preferredReviewStatus = reviewSnapshot ?? review.data
+  const cockpitShip = useMemo(
+    () => deriveShip(preferredReviewStatus as ReviewStatusData | undefined, issueView.ship.log),
+    [issueView.ship.log, preferredReviewStatus],
+  )
+  const cockpitIssueView = useMemo(
+    () => ({ ...issueView, ship: cockpitShip }),
+    [cockpitShip, issueView],
   )
   // PAN-2908 C-VOCAB/one-data-model: the header pill runs on the shared
   // pipeline machine (WS snapshot first, HTTP detail as warmup fallback) —
@@ -451,13 +507,15 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     () => issueAgents.some((a) => a.role === 'work' && (a.status === 'running' || a.status === 'starting')),
     [issueAgents],
   )
+  const hasLiveSession = issueAgents.some((agent) => agent.status === 'running' || agent.status === 'starting')
+    || treeSessions.some((session) => session.presence === 'active')
   const pipelineState = derivePipelineState({
-    reviewStatus: (reviewSnapshot ?? review.data ?? null),
+    reviewStatus: preferredReviewStatus ?? null,
     agent: primaryAgent,
     hasPlan: headerActions.state.hasPlan,
     hasTasks: tasksRollup.total > 0,
     issueCanonicalState: issueRecord?.state ?? issueRecord?.status ?? null,
-    isMerged: (reviewSnapshot ?? review.data)?.mergeStatus === 'merged',
+    isMerged: preferredReviewStatus?.mergeStatus === 'merged',
   })
   const currentPhaseKey = currentPhase(pipelineState)
   const phase = currentPhaseKey
@@ -465,7 +523,26 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     : pipelineState === 'merged' || pipelineState === 'done'
       ? phaseLabel('done')
       : '—'
-  const cost = costs.data?.resolvedTotalCost ?? costs.data?.totalCost ?? 0
+  const cost = issueView.header.cost
+  const trackerHref = trackerIssueUrl(issueId, issueRecord?.url)
+  const createPrHref = pr.data?.pr ? null : githubCompareUrl(trackerHref, branch)
+  const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
+
+  useEffect(() => {
+    if (tabSelectionLocked.current || issueAgents.length === 0) return
+    tabSelectionLocked.current = true
+    setActiveTab('session')
+    setActiveSubView('conversation')
+  }, [issueAgents.length])
+
+  const applySessionSelection = useCallback((session: SessionNode) => {
+    tabSelectionLocked.current = true
+    setSelectedTreeSession(session)
+    setTreeContext(null)
+    setActiveTab(null)
+    setActiveSubView(undefined)
+  }, [])
+  const { queue: queuePhaseSession, cancel: cancelPhaseSession } = useDeferredSessionSelection(treeSessions, applySessionSelection)
   const toggleSpine = () => {
     setSpineCollapsed((collapsed) => {
       const next = !collapsed
@@ -473,21 +550,27 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
       return next
     })
   }
-  const selectTab = (tab: MissionTab) => {
+  const selectTab = (tab: MissionTab, subView: MissionSubView | undefined = DEFAULT_SUB_VIEW[tab]) => {
+    cancelPhaseSession()
+    tabSelectionLocked.current = true
     setActiveTab(tab)
+    setActiveSubView(subView)
     setTreeContext(null)
     setSelectedTreeSession(null)
   }
   const selectIssueFromTree = () => {
+    cancelPhaseSession()
+    tabSelectionLocked.current = true
     setTreeContext('issue')
     setSelectedTreeSession(null)
     setActiveTab(null)
+    setActiveSubView(undefined)
   }
   const selectSessionFromTree = (session: SessionNode) => {
-    setSelectedTreeSession(session)
-    setTreeContext(null)
-    setActiveTab(null)
+    cancelPhaseSession()
+    applySessionSelection(session)
   }
+  const resolveNeedsYouAction = useCockpitNeedsYouActions(issueId, treeSessions, selectSessionFromTree)
   // Open an agent's conversation by session type (work/review/test/…). Shared by
   // the pipeline phases (#4) and the Overview "Now" links (#9).
   const openAgentByType = (type: string): boolean => {
@@ -495,13 +578,51 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     if (session) { selectSessionFromTree(session); return true }
     return false
   }
+  const selectPipelinePhase = (selectedPhase: Phase, sessionId?: string) => {
+    if (sessionId) {
+      const session = treeSessions.find((candidate) => candidate.sessionId === sessionId)
+      if (session) selectSessionFromTree(session)
+      else queuePhaseSession(sessionId)
+      return
+    }
+    if (selectedPhase === 'plan') {
+      selectTab('plan', 'map')
+      return
+    }
+    if (selectedPhase === 'work' || selectedPhase === 'review' || selectedPhase === 'test') {
+      if (!openAgentByType(selectedPhase)) selectTab('session', 'conversation')
+      return
+    }
+    selectTab('overview')
+  }
   const recordTreeSessions = useCallback((sessions: readonly SessionNode[]) => {
     setTreeSessions(sessions)
     setSelectedTreeSession((current) => {
       if (!current) return current
       return sessions.find((session) => session.sessionId === current.sessionId) ?? current
     })
+    if (!tabSelectionLocked.current && sessions.length > 0) {
+      tabSelectionLocked.current = true
+      setActiveTab('session')
+      setActiveSubView('conversation')
+    }
   }, [])
+  const overviewState = pipelineState === 'merged' || pipelineState === 'done'
+    ? 'done'
+    : !headerActions.state.hasPlan && issueView.agents.length === 0
+      ? 'pre-work'
+      : 'live'
+  const overviewBody = (
+    <IssueOverviewTab
+      issueId={issueId}
+      model={cockpitIssueView}
+      state={overviewState}
+      hasPlan={headerActions.state.hasPlan}
+      workRunning={workAgentRunning}
+      mergedCommit={mergeCommitOid(pr.data?.pr?.mergeCommit)}
+      reviewSummary={review.data?.reviewNotes ?? review.data?.mergeNotes}
+    />
+  )
 
   return (
     <IssueView issueId={issueId} density="cockpit" className={styles.missionWrap}>
@@ -509,46 +630,104 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
         <div className={styles.headerTop}>
           <div className={styles.headerTitle}>
             <div className="text-[11px] text-muted-foreground/70">
-              {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}Issues
+              {projectName ? <><span className="text-muted-foreground">{projectName}</span> / </> : null}<span>Issues</span> / <span className="font-mono text-foreground">{issueId}</span>
             </div>
-            <div className="mt-1 flex flex-wrap items-center gap-2">
-              <span className="font-mono text-[13px] font-medium text-foreground">{issueId}</span>
-              <h1 className="min-w-0 max-w-full break-words text-[16px] font-medium leading-snug text-foreground">{title}</h1>
+            <h1 className="mt-1 min-w-0 max-w-full break-words text-[17px] font-medium leading-snug text-foreground">{title}</h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
               <CockpitPill tone={pillTone(pipelineState)}>{phase}</CockpitPill>
+              <StatusNarrative
+                issueId={issueId}
+                hasPlan={headerActions.state.hasPlan}
+                workRunning={workAgentRunning}
+              />
             </div>
           </div>
           <div className={styles.headerMeta}>
-            <div className="flex items-start gap-4">
-              <HeaderStat label="Branch" value={<span className="font-mono">{branch}</span>} />
-              <HeaderStat
-                label="PR / CI"
-                value={pr.data?.pr
-                  ? `#${pr.data.pr.number}${checks.data?.summary.total ? ` · ${checks.data.summary.passed}/${checks.data.summary.total}` : ''}`
-                  : 'no PR'}
-              />
-              <HeaderStat
-                label="Cost"
-                value={<span className="text-signal-cost-foreground tabular-nums">{cost > 0 ? `$${cost.toFixed(2)}` : '—'}</span>}
-              />
-            </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <span
+                data-testid="header-branch-chip"
+                className="inline-flex h-7 min-w-0 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-muted-foreground"
+              >
+                <GitBranch size={12} aria-hidden="true" />
+                <span className="max-w-44 truncate font-mono text-foreground">{branch}</span>
+                <button
+                  type="button"
+                  aria-label="Copy branch name"
+                  title="Copy branch name"
+                  className="grid h-5 w-5 place-items-center rounded-[var(--radius-sm)] hover:bg-accent hover:text-foreground"
+                  onClick={() => void navigator.clipboard?.writeText(branch)}
+                >
+                  <Copy size={11} aria-hidden="true" />
+                </button>
+              </span>
+
+              {pr.data?.pr ? (
+                <a
+                  href={pr.data.pr.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-foreground hover:bg-accent"
+                >
+                  <GitPullRequest size={12} aria-hidden="true" />
+                  <span className="font-mono">PR #{pr.data.pr.number}</span>
+                  {checks.data?.summary.total ? <span className="text-muted-foreground">{checks.data.summary.passed}/{checks.data.summary.total}</span> : null}
+                </a>
+              ) : (
+                <span className="inline-flex h-7 items-center gap-1.5 rounded-[var(--radius-sm)] border border-border bg-background/40 px-2 text-[11px] text-muted-foreground">
+                  <GitPullRequest size={12} aria-hidden="true" />
+                  <span>No PR</span>
+                  {createPrHref ? <a href={createPrHref} target="_blank" rel="noreferrer" className="text-primary hover:underline">Create PR</a> : null}
+                </span>
+              )}
+
+              <span
+                data-testid="header-cost-chip"
+                aria-label={`Cost ${cost ?? 'unavailable'}`}
+                className="inline-flex h-7 items-center rounded-[var(--radius-sm)] border badge-border-signal-cost badge-bg-signal-cost px-2 font-mono text-[11px] font-medium tabular-nums text-signal-cost-foreground"
+              >
+                {cost ?? '—'}
+              </span>
+
+              {trackerHref ? (
+                <a
+                  data-testid="header-tracker-link"
+                  href={trackerHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-7 items-center overflow-hidden rounded-[var(--radius-sm)] border border-border bg-background/40 text-[11px] text-foreground hover:bg-accent"
+                >
+                  <span className="inline-flex h-full items-center gap-1.5 px-2">
+                    Open tracker <ExternalLink size={11} aria-hidden="true" />
+                  </span>
+                  <span className="grid h-full w-6 place-items-center border-l border-border text-muted-foreground" aria-hidden="true">
+                    <ChevronDown size={11} />
+                  </span>
+                </a>
+              ) : null}
+
               {/* PAN-2908 C-ACTIONS: merge flows through the shared registry menu
                   (primary at READY_TO_MERGE); the bespoke MergeCta is gone. */}
               <IssueActionMenu issueId={issueId} mode="primary-strip" className="flex items-center gap-1" />
             </div>
           </div>
         </div>
-        <div data-section="StatusNarrative" className="mt-4 border-t border-border pt-4">
-          <StatusNarrative
-            issueId={issueId}
-            hasPlan={headerActions.state.hasPlan}
-            workRunning={workAgentRunning}
-            cost={cost > 0 ? `$${cost.toFixed(2)}` : undefined}
-          />
-        </div>
         {/* PAN-2908 C-DETAIL: the pipeline band lives inside IssueDetail now —
             the cockpit route renders the ONE component, no duplicate shell. */}
       </header>
+
+      <NeedsYouSlot
+        model={issueView}
+        actions={headerActions.all}
+        resolveAction={resolveNeedsYouAction}
+      />
+
+      <CockpitPhaseRail
+        pipelineState={pipelineState}
+        agents={issueView.agents}
+        ship={cockpitShip}
+        testStatus={preferredReviewStatus?.testStatus}
+        onSelectPhase={selectPipelinePhase}
+      />
 
       <nav data-section="Detail Tabs" className="flex flex-nowrap gap-1 overflow-x-auto border-b border-border bg-card px-3 pt-2" aria-label="Issue cockpit tabs">
         {TABS.map((tab) => {
@@ -558,6 +737,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
               key={tab.id}
               type="button"
               aria-selected={activeTab === tab.id}
+              aria-label={tab.id === 'plan' ? tab.label : undefined}
               onClick={() => selectTab(tab.id)}
               className={`flex shrink-0 items-center gap-1.5 rounded-[9px] px-3 py-2 text-[12px] font-medium transition-colors ${
                 activeTab === tab.id
@@ -565,25 +745,19 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground'
               }`}
             >
+              {tab.id === 'session' && hasLiveSession ? (
+                <span data-testid="session-live-dot" className="h-[7px] w-[7px] rounded-full bg-info" aria-hidden="true" />
+              ) : null}
               {tab.label}
+              {tab.id === 'plan' && tasksRollup.total > 0 ? (
+                <span className="font-mono text-[10px] tabular-nums text-muted-foreground" aria-hidden="true">
+                  {tasksRollup.done}/{tasksRollup.total}
+                </span>
+              ) : null}
               {badge && <CockpitPill tone={badge.tone} className="px-[5px] py-0 text-[9px]">{badge.label}</CockpitPill>}
             </button>
           )
         })}
-        <button
-          type="button"
-          data-section="TasksRail / TasksTab"
-          aria-expanded={tasksDrawerOpen}
-          aria-label={`Tasks: ${tasksRollup.done} of ${tasksRollup.total} complete. Open plan progress`}
-          onClick={() => setTasksDrawerOpen(true)}
-          className="sticky right-0 ml-auto flex shrink-0 items-center gap-2 rounded-[9px] border badge-border-primary badge-bg-primary px-3 py-2 text-[12px] font-medium text-primary shadow-[-10px_0_14px_var(--card)] transition-colors hover:bg-primary/15"
-        >
-          <span>Tasks</span>
-          <span className="tabular-nums">{tasksRollup.done}/{tasksRollup.total}</span>
-          <span className="h-1 w-12 overflow-hidden rounded-[var(--radius-sm)] bg-border" aria-hidden="true">
-            <span className="block h-full bg-primary" style={{ width: `${tasksRollup.percentDone}%` }} />
-          </span>
-        </button>
       </nav>
 
       <div
@@ -601,7 +775,11 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
           onSessionsChange={recordTreeSessions}
           onOpenVerification={() => selectTab('overview')}
         /></div>
-        <main className="min-w-0 rounded-[20px] border border-border bg-card/30">
+        <main
+          className="min-w-0 rounded-[20px] border border-border bg-card/30"
+          data-active-tab={activeTab ?? undefined}
+          data-active-subview={activeSubView}
+        >
           <div className="p-4">
             {(treeContext || selectedTreeSession) && (
               <div data-section="SessionPanel"><IssueTreeContextPanel
@@ -613,60 +791,210 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 agentDock={agentDock}
                 actionDock={actionDock}
                 timeline={timeline}
+                overview={overviewBody}
                 onBackToIssue={selectIssueFromTree}
-                onTab={selectTab}
-                onOpenAgent={openAgentByType}
               /></div>
             )}
-            {/* PAN-2908 C-DETAIL (operator decision, #2962): the binding tabs
-                are the ONE IssueDetail at page density — the cockpit nav drives
-                its tab, the shell inside it drives its conversations. */}
-            {ISSUE_DETAIL_TAB_IDS.has(activeTab as MissionTab) && (
-              <div data-section="IssueDetail page body" className="h-[calc(100vh-340px)] min-h-[520px]">
+            {/* The six cockpit tabs fold the legacy surfaces into sub-views while
+                preserving the ONE IssueDetail page-density renderer. */}
+            {issueDetailTab && (
+              <div
+                data-section="Session tab"
+                className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}
+              >
+                {activeTab === 'session' ? (
+                  <div
+                    role="tablist"
+                    aria-label="Session views"
+                    className="flex shrink-0 gap-1 border-b border-border px-3 py-2"
+                  >
+                    {(['conversation', 'terminal'] as const).map((subView) => (
+                      <button
+                        key={subView}
+                        type="button"
+                        role="tab"
+                        aria-selected={activeSubView === subView}
+                        onClick={() => selectTab('session', subView)}
+                        className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                          activeSubView === subView
+                            ? 'bg-primary/9 text-primary'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                        }`}
+                      >
+                        {subView === 'conversation' ? 'Conversation' : 'Terminal'}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
                 <IssueDetail
                   issueId={issueId}
                   density="page"
                   showTabs={false}
-                  tab={activeTab as MissionTab}
-                  onSelectTab={(tab) => selectTab(tab as MissionTab)}
+                  tab={issueDetailTab}
+                  onSelectTab={(tab) => {
+                    const selection = resolveTabSelection(tab)
+                    if (selection) selectTab(selection.tab, selection.subView)
+                  }}
                   agents={issueAgents}
                   reviewStatus={reviewSnapshot}
+                  className={activeTab === 'session' ? 'min-h-0 flex-1' : undefined}
                 />
               </div>
             )}
-            {activeTab === 'overview' && <div data-section="Awareness rail"><OverviewTab issueId={issueId} onTab={selectTab} onOpenAgent={openAgentByType} sessions={treeSessions} onSelectSession={selectSessionFromTree} /></div>}
-            {activeTab === 'code' && (
-              <div data-section="Code tab" className="space-y-3.5">
-                <GitHubCiPanel issueId={issueId} />
-                <ChangedFilesView issueId={issueId} />
+            {activeTab === 'plan' && (
+              <div data-section="Plan / Activity / Discussion tabs" className="space-y-3.5">
+                <div role="tablist" aria-label="Plan views" className="flex gap-1 border-b border-border pb-2">
+                  {(['tasks', 'map', 'prd'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('plan', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'tasks' ? 'Tasks' : subView === 'map' ? 'Map' : 'PRD'}
+                    </button>
+                  ))}
+                </div>
+                {activeSubView === 'tasks' ? (
+                  <div data-section="TasksRail / TasksTab"><TasksPanel issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'map' ? <PlanMapCard issueId={issueId} /> : null}
+                {activeSubView === 'prd' ? <PrdViewer issueId={issueId} onClose={() => selectTab('plan', 'map')} /> : null}
               </div>
             )}
-            {activeTab === 'timeline' && (
-              <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
-                <div>
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Status history</h3>
-                  <StatusHistoryTab issueId={issueId} />
-                </div>
-                <div>
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Activity</h3>
-                  <ActivityTab issueId={issueId} />
-                </div>
+            {activeTab === 'overview' && (
+              <div className="space-y-3.5">
+                {overviewBody}
               </div>
             )}
-            {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
-            {activeTab === 'costs' && <div data-section="Costs / Artifacts / Ship tabs"><CostsTab issueId={issueId} /></div>}
-            {activeTab === 'ship' && <div data-section="Costs / Artifacts / Ship tabs"><ShipTab issueId={issueId} /></div>}
+            {activeTab === 'changes' && (
+              <div data-section="Changes tab" className="space-y-3.5">
+                <div role="tablist" aria-label="Change views" className="flex gap-1 border-b border-border pb-2">
+                  {(['files', 'checks', 'artifacts'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('changes', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'files' ? 'Files' : subView === 'checks' ? 'Checks' : 'Artifacts'}
+                    </button>
+                  ))}
+                </div>
+                {activeSubView === 'files' ? (
+                  <div><ChangedFilesView issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'checks' ? (
+                  <div><GitHubCiPanel issueId={issueId} /></div>
+                ) : null}
+                {activeSubView === 'artifacts' ? (
+                  <div data-section="Cost / Artifacts / Ship homes"><DrawerArtifactsPanel issueId={issueId} /></div>
+                ) : null}
+              </div>
+            )}
+            {activeTab === 'activity' && (
+              <div data-section="Plan / Activity / Discussion tabs" className="space-y-3.5">
+                <div role="tablist" aria-label="Activity views" className="flex gap-1 border-b border-border pb-2">
+                  {(['feed', 'history'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('activity', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'feed' ? 'Feed' : 'Status history'}
+                    </button>
+                  ))}
+                </div>
+                {activeSubView === 'feed' ? <ActivityTab issueId={issueId} /> : null}
+                {activeSubView === 'history' ? <StatusHistoryTab issueId={issueId} /> : null}
+              </div>
+            )}
+            {activeTab === 'discussion' && <div data-section="Plan / Activity / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}
           </div>
         </main>
+        <aside data-section="Awareness rail" className={styles.awarenessRail} aria-label="Issue awareness">
+          <section data-testid="right-rail-now" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div data-section="NowPanel"><NowPanel reviewStatus={review.data} pr={pr.data?.pr} sections={issueView.activity.sections} onTab={selectTab} onOpenAgent={openAgentByType} /></div>
+          </section>
+          <RunDetailsCard model={issueView} />
+          <section data-testid="right-rail-gates" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Gates</h3>
+            <VerificationGatesGrid verification={issueView.verification} />
+          </section>
+          <section data-testid="right-rail-cost" data-section="Cost / Artifacts / Ship homes" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Cost</h3>
+                <div className="mt-1 font-mono text-[18px] tabular-nums text-signal-cost-foreground">
+                  {cost ?? '—'}
+                </div>
+                <div className="mt-1 font-mono text-[10px] text-muted-foreground">
+                  {costs.data?.totalTokens ? `${costs.data.totalTokens.toLocaleString()} tokens` : 'No token data'}
+                </div>
+              </div>
+              <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setCostsOpen(true)}>
+                All costs →
+              </button>
+            </div>
+          </section>
+          <section data-testid="right-rail-environment" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <h3 className="mb-2 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Environment</h3>
+            <div data-section="UatEnvironmentPanel"><UatEnvironmentPanel issueId={issueId} /></div>
+          </section>
+          <section data-testid="right-rail-activity" className="rounded-[var(--radius)] border border-border bg-card p-3">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">Recent activity</h3>
+              <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => selectTab('activity', 'feed')}>
+                All activity →
+              </button>
+            </div>
+            <DrawerActivityRailView activityRail={recentActivity} compact limit={3} />
+          </section>
+        </aside>
       </div>
-      <TasksDrawer
-        issueId={issueId}
-        open={tasksDrawerOpen}
-        query={tasksQuery}
-        rollup={tasksRollup}
-        onClose={() => setTasksDrawerOpen(false)}
-        onOpenFull={() => selectTab('tasks')}
-      />
+      {costsOpen ? (
+        <div className="absolute inset-0 z-[60]" data-testid="cost-rollup-layer">
+          <button
+            type="button"
+            aria-label="Close cost breakdown"
+            className="absolute inset-0 w-full border-0 bg-background/60 backdrop-blur-[2px]"
+            onClick={() => setCostsOpen(false)}
+          />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label="Cost breakdown"
+            className="absolute inset-y-0 right-0 w-[min(620px,calc(100%_-_28px))] overflow-y-auto border-l border-border bg-card"
+          >
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card px-4 py-3">
+              <h2 className="text-[14px] font-medium text-foreground">Cost breakdown</h2>
+              <button type="button" className="text-[12px] text-muted-foreground hover:text-foreground" onClick={() => setCostsOpen(false)}>
+                Close
+              </button>
+            </div>
+            <CostsTab issueId={issueId} />
+          </aside>
+        </div>
+      ) : null}
     </IssueView>
   )
 }
