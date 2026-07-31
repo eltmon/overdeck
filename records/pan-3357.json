@@ -207,10 +207,10 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T18:49:10.772Z",
+  "updated": "2026-07-31T18:49:17.847Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -218,12 +218,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T18:49:09.008Z",
+    "updatedAt": "2026-07-31T18:49:09.459Z",
+    "reviewNotes": "[correctness] Terminal-agent GC deletes retained transcripts immediately and then erases their expiration proof — `src/lib/cloister/deacon.ts:3131`",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
     "lastVerifiedCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
-    "reviewSpawnedAt": "2026-07-31T18:45:04.024Z",
+    "reviewSpawnedAt": "2026-07-31T18:49:09.457Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -338,24 +339,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4832741,
-            "output": 505387,
-            "cacheRead": 176207360,
+            "input": 4833168,
+            "output": 505482,
+            "cacheRead": 176384000,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18671092,
-          "output": 871341,
-          "cacheRead": 236710400,
+          "input": 18671519,
+          "output": 871436,
+          "cacheRead": 236887040,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 237.85089,
-        "pricingAsOf": "2026-07-31T18:49:09.046Z"
+        "usd": 237.944195,
+        "pricingAsOf": "2026-07-31T18:49:17.837Z"
       }
     },
     "merges": [
