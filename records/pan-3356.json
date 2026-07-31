@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T17:14:18.753Z",
+  "updated": "2026-07-31T17:17:40.395Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "docs-update": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 2758339,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T17:14:18.753Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -213,6 +205,17 @@
         "outcome": "completed",
         "reason": "Updated the independent no-loss lock to 22 cockpit sections and 54 total, renamed every folded surface marker, and recorded Session, Changes, Plan/Activity/Discussion, and Cost/Artifacts/Ship relocations. Kept action parity tests unmodified; 10 no-loss tests and 114 focused density/parity tests passed, plus typecheck.",
         "releasedAt": "2026-07-31T17:13:52.484Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 2758339,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T17:14:18.753Z",
+        "itemId": "docs-update",
+        "outcome": "completed",
+        "reason": "Rewrote the cockpit layout documentation for the six-tab live-run IA, legacy-route normalization, crew spine, needs-you slot, awareness rail, and responsive behavior; linked the v2 mockup and added a PAN-3356 module header. Rechecked configuration/ and reference/: no Mintlify page documents this internal cockpit structure. Typecheck and link verification passed.",
+        "releasedAt": "2026-07-31T17:17:40.394Z"
       }
     ],
     "statusReasons": {
@@ -263,6 +266,10 @@
       "inventory-bookkeeping": {
         "reason": "Updated the independent no-loss lock to 22 cockpit sections and 54 total, renamed every folded surface marker, and recorded Session, Changes, Plan/Activity/Discussion, and Cost/Artifacts/Ship relocations. Kept action parity tests unmodified; 10 no-loss tests and 114 focused density/parity tests passed, plus typecheck.",
         "updatedAt": "2026-07-31T17:13:52.484Z"
+      },
+      "docs-update": {
+        "reason": "Rewrote the cockpit layout documentation for the six-tab live-run IA, legacy-route normalization, crew spine, needs-you slot, awareness rail, and responsive behavior; linked the v2 mockup and added a PAN-3356 module header. Rechecked configuration/ and reference/: no Mintlify page documents this internal cockpit structure. Typecheck and link verification passed.",
+        "updatedAt": "2026-07-31T17:17:40.394Z"
       }
     }
   },
@@ -320,6 +327,8 @@
     "inventory-bookkeeping.inventory-bookkeeping.ac2": "completed",
     "inventory-bookkeeping.inventory-bookkeeping.ac3": "completed",
     "inventory-bookkeeping.inventory-bookkeeping.ac4": "completed",
-    "docs-update": "running"
+    "docs-update": "completed",
+    "docs-update.docs-update.ac1": "completed",
+    "docs-update.docs-update.ac2": "completed"
   }
 }
