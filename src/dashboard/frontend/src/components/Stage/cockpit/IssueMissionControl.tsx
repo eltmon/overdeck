@@ -67,7 +67,7 @@ type MissionSubView = 'conversation' | 'terminal' | 'tasks' | 'map' | 'prd' | 'f
 type TabSelection = { tab: MissionTab; subView?: MissionSubView }
 
 /** Tabs whose bodies delegate to the ONE IssueDetail component for at least one sub-view. */
-const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session', 'activity'])
+const ISSUE_DETAIL_TAB_IDS = new Set<MissionTab>(['session'])
 
 const TABS: Array<{ id: MissionTab; label: string }> = [
   { id: 'overview', label: 'Overview' },
@@ -109,7 +109,6 @@ function resolveTabSelection(tabId: string | null): TabSelection | null {
 function issueDetailTabFor(tab: MissionTab | null, subView: MissionSubView | undefined): string | null {
   if (!tab || !ISSUE_DETAIL_TAB_IDS.has(tab)) return null
   if (tab === 'session') return subView === 'terminal' ? 'terminal' : 'conversation'
-  if (tab === 'activity') return subView === 'history' ? null : 'activity'
   return null
 }
 
@@ -861,16 +860,28 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
                 ) : null}
               </div>
             )}
-            {activeTab === 'activity' && activeSubView === 'history' && (
-              <div data-section="PRD / Timeline / Discussion tabs" className="space-y-4">
-                <div>
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Status history</h3>
-                  <StatusHistoryTab issueId={issueId} />
+            {activeTab === 'activity' && (
+              <div data-section="PRD / Timeline / Discussion tabs" className="space-y-3.5">
+                <div role="tablist" aria-label="Activity views" className="flex gap-1 border-b border-border pb-2">
+                  {(['feed', 'history'] as const).map((subView) => (
+                    <button
+                      key={subView}
+                      type="button"
+                      role="tab"
+                      aria-selected={activeSubView === subView}
+                      onClick={() => selectTab('activity', subView)}
+                      className={`rounded-[var(--radius-sm)] px-3 py-1.5 text-[12px] font-medium transition-colors ${
+                        activeSubView === subView
+                          ? 'bg-primary/9 text-primary'
+                          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                      }`}
+                    >
+                      {subView === 'feed' ? 'Feed' : 'Status history'}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <h3 className="mb-2 text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">Activity</h3>
-                  <ActivityTab issueId={issueId} />
-                </div>
+                {activeSubView === 'feed' ? <ActivityTab issueId={issueId} /> : null}
+                {activeSubView === 'history' ? <StatusHistoryTab issueId={issueId} /> : null}
               </div>
             )}
             {activeTab === 'discussion' && <div data-section="PRD / Timeline / Discussion tabs"><DiscussionsTab issueId={issueId} /></div>}

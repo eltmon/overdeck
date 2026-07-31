@@ -440,17 +440,13 @@ describe('IssueMissionControl', () => {
     expect(container.querySelector('main')).not.toHaveAttribute('data-active-subview')
   })
 
-  it('the folded binding tabs keep the ONE IssueDetail at page density', () => {
+  it('keeps the ONE IssueDetail at page density for the Session transcript', () => {
     renderMissionControl()
     const detail = screen.getByTestId('issue-detail-page-mock')
     expect(detail).toHaveAttribute('data-density', 'page')
     expect(detail).toHaveAttribute('data-tab', 'conversation')
     expect(detail).toHaveAttribute('data-issue-id', 'PAN-1661')
     expect(detail).toHaveAttribute('data-show-tabs', 'false')
-
-    const nav = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
-    fireEvent.click(within(nav).getByRole('button', { name: 'Activity' }))
-    expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'activity')
   })
 
   it.each([
@@ -539,6 +535,31 @@ describe('IssueMissionControl', () => {
       .getByRole('button', { name: /Changes/ })
     expect(changes).toHaveTextContent(expectedBadge ? `Changes${expectedBadge}` : 'Changes')
     if (!expectedBadge) expect(changes.textContent).toBe('Changes')
+  })
+
+  it('renders Feed and Status history inside Activity without leaving the cockpit tab', () => {
+    const { container } = renderMissionControl()
+    const cockpitTabs = screen.getByRole('navigation', { name: 'Issue cockpit tabs' })
+    fireEvent.click(within(cockpitTabs).getByRole('button', { name: 'Activity' }))
+
+    const activityViews = screen.getByRole('tablist', { name: 'Activity views' })
+    expect(screen.getByText('Activity tab')).toBeInTheDocument()
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'feed')
+
+    fireEvent.click(within(activityViews).getByRole('tab', { name: 'Status history' }))
+    expect(screen.getAllByText('Status history')).toHaveLength(2)
+    expect(screen.queryByText('Activity tab')).toBeNull()
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'history')
+    expect(within(cockpitTabs).getByRole('button', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true')
+  })
+
+  it('keeps the legacy Timeline deep link on Activity status history', () => {
+    window.history.replaceState(null, '', '/?tab=timeline')
+    const { container } = renderMissionControl()
+
+    expect(container.querySelector('main')).toHaveAttribute('data-active-tab', 'activity')
+    expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'history')
+    expect(screen.getAllByText('Status history')).toHaveLength(2)
   })
 
   it('persists the collapsible agent spine and defaults to collapsed without a saved choice (#2962)', () => {
