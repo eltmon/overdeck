@@ -123,18 +123,18 @@
     "recordedAt": "2026-07-31T00:06:01.082Z"
   },
   "created": "2026-07-30T21:02:35.588Z",
-  "updated": "2026-07-31T00:11:59.404Z",
+  "updated": "2026-07-31T00:12:01.321Z",
   "pipeline": {
     "issueId": "PAN-3340",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T00:06:38.713Z",
-    "updatedAt": "2026-07-31T00:11:59.359Z",
-    "reviewNotes": "the new trigger-route guard rejects existing internal review-dispatch callers",
+    "updatedAt": "2026-07-31T00:12:00.083Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3340-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3351",
     "reviewedAtCommit": "27d75123ae907dafcda3f2371b2166fc463fc22b",
     "lastVerifiedCommit": "208e1a781c4d1ab09be9c70c82264ba4c9ba2a91",
@@ -245,7 +245,7 @@
       },
       "costAtCloseOut": {
         "usd": 180.577937,
-        "pricingAsOf": "2026-07-31T00:11:59.387Z"
+        "pricingAsOf": "2026-07-31T00:12:01.318Z"
       }
     },
     "merges": [
