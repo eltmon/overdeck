@@ -288,10 +288,10 @@
       "tests/unit/lib/cloister/agent-gc.test.ts",
       "tests/unit/lib/overdeck/agents-removal.test.ts"
     ],
-    "recordedAt": "2026-07-31T20:19:13.579Z"
+    "recordedAt": "2026-07-31T20:19:49.432Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T20:19:45.663Z",
+  "updated": "2026-07-31T20:19:49.433Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "pending",
