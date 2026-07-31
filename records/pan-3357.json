@@ -219,19 +219,19 @@
     "recordedAt": "2026-07-31T16:35:34.622Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-07-31T18:49:28.962Z",
+  "updated": "2026-07-31T19:20:44.157Z",
   "pipeline": {
     "issueId": "PAN-3357",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T16:36:34.590Z",
-    "updatedAt": "2026-07-31T18:49:28.143Z",
-    "reviewNotes": "[correctness] Terminal-agent GC deletes retained transcripts immediately and then erases their expiration proof — `src/lib/cloister/deacon.ts:3131`",
+    "updatedAt": "2026-07-31T19:20:41.833Z",
+    "reviewNotes": "Agent re-review request (3/25): Fixed review issues",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3359",
     "reviewedAtCommit": "d47930b7aa187559421c16a3388518ee9baf6532",
@@ -304,28 +304,6 @@
         "src/lib/lifecycle/teardown-workspace.ts"
       ],
       "recordedAt": "2026-07-31T16:35:34.622Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-d47930b7/security.md",
-        "atCommit": "d47930b7aa187559421c16a3388518ee9baf6532"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-d47930b7/correctness.md",
-        "atCommit": "d47930b7aa187559421c16a3388518ee9baf6532"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-d47930b7/performance.md",
-        "atCommit": "d47930b7aa187559421c16a3388518ee9baf6532"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3357/.pan/review/agent-pan-3357-review-d47930b7/requirements.md",
-        "atCommit": "d47930b7aa187559421c16a3388518ee9baf6532"
-      }
     }
   },
   "closeOut": {
@@ -373,24 +351,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4834328,
-            "output": 505630,
-            "cacheRead": 176737280,
+            "input": 5053089,
+            "output": 552660,
+            "cacheRead": 211023872,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18672679,
-          "output": 871584,
-          "cacheRead": 237240320,
+          "input": 18891440,
+          "output": 918614,
+          "cacheRead": 271526912,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 238.131075,
-        "pricingAsOf": "2026-07-31T18:49:28.152Z"
+        "usd": 257.779076,
+        "pricingAsOf": "2026-07-31T19:20:41.893Z"
       }
     },
     "merges": [
