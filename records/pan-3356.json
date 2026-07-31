@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T16:20:37.165Z",
+  "updated": "2026-07-31T16:29:09.504Z",
   "pipeline": {
     "issueId": "PAN-3356",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "plan-tab": {
-        "writerId": "agent-pan-3356",
-        "agentId": "agent-pan-3356",
-        "pid": 1367831,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-07-31T16:20:37.165Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3356",
@@ -147,6 +139,17 @@
         "outcome": "completed",
         "reason": "Added Session-local Conversation and Terminal controls, a blue live-session indicator, and a shared TellComposer extracted from ActiveAgentPanel. The composer targets the active spine session and preserves the existing /tell versus /resume delivery behavior. Typecheck and 41 focused tests passed.",
         "releasedAt": "2026-07-31T16:20:28.075Z"
+      },
+      {
+        "writerId": "agent-pan-3356",
+        "agentId": "agent-pan-3356",
+        "pid": 1367831,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-07-31T16:20:37.165Z",
+        "itemId": "plan-tab",
+        "outcome": "completed",
+        "reason": "Moved planning into Tasks, Map, and PRD segments, added the 2/5-style count from the shared plan query cache, retained xBRIEF fullscreen promotion, and relocated the protected task marker. Removed the sticky chip, TasksDrawer, and orphaned drawer CSS. Typecheck, 33 focused tests, and the 10-test no-loss audit passed.",
+        "releasedAt": "2026-07-31T16:29:09.504Z"
       }
     ],
     "statusReasons": {
@@ -173,6 +176,10 @@
       "session-tab": {
         "reason": "Added Session-local Conversation and Terminal controls, a blue live-session indicator, and a shared TellComposer extracted from ActiveAgentPanel. The composer targets the active spine session and preserves the existing /tell versus /resume delivery behavior. Typecheck and 41 focused tests passed.",
         "updatedAt": "2026-07-31T16:20:28.075Z"
+      },
+      "plan-tab": {
+        "reason": "Moved planning into Tasks, Map, and PRD segments, added the 2/5-style count from the shared plan query cache, retained xBRIEF fullscreen promotion, and relocated the protected task marker. Removed the sticky chip, TasksDrawer, and orphaned drawer CSS. Typecheck, 33 focused tests, and the 10-test no-loss audit passed.",
+        "updatedAt": "2026-07-31T16:29:09.504Z"
       }
     }
   },
@@ -205,6 +212,10 @@
     "session-tab.session-tab.ac1": "completed",
     "session-tab.session-tab.ac2": "completed",
     "session-tab.session-tab.ac3": "completed",
-    "plan-tab": "running"
+    "plan-tab": "completed",
+    "plan-tab.plan-tab.ac1": "completed",
+    "plan-tab.plan-tab.ac2": "completed",
+    "plan-tab.plan-tab.ac3": "completed",
+    "plan-tab.plan-tab.ac4": "completed"
   }
 }
