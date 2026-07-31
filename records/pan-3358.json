@@ -42,6 +42,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-07-31T20:13:30.238Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-07-31T20:28:08.400Z"
     }
   ],
   "feedback": [],
@@ -130,10 +135,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-07-31T20:15:05.746Z",
+  "updated": "2026-07-31T20:28:08.400Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -141,13 +146,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-07-31T20:15:05.717Z",
+    "updatedAt": "2026-07-31T20:28:07.088Z",
     "reviewNotes": "Verification failed at test",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "10b87191ace512116ee736707a0365e8587af4fc",
     "reviewRequestedAt": "2026-07-31T20:13:10.439Z",
-    "reviewSpawnedAt": "2026-07-31T20:12:34.796Z",
+    "reviewSpawnedAt": "2026-07-31T20:28:07.086Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         ".husky/commit-msg",
@@ -238,9 +243,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3664190,
-            "output": 161250,
-            "cacheRead": 31543808,
+            "input": 3957266,
+            "output": 266912,
+            "cacheRead": 43895296,
             "cacheWrite": 0
           }
         },
@@ -287,15 +292,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 18480789,
-          "output": 939000,
-          "cacheRead": 288962560,
+          "input": 18773865,
+          "output": 1044662,
+          "cacheRead": 301314048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 265.055225,
-        "pricingAsOf": "2026-07-31T20:15:05.742Z"
+        "usd": 275.866209,
+        "pricingAsOf": "2026-07-31T20:28:07.130Z"
       }
     },
     "merges": [
