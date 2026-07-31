@@ -97,6 +97,37 @@ describe('setProjectVersionSync', () => {
     expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
   });
 
+  it.each([
+    {
+      label: 'four-space project indentation',
+      fixture: `projects:\n    alpha:\n        name: Alpha\n        path: /repo/alpha\n    beta:\n        name: Beta\n        path: /repo/beta\n`,
+    },
+    {
+      label: 'three-space project indentation',
+      fixture: `projects:\n   alpha:\n      name: Alpha\n      path: /repo/alpha\n   beta:\n      name: Beta\n      path: /repo/beta\n`,
+    },
+  ])('derives indentation for $label and restores the original bytes', async ({ fixture }) => {
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await setProjectVersionSync('alpha', MYN_VERSION_SYNC);
+    const parsed = loadProjectsConfigSync();
+    expect(parsed.projects.alpha?.version_sync).toEqual(MYN_VERSION_SYNC);
+    expect(parsed.projects.version_sync).toBeUndefined();
+
+    await setProjectVersionSync('alpha', null);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
+  it('rejects a flow-style project without changing the file', async () => {
+    const fixture = 'projects:\n  alpha: { name: Alpha, path: /repo/alpha }\n';
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await expect(setProjectVersionSync('alpha', MYN_VERSION_SYNC)).rejects.toThrow(
+      'Project alpha uses flow-style YAML; version_sync requires a block mapping',
+    );
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
   it('rejects an unknown project key and names the known keys', async () => {
     writeFileSync(PROJECTS_CONFIG_FILE, 'projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n', 'utf-8');
 

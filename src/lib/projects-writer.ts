@@ -26,9 +26,17 @@ function nodeRange(value: unknown): [number, number, number] | undefined {
     : undefined;
 }
 
-function renderVersionSync(block: VersionSyncConfig): string {
+function keyIndent(content: string, pair: Pair): string {
+  const range = nodeRange(pair.key);
+  if (!range) throw new Error('Could not locate a mapping key in projects.yaml');
+  const indent = content.slice(lineStart(content, range[0]), range[0]);
+  if (!/^\s*$/.test(indent)) throw new Error('Project mapping key does not start on its own line');
+  return indent;
+}
+
+function renderVersionSync(block: VersionSyncConfig, indent: string): string {
   const rendered = stringify({ version_sync: block }, { indent: 2, lineWidth: 120 }).trimEnd();
-  return `${rendered.split('\n').map(line => `    ${line}`).join('\n')}\n`;
+  return `${rendered.split('\n').map(line => `${indent}${line}`).join('\n')}\n`;
 }
 
 export async function setProjectVersionSync(
@@ -51,21 +59,30 @@ export async function setProjectVersionSync(
   const projects = projectsNode as YAMLMap;
   const knownKeys = projects.items.map(keyValue).filter((key): key is string => key !== undefined);
   const projectPair = projects.items.find(pair => keyValue(pair) === projectKey);
-  if (!projectPair || !isMap(projectPair.value)) {
+  if (!projectPair) {
     throw new Error(
       `Unknown project key: ${projectKey}. Known project keys: ${knownKeys.length > 0 ? knownKeys.join(', ') : '(none)'}`,
     );
   }
+  if (!isMap(projectPair.value)) {
+    throw new Error(`Project ${projectKey} must use a block mapping before version_sync can be edited`);
+  }
+
+  const project = projectPair.value as YAMLMap;
+  if (project.flow) {
+    throw new Error(`Project ${projectKey} uses flow-style YAML; version_sync requires a block mapping`);
+  }
+  const versionPair = project.items.find(pair => keyValue(pair) === 'version_sync');
+  const indentPair = versionPair ?? project.items[0];
+  if (!indentPair) throw new Error(`Project ${projectKey} has no block fields to derive indentation from`);
 
   let replacement = '';
   if (block !== null) {
     const validation = validateVersionSyncConfig(block);
     if (!validation.ok) throw new Error(validation.errors.join('; '));
-    replacement = renderVersionSync(validation.config);
+    replacement = renderVersionSync(validation.config, keyIndent(content, indentPair));
   }
 
-  const project = projectPair.value as YAMLMap;
-  const versionPair = project.items.find(pair => keyValue(pair) === 'version_sync');
   let updated: string;
   if (versionPair) {
     const keyRange = nodeRange(versionPair.key);
