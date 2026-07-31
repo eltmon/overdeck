@@ -1,0 +1,500 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-07-31T15:17:09.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3357: Deacon stale-state purge deleted conv-* transcript dirs — 258 conversations shown as 'Transcript missing'",
+    "updated": "2026-07-31T15:26:08.114Z"
+  },
+  "plan": {
+    "id": "pan-3357",
+    "title": "Deacon stale-state purge deleted conv-* transcript dirs — 258 conversations shown as 'Transcript missing'",
+    "status": "proposed",
+    "uid": "2be92988-5932-4a19-8572-48b5d3785b62",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-07-31T15:17:09.000Z",
+    "updated": "2026-07-31T15:26:08.114Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3357",
+        "label": "PAN-3357",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3357.md",
+        "label": "PRD draft",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "deacon",
+      "transcripts",
+      "retention",
+      "data-loss"
+    ],
+    "metadata": {
+      "sizeJustification": "One inseparable hardening change against a single data-loss incident: the deletion door (WI-1) is meaningless without the call-site routing (WI-2) and CI guard (WI-3), and the sweep config (WI-4), migration command (WI-5), and docs (WI-6) all document or consume the same invariant. The 8-subsystem count is an artifact of cross-cutting fixes spanning cloister/lib/cli/scripts/docs with two files each; no slice ships standalone value without the door.",
+      "canonicalFilename": "2026-07-31-PAN-3357-deacon-stale-state-purge-deleted-conv-transcript-dirs-258-conversations-shown-as-transcript-missing.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The deacon retention purge deleted conv-* agent dirs — the only home of codex/ohmypi conversation transcripts — surfacing as 'Transcript missing' for 258 conversations. The immediate conv-* guard already landed (7952eb6a67), but work/review/planning agent transcripts inside agent dirs are still deleted by four other paths (retention purge, pre-fresh-spawn wipes, close-out/deep-wipe teardown, orphan sweep), with no shared invariant across five scattered deletion call sites.",
+      "Proposal": "Introduce a single deletion door (removeAgentStateDir in src/lib/agents/state-dir-removal.ts) that deletes runtime residue but preserves every **/*.jsonl transcript artifact in place; route all five deletion sites through it; add a CI guard script that fails lint on any new direct rm of an AGENTS_DIR path outside the door; add opt-in retention.transcript_days config with a dedicated deacon sweep (unset = retain forever, sweep never registered); add a one-time idempotent `pan admin migrate-legacy-agent-dirs` command for other machines; correct stale 'Phase 6' docstrings and document the retention model.",
+      "NonGoals": "- A --purge-transcripts escape hatch for deep-wipe (explicitly rejected; deep-wipe preserves transcripts)\n- Per-harness transcript allowlists (**/*.jsonl is the single preservation predicate)\n- Fixing the codex newest-rollout fallback window after fresh spawn (pre-existing, PAN-1690)\n- Restoring the 258 already-purged dirs from restic (done by hand on the primary machine; FR-5's command covers other machines)\n- Changing claude-code or kimi-code transcript locations (their transcripts never lived in agent dirs)\n- Re-implementing the conv-* retention-purge guard (landed in 7952eb6a67)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Adopted the canonical PRD on overdeck-state (drafts/pan-3357.md, written by the investigating conversation) as the workspace PRD draft after re-verifying every file/line reference against this workspace.",
+        "rationale": "The PRD-first gate requires a workspace draft, the canonical PRD is accurate and current (2026-07-31), and rewriting it would risk drift; the only refinement made was naming the verified conversations read door (getConversationByName in src/lib/database/conversations-db.ts:212) for the WI-4 sweep."
+      },
+      {
+        "summary": "Kept the PRD's six work items as six xBRIEF items 1:1 rather than decomposing further.",
+        "rationale": "Each work item is already a small, independently reviewable vertical slice with its own named tests; the five deletion-site routes in WI-2 are mechanically identical swaps the task-granularity rules allow as one task."
+      },
+      {
+        "summary": "Set requiresInspection: true only on the deletion-door module item.",
+        "rationale": "The door is the foundation two downstream items call directly (route-deletion-sites) or allowlist against (guard-agent-dir-removal); every other item is mechanical or a leaf whose failure surfaces at typecheck/lint/test."
+      }
+    ],
+    "items": [
+      {
+        "id": "deletion-door-module",
+        "title": "Create removeAgentStateDir deletion door in src/lib/agents/state-dir-removal.ts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3357",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "route-deletion-sites",
+            "guard-agent-dir-removal"
+          ],
+          "files_scope": [
+            "src/lib/agents/state-dir-removal.ts",
+            "src/lib/agents/__tests__/state-dir-removal.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/state-dir-removal.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the four named tests in state-dir-removal.test.ts pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the single deletion door per PRD WI-1: an async (fs/promises only) removeAgentStateDir(dirPath) that recursively walks an agent dir, deletes every non-.jsonl file, preserves every **/*.jsonl in place, post-order prunes directories left empty, and returns { removedFiles, preservedTranscripts, removedDir }. A missing dirPath is a no-op success (removedDir: true, zero counts) to preserve callers' force:true semantics. If no .jsonl exists anywhere in the tree, remove the directory entirely (equivalent to the old rm -rf). Write src/lib/agents/__tests__/state-dir-removal.test.ts with mkdtempSync temp dirs and exactly these four test names: 'removes a dir with no jsonl entirely', 'preserves codex-home/sessions rollouts and deletes runtime residue', 'preserves root-level per-run jsonl (PAN-1908 pi layout)', 'is idempotent on an already-pruned dir'. Do NOT add this to deacon.ts or agent-state.ts (file-size ratchet, NFR-3)."
+        },
+        "items": [
+          {
+            "id": "deletion-door-module.ac1",
+            "title": "Given a temp agent dir with no .jsonl files, when removeAgentStateDir runs, then it deletes the directory entirely and returns removedDir: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deletion-door-module.ac2",
+            "title": "Given a temp agent dir with codex-home/sessions rollouts plus state.json/session.id residue, when the door runs, then it preserves every .jsonl in place and deletes the residue files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deletion-door-module.ac3",
+            "title": "Given a root-level per-run .jsonl (PAN-1908 pi layout), when the door runs, then it preserves the root .jsonl and removes empty subdirectories that held only residue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "deletion-door-module.ac4",
+            "title": "When removeAgentStateDir runs a second time on an already-pruned dir, then it succeeds idempotently and preserves the same transcript files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "route-deletion-sites",
+        "title": "Route all five agent-dir deletion sites through removeAgentStateDir",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/agent-state.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/agent-directory-cleanup.ts",
+            "src/lib/lifecycle/teardown-workspace.ts",
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-stash-janitor.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "extended deacon-stash-janitor tests pass, including the jsonl-preservation case",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-2, replace raw agent-dir removals with await removeAgentStateDir(path) at these verified sites: (1) src/lib/agents/agent-state.ts:234 wipeAgentStateDirs; (2) src/lib/cloister/deacon.ts:909 retention purge — enclosing cleanupStaleAgentState is already async, also extend the 'Purged stale ... state' action/log line to include preserved-transcript counts from the door result; (3) src/lib/agent-directory-cleanup.ts:228 (sync rmSync) and :429 (async rm) — for line 228, git grep callers first and convert the helper and its caller chain to async; a fire-and-forget void wrapper is NOT acceptable; (4) src/lib/lifecycle/teardown-workspace.ts:327 removeAgentStateImpl — keep step-result counting, count removedDir || preservedTranscripts > 0 as removed, and reword the step message to 'Cleaned N agent state director(ies) (M transcript files preserved)'; (5) src/lib/cloister/review-convoy.ts:152-154 — leave the three marker-file deletions as-is and add a code comment referencing PAN-3357 explaining the exemption. If deacon.ts grows past its allowlisted line count, bump the existing '# PAN-3357' row in scripts/file-size-allowlist.txt in the same commit. Test: extend the 'cleanupStaleAgentState conv-* preservation' describe in src/lib/cloister/__tests__/deacon-stash-janitor.test.ts — vi.mock state-dir-removal.js to assert the purge calls the door for a stale agent-* dir, and a dir containing a fake codex-home/sessions/x.jsonl survives with the jsonl intact (real door, temp dir)."
+        },
+        "items": [
+          {
+            "id": "route-deletion-sites.ac1",
+            "title": "git grep shows wipeAgentStateDirs, the deacon retention purge, both orphan-sweep removals, and removeAgentStateImpl all call removeAgentStateDir and contain no raw rm/rmSync of an AGENTS_DIR path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-deletion-sites.ac2",
+            "title": "Given a stale agent-* dir containing codex-home/sessions/x.jsonl, when the deacon retention purge runs, then the dir survives with the jsonl intact and the extended deacon-stash-janitor test passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-deletion-sites.ac3",
+            "title": "The purge action log line records preserved-transcript counts alongside each purged agent dir",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-deletion-sites.ac4",
+            "title": "review-convoy.ts retains its three marker-file deletions and contains a PAN-3357 comment explaining the exemption",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "guard-agent-dir-removal",
+        "title": "Add CI guard script failing lint on direct AGENTS_DIR deletions outside the door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "scripts/guard-agent-dir-removal.sh",
+            "package.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/guard-agent-dir-removal.sh",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "guard script exits 0 on HEAD",
+            "npm run lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-3: create scripts/guard-agent-dir-removal.sh by copying the structure and allowlist style of scripts/guard-workspace-doors.sh. The guard greps src/ for rm/rmSync/rmdir calls whose argument expression references AGENTS_DIR or getAgentDir outside src/lib/agents/state-dir-removal.ts. Inline allowlist: review-convoy.ts marker-file deletions, lifecycle-restart.ts:728,731 (single-file session.id/sessions.json removals), termination.ts:175,237 (git-guard/ removal), and test files; every allowlisted site must carry a '// PAN-3357: not a dir removal' comment the guard checks for (add the comment to lifecycle-restart.ts and termination.ts sites as part of this item if missing). Wire the script into the npm run lint chain in package.json next to guard-workspace-doors.sh. Do not add fixture-based negative tests unless guard-workspace-doors.sh has one."
+        },
+        "items": [
+          {
+            "id": "guard-agent-dir-removal.ac1",
+            "title": "bash scripts/guard-agent-dir-removal.sh exits 0 against HEAD and npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-agent-dir-removal.ac2",
+            "title": "When a scratch source file adds a raw rm of an AGENTS_DIR path, the guard fails with a non-zero exit and names the offending file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "guard-agent-dir-removal.ac3",
+            "title": "Each allowlisted site contains the required '// PAN-3357: not a dir removal' comment and the guard rejects allowlist entries missing it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-days-sweep",
+        "title": "Add opt-in retention.transcript_days config and deacon transcript sweep",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/config.ts",
+            "src/lib/cloister/transcript-retention.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/transcript-retention.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/transcript-retention.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "the three named transcript-retention tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-4: add transcript_days?: number to the retention config interface (~src/lib/cloister/config.ts:305 block) with NO entry in DEFAULT_CLOISTER_CONFIG — unset means retain forever and the sweep is never registered. Docstring intent: 'Days to keep transcript artifacts (**/*.jsonl) inside ended agents' state dirs. UNSET (default) = retain forever; the sweep does not run. This is the only mechanism that may delete transcript artifacts.' Create src/lib/cloister/transcript-retention.ts implementing the sweep with fs/promises only: only runs when transcript_days is a positive number; iterates agent dirs; skips any with a live tmux session (sessionExists); for conv-* dirs additionally requires the conversation row status 'ended' or archived_at set, read via getConversationByName from src/lib/database/conversations-db.ts (inject this dependency for testability — never raw SQLite); deletes .jsonl files with mtime older than N days; prunes empty dirs; logs one summary action line. Wire it into the deacon patrol next to the shouldRunRecoveryJanitor('agent-state', ...) block (~deacon.ts:3119), registered only when configured. Write src/lib/cloister/__tests__/transcript-retention.test.ts with mkdtempSync temp dirs and vi.useFakeTimers (never real waits) using exactly these three test names: 'does not run when transcript_days is unset' (assert no fs traversal via mocked readdir), 'deletes only jsonl older than N days for ended agents', 'never touches dirs with a live tmux session'."
+        },
+        "items": [
+          {
+            "id": "transcript-days-sweep.ac1",
+            "title": "When transcript_days is unset, the sweep does not run and no fs traversal occurs (asserted via mocked readdir)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-days-sweep.ac2",
+            "title": "Given transcript_days = N and an ended agent dir, when the sweep runs, then it deletes only .jsonl files with mtime older than N days and preserves newer ones",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-days-sweep.ac3",
+            "title": "Given a dir with a live tmux session, when the sweep runs, then it never touches that dir's files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-days-sweep.ac4",
+            "title": "DEFAULT_CLOISTER_CONFIG contains no transcript_days entry, so the config defaults to retain-forever",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-legacy-agent-dirs",
+        "title": "Add pan admin migrate-legacy-agent-dirs command for pre-rebrand conv-* dirs",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/migrate-legacy-agent-dirs.ts",
+            "src/cli/commands/admin/index.ts",
+            "src/cli/commands/admin/__tests__/migrate-legacy-agent-dirs.test.ts",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/admin/__tests__/migrate-legacy-agent-dirs.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "migration command tests pass",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-5: create src/cli/commands/admin/migrate-legacy-agent-dirs.ts following the structure of src/cli/commands/admin/state-migrate.ts, registered under pan admin. Behavior: for each conv-* dir in ~/.panopticon/agents/ (literal legacy path — predates OVERDECK_HOME), if ~/.overdeck/agents/<name> does not exist, copy recursively preserving mtimes (never move, never overwrite, never modify the legacy side); print 'copied N, skipped M'; exit 0 when the legacy dir is absent. Structure the core copy logic to accept both home paths as parameters so tests inject temp dirs. This verb gets NO wrapper skill — add it to the exclusion list in docs/SKILLS-CONVENTION.md if scripts/lint-skills.sh requires it. Test file location may follow existing admin-command test conventions (files_scope_confidence medium for that reason): unit test with two mkdtempSync temp dirs standing in for legacy and current homes, asserting copy-once idempotence."
+        },
+        "items": [
+          {
+            "id": "migrate-legacy-agent-dirs.ac1",
+            "title": "Given a legacy conv-* dir absent from the current home, when the command runs, then it copies the dir recursively preserving mtimes and prints 'copied 1, skipped 0'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-legacy-agent-dirs.ac2",
+            "title": "When the command runs a second time, then it prints 'copied 0' and exits 0 without overwriting anything",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-legacy-agent-dirs.ac3",
+            "title": "When the legacy ~/.panopticon/agents dir is absent, the command exits 0 as a no-op",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "transcript-retention-docs",
+        "title": "Document transcript retention model and fix stale Phase 6 docstrings",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-07-31T15:17:09.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3357",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md",
+            "src/lib/cloister/config.ts",
+            "src/lib/cloister/deacon.ts",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'Phase 6' src/lib/cloister/config.ts src/lib/cloister/deacon.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "git grep returns no Phase 6 hits in config.ts or deacon.ts docstrings",
+            "npm run lint completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Per PRD WI-6, in the same PR: (1) docs/AGENT-STATE-PLANES.md — add a 'Transcript retention' subsection covering retain-forever-by-default, the removeAgentStateDir deletion door, retention.transcript_days, and the conv-* invariant; (2) rewrite the agent_state_days / reviewer_state_days docstrings at src/lib/cloister/config.ts:305-312 to stop citing runParallelReview 'Phase 6' (machinery deleted in R6), naming the actual current cleanup owners (retention purge + event-driven wipes) and noting both preserve transcripts; (3) same stale-comment fix at src/lib/cloister/deacon.ts:836-840; (4) CLAUDE.md — one short paragraph under the Agent State Planes section: agent-dir deletion goes through removeAgentStateDir(), transcripts (**/*.jsonl) are retained forever unless retention.transcript_days is set; (5) Mintlify user docs: if a configuration page documents cloister retention, add transcript_days there; if none exists, state that in the PR description instead of creating a new page."
+        },
+        "items": [
+          {
+            "id": "transcript-retention-docs.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md contains a 'Transcript retention' subsection that names removeAgentStateDir, retention.transcript_days, and the conv-* invariant",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-retention-docs.ac2",
+            "title": "git grep -n 'Phase 6' src/lib/cloister/config.ts src/lib/cloister/deacon.ts returns no hits in docstrings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "transcript-retention-docs.ac3",
+            "title": "CLAUDE.md's Agent State Planes section contains a paragraph stating agent-dir deletion goes through removeAgentStateDir and transcripts are retained forever by default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "deletion-door-module",
+        "to": "route-deletion-sites",
+        "type": "blocks"
+      },
+      {
+        "from": "route-deletion-sites",
+        "to": "guard-agent-dir-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "route-deletion-sites",
+        "to": "transcript-retention-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "route-deletion-sites",
+        "to": "transcript-days-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "transcript-days-sweep",
+        "to": "transcript-retention-docs",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
