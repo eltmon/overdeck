@@ -16,8 +16,9 @@ this table and that module from drifting silently.
 | 4 | `merged` | Merged to main: forge/durable merge evidence resolved per required repository through either convention head (`feature/<id>` or `strike/<id>`). Polyrepo probes run inside each resolved repository; forge squash-merge detection covers GitHub PRs and GitLab MRs, with GitLab artifacts matched to the branch head SHA. The last resort is a non-PR landing where the shared L2-work lens finds at least one convention-branch ref contained in its repository's default branch with the tip off the first-parent line and zero unmerged refs across all configured repositories. | merge door: `triggerMerge` → merge specialist (`merge-agent.ts`); verification: `verifyBranchMergedImpl()` + `getForgeAdapter().findMergedArtifact()`; fallback: `gatherIssueBranchContainment()` | PR/MR id and URL, `mergeStatus: merged`, durable merge record, or branch-containment evidence |
 | 5 | `post-merge` | Post-merge handoff: work/planning agents paused, workspace Docker stack + networks stopped, `verifying-on-main` label; for a containment-evidenced non-PR landing, passes when no work/planning agents are running because no observed merge event could trigger the lifecycle; for a strike landing, skips on the same quiescence test because the strike path never runs the work-agent handoff (PAN-3180) | `postMergeLifecycle()` (`merge-agent.ts`) — at-most-once per merge (PAN-328 in-flight guard); DoD containment and strike fallbacks | issue labels, agent states |
 | 6 | `main-verify` | Verified on main: the merge commit's own check-runs all concluded green, or — when they are missing or failed — a later default-branch head that contains the merge commit has all-green check-runs (PAN-3202) | deacon verify-on-main flow; `checkMainVerifyRow()` (`dod-gate.ts`) | `verifying_on_main` → verified; the observed string names either the merge commit or the later green head |
-| 7 | `deploy` | **Deployed: the live dashboard runs a canonical build that includes the merge.** When the `merged` row misses without resolving a merge commit, this row skips and reports its row-4 dependency instead of recording a second miss. | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`) + deploy intent queue (`pending-deploy.json`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit`, `buildDirty`, and `buildBranch` + stale-build chip; the row misses when the build is dirty or `buildCommit` is not an ancestor of `origin/main` |
-| 8 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
+| 7 | `ship` | Version strings propagated for the merged UAT batch; direct merges and projects without `version_sync` skip explicitly | ship runner (`version-ship.ts`) via `finishPromote()` or the batch-card Ship version action; terminal settlement in `evaluateDodGate()` | durable per-issue `pipeline.ship`; partial and failed verdicts name the paths or error |
+| 8 | `deploy` | **Deployed: the live dashboard runs a canonical build that includes the merge.** When the `merged` row misses without resolving a merge commit, this row skips and reports its row-4 dependency instead of recording a second miss. | staleness-gated Step 0 (`merge-agent.ts`) + Deacon deploy patrol (`deploy-patrol.ts`) + deploy intent queue (`pending-deploy.json`), guarded by `getDeployBlockReason()` | `/api/health` `buildCommit`, `buildDirty`, and `buildBranch` + stale-build chip; the row misses when the build is dirty or `buildCommit` is not an ancestor of `origin/main` |
+| 9 | `teardown` | Close-out: worktree removed, branches per `close_out` config, xBRIEF `plan.status: completed`, planning artifacts archived, tracker issue CLOSED + `closed-out` label, review status cleared, Docker `_devnet` teardown verified | `pan close <id>` / dashboard Close Out (`closeOut`); closed-issue reaper (`reapIssueResidue`) as backstop | issue state, `workspaces/` dir |
 
 ## Verdict durability
 
@@ -25,9 +26,12 @@ Rows 1–3 read live status first and fall back to the per-issue record's `pipel
 
 ## Rules of the table
 
-- **Merged ≠ done.** Steps 5–8 are where "shipped" actually happens; step 7 is where the fix
+- **Merged ≠ done.** Steps 5–9 are where "shipped" actually happens; step 8 is where the fix
   starts existing for users. On 2026-07-15, three merges (PAN-2684/2690/2701) were fully
   closed-out while the live server ran a build from three merges earlier — every fix inert.
+- **The ship row is batch-scoped and reads recorded verdicts.** A project with no `version_sync`
+  and a direct merge with no batch ship record both skip explicitly. A configured batch passes
+  only on its durable `pipeline.ship` verdict; pending, partial, and failed records remain misses.
 - **Every row must name a live owner.** Doctrine ("the flywheel usually does X") is not an
   owner; only code with a trigger is. When you find an ownerless step, drive it manually for
   velocity and file the gap issue — the flywheel follows the same backstop-as-symptom rule
@@ -73,7 +77,7 @@ Rows 1–3 read live status first and fall back to the per-issue record's `pipel
   walks the default-branch first-parent line above the merge, newest first, and accepts the first
   head (of at most five probed) whose check-runs all concluded green. That is strictly stronger
   evidence than the original run, because it proves main is healthy *with* the merge included,
-  which is what the row exists to establish; row 7 already trusts the same containment relation.
+  which is what the row exists to establish; row 8 already trusts the same containment relation.
   The merge commit's own run stays primary and its outcome is always recorded first, so the
   observed string states plainly which form passed, and a merge with red checks still misses
   until a green head containing it exists.

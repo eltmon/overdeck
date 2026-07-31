@@ -154,6 +154,19 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   },
 };
 
+interface ShipRowDeps {
+  readProject: (ctx: LifecycleContext) => ReturnType<typeof resolveProjectForIssue>;
+  readPipeline: (ctx: LifecycleContext) => Promise<PanIssuePipelineRecord | null>;
+}
+
+const defaultShipRowDeps: ShipRowDeps = {
+  readProject: ctx => resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath),
+  readPipeline: async ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    return (await readIssueRecord(project, ctx.issueId))?.pipeline ?? null;
+  },
+};
+
 interface DeployRowDeps {
   dashboardUrl: () => string;
   readJson: (url: string) => Promise<Record<string, unknown>>;
@@ -173,6 +186,7 @@ export interface EvaluateDodGateDeps {
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
+  ship: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
   deploy: (ctx: LifecycleContext, merge: {
     mergedAt?: string;
     mergeCommit?: string;
@@ -190,6 +204,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   merged: checkMergedRow,
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
+  ship: checkShipRow,
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
   now: () => new Date().toISOString(),
@@ -635,6 +650,49 @@ export async function checkMainVerifyRow(
   }
 }
 
+export async function checkShipRow(
+  ctx: LifecycleContext,
+  deps: ShipRowDeps = defaultShipRowDeps,
+): Promise<DodRowResult> {
+  const project = deps.readProject(ctx);
+  if (!project?.version_sync) {
+    return result('ship', 'skip', 'project declares no version_sync; ship step not applicable');
+  }
+
+  const pipeline = await deps.readPipeline(ctx);
+  const ship = pipeline?.ship;
+  if (!ship) {
+    return result('ship', 'skip', 'merged outside a batch; ship is batch-scoped');
+  }
+  if (ship.status === 'passed') {
+    return result(
+      'ship',
+      'pass',
+      `version ${ship.version ?? 'unknown'} shipped for batch ${ship.batch}; ${ship.paths?.length ?? 0} path(s) verified`,
+    );
+  }
+  if (ship.status === 'pending') {
+    return result(
+      'ship',
+      'miss',
+      `batch ${ship.batch} merged but no version was shipped — use the Ship version action on the batch card for ${ship.batch}`,
+    );
+  }
+  if (ship.status === 'partial') {
+    const failing = ship.paths?.filter(path => !path.ok).map(path => path.path) ?? [];
+    return result(
+      'ship',
+      'miss',
+      `batch ${ship.batch} partially propagated version ${ship.version ?? 'unknown'}; failing paths: ${failing.join(', ') || 'unknown'}`,
+    );
+  }
+  return result(
+    'ship',
+    'miss',
+    `batch ${ship.batch} version ship failed: ${ship.error ?? ship.reason ?? 'unknown error'}`,
+  );
+}
+
 export async function checkDeployRow(
   ctx: LifecycleContext,
   merge: {
@@ -749,11 +807,12 @@ export async function evaluateDodGate(
     landedWork: merged.status === 'pass',
     mainVerifyStatus: mainVerify.status,
   };
-  const [review, tests, verification, postMerge, deploy] = await Promise.all([
+  const [review, tests, verification, postMerge, ship, deploy] = await Promise.all([
     deps.review(ctx.issueId, settlement),
     deps.tests(ctx.issueId, settlement),
     deps.verification(ctx.issueId, settlement),
     deps.postMerge(ctx, merged),
+    deps.ship(ctx),
     deps.deploy(ctx, {
       mergedAt: merged.mergedAt,
       mergeCommit: merged.mergeCommit,
@@ -761,7 +820,7 @@ export async function evaluateDodGate(
       mainVerifyRowStatus: mainVerify.status,
     }),
   ]);
-  const rows = [review, tests, verification, merged, postMerge, mainVerify, deploy];
+  const rows = [review, tests, verification, merged, postMerge, mainVerify, ship, deploy];
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {
       row.acceptedBy = { flag: acceptFlagFor(rowDefinition(row.id)), by, at: deps.now() };
