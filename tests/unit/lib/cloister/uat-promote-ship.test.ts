@@ -9,6 +9,7 @@ import {
   shipPromotedBatch,
   ShipPromotedBatchError,
 } from '../../../../src/lib/cloister/ship-record.js';
+import { aggregateGenerationShipStatus } from '../../../../src/lib/cloister/ship-status.js';
 import { projectPipeline } from '../../../../src/lib/pan-dir/records.js';
 import type {
   PanIssuePipelineRecord,
@@ -169,6 +170,41 @@ describe('durable ship records', () => {
 
     expect(attempts).toEqual(new Map([['PAN-1', 2], ['PAN-2', 1]]));
     expect([...records.values()].map(value => value.pipeline.ship?.status)).toEqual(['pending', 'pending']);
+  });
+
+  it('keeps the batch aggregate blocking when terminal persistence permanently splits members', async () => {
+    const gen = generation('promoted');
+    const records = new Map(gen.members.map(member => [member.issueId, record(member.issueId)]));
+    const deps = {
+      resolveProject: () => ({ name: 'Overdeck', path: PROJECT_ROOT }),
+      updateRecord: vi.fn(async (_project: unknown, issueId: string, mutator: (record: PanIssueRecord) => void | Promise<void>) => {
+        if (issueId === 'PAN-2') throw new Error('persistent write failure');
+        const current = records.get(issueId)!;
+        await mutator(current);
+        records.set(issueId, current);
+        return current;
+      }),
+    } as never;
+
+    await expect(persistShipRecords(gen, {
+      status: 'passed',
+      version: '1.2.3',
+      batch: BATCH,
+      paths: [{ path: 'package.json', ok: true, detail: 'reports 1.2.3' }],
+      at: '2026-07-31T01:00:00.000Z',
+    }, deps)).rejects.toMatchObject({
+      failedIssueIds: ['PAN-2'],
+      persistedIssueIds: ['PAN-1'],
+    });
+
+    const aggregate = aggregateGenerationShipStatus(gen, new Map([
+      ['PAN-1', records.get('PAN-1')?.pipeline.ship ?? null],
+      ['PAN-2', records.get('PAN-2')?.pipeline.ship ?? null],
+    ]));
+    expect(aggregate).toMatchObject({
+      status: 'pending',
+      reason: '1 member(s) have no durable ship settlement',
+    });
   });
 
   it('preserves pipeline.ship when the ordinary record projection runs later', () => {

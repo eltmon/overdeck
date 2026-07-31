@@ -302,11 +302,15 @@ submit App Store or Play builds, deploy production, generate release notes, or
 create Git tags; those remain separate operator actions.
 
 Ship never runs in the ambient project checkout. Promotion records the exact
-merge SHA and target branch for every participating repository, then ship creates
-temporary detached worktrees at those promoted SHAs. Commits are pushed with an
-explicit `HEAD:<targetBranch>` ref, and the temporary worktrees are removed after
-the run, so an operator's primary checkout remains untouched even when it is
-stale or dirty.
+merge SHA and target branch for every participating repository. Before each
+attempt, ship fetches the target, proves the promoted SHA is its ancestor, and
+creates a temporary detached worktree at the fetched target head. Rooting retries
+at the current target recovers when an earlier attempt pushed before durable
+settlement failed, while the ancestry check refuses an unrelated target. Commits
+use hook-disabled trusted Git invocations, push with an explicit
+`HEAD:<targetBranch>` ref, and the temporary worktrees are removed after the run,
+so an operator's primary checkout remains untouched even when it is stale or
+dirty.
 
 A project opts in through `version_sync` in `~/.overdeck/projects.yaml`. Mind
 Your Now uses one canonical JSON field plus its existing propagation command:
@@ -320,6 +324,7 @@ projects:
           json_field: version
       command: pnpm vsync
       command_cwd: frontend
+      command_image: myn-version-sync:latest
       expect:
         - path: frontend/package.json
           pattern: '"version": "{version}"'
@@ -364,7 +369,12 @@ The fields are deliberately small:
 
 - `set[].path` and `set[].json_field` identify JSON string fields written before
   the command runs.
-- `command` is optional; `command_cwd` is relative to the project root.
+- `command` is optional; `command_cwd` is relative to the project root and
+  `command_image` is required with it. The operator-owned image must already be
+  present locally. The command runs without host credentials in a read-only,
+  capability-dropped container with only the prepared project tree writable,
+  no network, and a five-minute hard timeout; the credentialed push remains in
+  hook-disabled trusted parent code.
 - `expect[].pattern` is a regular expression checked after propagation.
   `{version}` expands to the complete version such as `48.8.0`, while
   `{majorMinor}` expands to `48.8`. Patterns are limited to 512 characters,
@@ -383,12 +393,17 @@ version is sent as `shipVersion` with promotion. Leaving it empty is allowed:
 the batch still merges, but every member receives a `pending` ship verdict and
 cannot pass close-out until the version is shipped. The promoted batch then
 stays on the card with a **Ship version** action, which runs the same runner and
-rewrites every member's verdict. Terminal-only operators can call
+rewrites every member's verdict. Promoted `pending`, `partial`, and `failed`
+batches remain visible with their current outcome and retry action; only a
+conservative all-member `passed` aggregate removes the card. Terminal-only operators can call
 `POST /api/merge-train/generations/:name/ship` with `{ "version": "48.8.0" }`;
 there is no separate `pan ship` command.
 
 The **ship row** in the Definition-of-Done gate is the close-out check that
-reads each member's durable `pipeline.ship` record:
+resolves the member's promoted generation and reads the conservative aggregate
+of every member's durable `pipeline.ship` record. One missing, pending, partial,
+or failed member therefore blocks every member, even if another member's
+terminal record persisted first:
 
 | Recorded state | Ship row result |
 | --- | --- |

@@ -5,6 +5,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { promisify } from 'node:util';
 import { VersionShipOperationError, type VersionShipAllowedRepo } from './version-ship.js';
 import { redactVersionShipDiagnostic } from './version-ship-deps.js';
+import { versionShipGitArgs, versionShipGitEnv } from './version-ship-git.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -43,9 +44,10 @@ function validateMergeSha(sha: string): void {
 
 async function runGit(args: string[], cwd: string, safeMessage: string): Promise<string> {
   try {
-    const { stdout } = await execFileAsync('git', args, {
+    const { stdout } = await execFileAsync('git', versionShipGitArgs(args), {
       cwd,
       encoding: 'utf-8',
+      env: versionShipGitEnv(),
       maxBuffer: 16 * 1024 * 1024,
     });
     return stdout.trim();
@@ -92,9 +94,17 @@ export async function withVersionShipWorkspace<T>(
       const sourceRoot = await realpath(repo.repoPath);
       const worktreePath = repo.configPath === '.' ? wrapperRoot : join(wrapperRoot, repo.configPath);
       await mkdir(dirname(worktreePath), { recursive: true });
+      await runGit(['check-ref-format', '--branch', repo.targetBranch], sourceRoot, 'configured target branch is invalid');
       await runGit(['fetch', 'origin', repo.targetBranch], sourceRoot, `could not fetch ${repo.targetBranch} before version ship`);
       await runGit(['cat-file', '-e', `${repo.mergeSha}^{commit}`], sourceRoot, 'promoted merge commit is unavailable locally');
-      await runGit(['worktree', 'add', '--detach', worktreePath, repo.mergeSha], sourceRoot, 'could not create the version ship worktree');
+      const targetRef = `refs/remotes/origin/${repo.targetBranch}`;
+      await runGit(
+        ['merge-base', '--is-ancestor', repo.mergeSha, targetRef],
+        sourceRoot,
+        `promoted merge commit is not an ancestor of ${repo.targetBranch}`,
+      );
+      const targetHead = await runGit(['rev-parse', targetRef], sourceRoot, `could not resolve ${repo.targetBranch} before version ship`);
+      await runGit(['worktree', 'add', '--detach', worktreePath, targetHead], sourceRoot, 'could not create the version ship worktree');
       prepared.push({ sourceRoot, worktreePath });
     }
 
@@ -104,14 +114,16 @@ export async function withVersionShipWorkspace<T>(
     });
   } finally {
     for (const repo of [...prepared].reverse()) {
-      await execFileAsync('git', ['worktree', 'remove', '--force', repo.worktreePath], {
+      await execFileAsync('git', versionShipGitArgs(['worktree', 'remove', '--force', repo.worktreePath]), {
         cwd: repo.sourceRoot,
         encoding: 'utf-8',
+        env: versionShipGitEnv(),
         maxBuffer: 16 * 1024 * 1024,
       }).catch(() => {});
-      await execFileAsync('git', ['worktree', 'prune'], {
+      await execFileAsync('git', versionShipGitArgs(['worktree', 'prune']), {
         cwd: repo.sourceRoot,
         encoding: 'utf-8',
+        env: versionShipGitEnv(),
         maxBuffer: 16 * 1024 * 1024,
       }).catch(() => {});
     }

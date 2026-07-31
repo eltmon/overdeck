@@ -15,6 +15,7 @@ let versionSyncConfig: {
   set?: Array<{ path: string; json_field: string }>;
   command?: string;
   command_cwd?: string;
+  command_image?: string;
   expect?: Array<{ path: string; pattern: string }>;
   commit_message?: string;
   push?: string[];
@@ -24,7 +25,7 @@ let versionShipOutcome: {
   version?: string;
   batch: string;
   paths?: Array<{ path: string; ok: boolean; detail: string }>;
-  error?: string;
+  errorCode?: string;
   at: string;
 } | null;
 let versionSyncValidationErrors: string[] | null;
@@ -297,6 +298,7 @@ describe('ProjectSettingsDisclosure', () => {
 
     fireEvent.change(screen.getByLabelText('Version sync command'), { target: { value: 'pnpm vsync' } });
     fireEvent.change(screen.getByLabelText('Version sync command cwd'), { target: { value: 'frontend' } });
+    fireEvent.change(screen.getByLabelText('Version sync command image'), { target: { value: 'myn-version-sync:latest' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add target' }));
     fireEvent.change(screen.getByLabelText('Set path 1'), { target: { value: 'frontend/package.json' } });
     fireEvent.change(screen.getByLabelText('Set JSON field 1'), { target: { value: 'version' } });
@@ -310,6 +312,7 @@ describe('ProjectSettingsDisclosure', () => {
     await waitFor(() => expect(versionSyncConfig).toEqual({
       command: 'pnpm vsync',
       command_cwd: 'frontend',
+      command_image: 'myn-version-sync:latest',
       set: [{ path: 'frontend/package.json', json_field: 'version' }],
       expect: [{ path: 'frontend/package.json', pattern: '"version": "{version}"' }],
       push: ['frontend'],
@@ -353,7 +356,7 @@ describe('ProjectSettingsDisclosure', () => {
   });
 
   it('removes version_sync and returns to the explicit skip state', async () => {
-    versionSyncConfig = { command: 'pnpm vsync' };
+    versionSyncConfig = { command: 'pnpm vsync', command_image: 'myn-version-sync:latest' };
     renderDisclosure();
     fireEvent.click(await screen.findByRole('button', { name: 'Remove version sync' }));
 

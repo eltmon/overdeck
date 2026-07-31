@@ -8,6 +8,7 @@ interface VersionSyncConfig {
   set?: Array<{ path: string; json_field: string }>;
   command?: string;
   command_cwd?: string;
+  command_image?: string;
   expect?: Array<{ path: string; pattern: string }>;
   commit_message?: string;
   push?: string[];
@@ -18,8 +19,7 @@ interface VersionShipOutcome {
   version?: string;
   batch: string;
   paths?: Array<{ path: string; ok: boolean; detail: string }>;
-  error?: string;
-  reason?: string;
+  errorCode?: string;
   at: string;
 }
 
@@ -32,6 +32,7 @@ interface VersionSyncDraft {
   set: Array<{ path: string; json_field: string }>;
   command: string;
   command_cwd: string;
+  command_image: string;
   expect: Array<{ path: string; pattern: string }>;
   commit_message: string;
   push: string[];
@@ -41,6 +42,7 @@ const emptyVersionSyncDraft = (): VersionSyncDraft => ({
   set: [],
   command: '',
   command_cwd: '',
+  command_image: '',
   expect: [],
   commit_message: '',
   push: [],
@@ -51,6 +53,7 @@ function versionSyncDraft(config: VersionSyncConfig | null): VersionSyncDraft {
     set: config?.set?.map(entry => ({ ...entry })) ?? [],
     command: config?.command ?? '',
     command_cwd: config?.command_cwd ?? '',
+    command_image: config?.command_image ?? '',
     expect: config?.expect?.map(entry => ({ ...entry })) ?? [],
     commit_message: config?.commit_message ?? '',
     push: [...(config?.push ?? [])],
@@ -62,6 +65,7 @@ function compactVersionSyncDraft(draft: VersionSyncDraft): VersionSyncConfig {
     ...(draft.set.length > 0 ? { set: draft.set.map(entry => ({ path: entry.path.trim(), json_field: entry.json_field.trim() })) } : {}),
     ...(draft.command.trim() ? { command: draft.command.trim() } : {}),
     ...(draft.command_cwd.trim() ? { command_cwd: draft.command_cwd.trim() } : {}),
+    ...(draft.command_image.trim() ? { command_image: draft.command_image.trim() } : {}),
     ...(draft.expect.length > 0 ? { expect: draft.expect.map(entry => ({ path: entry.path.trim(), pattern: entry.pattern })) } : {}),
     ...(draft.commit_message.trim() ? { commit_message: draft.commit_message.trim() } : {}),
     ...(draft.push.length > 0 ? { push: draft.push.map(path => path.trim()) } : {}),
@@ -112,7 +116,7 @@ function VersionShipOutcomeView({ outcome }: { outcome: VersionShipOutcome | nul
   }
   return (
     <p className="text-[11px] text-red-400">
-      Version ship failed for {shortName(outcome.batch)}: {outcome.error ?? outcome.reason ?? 'unknown error'}
+      Version ship failed for {shortName(outcome.batch)}: {outcome.errorCode ?? 'unknown failure'}
     </p>
   );
 }
@@ -184,7 +188,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
         <p className="mt-2 text-[11px] text-muted-foreground">Loading version ship…</p>
       ) : editing ? (
         <div className="mt-3 space-y-3">
-          <div className="grid gap-2 sm:grid-cols-2">
+          <div className="grid gap-2 sm:grid-cols-3">
             <label className="text-[10.5px] text-muted-foreground">Command
               <input aria-label="Version sync command" className={inputClass} value={draft.command} onChange={event => setDraft({ ...draft, command: event.target.value })} placeholder="pnpm vsync" />
               {fieldError('command')}
@@ -192,6 +196,10 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
             <label className="text-[10.5px] text-muted-foreground">Command working directory
               <input aria-label="Version sync command cwd" className={inputClass} value={draft.command_cwd} onChange={event => setDraft({ ...draft, command_cwd: event.target.value })} placeholder="frontend" />
               {fieldError('command_cwd')}
+            </label>
+            <label className="text-[10.5px] text-muted-foreground">Sandbox image
+              <input aria-label="Version sync command image" className={inputClass} value={draft.command_image} onChange={event => setDraft({ ...draft, command_image: event.target.value })} placeholder="myn-version-sync:latest" />
+              {fieldError('command_image')}
             </label>
           </div>
           <label className="block text-[10.5px] text-muted-foreground">Commit message
@@ -246,7 +254,7 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
       ) : data?.config ? (
         <div className="mt-2 space-y-2">
           <div className="rounded border border-border bg-muted/20 p-2 font-mono text-[10.5px] text-muted-foreground">
-            {data.config.command && <div>command: <span className="text-foreground">{data.config.command}</span>{data.config.command_cwd ? ` (cwd ${data.config.command_cwd})` : ''}</div>}
+            {data.config.command && <div>command: <span className="text-foreground">{data.config.command}</span>{data.config.command_cwd ? ` (cwd ${data.config.command_cwd})` : ''}{data.config.command_image ? ` in ${data.config.command_image}` : ''}</div>}
             {(data.config.set ?? []).map(entry => <div key={`${entry.path}:${entry.json_field}`}>set: <span className="text-foreground">{entry.path} → {entry.json_field}</span></div>)}
             {(data.config.expect ?? []).map(entry => <div key={`${entry.path}:${entry.pattern}`}>expect: <span className="text-foreground">{entry.path} / {entry.pattern}</span></div>)}
             {(data.config.push ?? []).map(path => <div key={path}>push: <span className="text-foreground">{path}</span></div>)}

@@ -50,7 +50,12 @@ export interface VersionShipDeps {
   resolveFile: (projectRoot: string, declaredPath: string) => Promise<string>;
   resolveDirectory: (projectRoot: string, declaredPath: string) => Promise<string>;
   writeVersion: (path: string, jsonField: string, version: string) => Promise<void>;
-  runCommand: (command: string, cwd: string) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
+  runCommand: (
+    command: string,
+    cwd: string,
+    projectRoot: string,
+    image: string,
+  ) => Promise<{ exitCode: number; stdout: string; stderr: string }>;
   readFile: (path: string) => Promise<string>;
   testPattern: (pattern: string, content: string) => Promise<boolean>;
   hasChanges: (repoRoot: string, paths: string[]) => Promise<boolean>;
@@ -140,6 +145,12 @@ export async function runVersionShip(
       ...expectation,
       absolutePath: await deps.resolveFile(projectRoot, expectation.path),
     })));
+    if (config.command && !config.command_image) {
+      throw new VersionShipOperationError(
+        'path-validation-failed',
+        'version_sync.command_image is required to sandbox the version sync command',
+      );
+    }
     const commandCwd = config.command
       ? await deps.resolveDirectory(projectRoot, config.command_cwd ?? '.')
       : null;
@@ -167,8 +178,8 @@ export async function runVersionShip(
       await deps.writeVersion(target.absolutePath, target.json_field, version);
     }
 
-    if (config.command && commandCwd) {
-      const commandResult = await deps.runCommand(config.command, commandCwd);
+    if (config.command && commandCwd && config.command_image) {
+      const commandResult = await deps.runCommand(config.command, commandCwd, projectRoot, config.command_image);
       if (commandResult.exitCode !== 0) {
         deps.logDiagnostic?.(
           `[version-ship] command exited ${commandResult.exitCode}: ${commandResult.stderr || commandResult.stdout}`,

@@ -1,13 +1,16 @@
 import { execFile } from 'node:child_process';
 import { constants } from 'node:fs';
-import { lstat, open, realpath } from 'node:fs/promises';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { lstat, mkdtemp, open, readFile, realpath, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { redactSensitiveText } from '../secret-redaction.js';
 import {
   VersionShipOperationError,
   type ShipFailureCode,
   type VersionShipDeps,
 } from './version-ship.js';
+import { versionShipGitArgs, versionShipGitEnv } from './version-ship-git.js';
 
 interface ExecResult {
   exitCode: number;
@@ -17,6 +20,7 @@ interface ExecResult {
 
 const MAX_EXPECT_FILE_BYTES = 1024 * 1024;
 const REGEX_TIMEOUT_MS = 250;
+const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
 
 function tokenizeCommand(command: string): string[] {
   const tokens: string[] = [];
@@ -56,10 +60,8 @@ function tokenizeCommand(command: string): string[] {
 }
 
 export function redactVersionShipDiagnostic(value: string): string {
-  return value
-    .replace(/\b(Bearer\s+)[A-Za-z0-9._~+\/-]+=*/gi, '$1[redacted]')
-    .replace(/\b(token|password|passwd|secret|api[_-]?key|private[_-]?key)\s*[:=]\s*\S+/gi, '$1=[redacted]')
-    .replace(/(https?:\/\/)[^\s/@:]+:[^\s/@]+@/gi, '$1[redacted]@')
+  return redactSensitiveText(value)
+    .replace(/\b(Bearer\s+)[A-Za-z0-9._~+\/-]+=*/gi, '$1[REDACTED]')
     .slice(-2_000);
 }
 
@@ -67,9 +69,14 @@ function logDiagnostic(message: string): void {
   console.error(redactVersionShipDiagnostic(message));
 }
 
-function execFileResult(file: string, args: string[], cwd: string): Promise<ExecResult> {
+function execGitResult(args: string[], cwd: string): Promise<ExecResult> {
   return new Promise(resolveResult => {
-    execFile(file, args, { cwd, encoding: 'utf-8', maxBuffer: 16 * 1024 * 1024 }, (error, stdout, stderr) => {
+    execFile('git', versionShipGitArgs(args), {
+      cwd,
+      encoding: 'utf-8',
+      env: versionShipGitEnv(),
+      maxBuffer: 16 * 1024 * 1024,
+    }, (error, stdout, stderr) => {
       resolveResult({
         exitCode: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
         stdout,
@@ -79,19 +86,94 @@ function execFileResult(file: string, args: string[], cwd: string): Promise<Exec
   });
 }
 
-async function execFileOrThrow(
-  file: string,
+async function execGitOrThrow(
   args: string[],
   cwd: string,
   code: Extract<ShipFailureCode, 'commit-failed' | 'push-failed'>,
   safeMessage: string,
 ): Promise<ExecResult> {
-  const result = await execFileResult(file, args, cwd);
+  const result = await execGitResult(args, cwd);
   if (result.exitCode !== 0) {
-    logDiagnostic(`[version-ship] ${file} ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
+    logDiagnostic(`[version-ship] git ${args.join(' ')} failed: ${result.stderr || result.stdout}`);
     throw new VersionShipOperationError(code, safeMessage);
   }
   return result;
+}
+
+function dockerHostEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const key of ['DOCKER_CONFIG', 'DOCKER_HOST', 'HOME', 'PATH', 'XDG_RUNTIME_DIR']) {
+    const value = process.env[key];
+    if (value !== undefined) env[key] = value;
+  }
+  return env;
+}
+
+function runDocker(args: string[], cwd: string, timeout: number): Promise<ExecResult> {
+  return new Promise(resolveResult => {
+    execFile('docker', args, {
+      cwd,
+      encoding: 'utf-8',
+      env: dockerHostEnv(),
+      killSignal: 'SIGKILL',
+      maxBuffer: 16 * 1024 * 1024,
+      timeout,
+    }, (error, stdout, stderr) => {
+      resolveResult({
+        exitCode: typeof error?.code === 'number' ? error.code : error ? 1 : 0,
+        stdout,
+        stderr,
+      });
+    });
+  });
+}
+
+async function runSandboxedCommand(
+  command: string,
+  cwd: string,
+  projectRoot: string,
+  image: string,
+  runDockerCommand: typeof runDocker = runDocker,
+): Promise<ExecResult> {
+  const [file, ...commandArgs] = tokenizeCommand(command);
+  const commandRelative = relative(projectRoot, cwd);
+  const containerCwd = commandRelative === ''
+    ? '/workspace'
+    : `/workspace/${commandRelative.split(sep).join('/')}`;
+  const runtimeDir = await mkdtemp(join(tmpdir(), 'overdeck-version-ship-command-'));
+  const cidFile = join(runtimeDir, 'container.cid');
+  const uid = typeof process.getuid === 'function' ? process.getuid() : 65534;
+  const gid = typeof process.getgid === 'function' ? process.getgid() : 65534;
+
+  try {
+    return await runDockerCommand([
+      'run', '--rm', '--init',
+      '--cidfile', cidFile,
+      '--pull', 'never',
+      '--network', 'none',
+      '--read-only',
+      '--cap-drop', 'ALL',
+      '--security-opt', 'no-new-privileges',
+      '--pids-limit', '256',
+      '--memory', '2g',
+      '--user', `${uid}:${gid}`,
+      '--mount', `type=bind,src=${projectRoot},dst=/workspace,rw`,
+      '--tmpfs', '/tmp:rw,nosuid,nodev,size=67108864',
+      '--workdir', containerCwd,
+      '--env', 'CI=1',
+      '--env', 'HOME=/tmp',
+      '--env', 'TMPDIR=/tmp',
+      image,
+      file,
+      ...commandArgs,
+    ], projectRoot, COMMAND_TIMEOUT_MS);
+  } finally {
+    const containerId = await readFile(cidFile, 'utf-8').catch(() => '');
+    if (containerId.trim()) {
+      await runDockerCommand(['rm', '-f', containerId.trim()], projectRoot, 30_000).catch(() => ({ exitCode: 1, stdout: '', stderr: '' }));
+    }
+    await rm(runtimeDir, { recursive: true, force: true });
+  }
 }
 
 function escapeRegex(value: string): string {
@@ -201,21 +283,27 @@ function testPatternInWorker(pattern: string, content: string): Promise<boolean>
   });
 }
 
-export function buildVersionShipDeps(): VersionShipDeps {
+export interface BuildVersionShipDepsOptions {
+  runDocker?: typeof runDocker;
+}
+
+export function buildVersionShipDeps(options: BuildVersionShipDepsOptions = {}): VersionShipDeps {
   return {
     now: () => new Date().toISOString(),
     resolveFile: (root, path) => validateContainedPath(root, path, 'file'),
     resolveDirectory: (root, path) => validateContainedPath(root, path, 'directory'),
     writeVersion: writeJsonStringField,
-    runCommand: async (command, cwd) => {
-      const [file, ...args] = tokenizeCommand(command);
-      return execFileResult(file, args, cwd);
-    },
+    runCommand: (command, cwd, projectRoot, image) => runSandboxedCommand(
+      command,
+      cwd,
+      projectRoot,
+      image,
+      options.runDocker ?? runDocker,
+    ),
     readFile: readBoundedRegularFile,
     testPattern: testPatternInWorker,
     hasChanges: async (repoRoot, paths) => {
-      const result = await execFileOrThrow(
-        'git',
+      const result = await execGitOrThrow(
         ['status', '--porcelain', '--', ...paths],
         repoRoot,
         'commit-failed',
@@ -224,12 +312,12 @@ export function buildVersionShipDeps(): VersionShipDeps {
       return result.stdout.trim().length > 0;
     },
     commit: async (repoRoot, paths, message) => {
-      await execFileOrThrow('git', ['add', '--', ...paths], repoRoot, 'commit-failed', 'could not stage declared version paths');
-      await execFileOrThrow('git', ['commit', '-m', message], repoRoot, 'commit-failed', 'could not commit declared version paths');
+      await execGitOrThrow(['add', '--', ...paths], repoRoot, 'commit-failed', 'could not stage declared version paths');
+      await execGitOrThrow(['commit', '-m', message], repoRoot, 'commit-failed', 'could not commit declared version paths');
     },
     push: async (repoRoot, targetBranch) => {
-      await execFileOrThrow('git', ['check-ref-format', '--branch', targetBranch], repoRoot, 'push-failed', 'configured target branch is invalid');
-      await execFileOrThrow('git', ['push', 'origin', `HEAD:${targetBranch}`], repoRoot, 'push-failed', `could not push version commit to ${targetBranch}`);
+      await execGitOrThrow(['check-ref-format', '--branch', targetBranch], repoRoot, 'push-failed', 'configured target branch is invalid');
+      await execGitOrThrow(['push', 'origin', `HEAD:${targetBranch}`], repoRoot, 'push-failed', `could not push version commit to ${targetBranch}`);
     },
     logDiagnostic,
   };

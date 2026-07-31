@@ -6,7 +6,8 @@ import {
   evaluateDodGate,
 } from '../../../../src/lib/lifecycle/dod-gate.js';
 import { DOD_ROWS, type DodRowId, type DodRowResult } from '../../../../src/lib/lifecycle/dod.js';
-import type { PanIssuePipelineRecord } from '../../../../src/lib/pan-dir/record.js';
+import type { PanIssuePipelineRecord, PanIssueShipRecord } from '../../../../src/lib/pan-dir/record.js';
+import type { UatGeneration } from '../../../../src/lib/overdeck/merge-sync.js';
 
 const ctx = { issueId: 'PAN-3358', projectPath: '/repo/overdeck' };
 
@@ -21,10 +22,30 @@ function pipeline(ship?: PanIssuePipelineRecord['ship']): PanIssuePipelineRecord
   };
 }
 
+function promotedGeneration(name: string): UatGeneration {
+  return {
+    name,
+    worktreePath: '/repo/worktrees/uat',
+    projectRoot: ctx.projectPath,
+    baseSha: 'main-sha',
+    status: 'promoted',
+    members: [
+      { issueId: 'PAN-3358', title: 'Ship', branch: 'feature/pan-3358', headSha: 'head', mergeOrder: 1 },
+      { issueId: 'PAN-3359', title: 'Peer', branch: 'feature/pan-3359', headSha: 'peer', mergeOrder: 2 },
+    ],
+    heldOut: [],
+    resolutions: [],
+    stackStartedAt: null,
+    createdAt: '2026-07-31T00:00:00.000Z',
+    updatedAt: '2026-07-31T00:00:00.000Z',
+  };
+}
+
 function shipDeps(
   versionSyncConfigured: boolean,
   ship?: PanIssuePipelineRecord['ship'],
   promotedBatch?: string,
+  batchShip: PanIssueShipRecord | null = ship ?? null,
 ) {
   return {
     readProject: () => ({
@@ -33,7 +54,8 @@ function shipDeps(
       ...(versionSyncConfigured ? { version_sync: {} } : {}),
     }),
     readPipeline: async () => pipeline(ship),
-    findPromotedBatch: () => promotedBatch ? { name: promotedBatch } : null,
+    findPromotedBatch: () => promotedBatch ? promotedGeneration(promotedBatch) : null,
+    readBatchShip: async () => batchShip,
   };
 }
 
@@ -57,6 +79,30 @@ describe('checkShipRow', () => {
       status: 'miss',
       observed: 'batch uat/pan-ember-0731 includes this issue but no durable ship settlement was recorded',
     });
+  });
+
+  it('keeps every member blocked when one terminal record persisted but the batch aggregate is pending', async () => {
+    const individualPassed: PanIssueShipRecord = {
+      status: 'passed',
+      version: '48.8.0',
+      batch: 'uat/pan-ember-0731',
+      paths: [{ path: 'package.json', ok: true, detail: 'reports 48.8.0' }],
+      at: '2026-07-31T01:00:00.000Z',
+    };
+    const conservativeBatch: PanIssueShipRecord = {
+      status: 'pending',
+      batch: 'uat/pan-ember-0731',
+      reason: '1 member(s) have no durable ship settlement',
+      at: '2026-07-31T01:00:00.000Z',
+    };
+    const deps = shipDeps(true, individualPassed, 'uat/pan-ember-0731', conservativeBatch);
+
+    const first = await checkShipRow(ctx, deps);
+    const second = await checkShipRow({ ...ctx, issueId: 'PAN-3359' }, deps);
+
+    expect(first).toMatchObject({ status: 'miss' });
+    expect(second).toMatchObject({ status: 'miss' });
+    expect(first.observed).toContain('Ship version action');
   });
 
   it('passes a recorded passed verdict with version, batch, and path count', async () => {

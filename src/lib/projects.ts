@@ -119,6 +119,7 @@ export interface VersionSyncConfig {
   set?: Array<{ path: string; json_field: string }>;
   command?: string;
   command_cwd?: string;
+  command_image?: string;
   expect?: Array<{ path: string; pattern: string }>;
   commit_message?: string;
   push?: string[];
@@ -210,6 +211,22 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
 
   if (raw.command_cwd !== undefined) {
     validatePath('version_sync.command_cwd', raw.command_cwd);
+  }
+
+  if (raw.command_image !== undefined) {
+    if (
+      typeof raw.command_image !== 'string'
+      || raw.command_image.length > 255
+      || !/^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/.test(raw.command_image)
+    ) {
+      errors.push('version_sync.command_image must be a valid container image reference');
+    }
+  } else if (
+    typeof raw.command === 'string'
+    && raw.command.trim().length > 0
+    && !/[\r\n]/.test(raw.command)
+  ) {
+    errors.push('version_sync.command_image is required when version_sync.command is set');
   }
 
   if (raw.commit_message !== undefined && typeof raw.commit_message !== 'string') {

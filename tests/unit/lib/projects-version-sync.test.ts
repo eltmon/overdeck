@@ -33,6 +33,7 @@ const MYN_VERSION_SYNC = {
   ],
   command: 'pnpm vsync',
   command_cwd: 'frontend',
+  command_image: 'myn-version-sync:latest',
   expect: [
     { path: 'frontend/package.json', pattern: '"version": "{version}"' },
     { path: 'api/src/main/java/com/myn/config/Version.java', pattern: 'String version = "{version}\\.git "' },
@@ -197,6 +198,15 @@ describe('validateVersionSyncConfig', () => {
     expect(result).toEqual({
       ok: false,
       errors: ['version_sync.set[0].path must not escape the project root'],
+    });
+  });
+
+  it('requires a sandbox image for a configured command', () => {
+    const result = validateVersionSyncConfig({ command: 'pnpm vsync' });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ['version_sync.command_image is required when version_sync.command is set'],
     });
   });
 

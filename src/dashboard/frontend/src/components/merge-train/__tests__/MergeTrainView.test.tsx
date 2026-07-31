@@ -571,6 +571,39 @@ describe('actions post to the new endpoints behind confirms (ac3)', () => {
     });
   });
 
+  it.each(['partial', 'failed'] as const)(
+    'keeps a promoted %s batch visible with its retry action',
+    async (status) => {
+      const promoted = {
+        ...PAN_READY_GEN,
+        status: 'promoted',
+        versionSyncConfigured: true,
+        shipStatus: {
+          status,
+          version: '48.8.0',
+          batch: PAN_READY_GEN.name,
+          at: '2026-06-10T04:00:00.000Z',
+          ...(status === 'partial'
+            ? { paths: [{ path: 'package.json', ok: false, detail: 'pattern missed' }] }
+            : { errorCode: 'push-failed' }),
+        },
+      };
+      mockFetch(twoProjectResponses({
+        '/api/merge-train/queues': [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, queue: [] },
+        ],
+        '/api/merge-train/generations': [
+          { projectKey: 'overdeck', projectName: 'Overdeck', enabled: true, generations: [promoted] },
+        ],
+      }));
+      renderView();
+
+      const section = await screen.findByTestId('merge-train-project-overdeck');
+      expect(section.textContent).toContain(`promoted · version ${status}`);
+      expect(screen.getByRole('button', { name: 'Ship version' })).toBeInTheDocument();
+    },
+  );
+
   it('adds no version UI when the project has no version_sync', async () => {
     mockFetch(twoProjectResponses());
     renderView();

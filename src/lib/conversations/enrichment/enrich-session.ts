@@ -26,6 +26,7 @@ import { applyFallbackSync, selectEnrichmentModelForTier } from '../../model-fal
 import { loadConfigSync as loadYamlConfig } from '../../config-yaml.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../../providers.js';
 import { FsError } from '../../errors.js';
+import { redactSensitiveText } from '../../secret-redaction.js';
 import type { TokenUsage } from '../../cost.js';
 import type { EnrichmentTier, EnrichmentTierConfig, ModelProvider } from '../../model-fallback.js';
 import type { ModelId } from '../../settings.js';
@@ -71,21 +72,6 @@ export interface EnrichSessionResult {
 }
 
 // ─── JSONL message reader ─────────────────────────────────────────────────────
-
-function redactSensitiveText(text: string): string {
-  return text
-    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, '[REDACTED_PRIVATE_KEY]')
-    .replace(/\b(?:sk-ant|sk-proj|sk-[A-Za-z0-9_-]{8})[A-Za-z0-9_-]+\b/g, '[REDACTED_API_KEY]')
-    .replace(/\b(?:ghp|github_pat|glpat|xox[baprs]|npm)_[A-Za-z0-9_\-]{20,}\b/g, '[REDACTED_TOKEN]')
-    .replace(/\bAKIA[0-9A-Z]{16}\b/g, '[REDACTED_AWS_KEY]')
-    .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED_JWT]')
-    .replace(/\b(?:DATABASE_URL|[A-Z0-9_]*(?:PASSWORD|PASSWD|API_KEY|SECRET|TOKEN)[A-Z0-9_]*)\s*=\s*[^\s,;]+/g, (match) => {
-      const [key] = match.split('=', 1);
-      return `${key}=[REDACTED]`;
-    })
-    .replace(/\b(?:postgres(?:ql)?|mysql|mongodb|redis):\/\/[^\s,;@]+:[^\s,;@]+@[^\s,;]+/gi, '[REDACTED_DATABASE_URL]')
-    .replace(/\b(password|passwd|api[_-]?key|secret|token)\s*[:=]\s*[^\s,;]+/gi, '$1=[REDACTED]');
-}
 
 const MAX_JSONL_LINE_CHARS = 20_000;
 const L3_MAX_LINES = 5_000;

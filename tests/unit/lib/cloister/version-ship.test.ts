@@ -9,7 +9,10 @@ import {
   type VersionShipDeps,
 } from '../../../../src/lib/cloister/version-ship.js';
 import type { VersionSyncConfig } from '../../../../src/lib/projects.js';
-import { buildVersionShipDeps } from '../../../../src/lib/cloister/version-ship-deps.js';
+import {
+  buildVersionShipDeps,
+  redactVersionShipDiagnostic,
+} from '../../../../src/lib/cloister/version-ship-deps.js';
 
 const PROJECT_ROOT = '/repo';
 const NOW = '2026-07-31T12:00:00.000Z';
@@ -47,6 +50,7 @@ function config(overrides: Partial<VersionSyncConfig> = {}): VersionSyncConfig {
     set: [{ path: 'frontend/package.json', json_field: 'version' }],
     command: 'pnpm vsync',
     command_cwd: 'frontend',
+    command_image: 'myn-version-sync:latest',
     expect: [{ path: 'frontend/package.json', pattern: '"version": "{version}"' }],
     push: ['frontend'],
     ...overrides,
@@ -70,7 +74,12 @@ describe('runVersionShip', () => {
     }, deps);
 
     expect(deps.writeVersion).toHaveBeenCalledWith('/repo/frontend/package.json', 'version', '1.2.3');
-    expect(deps.runCommand).toHaveBeenCalledWith('pnpm vsync', '/repo/frontend');
+    expect(deps.runCommand).toHaveBeenCalledWith(
+      'pnpm vsync',
+      '/repo/frontend',
+      '/repo',
+      'myn-version-sync:latest',
+    );
     expect(deps.commit).toHaveBeenCalledWith(
       '/repo/frontend',
       ['package.json'],
@@ -223,6 +232,25 @@ describe('runVersionShip', () => {
     expect(deps.runCommand).not.toHaveBeenCalled();
   });
 
+  it('rejects an unsandboxed configured command before changing files', async () => {
+    const deps = fakeDeps();
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({ command_image: undefined }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [{ path: 'frontend', targetBranch: 'main' }],
+    }, deps);
+
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'path-validation-failed',
+      error: 'version_sync.command_image is required to sandbox the version sync command',
+    });
+    expect(deps.writeVersion).not.toHaveBeenCalled();
+    expect(deps.runCommand).not.toHaveBeenCalled();
+  });
+
   it('rejects a push path that is not one of the registered project repositories', async () => {
     const deps = fakeDeps();
     const report = await runVersionShip({
@@ -287,6 +315,59 @@ function runCommitGuard(subject: string): ReturnType<typeof spawnSync> {
     env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ''}` },
   });
 }
+
+describe('version ship command sandbox', () => {
+  it('runs the configured command without host credentials, network, hooks, or an unbounded lifetime', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'version-ship-sandbox-'));
+    const cwd = join(root, 'frontend');
+    tempDirs.push(root);
+    mkdirSync(cwd);
+    const runDocker = vi.fn(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
+    const deps = buildVersionShipDeps({ runDocker });
+
+    await deps.runCommand('pnpm vsync', cwd, root, 'myn-version-sync:latest');
+
+    expect(runDocker).toHaveBeenCalledOnce();
+    const [args, dockerCwd, timeout] = runDocker.mock.calls[0]!;
+    expect(args).toEqual(expect.arrayContaining([
+      '--pull', 'never',
+      '--network', 'none',
+      '--read-only',
+      '--cap-drop', 'ALL',
+      '--security-opt', 'no-new-privileges',
+      '--workdir', '/workspace/frontend',
+      '--env', 'CI=1',
+      '--env', 'HOME=/tmp',
+      'myn-version-sync:latest',
+      'pnpm', 'vsync',
+    ]));
+    expect(args.some((arg: string) => /TOKEN|PASSWORD|SECRET|SSH_AUTH_SOCK/.test(arg))).toBe(false);
+    expect(dockerCwd).toBe(root);
+    expect(timeout).toBe(5 * 60 * 1000);
+  });
+});
+
+describe('version ship diagnostic redaction', () => {
+  it('redacts standalone credential formats before local logging', () => {
+    const diagnostic = [
+      `ghp_${'A'.repeat(36)}`,
+      `glpat-${'B'.repeat(24)}`,
+      `npm_${'C'.repeat(32)}`,
+      `AKIA${'D'.repeat(16)}`,
+      'eyJheader.payload.signature',
+      '-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----',
+    ].join(' ');
+
+    const redacted = redactVersionShipDiagnostic(diagnostic);
+
+    expect(redacted).not.toContain('ghp_');
+    expect(redacted).not.toContain('glpat-');
+    expect(redacted).not.toContain('npm_');
+    expect(redacted).not.toContain('AKIA');
+    expect(redacted).not.toContain('eyJheader');
+    expect(redacted).not.toContain('secret');
+  });
+});
 
 describe('commit-msg version guard', () => {
   it('accepts the batch ship subject for a package version change', () => {

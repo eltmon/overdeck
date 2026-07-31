@@ -69,8 +69,8 @@ export interface UatGenerationPayload {
     status: 'pending' | 'passed' | 'partial' | 'failed';
     version?: string;
     batch: string;
-    error?: string;
-    reason?: string;
+    paths?: Array<{ path: string; ok: boolean; detail: string }>;
+    errorCode?: string;
     at: string;
   } | null;
   stack: {
@@ -178,7 +178,7 @@ function visibleGenerationsOf(section: MergeTrainProjectSection): UatGenerationP
     (g) => g.status === 'assembling'
       || g.status === 'ready'
       || g.status === 'superseded'
-      || (g.status === 'promoted' && g.versionSyncConfigured === true && g.shipStatus?.status === 'pending'),
+      || (g.status === 'promoted' && g.versionSyncConfigured === true && g.shipStatus?.status !== 'passed'),
   );
 }
 
@@ -672,6 +672,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                           }
                           const isSuperseded = gen.status === 'superseded';
                           const isPromoted = gen.status === 'promoted';
+                          const promotedShipStatus = gen.shipStatus?.status ?? 'pending';
                           return (
                             <div
                               key={gen.name}
@@ -680,7 +681,7 @@ export function MergeTrainView({ active, onNavigateIssue, showProjectFilter = tr
                               <div className="flex items-center gap-2">
                                 <span className={`text-[10px] ${isSuperseded ? 'text-muted-foreground' : isPromoted ? 'text-amber-400' : 'text-emerald-400'}`}>{isSuperseded ? '○' : '●'}</span>
                                 <span className={`font-mono text-[11px] font-bold ${isSuperseded ? 'text-foreground' : isPromoted ? 'text-amber-400' : 'text-emerald-400'}`}>{shortName(gen.name)}</span>
-                                <span className="ml-auto text-[10px] text-muted-foreground">{isSuperseded ? 'superseded · still testable' : isPromoted ? 'promoted · version pending' : 'ready to test'}</span>
+                                <span className="ml-auto text-[10px] text-muted-foreground">{isSuperseded ? 'superseded · still testable' : isPromoted ? `promoted · version ${promotedShipStatus}` : 'ready to test'}</span>
                               </div>
                               <div className="mt-0.5 pl-4 text-[10.5px] text-muted-foreground">
                                 {gen.members.map((m, i) => (

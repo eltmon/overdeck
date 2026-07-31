@@ -15,11 +15,14 @@ import {
   readIssueRecord,
   resolveProjectForIssue,
   type PanIssuePipelineRecord,
+  type PanIssueShipRecord,
 } from '../pan-dir/record.js';
+import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
+import { aggregateGenerationShipStatus, loadShipRecords } from '../cloister/ship-status.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
-import { listUatGenerationsSync } from '../overdeck/merge-sync.js';
+import { listUatGenerationsSync, type UatGeneration } from '../overdeck/merge-sync.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
@@ -156,9 +159,10 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
 };
 
 interface ShipRowDeps {
-  readProject: (ctx: LifecycleContext) => ReturnType<typeof resolveProjectForIssue>;
+  readProject: (ctx: LifecycleContext) => ProjectConfig | null;
   readPipeline: (ctx: LifecycleContext) => Promise<PanIssuePipelineRecord | null>;
-  findPromotedBatch: (ctx: LifecycleContext) => { name: string } | null;
+  findPromotedBatch: (ctx: LifecycleContext) => UatGeneration | null;
+  readBatchShip: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
 }
 
 const defaultShipRowDeps: ShipRowDeps = {
@@ -172,6 +176,10 @@ const defaultShipRowDeps: ShipRowDeps = {
     return listUatGenerationsSync({ projectRoot: resolve(project.path), statuses: ['promoted'] })
       .find(generation => generation.members.some(member => member.issueId.toUpperCase() === ctx.issueId.toUpperCase())) ?? null;
   },
+  readBatchShip: async (project, generation) => aggregateGenerationShipStatus(
+    generation,
+    await loadShipRecords(project, [generation]),
+  ),
 };
 
 interface DeployRowDeps {
@@ -666,10 +674,11 @@ export async function checkShipRow(
     return result('ship', 'skip', 'project declares no version_sync; ship step not applicable');
   }
 
-  const pipeline = await deps.readPipeline(ctx);
-  const ship = pipeline?.ship;
+  const promotedBatch = deps.findPromotedBatch(ctx);
+  const ship = promotedBatch
+    ? await deps.readBatchShip(project, promotedBatch)
+    : (await deps.readPipeline(ctx))?.ship;
   if (!ship) {
-    const promotedBatch = deps.findPromotedBatch(ctx);
     if (promotedBatch) {
       return result(
         'ship',
