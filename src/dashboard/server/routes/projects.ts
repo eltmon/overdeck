@@ -10,10 +10,21 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { httpHandler } from './http-handler.js';
 import { postProjectRenameRoute } from './project-rename.js';
-import { resolveProjectFromIssueSync, listProjectsSync, getProjectSync, setProjectAutoMergeDefaultSync, setProjectSwarmPolicySync } from '../../../lib/projects.js';
+import {
+  resolveProjectFromIssueSync,
+  listProjectsSync,
+  getProjectSync,
+  setProjectAutoMergeDefaultSync,
+  setProjectSwarmPolicySync,
+  validateVersionSyncConfig,
+  type ProjectConfig,
+  type VersionSyncConfig,
+} from '../../../lib/projects.js';
 import { resolveSwarmPolicy } from '../../../lib/swarm-policy.js';
 import type { SwarmPolicyLayer } from '../../../lib/swarm-policy.js';
-import { readIssueRecordSync } from '../../../lib/pan-dir/record.js';
+import { readIssueRecordSync, type PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
+import { setProjectVersionSync } from '../../../lib/projects-writer.js';
+import { listUatGenerationsSync, type UatGeneration } from '../../../lib/overdeck/merge-sync.js';
 import { updateIssueRecord } from '../../../lib/pan-dir/record-update.js';
 import { loadConfigSync } from '../../../lib/config-yaml.js';
 import { resolveImplicitStaffing } from '../../../lib/agents/staffing.js';
@@ -22,7 +33,10 @@ import { normalizeModelOverrideSync } from '../../../lib/model-validation.js';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { registerProjectFromPath, DuplicateProjectError } from '../../../lib/project-registration.js';
-import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
+import {
+  rejectUnauthorizedDashboardRequest,
+  rejectUnsafeDashboardMutationRequest,
+} from './dashboard-auth.js';
 
 const execAsync = promisify(exec);
 import { extractPrefixSync } from '../../../lib/issue-id.js';
@@ -770,6 +784,97 @@ const getProjectReleaseStatusRoute = HttpRouter.add(
   })),
 );
 
+interface ProjectVersionSyncRouteDeps {
+  getProject: (key: string) => ProjectConfig | null;
+  listProjectKeys: () => string[];
+  listPromotedGenerations: (projectRoot: string) => UatGeneration[];
+  readShip: (project: ProjectConfig, issueId: string) => PanIssueShipRecord | null;
+  writeVersionSync: typeof setProjectVersionSync;
+}
+
+const defaultProjectVersionSyncRouteDeps: ProjectVersionSyncRouteDeps = {
+  getProject: key => getProjectSync(key) ?? null,
+  listProjectKeys: () => listProjectsSync().map(entry => entry.key),
+  listPromotedGenerations: projectRoot => listUatGenerationsSync({
+    projectRoot: resolve(projectRoot),
+    statuses: ['promoted'],
+    limit: 1,
+  }),
+  readShip: (project, issueId) => readIssueRecordSync(project, issueId)?.pipeline.ship ?? null,
+  writeVersionSync: setProjectVersionSync,
+};
+
+export async function getProjectVersionSyncPayload(
+  projectKey: string,
+  deps: ProjectVersionSyncRouteDeps = defaultProjectVersionSyncRouteDeps,
+): Promise<{ status: number; body: unknown }> {
+  const project = deps.getProject(projectKey);
+  if (!project) return { status: 404, body: { error: `Unknown project key: ${projectKey}` } };
+
+  const generation = deps.listPromotedGenerations(project.path)[0];
+  const outcomes = generation?.members.flatMap(member => {
+    const ship = deps.readShip(project, member.issueId);
+    return ship?.batch === generation.name ? [ship] : [];
+  }) ?? [];
+  const lastOutcome = outcomes.sort((left, right) => right.at.localeCompare(left.at))[0] ?? null;
+  return { status: 200, body: { config: project.version_sync ?? null, lastOutcome } };
+}
+
+export async function putProjectVersionSyncPayload(
+  projectKey: string,
+  payload: unknown,
+  deps: ProjectVersionSyncRouteDeps = defaultProjectVersionSyncRouteDeps,
+): Promise<{ status: number; body: unknown }> {
+  const project = deps.getProject(projectKey);
+  if (!project) {
+    const known = deps.listProjectKeys();
+    return {
+      status: 404,
+      body: { error: `Unknown project key: ${projectKey}. Known project keys: ${known.join(', ') || '(none)'}` },
+    };
+  }
+  if (typeof payload !== 'object' || payload === null || Array.isArray(payload) || !('config' in payload)) {
+    return { status: 400, body: { error: 'body must be { config: VersionSyncConfig | null }' } };
+  }
+
+  const raw = (payload as { config: unknown }).config;
+  if (raw === null) {
+    await deps.writeVersionSync(projectKey, null);
+    return { status: 200, body: { config: null } };
+  }
+  const validation = validateVersionSyncConfig(raw);
+  if (!validation.ok) return { status: 400, body: { errors: validation.errors } };
+  await deps.writeVersionSync(projectKey, validation.config);
+  return { status: 200, body: { config: validation.config } };
+}
+
+const getProjectVersionSyncRoute = HttpRouter.add(
+  'GET',
+  '/api/projects/:projectKey/version-sync',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnauthorizedDashboardRequest(request);
+    if (authError) return authError;
+    const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+    const response = yield* Effect.promise(() => getProjectVersionSyncPayload(key));
+    return jsonResponse(response.body, { status: response.status });
+  })),
+);
+
+const putProjectVersionSyncRoute = HttpRouter.add(
+  'PUT',
+  '/api/projects/:projectKey/version-sync',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const key = (yield* HttpRouter.params)['projectKey'] ?? '';
+    const body = yield* readProjectJsonBody;
+    const response = yield* Effect.promise(() => putProjectVersionSyncPayload(key, body));
+    return jsonResponse(response.body, { status: response.status });
+  })),
+);
+
 // ─── Route: GET /api/projects/:projectKey/auto-merge-default ─────────────────
 const getProjectAutoMergeDefaultRoute = HttpRouter.add(
   'GET',
@@ -1068,6 +1173,8 @@ export const projectsRouteLayer = Layer.mergeAll(
   getProjectSessionTreeRoute,
   getAllSessionTreesRoute,
   getProjectReleaseStatusRoute,
+  getProjectVersionSyncRoute,
+  putProjectVersionSyncRoute,
   getProjectAutoMergeDefaultRoute,
   postProjectAutoMergeDefaultRoute,
   postProjectRenameRoute,

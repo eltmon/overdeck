@@ -379,6 +379,10 @@ interface ProjectRenamePlan {
 // event loop stalls.
 let _projectsCache: { mtime: number; config: ProjectsConfig } | null = null;
 
+export function invalidateProjectsConfigCache(): void {
+  _projectsCache = null;
+}
+
 export function loadProjectsConfigSync(): ProjectsConfig {
   if (!existsSync(PROJECTS_CONFIG_FILE)) {
     return { projects: {} };

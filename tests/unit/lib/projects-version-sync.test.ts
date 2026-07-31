@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 
 const { TEST_HOME } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -25,6 +25,7 @@ import {
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from '../../../src/lib/projects.js';
+import { setProjectVersionSync } from '../../../src/lib/projects-writer.js';
 
 const MYN_VERSION_SYNC = {
   set: [
@@ -76,6 +77,32 @@ describe('project version_sync config', () => {
     });
 
     expect(loadProjectsConfigSync().projects.app?.version_sync).toBeUndefined();
+  });
+});
+
+describe('setProjectVersionSync', () => {
+  it('sets and clears one project without changing any surrounding YAML bytes', async () => {
+    const fixture = `# operator-owned registry\nprojects:\n  alpha:\n    name: "Alpha App" # quoted on purpose\n    path: '/repo/alpha'\n  beta:\n    name: Beta\n    path: /repo/beta\n# trailing operator note\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+
+    await setProjectVersionSync('alpha', MYN_VERSION_SYNC);
+    const configured = readFileSync(PROJECTS_CONFIG_FILE, 'utf-8');
+    expect(configured).toContain('version_sync:');
+    expect(configured).toContain('# operator-owned registry');
+    expect(configured).toContain('name: "Alpha App" # quoted on purpose');
+    expect(configured).toContain("path: '/repo/alpha'");
+    expect(configured).toContain('# trailing operator note');
+
+    await setProjectVersionSync('alpha', null);
+    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+  });
+
+  it('rejects an unknown project key and names the known keys', async () => {
+    writeFileSync(PROJECTS_CONFIG_FILE, 'projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n', 'utf-8');
+
+    await expect(setProjectVersionSync('missing', MYN_VERSION_SYNC)).rejects.toThrow(
+      'Unknown project key: missing. Known project keys: alpha',
+    );
   });
 });
 
