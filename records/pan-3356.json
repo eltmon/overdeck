@@ -248,22 +248,23 @@
     "recordedAt": "2026-07-31T18:26:14.599Z"
   },
   "created": "2026-07-31T14:48:31.210Z",
-  "updated": "2026-07-31T20:35:28.723Z",
+  "updated": "2026-07-31T20:41:48.791Z",
   "pipeline": {
     "issueId": "PAN-3356",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T18:31:21.084Z",
-    "updatedAt": "2026-07-31T20:35:03.150Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
+    "updatedAt": "2026-07-31T20:41:48.691Z",
+    "reviewNotes": "Current-cycle observer reuse is clean; late findings were outside the cycle diff",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "AC1-3 met: TABS holds exactly the six ids (nav's 7th button is the pre-existing Tasks chip, no aria-selected); all nine LEGACY_TAB_MAP ids covered by it.each routing tests asserting data-active-tab + data-active-subview, plus ?tab=plan as plan-map; default resolves to session via initialTab, the issueAgents effect, and recordTreeSessions, overview otherwise, all guarded by tabSelectionLocked. Sub-view switchers correctly deferred to WI-6/7/8/9. Non-blocking: ?tab= is sampled once in a []-dep useMemo and never written back, so a remount re-applies the legacy deep link.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
-    "reviewedAtCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393",
+    "reviewedAtCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160",
     "lastVerifiedCommit": "6ddf3846ac5a458dd66e3a5625387a69fdc29393",
     "reviewSpawnedAt": "2026-07-31T20:35:03.149Z",
     "scopeDrift": {
@@ -342,6 +343,24 @@
         "tests/unit/dashboard/frontend/issue-view-no-loss.test.ts"
       ],
       "recordedAt": "2026-07-31T18:26:14.599Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "a8ac81d02ef3c94a2a0fa0188bd59d268e23b160"
+      }
     }
   },
   "closeOut": {
@@ -349,9 +368,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19128798,
-            "output": 315173,
-            "cacheRead": 127911936,
+            "input": 25673626,
+            "output": 388278,
+            "cacheRead": 147769856,
             "cacheWrite": 0
           }
         },
@@ -398,15 +417,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 34621801,
-          "output": 1160854,
-          "cacheRead": 589650432,
+          "input": 41166629,
+          "output": 1233959,
+          "cacheRead": 609508352,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 502.759841,
-        "pricingAsOf": "2026-07-31T20:35:03.170Z"
+        "usd": 547.606091,
+        "pricingAsOf": "2026-07-31T20:41:48.775Z"
       }
     },
     "merges": [
