@@ -821,3 +821,37 @@ Session resumed (monitors re-armed as one combined memory+RSS+liveness watch). *
 - **P0 PAN-3436 landed** (#3438 squash `9847ceb60e`, handed off) — supervisor no longer serially evicts dashboards after a reboot. Deploy + close-out next tick.
 - **LEAK NOT CLOSED — self-correction.** My tick-35 "soaking clean (644MB at 19min)" was a LOW-LOAD window, not proof. Current build post-fix: 1936MB@18min → **2591MB@47min = ~22MB/min sustained**. A second growth path survives the watcher bound. Reopened PAN-3431 with the three-point curve + heap-diff directive (15min vs 45min snapshots under load), suspects: #3414 per-agent activity polling, event-store arrays, #3400 patrol structures. **Re-struck.** LESSON (repeat of the reviewer-cost lesson): a single favorable reading under different load is not verification — require a TREND at comparable load.
 - MIN-931 review convoy live (4 lanes spawned 16:36). MIN-932 planning deep ($5.83, +833). Campaign healthy.
+
+## RUN-79 interstitial (~20:50Z) — pre-emptive reload at 3.4GB; P0 deployed; leak curve characterized
+
+Monitor tripped at 3383MB/52min (predicted). System had 32GB headroom so no crisis — used the moment for a **`pan reload`, which BOTH deployed the merged P0 (PAN-3436) and reset the server** (fresh: 391MB). Four-point curve appended to PAN-3431: 391MB@0 → 1936@18min → 2591@47min → 3383@52min ≈ 3GB/hour under fleet load, **non-linear — half the growth lands in the first 18 minutes**, pointing at per-agent/per-session accumulation at attach/discovery time rather than a steady drip; told the strike to snapshot at 2min vs 18min. Operational baseline until fixed: reload ~hourly.
+
+## RUN-79 interstitial (~20:55Z) — PAN-3338 convoy dead-end root-caused (PAN-3446) + unblocked
+
+Agent reported discovery-ready failing to launch reviewers. Verified on disk: parent `state.json` has `reviewRunId: null` (status `starting`) while the run dir `.pan/review/agent-pan-3338-review-6130a234/` EXISTS. **Two defects: (1) reviewRunId never durably persisted at discovery-ready — plausibly erased by one of today's restarts; (2) dispatch (`project-routes.ts:665`) 409s instead of deriving the run id from the artifact sitting in the workspace.** Filed **PAN-3446** with both, + the derivation-with-repair fix and its ambiguity guard; **struck**. PAN-3338 unblocked via abort + request (fresh verification → convoy). The agent correctly refused to mutate state — right call, that's how the defect stayed diagnosable.
+
+## RUN-79 tick 39 (2026-08-01 ~21:00Z) — P0 PAN-3436 CLOSED OUT (26 total); campaign Lane A item 2 in work
+
+- **P0 PAN-3436 closed out** (deployed in the 20:45 reload; 8-row DoD, no overrides). 26 issues landed+closed this run.
+- Campaign: **MIN-932 work agent live** ($6.36, +622/−64 — planning→work chained cleanly), MIN-931 reworking an organic review finding (`dryRun returns a successful empty preview even though preview is unsupported` — genuine correctness catch, the convoy is earning its keep).
+- Leak strike round 2 investigating (+41/−92 — already reverting/adjusting the prior approach). PAN-3446 strike warming. Server 1102MB@10min post-reload — consistent with the ~3GB/hr curve; next pre-emptive reload when the monitor trips.
+- Ready set still empty; nothing schedulable despite the UAT gate being off.
+
+## RUN-79 tick 40 (2026-08-01 ~21:20Z) — state push unblocked; composer-wedge specimen #5 WITH THE FIX LIVE → PAN-3422 reopened
+
+- State push resolved: the other session pushed, my tick-39 record rode along (no bypass taken — PAN-3062 specimen stands).
+- **PAN-3422 REOPENED — specimen #5 on the fixed build.** MIN-931 wedged with TWO unsubmitted feedback pointers, cost byte-identical across two ticks, no pending decision. **New distinguishing detail: context at 92%** — the compaction boundary is the lead. Hypothesis appended: the supervisor verifies the Enter keystroke was accepted, but a turn started near compaction can discard it; verification must confirm an ACTIVITY DELTA (turn actually started), not just keystroke acceptance, and re-deliver once if absent. 5th manual `--fresh` of this class today.
+- **Self-correction:** at tick 33 I called this class "structurally dead" after ONE successful delivery on MIN-931. Same error shape as the leak: a single favorable observation is not verification. (Twice today. The rule I keep re-learning: confirm with a trend or an adverse-condition test — here, delivery at high context — before declaring a class closed.)
+- Leak strike round 2 ($4.84) and PAN-3446 strike ($5.65, +279) both progressing. MIN-932 deep in work ($13.83, +1189). Server 1032MB@29min — notably flatter than the earlier 1936MB@18min curve; leak may be load-dependent (fleet is lighter now). Keep measuring at comparable load before concluding anything.
+
+## RUN-79 interstitial (~21:35Z) — 🔴 RED MAIN P0 (PAN-3448) reported by a strike; struck immediately
+
+strike-3446 refused to signal ready and reported main's suite RED for an orthogonal reason — CORRECT call, and it caught something I had missed. Verified: `render.test.ts:124,147` ship literal `bd ready` fixtures that `beads-removal-no-loss.test.ts` forbids; CI red on 8519e39408 + 1dc4b9494e. Source: `51fb0d1370` — **the very commit that blocked my tick-39 push** (PAN-3062 specimen), whose stated purpose was stripping bd boilerplate while its fixtures embed the forbidden strings. Filed **PAN-3448** (blocks-main) + struck; fix direction = build fixture text without literal matches, never weaken the guard. strike-3446's own fix pushed as **PR #3447**, merges when main is green.
+LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red main before my own tick sweep did.
+
+## RUN-79 tick 41 (2026-08-01 ~21:50Z) — red-main strike on target; MIN-931 wedge recovery CONFIRMED; PAN-3422 re-struck
+
+- strike-3448 "Fixing forbidden fixture literals" — exactly the prescribed fix (build fixture text without literal matches, guard untouched). Main CI queued on a newer head; watch for green.
+- **MIN-931 fresh session verified working** ($2.97/+46−79 frozen → $5.23/+448−143). Wedge recovery real, not cosmetic.
+- **PAN-3422 re-struck** with the compaction-boundary lead (verify activity delta, not just keystroke acceptance; re-deliver once if the turn never starts). This class has cost 5 manual interventions today — highest-frequency operational failure of the run.
+- MIN-932 deep in Lane A work ($18.10, +1535/−157). Leak strike round 2 still at +42/−92 (small diff, high thought — heap analysis).

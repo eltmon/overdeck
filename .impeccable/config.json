@@ -25,7 +25,9 @@
         "rule": "dark-glow",
         "value": "*",
         "files": [
-          "design/style-guide/mockups/god-view-river.html"
+          "design/style-guide/mockups/god-view-river.html",
+          "design/style-guide/mockups/god-view-spectrum-kimi-code-harness.html",
+          "design/style-guide/mockups/god-view-confluence.html"
         ],
         "createdAt": "2026-08-01T20:26:45.357Z",
         "reason": "God view is an operator-mandated neon/Winamp visualizer surface that intentionally breaks the dashboard style guide; its shipped production theme (GodView/theme.css: gv-glow drop-shadow, gv-topbar box-shadow 0 0 20px var(--gv-border-glow), gvNeonPulse) already uses colored glows on dark backgrounds as the surface's design language"
