@@ -191,7 +191,7 @@ export async function announceNewRestart(deps: RestartAnnouncerDeps = {}): Promi
   await syncSupervisorUnitFailureStatus({ readStatus, writeStatus, readSupervisorUnitFailed, now });
 
   const status = await readStatus();
-  if (!status) return false;
+  if (!status || status.phase === 'stopping') return false;
   if (getLastAnnounced() === status.ts) return false;
 
   const ageMs = now() - Date.parse(status.ts);

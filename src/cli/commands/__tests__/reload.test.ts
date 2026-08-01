@@ -161,6 +161,7 @@ const ALTERNATE_BUILD_WORKTREE = `${TEST_OVERDECK_HOME}/deployments/dashboard/.p
 const DEFAULT_ORIGIN_MAIN_SHA = '1111111111111111111111111111111111111111';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
+const originalRestartInitiator = process.env.OVERDECK_RESTART_INITIATOR;
 const originalHome = process.env.HOME;
 const originalPath = process.env.PATH;
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -168,6 +169,8 @@ const originalOverdeckHome = process.env.OVERDECK_HOME;
 function restoreEnv(): void {
   if (originalAgentId === undefined) delete process.env.OVERDECK_AGENT_ID;
   else process.env.OVERDECK_AGENT_ID = originalAgentId;
+  if (originalRestartInitiator === undefined) delete process.env.OVERDECK_RESTART_INITIATOR;
+  else process.env.OVERDECK_RESTART_INITIATOR = originalRestartInitiator;
   if (originalHome === undefined) delete process.env.HOME;
   else process.env.HOME = originalHome;
   if (originalPath === undefined) delete process.env.PATH;
@@ -181,6 +184,7 @@ describe('reloadCommand', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
+    delete process.env.OVERDECK_RESTART_INITIATOR;
     process.env.HOME = '/home/test';
     process.env.PATH = '/usr/bin:/bin';
     process.env.OVERDECK_HOME = TEST_OVERDECK_HOME;
@@ -188,7 +192,10 @@ describe('reloadCommand', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mocks.acquireRestartLock.mockReturnValue(Effect.succeed({ release: vi.fn(() => Promise.resolve()) }));
+    mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+      refresh: vi.fn(() => Promise.resolve()),
+      release: vi.fn(() => Promise.resolve()),
+    }));
     mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
     mocks.readPlatformConfig.mockReturnValue({
       dashboardPort: 3010,
@@ -336,6 +343,22 @@ describe('reloadCommand', () => {
     expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
     expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan reload');
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the deploy initiator and stopping phase before restarting', async () => {
+    process.env.OVERDECK_RESTART_INITIATOR = 'deploy-patrol';
+
+    await reloadCommand({ skipBuild: true });
+
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: 'pan reload',
+      success: false,
+      phase: 'stopping',
+      initiator: 'deploy-patrol',
+    }));
+    const stoppingCall = mocks.writeRestartStatus.mock.invocationCallOrder[0];
+    const restartCall = mocks.restartDashboard.mock.invocationCallOrder[0];
+    expect(stoppingCall).toBeLessThan(restartCall);
   });
 
   it('warns that a proceeding agent reload disconnects live sessions', async () => {

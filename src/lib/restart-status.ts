@@ -63,11 +63,14 @@ async function releaseRestartEventsLock(): Promise<void> {
 }
 
 export type RestartTrigger = 'pan reload' | 'pan restart' | 'watchdog';
+export type RestartPhase = 'stopping' | 'healthy' | 'failed';
 
 export interface RestartStatus {
   ts: string;
   trigger: RestartTrigger;
   success: boolean;
+  /** Durable progress marker written before the old dashboard receives SIGTERM. */
+  phase?: RestartPhase;
   error?: string;
   durationMs: number;
   attempts: number;
@@ -105,6 +108,7 @@ function parseRestartEventLine(line: string): RestartStatus | null {
       typeof parsed.ts !== 'string' ||
       (parsed.trigger !== 'pan reload' && parsed.trigger !== 'pan restart' && parsed.trigger !== 'watchdog') ||
       typeof parsed.success !== 'boolean' ||
+      (parsed.phase !== undefined && parsed.phase !== 'stopping' && parsed.phase !== 'healthy' && parsed.phase !== 'failed') ||
       typeof parsed.durationMs !== 'number' ||
       !Number.isFinite(parsed.durationMs) ||
       typeof parsed.attempts !== 'number' ||
@@ -122,6 +126,7 @@ function parseRestartEventLine(line: string): RestartStatus | null {
       ts: parsed.ts,
       trigger: parsed.trigger,
       success: parsed.success,
+      phase: parsed.phase,
       error: parsed.error,
       durationMs: parsed.durationMs,
       attempts: parsed.attempts,
@@ -209,6 +214,7 @@ async function readRestartStatusPromise(): Promise<RestartStatus | null> {
       typeof parsed.ts !== 'string' ||
       (parsed.trigger !== 'pan reload' && parsed.trigger !== 'pan restart' && parsed.trigger !== 'watchdog') ||
       typeof parsed.success !== 'boolean' ||
+      (parsed.phase !== undefined && parsed.phase !== 'stopping' && parsed.phase !== 'healthy' && parsed.phase !== 'failed') ||
       typeof parsed.durationMs !== 'number' ||
       !Number.isFinite(parsed.durationMs) ||
       typeof parsed.attempts !== 'number' ||
@@ -226,6 +232,7 @@ async function readRestartStatusPromise(): Promise<RestartStatus | null> {
       ts: parsed.ts,
       trigger: parsed.trigger,
       success: parsed.success,
+      phase: parsed.phase,
       error: parsed.error,
       durationMs: parsed.durationMs,
       attempts: parsed.attempts,

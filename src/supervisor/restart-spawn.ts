@@ -98,6 +98,7 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
         env: {
           ...(options.env ?? process.env),
           OVERDECK_RESTART_LOCK_HELD: '1',
+          OVERDECK_RESTART_INITIATOR: 'supervisor-watchdog',
           OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
           ...(spawnOptions.bootId ? { OVERDECK_BOOT_ID: spawnOptions.bootId } : {}),
         },

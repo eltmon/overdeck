@@ -46,6 +46,7 @@ describe('supervisor restart spawner', () => {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: expect.objectContaining({
         OVERDECK_RESTART_LOCK_HELD: '1',
+        OVERDECK_RESTART_INITIATOR: 'supervisor-watchdog',
         OVERDECK_SKIP_SUPERVISOR_CYCLE: '1',
         OVERDECK_BOOT_ID: 'boot-test',
       }),

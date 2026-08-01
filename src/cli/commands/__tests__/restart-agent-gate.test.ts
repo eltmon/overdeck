@@ -53,6 +53,7 @@ vi.mock('../../../lib/deploy/agent-restart-gate.js', () => ({
 import { restartCommand } from '../restart.js';
 
 const originalAgentId = process.env.OVERDECK_AGENT_ID;
+const originalRestartInitiator = process.env.OVERDECK_RESTART_INITIATOR;
 const originalLockHeld = process.env.OVERDECK_RESTART_LOCK_HELD;
 const originalSkipSupervisorCycle = process.env.OVERDECK_SKIP_SUPERVISOR_CYCLE;
 
@@ -66,6 +67,7 @@ describe('restartCommand agent deploy-window gate', () => {
     vi.clearAllMocks();
     process.exitCode = undefined;
     delete process.env.OVERDECK_AGENT_ID;
+    delete process.env.OVERDECK_RESTART_INITIATOR;
     delete process.env.OVERDECK_RESTART_LOCK_HELD;
     process.env.OVERDECK_SKIP_SUPERVISOR_CYCLE = '1';
 
@@ -84,6 +86,7 @@ describe('restartCommand agent deploy-window gate', () => {
     mocks.devSupervisorRefusalLines.mockReturnValue([]);
     mocks.agentRestartBlockReason.mockResolvedValue(null);
     mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+      refresh: vi.fn(async () => undefined),
       release: mocks.releaseRestartLock,
     }));
     mocks.restartDashboard.mockReturnValue(Effect.succeed(undefined));
@@ -94,6 +97,7 @@ describe('restartCommand agent deploy-window gate', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     restoreEnv('OVERDECK_AGENT_ID', originalAgentId);
+    restoreEnv('OVERDECK_RESTART_INITIATOR', originalRestartInitiator);
     restoreEnv('OVERDECK_RESTART_LOCK_HELD', originalLockHeld);
     restoreEnv('OVERDECK_SKIP_SUPERVISOR_CYCLE', originalSkipSupervisorCycle);
     process.exitCode = undefined;
@@ -146,6 +150,22 @@ describe('restartCommand agent deploy-window gate', () => {
     expect(mocks.agentRestartBlockReason).not.toHaveBeenCalled();
     expect(mocks.acquireRestartLock).toHaveBeenCalledWith('pan restart');
     expect(mocks.restartDashboard).toHaveBeenCalledTimes(1);
+  });
+
+  it('persists the watchdog initiator and stopping phase before restarting', async () => {
+    process.env.OVERDECK_RESTART_LOCK_HELD = '1';
+    process.env.OVERDECK_RESTART_INITIATOR = 'supervisor-watchdog';
+
+    await restartCommand({ dashboard: true });
+
+    expect(mocks.writeRestartStatus).toHaveBeenCalledWith(expect.objectContaining({
+      trigger: 'pan restart',
+      success: false,
+      phase: 'stopping',
+      initiator: 'supervisor-watchdog',
+    }));
+    expect(mocks.writeRestartStatus.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.restartDashboard.mock.invocationCallOrder[0]);
   });
 
   it('warns that a proceeding agent restart disconnects live sessions', async () => {
