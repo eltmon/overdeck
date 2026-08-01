@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:19:19.498Z",
+  "updated": "2026-08-01T10:20:03.292Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -58,5 +58,20 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "snapshot-evidence": {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 264958,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:20:03.291Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "snapshot-evidence": "running"
+  }
 }
