@@ -21,6 +21,9 @@ export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
 
 const BEADS_REGION = /<!-- BEGIN BEADS INTEGRATION\b[\s\S]*?<!-- END BEADS INTEGRATION -->\s*/g;
 
+/** Pre-rebrand managed region — superseded by the OVERDECK markers, never rewritten since. */
+const LEGACY_PANOPTICON_REGION = /<!-- BEGIN PANOPTICON CONTEXT\b[\s\S]*?<!-- END PANOPTICON CONTEXT -->\s*/g;
+
 /** Headings of sections `bd onboard` writes outside its marked region. */
 const BD_ONBOARD_SECTIONS = /^## (Quick Reference|Landing the Plane \(Session Completion\)|Session Completion)\s*$/;
 
@@ -98,6 +101,12 @@ export function stripBeadsManagedRegion(existing: string): string {
  */
 export function applyManagedRegion(existing: string, managed: string): string {
   existing = stripBeadsManagedRegion(existing);
+  // Rebrand leftover: a PANOPTICON-marked region is this same managed region
+  // under its old name — orphaned when the markers were renamed, so it would
+  // otherwise persist as a stale duplicate next to the OVERDECK one forever.
+  if (existing.includes('<!-- BEGIN PANOPTICON CONTEXT')) {
+    existing = existing.replace(LEGACY_PANOPTICON_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  }
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
   // Use the LAST end-marker, not the first. Layer content may legitimately

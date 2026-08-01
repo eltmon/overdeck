@@ -182,6 +182,26 @@ Never run bd sync manually here.
   });
 });
 
+describe('applyManagedRegion legacy PANOPTICON region', () => {
+  it('removes the pre-rebrand PANOPTICON region when rewriting the OVERDECK one', () => {
+    const existing = `# User notes
+
+<!-- BEGIN PANOPTICON CONTEXT — managed by \`pan sync\`; edit the layer source, not this region -->
+old rendered content
+<!-- END PANOPTICON CONTEXT -->
+
+${REGION_BEGIN}
+current content
+${REGION_END}
+`;
+    const out = applyManagedRegion(existing, 'fresh content');
+    expect(out).not.toContain('PANOPTICON CONTEXT');
+    expect(out).toContain('# User notes');
+    expect(out).toContain('fresh content');
+    expect(occurrences(out, REGION_BEGIN)).toBe(1);
+  });
+});
+
 function occurrences(haystack: string, needle: string): number {
   let n = 0;
   let i = haystack.indexOf(needle);
