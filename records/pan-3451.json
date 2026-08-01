@@ -27,6 +27,11 @@
       "timestamp": "2026-08-01T23:26:02.666Z",
       "reason": "end",
       "note": "Review finding fixed: checklist HTTP requests now resolve plans and status overlays through the asynchronous workspace-plan door. The synchronous helper remains for CLI callers, both paths share a pure evaluator, and regression tests prove the Promise helper never invokes the synchronous reader. Typecheck, lint, and 17 focused tests passed."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T23:29:23.262Z"
     }
   ],
   "feedback": [],
@@ -63,7 +68,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:29:22.125Z",
+  "updated": "2026-08-01T23:29:23.262Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "reviewing",
