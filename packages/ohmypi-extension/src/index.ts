@@ -386,6 +386,13 @@ async function issueIdFor(env: HookEnv): Promise<string | null> {
   return match ? `${match[1]!.toUpperCase()}-${match[2]}` : null
 }
 
+async function workspaceFor(env: HookEnv): Promise<string | null> {
+  if (env.workspace) return env.workspace
+  if (process.env['OVERDECK_WORKSPACE']) return process.env['OVERDECK_WORKSPACE']!
+  const state = await readAgentState(env)
+  return typeof state['workspace'] === 'string' && state['workspace'].trim() ? state['workspace'] : null
+}
+
 async function sessionIdFor(env: HookEnv): Promise<string | null> {
   const { paths } = envFor(env)
   try {
@@ -442,11 +449,10 @@ async function recordCostEvent(env: HookEnv, event: ToolExecutionEndEvent | Turn
 }
 
 async function evidenceClean(env: HookEnv): Promise<boolean> {
-  const result = await postJsonWithTimeout(
-    env,
-    `${getDashboardUrl()}/api/agents/${env.agentId}/plan-checklist`,
-    {},
-  )
+  const issueId = await issueIdFor(env)
+  const workspace = await workspaceFor(env)
+  if (!issueId || !workspace) return false
+  const result = await postJsonWithTimeout(env, `${getDashboardUrl()}/api/agents/${env.agentId}/plan-checklist`, { issueId })
   return result?.['complete'] === true
 }
 
@@ -483,7 +489,7 @@ async function markStuck(env: HookEnv, reason: string): Promise<void> {
 
 const COMPLETION_PHRASES = [
   'Implementation complete',
-  'all beads closed',
+  'all tasks closed',
   'ready for review',
   'work complete',
 ]
@@ -522,7 +528,7 @@ async function updateProgress(env: HookEnv, kind: 'tool' | 'turn', timestamp: st
 export async function handleWorkAgentTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
   const output = await readTurnOutput(env, event)
   if (await evidenceClean(env)) {
-    await postWorkComplete(env, 'evidence-clean', 'All xBRIEF checklist items are complete')
+    await postWorkComplete(env, 'evidence-clean', 'All xBRIEF plan items are complete')
     return
   }
 
