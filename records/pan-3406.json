@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-01T13:41:14.792Z",
+  "updated": "2026-08-01T13:42:29.884Z",
   "pipeline": {
     "issueId": "PAN-3406",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "order-books-doc-title-join": {
-        "writerId": "agent-pan-3406",
-        "agentId": "agent-pan-3406",
-        "pid": 2862990,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T13:41:14.792Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3406",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Joined lane items to the dashboard issue read model at render time, rendered truncated full-title tooltips, and covered known, unknown, and mixed-case identifiers.",
         "releasedAt": "2026-08-01T13:40:59.453Z"
+      },
+      {
+        "writerId": "agent-pan-3406",
+        "agentId": "agent-pan-3406",
+        "pid": 2862990,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T13:41:14.792Z",
+        "itemId": "order-books-doc-title-join",
+        "outcome": "completed",
+        "reason": "Documented the render-time dashboard issue-title join, ID-only fallback, and canonical-ID-only persistence rule.",
+        "releasedAt": "2026-08-01T13:42:29.883Z"
       }
     ],
     "statusReasons": {
       "lane-item-titles": {
         "reason": "Joined lane items to the dashboard issue read model at render time, rendered truncated full-title tooltips, and covered known, unknown, and mixed-case identifiers.",
         "updatedAt": "2026-08-01T13:40:59.453Z"
+      },
+      "order-books-doc-title-join": {
+        "reason": "Documented the render-time dashboard issue-title join, ID-only fallback, and canonical-ID-only persistence rule.",
+        "updatedAt": "2026-08-01T13:42:29.883Z"
       }
     }
   },
@@ -90,6 +97,8 @@
     "lane-item-titles.lane-item-titles.ac3": "completed",
     "lane-item-titles.lane-item-titles.ac4": "completed",
     "lane-item-titles.lane-item-titles.ac5": "completed",
-    "order-books-doc-title-join": "running"
+    "order-books-doc-title-join": "completed",
+    "order-books-doc-title-join.order-books-doc-title-join.ac1": "completed",
+    "order-books-doc-title-join.order-books-doc-title-join.ac2": "completed"
   }
 }
