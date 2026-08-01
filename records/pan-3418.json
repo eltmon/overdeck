@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:30:50.826Z",
+  "updated": "2026-08-01T15:39:14.429Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "db-writes-null-for-empty": {
-        "writerId": "agent-pan-3418",
-        "agentId": "agent-pan-3418",
-        "pid": 3250046,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:30:50.826Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Normalized trimmed model and effort to undefined at create boundary; added regression coverage for empty and real model values",
         "releasedAt": "2026-08-01T15:30:26.193Z"
+      },
+      {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 3250046,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:30:50.826Z",
+        "itemId": "db-writes-null-for-empty",
+        "outcome": "completed",
+        "reason": "Normalized model and effort at the conversations write door, including reactivation; added database-backed regression coverage",
+        "releasedAt": "2026-08-01T15:39:14.428Z"
       }
     ],
     "statusReasons": {
       "server-coerce-empty-fields": {
         "reason": "Normalized trimmed model and effort to undefined at create boundary; added regression coverage for empty and real model values",
         "updatedAt": "2026-08-01T15:30:26.193Z"
+      },
+      "db-writes-null-for-empty": {
+        "reason": "Normalized model and effort at the conversations write door, including reactivation; added database-backed regression coverage",
+        "updatedAt": "2026-08-01T15:39:14.428Z"
       }
     }
   },
@@ -88,6 +95,10 @@
     "server-coerce-empty-fields.server-coerce-empty-fields.ac1": "completed",
     "server-coerce-empty-fields.server-coerce-empty-fields.ac2": "completed",
     "server-coerce-empty-fields.server-coerce-empty-fields.ac3": "completed",
-    "db-writes-null-for-empty": "running"
+    "db-writes-null-for-empty": "completed",
+    "db-writes-null-for-empty.db-writes-null-for-empty.ac1": "completed",
+    "db-writes-null-for-empty.db-writes-null-for-empty.ac2": "completed",
+    "db-writes-null-for-empty.db-writes-null-for-empty.ac3": "completed",
+    "db-writes-null-for-empty.db-writes-null-for-empty.ac4": "completed"
   }
 }
