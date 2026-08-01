@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:19:13.604Z",
+  "updated": "2026-08-01T15:29:58.412Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -47,5 +47,26 @@
       "open": true,
       "needsYouEmittedAt": "2026-07-28T21:04:35.248Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "persist-project-key": {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3215967,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:29:58.412Z"
+      }
+    },
+    "statusReasons": {
+      "persist-project-key": {
+        "reason": "code implemented, tested, pushed (a10f31d/be9cf7d)",
+        "updatedAt": "2026-08-01T15:29:58.412Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "persist-project-key": "running"
+  }
 }
