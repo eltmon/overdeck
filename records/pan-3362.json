@@ -162,6 +162,26 @@
       "timestamp": "2026-08-01T13:59:47.521Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T14:21:25.850Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T14:21:25.880Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T14:21:25.916Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T14:21:25.941Z"
     }
   ],
   "feedback": [
@@ -208,7 +228,7 @@
     "recordedAt": "2026-08-01T13:59:42.560Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T14:20:38.130Z",
+  "updated": "2026-08-01T14:21:25.941Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -339,7 +359,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3362",
