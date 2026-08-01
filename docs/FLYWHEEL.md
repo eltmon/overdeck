@@ -23,7 +23,7 @@ The Flywheel produces two different artifacts. They are not interchangeable.
 
 **State** is the durable cumulative memory across all runs. It lives at `docs/FLYWHEEL-STATE.md`, owned and edited by the orchestrator, plain markdown. Future runs read it before doing anything else. The dashboard's **State** tab renders it as markdown via `GET /api/flywheel/state`. The file does not exist before the first run that needs to record something durable; the orchestrator creates it.
 
-`pan flywheel report` writes the per-run report at `${OVERDECK_HOME}/flywheel/runs/<runId>/report.md` and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. The CLI does not author State content — that is the orchestrator's job.
+`pan flywheel report` writes the per-run report at `${OVERDECK_HOME}/flywheel/runs/<runId>/report.md` and commits any orchestrator-authored changes to `docs/FLYWHEEL-STATE.md`. Before committing, it enforces State retention whenever the file exceeds 1,000 lines or 120 KiB: the curated Substrate fixes, Recurring patterns, Cross-run operational gotchas, and Parked items sections plus the latest three runs remain verbatim, while older run detail becomes one terse line per run. The original detail remains in git history; compaction changes only the working copy.
 
 ## Status contract
 
@@ -130,7 +130,7 @@ The Flywheel lifecycle is exposed as `pan flywheel` commands and mirrored by das
 | `pan flywheel status` | Reads the latest `FlywheelStatus` snapshot. |
 | `pan flywheel emit-status --file <json>` | Validates and writes a status snapshot from the orchestrator. |
 | `pan flywheel complete` | Finalizes a drained orders-bound run, writes its report and retrospective result, then starts the next ready book or backlog mode when configured. |
-| `pan flywheel report` | Writes the per-run report under the run directory and commits any pending changes to `docs/FLYWHEEL-STATE.md`. |
+| `pan flywheel report` | Writes the per-run report, compacts over-threshold State to curated sections + three verbatim runs + one-line older runs, then commits `docs/FLYWHEEL-STATE.md`. |
 
 Cloister owns the singleton gate. Only one Flywheel run may be active for a Overdeck home at a time. If a second start request arrives, it should fail with a clear active-run response instead of spawning a competing orchestrator. Pause and resume operate on that same saved run record, not on a new run.
 
