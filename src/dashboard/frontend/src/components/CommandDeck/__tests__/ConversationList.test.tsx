@@ -80,6 +80,9 @@ function makeClient() {
     },
   });
   client.setQueryData(['conversations'], [mockConversation]);
+  // PAN-1577: pre-seed so ConversationList's registered-projects query (for
+  // each row's Move submenu) doesn't fire an extra real fetch in these tests.
+  client.setQueryData(['registered-projects'], []);
   return client;
 }
 
@@ -404,5 +407,97 @@ describe('ConversationList rename flow', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 
     resolveResponse?.();
+  });
+});
+
+// ─── Move menu (PAN-1577) ──────────────────────────────────────────────────
+
+describe('ConversationList move flow (PAN-1577)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.endsWith('/move')) {
+        return Promise.resolve({ ok: true, json: async () => ({ projectKey: 'myn' }) });
+      }
+      // Background refetches (e.g. onSettled's invalidateQueries) hit /api/conversations —
+      // must resolve to an array or ConversationList's memo chain throws.
+      return Promise.resolve({ ok: true, json: async () => [mockConversation] });
+    }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function renderWithProjects() {
+    const client = makeClient();
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    return client;
+  }
+
+  it('exposes a Move item with a project picker from the 3-dot menu (ac1)', () => {
+    renderWithProjects();
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).toBeInTheDocument();
+  });
+
+  it('exposes a Move item with a project picker from right-click (ac1)', () => {
+    renderWithProjects();
+    fireEvent.contextMenu(screen.getByTitle('test-conv'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).toBeInTheDocument();
+  });
+
+  it('disables the conversation\'s current project in the picker (ac2)', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).not.toBeDisabled();
+  });
+
+  it('moves the conversation via the shared mutation when another project is selected (ac2)', async () => {
+    renderWithProjects();
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'MYN' }));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/move',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ projectKey: 'myn' }),
+        }),
+      );
+    });
   });
 });

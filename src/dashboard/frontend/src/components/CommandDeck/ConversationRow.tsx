@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useDashboardStore } from '../../lib/store';
-import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical } from 'lucide-react';
+import { Circle, Archive, Copy, Check, X, Pencil, Sparkles, Star, Loader2, Terminal, FileCode, Search, Globe, Wrench, Zap, GitBranch, GitBranchPlus, GitFork, AlertCircle, Scissors, TriangleAlert, FileText, FileX, ExternalLink, Share2, MoreVertical, FolderInput } from 'lucide-react';
 import { toolNameToPhase, getPhaseLabel, isSpinnerPhase } from '../../lib/workingPhase';
 import { useConfirm } from '../DialogProvider';
 import { useNow } from '../../hooks/useNow';
@@ -10,6 +10,7 @@ import { AwaitingInputIndicator } from '../AwaitingInputIndicator';
 import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
+import type { RegisteredProject } from './UnknownProjectState';
 import styles from './styles/command-deck.module.css';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
@@ -82,6 +83,9 @@ interface ConversationRowProps {
   onSelect: (name: string) => void;
   mutations: ConversationMutations;
   variant?: 'flat' | 'nested';
+  /** Registered projects for the Move submenu (PAN-1577). Fetched once by the
+   * list/container rather than per-row to avoid a duplicate request per row. */
+  registeredProjects?: readonly RegisteredProject[];
 }
 
 export function ConversationRow({
@@ -90,6 +94,7 @@ export function ConversationRow({
   onSelect,
   mutations,
   variant = 'flat',
+  registeredProjects = [],
 }: ConversationRowProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -100,6 +105,7 @@ export function ConversationRow({
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const menuBtnRef = useRef<HTMLSpanElement>(null);
+  const [moveSubmenuOpen, setMoveSubmenuOpen] = useState(false);
   const confirm = useConfirm();
   const now = useNow(60_000);
 
@@ -116,7 +122,7 @@ export function ConversationRow({
   // Close the menu on Escape, scroll, or resize — a portaled menu can't track
   // its trigger once the list scrolls, so dismiss rather than float orphaned.
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!menuOpen) { setMoveSubmenuOpen(false); return; }
     const dismiss = () => setMenuOpen(false);
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
     window.addEventListener('keydown', onKey);
@@ -480,6 +486,48 @@ export function ConversationRow({
               : <Sparkles size={14} />}
             Regenerate title
           </button>
+          {registeredProjects.length > 0 && (
+            <span style={{ position: 'relative', display: 'block' }}>
+              <button
+                role="menuitem"
+                className={styles.headerMenuItem}
+                aria-haspopup="menu"
+                aria-expanded={moveSubmenuOpen}
+                onClick={() => setMoveSubmenuOpen((open) => !open)}
+              >
+                <FolderInput size={14} />
+                Move
+              </button>
+              {moveSubmenuOpen && (
+                <>
+                  <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
+                  <div role="menu" className={styles.headerSubmenu}>
+                    {registeredProjects.map((project) => {
+                      const isCurrent = conv.projectKey === project.key;
+                      const projectName = project.name ?? project.key;
+                      return (
+                        <button
+                          key={project.key}
+                          role="menuitem"
+                          className={styles.headerMenuItem}
+                          disabled={isCurrent}
+                          onClick={() => {
+                            if (isCurrent) return;
+                            mutations.move({ name: conv.name, projectKey: project.key, projectName });
+                            setMoveSubmenuOpen(false);
+                            setMenuOpen(false);
+                          }}
+                        >
+                          {projectName}
+                          {isCurrent && <Check size={14} className={styles.headerMenuItemCheck} />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </span>
+          )}
           {conv.claudeSessionId && !conv.forkStatus && (
             <button
               role="menuitem"

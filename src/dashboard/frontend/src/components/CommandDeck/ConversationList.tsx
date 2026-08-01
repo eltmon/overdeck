@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../lib/store';
 import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { fetchRegisteredProjects } from './UnknownProjectState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -208,6 +209,14 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
     },
   });
 
+  // Registered projects for each row's Move submenu (PAN-1577) — one shared
+  // query for the whole list, same key the Sidebar/CommandDeck use.
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
+  });
+
   // Refresh the list the instant a conversation is created (server emits a
   // `conversation.created` domain event that bumps this revision), instead of
   // waiting up to 10s for the next poll tick.
@@ -325,6 +334,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
                   isSelected={selectedConversation === conv.name}
                   onSelect={(name) => onSelectConversation(name)}
                   mutations={mutations}
+                  registeredProjects={registeredProjects}
                 />
               </motion.div>
             ))}
