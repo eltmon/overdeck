@@ -301,7 +301,7 @@
     "recordedAt": "2026-08-01T22:26:16.391Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:28:15.147Z",
+  "updated": "2026-08-01T22:30:16.670Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -311,9 +311,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T22:27:25.587Z",
-    "updatedAt": "2026-08-01T22:27:25.989Z",
+    "updatedAt": "2026-08-01T22:30:14.458Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed cycle-7 blocking findings - test mock callback invocation and batch-reader state-home resolution",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T22:27:25.587Z",
     "reviewSpawnedAt": "2026-08-01T22:20:43.932Z",
@@ -384,9 +383,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29447957,
-            "output": 450375,
-            "cacheRead": 100844544,
+            "input": 29688362,
+            "output": 461775,
+            "cacheRead": 104838656,
             "cacheWrite": 0
           }
         },
@@ -439,9 +438,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 33999028,
-          "output": 539972,
-          "cacheRead": 114340864,
+          "input": 34239433,
+          "output": 551372,
+          "cacheRead": 118334976,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -452,8 +451,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 253.5710593,
-        "pricingAsOf": "2026-08-01T22:27:28.518Z"
+        "usd": 257.1121403,
+        "pricingAsOf": "2026-08-01T22:30:14.933Z"
       }
     },
     "merges": [
@@ -462,7 +461,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
