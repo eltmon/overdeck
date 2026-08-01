@@ -77,6 +77,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T21:16Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-01T21:16:28.095Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T21:29:29.991Z"
     }
   ],
   "feedback": [],
@@ -126,19 +131,19 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:29:28.703Z",
+  "updated": "2026-08-01T21:29:30.902Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:29:28.189Z",
+    "updatedAt": "2026-08-01T21:29:28.720Z",
     "reviewNotes": "Correctness reviewer failed; residue forge addressing, audit evidence, partial-failure handling, and record-read batching remain blocked",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewSpawnedAt": "2026-08-01T21:09:43.292Z",
+    "reviewSpawnedAt": "2026-08-01T21:29:28.719Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -267,7 +272,7 @@
       },
       "costAtCloseOut": {
         "usd": 90.6166233,
-        "pricingAsOf": "2026-08-01T21:29:28.261Z"
+        "pricingAsOf": "2026-08-01T21:29:30.884Z"
       }
     },
     "merges": [
