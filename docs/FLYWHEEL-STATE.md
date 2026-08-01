@@ -586,3 +586,11 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **MIN-929: review verdict announced but never recorded.** Parent printed "Review passed after cycle-3 convergence gate" + synthesis written ~1.5h ago, yet no test dispatch, no ready flip, health monitor still nudging the idle work agent — the signal step silently failed (synthesis-present variant of REVIEWER_READY-never-landed). `pan review restart MIN-929` resumed the parent (per-lane idempotency re-runs nothing). VERIFY next tick: verdict recorded + test dispatched; if the signal fails twice, file the specimen with pane+transcript evidence.
 - #3400 (PAN-3393) test lane pending. PAN-3392 close-out still deploy-gated (live e7911e9c predates its merge).
 - Fresh MIN-864 session working ($0.70, new review convoy live since 07:32). pan-3362 $32.93 post-compaction continuing. pan-3367 $68.51 audit (COST WATCH — biggest spender of the run). min-874 $58.32 out 3.4k. min-839 $17.34 +782/−67.
+
+## RUN-79 tick 9 (2026-08-01 ~11:55Z) — PAN-3393 LANDED (stuck-flag machinery fixed); cost + crash-restore watch
+
+- **PAN-3393 landed** (#3400 squash `2a04120c02`, handed off): stuck flags auto-retire, /unstick is merged-aware, `pan unstick` exists (PAN-3321 gap closed). Close-out on CI+deploy. #3403 (PAN-1889) test lane in CI.
+- **Crash-restore cluster**: pan-3367, pan-3362, MIN-929's work agent all show "prior process ended unexpectedly" restores this tick. No OOM lines visible; RAM 50.6/64GB (13.5GB avail). Likely the deploy-window restarts; all restored and continuing. Watch for recurrence — if another cluster appears without a deploy, investigate the killer.
+- **COST WATCH: pan-3367 at $93.93** (29-issue audit, +2343/−391 docs; crashed+restored at ctx 82%). min-874 $75.68 +3343/−211. Cost limits are warn-only per operator policy — flagging, not stopping. Both producing proportionate output.
+- MIN-929 verdict signal still not confirmed post-re-drive (parent idle again; sessions recreated 07:36/07:47). NEXT TICK: hard-verify via durable record; if the signal failed twice, file the synthesis-present signal-loss specimen.
+- PAN-3392 close-out deploy-gated. MIN-864 fresh session + convoy progressing slowly ($0.86).
