@@ -526,3 +526,23 @@ Heartbeat stopped at operator direction; no monitors or background watches remai
 - **MIN-864 unstuck after ~1 week**: polyrepo workspace (6 sub-repos on feature/min-864), verification passed 07-25, open GitLab MR, but NO registry agent state and review record pending/pending — pipeline lost track. `pan review request MIN-864` accepted (verification → convoy). Watch: if the convoy wedges on the wrapper shape, that's live evidence for the wrapper-blind stamp/compare sites (PAN-2948 follow-up).
 - Strike baselines for delta checks: pan-1889 $4.59 +296/−21 · pan-3389 $3.84 +37/−13 · pan-3390 $4.21 +60/−6 · MIN-929 fresh session $3.54 +6/−11 (progressing).
 - Main CI green ×2. Load normal.
+
+## RUN-79 tick 3 (2026-08-01 ~10:10Z) — MIN-864 root-caused end-to-end; 2 substrate bugs filed+struck (PAN-3392, PAN-3393)
+
+- **MIN-864 fully diagnosed**: my tick-2 re-review triggered verification, which failed at `sync-target-branch` — REAL merge conflicts vs main in fe (8 files) + api (4 files), all voice-pipeline area (main got competing voice work during the week it sat). Feedback was written but delivery failed: **resurrection silently returned false because the agent registry row is GONE** (`feedback-target.ts:167` null-state path has no log and no start fallback) → re-marked `stuck: feedback_delivery_needs_you`. Plain `pan start MIN-864` worked first try (7 checklist items, continue.json). Agent now resolving conflicts per the feedback file.
+- **PAN-3392 filed+struck**: resurrection resume-only + silent null-state failure + no start fallback (the backstop-as-symptom rule — I manually did what the primary path should have).
+- **PAN-3393 filed+struck**: stuck flags never auto-retire + `/unstick` route resets lifecycle (corrupting for merged rows) + `pan unstick` missing (PAN-3321). Two specimens: PAN-3356, MIN-864. This was the handover's unfiled watch item — now filed.
+- Strike deltas (all progressing): pan-1889 $9.05 +331/−31 · pan-3389 $5.16 (out 344→534, verifying) · pan-3390 $6.09 (out 231→406, verifying). MIN-929 durable-review verification worker running. PAN-3390 merge-verify worker running.
+- Noted, not chased: verification workers spawn from the stale `.pan-reload-generation-a` dist path while the live server is the post-merge primary-dist build — watch whether worker code lags fixes; candidate issue if it bites.
+- Main CI green. Load ~11 (verification suites). Fleet: 5 strikes + 2 MIN work agents.
+
+## RUN-79 tick 4 (2026-08-01 ~10:35Z) — OPERATOR SATURATION DIRECTIVE: full both-project audit; 6 zombies drained, 4 starts, 2 strikes landed/healed
+
+Operator: "ALL issues in MYN and overdeck pipelines should be progressing" — treated as blanket release + full pane-level audit of both projects.
+
+- **PAN-3390 (composer effort) LANDED** — train had merged PR #3391 while the strike sat in `pan monitor` for ~54 min unaware; `pan done --strike` handed off. **PAN-3389 PR #3394 in CI** (same monitor-blindness, 59 min). WATCH ITEM: `pan monitor` blocks strike agents for an hour+ without waking them on their own PR merge — candidate substrate issue after observing next occurrence.
+- **PAN-3305 un-wedged**: not an operator hold — PR #3316 merged 2 days ago but 3 de-flake commits sat UNPUSHED on the local strike branch (remote branch deleted post-merge). Pushed, PR #3395 open. Close-out after it lands.
+- **Starts**: PAN-3362 + PAN-3367 (operator directive = release), MIN-874 (planning was done, start was never issued — planning→start gap again), MIN-839 (auto-planning → auto-start).
+- **MIN zombie sweep (11 rows)**: drained 6 by close-out (MIN-852, 729, 794, 861, 862 = real lag; MIN-882 already closed 07-23 = resolver residue). 7 recordless ancients (MIN-172, 572, 576, 596, 620, 622, 632) fail close-out "no record found" — no disposition path. Filed **PAN-3396** (resolver resurrects terminal issues + recordless dead-letter).
+- **MIN-908 closed out.** MIN-929: work agent idle is NORMAL (in review); convoy lanes correctness+requirements were frozen at 0 output (PAN-3375 signature on FRESH spawns, not warm-resumes — the landed detector may not cover this variant); per-lane restarts issued — correctness recovered, requirements still 0-output, one more cycle before escalating.
+- Fleet now ~10 active. Load watch: verification suites stacking.

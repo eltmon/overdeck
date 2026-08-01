@@ -4,12 +4,13 @@ import { ComposerFooter } from '../ComposerFooter';
 import { resetComposerStore } from '../../../lib/composerStore';
 import { modelSupportsImages, findModelDef } from '../../Settings/modelCatalog';
 
-const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, voiceWidgetRenders } = vi.hoisted(() => ({
+const { editorState, mockFocus, mockToastError, mockToastWarning, mockSaveStoredModel, storedEffort, voiceWidgetRenders } = vi.hoisted(() => ({
   editorState: { text: '' },
   mockFocus: vi.fn(),
   mockToastError: vi.fn(),
   mockToastWarning: vi.fn(),
   mockSaveStoredModel: vi.fn(),
+  storedEffort: { value: 'medium' },
   voiceWidgetRenders: [] as Array<{ autoStartToken?: number }>,
 }));
 
@@ -62,7 +63,7 @@ vi.mock('../EffortPicker', () => ({
   EffortPicker: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
     <button type="button" data-testid="effort-picker" onClick={() => onChange('high')}>{value}</button>
   ),
-  loadStoredEffort: () => 'medium',
+  loadStoredEffort: () => storedEffort.value,
 }));
 
 vi.mock('../VoiceWidget', () => ({
@@ -117,6 +118,7 @@ describe('ComposerFooter attachments', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetComposerStore();
+    storedEffort.value = 'medium';
     voiceWidgetRenders.length = 0;
     editorState.text = '';
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('image-1');
@@ -131,6 +133,35 @@ describe('ComposerFooter attachments', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+  });
+
+  it('shows and tracks the conversation effort instead of the browser default', () => {
+    storedEffort.value = 'max';
+    const view = render(<ComposerFooter conversation={{ ...conversation, effort: 'high' }} />);
+
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('high');
+
+    view.rerender(<ComposerFooter conversation={{ ...conversation, effort: 'low' }} />);
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('low');
+  });
+
+  it('does not use the browser default for an existing session with no persisted effort', () => {
+    storedEffort.value = 'max';
+    render(<ComposerFooter conversation={{ ...conversation, effort: null }} />);
+
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('high');
+  });
+
+  it('uses the browser default only before a conversation session exists', () => {
+    storedEffort.value = 'max';
+    render(<ComposerFooter conversation={{
+      ...conversation,
+      sessionAlive: false,
+      claudeSessionId: null,
+      effort: null,
+    }} />);
+
+    expect(screen.getByTestId('effort-picker')).toHaveTextContent('max');
   });
 
   it.each([
