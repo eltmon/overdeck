@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:31:35.858Z",
+  "updated": "2026-08-01T20:31:40.158Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -141,5 +141,51 @@
     "residue-ceremony.residue-ceremony.ac3": "completed",
     "residue-ceremony.residue-ceremony.ac4": "completed",
     "docs-membership-residue": "running"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "scripts/file-size-allowlist.txt",
+      "src/lib/lifecycle/workflows.ts"
+    ],
+    "declaredScope": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/close.ts",
+      "src/lib/__tests__/pipeline-membership.test.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/residue.ts",
+      "src/lib/lifecycle/types.ts",
+      "src/lib/lifecycle/workflows.ts",
+      "src/lib/pan-dir/record.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/pipeline-membership.ts",
+      "sync-sources/skills/pan-close/SKILL.md",
+      "tests/cli/commands/close-residue-flag.test.ts",
+      "tests/unit/lib/lifecycle/dod.test.ts",
+      "tests/unit/lib/lifecycle/residue.test.ts",
+      "tests/unit/lib/pan-dir/record-close-out.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/DEFINITION-OF-DONE.md",
+      "docs/PIPELINE-MEMBERSHIP.md",
+      "src/cli/commands/close.ts",
+      "src/lib/__tests__/pipeline-membership.test.ts",
+      "src/lib/lifecycle/dod.ts",
+      "src/lib/lifecycle/residue.ts",
+      "src/lib/lifecycle/types.ts",
+      "src/lib/pan-dir/record.ts",
+      "src/lib/pipeline-membership-gather.ts",
+      "src/lib/pipeline-membership.ts",
+      "sync-sources/skills/pan-close/SKILL.md",
+      "tests/cli/commands/close-residue-flag.test.ts",
+      "tests/unit/lib/lifecycle/dod.test.ts",
+      "tests/unit/lib/lifecycle/residue.test.ts",
+      "tests/unit/lib/pan-dir/record-close-out.test.ts",
+      "tests/unit/lib/pipeline-membership-gather.test.ts"
+    ],
+    "recordedAt": "2026-08-01T20:31:40.157Z"
   }
 }
