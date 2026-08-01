@@ -49,22 +49,29 @@ import { listSessionNames } from '../../../lib/tmux.js';
 import { withConcurrencyLimit } from '../../../lib/concurrency.js';
 import { IssueDataService } from '../services/issue-data-service.js';
 import { ReadModelService } from '../read-model.js';
-import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodePresence, type SessionNodeType } from '@overdeck/contracts';
+import { compareIssueIds, type AgentSnapshot, type SessionNode, type SessionNodeType } from '@overdeck/contracts';
 import { normalizeAgentStatus } from '../services/agent-status.js';
 import { buildLintSessionNode } from './command-deck-lint-node.js';
 import { deriveSessionPresence } from '../services/session-presence.js';
-import { getAgentDir, getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
+import { getAgentRuntimeState, getAgentStateSync } from '../../../lib/agents.js';
 import { enrichSessionsWithModelOrigin } from '../services/model-origin-enrich.js';
-import { detectAwaitingInputForAgent, type AwaitingInputDetection } from '../../../lib/agent-input-detection.js';
+import { detectAwaitingInputForAgent } from '../../../lib/agent-input-detection.js';
 import { getTmuxSessionName } from '../../../lib/cloister/specialists.js';
 import { getReviewStatusSync } from '../review-status.js';
 import { resolveJsonlPath } from './jsonl-resolver.js';
-import { buildReviewerNodes, readSynthesisRounds, type ReviewerRoundMetadata } from './reviewer-tree.js';
+import type { ReviewerRoundMetadata } from './reviewer-tree.js';
+import {
+  awaitingInputFromProjection,
+  buildSpecialistSessionNodes,
+  readSessionGateFields,
+} from './session-tree-specialists.js';
 import { PAN_CONTINUE_FILENAME, PAN_DIRNAME, WORKSPACE_RUNTIME_DIRNAME } from '../../../lib/pan-dir/index.js';
 import { isPlanningComplete } from '../../../lib/xbrief/io.js';
 import { findSpecByIssueThroughOverdeck } from '../../../lib/overdeck/specs.js';
 import { findSpecByIssue } from '../../../lib/pan-dir/specs.js';
 import { getOverdeckHome } from '../../../lib/paths.js';
+import { parseIssueIdFromTextSync } from '../../../lib/resource-utils.js';
+import { isDiscoverableAgentSession } from '../services/resource-discovery.js';
 
 // ─── Shared IssueDataService (via singleton) ────────────────────────────────
 
@@ -107,19 +114,6 @@ interface ActivityContext {
   agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>;
 }
 
-function awaitingInputFromProjection(
-  agentId: string,
-  agentSnapshotsById?: ReadonlyMap<string, AgentSnapshot>,
-): AwaitingInputDetection | null | undefined {
-  const agent = agentSnapshotsById?.get(agentId);
-  if (!agent) return undefined;
-  if (agent.hasPendingQuestion !== true) return null;
-  return {
-    reason: (agent.pendingQuestionReason as AwaitingInputDetection['reason'] | undefined) ?? 'other',
-    prompt: agent.pendingQuestionPrompt || 'Agent is waiting for human input',
-  };
-}
-
 const LEGACY_SESSION_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 /** Hide stopped legacy sessions older than 24h from the Command Deck tree.
@@ -150,8 +144,8 @@ function getSlotWorkSessionPattern(issueLower: string): RegExp {
 function issueIdsWithLiveTmuxSessions(sessionNames: ReadonlySet<string>): Set<string> {
   const issueIds = new Set<string>();
   for (const sessionName of sessionNames) {
-    const match = /^(?:planning|strike)-([a-z]+-\d+)$|^agent-([a-z]+-\d+)(?:-plan)?$/i.exec(sessionName);
-    const issueId = match?.[1] ?? match?.[2];
+    if (!isDiscoverableAgentSession(sessionName)) continue;
+    const issueId = parseIssueIdFromTextSync(sessionName);
     if (issueId) issueIds.add(issueId.toLowerCase());
   }
   return issueIds;
@@ -190,44 +184,6 @@ export function compareSessionTreeSessionIds(a: string, b: string, issueLower: s
   if (aRank !== bRank) return aRank - bRank;
   if (aSlot !== bSlot) return aSlot - bSlot;
   return aId.localeCompare(bId);
-}
-
-/** Read agent-state gates for session nodes that are otherwise built from
- *  history or runtime projection rather than directly from state. */
-async function readSessionGateFields(
-  sessionId: string,
-  state = getAgentStateSync(sessionId),
-): Promise<{
-  paused?: true;
-  pausedReason?: string;
-  pausedAt?: string;
-  troubled?: true;
-  troubledAt?: string;
-  troubledReason?: string;
-  consecutiveFailures?: number;
-  queuedMailCount?: number;
-}> {
-  const s = state;
-  if (!s) return {};
-  return {
-    paused: s.paused === true ? true : undefined,
-    pausedReason: s.paused === true ? s.pausedReason : undefined,
-    pausedAt: s.paused === true ? s.pausedAt : undefined,
-    troubled: s.troubled === true ? true : undefined,
-    troubledAt: s.troubled === true ? s.troubledAt : undefined,
-    troubledReason: s.troubled === true ? s.lastFailureReason : undefined,
-    consecutiveFailures: s.troubled === true ? s.consecutiveFailures : undefined,
-    queuedMailCount: s.troubled === true ? await countQueuedMail(sessionId) : undefined,
-  };
-}
-
-async function countQueuedMail(agentId: string): Promise<number> {
-  try {
-    const entries = await readdir(join(getAgentDir(agentId), 'mail'), { withFileTypes: true });
-    return entries.filter((entry) => entry.isFile() && entry.name.endsWith('.md')).length;
-  } catch {
-    return 0;
-  }
 }
 
 async function collectSessionTreeNodes(
@@ -422,84 +378,19 @@ async function collectSessionTreeNodes(
     });
   }
 
-  if (centralStatus?.history && centralStatus.history.length > 0) {
-    const reviewEntries = centralStatus.history.filter((entry) => entry.type === 'review');
-    const latestReview = reviewEntries[reviewEntries.length - 1];
-    if (latestReview) {
-      const resolvedProject = resolveProjectFromIssueSync(issueId);
-      const reviewerProjectKey = resolvedProject?.projectKey ?? issuePrefix.toLowerCase();
-      const synthesisRoundMetadata = await readSynthesisRounds(issueId, reviewerProjectKey);
-      // PAN-1048: review orchestrator uses spawnRun naming — agent-<issue>-review
-      const orchestratorSessionName = `agent-${issueLower}-review`;
-      const orchestratorPresence: SessionNodePresence = context.tmuxSessionNames.has(orchestratorSessionName)
-        ? (latestReview.status === 'reviewing' ? 'active' : 'idle')
-        : 'ended';
-      const orchestratorJsonlPath = await resolveJsonlPath(orchestratorSessionName, workspacePath);
-      const orchestratorAwaitingInput = awaitingInputFromProjection(orchestratorSessionName, context.agentSnapshotsById);
-      const orchestratorSnapshot = context.agentSnapshotsById?.get(orchestratorSessionName);
-      sections.push({
-        type: 'review',
-        sessionId: orchestratorSessionName,
-        model: 'specialist',
-        startedAt: latestReview.timestamp,
-        endedAt: undefined,
-        duration: 0,
-        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
-        presence: orchestratorPresence,
-        roundMetadata: synthesisRoundMetadata as SessionNode['roundMetadata'],
-        awaitingInput: orchestratorAwaitingInput !== undefined ? (orchestratorAwaitingInput !== null) : false,
-        awaitingInputPrompt: orchestratorAwaitingInput?.prompt,
-        awaitingInputReason: orchestratorAwaitingInput?.reason,
-        pendingInputKinds: orchestratorSnapshot?.pendingInputKinds ? [...orchestratorSnapshot.pendingInputKinds] : undefined,
-        hasJsonl: !!orchestratorJsonlPath,
-        tmuxSession: orchestratorSessionName,
-        ...await readSessionGateFields(orchestratorSessionName),
-      });
-      const reviewerNodes = await buildReviewerNodes({
-        issueId,
-        projectKey: reviewerProjectKey,
-        workspacePath,
-        projectPath,
-        tmuxSessionNames: context.tmuxSessionNames,
-        startedAt: latestReview.timestamp,
-        endedAt: undefined,
-        status: normalizeAgentStatus(latestReview.status === 'reviewing' ? 'running' : latestReview.status),
-        agentSnapshotsById: context.agentSnapshotsById,
-      });
-      sections.push(...(reviewerNodes as unknown as SessionNode[]));
-    }
+  const statusHistory = centralStatus?.history ?? [];
+  sections.push(...await buildSpecialistSessionNodes({
+    issueId,
+    fallbackProjectKey: issuePrefix.toLowerCase(),
+    workspacePath,
+    projectPath,
+    tmuxSessionNames: context.tmuxSessionNames,
+    agentSnapshotsById: context.agentSnapshotsById,
+    centralStatus,
+  }));
 
-    // Test role — one canonical session (`agent-<issue>-test`) reused across
-    // rounds, so emit a single node anchored to the latest `test` history
-    // entry, the same way review uses latestReview.
-    const testEntries = centralStatus.history.filter((entry) => entry.type === 'test');
-    const latestTest = testEntries[testEntries.length - 1];
-    if (latestTest) {
-      const testSessionName = `agent-${issueLower}-test`;
-      const testIsLive = context.tmuxSessionNames.has(testSessionName);
-      const testJsonlPath = await resolveJsonlPath(testSessionName, workspacePath);
-      const testAwaitingInput = awaitingInputFromProjection(testSessionName, context.agentSnapshotsById);
-      const testSnapshot = context.agentSnapshotsById?.get(testSessionName);
-      sections.push({
-        type: 'test',
-        sessionId: testSessionName,
-        model: 'specialist',
-        startedAt: latestTest.timestamp,
-        endedAt: undefined,
-        duration: 0,
-        status: normalizeAgentStatus(latestTest.status === 'testing' ? 'running' : latestTest.status),
-        presence: testIsLive ? (latestTest.status === 'testing' ? 'active' : 'idle') : 'ended',
-        awaitingInput: testAwaitingInput !== undefined ? (testAwaitingInput !== null) : false,
-        awaitingInputPrompt: testAwaitingInput?.prompt,
-        awaitingInputReason: testAwaitingInput?.reason,
-        pendingInputKinds: testSnapshot?.pendingInputKinds ? [...testSnapshot.pendingInputKinds] : undefined,
-        hasJsonl: !!testJsonlPath,
-        tmuxSession: testIsLive ? testSessionName : undefined,
-        ...await readSessionGateFields(testSessionName),
-      });
-    }
-
-    const mergeEntries = centralStatus.history.filter((entry) => entry.type === 'merge');
+  if (statusHistory.length > 0) {
+    const mergeEntries = statusHistory.filter((entry) => entry.type === 'merge');
     const latestMerge = mergeEntries[mergeEntries.length - 1];
     if (latestMerge) {
       const shipSessionName = `agent-${issueLower}-ship`;
@@ -531,7 +422,10 @@ async function collectSessionTreeNodes(
   }
   // PAN-2053: attach read-only model-origin so the right-click MODEL inspector works
   // in the project tree, not just the activity cockpit. Shared helper with command-deck.
-  enrichSessionsWithModelOrigin(sections, issueId);
+  enrichSessionsWithModelOrigin(
+    sections as Parameters<typeof enrichSessionsWithModelOrigin>[0],
+    issueId,
+  );
 
   return sections.filter((s) => !isStaleLegacySession(s));
 }
