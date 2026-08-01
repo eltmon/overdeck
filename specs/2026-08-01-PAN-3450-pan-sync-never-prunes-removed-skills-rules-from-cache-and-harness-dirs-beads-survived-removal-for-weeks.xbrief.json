@@ -1,0 +1,541 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T22:10:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3450: pan sync never prunes removed skills/rules from cache and harness dirs (beads survived removal for weeks)",
+    "updated": "2026-08-01T22:15:55.361Z"
+  },
+  "plan": {
+    "id": "pan-3450",
+    "title": "pan sync never prunes removed skills/rules from cache and harness dirs (beads survived removal for weeks)",
+    "status": "proposed",
+    "uid": "5a52a22a-b843-4e9e-a46d-243f0c122bec",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T22:10:00.000Z",
+    "updated": "2026-08-01T22:15:55.361Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3450",
+        "label": "PAN-3450",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "sync",
+      "skills",
+      "rules",
+      "manifest",
+      "pruning",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "pan sync copies bundled skills/agents/rules into the ~/.overdeck cache and distributes them to ~/.claude/, ~/.agents/skills/, and workspace .claude/ dirs, but no stage ever deletes entries whose bundled source was removed. The PAN-2648 beads removal deleted the sources, yet beads-dolt-authority.md and the beads skills survived in every cache and target for weeks and kept being re-provisioned into agent sessions. Empty source dirs (git does not track directories) were also recreated in the cache on every sync, defeating manual cache cleanup.",
+      "Proposal": "Add one shared manifest-driven prune helper (pruneStaleManifestEntriesSync) in src/lib/manifest.ts and wire it into all four copy stages: refreshCacheSync (cache vs SYNC_SOURCES), executeSyncSync (~/.claude), executeAgentSkillsSync (~/.agents/skills), and mergeSkillsIntoWorkspaceSync (workspace .claude). An entry is pruned only when its manifest source is 'overdeck', its path is absent from the stage's source set, and its on-disk hash matches the manifest hash; user-modified stale files are kept, dropped from the manifest, and reported in keptModified. The rebuilt cache manifest carries forward provenance for non-bundle files so user content is never re-labeled 'overdeck'. copyDirectoryRecursive creates destination dirs lazily so empty source trees produce nothing. The CLI reports pruned/kept counts.",
+      "NonGoals": "- Removing removeLegacySkills070Sync() (subsumed but harmless defense in depth)\n- A dry-run/plan surface for prunes (planSyncSync and SyncItem.status unchanged)\n- Changing distribution or adoption semantics for non-stale files\n- Resolving whether ~/.claude/rules/ should exist alongside CLAUDE.md rule folding\n- Pruning hooks, bin scripts, context-layer renders, or any non-manifest-tracked content\n- Deleting user-modified stale files under any flag (no --force delete)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Modified stale target files are kept and dropped from the manifest (become user-owned) rather than deleted",
+        "rationale": "The issue mandates leaving user-authored content untouched; deleting user-modified content is a one-way door, and dropping the entry makes the keep idempotent."
+      },
+      {
+        "summary": "Rebuilt cache manifest carries forward old provenance for non-bundle files and labels never-manifested files 'user'",
+        "rationale": "buildManifestFromDirectory stamps everything 'overdeck'; without carry-forward, user cache files would be pruned on the next sync, violating the issue's own constraint."
+      },
+      {
+        "summary": "Target pruning covers the rules/ prefix sourced from CACHE_RULES_DIR",
+        "rationale": "Stale bundled rules are the reported symptom (beads-dolt-authority.md); manifest provenance plus hash match makes pruning them safe while current rule entries are preserved."
+      },
+      {
+        "summary": "No dry-run/plan reporting for prunes",
+        "rationale": "Extending SyncItem.status and the plan display adds surface area the issue does not ask for; execute-path reporting gives operators the visibility they need."
+      }
+    ],
+    "items": [
+      {
+        "id": "prune-helper",
+        "title": "Add pruneStaleManifestEntriesSync helper to src/lib/manifest.ts and extend SyncResult/MergeResult",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cache-prune",
+            "claude-target-prune",
+            "agent-skills-prune",
+            "workspace-merge-prune"
+          ],
+          "files_scope": [
+            "src/lib/manifest.ts",
+            "src/lib/sync.ts",
+            "src/lib/harness-skill-sync.ts",
+            "src/lib/skills-merge.ts",
+            "tests/unit/lib/manifest-prune.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/manifest-prune.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "manifest-prune.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/manifest.ts add `export interface PruneResult { pruned: string[]; keptModified: string[] }` and `export function pruneStaleManifestEntriesSync(targetBase: string, manifest: Manifest, currentSourceRelPaths: ReadonlySet<string>, opts?: { prefixes?: string[] }): PruneResult`. Semantics: iterate Object.entries(manifest.installed); skip entries where entry.source !== 'overdeck', where rel is in currentSourceRelPaths, or where opts.prefixes is given and no prefix matches rel. For remaining entries: if the target file is missing, removeManifestEntry and record rel in pruned; else if hashFileSync(target) === entry.hash, delete the file (rmSync force), removeManifestEntry, record pruned, then remove now-empty ancestor dirs walking up from the file's dirname while the dir exists, is empty, and is not targetBase; else (hash differs) keep the file, removeManifestEntry, record rel in keptModified. Also extend SyncResult in src/lib/sync.ts (~line 395) with `pruned: string[]; keptModified: string[]` and initialize both to [] in the two constructors (executeSyncSync at ~line 421, executeAgentSkillsSync in src/lib/harness-skill-sync.ts at ~line 46); extend MergeResult in src/lib/skills-merge.ts (~line 25) the same way with initialization in mergeSkillsIntoWorkspaceSync. Write tests/unit/lib/manifest-prune.test.ts constructing a temp targetBase and Manifest by hand (no paths.js mock — the helper takes explicit args): prune on hash-match, entry-drop on missing file, keep+drop+report on hash-mismatch, skip non-overdeck source, skip unmanifested files, prefix filtering, empty-ancestor removal that stops at targetBase, and idempotency (second call prunes nothing)."
+        },
+        "items": [
+          {
+            "id": "prune-helper.ac1",
+            "title": "Given a manifest entry with source 'overdeck' whose path is outside the source set and whose on-disk hash matches, pruneStaleManifestEntriesSync deletes the file, drops the entry, and returns the path in pruned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prune-helper.ac2",
+            "title": "Given the same stale entry but a hash-mismatched file, the helper preserves the file, drops the entry, and returns the path in keptModified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prune-helper.ac3",
+            "title": "The helper preserves both the file and the manifest entry for entries with a non-'overdeck' source, entries inside the source set, and entries excluded by the prefixes filter",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prune-helper.ac4",
+            "title": "After deleting a pruned file the helper removes now-empty ancestor directories but never removes targetBase itself, and a second call with the same inputs returns empty pruned/keptModified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "prune-helper.ac5",
+            "title": "SyncResult in src/lib/sync.ts and MergeResult in src/lib/skills-merge.ts expose pruned and keptModified string arrays initialized to empty in all constructors, and npm run typecheck passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cache-prune",
+        "title": "Prune stale cache entries and stop mirroring empty dirs in refreshCacheSync()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sync.ts",
+            "tests/unit/lib/sync-prune-cache.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-prune-cache.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-prune-cache.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In refreshCacheSync() (src/lib/sync.ts:228): (1) read the OLD cache manifest via readManifestSync(CACHE_MANIFEST) at function top before copying; (2) build the source set by unioning collectSourceFilesSync(SYNC_SOURCES.skills, 'skills/'), collectSourceFilesSync(SYNC_SOURCES.devSkills, 'skills/') when isDevMode(), collectSourceFilesSync(SYNC_SOURCES.agents, 'agent-definitions/'), and collectSourceFilesSync(SYNC_SOURCES.rules, 'rules/'); (3) after the existing copy loops, call pruneStaleManifestEntriesSync(join(SKILLS_DIR, '..'), oldManifest, sourceSet) and expose the result on RefreshCacheResult (src/lib/sync.ts:223) as `pruned: string[]; keptModified: string[]`; (4) after buildManifestFromDirectory (line 327), post-process the new manifest: for every entry whose rel is NOT in the source set, restore the old manifest entry with a fresh hashFileSync if one existed, otherwise set its source to 'user'; (5) in copyDirectoryRecursive (line 199) delete the upfront mkdirSync(dest) at line 202 and instead mkdirSync(dest, { recursive: true }) inside the entry.isFile() branch before copyFileSync; (6) in the skills and dev-skills loops (lines 241, 254), count a dir toward copied/total only when it contains at least one file. Write tests/unit/lib/sync-prune-cache.test.ts using the vi.mock('../../../src/lib/paths.js') + vi.hoisted temp-dir pattern from tests/unit/lib/sync-adopt-legacy.test.ts: stale skill dir and stale rule file recorded in the old cache manifest are pruned; an unmanifested cache file survives and is labeled 'user' in the rebuilt manifest; an old-manifest entry whose file was modified on disk survives with its label carried forward; an empty source skill dir creates no cache dir and is not counted; a second refreshCacheSync() prunes nothing."
+        },
+        "items": [
+          {
+            "id": "cache-prune.ac1",
+            "title": "Given cache files recorded in the old cache manifest with source 'overdeck' and absent from SYNC_SOURCES, refreshCacheSync deletes them from the cache and the rebuilt manifest contains no entry for them",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-prune.ac2",
+            "title": "Given a cache file with no old-manifest entry, refreshCacheSync preserves it and labels it 'user' in the rebuilt manifest; given an old-manifest entry whose file was modified, it preserves the file and carries the old label forward",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-prune.ac3",
+            "title": "Given an empty source skill directory, refreshCacheSync creates no directory for it in the cache and excludes it from the copied/total counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cache-prune.ac4",
+            "title": "Given an unchanged bundle, a second refreshCacheSync run returns empty pruned and keptModified lists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "claude-target-prune",
+        "title": "Prune stale entries from ~/.claude in executeSyncSync()",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/sync.ts",
+            "tests/unit/lib/sync-prune-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-prune-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-prune-target.test.ts executeSyncSync cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In executeSyncSync() (src/lib/sync.ts:421), after the copy loop and before writeManifestSync (line 510): build the source set from the already-collected allFiles relativePaths PLUS collectSourceFilesSync(CACHE_RULES_DIR, 'rules/') (required so current rules/ manifest entries are not wrongly pruned — hazard H2), then call pruneStaleManifestEntriesSync(CLAUDE_DIR, manifest, sourceSet, { prefixes: ['skills/', 'agents/', 'rules/'] }) and append the results into result.pruned / result.keptModified (fields added by prune-helper). Write the executeSyncSync section of tests/unit/lib/sync-prune-target.test.ts (same paths.js mock pattern): manifest-tracked stale skills/old-skill/SKILL.md with matching hash is deleted, its entry dropped, and the now-empty skills/old-skill/ dir removed; the same file user-modified is kept, its entry dropped, and the path appears in keptModified; an unmanifested ~/.claude/skills/user-skill/ absent from the cache is untouched; a stale rules/beads-dolt-authority.md entry is pruned while a manifest entry for a rule still in CACHE_RULES_DIR is kept."
+        },
+        "items": [
+          {
+            "id": "claude-target-prune.ac1",
+            "title": "Given a manifest-tracked stale skill file in ~/.claude with matching hash, executeSyncSync deletes the file, drops the entry, removes the empty skill dir, and reports the path in pruned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-target-prune.ac2",
+            "title": "Given the same stale entry with a user-modified file, executeSyncSync preserves the file, drops the entry, and reports the path in keptModified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "claude-target-prune.ac3",
+            "title": "executeSyncSync leaves unmanifested target files untouched and keeps manifest entries for rules still present in CACHE_RULES_DIR while pruning stale rules entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "agent-skills-prune",
+        "title": "Prune stale entries from ~/.agents/skills in executeAgentSkillsSync()",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/harness-skill-sync.ts",
+            "tests/unit/lib/sync-prune-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/sync-prune-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "sync-prune-target.test.ts executeAgentSkillsSync cases pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In executeAgentSkillsSync() (src/lib/harness-skill-sync.ts:46), before writeManifestSync: build the source set by mapping collectSourceFilesSync(sourceSkillsDir, '') to `skills/<rel>` manifest keys, then call pruneStaleManifestEntriesSync(dirname(targetSkillsDir), manifest, sourceSet, { prefixes: ['skills/'] }) and append results into the function's SyncResult.pruned/keptModified. Add the executeAgentSkillsSync cases to tests/unit/lib/sync-prune-target.test.ts using the function's existing injectable targetSkillsDir/sourceSkillsDir parameters (no paths.js mock needed): stale manifest-tracked file deleted and reported, user-modified stale file kept and reported in keptModified, unmanifested file untouched."
+        },
+        "items": [
+          {
+            "id": "agent-skills-prune.ac1",
+            "title": "Given a stale manifest-tracked file under the target skills dir with matching hash, executeAgentSkillsSync deletes it, drops the entry, and reports the path in pruned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "agent-skills-prune.ac2",
+            "title": "Given a user-modified stale file, executeAgentSkillsSync preserves it, drops the entry, reports it in keptModified, and leaves unmanifested files untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "workspace-merge-prune",
+        "title": "Prune stale entries in mergeSkillsIntoWorkspaceSync()",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/skills-merge.ts",
+            "tests/unit/lib/skills-merge.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/skills-merge.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "skills-merge.test.ts passes including new prune cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In mergeSkillsIntoWorkspaceSync() (src/lib/skills-merge.ts:67): build the source set from the three cache dirs using the same category mapping as the sources array at lines 87-91 (SKILLS_DIR → 'skills/', CACHE_AGENTS_DIR → 'agents/', CACHE_RULES_DIR → 'rules/'), then after the copy loop and before writeManifestSync (~line 135) call pruneStaleManifestEntriesSync(join(workspacePath, '.claude'), manifest, sourceSet, { prefixes: ['skills/', 'agents/', 'rules/'] }) and append results into the extended MergeResult.pruned/keptModified. Extend tests/unit/lib/skills-merge.test.ts (it already builds temp workspaces) with: stale manifest-tracked workspace file pruned and reported; user-modified stale file kept and reported in keptModified; unmanifested file untouched."
+        },
+        "items": [
+          {
+            "id": "workspace-merge-prune.ac1",
+            "title": "Given a stale manifest-tracked file in a workspace .claude dir with matching hash, mergeSkillsIntoWorkspaceSync deletes it, drops the entry, and reports the path in pruned",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "workspace-merge-prune.ac2",
+            "title": "Given a user-modified stale file or an unmanifested file, mergeSkillsIntoWorkspaceSync preserves it and reports only the modified one in keptModified",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sync-cli-reporting",
+        "title": "Report pruned and kept-modified counts in the pan sync CLI output",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/sync.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/sync.ts: at the cache spinner summary (~lines 301-308) append, only when nonzero, `pruned N stale` / `kept N user-modified stale` fragments from the RefreshCacheResult fields; at the distribution spinner summary (~lines 316-360) do the same for executeSyncSync and executeAgentSkillsSync results. When any keptModified list is nonempty, print each kept path under a `Kept user-modified stale file(s):` line in chalk.dim, mirroring the conflict-list style at ~line 349. Do not change planSyncSync, SyncItem.status, or the --dry-run path. Verification: npm run typecheck and npm run lint pass; no new test file required (display-only change), but run npx vitest run tests/unit/lib/sync-prune-target.test.ts tests/unit/lib/sync-prune-cache.test.ts to confirm no regression in the result plumbing."
+        },
+        "items": [
+          {
+            "id": "sync-cli-reporting.ac1",
+            "title": "When a sync run prunes entries, the cache and distribution summaries print the pruned counts; when nothing is pruned, no prune fragment appears",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sync-cli-reporting.ac2",
+            "title": "When keptModified is nonempty, the CLI prints each kept path under a Kept user-modified stale file(s) heading",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-sync-prune",
+        "title": "Document sync pruning in core-commands.mdx, skills.mdx, and the pan-sync skill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:10:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3450",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "cli/core-commands.mdx",
+            "features/skills.mdx",
+            "sync-sources/skills/pan-sync/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes including scripts/lint-skills.sh"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Update three doc surfaces to state the new behavior: (1) cli/core-commands.mdx `## pan sync` section (line 31) — sync now prunes cache and target entries whose bundled source was removed, never deletes user-owned or user-modified files (user-modified stale files are reported instead), and does not propagate empty source dirs; (2) features/skills.mdx — add the same prune guarantee where the cache→harness sync flow is described; (3) sync-sources/skills/pan-sync/SKILL.md — update the behavior prose so agents know removed skills/rules disappear from harness dirs on the next sync. No flag changes, so scripts/lint-skills.sh should pass unchanged; run npm run lint to confirm."
+        },
+        "items": [
+          {
+            "id": "docs-sync-prune.ac1",
+            "title": "cli/core-commands.mdx's pan sync section states that sync prunes removed-source entries and never deletes user-owned or user-modified files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-sync-prune.ac2",
+            "title": "features/skills.mdx and sync-sources/skills/pan-sync/SKILL.md state that removed skills/rules disappear from harness dirs on the next sync, and npm run lint passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "prune-helper",
+        "to": "cache-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "prune-helper",
+        "to": "claude-target-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "prune-helper",
+        "to": "agent-skills-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "prune-helper",
+        "to": "workspace-merge-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-prune",
+        "to": "claude-target-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-target-prune",
+        "to": "agent-skills-prune",
+        "type": "blocks"
+      },
+      {
+        "from": "cache-prune",
+        "to": "sync-cli-reporting",
+        "type": "blocks"
+      },
+      {
+        "from": "claude-target-prune",
+        "to": "sync-cli-reporting",
+        "type": "blocks"
+      },
+      {
+        "from": "agent-skills-prune",
+        "to": "sync-cli-reporting",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3450-pan-sync-never-prunes-removed-skills-rules-from-cache-and-harness-dirs-beads-survived-removal-for-weeks.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
