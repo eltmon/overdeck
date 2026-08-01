@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:45:11.580Z",
+  "updated": "2026-08-01T10:45:20.226Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,8 +78,16 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "audit-batch-c": {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 1749524,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:45:20.225Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -144,6 +152,7 @@
     "audit-batch-b": "completed",
     "audit-batch-b.audit-batch-b.ac1": "completed",
     "audit-batch-b.audit-batch-b.ac2": "completed",
-    "audit-batch-b.audit-batch-b.ac3": "completed"
+    "audit-batch-b.audit-batch-b.ac3": "completed",
+    "audit-batch-c": "running"
   }
 }
