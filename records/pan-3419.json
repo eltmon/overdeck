@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T16:17:14.194Z",
+  "updated": "2026-08-01T16:24:13.805Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "grouping-explicit-first": {
-        "writerId": "agent-pan-3419",
-        "agentId": "agent-pan-3419",
-        "pid": 3722687,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:17:14.194Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3419",
@@ -114,6 +106,17 @@
         "outcome": "completed",
         "reason": "Added --project to handoff and fork, forwarded canonical project selection through fork-client, displayed the result, updated skill parity, and added regression tests",
         "releasedAt": "2026-08-01T16:16:51.006Z"
+      },
+      {
+        "writerId": "agent-pan-3419",
+        "agentId": "agent-pan-3419",
+        "pid": 3722687,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:17:14.194Z",
+        "itemId": "grouping-explicit-first",
+        "outcome": "completed",
+        "reason": "Added a shared explicit-project-first resolver with cwd fallback, routed CommandDeck grouping and navigation through it, exposed projectKey on conversation DTOs, and added frontend regressions",
+        "releasedAt": "2026-08-01T16:24:13.805Z"
       }
     ],
     "statusReasons": {
@@ -128,6 +131,10 @@
       "cli-project-flag": {
         "reason": "Added --project to handoff and fork, forwarded canonical project selection through fork-client, displayed the result, updated skill parity, and added regression tests",
         "updatedAt": "2026-08-01T16:16:51.006Z"
+      },
+      "grouping-explicit-first": {
+        "reason": "Added a shared explicit-project-first resolver with cwd fallback, routed CommandDeck grouping and navigation through it, exposed projectKey on conversation DTOs, and added frontend regressions",
+        "updatedAt": "2026-08-01T16:24:13.805Z"
       }
     }
   },
@@ -148,6 +155,10 @@
     "cli-project-flag.cli-project-flag.ac2": "completed",
     "cli-project-flag.cli-project-flag.ac3": "completed",
     "cli-project-flag.cli-project-flag.ac4": "completed",
-    "grouping-explicit-first": "running"
+    "grouping-explicit-first": "completed",
+    "grouping-explicit-first.grouping-explicit-first.ac1": "completed",
+    "grouping-explicit-first.grouping-explicit-first.ac2": "completed",
+    "grouping-explicit-first.grouping-explicit-first.ac3": "completed",
+    "grouping-explicit-first.grouping-explicit-first.ac4": "completed"
   }
 }
