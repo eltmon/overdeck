@@ -184,19 +184,19 @@
     "recordedAt": "2026-08-01T13:04:50.271Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T13:24:45.430Z",
+  "updated": "2026-08-01T13:28:23.350Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T13:05:01.169Z",
-    "updatedAt": "2026-08-01T13:22:47.089Z",
-    "reviewNotes": "[requirements] The seed writer deliberately evades the state-write safety linter instead of declaring a narrow supported exception — manifest no-workaround policy",
+    "updatedAt": "2026-08-01T13:28:23.195Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed cycle-3 review findings: replaced the continue.json linter evasion with a real, narrow, tested exception (CONTINUE_FIXTURE_EXCEPTIONS) scoped to exactly src/lib/uat-fixtures/seed.ts, kept separate from the PAN-1919 legacy-must-stay-empty CONTINUE_EXCLUDES array; fixed the fixture project/agent paths to derive from getOverdeckHome() instead of a hardcoded /home/node/.overdeck (fixes drift under an overridden container-local home); corrected the docs' row-count claim to name the real per-store counts (5 agents, 4 activity entries) instead of 'exactly one'.",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "87c376a334e309a2c06294525adbf54eb0173f9f",
@@ -231,28 +231,6 @@
         "tests/unit/lib/uat-fixtures/seed.test.ts"
       ],
       "recordedAt": "2026-08-01T13:04:50.271Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-87c376a3/security.md",
-        "atCommit": "87c376a334e309a2c06294525adbf54eb0173f9f"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-87c376a3/correctness.md",
-        "atCommit": "87c376a334e309a2c06294525adbf54eb0173f9f"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-87c376a3/performance.md",
-        "atCommit": "87c376a334e309a2c06294525adbf54eb0173f9f"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-87c376a3/requirements.md",
-        "atCommit": "87c376a334e309a2c06294525adbf54eb0173f9f"
-      }
     }
   },
   "closeOut": {
@@ -300,10 +278,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 886,
-            "output": 207515,
-            "cacheRead": 172326019,
-            "cacheWrite": 4525990
+            "input": 930,
+            "output": 214422,
+            "cacheRead": 187000100,
+            "cacheWrite": 4538057
           }
         }
       },
@@ -315,15 +293,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 886,
-          "output": 207515,
-          "cacheRead": 172326019,
-          "cacheWrite": 4525990
+          "input": 930,
+          "output": 214422,
+          "cacheRead": 187000100,
+          "cacheWrite": 4538057
         }
       },
       "costAtCloseOut": {
-        "usd": 126.639365,
-        "pricingAsOf": "2026-08-01T13:22:47.093Z"
+        "usd": 129.673505,
+        "pricingAsOf": "2026-08-01T13:28:23.343Z"
       }
     },
     "merges": [
@@ -332,7 +310,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3362",
