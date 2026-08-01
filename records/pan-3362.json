@@ -208,7 +208,7 @@
     "recordedAt": "2026-08-01T13:59:42.560Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T15:07:33.466Z",
+  "updated": "2026-08-01T15:07:36.075Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -348,6 +348,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-01T07:36:32.192Z"
+    },
+    {
+      "issue": "PAN-3362",
+      "recoveryPath": "verdict-fallback-contention",
+      "obligationGeneration": "2026-08-01T14:53:43.234Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-01T15:07:36.068Z"
     }
   ],
   "tasks": {
