@@ -1,0 +1,359 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T07:25:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3362: No way to seed tracker-backed issue fixtures in workspace containers — every UI-redesign UAT is environment-blocked and needs an operator override",
+    "updated": "2026-08-01T07:36:25.931Z"
+  },
+  "plan": {
+    "id": "pan-3362",
+    "title": "Seed tracker-backed issue fixtures into workspace containers for UI UAT",
+    "status": "proposed",
+    "uid": "611defa2-c287-4d6f-a8e2-cf6e9785665f",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T07:25:00.000Z",
+    "updated": "2026-08-01T07:36:25.931Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3362",
+        "label": "PAN-3362",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "uat",
+      "workspace-containers",
+      "fixtures",
+      "test-role",
+      "dashboard"
+    ],
+    "narratives": {
+      "Problem": "Workspace-isolated dashboard containers have no tracker-backed issue data by design (skip-polling IssueDataService serves an empty container-local cache; no project registration), so every UI-redesign browser UAT is environment-blocked and ends in an operator override on diffs nobody doubts (PAN-3356, PAN-2619, PAN-2809 class).",
+      "Proposal": "Add `pan admin seed-uat-fixtures <issue-id>`: a host-side command that execs an in-container `--local` seeder in the workspace's server container, writes an obviously-fake fixture set (project `uat-fixtures`/prefix `FIX`/issue `FIX-1`: normalized issue cache row, 5 agent rows incl. review convoy, review_status with PR fields, activity events, xBRIEF spec + continue.json) through the canonical write doors, then restarts the server so skip-polling picks it up. Full design, fixture shapes, and door table in .pan/drafts/PAN-3362.md.",
+      "NonGoals": "- Fixing GET /api/fs/list-dirs 401 in containers (separate paper cut)\n- PAN-2809 node-pty musl/glibc live-terminal Playwright in containers\n- Seeding real tracker data or any tracker connection at seed time\n- Seeding the host dashboard or any non-container OVERDECK_HOME\n- Registering the fixture project on the host or syncing it to any tracker\n- Changing deacon/patrol behavior, the single-deacon invariant, or IssueDataService polling\n- Per-project application seeds (pan admin db seed covers that)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "CLI command (host wrapper + in-container --local) instead of an HTTP seed endpoint",
+        "rationale": "The issue requests `pan admin seed-uat-fixtures` next to the existing container recovery commands; an endpoint adds an unauthenticated mutation surface and cannot hide the mandatory server restart."
+      },
+      {
+        "summary": "Fixtures live only in container-local OVERDECK_HOME with an env-marker guard on --local",
+        "rationale": "The container's /home/node/.overdeck is isolated from the host by design; refusing to seed without OVERDECK_DISABLE_DEACON=1/CONTAINER_MODE=1 (unless --force) makes host pollution a deliberate act."
+      },
+      {
+        "summary": "Host wrapper restarts the server service after seeding",
+        "rationale": "skip-polling IssueDataService loads cache.db and the read model once at boot (main.ts:170-173); without a restart the seed is invisible."
+      },
+      {
+        "summary": "Fixture project key uat-fixtures, prefix FIX, issue FIX-1, no tracker fields",
+        "rationale": "Reserved identity plus [FIXTURE] title and uat-fixture label satisfies the issue's obviously-fake constraint; tracker-less config can never be polled or synced."
+      },
+      {
+        "summary": "No wrapper skill; exclusion-list row in docs/SKILLS-CONVENTION.md",
+        "rationale": "Guidance for the non-obvious workflow lives in roles/test.md and docs/WORKSPACE-CONTAINERS.md; --help covers the mechanics, matching the convention's exclusion criteria."
+      }
+    ],
+    "items": [
+      {
+        "id": "fixture-data",
+        "title": "Fixture data module: builders for the uat-fixtures/FIX-1 fixture set",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T07:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3362",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "seed-writer",
+            "cli-command"
+          ],
+          "files_scope": [
+            "src/lib/uat-fixtures/fixture-data.ts",
+            "tests/unit/lib/uat-fixtures/fixture-data.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/uat-fixtures/fixture-data.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fixture-data.test.ts passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/uat-fixtures/fixture-data.ts with pure builder functions for the complete fixture set specified in .pan/drafts/PAN-3362.md (Proposal table + WI-1): fixtureProjectConfig() (ProjectConfig, key uat-fixtures, NO tracker fields, path <OVERDECK_HOME>/uat-fixtures/repo, issue_prefix FIX), fixtureNormalizedIssue() (GitHub cache shape per issue-data-service.ts:~960-994 — id github-uat-fixtures-repo-1, identifier FIX-1, canonicalStatus in_progress, labels [uat-fixture], project {id: github-uat-fixtures-repo}, sourceRepo uat-fixtures/repo, [FIXTURE] title prefix), fixtureAgentStates() (agent-fix-1-work with branch feature/fix-1 plus agent-fix-1-review-{security,correctness,performance,requirements} with reviewSubRole set), fixtureReviewStatus() (reviewStatus approved, testStatus passed, prUrl https://github.com/uat-fixtures/repo/pull/1, prNumber 1, prHeadSha fake), fixtureActivityEntries() (3-4 EmitActivityOptions for FIX-1), fixtureXBriefDoc() (valid xBRIEF v0.8, plan.id fix-1, 3 items with 2 ACs each), fixtureContinueJson(). Export every fixture-identifying literal as a named constant shared by seeder/CLI/tests. Write tests/unit/lib/uat-fixtures/fixture-data.test.ts asserting the shapes and fake markers."
+        },
+        "items": [
+          {
+            "id": "fixture-data.ac1",
+            "title": "Given the builders, when tests run, then fixtureNormalizedIssue() returns an object containing identifier 'FIX-1', canonicalStatus, labels including 'uat-fixture', project.id 'github-uat-fixtures-repo', and a title starting with '[FIXTURE]'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-data.ac2",
+            "title": "fixtureAgentStates() returns 5 AgentState rows: one work row with branch 'feature/fix-1' and four rows named agent-fix-1-review-<role> each carrying reviewSubRole",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-data.ac3",
+            "title": "fixtureXBriefDoc() parses through the repo's xBRIEF reader and contains exactly 3 items each with 2 acceptance-criterion sub-items; fixtureProjectConfig() contains no tracker, github_repo, linear_team, rally_project, or gitlab_repo field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fixture-data.ac4",
+            "title": "A test asserts no string in any fixture builder output contains 'eltmon/' or a real tracker hostname",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "seed-writer",
+        "title": "Seed writer: seedUatFixturesLocal writes the fixture set through canonical doors",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T07:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3362",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/uat-fixtures/seed.ts",
+            "tests/unit/lib/uat-fixtures/seed.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/uat-fixtures",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "all uat-fixtures tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-4",
+            "FR-5",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/uat-fixtures/seed.ts exporting async seedUatFixturesLocal(opts?: { force?: boolean }): Promise<SeedReport> per .pan/drafts/PAN-3362.md WI-2: (1) refuse unless process.env OVERDECK_DISABLE_DEACON==='1' or CONTAINER_MODE==='1' or opts.force, with an error message naming --force; (2) registerProjectSync('uat-fixtures', fixtureProjectConfig()); (3) CacheService.set('github','issues',[fixtureNormalizedIssue()], {ttlSeconds:86400}); (4) saveOverdeckAgentStateSync for each fixtureAgentStates() row; (5) upsertReviewStatusSync(fixtureReviewStatus()); (6) emitActivityEntryDurable for each fixtureActivityEntries() entry; (7) mkdir -p + write spec.vbrief.json and continue.json under <OVERDECK_HOME>/uat-fixtures/repo/workspaces/feature-fix-1/.overdeck/ (derive from OVERDECK_HOME, never hardcode /home/node); (8) return a report (rows written per store + fixture issue id). NO raw SQL — only the named doors. Tests in tests/unit/lib/uat-fixtures/seed.test.ts use setupOverdeckTestDb() with a temp OVERDECK_HOME and fake env: seeding populates 5 agent rows, 1 review_status row with PR fields, readable activity events, both plan files; guard refusal without env markers; force override; idempotent re-run leaves identical row counts."
+        },
+        "items": [
+          {
+            "id": "seed-writer.ac1",
+            "title": "Given a temp OVERDECK_HOME with container env markers set, when seedUatFixturesLocal() runs, then the agents table returns 5 rows for FIX-1, review_status returns 1 row with pr_url/pr_number/pr_head_sha set, and activity events for FIX-1 are readable back",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-writer.ac2",
+            "title": "When OVERDECK_DISABLE_DEACON and CONTAINER_MODE are both unset, seedUatFixturesLocal() rejects with an error naming '--force', and succeeds when force: true is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-writer.ac3",
+            "title": "When called twice against the same OVERDECK_HOME, the second call leaves identical row counts in agents, review_status, and api_cache (idempotent upsert)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "seed-writer.ac4",
+            "title": "Seeding persists spec.vbrief.json and continue.json under <OVERDECK_HOME>/uat-fixtures/repo/workspaces/feature-fix-1/.overdeck/ and the persisted spec passes the repo's plan reader",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-command",
+        "title": "CLI: pan admin seed-uat-fixtures with host wrapper and --local modes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T07:25:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3362",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/admin/seed-uat-fixtures.ts",
+            "src/cli/commands/admin/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build && node dist/cli/index.js admin seed-uat-fixtures --help"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "--help prints usage for <issue-id> host mode and --local/--force flags"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/cli/commands/admin/seed-uat-fixtures.ts and register it in src/cli/commands/admin/index.ts following the existing one-file-per-subcommand pattern (see src/cli/commands/admin/state-migrate.ts). Spec per .pan/drafts/PAN-3362.md WI-3: `pan admin seed-uat-fixtures <issue-id>` (host mode) resolves the workspace compose stack (project name overdeck-feature-<issue-lower>; reuse the compose resolution helper that `pan workspace rebuild` uses — locate via `grep -rn rebuildWorkspaceStack src/lib`), refuses with a clear error when no stack exists, runs `docker compose -p overdeck-feature-<issue-lower> exec -T server node dist/cli/index.js admin seed-uat-fixtures --local`, then `docker compose -p … restart server`, then polls the server health endpoint (https://api-feature-<issue-lower>.overdeck.localhost/api/health) until 200 or 60s timeout, and prints the seed report plus the dashboard URL. `--local [--force]` calls seedUatFixturesLocal({force}) and prints the report. Use execAsync/spawn, never execSync."
+        },
+        "items": [
+          {
+            "id": "cli-command.ac1",
+            "title": "node dist/cli/index.js admin seed-uat-fixtures --help exits 0 and prints usage covering the <issue-id> positional and the --local/--force flags",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-command.ac2",
+            "title": "Given this issue's own workspace stack is running, when `pan admin seed-uat-fixtures pan-3362` completes, then it exits 0 after restarting the server, and the container dashboard at https://feature-pan-3362.overdeck.localhost renders FIX-1's issue detail with a phase, branch feature/fix-1, a PR link, four review-convoy rows, a Plan tab with a non-zero item badge, and a non-empty Activity feed (browser UAT for this issue)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-command.ac3",
+            "title": "When the named issue has no running compose stack, host mode exits non-zero with an error naming the expected compose project and how to start the stack",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-command.ac4",
+            "title": "When run twice against the same stack, the second run exits 0 and the container dashboard still renders exactly one FIX-1 issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Docs: WORKSPACE-CONTAINERS seeding section, test-role guidance, skills exclusion row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T07:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3362",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACE-CONTAINERS.md",
+            "roles/test.md",
+            "docs/SKILLS-CONVENTION.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint (including lint-skills) completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Update the three docs per .pan/drafts/PAN-3362.md WI-4: (1) docs/WORKSPACE-CONTAINERS.md gains a 'Seeding UAT issue fixtures' section next to the recovery commands (~line 109-119) covering both modes, the restart behavior, the ephemeral-across-recreate caveat (re-seed after up --force-recreate), and the obviously-fake contract (never register a real FIX project); (2) roles/test.md extends the container rule at line 64 so test agents run `pan admin seed-uat-fixtures <issue-id>` and UAT against FIX-1 before declaring an environment-blocked UI UAT — only a seeding failure itself is environment-blocked; (3) docs/SKILLS-CONVENTION.md exclusion table gains a `pan admin seed-uat-fixtures` row (rationale: guidance lives in roles/test.md + WORKSPACE-CONTAINERS.md; --help covers mechanics)."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/WORKSPACE-CONTAINERS.md contains a 'Seeding UAT issue fixtures' section that names `pan admin seed-uat-fixtures`, the --local mode, the server-restart requirement, and the re-seed-after-recreate caveat",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "roles/test.md names `pan admin seed-uat-fixtures` in its container-UAT guidance and states that a UI UAT may be declared environment-blocked only when seeding itself fails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "docs/SKILLS-CONVENTION.md exclusion table includes a row for `pan admin seed-uat-fixtures` and `npm run lint` passes with no skill-drift failure",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "fixture-data",
+        "to": "seed-writer",
+        "type": "blocks"
+      },
+      {
+        "from": "seed-writer",
+        "to": "cli-command",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-command",
+        "to": "docs",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3362-seed-tracker-backed-issue-fixtures-into-workspace-containers-for-ui-uat.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
