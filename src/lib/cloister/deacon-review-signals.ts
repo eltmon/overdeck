@@ -13,6 +13,7 @@ import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
 import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { extractMarkdownSection, findBlockingFindings } from '../review-findings.js';
+import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
 
 const REVIEWER_IDLE_FAILURE_MS = 3 * 60 * 1000;
 const REVIEW_REPORTS_PRESENT_NUDGE_COOLDOWN_MS = 60 * 1000;
@@ -89,18 +90,16 @@ export function synthesizeReviewFromReports(opts: {
 }
 
 /**
- * Respawn a convoy reviewer that has gone idle without writing its output.
+ * Retry a convoy reviewer that has stopped making progress without writing output.
  *
- * PAN-1806: when a reviewer hits a terminal API error it lands back at an idle
- * TUI prompt and never writes a report. Deacon detects that idle state and,
- * on the first occurrence, kills the stale session and starts a fresh reviewer
- * against the same runId, output path, and context manifest. The retry count is
- * persisted on the fresh agent state so a second idle detection signals failure.
+ * The retry covers terminal API errors, warm-resume kickoffs that never start a
+ * turn, and elapsed reviewer deadlines. It preserves the same run/output wiring
+ * and persists one shared attempt count so every trigger is bounded together.
  */
-async function respawnIdleReviewer(state: AgentState, agentId: string): Promise<boolean> {
+async function retryReviewer(state: AgentState, agentId: string, trigger: string): Promise<boolean> {
   const outputPath = state.reviewOutputPath;
   const attempt = (state.reviewRetryAttempt ?? 0) + 1;
-  logDeaconEventSync(`monitorReviewConvoySignals: ${agentId} idle with no output — respawning reviewer (attempt ${attempt})`);
+  logDeaconEventSync(`monitorReviewConvoySignals: ${agentId} ${trigger} — retrying reviewer (attempt ${attempt})`);
 
   try {
     await Effect.runPromise(killSession(agentId));
@@ -349,24 +348,33 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     const REVIEWER_STARTUP_GRACE_MS = 90_000;
     const withinStartupGrace = Number.isFinite(startedMs) && (Date.now() - startedMs) < REVIEWER_STARTUP_GRACE_MS;
 
-    // PAN-1806: detect a reviewer that hit a terminal API error and is now
-    // idle at its TUI prompt with no report written. The Stop-hook mirror
-    // reports 'idle' once the model ends its turn; if that persists while the
-    // session is alive and the output file is missing, fail fast rather than
-    // wait for the hard deadline. Retry once before signaling failure.
+    // PAN-1806/PAN-3375: detect both terminal API errors that return to an idle
+    // prompt and warm-resume kickoffs that never start a turn. resumeAgent marks
+    // the runtime active after delivery, so a swallowed kickoff otherwise leaves
+    // a stale active mirror forever. Any real reviewer work refreshes lastActivity;
+    // retry once when either mirror is stale and no report exists.
     const runtimeState = getAgentRuntimeStateSync(agentId);
-    const runtimeIdleAgeMs =
-      runtimeState?.state === 'idle'
-        ? Date.now() - new Date(runtimeState.lastActivity).getTime()
-        : 0;
-    const idleAndNoOutput = reviewerSessionAlive && !outputWrittenForThisRun && runtimeIdleAgeMs > REVIEWER_IDLE_FAILURE_MS;
+    const runtimeActivityMs = getAgentEffectiveLastActivityMs(agentId)
+      ?? (runtimeState?.lastActivity ? Date.parse(runtimeState.lastActivity) : Number.NaN);
+    const runtimeActivityAgeMs = Number.isFinite(runtimeActivityMs)
+      ? Date.now() - runtimeActivityMs
+      : 0;
+    const idleAndNoOutput = reviewerSessionAlive
+      && !outputWrittenForThisRun
+      && runtimeState?.state === 'idle'
+      && runtimeActivityAgeMs > REVIEWER_IDLE_FAILURE_MS;
+    const staleActiveAndNoOutput = reviewerSessionAlive
+      && !outputWrittenForThisRun
+      && runtimeState?.state === 'active'
+      && runtimeActivityAgeMs > REVIEWER_IDLE_FAILURE_MS;
+    const stalledAndNoOutput = idleAndNoOutput || staleActiveAndNoOutput;
 
     // PAN-1818: context-window overflow is deterministic on the same diff/manifest.
-    // Capture the pane tail and fast-fail BEFORE the idle-respawn branch so we never
-    // burn another cycle respawning a reviewer that will re-overflow. Only check when
-    // the reviewer is idle at its prompt — an active reviewer cannot have hit a 400 yet.
+    // Capture the pane tail and fast-fail BEFORE the retry branch so we never
+    // burn another cycle on a reviewer that will re-overflow. Check an explicit
+    // idle mirror or a stale active mirror whose activity evidence stopped moving.
     let contextOverflowDetected = false;
-    if (!outputWrittenForThisRun && runtimeState?.state === 'idle') {
+    if (!outputWrittenForThisRun && (runtimeState?.state === 'idle' || staleActiveAndNoOutput)) {
       const tail = await Effect.runPromise(capturePane(agentId, 100)).catch(() => '');
       contextOverflowDetected = isContextOverflowTail(tail);
       // PAN-2285: a convoy reviewer wedged on a revoked Codex refresh token shows
@@ -391,19 +399,29 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     } else if (contextOverflowDetected) {
       signal = 'failed';
       reason = 'context-window overflow (no retry — deterministic)';
-    } else if (idleAndNoOutput) {
+    } else if (stalledAndNoOutput) {
       const attempt = state.reviewRetryAttempt ?? 0;
-      if (attempt < 1 && (await respawnIdleReviewer(state, agentId))) {
+      const trigger = staleActiveAndNoOutput
+        ? 'warm-resumed but produced no activity or output'
+        : 'idle with no output';
+      if (attempt < 1 && (await retryReviewer(state, agentId, trigger))) {
         continue;
       }
       signal = 'failed';
-      reason = `reviewer idle with no output after terminal API error${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`;
+      reason = staleActiveAndNoOutput
+        ? `reviewer warm-resumed but produced no activity or output${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`
+        : `reviewer idle with no output after terminal API error${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`;
     } else if (reviewerSessionAlive) {
       // Still working or idling attachably. Only intervene if well past the
-      // deadline (genuinely wedged).
+      // deadline (genuinely wedged). The first elapsed deadline restarts only
+      // this lane; the second produces a terminal timeout for synthesis.
       if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs + REVIEWER_STARTUP_GRACE_MS) {
+        const attempt = state.reviewRetryAttempt ?? 0;
+        if (attempt < 1 && (await retryReviewer(state, agentId, `still running past deadline ${state.reviewDeadlineAt}`))) {
+          continue;
+        }
         signal = 'timeout';
-        reason = `reviewer still running past deadline ${state.reviewDeadlineAt}`;
+        reason = `reviewer still running past deadline ${state.reviewDeadlineAt}${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`;
       } else {
         continue;
       }
@@ -411,8 +429,12 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       // Session not up yet — too early to call it dead.
       continue;
     } else if (Number.isFinite(deadlineMs) && Date.now() >= deadlineMs) {
+      const attempt = state.reviewRetryAttempt ?? 0;
+      if (attempt < 1 && (await retryReviewer(state, agentId, `exceeded deadline ${state.reviewDeadlineAt}`))) {
+        continue;
+      }
       signal = 'timeout';
-      reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}`;
+      reason = `reviewer exceeded deadline ${state.reviewDeadlineAt}${attempt >= 1 ? ' (retry exhausted)' : ' (retry failed)'}`;
     } else {
       // Session gone, no report, before deadline → reviewer crashed or exited
       // before writing a report.
