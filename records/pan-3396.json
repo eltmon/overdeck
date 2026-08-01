@@ -398,16 +398,16 @@
     "recordedAt": "2026-08-01T23:08:56.965Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:12:32.672Z",
+  "updated": "2026-08-01T23:12:38.907Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:12:31.403Z",
+    "updatedAt": "2026-08-01T23:12:38.891Z",
     "reviewNotes": "All reviewer findings are unchanged from the prior synthesized head and none survive the cycle-9 convergence gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -462,24 +462,6 @@
       ],
       "recordedAt": "2026-08-01T23:08:56.965Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "cd39c67b311119a3bce290a6807309c945a71c29"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "cd39c67b311119a3bce290a6807309c945a71c29"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "cd39c67b311119a3bce290a6807309c945a71c29"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "cd39c67b311119a3bce290a6807309c945a71c29"
-      }
-    },
     "reviewCycleHistory": [
       {
         "cycle": 1,
@@ -502,9 +484,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 33265022,
-            "output": 501764,
-            "cacheRead": 119390720,
+            "input": 33373238,
+            "output": 502070,
+            "cacheRead": 119436800,
             "cacheWrite": 0
           }
         },
@@ -557,9 +539,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 37816093,
-          "output": 591361,
-          "cacheRead": 132887040,
+          "input": 37924309,
+          "output": 591667,
+          "cacheRead": 132933120,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -570,8 +552,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 284.8531523,
-        "pricingAsOf": "2026-08-01T23:12:31.492Z"
+        "usd": 285.4264523,
+        "pricingAsOf": "2026-08-01T23:12:38.901Z"
       }
     },
     "merges": [
@@ -580,7 +562,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
