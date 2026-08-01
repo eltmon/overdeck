@@ -58,7 +58,7 @@ body{color:var(--gv-text-primary);font-family:var(--gv-font-display)}
 @keyframes evspop{0%{transform:scale(1.3)}100%{transform:scale(1)}}
 .tb-meter{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px}
 .tb-meter .bar{width:44px;height:5px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
-.tb-meter .bar i{display:block;height:100%;border-radius:2px;transition:width .5s}
+.tb-meter .bar i{display:block;height:100%;width:100%;border-radius:2px;transform-origin:left center;transition:transform .5s}
 .tb-meter label{font-size:8px;letter-spacing:.1em;color:var(--gv-text-secondary);font-family:var(--gv-font-mono);white-space:nowrap}
 .tb-meter label b{font-weight:600}
 #active-pill{display:flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;
@@ -273,9 +273,9 @@ body{color:var(--gv-text-primary);font-family:var(--gv-font-display)}
     <canvas id="ecg" width="110" height="28"></canvas>
     <div class="tb-stat"><span class="v" id="evm" style="color:var(--gv-blue)">0</span><span class="k">events/min</span></div>
     <div class="vr"></div>
-    <div class="tb-meter"><div class="bar"><i id="cpu-fill" style="background:var(--gv-blue);width:55%"></i></div><label>CPU <b id="cpuV" style="color:var(--gv-blue)">--%</b></label></div>
-    <div class="tb-meter"><div class="bar"><i id="mem-fill" style="background:var(--gv-purple);width:82%"></i></div><label>MEM <b id="memV" style="color:var(--gv-purple)">--%</b></label></div>
-    <div class="tb-meter"><div class="bar"><i id="swp-fill" style="background:var(--gv-red);width:100%"></i></div><label>SWP <b id="swpV" style="color:var(--gv-red)">--%</b></label></div>
+    <div class="tb-meter"><div class="bar"><i id="cpu-fill" style="background:var(--gv-blue);transform:scaleX(.55)"></i></div><label>CPU <b id="cpuV" style="color:var(--gv-blue)">--%</b></label></div>
+    <div class="tb-meter"><div class="bar"><i id="mem-fill" style="background:var(--gv-purple);transform:scaleX(.82)"></i></div><label>MEM <b id="memV" style="color:var(--gv-purple)">--%</b></label></div>
+    <div class="tb-meter"><div class="bar"><i id="swp-fill" style="background:var(--gv-red);transform:scaleX(1)"></i></div><label>SWP <b id="swpV" style="color:var(--gv-red)">--%</b></label></div>
     <div class="tb-stat"><span class="v" id="loadV" style="color:var(--gv-amber)">—</span><span class="k">load</span></div>
     <div class="vr"></div>
     <div class="tb-stat"><span class="v" id="wipV" style="color:var(--gv-text-primary)">—</span><span class="k">wip</span></div>
@@ -1747,9 +1747,9 @@ function hudTick(evm) {
   hudLast = now;
   cpu = clamp(cpu + (SNAP.system.cpuPct - cpu) * .06 + (Math.random() - .5) * 2.4, 8, 97);
   mem = clamp(mem + (SNAP.system.memPct - mem) * .06 + (Math.random() - .5) * .8, 40, 97);
-  document.getElementById('cpu-fill').style.width = cpu.toFixed(0) + '%';
-  document.getElementById('mem-fill').style.width = mem.toFixed(0) + '%';
-  document.getElementById('swp-fill').style.width = swp.toFixed(0) + '%';
+  document.getElementById('cpu-fill').style.transform = 'scaleX(' + (cpu / 100).toFixed(3) + ')';
+  document.getElementById('mem-fill').style.transform = 'scaleX(' + (mem / 100).toFixed(3) + ')';
+  document.getElementById('swp-fill').style.transform = 'scaleX(' + (swp / 100).toFixed(3) + ')';
   document.getElementById('cpuV').textContent = Math.round(cpu) + '%';
   document.getElementById('memV').textContent = Math.round(mem) + '%';
   document.getElementById('swpV').textContent = Math.round(swp) + '%';
