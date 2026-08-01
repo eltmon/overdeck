@@ -108,14 +108,29 @@ describe('stopDashboard pid death verification', () => {
     await expect(Effect.runPromise(stopDashboard(baseConfig, {
       graceTimeoutMs: 100,
       portOwnerProbe,
+      pidSurvivorProbe: async () => '9101 D node dashboard.js',
     }))).rejects.toMatchObject({
       failure: {
         stage: 'dashboard',
-        reason: expect.stringContaining('PID 9101 (cmd: unknown) survived SIGKILL'),
+        reason: expect.stringContaining('PID 9101 (cmd: 9101 D node dashboard.js) survived SIGKILL'),
       },
     });
     expect(kill).toHaveBeenCalledWith(9101, 'SIGKILL');
     expect(kill).toHaveBeenCalledWith(9101, 0);
+  });
+
+  it('resolves when the pid disappears before its post-SIGKILL state can be read', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9151])
+      .mockResolvedValue([]);
+    const kill = vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
+
+    await expect(Effect.runPromise(stopDashboard(baseConfig, {
+      graceTimeoutMs: 100,
+      portOwnerProbe,
+      pidSurvivorProbe: async () => null,
+    }))).resolves.toBeUndefined();
+    expect(kill).toHaveBeenCalledWith(9151, 'SIGKILL');
   });
 
   it('resolves when every targeted pid is ESRCH-dead and the ports are free', async () => {
@@ -165,6 +180,23 @@ describe('restartDashboard — scope contract', () => {
     const startHook = vi.fn().mockResolvedValue(undefined);
     await Effect.runPromise(restartDashboard(baseConfig, startHook, { healthTimeoutMs: 2000 }));
     expect(startHook).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts the replacement when a confirmed survivor has released both ports', async () => {
+    const portOwnerProbe = vi.fn()
+      .mockResolvedValueOnce([9161])
+      .mockResolvedValue([]);
+    vi.spyOn(process, 'kill').mockImplementation((() => true) as typeof process.kill);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const startHook = vi.fn().mockResolvedValue(undefined);
+
+    await expect(Effect.runPromise(restartDashboard(baseConfig, startHook, {
+      healthTimeoutMs: 2000,
+      portOwnerProbe,
+      pidSurvivorProbe: async () => '9161 D node dashboard.js',
+    }))).resolves.toEqual({ ownershipVerified: false, spawnedPid: null });
+    expect(startHook).toHaveBeenCalledOnce();
+    expect(warning).toHaveBeenCalledWith(expect.stringContaining('ports are free, continuing restart'));
   });
 
   it('does NOT import or call CLIProxy / Traefik / TLDR modules', async () => {
@@ -514,7 +546,10 @@ describe('dashboard EADDRINUSE fast failure', () => {
         healthTimeoutMs: 5_000,
         expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
         eaddrinuseLogPath: logPath,
-        portOwnerProbe: async () => [8101],
+        portOwnerProbe: vi.fn()
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([])
+          .mockResolvedValue([8101]),
         pidDescriptor: async () => '8101 node old-dashboard.js',
       },
     )).catch((error) => {
