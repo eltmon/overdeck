@@ -29,15 +29,7 @@
       "note": "Review finding fixed: checklist HTTP requests now resolve plans and status overlays through the asynchronous workspace-plan door. The synchronous helper remains for CLI callers, both paths share a pure evaluator, and regression tests prove the Promise helper never invokes the synchronous reader. Typecheck, lint, and 17 focused tests passed."
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-01T23:18:11Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3451\n\n# Review Synthesis — PAN-3451 — 2026-08-01T23:30:00Z\n\n## Verdict: CHANGES REQUESTED — the new checklist route performs synchronous plan and record reads on the dashboard event loop\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/context.json\n- Branch: feature/pan-3451\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451\n- HEAD reviewed: 23c9bb23203555981d7dafc9cca1db1ff3e88346\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Checklist requests block the dashboard event loop — `src/dashboard/server/routes/agents/runtime-events.ts:195`\nThe added route calls `checkIncompletePlanItemsPromise()` from the HTTP request path, but that helper immediately executes `checkIncompletePlanItemsSync()`. The synchronous path reaches `readWorkspacePlanSync()`, canonical spec directory enumeration, plan-file reads, and status-overlay record reads. Wrapping that call in `Effect.promise` does not move the filesystem work off Node's event loop, so every Pi or OhMyPi `turn_end` can pause dashboard HTTP handling, WebSockets, terminal traffic, and Deacon polling while the plan resolves. This finding is inside the PR diff and blocks cycle 1.\n\nAdd a server-safe asynchronous checklist helper backed by the asynchronous workspace-plan resolver and a shared pure checklist evaluator. Keep the synchronous helper only for callers that require its existing CLI contract; do not present synchronous filesystem work as asynchronous through `Promise` or `Effect.promise`.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- correctness\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3451 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/work/__tests__/done-preflight-checklist.test.ts",
@@ -71,22 +63,22 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:27:32.310Z",
+  "updated": "2026-08-01T23:29:22.125Z",
   "pipeline": {
     "issueId": "PAN-3451",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-01T23:27:29.294Z",
+    "updatedAt": "2026-08-01T23:29:22.014Z",
     "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346",
     "reviewRequestedAt": "2026-08-01T23:27:28.497Z",
-    "reviewSpawnedAt": "2026-08-01T23:13:02.766Z",
+    "reviewSpawnedAt": "2026-08-01T23:29:22.012Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/lib/work/__tests__/done-preflight-checklist.test.ts",
@@ -182,7 +174,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.775502,
-        "pricingAsOf": "2026-08-01T23:27:32.306Z"
+        "pricingAsOf": "2026-08-01T23:29:22.038Z"
       }
     },
     "merges": [
