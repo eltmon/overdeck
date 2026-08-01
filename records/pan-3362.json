@@ -2,7 +2,7 @@
   "issueId": "PAN-3362",
   "schemaVersion": 2,
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T07:10:01.718Z",
+  "updated": "2026-08-01T07:10:02.603Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3362: No way to seed tracker-backed issue fixtures in workspace containers — every UI-redesign UAT is environment-blocked and needs an operator override",
       "timestamp": "2026-08-01T07:10:01.718Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
