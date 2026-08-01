@@ -1,9 +1,10 @@
 /**
  * `pan review restart <id> [--model <model>]`
  *
- * Kills all running reviewer + coordinator sessions for an issue, then
- * dispatches a fresh review pipeline. When `--model` is provided, every
- * reviewer spawns with that model instead of the configured per-role models.
+ * Restarts the review parent and re-dispatches any reviewer lane that has not
+ * produced its report. Completed sibling reports and saved sessions are preserved;
+ * `--role` explicitly re-runs one lane. When `--model` is provided, restarted
+ * reviewers use that model instead of the configured per-role models.
  *
  * This is the CLI equivalent of the dashboard's right-click → "Restart all
  * reviewers (with model)" context menu.

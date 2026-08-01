@@ -17,11 +17,12 @@
 
 import { Effect } from 'effect';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mkdirSync, rmSync, writeFileSync } from 'fs';
+import { mkdirSync, readFileSync as readTestFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
+  handleReviewDiscoveryReady,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -559,6 +560,10 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
     expect(block).toContain('if (fullReview)');
+    expect(block).toContain('savedReview?.reviewRunId === runId');
+    expect(block).toContain('handleReviewDiscoveryReady(opts.issueId');
+    expect(block).toContain("source: 'same-run parent resume'");
+    expect(block).toContain('missing reviewer recovery failed');
     expect(block).toContain('await spawnConvoyReviewers(reviewAgentId)');
     expect(block).toContain('Convoy review resumed (session preserved)');
   });
@@ -959,6 +964,38 @@ describe('convoy orchestration', () => {
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
       prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
     }));
+  });
+
+  it('re-dispatches only the missing reviewer when sibling reports already exist', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    const reviewDir = dirname(manifestPath);
+    for (const role of ['security', 'performance', 'requirements']) {
+      writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+    }
+    mockGetAgentState.mockImplementation((agentId: string) => agentId === 'agent-pan-1059-review'
+      ? {
+          id: agentId,
+          workspace,
+          reviewRunId: REVIEW_AGENT_RUN_ID,
+          reviewContextManifestPath: manifestPath,
+        }
+      : null);
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+    }));
+
+    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toMatchObject({ success: true, launched: 1 });
+    expect(mockSpawnRun).toHaveBeenCalledTimes(1);
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      subRole: 'correctness',
+      reviewOutputPath: `${reviewDir}/correctness.md`,
+    }));
+    expect(readTestFileSync(`${reviewDir}/security.md`, 'utf-8')).toBe('security complete');
+    expect(readTestFileSync(`${reviewDir}/performance.md`, 'utf-8')).toBe('performance complete');
+    expect(readTestFileSync(`${reviewDir}/requirements.md`, 'utf-8')).toBe('requirements complete');
   });
 });
 
