@@ -156,17 +156,17 @@
     "recordedAt": "2026-08-01T21:32:02.810Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:35:36.963Z",
+  "updated": "2026-08-01T21:38:03.422Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:34:40.403Z",
-    "reviewNotes": "Correctness reviewer failed; residue forge addressing, audit evidence, partial-failure handling, and record-read batching remain blocked",
+    "updatedAt": "2026-08-01T21:38:03.361Z",
+    "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:32:03.917Z",
     "reviewSpawnedAt": "2026-08-01T21:29:28.719Z",
@@ -214,6 +214,24 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-08-01T21:32:02.810Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
+      }
     }
   },
   "closeOut": {
@@ -229,9 +247,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10498200,
-            "output": 158981,
-            "cacheRead": 37574144,
+            "input": 13682811,
+            "output": 222226,
+            "cacheRead": 42890752,
             "cacheWrite": 0
           }
         },
@@ -284,9 +302,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15049271,
-          "output": 248578,
-          "cacheRead": 51070464,
+          "input": 18233882,
+          "output": 311823,
+          "cacheRead": 56387072,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -297,8 +315,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 115.7001003,
-        "pricingAsOf": "2026-08-01T21:34:43.956Z"
+        "usd": 136.1788093,
+        "pricingAsOf": "2026-08-01T21:38:03.398Z"
       }
     },
     "merges": [
@@ -307,7 +325,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
