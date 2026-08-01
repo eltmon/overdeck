@@ -47,7 +47,7 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:54:58.635Z",
+  "updated": "2026-08-01T20:55:38.053Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -58,7 +58,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-08-01T20:54:58.520Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
-    "reviewRequestedAt": "2026-08-01T20:44:51.569Z",
+    "reviewRequestedAt": "2026-08-01T20:55:37.668Z",
     "reviewSpawnedAt": "2026-08-01T20:48:38.890Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -90,7 +90,8 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z"
   },
   "closeOut": {
     "usage": {
