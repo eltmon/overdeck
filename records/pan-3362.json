@@ -86,10 +86,10 @@
     "recordedAt": "2026-08-01T11:32:46.338Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:57:44.703Z",
+  "updated": "2026-08-01T11:58:48.538Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -97,8 +97,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:33:25.155Z",
-    "updatedAt": "2026-08-01T11:57:44.692Z",
-    "reviewNotes": "public `--force` permits the explicitly forbidden host-seeding path",
+    "updatedAt": "2026-08-01T11:58:48.357Z",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
@@ -140,9 +139,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 255381,
-            "output": 12012,
-            "cacheRead": 3643392,
+            "input": 261119,
+            "output": 12512,
+            "cacheRead": 4073472,
             "cacheWrite": 0
           }
         },
@@ -189,9 +188,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2764716,
-          "output": 97610,
-          "cacheRead": 20215808,
+          "input": 2770454,
+          "output": 98110,
+          "cacheRead": 20645888,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -202,8 +201,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.413607,
-        "pricingAsOf": "2026-08-01T11:57:44.698Z"
+        "usd": 51.672337,
+        "pricingAsOf": "2026-08-01T11:58:48.411Z"
       }
     },
     "merges": [
