@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:43:54.818Z",
+  "updated": "2026-08-01T15:49:12.307Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "harness-chip-independent-of-model": {
-        "writerId": "agent-pan-3418",
-        "agentId": "agent-pan-3418",
-        "pid": 4621,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:43:54.818Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "Expanded the write-door backfill predicate to repair NULL and empty models while preserving known values; added database regression tests",
         "releasedAt": "2026-08-01T15:43:33.322Z"
+      },
+      {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 4621,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:43:54.818Z",
+        "itemId": "harness-chip-independent-of-model",
+        "outcome": "completed",
+        "reason": "Rendered harness metadata independently from model availability and added frontend regression tests for absent and present model values",
+        "releasedAt": "2026-08-01T15:49:12.307Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "widen-backfill-predicate": {
         "reason": "Expanded the write-door backfill predicate to repair NULL and empty models while preserving known values; added database regression tests",
         "updatedAt": "2026-08-01T15:43:33.322Z"
+      },
+      "harness-chip-independent-of-model": {
+        "reason": "Rendered harness metadata independently from model availability and added frontend regression tests for absent and present model values",
+        "updatedAt": "2026-08-01T15:49:12.307Z"
       }
     }
   },
@@ -126,6 +133,8 @@
     "widen-backfill-predicate": "completed",
     "widen-backfill-predicate.widen-backfill-predicate.ac1": "completed",
     "widen-backfill-predicate.widen-backfill-predicate.ac2": "completed",
-    "harness-chip-independent-of-model": "running"
+    "harness-chip-independent-of-model": "completed",
+    "harness-chip-independent-of-model.harness-chip-independent-of-model.ac1": "completed",
+    "harness-chip-independent-of-model.harness-chip-independent-of-model.ac2": "completed"
   }
 }
