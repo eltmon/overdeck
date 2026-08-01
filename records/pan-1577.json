@@ -219,27 +219,20 @@
       "timestamp": "2026-08-01T19:58:31.118Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-01T19:58:31Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-1577\n\n# Review Synthesis — PAN-1577 — 2026-08-01T19:52:08Z\n\n## Verdict: CHANGES REQUESTED — all four current-cycle convoy reviewers failed to start\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-170fd3f3/context.json\n- Branch: feature/pan-1577\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n- HEAD reviewed: 170fd3f3cf7fcd6e206f4232e6548784f6c6627e\n- Cycle number: 2\n- Prior cycle SHA: 4f4017c42752007bc103f8a3466a7e6fee75763d\n- PR base: 701f7a15c1841ea00a8c2f2a8fdc9d20e8e4f612\n- PR commits: 14\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed | — | infrastructure failure |\n| correctness | failed | — | infrastructure failure |\n| performance | failed | — | infrastructure failure |\n| requirements | failed | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Current-cycle reviewer failed to start\nThe discovery-ready launch reported that `agent-pan-1577-review-security` was already running and could not be resumed because its pane was blocked on a choice menu. The terminal signal was `REVIEWER_FAILED security`. A later `REVIEWER_READY` message referenced the prior run's `agent-pan-1577-review-4f4017c4/security.md`, which does not review HEAD `170fd3f3cf7fcd6e206f4232e6548784f6c6627e` and cannot satisfy this cycle.\n\n### [correctness] Current-cycle reviewer failed to start\nThe discovery-ready launch reported that `agent-pan-1577-review-correctness` was already running and could not be resumed because its pane was blocked on a choice menu. The terminal signal was `REVIEWER_FAILED correctness`. A later `REVIEWER_READY` message referenced the prior run's `agent-pan-1577-review-4f4017c4/correctness.md`, which does not review the current HEAD and cannot satisfy this cycle.\n\n### [performance] Current-cycle reviewer failed to start\nThe discovery-ready launch reported that `agent-pan-1577-review-performance` was already running and could not be resumed because its pane was blocked on a choice menu. The terminal signal was `REVIEWER_FAILED performance`; no current-run report was produced.\n\n### [requirements] Current-cycle reviewer failed to start\nThe discovery-ready launch reported that `agent-pan-1577-review-requirements` was already running and could not be resumed because its pane was blocked on a choice menu. The terminal signal was `REVIEWER_FAILED requirements`. A later `REVIEWER_READY` message referenced the prior run's `agent-pan-1577-review-4f4017c4/requirements.md`, which does not review the current HEAD and cannot satisfy this cycle.\n\n## Non-blocking Findings\nNone. No current-cycle reviewer report was available to evaluate code findings.\n\n## Scope Note\nThe branch contains fixes for the previous cycle's reported blockers, but the current cycle cannot approve them without fresh security, correctness, performance, and requirements reports for HEAD `170fd3f3cf7fcd6e206f4232e6548784f6c6627e`. Prior-run reports were not carried-forward stubs and were therefore not reused.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-170fd3f3/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-1577 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T20:06:14.375Z",
+  "updated": "2026-08-01T20:06:18.636Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T20:06:14.312Z",
+    "updatedAt": "2026-08-01T20:06:17.883Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
@@ -327,7 +320,7 @@
       },
       "costAtCloseOut": {
         "usd": 163.913628,
-        "pricingAsOf": "2026-08-01T20:06:14.360Z"
+        "pricingAsOf": "2026-08-01T20:06:17.908Z"
       }
     },
     "merges": [
