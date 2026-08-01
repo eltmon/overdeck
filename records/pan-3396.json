@@ -74,7 +74,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:47:36.186Z",
+  "updated": "2026-08-01T20:47:41.349Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -83,8 +83,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:47:31.788Z",
+    "updatedAt": "2026-08-01T20:47:33.629Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all blocking review issues: wired residue through workflow, fixed forge commands, fixed error handling, optimized record-read concurrency, and fixed mergeStatus deletion",
+    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "137976e6c728372482d643dc0e74009789d733ff",
     "reviewRequestedAt": "2026-08-01T20:47:01.917Z",
@@ -188,10 +189,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1455,
-            "output": 72030,
-            "cacheRead": 36318341,
-            "cacheWrite": 720013
+            "input": 1467,
+            "output": 72387,
+            "cacheRead": 36652372,
+            "cacheWrite": 720611
           }
         }
       },
@@ -209,15 +210,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1455,
-          "output": 72030,
-          "cacheRead": 36318341,
-          "cacheWrite": 720013
+          "input": 1467,
+          "output": 72387,
+          "cacheRead": 36652372,
+          "cacheWrite": 720611
         }
       },
       "costAtCloseOut": {
-        "usd": 41.658113300000004,
-        "pricingAsOf": "2026-08-01T20:47:31.903Z"
+        "usd": 41.694060300000004,
+        "pricingAsOf": "2026-08-01T20:47:41.088Z"
       }
     },
     "merges": [
