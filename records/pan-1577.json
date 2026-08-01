@@ -86,7 +86,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:00:05.902Z",
+  "updated": "2026-08-01T15:00:47.055Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -136,5 +136,20 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "claude-sonnet-5",
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "persist-project-key": {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 1365600,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:00:47.055Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "persist-project-key": "running"
+  }
 }
