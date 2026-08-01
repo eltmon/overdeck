@@ -4,17 +4,17 @@
     "created": "2026-08-01T21:55:42Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3447: feat(dashboard): God View \"Confluence\" — the River × Spectrum Deck union visualizer (mockup + PRD)",
-    "updated": "2026-08-01T22:06:32.074Z"
+    "updated": "2026-08-01T22:07:56.612Z"
   },
   "plan": {
     "id": "pan-3447",
     "title": "feat(dashboard): God View \"Confluence\" — the River × Spectrum Deck union visualizer (mockup + PRD)",
-    "status": "proposed",
+    "status": "running",
     "uid": "07d36011-b5aa-4df1-9510-1de20b689416",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-01T21:55:42Z",
-    "updated": "2026-08-01T22:06:32.074Z",
+    "updated": "2026-08-01T22:07:56.612Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3447",
@@ -1288,5 +1288,5 @@
       }
     ]
   },
-  "status": "proposed"
+  "status": "active"
 }
