@@ -554,3 +554,12 @@ Operator: "ALL issues in MYN and overdeck pipelines should be progressing" — t
 - **MIN-929 review APPROVED** (cycle-3 convergence, 0 blocking; all four reports + synthesis written). The per-lane restarts un-froze both lanes — but NOTE: the freeze hit FRESH spawns, not warm resumes; PAN-3375's detector may not cover this variant. Second specimen = file the variant.
 - Delta-verified ALL active agents working: strike-1889 $12.65 (task output), strike-3392 $12.91 ctx 87% (WATCH context), strike-3393 $8.50 (tests), pan-3362 $10.21 +526, pan-3367 $13.32 +667, min-874 $12.99 +892, min-864 $6.76 +38/−102 (conflict resolution — deletions = taking main's side where superseded).
 - Close-outs pending deploy/CI: PAN-3389, PAN-3390, PAN-3305.
+
+## RUN-79 tick 6 (2026-08-01 ~11:05Z) — PAN-3390 closed out; strike-3392 READY (PR #3398 in CI); MIN-839 auto-started
+
+- **PAN-3390 closed out** (live build 3dbdb49764 contains its merge; 8-row DoD). PAN-3389 + PAN-3305 close-outs wait on the next deploy (their merges postdate the live build).
+- **strike-pan-3392 READY** — diff reviewed and it's the prescribed fix done right: null-state logs + canonical-start fallback (via agents endpoint = the write door), resume-failure and resume-lied paths also fall back, orphan-proposed-reconciler refactored onto the same shared spawn (single door, −65 dup lines). PR #3398: only test lane pending. Land on green.
+- strike-3393 in verify ($11.61). strike-1889 still implementing ($13.32 → watch; longest-running strike).
+- **MIN-839 work agent auto-started** post-finalize (06:58 local) — the planning→start gap did not recur here.
+- MIN-929 awaiting test dispatch (review APPROVED). MIN-864 conflict resolution slowed ($6.99, +38/−102, nudge visible) — one more tick before intervening.
+- pan-3362 $18.76 +809 · pan-3367 $29.49 +1432 (audit docs) · min-874 $24.30 +2364 (Java tests) — all delta-verified working. 21 agents active.
