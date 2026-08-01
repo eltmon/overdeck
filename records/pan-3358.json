@@ -410,10 +410,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T00:12:46.911Z",
+  "updated": "2026-08-01T00:12:57.590Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -421,8 +421,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-08-01T00:12:46.886Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
+    "updatedAt": "2026-08-01T00:12:57.569Z",
+    "reviewNotes": "[correctness] Every projects-config mutation fails on supported platforms without util-linux `flock` — `src/lib/projects-config-write.ts:52`",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
@@ -511,6 +511,28 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-07-31T20:12:30.347Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/security.md",
+        "atCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d"
+      },
+      "correctness": {
+        "status": "blocked",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/correctness.md",
+        "atCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/performance.md",
+        "atCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/requirements.md",
+        "atCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d"
+      }
     }
   },
   "closeOut": {
@@ -566,18 +588,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11228227,
-            "output": 1269669,
-            "cacheRead": 543337984,
+            "input": 11232463,
+            "output": 1272075,
+            "cacheRead": 543957504,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 72815103,
-          "output": 2783442,
-          "cacheRead": 837286912,
+          "input": 72819339,
+          "output": 2785848,
+          "cacheRead": 837906432,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -588,8 +610,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 880.055832,
-        "pricingAsOf": "2026-08-01T00:12:46.904Z"
+        "usd": 880.458952,
+        "pricingAsOf": "2026-08-01T00:12:57.579Z"
       }
     },
     "merges": [
