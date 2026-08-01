@@ -528,15 +528,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const trackerHref = trackerIssueUrl(issueId, issueRecord?.url)
   const createPrHref = pr.data?.pr ? null : githubCompareUrl(trackerHref, branch)
   const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
-
   useEffect(() => {
-    if (activeTab !== 'session' || activeSubView !== 'terminal') return
-    // At narrow pane widths the crew lane stacks above Session. The Terminal
-    // panel still mounts and opens its WebSocket, but can land below the
-    // scrollable pane's viewport, making the selected toggle look like a no-op.
-    sessionContentRef.current?.scrollIntoView?.({ block: 'start', inline: 'nearest' })
+    if (activeTab === 'session' && activeSubView === 'terminal') sessionContentRef.current?.scrollIntoView?.({ block: 'start', inline: 'nearest' })
   }, [activeSubView, activeTab])
-
   useEffect(() => {
     if (tabSelectionLocked.current || issueAgents.length === 0) return
     tabSelectionLocked.current = true
@@ -807,11 +801,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {/* The six cockpit tabs fold the legacy surfaces into sub-views while
                 preserving the ONE IssueDetail page-density renderer. */}
             {issueDetailTab && (
-              <div
-                ref={sessionContentRef}
-                data-section="Session tab"
-                className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}
-              >
+              <div ref={sessionContentRef} data-section="Session tab" className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}>
                 {activeTab === 'session' ? (
                   <div
                     role="tablist"
