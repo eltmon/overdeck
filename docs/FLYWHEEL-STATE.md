@@ -897,3 +897,9 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **PAN-3422 round 2 merged (`64cad73d01`), handed off, and DEPLOYED** — the live server now runs the eaten-message watcher, so a delivery swallowed at the compaction boundary is detected and re-driven instead of leaving an agent wedged at the ❯ prompt with visible unsubmitted text. The run's highest-frequency operational failure (5 manual `--fresh` recoveries today) now has a structural answer covering both variants: keystroke acceptance (round 1) AND turn-actually-started (round 2).
 - Verification standard for calling this class closed, recorded so I do not repeat today's twice-made error: do NOT declare it dead on one clean delivery. Require either (a) a delivery to an agent at >85% context that lands and processes, or (b) 24h with zero specimens. The reload also resets the leak curve as a side benefit.
 - #3449 (reviewRunId) test lane still running — merges on green.
+
+## RUN-79 tick 49 (2026-08-01 ~23:30Z) — PAN-3422 CLOSED OUT (28 total); #3449 was red-main collateral, resynced
+
+- **PAN-3422 closed out** — eaten-message watcher live and verified through the full DoD. 28 issues landed+closed this run.
+- **#3449 (PAN-3446) diagnosed, not flaky:** its test lane failed because the branch last merged main at `4c4ff124e9` — BEFORE the red-main fixture fix — so it inherited PAN-3448's failure. Not a defect in its own change. Merged current green main into `strike/pan-3446` and pushed (`ac32151929`); CI re-runs clean. **Generalizable: every PR whose branch synced during a red-main window carries that red forward until resynced — check branch-sync timestamp against the red window before treating a PR failure as its own.**
+- Main green on two consecutive heads. Fleet 33 sessions, no wedge specimens since the watcher deployed (~20 min — far short of the 24h/high-context bar for declaring the class closed).
