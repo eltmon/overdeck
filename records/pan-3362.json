@@ -181,22 +181,22 @@
     "recordedAt": "2026-08-01T13:04:50.271Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T13:19:55.216Z",
+  "updated": "2026-08-01T13:21:41.210Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T13:05:01.169Z",
-    "updatedAt": "2026-08-01T13:19:51.849Z",
+    "updatedAt": "2026-08-01T13:21:41.158Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
-    "lastVerifiedCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
+    "lastVerifiedCommit": "87c376a334e309a2c06294525adbf54eb0173f9f",
     "reviewRequestedAt": "2026-08-01T13:05:01.169Z",
     "reviewSpawnedAt": "2026-08-01T13:10:44.640Z",
     "scopeDrift": {
@@ -275,10 +275,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 852,
-            "output": 194154,
-            "cacheRead": 161290431,
-            "cacheWrite": 4496597
+            "input": 874,
+            "output": 202971,
+            "cacheRead": 168385276,
+            "cacheWrite": 4518367
           }
         }
       },
@@ -290,15 +290,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 852,
-          "output": 194154,
-          "cacheRead": 161290431,
-          "cacheWrite": 4496597
+          "input": 874,
+          "output": 202971,
+          "cacheRead": 168385276,
+          "cacheWrite": 4518367
         }
       },
       "costAtCloseOut": {
-        "usd": 120.018607,
-        "pricingAsOf": "2026-08-01T13:19:52.444Z"
+        "usd": 121.580215,
+        "pricingAsOf": "2026-08-01T13:21:41.200Z"
       }
     },
     "merges": [
