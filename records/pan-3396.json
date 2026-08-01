@@ -412,21 +412,21 @@
     "recordedAt": "2026-08-01T23:49:58.057Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:49:58.060Z",
+  "updated": "2026-08-01T23:49:59.437Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:48:11.751Z",
+    "updatedAt": "2026-08-01T23:49:59.433Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (1224874ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/overdeck/bootstrap.test.ts (4 tests | 1 failed) 16839ms\n     × AC2: snapshot sequence advances when EventBus emits — no direct store polling 12097ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 17353ms\n     × emits, reads, and streams events through EventBusLive 12100ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 2 failed) 27916ms\n     × ignores extra tables and columns and succeeds in query-only mode 11922ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 11138ms (retry x1)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 8882ms\n     × searches observations with issue, tag, workspace, and sibling filters 5705ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 2 failed) 28396ms\n     × replays gap-fill events from the events transport 12216ms (retry x1)\n     × fails replay with SnapshotRequired when the requested offset predates retained events 11259ms (retry x1)\n\n Test Files  145 passed (145)\n      Tests  1755 passed (1755)\n   Start at  19:38:48\n   Duration  53.66s (transform 10.11s, setup 22.84s, import 80.32s, tests 43.91s, environment 41.82s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-gFWoCX/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn \n…(1816 chars elided)…\nting workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XU4XBn/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "48b5fba3656807360826f012d5f95ff9d190b8f6",
-    "reviewRequestedAt": "2026-08-01T23:46:46.628Z",
+    "reviewRequestedAt": "2026-08-01T23:49:59.433Z",
     "reviewSpawnedAt": "2026-08-01T23:39:10.989Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -474,7 +474,7 @@
         "tests/unit/lib/pan-dir/record-close-out.test.ts",
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
-      "recordedAt": "2026-08-01T23:46:16.725Z"
+      "recordedAt": "2026-08-01T23:49:58.057Z"
     },
     "reviewCycleHistory": [
       {
