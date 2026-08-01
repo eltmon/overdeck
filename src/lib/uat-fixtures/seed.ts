@@ -86,8 +86,13 @@ export async function seedUatFixturesLocal(): Promise<SeedReport> {
   const activityEntries = fixtureActivityEntries();
   for (const entry of activityEntries) {
     // At-most-once by stable id: a re-seed must not append duplicate visible
-    // lifecycle events (review finding, PAN-3362 cycle 1).
-    await emitActivityEntryOnce(entry);
+    // lifecycle events (review finding, PAN-3362 cycle 1). Only 'appended' and
+    // 'duplicate' are durable outcomes — 'failed'/'unconfirmed' must not be
+    // reported as a successful write (review finding, PAN-3362 cycle 2).
+    const outcome = await emitActivityEntryOnce(entry);
+    if (outcome !== 'appended' && outcome !== 'duplicate') {
+      throw new Error(`Failed to persist fixture activity entry ${entry.id}: emitActivityEntryOnce returned '${outcome}'`);
+    }
   }
 
   const workspaceOverdeckDir = join(
