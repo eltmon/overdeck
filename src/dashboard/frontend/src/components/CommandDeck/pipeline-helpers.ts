@@ -108,20 +108,20 @@ export function isBlockedFeature(feature: ProjectFeature, reviewStatus: ReviewSt
   );
 }
 
+function isPlanApprovalPending(feature: ProjectFeature): boolean {
+  return feature.pipelineBucket === 'planned_backlog'
+    && feature.hasPrd
+    && !feature.hasState
+    && !feature.sessions?.some(session => session.type === 'planning');
+}
+
 export function isNeedsYouFeature(feature: ProjectFeature, reviewStatus: ReviewStatusSnapshot | undefined): boolean {
   if (reviewStatus?.readyForMerge || feature.readyForMerge) return true;
   if (feature.sessions?.some(session => session.paused)) return true;
   if (feature.sessions?.some(session => session.type === 'planning' && session.awaitingInput)) return true;
-  // Plan proposed but not yet approved: PRD exists, no workspace continue state,
-  // and no active planning session still writing the plan.
-  if (
-    feature.hasPrd &&
-    !feature.hasState &&
-    !feature.sessions?.some(session => session.type === 'planning')
-  ) {
-    return true;
-  }
-  return false;
+  // The membership resolver distinguishes a real planned backlog from terminal
+  // PRD residue and active work whose workspace continue state is unavailable.
+  return isPlanApprovalPending(feature);
 }
 
 export function stuckReason(reviewStatus: ReviewStatusSnapshot | undefined): string {
@@ -241,9 +241,11 @@ export function sublineFor(entry: BucketedFeature): string {
 
   if (isNeedsYouFeature(feature, reviewStatus)) {
     if (reviewStatus?.readyForMerge || feature.readyForMerge) return 'merge train assembled — held for your review';
-    if (feature.sessions?.some(session => session.paused)) return 'waiting on your answer';
-    if (phase === 'plan') return 'plan approval pending';
-    return progress ?? 'all checks passed';
+    if (feature.sessions?.some(session => session.paused || (session.type === 'planning' && session.awaitingInput))) {
+      return 'waiting on your answer';
+    }
+    if (isPlanApprovalPending(feature)) return 'plan approval pending';
+    return progress ?? 'waiting on your decision';
   }
 
   if (isBlockedFeature(feature, reviewStatus)) {

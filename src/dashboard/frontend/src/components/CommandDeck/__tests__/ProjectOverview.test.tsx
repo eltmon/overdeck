@@ -366,6 +366,7 @@ describe('ProjectOverview', () => {
             hasPlanning: true,
             hasPrd: true,
             hasState: false,
+            pipelineBucket: 'planned_backlog',
           }),
         ]}
         issueCosts={{}}
