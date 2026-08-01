@@ -136,22 +136,39 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T18:32:15.319Z",
+  "updated": "2026-08-01T18:36:24.513Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T18:26:35.794Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-01T18:36:24.467Z",
+    "reviewNotes": "Effective current-project resolution is missing across server, CLI, menus, and drag-drop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d",
-    "reviewRequestedAt": "2026-08-01T17:55:06.837Z",
-    "reviewSpawnedAt": "2026-08-01T18:09:07.221Z"
+    "reviewSpawnedAt": "2026-08-01T18:09:07.221Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -166,9 +183,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 383656,
-            "output": 6105,
-            "cacheRead": 1850368,
+            "input": 2352193,
+            "output": 39824,
+            "cacheRead": 5038080,
             "cacheWrite": 0
           }
         },
@@ -221,9 +238,9 @@
           "cacheWrite": 120026
         },
         "openai/gpt-5.6-sol": {
-          "input": 5732154,
-          "output": 139373,
-          "cacheRead": 29658624,
+          "input": 7700691,
+          "output": 173092,
+          "cacheRead": 32846336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -234,8 +251,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 112.516999,
-        "pricingAsOf": "2026-08-01T18:26:35.808Z"
+        "usd": 124.96511,
+        "pricingAsOf": "2026-08-01T18:36:24.506Z"
       }
     },
     "merges": [
@@ -435,5 +452,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
