@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:50:41.472Z",
+  "updated": "2026-08-01T20:50:44.159Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -100,7 +100,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:50:33.797Z",
+    "updatedAt": "2026-08-01T20:50:38.684Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all blocking review issues: wired residue through workflow, fixed forge commands, fixed error handling, optimized record-read concurrency, and fixed mergeStatus deletion",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "137976e6c728372482d643dc0e74009789d733ff",
@@ -234,7 +234,7 @@
       },
       "costAtCloseOut": {
         "usd": 41.694060300000004,
-        "pricingAsOf": "2026-08-01T20:50:34.927Z"
+        "pricingAsOf": "2026-08-01T20:50:43.774Z"
       }
     },
     "merges": [
