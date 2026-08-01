@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T03:57:20.524Z",
-  "updated": "2026-08-01T04:54:46.177Z",
+  "updated": "2026-08-01T04:56:37.225Z",
   "pipeline": {
     "issueId": "PAN-3373",
     "reviewStatus": "pending",
@@ -13,13 +13,21 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T04:54:44.056Z",
+    "updatedAt": "2026-08-01T04:56:37.214Z",
     "mergeNotes": "Stale strike signal: recorded HEAD 1f048108082760aac0d0abf23f6c681e5d9158df differs from origin/strike/pan-3373 at 7f27c8bb502f55028ff083c3e7fcd06837701043",
     "strikeReadyHead": "1f048108082760aac0d0abf23f6c681e5d9158df",
     "strikeReadyAt": "2026-08-01T04:52:37.211Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "recovering",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-01T04:56:37.213Z",
+        "strikeHead": "1f048108082760aac0d0abf23f6c681e5d9158df",
+        "mainHead": "c15edea146bcc182f09321e437e8e010915e0905",
+        "outcome": "failed",
+        "detail": "Stale strike signal: recorded HEAD 1f048108082760aac0d0abf23f6c681e5d9158df differs from origin/strike/pan-3373 at 7f27c8bb502f55028ff083c3e7fcd06837701043"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -43,7 +51,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.721747,
-        "pricingAsOf": "2026-08-01T04:54:46.158Z"
+        "pricingAsOf": "2026-08-01T04:56:37.217Z"
       }
     },
     "merges": [],
