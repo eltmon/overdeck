@@ -115,10 +115,10 @@
     "recordedAt": "2026-08-01T18:21:54.888Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T18:54:43.581Z",
+  "updated": "2026-08-01T18:58:23.141Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -126,11 +126,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T18:23:27.074Z",
-    "updatedAt": "2026-08-01T18:54:43.516Z",
+    "updatedAt": "2026-08-01T18:58:23.090Z",
+    "reviewNotes": "Synchronous project resolution blocks the dashboard event loop; required conversation 1827 reassignment lacks auditable evidence",
     "inspectNotes": "All 5 ACs verified against tree at c2817141. AC-1: idempotent ALTER at infra.ts:279 inside ensureWorkspaceTablesSync, called from runOverdeckMigrationSync (infra.ts:204) which getOverdeckDatabaseSync runs on every open; runSchemaTopUp swallows duplicate-column so re-open is safe; text column with no default = nullable. AC-2: createConversation INSERT carries project_key (conversations.ts:1231/1249) from handleConversationCreate's canonicalProjectKey; every LegacyConversation read goes through the single LEGACY_CONVERSATION_SELECT which now selects c.project_key, and rowToLegacyConversation maps it to projectKey. AC-3: setConversationProjectKey (conversations.ts:1365) updates via the conversations write door, matching the setConversationHarness pattern, and passes null through. AC-4: getProjectSync is exact-key lookup so a yaml key returns itself and a display name maps to its key via listProjectsSync; unknown input yields 'Unknown project: <input>'. AC-5: resolveProjectKeyForCwd (projects.ts:555) normalizes with resolve(), guards prefix with a trailing slash so sibling dirs cannot false-match, keeps the longest projectPath, returns null outside all registered paths. NFR-1: existing rows get NULL, no read path changes behavior. Non-blocking: handleConversationCreate resolves the key twice (resolveRegisteredProjectKey then resolveProjectCwd re-resolves), and resolveProjectCwd's !projectConfig branch is now unreachable after a successful key resolution.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "lastVerifiedCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9",
-    "reviewRequestedAt": "2026-08-01T18:23:27.074Z",
     "reviewSpawnedAt": "2026-08-01T18:54:43.515Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -210,11 +210,69 @@
         "tests/unit/lib/overdeck/title-sources.test.ts"
       ],
       "recordedAt": "2026-08-01T18:21:54.888Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 533533,
+            "output": 8876,
+            "cacheRead": 4832256,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1862134,
+            "output": 23995,
+            "cacheRead": 6686208,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 2621063,
+            "output": 38186,
+            "cacheRead": 1068544,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1798857,
+            "output": 27317,
+            "cacheRead": 2146816,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1294613,
+            "output": 8663,
+            "cacheRead": 1883136,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 2791509,
@@ -226,15 +284,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2791509,
-          "output": 144374,
-          "cacheRead": 98470912,
+          "input": 10901709,
+          "output": 251411,
+          "cacheRead": 115087872,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.524221,
-        "pricingAsOf": "2026-08-01T18:54:43.555Z"
+        "usd": 119.594811,
+        "pricingAsOf": "2026-08-01T18:58:23.121Z"
       }
     },
     "merges": [
