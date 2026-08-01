@@ -546,3 +546,11 @@ Operator: "ALL issues in MYN and overdeck pipelines should be progressing" — t
 - **MIN zombie sweep (11 rows)**: drained 6 by close-out (MIN-852, 729, 794, 861, 862 = real lag; MIN-882 already closed 07-23 = resolver residue). 7 recordless ancients (MIN-172, 572, 576, 596, 620, 622, 632) fail close-out "no record found" — no disposition path. Filed **PAN-3396** (resolver resurrects terminal issues + recordless dead-letter).
 - **MIN-908 closed out.** MIN-929: work agent idle is NORMAL (in review); convoy lanes correctness+requirements were frozen at 0 output (PAN-3375 signature on FRESH spawns, not warm-resumes — the landed detector may not cover this variant); per-lane restarts issued — correctness recovered, requirements still 0-output, one more cycle before escalating.
 - Fleet now ~10 active. Load watch: verification suites stacking.
+
+## RUN-79 tick 5 (2026-08-01 ~10:50Z) — PAN-3389 + PAN-3305 both LANDED; MIN-929 review APPROVED; whole fleet delta-verified working
+
+- **PAN-3389 landed** (train merged #3394; handed off). `pan memory search` fix reaches the next deploy.
+- **PAN-3305 landed** (#3395 squash `4b2be68a` — the earlier test-lane FAILURE snapshot was stale, re-run green; handed off). The 2-day-old orphaned strike is fully recovered.
+- **MIN-929 review APPROVED** (cycle-3 convergence, 0 blocking; all four reports + synthesis written). The per-lane restarts un-froze both lanes — but NOTE: the freeze hit FRESH spawns, not warm resumes; PAN-3375's detector may not cover this variant. Second specimen = file the variant.
+- Delta-verified ALL active agents working: strike-1889 $12.65 (task output), strike-3392 $12.91 ctx 87% (WATCH context), strike-3393 $8.50 (tests), pan-3362 $10.21 +526, pan-3367 $13.32 +667, min-874 $12.99 +892, min-864 $6.76 +38/−102 (conflict resolution — deletions = taking main's side where superseded).
+- Close-outs pending deploy/CI: PAN-3389, PAN-3390, PAN-3305.
