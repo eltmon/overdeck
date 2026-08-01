@@ -71,7 +71,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:26:05.208Z",
+  "updated": "2026-08-01T23:26:16.234Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -80,7 +80,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:26:03.340Z",
+    "updatedAt": "2026-08-01T23:26:10.722Z",
     "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346",
@@ -164,24 +164,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 982889,
-            "output": 73674,
-            "cacheRead": 42083840,
+            "input": 987413,
+            "output": 74110,
+            "cacheRead": 43027968,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4711574,
-          "output": 174250,
-          "cacheRead": 62964736,
+          "input": 4716098,
+          "output": 174686,
+          "cacheRead": 63908864,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 60.267738,
-        "pricingAsOf": "2026-08-01T23:26:05.201Z"
+        "usd": 60.775502,
+        "pricingAsOf": "2026-08-01T23:26:10.796Z"
       }
     },
     "merges": [
