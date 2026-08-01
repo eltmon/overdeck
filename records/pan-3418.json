@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:57:41.962Z",
+  "updated": "2026-08-01T15:58:43.606Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "verify-live-data-repair": {
-        "writerId": "agent-pan-3418",
-        "agentId": "agent-pan-3418",
-        "pid": 1765728,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:57:41.962Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -118,6 +110,17 @@
         "outcome": "completed",
         "reason": "Re-seeded new-conversation selection from storage after live model discovery without affecting live conversations or inventing a default; added focused frontend tests",
         "releasedAt": "2026-08-01T15:57:12.968Z"
+      },
+      {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 1765728,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:57:41.962Z",
+        "itemId": "verify-live-data-repair",
+        "outcome": "blocked",
+        "reason": "Post-deploy verification cannot run before this branch is reviewed, merged, deployed, and the dashboard boot backfill executes; current read-only sweep still shows 20260801-7889 model='' and 5 empty-string rows",
+        "releasedAt": "2026-08-01T15:58:43.605Z"
       }
     ],
     "statusReasons": {
@@ -140,6 +143,10 @@
       "picker-reseeds-after-model-list-load": {
         "reason": "Re-seeded new-conversation selection from storage after live model discovery without affecting live conversations or inventing a default; added focused frontend tests",
         "updatedAt": "2026-08-01T15:57:12.968Z"
+      },
+      "verify-live-data-repair": {
+        "reason": "Post-deploy verification cannot run before this branch is reviewed, merged, deployed, and the dashboard boot backfill executes; current read-only sweep still shows 20260801-7889 model='' and 5 empty-string rows",
+        "updatedAt": "2026-08-01T15:58:43.605Z"
       }
     }
   },
@@ -163,6 +170,6 @@
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac1": "completed",
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac2": "completed",
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac3": "completed",
-    "verify-live-data-repair": "running"
+    "verify-live-data-repair": "blocked"
   }
 }
