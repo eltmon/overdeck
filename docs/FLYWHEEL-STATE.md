@@ -807,3 +807,11 @@ Session resumed (monitors re-armed as one combined memory+RSS+liveness watch). *
 - **MIN-930 (campaign P0 token leak) COMPLETED and handed off** while paused. Lane A advanced serially: **MIN-932 started** (auto-planning → work). MIN-931 continues Lane B ($1.39 fresh session post-rework).
 - Server RSS 1936MB at 18min under 31 sessions — higher than the 644MB post-fix reading; combined monitor will trip at 3GB. Watch for leak-fix regression vs. legitimate load.
 - New non-campaign issues appeared while paused (PAN-3419/3423/3436, MIN-923/924) — triage next tick.
+
+## RUN-79 tick 37 (2026-08-01 ~20:20Z) — 🏁 CAMPAIGN P0 SHIPPED: MIN-930 promoted + closed out
+
+- **Operator promoted uat/min-crow-0801** (7 repos incl. hermes-plugin) carrying **MIN-930 — the Hermes campaign's P0 token leak, the highest-urgency item across all projects** — plus MIN-922. **Both closed out clean** (no leftover-agent block this time: MIN-930 had already handed off, MIN-922 likewise — the postMergeLifecycle pause gap did NOT recur, 2 promotes without it).
+- Campaign status: Lane A = MIN-930 ✅ shipped → MIN-932 planning → MIN-933 queued. Lane B = MIN-931 reworking → MIN-934 queued (hard dep). **1 of 5 campaign issues terminal.**
+- Full read-door sweep re-derived: 13 PAN + 22 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable). Clean UAT batch EMPTY (candidate null) — correct.
+- NOTE: scratchpad was cleared by the session restart; status snapshot rebuilt from live state (FLYWHEEL-STATE.md was the recovery source — the durable-memory design working as intended).
+- P0 PAN-3436 PR #3438 in CI. UAT gate now OFF → eligible merges get scheduled as the ready set fills.
