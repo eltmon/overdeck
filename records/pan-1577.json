@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T16:06:10.643Z",
+  "updated": "2026-08-01T16:18:54.677Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,8 +49,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "move-mutation": {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3875244,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:18:54.677Z"
+      }
+    },
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -71,6 +79,10 @@
       "cli-move": {
         "reason": "Added pan conversations move <query> <projectKey>. Resolver: exact getConversationByName first, then unique fuzzy title match over listConversations(); non-zero exit with clear message for no-match or ambiguous match (lists candidates). PATCHes the move endpoint via getDashboardApiUrlSync, prints resolved title + old->new project labels (via getProjectSync name lookup), handles ECONNREFUSED as 'Dashboard not running'. Follows show.ts/reset-review.ts chalk+exitCli conventions. 8 new tests (exact match, fuzzy match, success labels, no-match, ambiguous, unknown-project, dashboard-down, command registration) all pass; typecheck/lint clean. Commit ccca029.",
         "updatedAt": "2026-08-01T16:06:10.642Z"
+      },
+      "move-mutation": {
+        "reason": "start",
+        "updatedAt": "2026-08-01T16:18:54.677Z"
       }
     },
     "claimHistory": [
@@ -153,6 +165,7 @@
     "cli-move.cli-move.ac1": "completed",
     "cli-move.cli-move.ac2": "completed",
     "cli-move.cli-move.ac3": "completed",
-    "cli-move.cli-move.ac4": "completed"
+    "cli-move.cli-move.ac4": "completed",
+    "move-mutation": "running"
   }
 }
