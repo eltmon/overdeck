@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T11:11:18.752Z",
+  "updated": "2026-08-01T11:11:20.991Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -240,5 +240,12 @@
     "synthesis-report.synthesis-report.ac1": "completed",
     "synthesis-report.synthesis-report.ac2": "completed",
     "synthesis-report.synthesis-report.ac3": "completed"
-  }
+  },
+  "decisions": [
+    {
+      "id": "D-test-waived",
+      "summary": "Test gate waived: PAN-3367 is a read-only docs audit (NFR-1: no re-run of any gate/suite as verdict basis; no code changes at all — every commit touches only docs/audits/pan-3367/**). The 'test' keyword match is a false positive from quoted issue-body prose discussing review/test-finding triage order, not a code-testing requirement. Each xBRIEF item's own verify_commands (grep/node checks over the report files, e.g. 'for f in pan-3216 ...; do grep -q **Verdict:** ...' and the derived-extra enumerator in synthesis-report) are this deliverable's mechanical acceptance check, run and confirmed passing before every pan task done call in this session.",
+      "recordedAt": "2026-08-01T11:11:20.991Z"
+    }
+  ]
 }
