@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T15:53:18.409Z",
+  "updated": "2026-08-01T15:59:15.662Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "fork-route-project": {
-        "writerId": "agent-pan-3419",
-        "agentId": "agent-pan-3419",
-        "pid": 1259085,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:53:18.409Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3419",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Added nullable conversations.project_key top-up, explicit conversation read/write support, canonical project resolvers, handler canonicalization, and regression coverage",
         "releasedAt": "2026-08-01T15:49:42.797Z"
+      },
+      {
+        "writerId": "agent-pan-3419",
+        "agentId": "agent-pan-3419",
+        "pid": 1259085,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:53:18.409Z",
+        "itemId": "fork-route-project",
+        "outcome": "completed",
+        "reason": "Added canonical explicit project validation plus source project inheritance for summary forks, persisted the result on successor conversations, and covered all resolver cases",
+        "releasedAt": "2026-08-01T15:59:15.661Z"
       }
     ],
     "statusReasons": {
       "store-project-key": {
         "reason": "Added nullable conversations.project_key top-up, explicit conversation read/write support, canonical project resolvers, handler canonicalization, and regression coverage",
         "updatedAt": "2026-08-01T15:49:42.797Z"
+      },
+      "fork-route-project": {
+        "reason": "Added canonical explicit project validation plus source project inheritance for summary forks, persisted the result on successor conversations, and covered all resolver cases",
+        "updatedAt": "2026-08-01T15:59:15.661Z"
       }
     }
   },
@@ -108,6 +115,10 @@
     "store-project-key.store-project-key.ac3": "completed",
     "store-project-key.store-project-key.ac4": "completed",
     "store-project-key.store-project-key.ac5": "completed",
-    "fork-route-project": "running"
+    "fork-route-project": "completed",
+    "fork-route-project.fork-route-project.ac1": "completed",
+    "fork-route-project.fork-route-project.ac2": "completed",
+    "fork-route-project.fork-route-project.ac3": "completed",
+    "fork-route-project.fork-route-project.ac4": "completed"
   }
 }
