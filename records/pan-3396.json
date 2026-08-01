@@ -281,7 +281,7 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:03:14.693Z",
+  "updated": "2026-08-01T22:07:22.688Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "reviewing",
@@ -454,8 +454,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "docs-membership-residue": {
+        "writerId": "agent-pan-3396",
+        "agentId": "agent-pan-3396",
+        "pid": 2403358,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:07:22.688Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3396",
@@ -554,6 +562,6 @@
     "residue-ceremony.residue-ceremony.ac2": "completed",
     "residue-ceremony.residue-ceremony.ac3": "completed",
     "residue-ceremony.residue-ceremony.ac4": "completed",
-    "docs-membership-residue": "pending"
+    "docs-membership-residue": "running"
   }
 }
