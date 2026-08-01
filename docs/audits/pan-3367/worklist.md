@@ -42,11 +42,15 @@ the 8 MIN/non-public candidates, in deliberate deviation from the literal text o
   this audit's method against the same merge requests (locatable via the MIN issue IDs already named
   in each report).
 
-This substitute has not been run through a formal xBRIEF replanning/amendment cycle — that
-requires operator action this audit cannot take on its own authority (see the operator escalation
-recorded in this issue's conversation). Until amended, the literal text of FR-1 and
-`audit-batch-e.ac1-ac2` remains unsatisfied for the 8 MIN/non-public candidates; this section
-records that as a known, deliberate, safety-driven deviation rather than an oversight.
+**Operator sign-off (2026-08-01).** This substitute was escalated to the repository operator as a
+formal requirements-amendment decision (the literal text of FR-1 and `audit-batch-e.ac1-ac2` calls
+for raw dumps and verbatim quotes for every candidate, including the 8 MIN/non-public ones). The
+operator approved treating the paraphrase-only substitute above as satisfying the intent of those
+acceptance criteria for non-public-prefix candidates, and separately confirmed the residual history
+exposure below is an accepted risk, not a merge blocker. This is recorded here as the requirements
+disposition for FR-1/`audit-batch-e.ac1-ac2` on the 8 MIN/non-public candidates; the literal text of
+those criteria remains formally unamended, but the deviation is operator-approved rather than a
+unilateral audit decision.
 
 **`candidates.json` reproducibility note:** the generator emits `resetAt` for every candidate on a
 fresh run. 59 of the 61 committed rows carry `resetAt`, backfilled from the committed
@@ -59,7 +63,17 @@ would require either re-fetching from the (further-compacted) live DB or re-gene
 re-deleting a private-repo evidence dump, neither of which is worth doing for two candidates this
 audit never covers.
 
-## Final count and variance from 29
+## History exposure — accepted risk (operator decision, 2026-08-01)
+
+The review's cycle-2 and cycle-3 security findings correctly identified that an early commit on
+this branch (since removed from the tree) briefly committed raw MIN event payloads and
+private-repository detail; because that commit remains a reachable ancestor of this branch, its
+blobs stay retrievable by SHA on the public GitHub PR even after later commits deleted the files.
+Retracting a published commit from a public branch's history requires a repository-host history
+purge or a clean-branch replacement — a one-way, destructive operation this audit does not have
+standing authority to perform on its own. This was escalated to the repository operator, who
+reviewed the exposure and explicitly accepted it as a known risk rather than requiring a history
+rewrite. No further remediation of the historical commit is planned as part of this audit.
 
 **Worklist total: 30** — 25 mandatory issues (named in the PAN-3367 body) + 5 derived
 zero-commit extras. This is **+1 relative to the ~29 the issue body estimates**. The variance is
