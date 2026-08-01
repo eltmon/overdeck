@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-01T16:20:53.281Z",
+  "updated": "2026-08-01T16:21:45.001Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T16:20:50.694Z",
-    "inspectNotes": "Inspecting item resolve-intent-hook"
+    "updatedAt": "2026-08-01T16:21:41.038Z",
+    "inspectNotes": "Both blocking findings fixed and covered. Same-value deadlock resolved: setters are plain useState setters again (useWorkspaceCreateIntent.ts:40-44) and invalidation moved back inside the resolve effect (:66-69), so an unchanged value leaves requestBody's memo identity (:58) intact, the effect does not re-run, and nothing is invalidated — matching NewWorkspaceModal.tsx:203-207. New test 'does not invalidate a resolved intent when a field is set to its current value' asserts stale stays false and no extra resolve fires. FR-2 no-loss restored: submitSeq (:50) is bumped per submission (:115) and on unmount (:52-54), and checked before findings handling, onCreated, setError, and setCreating, so a superseded or unmounted submission neither navigates nor writes state; covered by 'suppresses onCreated when the page unmounts during submission'. AC1 debounce (one POST per settle, 299/300 boundary), AC2 stale/canCreate until a successful resolve, AC3 422 findings via findingsFor with no onCreated, AC4 targetPath omitted when isolated all still hold. Ran the file: 7/7 pass."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 582348,
-            "output": 65656,
-            "cacheRead": 17646080,
+            "input": 584908,
+            "output": 65798,
+            "cacheRead": 18013696,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 582348,
-          "output": 65656,
-          "cacheRead": 17646080,
+          "input": 584908,
+          "output": 65798,
+          "cacheRead": 18013696,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 13.70446,
-        "pricingAsOf": "2026-08-01T16:20:50.706Z"
+        "usd": 13.905328,
+        "pricingAsOf": "2026-08-01T16:21:41.241Z"
       }
     },
     "merges": [],
