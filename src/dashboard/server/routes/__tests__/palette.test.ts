@@ -14,6 +14,10 @@ vi.mock('../../../../lib/memory/fts-db.js', () => ({
   runMemoryFtsStatement: vi.fn(),
 }));
 
+vi.mock('../../../../lib/overdeck/conversations.js', () => ({
+  getConversationByClaudeSessionId: vi.fn(),
+}));
+
 vi.mock('../../../../lib/config-yaml.js', async () => {
   const actual = await vi.importActual<typeof import('../../../../lib/config-yaml.js')>('../../../../lib/config-yaml.js');
   return {
@@ -33,6 +37,7 @@ vi.mock('../../../../lib/conversation-search/embedding-provider.js', async () =>
 import { getConversationSearchConfigSync } from '../../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../../lib/conversation-search/embedding-provider.js';
 import { runMemoryFtsStatement } from '../../../../lib/memory/fts-db.js';
+import { getConversationByClaudeSessionId } from '../../../../lib/overdeck/conversations.js';
 import { listProjectsSync } from '../../../../lib/projects.js';
 import { indexConversationFile } from '../../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../../lib/database/conversation-embeddings-db.js';
@@ -78,6 +83,7 @@ describe('palette conversation search', () => {
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'pan-palette-search-'));
     vi.mocked(listProjectsSync).mockReturnValue([]);
+    vi.mocked(getConversationByClaudeSessionId).mockReturnValue(null);
     vi.mocked(runMemoryFtsStatement).mockResolvedValue([]);
   });
 
@@ -88,7 +94,7 @@ describe('palette conversation search', () => {
     tmpDir = undefined;
   });
 
-  it('returns conversation hits from an indexed fixture session', async () => {
+  it('routes conversation hits by explicit project with cwd fallback', async () => {
     const root = tmpDir!;
     const projectDir = join(root, 'projects', 'overdeck');
     mkdirSync(projectDir, { recursive: true });
@@ -106,6 +112,10 @@ describe('palette conversation search', () => {
     const provider = fakeProvider(dimensions);
     vi.mocked(getConversationSearchConfigSync).mockReturnValue(config);
     vi.mocked(createConversationEmbeddingProvider).mockReturnValue(provider);
+    vi.mocked(listProjectsSync).mockReturnValue([{
+      key: 'overdeck-key',
+      config: { name: 'Overdeck', path: 'overdeck' },
+    } as ReturnType<typeof listProjectsSync>[number]]);
 
     const db = openEmbeddingsDb(config.dbPath, dimensions);
     expect(db.available).toBe(true);
@@ -128,9 +138,26 @@ describe('palette conversation search', () => {
       sessionId: 'session-a',
       conversationId: 'session-a',
       projectId: 'overdeck',
+      projectKey: 'Overdeck',
       role: 'assistant',
     });
     expect(result.conversations[0]?.excerptSegments).toContainEqual({ text: 'needle', match: true });
+
+    vi.mocked(getConversationByClaudeSessionId).mockReturnValue({
+      name: 'managed-conversation',
+      projectKey: 'target-key',
+    } as NonNullable<ReturnType<typeof getConversationByClaudeSessionId>>);
+    vi.mocked(listProjectsSync).mockReturnValue([{
+      key: 'target-key',
+      config: { name: 'Target Project', path: 'foreign-project' },
+    } as ReturnType<typeof listProjectsSync>[number]]);
+
+    const explicitResult = await runPaletteSearch('needle', 5);
+    expect(explicitResult.conversations[0]).toMatchObject({
+      conversationId: 'managed-conversation',
+      projectId: 'overdeck',
+      projectKey: 'Target Project',
+    });
   });
 
   it('drops conversation hits whose transcript file was deleted after indexing', async () => {
