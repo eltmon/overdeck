@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:49:39.545Z",
+  "updated": "2026-08-01T15:57:12.968Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "picker-reseeds-after-model-list-load": {
-        "writerId": "agent-pan-3418",
-        "agentId": "agent-pan-3418",
-        "pid": 747888,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:49:39.545Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -107,6 +99,17 @@
         "outcome": "completed",
         "reason": "Rendered harness metadata independently from model availability and added frontend regression tests for absent and present model values",
         "releasedAt": "2026-08-01T15:49:12.307Z"
+      },
+      {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 747888,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:49:39.545Z",
+        "itemId": "picker-reseeds-after-model-list-load",
+        "outcome": "completed",
+        "reason": "Re-seeded new-conversation selection from storage after live model discovery without affecting live conversations or inventing a default; added focused frontend tests",
+        "releasedAt": "2026-08-01T15:57:12.968Z"
       }
     ],
     "statusReasons": {
@@ -125,6 +128,10 @@
       "harness-chip-independent-of-model": {
         "reason": "Rendered harness metadata independently from model availability and added frontend regression tests for absent and present model values",
         "updatedAt": "2026-08-01T15:49:12.307Z"
+      },
+      "picker-reseeds-after-model-list-load": {
+        "reason": "Re-seeded new-conversation selection from storage after live model discovery without affecting live conversations or inventing a default; added focused frontend tests",
+        "updatedAt": "2026-08-01T15:57:12.968Z"
       }
     }
   },
@@ -144,6 +151,9 @@
     "harness-chip-independent-of-model": "completed",
     "harness-chip-independent-of-model.harness-chip-independent-of-model.ac1": "completed",
     "harness-chip-independent-of-model.harness-chip-independent-of-model.ac2": "completed",
-    "picker-reseeds-after-model-list-load": "running"
+    "picker-reseeds-after-model-list-load": "completed",
+    "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac1": "completed",
+    "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac2": "completed",
+    "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac3": "completed"
   }
 }
