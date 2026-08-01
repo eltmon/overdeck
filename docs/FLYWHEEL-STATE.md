@@ -9512,3 +9512,9 @@ Operator finished UAT pause and said resume.
 - **PAN-3377 closed out** (main CI green past the merge; live build = the merge commit itself; 8-row DoD, no overrides). **The verdict-laundering defect class is now closed end-to-end**: Variant A guard (PAN-3365) + Variant B guard (PAN-3377) both merged, deployed, verified, closed — from first forensic specimen to both guards live in under 5 hours.
 - strike-pan-3379 in verify ($4.98, +59/−14 — small surgical diff as expected for a retirement sweep). strike-pan-3375 pushing (+251/−38, deadline enforcement + resume-kickoff verification).
 - Interim-run scoreboard so far: **8 issues landed and closed out** (PAN-3365, 3366, 3368, 3370, 3373, 3377 + close-out drains), 4 substrate issues filed with root causes (PAN-3368, 3373, 3375, 3379), 1 dup correctly folded (PAN-3378→PAN-2952), 2 live incidents recovered (reload outage, convoy freeze), 0 overrides, laundered PAN-3358 row quarantined until organically superseded.
+
+## Interim tick 11 (2026-08-01 ~07:15Z) — both strikes ready and reviewed; CI watches armed
+
+- **PAN-3379 reviewed**: needs-you classification now requires the canonical `pipelineBucket` from the membership resolver (terminal/zombie buckets can never classify as needs-you) and captions are derived labels ("plan approval") instead of the frozen "all checks passed". Render-time derivation from the canonical read door — structurally kills the phantom class rather than sweeping a store. Small surgical diff (+59/−14) + 41 lines of tests. PR #3381.
+- **PAN-3375 reviewed**: deacon convoy monitor now (1) detects a warm-resumed reviewer whose activity mirror never advances → kill + per-lane respawn via the PAN-3368 door, bounded by `reviewRetryAttempt`; (2) enforces child `reviewDeadlineAt` with a single-lane retry before REVIEWER_FAILED. Fake-timer tests per repo rule (+185 test lines).
+- Both PRs in CI with a combined background watch; land + close out on green. Load back to ~3.
