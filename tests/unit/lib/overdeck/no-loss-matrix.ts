@@ -180,6 +180,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/abort',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.piAbortKey (Escape; no durable state)' },
   { surface: 'POST /api/conversations/:name/control-ack',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlAckRegistry (ephemeral ack)' },
   { surface: 'PATCH /api/conversations/:name',                           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle' },
+  { surface: 'PATCH /api/conversations/:name/move',                      kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.setConversationProjectKey (PAN-1577)' },
   { surface: 'DELETE /api/conversations/:name',                          kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive (idempotent alias)' },
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
   { surface: 'POST /api/conversations/:name/unarchive',                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unarchive' },
