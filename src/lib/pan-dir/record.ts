@@ -898,7 +898,8 @@ export function markRecordPipelineResidueClosedOutSync(
   record.pipeline.closedOut = true;
   record.pipeline.closedOutAt = now;
   record.pipeline.readyForMerge = false;
-  // mergeStatus deliberately left undefined — residue disposition never claims a merge
+  // Explicitly delete any existing mergeStatus — residue disposition never claims a merge
+  delete record.pipeline.mergeStatus;
   record.pipeline.updatedAt = now;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);

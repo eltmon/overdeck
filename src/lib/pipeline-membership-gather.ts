@@ -285,6 +285,7 @@ export interface PipelineMembershipGatherDeps {
   listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
   hasTerminalCloseOutRecord(project: ProjectConfig, issueId: string): Promise<boolean>;
+  batchHasTerminalCloseOutRecords(project: ProjectConfig, issueIds: string[]): Promise<Map<string, boolean>>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
 
@@ -306,6 +307,26 @@ const defaultDeps: PipelineMembershipGatherDeps = {
     } catch {
       return false;
     }
+  },
+  batchHasTerminalCloseOutRecords: async (project, issueIds) => {
+    const result = new Map<string, boolean>();
+    // Read records with bounded concurrency to avoid event-loop starvation
+    const batchSize = 10;
+    for (let i = 0; i < issueIds.length; i += batchSize) {
+      const batch = issueIds.slice(i, i + batchSize);
+      const batchResults = await Promise.allSettled(
+        batch.map(async (id) => {
+          try {
+            const record = await readIssueRecord(project, id);
+            result.set(id, record?.pipeline.closedOut === true);
+          } catch {
+            result.set(id, false);
+          }
+        }),
+      );
+      // Continue regardless of individual failures — populate result from settled promises
+    }
+    return result;
   },
   run: async (command, args, cwd) => {
     const { stdout } = await execFileAsync(command, args, {
@@ -684,15 +705,10 @@ export async function gatherProjectLensSignals(
   );
   const closedOutRecordIssues = new Set<string>();
   if (closedCandidatesWithOpenPr.length > 0) {
-    const closedOutResults = await Promise.allSettled(
-      closedCandidatesWithOpenPr.map((id) =>
-        deps.hasTerminalCloseOutRecord(project, id),
-      ),
-    );
-    for (let i = 0; i < closedCandidatesWithOpenPr.length; i++) {
-      const result = closedOutResults[i];
-      if (result.status === 'fulfilled' && result.value) {
-        closedOutRecordIssues.add(closedCandidatesWithOpenPr[i]);
+    const closedOutResults = await deps.batchHasTerminalCloseOutRecords(project, closedCandidatesWithOpenPr);
+    for (const [id, hasClosedOut] of closedOutResults) {
+      if (hasClosedOut) {
+        closedOutRecordIssues.add(id);
       }
     }
   }

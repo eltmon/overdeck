@@ -62,6 +62,13 @@ function deps(): PipelineMembershipGatherDeps {
     listTrackerIssues: vi.fn().mockResolvedValue([]),
     listSpecIssueIds: vi.fn().mockResolvedValue(['PAN-4']),
     hasTerminalCloseOutRecord: vi.fn().mockResolvedValue(false),
+    batchHasTerminalCloseOutRecords: vi.fn().mockImplementation(async (_project, issueIds: string[]) => {
+      const result = new Map<string, boolean>();
+      for (const id of issueIds) {
+        result.set(id, false);
+      }
+      return result;
+    }),
     run: vi.fn().mockImplementation(async (command, args, cwd) => {
       if (command === 'git' && args[0] === 'rev-parse') return cwd;
       if (command === 'git' && args.includes('--no-merged=main')) return 'feature/pan-1\norigin/feature/pan-3\n';
@@ -1214,14 +1221,15 @@ describe('gatherProjectLensSignals', () => {
     ]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.batchHasTerminalCloseOutRecords = vi.fn().mockResolvedValue(new Map([['PAN-31', false]]));
     mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
       args[0] === 'rev-parse' ? cwd : '');
 
     const result = await gatherProjectLensSignals(project, mocked);
 
-    // Probe should be called only for PAN-31 (closed + open PR), not PAN-30 (open) or PAN-32 (closed, no PR)
-    expect(mocked.hasTerminalCloseOutRecord).toHaveBeenCalledTimes(1);
-    expect(mocked.hasTerminalCloseOutRecord).toHaveBeenCalledWith(project, 'PAN-31');
+    // Batch probe should be called with only PAN-31 (closed + open PR), not PAN-30 (open) or PAN-32 (closed, no PR)
+    expect(mocked.batchHasTerminalCloseOutRecords).toHaveBeenCalledTimes(1);
+    expect(mocked.batchHasTerminalCloseOutRecords).toHaveBeenCalledWith(project, ['PAN-31']);
   });
 
   it('closed + open PR + hasTerminalCloseOut true → clean_terminal with residue reason', async () => {
@@ -1238,7 +1246,7 @@ describe('gatherProjectLensSignals', () => {
     ]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.hasTerminalCloseOutRecord = vi.fn().mockResolvedValue(true); // L7-record true
+    mocked.batchHasTerminalCloseOutRecords = vi.fn().mockResolvedValue(new Map([['PAN-33', true]])); // L7-record true
     mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
       args[0] === 'rev-parse' ? cwd : '');
 
@@ -1264,7 +1272,7 @@ describe('gatherProjectLensSignals', () => {
     ]);
     mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
     mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
-    mocked.hasTerminalCloseOutRecord = vi.fn().mockResolvedValue(false); // L7-record false
+    mocked.batchHasTerminalCloseOutRecords = vi.fn().mockResolvedValue(new Map([['PAN-34', false]])); // L7-record false
     mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
       args[0] === 'rev-parse' ? cwd : '');
 

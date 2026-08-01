@@ -119,4 +119,19 @@ describe('markRecordPipelineResidueClosedOutSync (PAN-3396)', () => {
     expect(after?.pipeline.readyForMerge).toBe(false);
     expect(after?.pipeline.mergeStatus).toBeUndefined();
   });
+
+  it('deletes existing mergeStatus when marking residue (non-blocking finding fix)', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'pan-record-residue-delete-'));
+    dirs.push(ws);
+    const project = getProjectConfigFromWorkspacePath(ws);
+    const record = baseRecord('PAN-3396');
+    record.pipeline.mergeStatus = 'merged';
+
+    writeIssueRecordSync(project, 'PAN-3396', record);
+    markRecordPipelineResidueClosedOutSync(project, 'PAN-3396');
+
+    const after = readIssueRecordSync(project, 'PAN-3396');
+    expect(after?.pipeline.closedOut).toBe(true);
+    expect(after?.pipeline.mergeStatus).toBeUndefined();
+  });
 });

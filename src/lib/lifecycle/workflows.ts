@@ -35,16 +35,18 @@ import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
+  markRecordPipelineResidueClosedOutSync,
   writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
+import { closeResidueConventionPrs } from './residue.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -207,9 +209,13 @@ export function closeOut(
 
     // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
     // PAN-3211: an abandoned disposition skips the gate entirely (PAN-3211).
+    // PAN-3396: a residue disposition also skips the gate and closes stale PRs/MRs.
     const abandon = opts.abandonDisposition;
+    const residue = opts.residueDisposition;
     const dodGate: DodGateResult = abandon
       ? buildAbandonedDodGate(abandon.reason, abandon.by)
+      : residue
+      ? buildResidueDodGate(residue.reason, residue.by)
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
@@ -239,6 +245,22 @@ export function closeOut(
         `Definition-of-Done gate blocked close-out: ${flags.join(', ')}. Re-run with the named --accept-<row> flag to record an explicit override.`,
       ));
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+    }
+
+    // 1.5. Close stale convention PRs/MRs for residue disposition (PAN-3396)
+    if (residue) {
+      const prRepos = resolveProjectReposForIssueSync(ctx.issueId, ctx.projectPath);
+      const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
+        issueId: ctx.issueId,
+        projectPath: ctx.projectPath,
+        github: prRepos.github ? { owner: prRepos.github.owner, repo: prRepos.github.repo } : undefined,
+        gitlab: prRepos.gitlab?.[0] ? { project: prRepos.gitlab[0] } : undefined,
+      }));
+      allSteps.push(residueStep);
+      if (!residueStep.success && !residueStep.skipped) {
+        allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
+        return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+      }
     }
 
     // 2. Move PRD + archive workspace artifacts
@@ -302,9 +324,9 @@ export function closeOut(
     }
 
     // 8. Mark durable pipeline terminal before clearing the DB cache.
-    const markTerminal = yield* markPipelineClosedOutStep(ctx);
+    const markTerminal = yield* markPipelineClosedOutStep(ctx, residue);
     allSteps.push(markTerminal);
-    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon);
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon, residue);
     allSteps.push(recordDodGate);
     if (!recordDodGate.success) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
@@ -330,12 +352,16 @@ export function closeOut(
   });
 }
 
-function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepResult> {
+function markPipelineClosedOutStep(ctx: LifecycleContext, residue?: { reason: string; by: string }): Effect.Effect<StepResult> {
   const step = 'close-out:mark-pipeline-terminal';
   return Effect.try({
     try: () => {
       const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
-      markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      if (residue) {
+        markRecordPipelineResidueClosedOutSync(project, ctx.issueId.toUpperCase());
+      } else {
+        markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      }
       return stepOk(step, ['Marked durable pipeline journal closed-out']);
     },
     catch: (err) => err,
@@ -346,7 +372,7 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
   );
 }
 
-function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }, residueDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
   const step = 'close-out:record-dod-gate';
   return Effect.tryPromise({
     try: async () => {
@@ -356,6 +382,7 @@ function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abando
         rows: dodGate.rows,
         accepted: dodGate.accepted,
         ...(abandonDisposition ? { disposition: abandonDisposition } : {}),
+        ...(residueDisposition ? { disposition: residueDisposition } : {}),
       });
       return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
     },
