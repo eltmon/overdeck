@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:32:33.432Z",
+  "updated": "2026-08-01T10:34:53.457Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T10:32:19.575Z",
-    "inspectNotes": "AC2 not met: the reset (pending/pending) timestamp required by AC2/FR-2 is never captured or recorded. [docs/audits/pan-3367/evidence/reproduce-worklist.mjs:30] sets sawPending=true but discards seq[j].t, so the hit object built at [reproduce-worklist.mjs:32-34] carries only negAt/passAt/minutes/negNotes — no resetAt. Consequently [docs/audits/pan-3367/evidence/candidates.json] has no reset field, and both worklist tables ([docs/audits/pan-3367/worklist.md:118] mandatory, [worklist.md:152] extras) have columns 'Issue | Negative verdict | Quoted notes | Pass at | Gap | Commits between | Branch exists | PR/MR' with no reset-timestamp column for any of the 30 rows. AC2 requires per row: negative-verdict timestamp/state/quoted notes, RESET AND pass timestamps, commit count with method, branch existence, PR/MR URL. Required fix: capture the pending/pending event time in the script (record resetAt alongside negAt/passAt), emit it into candidates.json, and add a 'Reset at' column to both tables; the value can be derived for existing rows from the committed events-<issue>.json.gz dumps without re-running against the (further compacted) DB, but the script must still record it so the derivation stays re-runnable per FR-1. Secondary (non-blocking, fix while in there): 'quoted notes' are truncated mid-string in the mandatory table (e.g. PAN-3037/PAN-3052/PAN-3083/PAN-3097/PAN-3115 all cut at '…/Projects/overde'); either quote in full or state explicitly in the table preamble that long notes are truncated and the verbatim text lives in commit-counts.json. AC1 (script committed, node:sqlite readOnly:true, 61 candidates with 61 matching per-issue raw event dumps, lossless gzip disclosed), AC3 (30 = 25 mandatory + 5 extras, variance from ~29 explained with compaction/matcher reasoning), AC4 (5 zero-commit extras, gap-sorted 60/54/33/30/17, under cap, no overflow) and NFR-2 all pass. All 25 mandatory issues are present in the table."
+    "updatedAt": "2026-08-01T10:34:53.434Z",
+    "inspectNotes": "Inspecting item snapshot-evidence"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 142,
-            "output": 51408,
-            "cacheRead": 13546444,
-            "cacheWrite": 255305
+            "input": 176,
+            "output": 64535,
+            "cacheRead": 18145200,
+            "cacheWrite": 287989
           }
         }
       },
       "totals": {
         "anthropic/claude-sonnet-5": {
-          "input": 142,
-          "output": 51408,
-          "cacheRead": 13546444,
-          "cacheWrite": 255305
+          "input": 176,
+          "output": 64535,
+          "cacheRead": 18145200,
+          "cacheWrite": 287989
         }
       },
       "costAtCloseOut": {
-        "usd": 3.861922,
-        "pricingAsOf": "2026-08-01T10:32:19.616Z"
+        "usd": 4.994723,
+        "pricingAsOf": "2026-08-01T10:34:53.448Z"
       }
     },
     "merges": [],
