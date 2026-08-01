@@ -531,9 +531,17 @@ async function spawnReviewRoleForIssuePromise(
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
   try {
+    const currentStatus = getReviewStatusSync(opts.issueId);
+    const clearsSupersededInfrastructureFailure = currentStatus?.stuckReason === 'review_infrastructure_failure';
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
+      ...(clearsSupersededInfrastructureFailure ? {
+        stuck: false,
+        stuckReason: undefined,
+        stuckAt: undefined,
+        stuckDetails: undefined,
+      } : {}),
     });
   } catch (err) {
     console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);

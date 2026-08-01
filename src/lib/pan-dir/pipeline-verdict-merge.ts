@@ -68,6 +68,72 @@ function cycleMs(value: unknown): number | undefined {
   return Number.isNaN(parsed) ? undefined : parsed;
 }
 
+function reviewCycleMs(pipeline: PipelineFields): number | undefined {
+  const spawned = cycleMs(pipeline.reviewSpawnedAt);
+  const requested = cycleMs(pipeline.reviewRequestedAt);
+  if (spawned === undefined) return requested;
+  if (requested === undefined) return spawned;
+  return Math.max(spawned, requested);
+}
+
+function carriesTerminalVerdict(pipeline: PipelineFields): boolean {
+  return GATE_NAMES.some((gate) => isTerminal(gate, pipeline[gate]));
+}
+
+export interface StaleVerdictSnapshot {
+  liveCycle: number;
+  snapshotCycle?: number;
+  liveHead?: string;
+  snapshotHead?: string;
+}
+
+/**
+ * A pending/reviewing row with a newer review obligation owns the current cycle.
+ * An older terminal snapshot is historical evidence and must not replace it,
+ * regardless of which whole-pipeline `updatedAt` happens to be newer.
+ */
+export function staleVerdictSnapshotAgainstLiveCycle(
+  live: PipelineFields,
+  snapshot: PipelineFields,
+): StaleVerdictSnapshot | null {
+  const liveReviewStatus = live.reviewStatus;
+  const liveSpawned = cycleMs(live.reviewSpawnedAt);
+  const liveRequested = cycleMs(live.reviewRequestedAt);
+  const liveCycle = reviewCycleMs(live);
+  const snapshotCycle = reviewCycleMs(snapshot);
+  const liveCycleActive = liveReviewStatus === 'reviewing'
+    || (liveReviewStatus === 'pending'
+      && liveRequested !== undefined
+      && (liveSpawned === undefined || liveRequested > liveSpawned));
+
+  if (
+    !liveCycleActive
+    || liveCycle === undefined
+    || snapshotCycle === undefined
+    || !carriesTerminalVerdict(snapshot)
+    || snapshotCycle >= liveCycle
+  ) return null;
+
+  return {
+    liveCycle,
+    snapshotCycle,
+    liveHead: typeof live.prHeadSha === 'string'
+      ? live.prHeadSha
+      : typeof live.lastVerifiedCommit === 'string'
+        ? live.lastVerifiedCommit
+        : typeof live.reviewedAtCommit === 'string'
+          ? live.reviewedAtCommit
+          : undefined,
+    snapshotHead: typeof snapshot.reviewedAtCommit === 'string'
+      ? snapshot.reviewedAtCommit
+      : typeof snapshot.lastVerifiedCommit === 'string'
+        ? snapshot.lastVerifiedCommit
+        : typeof snapshot.prHeadSha === 'string'
+          ? snapshot.prHeadSha
+          : undefined,
+  };
+}
+
 /**
  * Merge a freshly-read on-disk pipeline over a rebuilt one without losing a
  * terminal verdict the rebuild carries.
@@ -88,8 +154,8 @@ export function mergePipelineVerdictAware(
   if (!fresh?.updatedAt || !rebuilt?.updatedAt) return rebuilt;
   if (!(rebuilt.updatedAt < fresh.updatedAt)) return rebuilt;
 
-  const rebuiltCycle = cycleMs(rebuilt.reviewSpawnedAt);
-  const freshCycle = cycleMs(fresh.reviewSpawnedAt);
+  const rebuiltCycle = reviewCycleMs(fields(rebuilt));
+  const freshCycle = reviewCycleMs(fields(fresh));
   if (rebuiltCycle !== undefined && freshCycle !== undefined && freshCycle > rebuiltCycle) {
     return fresh;
   }
@@ -146,9 +212,14 @@ export function pipelineCoversFallbackVerdicts(
   journal: PanIssuePipelineRecord,
   fallback: { updatedAt: string; pipeline: PipelineFields },
 ): boolean {
-  const journalCycle = cycleMs(journal.reviewSpawnedAt);
+  const journalCycle = reviewCycleMs(fields(journal));
+  const fallbackCycle = reviewCycleMs(fallback.pipeline);
   const fallbackWrittenMs = cycleMs(fallback.updatedAt);
-  if (journalCycle !== undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs) {
+  if (
+    journalCycle !== undefined
+    && ((fallbackCycle !== undefined && journalCycle > fallbackCycle)
+      || (fallbackCycle === undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs))
+  ) {
     return true;
   }
 
@@ -184,10 +255,15 @@ export function findFallbackVerdictConflicts(
   journal: PanIssuePipelineRecord,
   fallback: { updatedAt: string; pipeline: PipelineFields },
 ): VerdictConflict[] {
-  const journalCycle = cycleMs(journal.reviewSpawnedAt);
+  const journalCycle = reviewCycleMs(fields(journal));
+  const fallbackCycle = reviewCycleMs(fallback.pipeline);
   const fallbackWrittenMs = cycleMs(fallback.updatedAt);
   // A newer review cycle legitimately resets the previous cycle's verdicts.
-  if (journalCycle !== undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs) {
+  if (
+    journalCycle !== undefined
+    && ((fallbackCycle !== undefined && journalCycle > fallbackCycle)
+      || (fallbackCycle === undefined && fallbackWrittenMs !== undefined && journalCycle > fallbackWrittenMs))
+  ) {
     return [];
   }
 

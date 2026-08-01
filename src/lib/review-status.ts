@@ -197,6 +197,41 @@ export function setReviewStatusSync(
     readyForMerge: false,
   };
 
+  const terminalReview = update.reviewStatus !== undefined
+    && ['passed', 'blocked', 'failed', 'skipped'].includes(update.reviewStatus);
+  const reviewerEvidenceHeads = Object.values(update.reviewerVerdicts ?? {})
+    .flatMap((verdict) => verdict?.atCommit ? [verdict.atCommit] : []);
+  const reviewEvidenceHead = update.reviewedAtCommit ?? reviewerEvidenceHeads[0];
+  if (
+    terminalReview
+    && reviewEvidenceHead
+    && status.lastVerifiedCommit
+    && reviewEvidenceHead !== status.lastVerifiedCommit
+  ) {
+    console.warn(
+      `[review-status] Rejecting review verdict for ${issueId}: `
+      + `evidence HEAD ${reviewEvidenceHead} does not match target HEAD ${status.lastVerifiedCommit}.`,
+    );
+    notifyPipelineSync({ type: 'status_changed', issueId, status });
+    return status;
+  }
+
+  const terminalTest = update.testStatus !== undefined
+    && ['passed', 'failed'].includes(update.testStatus);
+  if (
+    terminalTest
+    && update.lastVerifiedCommit
+    && status.reviewedAtCommit
+    && update.lastVerifiedCommit !== status.reviewedAtCommit
+  ) {
+    console.warn(
+      `[review-status] Rejecting test verdict for ${issueId}: `
+      + `evidence HEAD ${update.lastVerifiedCommit} does not match target HEAD ${status.reviewedAtCommit}.`,
+    );
+    notifyPipelineSync({ type: 'status_changed', issueId, status });
+    return status;
+  }
+
   // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
   // is explicitly resetting the merge lifecycle (update includes mergeStatus).
   // This is belt-and-suspenders — endpoint-level guards should catch this first.

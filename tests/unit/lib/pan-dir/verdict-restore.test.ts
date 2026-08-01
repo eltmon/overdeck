@@ -86,8 +86,9 @@ import {
   restoreReviewStatusFromRecords,
   type RestoreVerdictsResult,
 } from '../../../../src/lib/pan-dir/verdict-restore.js';
-import { getReviewStatusSync } from '../../../../src/lib/review-status.js';
+import { getReviewStatusSync, setReviewStatusSync } from '../../../../src/lib/review-status.js';
 import { getReviewStatusFromDbSync } from '../../../../src/lib/overdeck/review-status-sync.js';
+import { rehydrateHeadAnchor } from '../../../../src/lib/git-utils.js';
 
 describe('restoreReviewStatusFromRecords', () => {
   let projectRoot: string;
@@ -224,6 +225,44 @@ describe('restoreReviewStatusFromRecords', () => {
       detectedAt: '2026-07-26T18:58:00.000Z',
       paths: ['scripts/file-size-baseline.txt'],
     });
+  });
+
+  it('does not overwrite a fresh live review cycle with a stale durable verdict', async () => {
+    const oldHead = '1111111111111111111111111111111111111111';
+    const currentHead = rehydrateHeadAnchor('2222222222222222222222222222222222222222');
+    setReviewStatusSync('PAN-1922', {
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      verificationStatus: 'passed',
+      reviewSpawnedAt: '2026-08-01T03:00:17.321Z',
+      lastVerifiedCommit: currentHead,
+    });
+    writeRecord('PAN-1922', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      reviewSpawnedAt: '2026-08-01T02:43:19.538Z',
+      reviewedAtCommit: oldHead,
+      lastVerifiedCommit: oldHead,
+      testNotes: `Gates passed at HEAD ${oldHead.slice(0, 8)}`,
+      updatedAt: '2026-08-01T03:01:43.000Z',
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const result = await restoreReviewStatusFromRecords({ issueId: 'PAN-1922' });
+
+    expect(result).toMatchObject({ restored: 0, skipped: 1, failed: 0 });
+    expect(result.details[0]?.reason).toContain('live review cycle');
+    expect(getReviewStatusFromDbSync('PAN-1922')).toMatchObject({
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewSpawnedAt: '2026-08-01T03:00:17.321Z',
+      lastVerifiedCommit: currentHead,
+      readyForMerge: false,
+    });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(currentHead));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(oldHead));
+    warn.mockRestore();
   });
 
   it('skips issues with no per-issue record and creates no row', async () => {

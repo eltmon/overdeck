@@ -15,7 +15,9 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import { setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { getReviewStatusFromDbSync } from '../overdeck/review-status-sync.js';
 import { rehydrateHeadAnchor } from '../git-utils.js';
+import { staleVerdictSnapshotAgainstLiveCycle } from './pipeline-verdict-merge.js';
 import { collectInFlightIssueIds } from './records-backfill.js';
 import { readIssueRecord, type PanIssuePipelineRecord } from './records.js';
 
@@ -101,6 +103,21 @@ async function restoreOneIssue(
   }
 
   const update = pipelineToDurableUpdate(record.pipeline);
+  const liveStatus = getReviewStatusFromDbSync(normalizedId);
+  const staleSnapshot = liveStatus
+    ? staleVerdictSnapshotAgainstLiveCycle(
+        liveStatus as unknown as Record<string, unknown>,
+        record.pipeline as unknown as Record<string, unknown>,
+      )
+    : null;
+  if (staleSnapshot) {
+    const reason =
+      `live review cycle ${new Date(staleSnapshot.liveCycle).toISOString()} at HEAD ${staleSnapshot.liveHead ?? 'unknown'} `
+      + `supersedes durable snapshot cycle ${staleSnapshot.snapshotCycle ? new Date(staleSnapshot.snapshotCycle).toISOString() : 'unknown'} `
+      + `at HEAD ${staleSnapshot.snapshotHead ?? 'unknown'}`;
+    console.warn(`[verdict-restore] Refusing stale verdict restore for ${normalizedId}: ${reason}.`);
+    return { action: 'skipped', reason };
+  }
 
   if (options.dryRun) {
     return { action: 'restored' };

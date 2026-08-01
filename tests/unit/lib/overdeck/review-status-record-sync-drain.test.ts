@@ -183,6 +183,33 @@ describe('workspace verdict fallback drain (PAN-2989)', () => {
     expect(existsSync(fallbackPathOrThrow())).toBe(false);
   });
 
+  it('discards a stale-cycle fallback even when its bookkeeping timestamp is newer', async () => {
+    state.pipeline = {
+      issueId: ISSUE,
+      reviewStatus: 'reviewing',
+      testStatus: 'pending',
+      reviewSpawnedAt: '2026-08-01T03:00:17.321Z',
+      lastVerifiedCommit: '2222222222222222222222222222222222222222',
+      updatedAt: '2026-08-01T03:00:18.000Z',
+    };
+    writeFallback('2026-08-01T03:01:43.000Z', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      reviewSpawnedAt: '2026-08-01T02:43:19.538Z',
+      reviewedAtCommit: '1111111111111111111111111111111111111111',
+      lastVerifiedCommit: '1111111111111111111111111111111111111111',
+    });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(drainWorkspaceVerdictFallback(ISSUE)).resolves.toBe(true);
+
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    expect(existsSync(fallbackPathOrThrow())).toBe(false);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('2222222222222222222222222222222222222222'));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('1111111111111111111111111111111111111111'));
+    warn.mockRestore();
+  });
+
   it('folds a newer fallback into the record and deletes the file', async () => {
     state.pipeline = { reviewStatus: 'reviewing', testStatus: 'pending', updatedAt: '2026-07-22T09:00:00.000Z' };
     writeFallback('2026-07-22T10:00:00.000Z', { reviewStatus: 'blocked', reviewNotes: 'changes requested' });

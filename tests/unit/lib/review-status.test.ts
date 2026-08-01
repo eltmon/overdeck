@@ -61,6 +61,32 @@ describe('review status', () => {
     expect(invalidWrite).toBeTypeOf('function');
   });
 
+  it('rejects a review verdict whose evidence HEAD differs from the verified target HEAD', () => {
+    const verifiedHead = rehydrateHeadAnchor('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const staleReviewHead = rehydrateHeadAnchor('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    setReviewStatusSync('PAN-3377', {
+      reviewStatus: 'pending',
+      verificationStatus: 'passed',
+      lastVerifiedCommit: verifiedHead,
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3377', {
+      reviewStatus: 'passed',
+      reviewedAtCommit: staleReviewHead,
+      reviewNotes: 'stale review result',
+    });
+
+    expect(status.reviewStatus).toBe('pending');
+    expect(status.reviewedAtCommit).toBeUndefined();
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleReviewHead));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(verifiedHead));
+    warn.mockRestore();
+  });
+
   it('resolves canonical merged status even when the raw status map is stale', () => {
     setReviewStatusSync('PAN-3138', { mergeStatus: 'merged' });
     registerReviewStatusMapReader(() => ({
