@@ -122,6 +122,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T21:43:08.221Z"
+    },
+    {
+      "timestamp": "2026-08-01T21:43:31.947Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -171,7 +176,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:43:27.446Z",
+  "updated": "2026-08-01T21:43:31.998Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -180,7 +185,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:43:27.436Z",
+    "updatedAt": "2026-08-01T21:43:31.920Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:43:27.436Z",
@@ -252,9 +257,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 13688279,
-            "output": 222462,
-            "cacheRead": 43293184,
+            "input": 14061619,
+            "output": 222928,
+            "cacheRead": 43741696,
             "cacheWrite": 0
           }
         },
@@ -307,9 +312,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18239350,
-          "output": 312059,
-          "cacheRead": 56789504,
+          "input": 18612690,
+          "output": 312525,
+          "cacheRead": 57238016,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -320,8 +325,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 137.0368703,
-        "pricingAsOf": "2026-08-01T21:43:09.132Z"
+        "usd": 139.1418063,
+        "pricingAsOf": "2026-08-01T21:43:31.987Z"
       }
     },
     "merges": [
@@ -330,7 +335,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
