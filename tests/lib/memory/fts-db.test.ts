@@ -2,7 +2,7 @@ import { mkdtemp, rm, stat } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { closeMemoryFtsDatabases, getMemoryFtsDatabase, runMemoryFtsStatement, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
+import { __testInternals, closeMemoryFtsDatabases, getMemoryFtsDatabase, runMemoryFtsStatement, withMemoryFtsDatabase } from '../../../src/lib/memory/fts-db.js';
 import { resolveFtsDbPath } from '../../../src/lib/memory/paths.js';
 
 let tempDir: string | null = null;
@@ -23,6 +23,27 @@ afterEach(async () => {
   else process.env.OVERDECK_HOME = originalHome;
   if (tempDir) await rm(tempDir, { recursive: true, force: true });
   tempDir = null;
+});
+
+describe('memory FTS worker URL', () => {
+  const { memoryFtsWorkerUrl } = __testInternals;
+
+  it('resolves an arbitrary CLI chunk from the dist root', () => {
+    expect(memoryFtsWorkerUrl('file:///opt/overdeck/dist/search-B_onMFsl.js').href)
+      .toBe('file:///opt/overdeck/dist/lib/memory/fts-worker.js');
+  });
+
+  it('resolves an arbitrary dashboard chunk from the dashboard dist directory', () => {
+    expect(memoryFtsWorkerUrl('file:///opt/overdeck/dist/dashboard/search-B_onMFsl.js').href)
+      .toBe('file:///opt/overdeck/dist/dashboard/memory-fts-worker.js');
+  });
+
+  it('preserves source-mode and unbundled JavaScript resolution', () => {
+    expect(memoryFtsWorkerUrl('file:///opt/overdeck/src/lib/memory/fts-db.ts').href)
+      .toBe('file:///opt/overdeck/src/lib/memory/fts-worker.ts');
+    expect(memoryFtsWorkerUrl('file:///opt/overdeck/src/lib/memory/fts-db.js').href)
+      .toBe('file:///opt/overdeck/src/lib/memory/fts-worker.js');
+  });
 });
 
 describe('memory FTS database', () => {
