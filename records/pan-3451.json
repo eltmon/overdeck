@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:33:01.858Z",
+  "updated": "2026-08-01T23:58:42.622Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "passed",
@@ -98,11 +98,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-01T23:33:01.849Z",
+    "updatedAt": "2026-08-01T23:58:42.541Z",
     "reviewNotes": "All four reviewers passed; asynchronous checklist path fixes the prior event-loop blocker",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "f0e238ac045590f2454520637aa79daed3d47791",
+    "lastVerifiedCommit": "f0e238ac045590f2454520637aa79daed3d47791",
     "reviewSpawnedAt": "2026-08-01T23:29:22.012Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -180,6 +180,14 @@
             "cacheWrite": 0
           }
         },
+        "test": {
+          "anthropic/claude-sonnet-5": {
+            "input": 88,
+            "output": 14569,
+            "cacheRead": 7109241,
+            "cacheWrite": 192578
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 987413,
@@ -195,11 +203,17 @@
           "output": 209340,
           "cacheRead": 76946432,
           "cacheWrite": 0
+        },
+        "anthropic/claude-sonnet-5": {
+          "input": 88,
+          "output": 14569,
+          "cacheRead": 7109241,
+          "cacheWrite": 192578
         }
       },
       "costAtCloseOut": {
-        "usd": 83.379996,
-        "pricingAsOf": "2026-08-01T23:33:01.852Z"
+        "usd": 85.429156,
+        "pricingAsOf": "2026-08-01T23:58:42.594Z"
       }
     },
     "merges": [
