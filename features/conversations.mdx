@@ -114,6 +114,12 @@ to handoff mode. The dialog presents three intents, ordered richest to lightest:
 | **Agent handoff** | An agent writes a Markdown handoff document, optionally focused on a specific next task, that becomes the seed message. | Deliberate handoffs where dead ends, key files, and next steps matter |
 | **Exact copy** | Copies the raw conversation history verbatim — no summary generated. | Picking up exactly where you left off, **same model only** |
 
+The **Project** picker controls where the successor appears in the project tree,
+independently of its working directory. It defaults to **Same as source**, so an
+isolated handoff worktree stays associated with the source conversation's
+project. Choose another registered project only when the successor belongs
+somewhere else.
+
 <Note>
 **Fast summary** is an advanced toggle under *Fresh summary* that skips the LLM
 and extracts a bullet list of user messages, files modified, and tools used
@@ -201,6 +207,7 @@ pan handoff source-conv continue the API wiring
 pan handoff source-conv --model claude-sonnet-4-6
 pan handoff source-conv --harness pi
 pan handoff source-conv --cwd /path/to/project
+pan handoff source-conv --cwd ../isolated-worktree --project mind-your-now
 pan handoff source-conv --author source uses-source-agent-and-pollutes-its-context
 pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap clean handoff
 ```
@@ -214,6 +221,7 @@ pan handoff source-conv --author external --author-model claude-haiku-4-5 cheap 
 | `--model <model>` | Model for the new (forked) conversation. Defaults to the parent's model. |
 | `--harness <harness>` | Harness for the new conversation: `claude-code` or `pi`. |
 | `--cwd <path>` | Working directory for the new conversation. |
+| `--project <key-or-name>` | Registered project for the successor. Defaults to inheriting the source conversation's project, even when `--cwd` points outside that project's directory. |
 | `--author <who>` | Who authors the handoff doc: `external` (default) or `source`. |
 | `--author-model <model>` | Model for the external authoring session (only when `--author=external`). |
 | `--author-harness <harness>` | Harness for the external authoring session: `claude-code` or `pi` (external only). |
