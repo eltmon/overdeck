@@ -79,15 +79,7 @@
       "timestamp": "2026-08-01T21:16:28.095Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-01T21:16:28Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3396\n\n# Review Synthesis — PAN-3396 — 2026-08-01T21:15:37Z\n\n## Verdict: CHANGES REQUESTED — the correctness reviewer failed, and the residue ceremony still cannot reliably verify and close all configured forge artifacts\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-52c615cc/context.json\n- Branch: feature/pan-3396\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n- HEAD reviewed: 52c615cc2954d1b47837374742958da15606c094\n- Cycle number: 3\n- Prior cycle SHA: 137976e6c728372482d643dc0e74009789d733ff\n- Superseded intermediate run: 4c0769e0ad4bed5a81746f7bb21e4f022113f0b7 produced no synthesis\n- PR commits: 11\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-52c615cc/security.md | 0 |\n| correctness | failed | — | infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-52c615cc/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-52c615cc/requirements.md | 3 |\n\n## Blocking Findings\n\n### [correctness] The correctness reviewer ended before writing a report\nThe correctness sub-role produced `REVIEWER_FAILED correctness reviewer session ended before writing a report`. Review policy requires a blocked verdict whenever any reviewer fails or times out, because correctness coverage is incomplete for this cycle.\n\n### [requirements] The residue workflow passes local checkout paths as forge repository identifiers — `src/lib/lifecycle/workflows.ts:252`\n`resolveProjectReposForIssueSync()` returns `repoPath` as a local checkout path (`src/lib/project-repos.ts:61-92`), but the workflow forwards those values to `gh ... --repo` and `glab ... --repo`, which require forge coordinates. GitHub is additionally reduced to `githubRepos[0]`, so a multi-repository GitHub project would not be fully covered even after correcting the identifier shape. The operator door therefore aborts instead of closing the stale convention artifacts that FR-4, FR-5, NFR-2, and NFR-4 require. Resolve forge coordinates for every configured repository, or execute each command in its repository checkout without `--repo`, and lock the behavior with dependency-injected workflow tests.\n\n### [requirements] The durable residue audit records a planned cleanup action as verified evidence before cleanup runs — `src/lib/lifecycle/workflows.ts:215`\nThe workflow builds `buildResidueDodGate()` before `closeResidueConventionPrs()` and passes only the hard-coded string `Close stale convention PRs/MRs with no merge claim`. Neither the CLI's positive tracker-closed result nor the cleanup step's concrete closed/absent artifact details reach the gate persisted at `src/lib/lifecycle/workflows.ts:377`. This fails FR-4's evidence-bearing audit requirement. Run residue preconditions and forge cleanup first, then construct and persist the gate from the observed tracker and forge evidence.\n\n### [requirements] Partial forge failures still allow terminal disposition — `src/lib/lifecycle/residue.ts:93`\n`closeResidueConventionPrs()` fails only when errors exist and no artifact closure succeeded. If one PR/MR closes and another configured repository or convention-head lookup, close, or comment fails, the function returns `success: true` with warnings, so `closeOut()` continues and the L7 record hides the unresolved artifact as `clean_terminal`. Fail the step on every repository/head operation error while retaining successful actions in details for retry auditability, and add a mixed-success regression test that proves terminal marking does not run.\n\n### [performance] Batched record probes still repeat synchronous state-home resolution — `src/lib/pipeline-membership-gather.ts:311`\nThe new ten-item batch bounds promise fan-out but still calls `readIssueRecord(project, id)` for every candidate. Each call reaches `getIssueRecordPath()` and `resolveStateReadHomeSync()`, which synchronously reads the same project migration marker at `src/lib/state-read-home.ts:25`. Recurring membership refreshes therefore add O(zombie-count) event-loop-blocking filesystem reads, with up to three project gathers running concurrently. Add a batch record-read door that resolves the state home once per project and performs bounded asynchronous record-body reads while preserving per-record failure as `hasTerminalCloseOut: false`.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n\n## Convergence Note\nThis is cycle 3, so only changes since the prior completed synthesis at `137976e6c728372482d643dc0e74009789d733ff` are promotable. All four substantive blockers survive that gate: the workflow integration, hard-coded audit evidence, and batch helper were added after that synthesis, while the partial-failure branch is the changed attempted fix for the cycle-1 fail-closed finding. The blocker count is below the proportionality threshold of 33 for 11 PR commits.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-52c615cc/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3396 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -134,19 +126,18 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:27:44.879Z",
+  "updated": "2026-08-01T21:29:28.703Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:16:34.347Z",
+    "updatedAt": "2026-08-01T21:29:28.189Z",
     "reviewNotes": "Correctness reviewer failed; residue forge addressing, audit evidence, partial-failure handling, and record-read batching remain blocked",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewedAtCommit": "52c615cc2954d1b47837374742958da15606c094",
     "reviewSpawnedAt": "2026-08-01T21:09:43.292Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -207,9 +198,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6939862,
-            "output": 100690,
-            "cacheRead": 25894400,
+            "input": 6946242,
+            "output": 101188,
+            "cacheRead": 26514944,
             "cacheWrite": 0
           }
         },
@@ -247,10 +238,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1667,
-            "output": 79694,
-            "cacheRead": 42201467,
-            "cacheWrite": 1191024
+            "input": 2002,
+            "output": 100146,
+            "cacheRead": 48612110,
+            "cacheWrite": 1617764
           }
         }
       },
@@ -262,21 +253,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11490933,
-          "output": 190287,
-          "cacheRead": 39390720,
+          "input": 11497313,
+          "output": 190785,
+          "cacheRead": 40011264,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1667,
-          "output": 79694,
-          "cacheRead": 42201467,
-          "cacheWrite": 1191024
+          "input": 2002,
+          "output": 100146,
+          "cacheRead": 48612110,
+          "cacheWrite": 1617764
         }
       },
       "costAtCloseOut": {
-        "usd": 88.9824293,
-        "pricingAsOf": "2026-08-01T21:16:34.357Z"
+        "usd": 90.6166233,
+        "pricingAsOf": "2026-08-01T21:29:28.261Z"
       }
     },
     "merges": [
@@ -285,7 +276,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
