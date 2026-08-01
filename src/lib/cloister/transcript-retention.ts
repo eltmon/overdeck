@@ -72,7 +72,7 @@ const defaultDeps: TranscriptRetentionDeps = {
   isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
-  now: Date.now,
+  now: () => Date.now(),
   log: (message) => console.log(`[deacon] ${message}`),
 };
 
