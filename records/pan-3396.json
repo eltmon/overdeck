@@ -281,7 +281,7 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:07:22.688Z",
+  "updated": "2026-08-01T22:07:27.395Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "reviewing",
@@ -454,16 +454,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "docs-membership-residue": {
-        "writerId": "agent-pan-3396",
-        "agentId": "agent-pan-3396",
-        "pid": 2403358,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:07:22.688Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3396",
@@ -519,6 +511,16 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3396 dead)",
         "releasedAt": "2026-08-01T20:33:25.290Z"
+      },
+      {
+        "writerId": "agent-pan-3396",
+        "agentId": "agent-pan-3396",
+        "pid": 2403358,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:07:22.688Z",
+        "itemId": "docs-membership-residue",
+        "outcome": "completed",
+        "releasedAt": "2026-08-01T22:07:27.395Z"
       }
     ],
     "statusReasons": {
@@ -562,6 +564,9 @@
     "residue-ceremony.residue-ceremony.ac2": "completed",
     "residue-ceremony.residue-ceremony.ac3": "completed",
     "residue-ceremony.residue-ceremony.ac4": "completed",
-    "docs-membership-residue": "running"
+    "docs-membership-residue": "completed",
+    "docs-membership-residue.docs-membership-residue.ac1": "completed",
+    "docs-membership-residue.docs-membership-residue.ac2": "completed",
+    "docs-membership-residue.docs-membership-residue.ac3": "completed"
   }
 }
