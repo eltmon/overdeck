@@ -4,17 +4,17 @@
     "created": "2026-07-31T15:17:09.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3357: Deacon stale-state purge deleted conv-* transcript dirs — 258 conversations shown as 'Transcript missing'",
-    "updated": "2026-07-31T15:26:31.650Z"
+    "updated": "2026-08-01T01:58:06.975Z"
   },
   "plan": {
     "id": "pan-3357",
     "title": "Deacon stale-state purge deleted conv-* transcript dirs — 258 conversations shown as 'Transcript missing'",
-    "status": "running",
+    "status": "completed",
     "uid": "2be92988-5932-4a19-8572-48b5d3785b62",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-31T15:17:09.000Z",
-    "updated": "2026-07-31T15:26:31.650Z",
+    "updated": "2026-08-01T01:58:06.975Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3357",
@@ -496,5 +496,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
