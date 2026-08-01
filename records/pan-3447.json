@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T22:27:01.668Z",
+  "updated": "2026-08-01T22:28:11.562Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,23 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {
-      "hook-inventory-contract": {
-        "writerId": "deacon-swarm",
-        "agentId": "conv-20260801-2782",
-        "pid": 3321215,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:26:38.418Z"
-      },
-      "confluence-model": {
-        "writerId": "deacon-swarm",
-        "agentId": "conv-20260801-2782",
-        "pid": 3321215,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:26:59.585Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -81,18 +66,44 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3447 dead)",
         "releasedAt": "2026-08-01T22:11:28.784Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": "conv-20260801-2782",
+        "pid": 3321215,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:26:38.418Z",
+        "itemId": "hook-inventory-contract",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-01T22:28:11.475Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": "conv-20260801-2782",
+        "pid": 3321215,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:26:59.585Z",
+        "itemId": "confluence-model",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-01T22:28:11.475Z"
       }
     ],
     "statusReasons": {
       "hook-inventory-contract": {
-        "reason": "stale claim released (agent-pan-3447 dead)",
-        "updatedAt": "2026-08-01T22:11:28.784Z"
+        "reason": "stale claim released (deacon-swarm dead)",
+        "updatedAt": "2026-08-01T22:28:11.475Z"
+      },
+      "confluence-model": {
+        "reason": "stale claim released (deacon-swarm dead)",
+        "updatedAt": "2026-08-01T22:28:11.475Z"
       }
     }
   },
   "statusOverrides": {
-    "hook-inventory-contract": "running",
-    "confluence-model": "running"
+    "hook-inventory-contract": "pending",
+    "confluence-model": "pending"
   },
   "swarm": {
     "slotAssignments": [
