@@ -204,18 +204,17 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T19:54:44.664Z",
+  "updated": "2026-08-01T19:54:46.415Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T19:54:41.551Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-08-01T19:54:42.278Z",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
@@ -275,10 +274,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1452,
-            "output": 319686,
-            "cacheRead": 333773155,
-            "cacheWrite": 7471776
+            "input": 1454,
+            "output": 320888,
+            "cacheRead": 334630544,
+            "cacheWrite": 7472982
           }
         }
       },
@@ -296,15 +295,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1452,
-          "output": 319686,
-          "cacheRead": 333773155,
-          "cacheWrite": 7471776
+          "input": 1454,
+          "output": 320888,
+          "cacheRead": 334630544,
+          "cacheWrite": 7472982
         }
       },
       "costAtCloseOut": {
-        "usd": 158.705902,
-        "pricingAsOf": "2026-08-01T19:54:41.652Z"
+        "usd": 158.892419,
+        "pricingAsOf": "2026-08-01T19:54:46.410Z"
       }
     },
     "merges": [
@@ -504,5 +503,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
