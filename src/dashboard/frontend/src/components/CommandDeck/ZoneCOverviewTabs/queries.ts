@@ -350,6 +350,8 @@ export interface PullRequestData {
   baseRefName: string;
   headRefName: string;
   headRefOid?: string;
+  mergedAt?: string;
+  mergeCommit?: { oid?: string } | string | null;
   author: { login?: string; name?: string } | null;
   createdAt: string;
   updatedAt: string;

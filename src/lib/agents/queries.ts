@@ -10,6 +10,7 @@ import { getRuntimeCensus, getRuntimeCensusSnapshot } from '../runtime-census.js
 import { AGENTS_DIR } from '../paths.js';
 import { getRollbackAgentStatePath } from '../overdeck/agent-rollback-state.js';
 import { listOverdeckAgentStatesSync } from '../overdeck/agent-state-sync.js';
+import { removeAgentStateDir } from './state-dir-removal.js';
 
 export function listRunningAgentsSync(): (AgentState & { tmuxActive: boolean })[] {
   // Match liveness against ALL overdeck-socket sessions, not just `agent-*`.
@@ -81,7 +82,7 @@ export const listRunningAgents = (): Effect.Effect<(AgentState & { tmuxActive: b
  * event loop. Called from warnOnBareNumericIssueIds() during dashboard
  * read-model bootstrap, this blocked all HTTP/WebSocket/PTY traffic on
  * server startup while it scanned every agent dir, killed stale tmux
- * sessions, and recursively deleted directories.
+ * sessions, and recursively cleaned directories.
  *
  * This async variant does the same work using fs/promises and the
  * already-async killSessionAsync() so the bootstrap path no longer
@@ -123,7 +124,7 @@ export async function dropLegacyAgentStatesMissingRoleAsync(): Promise<number> {
 
       try { await Effect.runPromise(killSession(agentId)); } catch { /* best effort */ }
       try {
-        await fsp.rm(dirPath, { recursive: true, force: true });
+        await removeAgentStateDir(dirPath);
         dropped++;
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);

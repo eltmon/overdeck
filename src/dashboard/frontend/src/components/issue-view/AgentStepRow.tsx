@@ -643,33 +643,21 @@ export function AgentStepRow({
 
   const { latestReviewResult } = session.roundMetadata ?? {};
   const verdictTile = latestReviewResult === 'APPROVED' ? 'ok' : latestReviewResult === 'CHANGES_REQUESTED' ? 'bad' : undefined;
+  const cockpitDotStatus: StatusDotStatus = isPaused || session.awaitingInput
+    ? 'waiting'
+    : statusCssKey === 'error'
+      ? 'error'
+      : isLiveActivity
+        ? session.type === 'review' || session.type === 'reviewer' ? 'reviewing' : 'active'
+        : session.presence === 'ended' || session.status === 'stopped'
+          ? 'done'
+          : 'idle';
 
-  const renderCockpitTile = () => {
-    if (verdictTile) {
-      return (
-        <span className={`${cockpitStyles.tile} ${cockpitStyles[verdictTile]}`} data-section={SECTIONS.verdict}>
-          {verdictTile === 'ok' ? <CircleCheck size={11} /> : <CircleX size={11} />}
-        </span>
-      );
-    }
-    const tileClass = session.type === 'work' || session.type === 'strike'
-      ? cockpitStyles.work
-      : session.type === 'review' || session.type === 'reviewer'
-        ? cockpitStyles.review
-        : session.type === 'test'
-          ? cockpitStyles.ver
-          : '';
-    const active = isLiveActivity;
-    return (
-      <span className={`${cockpitStyles.tile} ${tileClass}`} data-section={SECTIONS.icon}>
-        {active ? (
-          <Loader2 size={11} className={cockpitStyles.spin} style={{ color: 'var(--info)' }} />
-        ) : (
-          <TypeIcon type={session.type} role={session.role} />
-        )}
-      </span>
-    );
-  };
+  const renderCockpitDot = () => (
+    <span className={cockpitStyles.dotSlot} data-section={SECTIONS.icon}>
+      <StatusDot status={cockpitDotStatus} size="md" title={statusTitle} variant="cockpit" />
+    </span>
+  );
 
   const renderRailIcon = () => (
     <span className={`${railStyles.sessionIconSlot} ${railIconClass}`} data-section={SECTIONS.icon} title={sessionLabelTitle}>
@@ -733,7 +721,7 @@ export function AgentStepRow({
   );
 
   if (density === 'cockpit') {
-    const subParts = [formatDurCockpit(session.duration), cost].filter(Boolean);
+    const duration = formatDurCockpit(session.duration) || '—';
     const cockpitButton = (
       <button
         type="button"
@@ -742,7 +730,7 @@ export function AgentStepRow({
         onClick={() => onClick?.()}
       >
         <span className={cockpitStyles.caret} data-section={SECTIONS.caret}>
-          {expandable && (
+          {expandable ? (
             <span
               role="button"
               tabIndex={-1}
@@ -751,37 +739,44 @@ export function AgentStepRow({
             >
               {expanded ? <ChevronDown size={11} /> : <ChevronRight size={11} />}
             </span>
-          )}
+          ) : null}
         </span>
-        {renderCockpitTile()}
+        {renderCockpitDot()}
         <span className={cockpitStyles.body}>
           <span className={cockpitStyles.l1}>
             <span className={cockpitStyles.name} data-section={SECTIONS.label}>{sessionLabel}</span>
+            <span className={cockpitStyles.verdict} data-section={SECTIONS.verdict}>
+              {verdictTile === 'ok' ? <CircleCheck size={11} /> : verdictTile === 'bad' ? <CircleX size={11} /> : null}
+            </span>
+            <span className={cockpitStyles.cost} data-section={SECTIONS.cost}>{cost ?? '—'}</span>
+          </span>
+          <span className={cockpitStyles.l2}>
+            <span className={cockpitStyles.model} data-section={SECTIONS.model}>{sessionModel || 'default model'}</span>
+            <span className={cockpitStyles.sub} data-section={SECTIONS.duration}>{duration}</span>
             <span className={`${cockpitStyles.status} ${cockpitStyles[statusClassForCockpit]}`} data-section={SECTIONS.status}>
-              {isLiveActivity ? <Loader2 size={9} className={cockpitStyles.spin} /> : null}
               {displayStatus}
             </span>
           </span>
-          {(sessionModel || subParts.length > 0) && (
-            <span className={cockpitStyles.l2}>
-              {sessionModel && (
-                <span className={cockpitStyles.model} data-section={SECTIONS.model}>{sessionModel}</span>
-              )}
-              {subParts.length > 0 && (
-                <span className={cockpitStyles.sub} data-section={SECTIONS.duration}>{subParts.join(' · ')}</span>
-              )}
-            </span>
-          )}
         </span>
       </button>
     );
+    const cockpitContent = (
+      <div className={cockpitStyles.rowWrap}>
+        {cockpitButton}
+        {isPaused && session.pausedReason ? (
+          <div className={cockpitStyles.pausedReason} data-section={SECTIONS.pausedReason} title={session.pausedReason}>
+            {session.pausedReason}
+          </div>
+        ) : null}
+      </div>
+    );
 
-    if (!showMenu) return cockpitButton;
+    if (!showMenu) return cockpitContent;
 
     return (
       <ContextMenuRoot>
         <ContextMenuTrigger asChild>
-          {cockpitButton}
+          {cockpitContent}
         </ContextMenuTrigger>
         {renderContextMenu()}
       </ContextMenuRoot>

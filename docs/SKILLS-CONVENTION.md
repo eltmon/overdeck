@@ -61,6 +61,7 @@ Verbs that **don't** get wrapped (current exclusion list, with rationale):
 | `pan cost`, `pan update`, `pan serve` | Operations whose `--help` is self-contained. |
 | `pan health` | Distinct from `pan doctor`; runtime-health output is meant to be read directly. |
 | `pan admin conversations` | Internal backfill utility; `--help` covers the single subcommand. |
+| `pan admin migrate-legacy-agent-dirs` | One-time idempotent migration; `--help` states the complete behavior. |
 
 This list is **deliberate, not aspirational.** Adding a wrapper for any of these should be justified case-by-case.
 

@@ -311,9 +311,9 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
     if (markTerminal.success) {
-      const pruned = pruneStoppedAgentsForIssue(ctx.issueId);
+      const pruned = yield* Effect.promise(() => pruneStoppedAgentsForIssue(ctx.issueId));
       allSteps.push(pruned.preserved.length > 0
-        ? stepSkipped('close-out:prune-agent-rows', [`WARNING: preserved live/non-stopped agents: ${pruned.preserved.join(', ')}`])
+        ? stepSkipped('close-out:prune-agent-rows', [`Preserved live agents or terminal rows with retained transcripts: ${pruned.preserved.join(', ')}`])
         : stepOk('close-out:prune-agent-rows', [`Pruned ${pruned.removed.length} stopped agent row(s)`]));
     }
 
