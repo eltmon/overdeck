@@ -2,7 +2,7 @@
   "issueId": "PAN-3411",
   "schemaVersion": 2,
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-01T15:21:55.863Z",
+  "updated": "2026-08-01T15:22:00.187Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3411: feat(dashboard): New Workspace as a full-page creation experience (replaces the modal)",
       "timestamp": "2026-08-01T15:21:55.863Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
