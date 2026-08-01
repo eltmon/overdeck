@@ -11,6 +11,7 @@ import { useAskUserQuestionUiStore } from '../../lib/askUserQuestionUiStore';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import type { RegisteredProject } from './UnknownProjectState';
+import { resolveEffectiveProjectKey } from './projectsData';
 import styles from './styles/command-deck.module.css';
 
 /** Compact token count, e.g. 1234 → "1.2k", 2_500_000 → "2.5M". */
@@ -258,7 +259,7 @@ export function ConversationRow({
       style={{ cursor: 'grab' }}
       onDragStart={(e) => {
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null }));
+        e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null, cwd: conv.cwd }));
       }}
       onClick={() => onSelect(conv.name)}
       onContextMenu={(e) => {
@@ -509,7 +510,7 @@ export function ConversationRow({
                   <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
                   <div role="menu" className={styles.headerSubmenu}>
                     {registeredProjects.map((project) => {
-                      const isCurrent = conv.projectKey === project.key;
+                      const isCurrent = resolveEffectiveProjectKey(conv, registeredProjects) === project.key;
                       const projectName = project.name ?? project.key;
                       return (
                         <button

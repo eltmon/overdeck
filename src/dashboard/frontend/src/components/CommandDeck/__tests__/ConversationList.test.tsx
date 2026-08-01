@@ -484,6 +484,30 @@ describe('ConversationList move flow (PAN-1577)', () => {
     expect(screen.getByRole('menuitem', { name: 'MYN' })).not.toBeDisabled();
   });
 
+  it('disables the cwd-derived project in the picker when there is no explicit override (review fix: effective resolution)', () => {
+    const client = makeClient();
+    // No projectKey override -- this conversation is only ever grouped into
+    // Krux via cwd inference, which the picker's disabled-state check must
+    // also honor (previously it only compared the raw, nullable projectKey).
+    client.setQueryData(['conversations'], [{ ...mockConversation, cwd: '/home/user/Projects/krux/sub', projectKey: null }]);
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).not.toBeDisabled();
+  });
+
   it('moves the conversation via the shared mutation when another project is selected (ac2)', async () => {
     renderWithProjects();
     fireEvent.click(screen.getByTitle('More actions'));
@@ -525,7 +549,7 @@ describe('ConversationRow drag source (PAN-1577)', () => {
     vi.restoreAllMocks();
   });
 
-  it('is draggable and carries {name, projectKey} as the drag payload (ac2)', () => {
+  it('is draggable and carries {name, projectKey, cwd} as the drag payload (ac2)', () => {
     const client = makeClient();
     client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
     render(
@@ -542,8 +566,11 @@ describe('ConversationRow drag source (PAN-1577)', () => {
     const dataTransfer = fakeDataTransfer();
     fireEvent.dragStart(row, { dataTransfer });
 
+    // cwd travels too (review fix): the drop target needs it to resolve the
+    // conversation's *effective* current project (override-first, cwd
+    // fallback) for the already-in-target no-op check.
     expect(dataTransfer.getData('application/json')).toBe(
-      JSON.stringify({ name: 'test-conv', projectKey: 'krux' }),
+      JSON.stringify({ name: 'test-conv', projectKey: 'krux', cwd: mockConversation.cwd }),
     );
   });
 });

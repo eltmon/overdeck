@@ -32,7 +32,7 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
-async function moveConversation(name: string, projectKey: string): Promise<void> {
+async function moveConversation(name: string, projectKey: string): Promise<{ projectKey: string | null }> {
   const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/move`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
@@ -40,6 +40,7 @@ async function moveConversation(name: string, projectKey: string): Promise<void>
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.error || 'Failed to move conversation');
+  return data as { projectKey: string | null };
 }
 
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
@@ -189,11 +190,20 @@ export function useConversationMutations(
       if (ctx?.previous) queryClient.setQueryData(['conversations'], ctx.previous);
       toast.error(err.message, { duration: 6000 });
     },
-    onSuccess: (_data, vars, ctx) => {
+    onSuccess: (data, vars, ctx) => {
+      // Settle the cache with the server-confirmed projectKey directly;
+      // other clients converge via the conversation.moved domain event. An
+      // unconditional invalidate here would double the list refetch.
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === vars.name ? { ...c, projectKey: data.projectKey } : c)) ?? [],
+      );
       toast.success(`Moved "${ctx?.title ?? vars.name}" to ${vars.projectName}`, { duration: 4000 });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    onSettled: (_data, error) => {
+      // onError already rolled back to the pre-mutation snapshot; re-sync
+      // from the server only on failure, since that snapshot may not reflect
+      // a concurrent change from elsewhere.
+      if (error) queryClient.invalidateQueries({ queryKey: ['conversations'] });
     },
   });
 

@@ -10,7 +10,7 @@ import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
@@ -465,40 +465,24 @@ export function CommandDeck({
     const excludeSet = new Set<number>();
     if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
-    const pathToKeys = new Map<string, string[]>();
     const keyToKeys = new Map<string, string[]>();
     for (const rp of registeredProjects) {
       const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
-      if (rp.path) pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
       keyToKeys.set(rp.key, keys);
     }
 
-    // Prefer the explicit projectKey override (PAN-1577); fall back to
-    // cwd→project-path inference only when it's null.
+    // One resolver decides "which project" for every conversation (PAN-1577):
+    // explicit projectKey override first, cwd→project-path inference otherwise.
     for (const conv of conversations) {
-      if (conv.projectKey) {
-        const projectKeys = keyToKeys.get(conv.projectKey);
-        if (projectKeys) {
-          for (const projectKey of projectKeys) {
-            if (!map[projectKey]) map[projectKey] = [];
-            map[projectKey].push(conv);
-          }
-          excludeSet.add(conv.id);
-        }
-        continue;
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) continue;
+      const projectKeys = keyToKeys.get(effectiveKey);
+      if (!projectKeys) continue;
+      for (const projectKey of projectKeys) {
+        if (!map[projectKey]) map[projectKey] = [];
+        map[projectKey].push(conv);
       }
-      if (!conv.cwd) continue;
-      const cwd = conv.cwd.replace(/\/+$/, '');
-      for (const [projectPath, projectKeys] of pathToKeys) {
-        if (cwd === projectPath || cwd.startsWith(projectPath + '/')) {
-          for (const projectKey of projectKeys) {
-            if (!map[projectKey]) map[projectKey] = [];
-            map[projectKey].push(conv);
-          }
-          excludeSet.add(conv.id);
-          break;
-        }
-      }
+      excludeSet.add(conv.id);
     }
 
     return { projectConversations: map, excludeConvIds: excludeSet };
@@ -518,15 +502,9 @@ export function CommandDeck({
   const resolveConversationProjectName = useCallback(
     (conv: Conversation | null | undefined): string | null => {
       if (!conv) return null;
-      if (conv.projectKey) {
-        const matched = registeredProjects.find((rp) => rp.key === conv.projectKey);
-        return matched ? (matched.name ?? matched.key) : null;
-      }
-      if (!conv.cwd) return null;
-      const cwd = conv.cwd;
-      const matched = registeredProjects.find(
-        (rp) => !!rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')),
-      );
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) return null;
+      const matched = registeredProjects.find((rp) => rp.key === effectiveKey);
       return matched ? (matched.name ?? matched.key) : null;
     },
     [registeredProjects],

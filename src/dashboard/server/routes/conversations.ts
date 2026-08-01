@@ -725,7 +725,7 @@ const patchConversationMoveRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const result = handleConversationMove(name, body);
+        const result = await handleConversationMove(name, body);
         return jsonResponse(result.body, { status: result.status });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

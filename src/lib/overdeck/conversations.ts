@@ -134,6 +134,8 @@ export const Conversation = Schema.Struct({
   handoffDocPath:      Schema.NullOr(Schema.String),
   handoffTargetConvId: Schema.NullOr(ConversationId),
   clearedToConvId:     Schema.NullOr(ConversationId),
+  /** Explicit project assignment override (PAN-1577). Null = fall back to deriving the project from cwd. */
+  projectKey:          Schema.NullOr(Schema.String),
   files:               Schema.Array(BackingFile),
 });
 export type Conversation = typeof Conversation.Type;
@@ -220,6 +222,7 @@ function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
     handoffDocPath:      row.handoffDocPath ?? null,
     handoffTargetConvId: row.handoffTargetConvId ?? null,
     clearedToConvId:     row.clearedToConvId ?? null,
+    projectKey:          row.projectKey ?? null,
     files:               files.map(rowToBackingFile),
   });
 }
@@ -399,6 +402,8 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
     Effect.Effect<Conversation, ConversationNotFound>;
   readonly setModel:   (name: ConversationName, model: string)    => Effect.Effect<Conversation, ConversationNotFound>;
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>;
+  /** Explicit project assignment override (PAN-1577); pass null to clear it back to cwd-derived grouping. */
+  readonly setProjectKey: (name: ConversationName, projectKey: string | null) => Effect.Effect<Conversation, ConversationNotFound>;
   readonly handoff:     (source: ConversationName, target: ConversationName, docPath: string) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
   readonly clear:       (source: ConversationName) =>
@@ -446,6 +451,7 @@ export const ConversationWriterLive = Layer.effect(
           title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
           createdAt: ts, archivedAt: null,
           handoffDocPath: null, handoffTargetConvId: null, clearedToConvId: null,
+          projectKey: null,
           files: [],
         });
       });
@@ -528,6 +534,17 @@ export const ConversationWriterLive = Layer.effect(
         return yield* resolver.get(name);
       });
 
+    const setProjectKey = (name: ConversationName, projectKey: string | null):
+      Effect.Effect<Conversation, ConversationNotFound> =>
+      Effect.gen(function* () {
+        yield* resolver.get(name);
+        yield* Effect.promise(() =>
+          db.q.update(conversationsTable).set({ projectKey }).where(eq(conversationsTable.name, name)),
+        );
+        yield* bus.emit({ type: 'conversation.projectKeyChanged', payload: { name, projectKey } });
+        return yield* resolver.get(name);
+      });
+
     // The fork primitive — the ONLY mechanism that creates a new backing file.
     // Creates a fresh UUID locator, registers a conversation_files pointer, records lineage.
     // NEVER opens an existing file for write.
@@ -579,7 +596,7 @@ export const ConversationWriterLive = Layer.effect(
 
     return ConversationWriter.of({
       create, archive, unarchive, setFavorite, unsetFavorite,
-      retitle, setModel, setHarness,
+      retitle, setModel, setHarness, setProjectKey,
       handoff, clear, summaryFork, compact,
     });
   }),

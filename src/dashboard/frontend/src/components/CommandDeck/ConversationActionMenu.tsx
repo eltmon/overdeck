@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import type { Conversation } from './ConversationList';
 import type { ConversationMutations } from './useConversationMutations';
 import { fetchRegisteredProjects } from './UnknownProjectState';
+import { resolveEffectiveProjectKey } from './projectsData';
 import { useConfirm } from '../DialogProvider';
 import styles from './styles/command-deck.module.css';
 
@@ -190,7 +191,7 @@ export function ConversationActionMenu({ conversation, mutations, position, onCl
                     <div className={styles.headerMenuOverlay} onClick={() => setMoveSubmenuOpen(false)} />
                     <div role="menu" className={styles.headerSubmenu}>
                       {registeredProjects.map((project) => {
-                        const isCurrent = conversation.projectKey === project.key;
+                        const isCurrent = resolveEffectiveProjectKey(conversation, registeredProjects) === project.key;
                         const projectName = project.name ?? project.key;
                         return (
                           <button

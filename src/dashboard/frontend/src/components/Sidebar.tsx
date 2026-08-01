@@ -7,7 +7,7 @@ import {
   Hammer, Loader2, History, Mic, FileText, BookOpen, ChevronDown, ChevronRight, MoreHorizontal, Shield, ListOrdered,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
 import { useConversationMutations } from './CommandDeck/useConversationMutations';
@@ -267,13 +267,14 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     const raw = e.dataTransfer.getData('application/json');
     if (!raw) return;
     try {
-      const payload = JSON.parse(raw) as { name: string; projectKey: string | null };
-      if (payload.projectKey === key) return;
+      const payload = JSON.parse(raw) as { name: string; projectKey: string | null; cwd?: string | null };
+      const effectiveKey = resolveEffectiveProjectKey(payload, registeredProjects);
+      if (effectiveKey === key) return;
       conversationMutations.move({ name: payload.name, projectKey: key, projectName: name });
     } catch {
       // malformed drag payload — ignore
     }
-  }, [conversationMutations]);
+  }, [conversationMutations, registeredProjects]);
 
   // PAN-1990: Workspaces rail — first-class workspaces/projects domain, distinct
   // from the "Projects" rail above (registered pan.projects.yaml entries).

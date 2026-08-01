@@ -111,7 +111,7 @@ describe('useConversationMutations — move (PAN-1577)', () => {
     });
   });
 
-  it('invalidates the conversations query once the mutation settles', async () => {
+  it('settles the cache from the server-confirmed response on success, without a redundant invalidate (review fix: avoid double refetch)', async () => {
     const target = conv({ name: 'conv-d', title: 'Settle test', projectKey: null });
     const { view, client } = setup([target]);
     const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
@@ -119,6 +119,24 @@ describe('useConversationMutations — move (PAN-1577)', () => {
 
     act(() => {
       view.result.current.move({ name: 'conv-d', projectKey: 'myn', projectName: 'MYN' });
+    });
+
+    await waitFor(() => {
+      const cached = client.getQueryData<Conversation[]>(['conversations']);
+      expect(cached?.find((c) => c.name === 'conv-d')?.projectKey).toBe('myn');
+    });
+
+    expect(invalidateQueries).not.toHaveBeenCalledWith({ queryKey: ['conversations'] });
+  });
+
+  it('invalidates the conversations query as a safety net when the request fails', async () => {
+    const target = conv({ name: 'conv-e', title: 'Error settle test', projectKey: 'krux' });
+    const { view, client } = setup([target]);
+    const invalidateQueries = vi.spyOn(client, 'invalidateQueries');
+    fetchMock.mockResolvedValue(new Response(JSON.stringify({ error: 'boom' }), { status: 500 }));
+
+    act(() => {
+      view.result.current.move({ name: 'conv-e', projectKey: 'myn', projectName: 'MYN' });
     });
 
     await waitFor(() => {

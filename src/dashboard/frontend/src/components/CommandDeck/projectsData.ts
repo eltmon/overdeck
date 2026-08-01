@@ -19,20 +19,31 @@ export interface RegisteredProjectLite {
   path: string;
 }
 
+/** The project a conversation effectively belongs to (PAN-1577): the explicit
+ * `projectKey` override when set, otherwise the registered project whose path
+ * contains `cwd`. Null when neither resolves — the single source of truth for
+ * every "is this conversation already in project X" check (grouping, the move
+ * pickers' current-project indicator, and drag-drop's no-op detection) so they
+ * can't disagree with each other. */
+export function resolveEffectiveProjectKey(
+  conv: { cwd?: string | null; projectKey?: string | null },
+  registeredProjects: readonly RegisteredProjectLite[],
+): string | null {
+  if (conv.projectKey) return conv.projectKey;
+  const cwd = conv.cwd;
+  if (!cwd) return null;
+  const matched = registeredProjects.find((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
+  return matched?.key ?? null;
+}
+
 /** True when a conversation doesn't resolve to any registered project — i.e. it
- * belongs in the No-project bucket. Prefers the explicit `projectKey` override
- * (PAN-1577) when set; falls back to cwd→project-path inference only when it's
- * null. */
+ * belongs in the No-project bucket. */
 export function isUnscopedConversation(
   conv: { cwd?: string | null; projectKey?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
 ): boolean {
-  if (conv.projectKey) {
-    return !registeredProjects.some((rp) => rp.key === conv.projectKey);
-  }
-  const cwd = conv.cwd;
-  if (!cwd) return true;
-  return !registeredProjects.some((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
+  const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+  return effectiveKey === null || !registeredProjects.some((rp) => rp.key === effectiveKey);
 }
 
 export interface ProjectData {

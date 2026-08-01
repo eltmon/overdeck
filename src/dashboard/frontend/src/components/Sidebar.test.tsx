@@ -358,4 +358,23 @@ describe('Sidebar drag-drop move (PAN-1577)', () => {
       expect.anything(),
     );
   });
+
+  it('is a no-op when dropped onto the cwd-derived project and there is no explicit override (review fix: effective resolution)', async () => {
+    const { fetchMock } = renderSidebarWithProjects();
+    const kruxButton = await within(screen.getByTestId('sidebar-projects')).findByTestId('sidebar-project-Krux');
+
+    // No projectKey override -- the conversation is only ever grouped into
+    // Krux via cwd inference. Dropping it onto Krux must still be recognized
+    // as already-there, not a real move.
+    const dataTransfer = fakeDataTransfer({
+      'application/json': JSON.stringify({ name: 'conv-a', projectKey: null, cwd: '/home/user/Projects/krux/sub' }),
+    });
+    fireEvent.dragOver(kruxButton, { dataTransfer });
+    fireEvent.drop(kruxButton, { dataTransfer });
+
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining('/move'),
+      expect.anything(),
+    );
+  });
 });

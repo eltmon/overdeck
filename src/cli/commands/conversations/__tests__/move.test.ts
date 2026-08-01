@@ -23,6 +23,17 @@ vi.mock('../../../../lib/config.js', async (importActual) => ({
   getDashboardApiUrlSync: vi.fn(() => 'http://dashboard.test'),
 }));
 
+// PAN-1577: isolate project resolution from real projects.yaml I/O. Only
+// 'effective-target' is a "registered" project here (existing tests move to
+// 'krux'/'myn', which stay unregistered so their raw-key fallback labels are
+// unaffected) — used solely by the effective-project-key resolution test.
+vi.mock('../../../../lib/projects.js', () => ({
+  getProjectSync: vi.fn((key: string) => (key === 'effective-target' ? { name: 'Effective Target', path: '/tmp/effective-target-project' } : null)),
+  listProjectsSync: vi.fn(() => [
+    { key: 'effective-target', config: { name: 'Effective Target', path: '/tmp/effective-target-project' } },
+  ]),
+}));
+
 let odb: OverdeckTestDb;
 
 beforeEach(() => {
@@ -37,12 +48,12 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-async function seedConversation(opts: { name: string; title?: string | null; projectKey?: string | null }) {
+async function seedConversation(opts: { name: string; title?: string | null; projectKey?: string | null; cwd?: string }) {
   const { createConversation, setConversationProjectKey } = await import('../../../../lib/overdeck/conversations.js');
   const conv = createConversation({
     name: opts.name,
     tmuxSession: `tmux-${opts.name}`,
-    cwd: '/tmp/move-test-workspace',
+    cwd: opts.cwd ?? '/tmp/move-test-workspace',
     claudeSessionId: `sess-${opts.name}`,
     title: opts.title ?? null,
     harness: 'claude-code',
@@ -122,6 +133,24 @@ describe('moveAction', () => {
     expect(output).toContain('myn');
   });
 
+  it('shows the cwd-derived project as "from" when there is no explicit override (effective resolution)', async () => {
+    await seedConversation({
+      name: 'move-effective-cwd',
+      title: 'Conversation without an override',
+      cwd: '/tmp/effective-target-project/sub',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ projectKey: 'krux' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const { moveAction } = await import('../move.js');
+    const { logs, errors } = captureConsole();
+    mockExit();
+
+    await moveAction('move-effective-cwd', 'krux');
+
+    expect(errors).toEqual([]);
+    expect(logs.join('\n')).toContain('from Effective Target to krux');
+  });
+
   it('exits non-zero with a clear message when no conversation matches (ac3)', async () => {
     const { moveAction } = await import('../move.js');
     const { errors } = captureConsole();
@@ -167,7 +196,12 @@ describe('moveAction', () => {
 
   it('exits non-zero with a clear message when the dashboard is unreachable (ac3)', async () => {
     await seedConversation({ name: 'move-dashboard-down', title: 'Some conversation' });
-    const connRefused = Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' });
+    // Matches Node 22's real global-fetch rejection shape: a TypeError whose
+    // message is the generic "fetch failed", with the actual errno nested on
+    // `.cause`, not a top-level `.code` (PAN-1577 review fix).
+    const connRefused = new TypeError('fetch failed', {
+      cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+    });
     const fetchMock = vi.fn().mockRejectedValue(connRefused);
     vi.stubGlobal('fetch', fetchMock);
     const { moveAction } = await import('../move.js');
