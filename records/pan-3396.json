@@ -296,17 +296,17 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:21:31.797Z",
+  "updated": "2026-08-01T22:25:32.574Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T22:20:43.934Z",
-    "reviewNotes": "Residue tests hang on a callback-incompatible execFile mock, and unmigrated membership reads still repeat synchronous state-home resolution",
+    "updatedAt": "2026-08-01T22:25:32.152Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed cycle-7 blocking findings - test mock callback invocation and batch-reader state-home resolution",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewSpawnedAt": "2026-08-01T22:20:43.932Z",
@@ -377,9 +377,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26391326,
-            "output": 429076,
-            "cacheRead": 91058176,
+            "input": 29161560,
+            "output": 447984,
+            "cacheRead": 100013056,
             "cacheWrite": 0
           }
         },
@@ -417,10 +417,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2462,
-            "output": 127941,
-            "cacheRead": 59904551,
-            "cacheWrite": 2478201
+            "input": 2594,
+            "output": 130647,
+            "cacheRead": 62452538,
+            "cacheWrite": 2504254
           }
         }
       },
@@ -432,21 +432,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30942397,
-          "output": 518673,
-          "cacheRead": 104554496,
+          "input": 33712631,
+          "output": 537581,
+          "cacheRead": 113509376,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2462,
-          "output": 127941,
-          "cacheRead": 59904551,
-          "cacheWrite": 2478201
+          "input": 2594,
+          "output": 130647,
+          "cacheRead": 62452538,
+          "cacheWrite": 2504254
         }
       },
       "costAtCloseOut": {
-        "usd": 232.2945213,
-        "pricingAsOf": "2026-08-01T22:20:45.941Z"
+        "usd": 251.4913963,
+        "pricingAsOf": "2026-08-01T22:25:32.253Z"
       }
     },
     "merges": [
@@ -455,7 +455,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
