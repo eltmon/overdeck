@@ -4,17 +4,17 @@
     "created": "2026-07-30T21:10:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3341: Pipeline board shows stale phase (e.g. Planning) for issues that are Done and merged but never close-ceremonied",
-    "updated": "2026-07-30T21:42:46.150Z"
+    "updated": "2026-08-01T01:41:00.522Z"
   },
   "plan": {
     "id": "pan-3341",
     "title": "Pipeline board shows stale phase (e.g. Planning) for issues that are Done and merged but never close-ceremonied",
-    "status": "running",
+    "status": "completed",
     "uid": "9db0665d-b8a0-4038-93ca-c934083d7075",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-30T21:10:00.000Z",
-    "updated": "2026-07-30T21:42:46.150Z",
+    "updated": "2026-08-01T01:41:00.522Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3341",
@@ -396,5 +396,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
