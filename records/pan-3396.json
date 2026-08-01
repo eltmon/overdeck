@@ -398,16 +398,16 @@
     "recordedAt": "2026-08-01T23:08:56.965Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:10:43.584Z",
+  "updated": "2026-08-01T23:11:14.773Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:10:41.264Z",
+    "updatedAt": "2026-08-01T23:11:07.303Z",
     "reviewNotes": "Verification failed at lint",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -553,7 +553,7 @@
       },
       "costAtCloseOut": {
         "usd": 284.8531523,
-        "pricingAsOf": "2026-08-01T23:10:43.498Z"
+        "pricingAsOf": "2026-08-01T23:11:07.401Z"
       }
     },
     "merges": [
