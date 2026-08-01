@@ -216,6 +216,18 @@ function DeliveryMethodToggle({ sessionId, deliveryMethod }: { sessionId: string
 export function SessionPanel({ session, issueId, roundMarkers, reviewers }: SessionPanelProps) {
   const isReviewSession = session.type === 'review';
   const resolvedModels = useResolvedModels();
+  // Workspace path for file-chip cwd resolution in transcripts — same query
+  // key as SessionPanelBranchChip, so react-query dedupes the fetch. Without
+  // a cwd, relative file references in agent messages render as plain text
+  // instead of openable chips (absolute references resolve regardless).
+  const { data: sessionGitInfo } = useQuery({
+    queryKey: ['agent-git-info', session.sessionId],
+    queryFn: () => fetchAgentGitInfo(session.sessionId),
+    enabled: !!session.sessionId,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+  });
+  const workspaceCwd = sessionGitInfo?.workspacePath ?? undefined;
   // Tool-call visibility toggle — shared with the embedded ConversationPanel
   // via controlled props. Keyed by sessionId so the preference sticks per
   // agent and matches the standalone conversation view's key for the same
@@ -272,7 +284,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       name: session.sessionId,
       tmuxSession: session.tmuxSession || session.sessionId,
       status: session.presence === 'ended' ? 'ended' : 'active',
-      cwd: '',
+      cwd: workspaceCwd ?? '',
       issueId: issueId || null,
       createdAt: session.startedAt,
       endedAt,
@@ -285,7 +297,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
       // synthetic agent session (PAN-1908: pi/codex work agents stream too).
       harness: session.harness as Conversation['harness'],
     };
-  }, [session, issueId, resolvedModels]);
+  }, [session, issueId, resolvedModels, workspaceCwd]);
 
   const hasJsonl = !!session.hasJsonl;
   const hasTranscript = !!session.transcript;
@@ -413,7 +425,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             />
           ) : hasTranscript ? (
             <div ref={transcriptRef} onScroll={onTranscriptScroll} className={styles.sessionPanelTranscript}>
-              <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={undefined} />
+              <ChatMarkdown text={session.transcript!} isStreaming={false} cwd={workspaceCwd} />
             </div>
           ) : session.presence !== 'ended' || session.status === 'starting' ? (
             // The agent is starting but hasn't written any JSONL or transcript
@@ -438,6 +450,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
             session={session}
             reviewers={reviewers ?? []}
             roundData={roundData}
+            cwd={workspaceCwd}
           />
         )}
 
@@ -461,7 +474,7 @@ export function SessionPanel({ session, issueId, roundMarkers, reviewers }: Sess
                     <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted-foreground)', marginBottom: 6 }}>
                       Round {r.round} — {r.status}
                     </div>
-                    <ChatMarkdown text={r.summary} isStreaming={false} cwd={undefined} />
+                    <ChatMarkdown text={r.summary} isStreaming={false} cwd={workspaceCwd} />
                   </div>
                 ) : null)}
               </>
