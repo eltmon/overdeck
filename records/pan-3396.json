@@ -156,7 +156,7 @@
     "recordedAt": "2026-08-01T21:32:02.810Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:34:31.351Z",
+  "updated": "2026-08-01T21:34:39.782Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -165,7 +165,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:32:17.733Z",
+    "updatedAt": "2026-08-01T21:34:35.427Z",
     "reviewNotes": "Correctness reviewer failed; residue forge addressing, audit evidence, partial-failure handling, and record-read batching remain blocked",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:32:03.917Z",
@@ -229,9 +229,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10460744,
-            "output": 155769,
-            "cacheRead": 35744256,
+            "input": 10470948,
+            "output": 156095,
+            "cacheRead": 36091392,
             "cacheWrite": 0
           }
         },
@@ -284,9 +284,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 15011815,
-          "output": 245366,
-          "cacheRead": 49240576,
+          "input": 15022019,
+          "output": 245692,
+          "cacheRead": 49587712,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -297,8 +297,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.5015163,
-        "pricingAsOf": "2026-08-01T21:32:27.167Z"
+        "usd": 114.7358843,
+        "pricingAsOf": "2026-08-01T21:34:36.259Z"
       }
     },
     "merges": [
@@ -307,7 +307,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
