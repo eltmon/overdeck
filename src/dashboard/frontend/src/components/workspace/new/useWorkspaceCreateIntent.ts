@@ -37,48 +37,21 @@ export function useWorkspaceCreateIntent({
   initialProjectKey = '',
   onCreated,
 }: UseWorkspaceCreateIntentOptions = {}) {
-  const [name, setNameState] = useState('');
-  const [projectKey, setProjectKeyState] = useState(initialProjectKey);
-  const [targetPath, setTargetPathState] = useState('');
-  const [mode, setModeState] = useState<WorkspaceCreateMode>('shared');
-  const [parentBranch, setParentBranchState] = useState('');
+  const [name, setName] = useState('');
+  const [projectKey, setProjectKey] = useState(initialProjectKey);
+  const [targetPath, setTargetPath] = useState('');
+  const [mode, setMode] = useState<WorkspaceCreateMode>('shared');
+  const [parentBranch, setParentBranch] = useState('');
   const [intent, setIntent] = useState<ResolvedWorkspaceIntent | null>(null);
   const [stale, setStale] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const resolveSeq = useRef(0);
+  const submitSeq = useRef(0);
 
-  const invalidateIntent = useCallback(() => {
-    resolveSeq.current += 1;
-    setIntent(null);
-    setStale(true);
-    setError(null);
+  useEffect(() => () => {
+    submitSeq.current += 1;
   }, []);
-
-  const setName = useCallback((value: string) => {
-    invalidateIntent();
-    setNameState(value);
-  }, [invalidateIntent]);
-
-  const setProjectKey = useCallback((value: string) => {
-    invalidateIntent();
-    setProjectKeyState(value);
-  }, [invalidateIntent]);
-
-  const setTargetPath = useCallback((value: string) => {
-    invalidateIntent();
-    setTargetPathState(value);
-  }, [invalidateIntent]);
-
-  const setMode = useCallback((value: WorkspaceCreateMode) => {
-    invalidateIntent();
-    setModeState(value);
-  }, [invalidateIntent]);
-
-  const setParentBranch = useCallback((value: string) => {
-    invalidateIntent();
-    setParentBranchState(value);
-  }, [invalidateIntent]);
 
   const effectiveTargetPath = mode === 'isolated' ? '' : targetPath;
 
@@ -91,6 +64,9 @@ export function useWorkspaceCreateIntent({
   }), [effectiveTargetPath, mode, name, parentBranch, projectKey]);
 
   useEffect(() => {
+    setIntent(null);
+    setStale(true);
+    setError(null);
     const seq = ++resolveSeq.current;
     const timer = setTimeout(() => {
       void (async () => {
@@ -136,6 +112,7 @@ export function useWorkspaceCreateIntent({
   ): Promise<string | null> => {
     setError(null);
     setCreating(true);
+    const seq = ++submitSeq.current;
     try {
       const response = await fetchWithTimeout('/api/workspace-registry', {
         method: 'POST',
@@ -143,11 +120,13 @@ export function useWorkspaceCreateIntent({
         headers: await dashboardMutationJsonHeaders(),
         body: JSON.stringify(body),
       });
+      if (seq !== submitSeq.current) return null;
       if (!response.ok) {
         const json = (await response.json().catch(() => ({}))) as {
           findings?: WorkspaceIntentFinding[];
           error?: string;
         };
+        if (seq !== submitSeq.current) return null;
         if (json.findings?.length) {
           setIntent((previous) => previous ? { ...previous, findings: json.findings ?? [] } : previous);
           setError(json.findings[0]?.message ?? 'The workspace intent was rejected.');
@@ -158,13 +137,16 @@ export function useWorkspaceCreateIntent({
       }
 
       const created = (await response.json()) as { id: string };
+      if (seq !== submitSeq.current) return null;
       onCreated?.(created.id);
       return created.id;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause));
+      if (seq === submitSeq.current) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
       return null;
     } finally {
-      setCreating(false);
+      if (seq === submitSeq.current) setCreating(false);
     }
   }, [onCreated, requestBody]);
 

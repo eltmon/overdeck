@@ -116,6 +116,20 @@ describe('useWorkspaceCreateIntent', () => {
     expect(result.current.canCreate).toBe(true);
   });
 
+  it('does not invalidate a resolved intent when a field is set to its current value', async () => {
+    const { result } = renderHook(() => useWorkspaceCreateIntent());
+    await settleResolve();
+    const resolveCount = resolveBodies().length;
+
+    act(() => result.current.setMode('shared'));
+    expect(result.current.stale).toBe(false);
+    expect(result.current.canCreate).toBe(true);
+
+    await settleResolve();
+    expect(resolveBodies()).toHaveLength(resolveCount);
+    expect(result.current.stale).toBe(false);
+  });
+
   it('surfaces create findings without reporting a created workspace', async () => {
     const onCreated = vi.fn();
     const { result } = renderHook(() => useWorkspaceCreateIntent({ onCreated }));
@@ -171,5 +185,24 @@ describe('useWorkspaceCreateIntent', () => {
     });
     expect(createdId).toBe('ws-new');
     expect(onCreated).toHaveBeenCalledWith('ws-new');
+  });
+
+  it('suppresses onCreated when the page unmounts during submission', async () => {
+    const onCreated = vi.fn();
+    let releaseCreate!: (response: Response) => void;
+    const pendingCreate = new Promise<Response>((resolve) => { releaseCreate = resolve; });
+    const { result, unmount } = renderHook(() => useWorkspaceCreateIntent({ onCreated }));
+    await settleResolve();
+    mockFetch.mockImplementationOnce(() => pendingCreate);
+
+    let submission!: Promise<string | null>;
+    act(() => { submission = result.current.submitIntent(); });
+    unmount();
+    await act(async () => {
+      releaseCreate(ok({ id: 'ws-late' }, 201));
+      expect(await submission).toBeNull();
+    });
+
+    expect(onCreated).not.toHaveBeenCalled();
   });
 });
