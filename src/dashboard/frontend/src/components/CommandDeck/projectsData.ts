@@ -19,15 +19,31 @@ export interface RegisteredProjectLite {
   path: string;
 }
 
-/** True when a conversation's cwd is not under any registered project (or has no
- * cwd) — i.e. it belongs in the No-project bucket. */
+/** Resolve an explicit project association first, then fall back to cwd containment. */
+export function resolveConversationProject(
+  conv: { cwd?: string | null; projectKey?: string | null },
+  registeredProjects: readonly RegisteredProjectLite[],
+): RegisteredProjectLite | null {
+  if (conv.projectKey) {
+    const explicit = registeredProjects.find((rp) => rp.key === conv.projectKey)
+      ?? registeredProjects.find((rp) => rp.name === conv.projectKey);
+    if (explicit) return explicit;
+  }
+
+  const cwd = conv.cwd?.replace(/\/+$/, '');
+  if (!cwd) return null;
+  return registeredProjects.find((rp) => {
+    const projectPath = rp.path?.replace(/\/+$/, '');
+    return Boolean(projectPath) && (cwd === projectPath || cwd.startsWith(`${projectPath}/`));
+  }) ?? null;
+}
+
+/** True when neither an explicit association nor cwd containment resolves a project. */
 export function isUnscopedConversation(
-  conv: { cwd?: string | null },
+  conv: { cwd?: string | null; projectKey?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
 ): boolean {
-  const cwd = conv.cwd;
-  if (!cwd) return true;
-  return !registeredProjects.some((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
+  return resolveConversationProject(conv, registeredProjects) === null;
 }
 
 export interface ProjectData {

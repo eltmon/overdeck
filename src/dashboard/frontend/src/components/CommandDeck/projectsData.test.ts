@@ -3,7 +3,9 @@ import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import {
   fetchProjectPipelineMembership,
   groupProjects,
+  isUnscopedConversation,
   refreshProjectPipelineMembership,
+  resolveConversationProject,
 } from './projectsData';
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -39,6 +41,46 @@ function feature(issueId: string, projectName: string): ProjectFeature {
     isShadow: false,
   };
 }
+
+describe('conversation project grouping', () => {
+  const registeredProjects = [
+    { key: 'root-key', name: 'Root Project', path: '/projects/root' },
+    { key: 'nested-key', name: 'Nested Project', path: '/projects/root/nested' },
+  ];
+
+  it('prefers an explicit yaml key over cwd containment', () => {
+    const conv = { projectKey: 'nested-key', cwd: '/isolated/handoff' };
+    expect(resolveConversationProject(conv, registeredProjects)).toEqual(registeredProjects[1]);
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
+  });
+
+  it('accepts a display name as an explicit association', () => {
+    expect(resolveConversationProject(
+      { projectKey: 'Nested Project', cwd: '/isolated/handoff' },
+      registeredProjects,
+    )).toEqual(registeredProjects[1]);
+  });
+
+  it('falls back to cwd containment when no explicit association exists', () => {
+    expect(resolveConversationProject(
+      { projectKey: null, cwd: '/projects/root/src' },
+      registeredProjects,
+    )).toEqual(registeredProjects[0]);
+  });
+
+  it('falls back to cwd containment when an explicit association is unknown', () => {
+    expect(resolveConversationProject(
+      { projectKey: 'missing', cwd: '/projects/root/src' },
+      registeredProjects,
+    )).toEqual(registeredProjects[0]);
+  });
+
+  it('leaves a conversation unscoped when neither association method matches', () => {
+    const conv = { projectKey: null, cwd: '/outside' };
+    expect(resolveConversationProject(conv, registeredProjects)).toBeNull();
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+  });
+});
 
 describe('project pipeline membership probes', () => {
   it('rejects a typed unavailable GET body returned with HTTP 200', async () => {
