@@ -113,10 +113,10 @@
     "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:36:48.914Z",
+  "updated": "2026-08-01T12:39:38.281Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -124,13 +124,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T12:29:41.661Z",
-    "updatedAt": "2026-08-01T12:36:01.271Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-01T12:39:38.241Z",
+    "reviewNotes": "Unrelated Deacon transcript-retention behavior violates the explicit PAN-3362 scope constraint",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
     "lastVerifiedCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
-    "reviewRequestedAt": "2026-08-01T12:29:41.661Z",
     "reviewSpawnedAt": "2026-08-01T12:36:01.269Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -163,6 +162,24 @@
         "tests/unit/lib/uat-fixtures/seed.test.ts"
       ],
       "recordedAt": "2026-08-01T12:28:15.326Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d"
+      }
     }
   },
   "closeOut": {
@@ -170,9 +187,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 261119,
-            "output": 12512,
-            "cacheRead": 4073472,
+            "input": 3542224,
+            "output": 61438,
+            "cacheRead": 16062464,
             "cacheWrite": 0
           }
         },
@@ -210,30 +227,30 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 732,
-            "output": 174279,
-            "cacheRead": 126867552,
-            "cacheWrite": 2725366
+            "input": 736,
+            "output": 175296,
+            "cacheRead": 128002201,
+            "cacheWrite": 2726980
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2770454,
-          "output": 98110,
-          "cacheRead": 20645888,
+          "input": 6051559,
+          "output": 147036,
+          "cacheRead": 32634880,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 732,
-          "output": 174279,
-          "cacheRead": 126867552,
-          "cacheWrite": 2725366
+          "input": 736,
+          "output": 175296,
+          "cacheRead": 128002201,
+          "cacheWrite": 2726980
         }
       },
       "costAtCloseOut": {
-        "usd": 61.049708,
-        "pricingAsOf": "2026-08-01T12:36:02.697Z"
+        "usd": 85.158651,
+        "pricingAsOf": "2026-08-01T12:39:38.270Z"
       }
     },
     "merges": [
@@ -242,7 +259,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3362",
