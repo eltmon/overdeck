@@ -71,7 +71,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:27:29.306Z",
+  "updated": "2026-08-01T23:27:32.310Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -80,7 +80,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:26:12.455Z",
+    "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
+    "updatedAt": "2026-08-01T23:27:29.294Z",
     "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346",
@@ -117,8 +118,7 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:25:56.881Z"
-    },
-    "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -182,7 +182,7 @@
       },
       "costAtCloseOut": {
         "usd": 60.775502,
-        "pricingAsOf": "2026-08-01T23:26:21.469Z"
+        "pricingAsOf": "2026-08-01T23:27:32.306Z"
       }
     },
     "merges": [
