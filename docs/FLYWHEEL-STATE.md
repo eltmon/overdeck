@@ -773,3 +773,7 @@ PSI avg10 hit 94 (thrashing) at 1.9GB avail: server ballooned AGAIN (743MB→2.4
 - **MIN-874 review: organic CHANGES REQUESTED** with substantive scope findings (OAuth/fallback/streaming/credential-safety/lifecycle/rollout incomplete) — rework drives server-side; its 7 yield victims free up as the convoy releases slots (PAN-3432 tracks the fan-out defect).
 - Campaign heads advancing post-memory-events (MIN-930 $4.46, MIN-931 $4.31 — modest but moving; trend-check next tick). strike-3431 (server leak) implementing (+175/−13).
 - Run scoreboard: **24 issues landed and closed out**, 19 substrate issues filed (14 fixed+landed same-day), 3 memory crises handled, 2 UAT promotes processed, 1 campaign adopted (5 issues, 2 in flight).
+
+## RUN-79 tick 31 (2026-08-01 ~17:50Z) — steady state; campaign heads strong
+
+- MIN-930 $6.06 +814/−50 (P0 tracking well) · MIN-931 $6.28 +714/−185. strike-3431 profiling ($14.58). MIN-839 session ended (rework done → server-side redispatch expected). No merge-ready set yet. Memory healthy. Yield backlog: 9 gates (down 1).
