@@ -162,6 +162,31 @@ describe('spawnReviewRoleForIssue', () => {
     );
   });
 
+  it('clears a superseded review-infrastructure failure when a fresh cycle dispatches', async () => {
+    mocks.getReviewStatus.mockReturnValue({
+      reviewStatus: 'pending',
+      verificationStatus: 'passed',
+      stuck: true,
+      stuckReason: 'review_infrastructure_failure',
+      stuckAt: '2026-08-01T02:44:56.000Z',
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-3377',
+      workspace: '/tmp/pan-review-fresh-cycle',
+      branch: 'feature/pan-3377',
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith('PAN-3377', expect.objectContaining({
+      reviewStatus: 'reviewing',
+      stuck: false,
+      stuckReason: undefined,
+      stuckAt: undefined,
+      stuckDetails: undefined,
+    }));
+  });
+
   it('threads explicit model and harness overrides to the review spawn', async () => {
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',

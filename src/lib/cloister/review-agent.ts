@@ -49,6 +49,7 @@ import { removeAgent } from '../agents/removal.js';
 import { listAgentIdsByPrefixSync } from '../overdeck/agents.js';
 import { getAgentStateSync as getAgentStateFileSync } from '../agents/agent-state.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { clearSupersededReviewInfrastructureFailure } from '../review-verdict-guards.js';
 import { loadConfigSync as loadYamlConfig, resolveModel, type ReviewMode } from '../config-yaml.js';
 import { buildReviewContext, formatTier1Summary, type ReviewContextManifest } from './review-context.js';
 import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveConflictGate } from './conflict-gate.js';
@@ -531,9 +532,11 @@ async function spawnReviewRoleForIssuePromise(
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
   try {
+    const currentStatus = getReviewStatusSync(opts.issueId);
     setReviewStatusSync(opts.issueId, {
       reviewStatus: 'reviewing',
       reviewSpawnedAt: new Date().toISOString(),
+      ...clearSupersededReviewInfrastructureFailure(currentStatus),
     });
   } catch (err) {
     console.error(`[review-agent] Failed to set reviewing status for ${opts.issueId}:`, err);

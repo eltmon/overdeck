@@ -27,10 +27,11 @@ import {
 } from './review-status-reconcile.js';
 import { isReviewRequestStale, needsReviewDispatch } from './review-dispatch-decision.js';
 import { REVIEW_STATUS_HISTORY_LIMIT } from './review-status-reconcile.js';
-import { REVIEW_STATUS_NOTE_LIMIT } from './review-status-limits.js';
+import { truncateReviewStatusNote } from './review-status-limits.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
+import { rejectVerdictEvidenceHeadMismatch } from './review-verdict-guards.js';
 
 export { reviewGatesPassedSync, verificationSatisfied, MERGED_VERIFICATION_REASON } from './review-status-reconcile.js';
 export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
@@ -39,11 +40,6 @@ export type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
 export interface MergeGateEligibility {
   eligible: boolean;
   reason?: string;
-}
-
-function truncateHistoryNote(notes: string | undefined): string | undefined {
-  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes;
-  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
 }
 
 /**
@@ -197,6 +193,10 @@ export function setReviewStatusSync(
     readyForMerge: false,
   };
 
+  if (rejectVerdictEvidenceHeadMismatch(
+    issueId, status, update, () => notifyPipelineSync({ type: 'status_changed', issueId, status }),
+  )) return status;
+
   // Guard: reject reviewStatus regression from 'passed' to 'reviewing' unless the caller
   // is explicitly resetting the merge lifecycle (update includes mergeStatus).
   // This is belt-and-suspenders — endpoint-level guards should catch this first.
@@ -304,7 +304,7 @@ export function setReviewStatusSync(
   // 2. Bounded history (last 20, truncated notes) for the returned event payload
   const boundedHistory = rawHistory.slice(-REVIEW_STATUS_HISTORY_LIMIT).map((entry) => ({
     ...entry,
-    notes: entry.notes ? truncateHistoryNote(entry.notes) : undefined,
+    notes: entry.notes ? truncateReviewStatusNote(entry.notes) : undefined,
   }));
 
   // Write raw history to the database (for archival), but return bounded history in the status
