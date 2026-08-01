@@ -321,7 +321,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T21:53:55.503Z",
+  "updated": "2026-08-01T21:54:03.178Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "skipped",
@@ -580,7 +580,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "k3[1m]",
   "tasks": {
     "sequence": 16,
     "claims": {},
