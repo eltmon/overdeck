@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:55.863Z",
-  "updated": "2026-08-01T16:16:04.922Z",
+  "updated": "2026-08-01T16:18:00.585Z",
   "pipeline": {
     "issueId": "PAN-3411",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T16:16:04.890Z",
-    "inspectNotes": "Inspecting item resolve-intent-hook"
+    "updatedAt": "2026-08-01T16:17:59.957Z",
+    "inspectNotes": "AC2 violated — a setter called with the value it already holds deadlocks the hook permanently stale. useWorkspaceCreateIntent.ts:51 invalidateIntent() unconditionally bumps resolveSeq and sets stale=true/intent=null from every setter (e.g. setMode at :73), but the resolve effect at :93 is keyed off the useMemo'd requestBody at :85 whose deps are all primitives — an identical value produces the same memo object, so the effect never re-runs and no new resolve is ever scheduled. Any in-flight/scheduled resolve is discarded by the seq guard at :94/:110, so stale stays true and canCreate stays false forever with no error surfaced, until some OTHER field changes. Reachable from the existing consumer's call sites: NewWorkspaceModal.tsx:402 (clicking the already-selected mode segment), :439 (FolderPicker re-picking the current path), and the open-reset at :105-113 which calls setName('')/setMode('shared')/setTargetPath('')/setParentBranch('') with values already current. This is a parity regression against the modal, which invalidates INSIDE the effect (NewWorkspaceModal.tsx:203-207) so a no-op change cannot invalidate anything. Required fix: make invalidation follow the actual dep change (invalidate inside the effect, or bump a nonce that is itself an effect dep) or make each setter a no-op when the value is unchanged; add a fake-timer test that re-sets an unchanged field and asserts stale returns to false. FR-2 no-loss: submitIntent at :132-168 drops the modal's submitSeq guard (NewWorkspaceModal.tsx:263,285-291) that suppresses onCreated for a submission superseded after dismissal — either carry that guard into the hook or state where the consumer now owns it. Non-blocking observation: the 422 path at :152 drops findings when intent is null (findingsFor stays empty, only error shows) — same as the modal, so no regression. AC1, AC3, AC4 are met and genuinely proven by the new fake-timer tests."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 540649,
-            "output": 42153,
-            "cacheRead": 12412928,
+            "input": 543461,
+            "output": 42255,
+            "cacheRead": 12768256,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 540649,
-          "output": 42153,
-          "cacheRead": 12412928,
+          "input": 543461,
+          "output": 42255,
+          "cacheRead": 12768256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 10.174299,
-        "pricingAsOf": "2026-08-01T16:16:04.902Z"
+        "usd": 10.369083,
+        "pricingAsOf": "2026-08-01T16:18:00.061Z"
       }
     },
     "merges": [],
