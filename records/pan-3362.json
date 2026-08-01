@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T10:19:31.121Z",
+  "updated": "2026-08-01T10:34:26.672Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -52,18 +52,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "fixture-data": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3362",
         "agentId": "agent-pan-3362",
         "pid": 228146,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:19:31.120Z"
+        "claimedAt": "2026-08-01T10:19:31.120Z",
+        "itemId": "fixture-data",
+        "outcome": "completed",
+        "reason": "Added pure fixture builders in src/lib/uat-fixtures/fixture-data.ts (project config, normalized issue, agent rows, review status, activity entries, xBRIEF doc, continue.json) plus unit tests in tests/unit/lib/uat-fixtures/fixture-data.test.ts covering the item's 4 ACs",
+        "releasedAt": "2026-08-01T10:34:26.672Z"
+      }
+    ],
+    "statusReasons": {
+      "fixture-data": {
+        "reason": "Added pure fixture builders in src/lib/uat-fixtures/fixture-data.ts (project config, normalized issue, agent rows, review status, activity entries, xBRIEF doc, continue.json) plus unit tests in tests/unit/lib/uat-fixtures/fixture-data.test.ts covering the item's 4 ACs",
+        "updatedAt": "2026-08-01T10:34:26.672Z"
       }
     }
   },
   "statusOverrides": {
-    "fixture-data": "running"
+    "fixture-data": "completed",
+    "fixture-data.fixture-data.ac1": "completed",
+    "fixture-data.fixture-data.ac2": "completed",
+    "fixture-data.fixture-data.ac3": "completed",
+    "fixture-data.fixture-data.ac4": "completed"
   }
 }
