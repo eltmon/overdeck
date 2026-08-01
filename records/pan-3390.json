@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T09:24:51.256Z",
-  "updated": "2026-08-01T10:20:00.356Z",
+  "updated": "2026-08-01T11:00:11.999Z",
   "pipeline": {
     "issueId": "PAN-3390",
     "reviewStatus": "passed",
@@ -13,7 +13,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T10:20:00.015Z",
+    "updatedAt": "2026-08-01T11:00:11.979Z",
     "testNotes": "Skipped: issue is already merged",
     "lastVerifiedCommit": "4abc3c85599fbfc9eae61f39a27f09695bc441d5",
     "strikeLandingState": "landed",
@@ -26,7 +26,9 @@
         "outcome": "transport-failed",
         "detail": "Strike merge request failed: fetch failed"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-08-01T11:00:11.979Z"
   },
   "closeOut": {
     "usage": {
@@ -54,7 +56,88 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-01T11:00:11.999Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 4abc3c85599fbfc9eae61f39a27f09695bc441d5",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3391 MERGED at 2026-08-01T10:18:23Z",
+          "status": "pass",
+          "mergedAt": "2026-08-01T10:18:23Z",
+          "mergeCommit": "4e041b39c58a1c3b1045dbbb9de4a8d63ce80dd3"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 4e041b39c58a1c3b1045dbbb9de4a8d63ce80dd3",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 3dbdb497 contains merge 4e041b39",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Cleaned 1 agent state directory (1 transcript files preserved); Preserved local branch strike/pan-3390 — not merged to main; Preserved remote branch strike/pan-3390 — not merged to main; Pruned 45 checkpoint ref(s) for agent-pan-3390, planning-pan-3390, strike-pan-3390; No specialist registry entries for PAN-3390"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
