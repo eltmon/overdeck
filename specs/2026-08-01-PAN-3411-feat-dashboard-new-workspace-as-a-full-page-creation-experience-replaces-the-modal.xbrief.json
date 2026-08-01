@@ -1,0 +1,1093 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:41:02Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3411: feat(dashboard): New Workspace as a full-page creation experience (replaces the modal)",
+    "updated": "2026-08-01T16:00:21.074Z"
+  },
+  "plan": {
+    "id": "pan-3411",
+    "title": "feat(dashboard): New Workspace as a full-page creation experience (replaces the modal)",
+    "status": "proposed",
+    "uid": "37a8c7ac-07c8-487a-82c3-90bc59eb6a7f",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:41:02Z",
+    "updated": "2026-08-01T16:00:21.074Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3411",
+        "label": "PAN-3411",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3411.md",
+        "label": "PRD draft",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3410",
+        "label": "PAN-3410 (style guide v2 — hard dependency)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "workspaces",
+      "ux"
+    ],
+    "narratives": {
+      "Problem": "Workspace creation opens a small settings-form modal. Creating a workspace is the beginning of a stream of work and deserves a full-page treatment: hero-scale name, one visible row of project chips, a calm resolved-intent status line, and a suggestion grid that teaches the empty state.",
+      "Proposal": "Add a routed /workspaces/new page (hand-rolled Tab routing) implementing the mockup design/style-guide/mockups/new-workspace-page.html using PAN-3410 style primitives, reusing the PAN-3330 resolve-before-create backend unchanged via an extracted intent hook. Port every modal affordance behind a no-loss parity checklist test (including bootstrap-main), re-point all three entry points to navigate, then delete NewWorkspaceModal + controller + tests in the same PR. The page-construction items deliberately share NewWorkspacePage.tsx and serialize via blocks edges (one file, one workspace — parallel dispatch would conflict). See .pan/drafts/PAN-3411.md for decisions D-1..D-9.",
+      "NonGoals": "- Memory-driven idea suggestions (static presets only in v1)\n- Migrating NewProjectModal to a page (PAN-3410 follow-up issue)\n- Any backend or route change (NFR-1)\n- Issue-workspace creation surfaces (user workspaces only)\n- Refactoring NewWorkspaceModal to consume the new hook (it is deleted in the same PR)\n- Re-implementing PAN-3410 style primitives ad hoc (hard dependency, D-9)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Treat PAN-3410 as a hard implementation gate (D-9) rather than halting planning.",
+        "rationale": "The issue body itself declares the dependency and the PRD forbids ad-hoc primitives; planning can complete against the mockup + primitive names, and the hazard + item ACs make the work agent stop-and-surface if it starts before PAN-3410 merges."
+      },
+      {
+        "summary": "Split the PRD's WI-2/WI-4 into finer xBRIEF items (hook, target row, bootstrap-main, status strip, CTA, cutover, removal as separate items).",
+        "rationale": "Repo doctrine: decompose aggressively into independently reviewable tasks; the parity audit must gate modal removal as its own verifiable step."
+      },
+      {
+        "summary": "Added bootstrap-main to the parity scope as a dedicated item.",
+        "rationale": "Code verification found the 'Register main workspace' affordance (NewWorkspaceModal.tsx:156-177, 471-498, 312-314) missing from the PRD's first-draft D-1 enumeration; dropping it would fail the no-loss audit the issue demands."
+      },
+      {
+        "summary": "Modal is not refactored to consume the extracted hook; transient duplication accepted.",
+        "rationale": "The modal is deleted in the same PR, so refactoring it first adds review surface and risk with zero durable benefit."
+      },
+      {
+        "summary": "Page-construction items share NewWorkspacePage.tsx and serialize through a total order of blocks edges instead of being split into per-item component files.",
+        "rationale": "Splitting into stub components would push the plan past the 25-file projected-surface finalize gate (33 files) for no behavioral gain; serialization is the truthful dispatch model for items editing one page file in one workspace, and the quality lint sanctions edges as the serialization mechanism."
+      }
+    ],
+    "items": [
+      {
+        "id": "route-and-page-shell",
+        "title": "Add /workspaces/new route and NewWorkspacePage shell with hero title and layout regions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "target-row-controls",
+            "bootstrap-main-affordance",
+            "status-strip",
+            "cta-and-submit",
+            "project-chip-row",
+            "idea-cards"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Header.tsx",
+            "src/dashboard/frontend/src/App/routes.ts",
+            "src/dashboard/frontend/src/App/AppRoutes.tsx",
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'workspace-new' value to the Tab union in Header.tsx, a '/workspaces/new' entry in TAB_PATHS (App/routes.ts), deep-link parsing for /workspaces/new that preserves the ?project= query param across refresh, and a dispatch branch in AppRoutes.tsx rendering a new src/dashboard/frontend/src/pages/NewWorkspacePage.tsx. The page renders the D-2 layout regions in order (project chip row placeholder, hero title, target row placeholder, hairline, status strip placeholder, hairline, idea grid placeholder) inside a generous page container, and owns the local state for mounting NewProjectModal (isOpen/onClose/onCreated) that project-chip-row will wire to its chips. The hero title is a chromeless editable input at the PAN-3410 display-xl scale, autofocused, placeholder 'Untitled workspace' in muted ink, autocomplete off, spellcheck false. ?project=<key> preselects that project in page state (accept key or display name, matching modal preset semantics). Use only PAN-3410 primitives for styling; if they are not merged, STOP and surface the dependency (D-9) rather than improvising styles. Visual contract: design/style-guide/mockups/new-workspace-page.html."
+        },
+        "items": [
+          {
+            "id": "route-and-page-shell.ac1",
+            "title": "Given the SPA, when navigating to /workspaces/new, then NewWorkspacePage renders the seven layout regions (chip row, hero title, target row, hairline, status strip, hairline, idea grid) in D-2 order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-and-page-shell.ac2",
+            "title": "Given a browser refresh on /workspaces/new?project=<key>, when the page loads, then it renders the creation page and preselects that project (deep-link parse preserves the query param)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "route-and-page-shell.ac3",
+            "title": "Hero title renders autofocused, showing 'Untitled workspace' as muted empty-state hint text at the PAN-3410 display-xl scale from the style-guide primitive, not an ad-hoc font-size",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolve-intent-hook",
+        "title": "Extract useWorkspaceCreateIntent hook: debounced resolve, stale tracking, findings, create",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "target-row-controls",
+            "bootstrap-main-affordance",
+            "status-strip",
+            "cta-and-submit"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts",
+            "src/dashboard/frontend/src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/workspace/new/__tests__/useWorkspaceCreateIntent.test.ts"
+          ],
+          "expected_outputs": [
+            "useWorkspaceCreateIntent.test.ts passes"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Port the resolve-before-create logic from NewWorkspaceModal.tsx (lines 199-263) into a reusable hook at src/dashboard/frontend/src/components/workspace/new/useWorkspaceCreateIntent.ts, consumed by the new page; do NOT refactor the modal (it is deleted in modal-removal — transient duplication is deliberate, D-3). The hook owns: form state (name, projectKey, targetPath, mode, parentBranch); a 300ms debounce (reuse the RESOLVE_DEBOUNCE_MS = 300 contract from NewWorkspaceModal.tsx:24) calling POST /api/workspace-registry/resolve; stale=true on every field change cleared only after a successful resolve; findingsFor(field) filtering resolver findings per field; canCreate = !creating && !stale && Boolean(intent) && !hasFindings; submitIntent POSTing /api/workspace-registry and surfacing 422 responses as findings; isolated mode dropping targetPath from the resolve request (effectiveTargetPath = ''). All debounce tests use vi.useFakeTimers() + advanceTimersByTimeAsync — never real timers."
+        },
+        "items": [
+          {
+            "id": "resolve-intent-hook.ac1",
+            "title": "Given rapid field edits, when the 300ms debounce window elapses, then exactly one resolve POST fires per settle (fake-timer tested)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-intent-hook.ac2",
+            "title": "Given any field change, when a resolve is in flight or pending, then stale is true and canCreate is false until a successful resolve clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-intent-hook.ac3",
+            "title": "Given a 422 create response, when submitIntent rejects, then the response findings surface through findingsFor and no onCreated navigation occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolve-intent-hook.ac4",
+            "title": "Given isolated mode, when a resolve request fires, then the request body omits targetPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "target-row-controls",
+        "title": "Target row: folder chip + picker, shared/isolated toggle, advanced parent-branch disclosure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the D-2 target row in NewWorkspacePage per the mockup: a folder chip showing the resolved target directory with a chevron that opens the picker (registered project targets from GET /api/workspace-registry/project-targets plus a Browse… option mounting the existing FolderPicker component unchanged); the shared/isolated mode toggle on the same quiet line (isolated disables/ignores the target chip); and an 'advanced' disclosure revealing the parent-branch input, whose value is included in the resolve payload. Wire every control through useWorkspaceCreateIntent. Preserve modal behaviors: switching project drops the old target selection; isolated mode previews worktree path/branch in resolution."
+        },
+        "items": [
+          {
+            "id": "target-row-controls.ac1",
+            "title": "Given a selected project, when the chevron opens the picker, then registered targets render plus a Browse… option, and choosing Browse… mounts FolderPicker whose selection sets targetPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-row-controls.ac2",
+            "title": "Given isolated mode is toggled on, when the form renders, then the target chip is disabled/ignored and the resolve request omits targetPath",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-row-controls.ac3",
+            "title": "Given the advanced disclosure is open and a parent branch is entered, when the resolve fires, then the payload includes parentBranch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "target-row-controls.ac4",
+            "title": "Given a target was chosen, when the project changes, then the old target selection is dropped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bootstrap-main-affordance",
+        "title": "Port the 'Register main workspace' bootstrap affordance to the page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Port the bootstrap-main affordance from NewWorkspaceModal.tsx (probe at lines 156-177, UI at 471-498, submit at 312-314) — the no-loss row most easily dropped. When the selected project has no main workspace, the page probes the registry with includeArchived=true (an archived main still counts as existing) and renders a 'Register main workspace' action; clicking it POSTs /api/workspace-registry with { project, bootstrapMain: true }; the action is hidden when a main workspace exists."
+        },
+        "items": [
+          {
+            "id": "bootstrap-main-affordance.ac1",
+            "title": "Given the selected project has no main workspace, when the probe returns, then the page renders the 'Register main workspace' action",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bootstrap-main-affordance.ac2",
+            "title": "Given the action is clicked, when the POST fires, then the body is { project: <key>, bootstrapMain: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bootstrap-main-affordance.ac3",
+            "title": "Given the project has a main workspace (including an archived one via includeArchived=true), when the probe returns, then the action does not render",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "status-strip",
+        "title": "Status strip: dot-metadata resolved-intent line with findings rendered in place",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the D-3 status strip per the mockup: a dot-metadata line composed from the live resolution — always 'Memory enabled' (emerald outcome dot), then mode ('Files shared' for shared / 'Isolated worktree'), then git posture ('git repository' / 'no git detected'), then parent branch when overridden — separated by middots. When findings exist, the affected segment is replaced by the finding text in the destructive token; the strip IS the validation surface and no separate error panel renders."
+        },
+        "items": [
+          {
+            "id": "status-strip.ac1",
+            "title": "Given a clean shared-mode resolution on a git repo, when the strip renders, then it shows 'Memory enabled · Files shared · git repository'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-strip.ac2",
+            "title": "Given isolated mode, when the strip renders, then the mode segment reads 'Isolated worktree'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-strip.ac3",
+            "title": "Given a parent-branch override, when the strip renders, then the branch appears as an additional segment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "status-strip.ac4",
+            "title": "Given findings from the resolver, when the strip renders, then the affected segment is replaced by the finding text in the destructive token and no separate error panel renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cta-and-submit",
+        "title": "Start workspace CTA with Enter-to-submit and invalidate/activate/navigate on success",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the D-4 status-strip right side and submit path: a quiet mono CANCEL (returns to the previous view) and the large 'Start workspace' CTA with an ↵ keycap using the PAN-3410 cta+keycap primitive. The CTA is disabled while creating/stale/no-intent/findings (identical canCreate contract). Enter anywhere in the form submits when enabled. On 201: invalidate the ['workspace-registry'] query key, POST the activate endpoint with the percent-encoded workspace id, and navigate into the workspace view — thread an onCreated callback from App.tsx's existing onSelectWorkspace (the same post-create posture as useNewWorkspaceModal.onCreated at useNewWorkspaceModal.ts:58) through the AppRoutes branch into the page; an activation failure still navigates."
+        },
+        "items": [
+          {
+            "id": "cta-and-submit.ac1",
+            "title": "Given the resolution is stale or findings are present, when the strip renders, then the Start workspace CTA is disabled",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cta-and-submit.ac2",
+            "title": "Given the form is valid, when Enter is pressed in any field, then submitIntent fires exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cta-and-submit.ac3",
+            "title": "Given a 201 create, when the promise resolves, then ['workspace-registry'] is invalidated, activate is POSTed with the percent-encoded id, and the app navigates to the workspace view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cta-and-submit.ac4",
+            "title": "Given activation fails after a 201 create, when the activate POST rejects, then the app still navigates to the workspace view",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "project-chip-row",
+        "title": "Project chip row: recency-ordered chips, overflow menu, NewProjectModal integration",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the D-5 chip row per the mockup using PAN-3410 chip primitives: a dashed 'add existing' chip and a 'new project' chip, then one chip per known project ordered by most recent workspace lastAccessedAt (source: GET /api/workspace-registry rows, lastAccessedAt field per Sidebar.tsx:160), collapsing beyond ~5 chips into a 'more projects' overflow menu. Sole registered project preselects its chip; ?project= preset preselects (key or display name). 'add existing' and 'new project' open NewProjectModal via the page-local mount that route-and-page-shell established (the modal component itself is unchanged); on its onCreated, the new project's chip appears selected."
+        },
+        "items": [
+          {
+            "id": "project-chip-row.ac1",
+            "title": "Given multiple projects, when the row renders, then chips are ordered by most recent workspace lastAccessedAt per project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-chip-row.ac2",
+            "title": "Given exactly one registered project and no preset, when the page loads, then its chip is preselected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-chip-row.ac3",
+            "title": "Given more than ~5 projects, when the row renders, then overflow collapses into a 'more projects' menu whose selections behave like chips",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "project-chip-row.ac4",
+            "title": "Given 'new project' or 'add existing' is clicked, when NewProjectModal's onCreated fires, then the new project's chip appears selected on the page",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "idea-cards",
+        "title": "Static idea-card grid with uppercase mono category labels and hero prefill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/NewWorkspacePage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.test.tsx passes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Implement the D-6 idea grid per the mockup: an 'Ideas for your next workspace' eyebrow heading and six static soft-card presets, verbatim from the mockup — AUTOMATE: 'Nightly dependency-audit sweep across all registered projects'; DELEGATE: 'Triage the untriaged backlog and draft a priority proposal'; EXPLORE: 'Map how the merge train decides dispatch order'; BUILD: 'Prototype kanban swimlanes grouped by project'; PLAN: 'Plan the Q3 cost-governor roadmap from open issues'; DESIGN: 'Redesign the agent card footer around the new style guide'. Each card is an eyebrow category label (uppercase mono) + short title; clicking sets the hero title to the example text and focuses the hero for editing. No model calls, no memory reads, no network requests."
+        },
+        "items": [
+          {
+            "id": "idea-cards.ac1",
+            "title": "Given the page loads, when the idea grid renders, then all six cards appear with uppercase mono category labels and the mockup's example titles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idea-cards.ac2",
+            "title": "Given a card is clicked, when the handler runs, then the hero title is set to the card's example text and the hero input receives focus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "idea-cards.ac3",
+            "title": "Given the grid renders, when network activity is observed, then no requests fire from the idea-card code path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parity-no-loss-audit",
+        "title": "No-loss parity checklist suite enumerating every modal affordance against the page",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/NewWorkspacePage.parity.test.tsx"
+          ],
+          "expected_outputs": [
+            "NewWorkspacePage.parity.test.tsx passes with every checklist row ticked"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Write the D-1 gate: a parity checklist test that enumerates every modal affordance as an explicit row and asserts the page covers it. Rows: name input; project select incl. sole-project default; preset accepting key or display name; target dropdown + Browse/FolderPicker; shared/isolated toggle (isolated drops targetPath); advanced parent branch; live resolved preview (path, branch, parent branch, git status, worktree flag, unregistered-target warning); inline per-field findings; Create disabled while stale/invalid; bootstrap-main ('Register main workspace'); form reset behavior equivalent to the modal's reopen-clears-state; onCreated = invalidate ['workspace-registry'] + POST activate (percent-encoded) + navigate, with activation failure still navigating. Each row references the page test that covers it; the suite fails if any row is unmapped. This suite must be green before entry-point-cutover and modal-removal start."
+        },
+        "items": [
+          {
+            "id": "parity-no-loss-audit.ac1",
+            "title": "Given the D-1 checklist, when the suite runs, then every enumerated affordance row maps to a passing page test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parity-no-loss-audit.ac2",
+            "title": "Given a row loses its covering test, when the suite runs, then it fails naming the uncovered affordance",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "entry-point-cutover",
+        "title": "Re-point sidebar +, command palette, and per-project buttons to navigate to /workspaces/new",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/App.tsx",
+            "src/dashboard/frontend/src/components/Sidebar.tsx",
+            "src/dashboard/frontend/src/components/CommandPalette.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "affected component tests pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Per D-7, re-point all three entry points to navigate instead of opening the modal: the sidebar WORKSPACES + button (Sidebar.tsx:598-608, currently wired at App.tsx:853) navigates to /workspaces/new?project=<selectedProjectKey> when a project is selected; the command-palette 'new-workspace' action (CommandPalette.tsx:458-467, wired at App.tsx:1000) navigates to /workspaces/new; the per-project button (ProjectOverview.tsx:337-353) navigates to /workspaces/new?project=<key>. Navigation uses the existing setActiveTab + pushState pattern. The modal stays mounted until modal-removal; this item only changes where the entry points lead."
+        },
+        "items": [
+          {
+            "id": "entry-point-cutover.ac1",
+            "title": "Given the sidebar + button is clicked with a project selected, when the handler runs, then the app navigates to /workspaces/new?project=<key> and does not open the modal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry-point-cutover.ac2",
+            "title": "Given the palette 'New workspace…' action is selected, when it fires, then the app navigates to /workspaces/new",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "entry-point-cutover.ac3",
+            "title": "Given the per-project 'New workspace' button is clicked, when it fires, then the app navigates to /workspaces/new?project=<key> and the page preselects that project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "modal-removal",
+        "title": "Delete NewWorkspaceModal, its controller hook, their tests, and the App.tsx mount",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/NewWorkspaceModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useNewWorkspaceModal.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/NewWorkspaceModal.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/useNewWorkspaceModal.test.tsx",
+            "src/dashboard/frontend/src/App.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint passes",
+            "full test suite passes with no NewWorkspaceModal references"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Gate: parity-no-loss-audit and entry-point-cutover are complete and green. Then git rm NewWorkspaceModal.tsx, useNewWorkspaceModal.ts, and their two test files; remove the modal mount (App.tsx:835-840) and the now-dead newWorkspace controller wiring from App.tsx. NewProjectModal is untouched. Verify no dangling imports via typecheck and a repo grep for 'NewWorkspaceModal' returning only historical docs/changelog references."
+        },
+        "items": [
+          {
+            "id": "modal-removal.ac1",
+            "title": "Given the parity suite is green, when the removal lands, then NewWorkspaceModal.tsx, useNewWorkspaceModal.ts, and their test files no longer exist in the tree",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-removal.ac2",
+            "title": "Given the removal, when typecheck and the full test suite run, then both pass with no dangling NewWorkspaceModal imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "modal-removal.ac3",
+            "title": "Given the removal, when NewProjectModal usage is inspected, then it remains mounted and functional (sidebar new-project + page chips still open it)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-update",
+        "title": "Update workspace-creation docs for the full-page experience",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/WORKSPACES-AND-PROJECTS.md",
+            "configuration/workspaces.mdx",
+            "CLAUDE.md",
+            "docs/audits/pan-1990-surface-inventory.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes (skills/docs drift checks green)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Per FR-8, update exactly these files: docs/WORKSPACES-AND-PROJECTS.md — the creation-flow section re-describes the /workspaces/new page (chip row, hero title, resolve-before-create status strip, entry points navigate); configuration/workspaces.mdx — the operator flow shows the page with a screenshot; CLAUDE.md — the 'Workspaces & Projects (PAN-1990)' paragraph's entry-points sentence now says the sidebar +, palette action, and per-project button navigate to /workspaces/new; docs/audits/pan-1990-surface-inventory.md — replace the NewWorkspaceModal row with the page row and record the no-loss audit outcome."
+        },
+        "items": [
+          {
+            "id": "docs-update.ac1",
+            "title": "Given the docs, when the creation-flow sections are read, then they describe /workspaces/new and navigation entry points instead of the modal",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac2",
+            "title": "Given the surface inventory, when the modal row is inspected, then it is replaced by a page row carrying a no-loss audit note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-update.ac3",
+            "title": "Given configuration/workspaces.mdx, when rendered, then it shows the page with a current screenshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "visual-and-keyboard-verification",
+        "title": "Playwright screenshots at two widths and keyboard-only pass, recorded in an evidence doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:41:02Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3411",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3411-visual-verification.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx playwright screenshot --viewport-size=1440,900 https://overdeck.localhost/workspaces/new",
+            "npx playwright screenshot --viewport-size=900,700 https://overdeck.localhost/workspaces/new"
+          ],
+          "expected_outputs": [
+            "narrow and wide screenshots render the full page without layout breakage",
+            "clean and finding states captured",
+            "docs/audits/pan-3411-visual-verification.md records the evidence and keyboard pass"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "After the page is complete and entry points are cut over, verify rendering yourself (never ask the operator to eyeball): use an isolated Playwright profile against the running dashboard to capture /workspaces/new at narrow and wide widths in both the clean state and a finding-present state, and attach the screenshots to the PR. Then perform a keyboard-only pass — chips, picker, toggle, advanced disclosure, and submit are all reachable and operable without a pointer. Record both outcomes (screenshot list + keyboard pass result) in docs/audits/pan-3411-visual-verification.md and link it from the PR description."
+        },
+        "items": [
+          {
+            "id": "visual-and-keyboard-verification.ac1",
+            "title": "Given the finished page, when screenshots are captured at narrow and wide widths, then both render all D-2 regions without overlap or truncation and are attached to the PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-and-keyboard-verification.ac2",
+            "title": "Given a finding-present resolution, when the strip is screenshotted, then the finding text appears in place in the destructive token",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "visual-and-keyboard-verification.ac3",
+            "title": "Given keyboard-only operation, when tabbing through the page, then chips, picker, toggle, advanced disclosure, and submit are each reachable and operable, and the pass is recorded in docs/audits/pan-3411-visual-verification.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolve-intent-hook",
+        "to": "target-row-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-intent-hook",
+        "to": "bootstrap-main-affordance",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-intent-hook",
+        "to": "status-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "resolve-intent-hook",
+        "to": "cta-and-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "target-row-controls",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "bootstrap-main-affordance",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "status-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "cta-and-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "project-chip-row",
+        "type": "blocks"
+      },
+      {
+        "from": "route-and-page-shell",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "bootstrap-main-affordance",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "status-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "cta-and-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "project-chip-row",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap-main-affordance",
+        "to": "status-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap-main-affordance",
+        "to": "cta-and-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap-main-affordance",
+        "to": "project-chip-row",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap-main-affordance",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "status-strip",
+        "to": "cta-and-submit",
+        "type": "blocks"
+      },
+      {
+        "from": "status-strip",
+        "to": "project-chip-row",
+        "type": "blocks"
+      },
+      {
+        "from": "status-strip",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "cta-and-submit",
+        "to": "project-chip-row",
+        "type": "blocks"
+      },
+      {
+        "from": "cta-and-submit",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "project-chip-row",
+        "to": "idea-cards",
+        "type": "blocks"
+      },
+      {
+        "from": "target-row-controls",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "bootstrap-main-affordance",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "status-strip",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "cta-and-submit",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "project-chip-row",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "idea-cards",
+        "to": "parity-no-loss-audit",
+        "type": "blocks"
+      },
+      {
+        "from": "parity-no-loss-audit",
+        "to": "entry-point-cutover",
+        "type": "blocks"
+      },
+      {
+        "from": "parity-no-loss-audit",
+        "to": "modal-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "cta-and-submit",
+        "to": "entry-point-cutover",
+        "type": "blocks"
+      },
+      {
+        "from": "cta-and-submit",
+        "to": "modal-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "entry-point-cutover",
+        "to": "modal-removal",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-removal",
+        "to": "docs-update",
+        "type": "blocks"
+      },
+      {
+        "from": "modal-removal",
+        "to": "visual-and-keyboard-verification",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3411-feat-dashboard-new-workspace-as-a-full-page-creation-experience-replaces-the-modal.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
