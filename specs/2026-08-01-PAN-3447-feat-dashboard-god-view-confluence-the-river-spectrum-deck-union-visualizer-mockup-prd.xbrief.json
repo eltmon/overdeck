@@ -1,0 +1,1292 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T21:55:42Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3447: feat(dashboard): God View \"Confluence\" — the River × Spectrum Deck union visualizer (mockup + PRD)",
+    "updated": "2026-08-01T22:06:32.074Z"
+  },
+  "plan": {
+    "id": "pan-3447",
+    "title": "feat(dashboard): God View \"Confluence\" — the River × Spectrum Deck union visualizer (mockup + PRD)",
+    "status": "proposed",
+    "uid": "07d36011-b5aa-4df1-9510-1de20b689416",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T21:55:42Z",
+    "updated": "2026-08-01T22:06:32.074Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3447",
+        "label": "PAN-3447",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3447.md",
+        "label": "Confluence PRD (canonical)",
+        "type": "spec"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3441",
+        "label": "PAN-3441 (parent: The River)",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3443",
+        "label": "PAN-3443 (parent: Spectrum Deck)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "god-view",
+      "visualization",
+      "webgl",
+      "canvas"
+    ],
+    "narratives": {
+      "Problem": "The /god-view center canvas is an empty placeholder ('Agent scan moved to the Agents fleet view'). Two complete god-view concepts were built for it — The River (PAN-3441) and the Spectrum Deck (PAN-3443) — and the operator directed that the production surface be the SUM of both: every feature of both parents, one surface, named Confluence. A complete, working, operator-reviewed reference implementation exists at design/style-guide/mockups/god-view-confluence.html.",
+      "Proposal": "Port the Confluence mockup engine verbatim into React modules under src/dashboard/frontend/src/components/GodView/confluence/: pure math into a tested model.ts, the union WebGL shader into aurora.ts, the 2D engine into RiverCanvas.tsx behind the GodViewConfluence composition root, the event simulator deleted and replaced by real data (useConfluenceData over the existing store + the PAN-800 hook-event stream carrying hookName), plus the HookBus rail, the hook telemetry trace BottomStrip, the enriched TopBar, feed↔orb linking, tooltip/help/fullscreen, and docs. No new npm dependencies; raw WebGL1 + Canvas 2D; the mockup is the spec and where prose and mockup disagree the mockup wins.",
+      "NonGoals": "- Sidebar/ActivityFeed internals unchanged beyond the FR-23 hover/click wiring\n- The mockup's issue rail is NOT ported — click opens the real /issues/<id> drawer (D-3)\n- Wiring any dark-fiber hook (the rail shows them; lighting them up is per-hook follow-up work)\n- Any new server-side pipeline for beads/cost HUD stats — absent sources render '—' (D-13)\n- Per-harness hook parity for non-Claude harnesses (their orbs spark on lifecycle beats only)\n- Configurability of mockup constants (they ship verbatim, D-5)\n- The viz observes and never acts on issues/agents\n- Configurability for mobile/small viewports (desktop-first)\n- The parents' Winamp spectrum analyzer and abstract oscilloscope (superseded by D-14's hook telemetry trace)\n- Restarting or deploying the live dashboard (flywheel's job, D-8)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Hook inventory helper lives in packages/contracts (frontend-safe), with a drift-guard test asserting parity with OVERDECK_HOOK_REGISTRATIONS",
+        "rationale": "D-11 demands the wired/unwired split derive from the registration table, but src/lib/claude-hooks-registration.ts imports node 'path' and the frontend cannot import it; contracts is the repo's only sanctioned server↔frontend shared-code path, and the parity test makes drift fail CI rather than silently diverge."
+      },
+      {
+        "summary": "New modules use the confluence/ directory and the data hook is named useConfluenceData (not the parent's useRiverData)",
+        "rationale": "PRD §6 renames the module directory to confluence/; naming the hook after the shipped surface keeps the codebase vocabulary consistent (D-15)."
+      },
+      {
+        "summary": "The parent's engine-port work item splits into aurora-shader and river-canvas items, and the smoke-test/docs item splits into separate test and docs items",
+        "rationale": "Tracer-bullet granularity rule: one focused change per item, each independently reviewable and mergeable; no behavior change versus the PRD (D-16)."
+      },
+      {
+        "summary": "requiresInspection:true on exactly three items (confluence-model, confluence-data, river-canvas), all inspectionDepth fast",
+        "rationale": "These are the foundation layers every other item consumes (pure math contract, data contract, effects-API contract); a wrong foundation there forces downstream rework (MIN-796 lesson). Everything else is a leaf or mechanically verifiable at typecheck/test time."
+      },
+      {
+        "summary": "plan.metadata.sizeJustification set instead of splitting into sibling issues",
+        "rationale": "The plan touches >25 files but only 5 subsystems, and it is one inseparable visual surface: the operator-approved mockup is a single artifact, shipping a subset leaves the canvas half-rendered, and the repo's complete-features rule forbids partial delivery."
+      },
+      {
+        "summary": "Workspace PRD copy patched at 6 spots where prose still described the pre-D-14 Winamp spectrum/oscilloscope",
+        "rationale": "D-14 (operator, 2026-08-01) replaced the bottom strip with the hook telemetry trace; stale references in §1, audit row 42, NFR-7, the §6 diagram, §7, and AC-18 would have sent the work agent building the superseded form."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One inseparable visual surface: the deliverable is a verbatim React port of a single operator-approved reference mockup (design/style-guide/mockups/god-view-confluence.html) plus its data wiring. The file count exceeds 25 because the port is decomposed into thin, independently reviewable modules (model/aurora/canvas/choreography/tooltip/help/hook-bus/bottom-strip/tests/docs), but the subsystem count is 5 and no subset ships a working god view — the complete-features rule forbids partial delivery of a single surface.",
+      "canonicalFilename": "2026-08-01-PAN-3447-feat-dashboard-god-view-confluence-the-river-spectrum-deck-union-visualizer-mockup-prd.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "hook-inventory-contract",
+        "title": "Pure 21-hook inventory in @overdeck/contracts with registration drift guard",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/hook-inventory.ts",
+            "packages/contracts/src/index.ts",
+            "packages/contracts/src/__tests__/hook-inventory.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- hook-inventory",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hook-inventory tests exit green including the registration-parity drift test",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-20",
+            "FR-22"
+          ]
+        },
+        "narrative": {
+          "Action": "Create packages/contracts/src/hook-inventory.ts: a dependency-free module (NO node builtins — the frontend bundle imports this) exporting the 21-hook inventory in the mockup's HOOKBUS order (design/style-guide/mockups/god-view-confluence.html, search 'const HOOKBUS'): 10 wired hooks with their hex colors (PreToolUse #00d4ff, PostToolUse #39ff14, PostToolUseFailure #ff4444, Stop #ff2d7c, SessionStart #9d4edd, Notification #ffb800, UserPromptSubmit #00d4ff, PreCompact #ff7700, PostCompact #ff7700, PermissionRequest #ffb800) and 11 unwired dark-fiber hooks (SessionEnd, SubagentStart, SubagentStop, StopFailure, PermissionDenied, TaskCreated, TaskCompleted, TeammateIdle, ConfigChange, WorktreeCreate, InstructionsLoaded). Re-export from the contracts index. Add a drift-guard test importing OVERDECK_HOOK_REGISTRATIONS from src/lib/claude-hooks-registration.ts and asserting the inventory's wired set equals the table's distinct hookType values exactly, so adding a registration without updating the inventory fails CI (D-11)."
+        },
+        "items": [
+          {
+            "id": "hook-inventory-contract.ac1",
+            "title": "hook-inventory.ts contains all 21 hook names in the mockup HOOKBUS order with the 10 wired hooks carrying their exact hex colors, and contains no node-builtin imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-inventory-contract.ac2",
+            "title": "the drift-guard test validates that the inventory wired set equals the distinct hookType values of OVERDECK_HOOK_REGISTRATIONS and fails when the two diverge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-inventory-contract.ac3",
+            "title": "npm test -- hook-inventory exits green and the contracts index re-exports the inventory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "confluence-model",
+        "title": "confluence/model.ts — pure engine math + unit tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/model.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- confluence",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "model tests exit green covering every enumerated case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-5",
+            "FR-6",
+            "FR-11",
+            "FR-17",
+            "FR-22",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "confluence-data",
+            "river-canvas",
+            "choreography",
+            "orb-tooltip",
+            "issue-rail-link",
+            "bottom-strip",
+            "smoke-test"
+          ],
+          "parallelSafeReason": "New pure module in a new directory; touches no existing file, so it cannot conflict with parallel items."
+        },
+        "narrative": {
+          "Action": "Extract every DOM-free piece of the Confluence engine (reference: design/style-guide/mockups/god-view-confluence.html — the mockup is the spec) into src/dashboard/frontend/src/components/GodView/confluence/model.ts, converting const to export const and taking layout as parameters instead of referencing canvas state: (1) STAGES, STAGE_COLORS, ROLE_COLORS, PROJECT_RING, HOOKS with HOOK_KEYS; (2) hashStr, hexA, fmtAge, clamp, fmtTokens, pickWeighted; (3) LayoutRect + computeLayout(W,H) keeping every mockup constant (padX=26, riverTop=92, spectrumH=54, doldrumsH=64, shelfH=34); (4) OrbState active|shelf|stale|failed + classifyOrb(input, now) with precedence shelf > failed > stale(≥30 min) > active; (5) positionOrb verbatim (stale two-row spread, failed cluster left of portalX, shelf spread, active column jitter); (6) pickOrb + acquireRadius max(18,r*1.9) / dropRadius max(52,r*4.2); (7) toolToFamily (exact case-sensitive name match, unknown→lifecycle); (8) modelGlyph (sonnet→S, gpt→G, opus→O, fable→F, k3|kimi→K, empty→null, else '?'); (9) gradual frost-accrual math (frost 0..1 from idle time, full frost = sink to Doldrums); (10) trace math for WI bottom-strip: time→x mapping over the 60 s window, 2 px row bucketing that stacks coincident events, per-second aggregate buckets with autoscale floor 5, window pruning — all taking `now` explicitly."
+        },
+        "items": [
+          {
+            "id": "confluence-model.ac1",
+            "title": "model.ts contains every export enumerated in the Action (constants, helpers, computeLayout, classifyOrb, positionOrb, pickOrb/hysteresis, toolToFamily, modelGlyph, frost math, trace math) with no DOM or node imports",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confluence-model.ac2",
+            "title": "model.test.ts covers: layout constants at 1680×945; stale spread assigns distinct monotonic x and alternating rows for 8 orbs; failed orbs land left of portalX; classifyOrb precedence shelf>failed>stale>active; fmtAge boundaries 59→59m, 60→1h, 1440→1d, 34551→24d; toolToFamily maps Bash→tool_exec, Edit→tool_write, Read→tool_read, WebFetch→tool_web, Agent→tool_agent, Stop→lifecycle, unknown→lifecycle; modelGlyph maps all five families plus null/'?' cases; trace math maps window edges, stacks coincident events, applies autoscale floor 5, and prunes events older than 60 s",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confluence-model.ac3",
+            "title": "every time-dependent function accepts `now` as a parameter and the test file contains no real setTimeout waits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "confluence-data",
+        "title": "useConfluenceData — store selectors producing orbs, hook stream, and HUD meta",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- confluence",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "data-hook tests exit green on a seeded store",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-9",
+            "FR-16",
+            "FR-19",
+            "FR-21",
+            "NFR-4",
+            "NFR-8"
+          ],
+          "foundationFor": [
+            "river-canvas",
+            "choreography",
+            "topbar-enrichment",
+            "hook-bus",
+            "bottom-strip",
+            "feed-orb-linking",
+            "orb-tooltip"
+          ]
+        },
+        "narrative": {
+          "Action": "Create the React hook producing the RiverSnapshot-equivalent the renderer consumes (PRD §6/§7): useConfluenceOrbs() subscribes to agentsById + issues + review-status slices, groups agents by issueId, applies classifyOrb and the stage mapping (planning agent→PLAN; review agent/convoy→REVIEW; test agent→TEST; mergeStatus queued/merging/verifying or merged-pending-closeout→VERIFY; else WORK — if the store exposes a canonical per-issue stage, use it per D-2), attaches model glyph via modelGlyph and the broken flag from the existing workspace stack-health surface, and returns orbs stable-referenced by issue id (custom-equality memoization). useHookStream() reuses the store's existing domain-event handler (no second socket): filter agent.activity_changed, map to {agentId, issueId, tool, hookName, family, ts}, keep a 500-entry ring buffer, a 60 s eventTimes window → eventsPerMin + eventsPerSec, per-family specRates (bump +0.13, decay ×0.5 per 1.6 s), and global energy EMA (min(1, evm/110)). Map heartbeat kinds to micro-states per R-17: thinking_start/stop→thinkUntil, waiting_start/clear→waitUntil, compaction kinds→compactT, cost-event→spend. useConfluenceMeta(): mergesToday (from recentActivity since local midnight), tokensToday + costPerMin (existing cost selectors — read-only, NO new cost pipeline), mergeQ (count of mergeStatus queued/merging), conversations count (conv-* sessions), staleTotal, system health, and beads WIP/BLOCKED/READY ONLY if an existing store slice carries them — otherwise omit and render '—' (D-13/NFR-8 checkpoint: ship hidden, file a follow-up, never build a tracker pipeline)."
+        },
+        "items": [
+          {
+            "id": "confluence-data.ac1",
+            "title": "Given a seeded Zustand store, the hook returns orbs classified per the PRD mapping (shelf with yieldReason, failed, stale ≥30 min, active) with correct stage, model glyph, broken flag, and stable object identity across no-op polls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confluence-data.ac2",
+            "title": "a fixture of agent-min-839-review-security plus three siblings and the review parent produces a convoy of 5 satellites including synthesis",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confluence-data.ac3",
+            "title": "a scripted agent.activity_changed stream advances eventsPerMin within the 60 s window (vi.useFakeTimers + advanceTimersByTimeAsync), bumps per-family rates +0.13 with ×0.5/1.6 s decay, and preserves hookName on each entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "confluence-data.ac4",
+            "title": "thinking/waiting/compaction/cost heartbeat kinds produces thinkUntil/waitUntil/compactT/spend micro-state fields, and an absent beads or cost source renders '—'/omission without throwing (NFR-8)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-stream-shaping",
+        "title": "Verify the per-tool hook event stream reaches the frontend; fallback coalesced fanout",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/agents/runtime-events.ts",
+            "src/dashboard/server/routes/agents/__tests__/tool-used-fanout.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm test -- tool-used-fanout",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fanout test exits green (or the checkpoint note records no server change was needed)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-20",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Implementation checkpoint (record the outcome in the completion note): with the dashboard running, drive one agent through a tool-heavy turn and confirm agent.activity_changed events carrying tool — and hookName where the ingestion knows the firing script (R-8/R-15) — arrive in the frontend store at ≥5/s. If confirmed, this item ships NO server change. Fallback (only if throttled): in the heartbeat route (runtime-events.ts, R-11) emit a dedicated agent.tool_used {agentId, tool, hookName, ts} event alongside the existing activity write, rate-limited to 10/s/agent with a 1 s trailing-edge coalescer inside the existing async handler — never execSync, never a bare setTimeout without cleanup (NFR-3) — fanned out through the same domain-event bus; add a route-level test posting scripted heartbeats and asserting the coalesced fanout with vi.useFakeTimers. Either way, hookName must survive to the frontend event (the hook bus and trace channels key on it); when only tool is present the frontend counts the event once under PostToolUse and does NOT attempt Pre/Post pairing inference (PRD §7). Non-Claude harnesses emitting no tool stream must not break anything — their orbs spark on lifecycle beats only (H-4)."
+        },
+        "items": [
+          {
+            "id": "hook-stream-shaping.ac1",
+            "title": "the completion note records the checkpoint result: measured events/s during a tool-heavy turn and whether the fallback was needed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-stream-shaping.ac2",
+            "title": "when the fallback ships, the route-level test emits scripted heartbeats and receives coalesced agent.tool_used events at ≤10/s/agent using fake timers, with hookName preserved end-to-end",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-stream-shaping.ac3",
+            "title": "an event carrying only tool (no hookName) produces exactly one PostToolUse count with no pairing inference",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "aurora-shader",
+        "title": "confluence/aurora.ts — full-window union WebGL shader with null-GL fallback",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/aurora.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-10",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Copy VERT, FRAG, and the GL setup block VERBATIM from the confluence mockup (search 'createShader' / the fragment shader with fbm nebula + aurora bands + synthwave perspective grid + starfield) into confluence/aurora.ts. Export createAurora(canvas): { setEnergy(v), resize(), dispose() } with the mockup's compile/link error handling; on any GL failure return a null-GL object so the page keeps the static theme background without throwing (NFR-4). The gl canvas is full-window, positioned behind every glass panel (the mockup's #gl is position:fixed inset:0 z-index:0, NOT clipped to the stage). setEnergy binds uEnergy to the events/min EMA; document.hidden skips GL uniform updates while cheap 2D drawing continues."
+        },
+        "items": [
+          {
+            "id": "aurora-shader.ac1",
+            "title": "aurora.ts contains the mockup's vertex and fragment shaders verbatim and returns { setEnergy, resize, dispose } from createAurora",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "aurora-shader.ac2",
+            "title": "when WebGL context creation or shader compilation fails, createAurora falls back to a null-GL object and nothing throws (NFR-4)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "aurora-shader.ac3",
+            "title": "setEnergy(v) updates the uEnergy uniform and GL uniform updates are skipped while document.hidden is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "river-canvas",
+        "title": "RiverCanvas + GodViewConfluence composition root — the engine port",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/RiverCanvas.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/confluence.css",
+            "src/dashboard/frontend/src/components/GodView/index.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm test -- confluence"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "confluence tests exit green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-10",
+            "FR-16",
+            "FR-17",
+            "FR-18",
+            "FR-21",
+            "NFR-1",
+            "NFR-2",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "choreography",
+            "orb-tooltip",
+            "issue-rail-link",
+            "feed-orb-linking",
+            "smoke-test"
+          ]
+        },
+        "narrative": {
+          "Action": "Port the mockup engine VERBATIM into React (do not redesign; constants and draw order ship as-is, D-5). RiverCanvas.tsx: stacked gl (item aurora-shader) + fx canvases plus an offscreen trails canvas; state containers orbs/particles (cap 1600)/pulses/tickers (cap 6)/specRates; the frame(now) loop with dt=min(.05,…) and decay math, movement integration (bob/orbit/separation/shelf/stale/failed/merging branches) and particle/pulse/ticker integration verbatim; the draw pipeline in the mockup's exact order: trails fade+stamp → drawRiver (incl. the stage-gradient waveform ribbon on the river midline, amplitude = total event energy) → drawZones → drawPortal → drawSun → trails composite 'lighter' → drawConvoys → drawOrbs → drawParticles → drawPulses → drawTickers → drawTide → drawStageHeaders (with lane-header activity alpha pulse) → drawConstellation → drawSequencer (double rotating dashed rings). Orbs render role core + modelGlyph letter + project ring + heat-scaled size/glow; convoy satellites on CIRCULAR orbits (D-10) with S/C/P/R/Σ letters, verdict-flash arcs, and arrival spirals (36 px/s decay to base orbit); shelf orbs show ⏸ + yield reason; gradual frost accrual on quiet active orbs (desaturate, frost crown, snow) before sinking to the Doldrums; merge-queue dwell (bob 1.5–3.5 s + MERGE Q depth); wrecks blink by the portal; micro-states per FR-21 (waiting amber dashed rotating ring, thinking white inner arc, compacting contraction + orange ring, broken red hazard flicker + error sparks + tag, cost rising $ particles); warn stays a distinct static amber dashed ring. Expose the effects API as thin wrappers over the mockup particle functions: emitSparks, emitRing, emitTicker, playTide, playMerge, playThaw, pulseSun, spawnFromSun, gateFlash. Keep a Map<issueId, RenderOrb> reconciled with props each frame (new→spawnOrb, merged→playMerge then drop, otherwise fade 1 s then drop). GodViewConfluence.tsx is the composition root (stage-wrap structure, hint chip, hook bus rail, sidebar, bottom strip, key/mouse wiring) and index.tsx replaces the 'Agent scan moved' placeholder with it. resize() caps DPR ≤ 2, uses ResizeObserver, and re-anchors all orbs via positionOrb; rAF starts on mount and cancels on unmount."
+        },
+        "items": [
+          {
+            "id": "river-canvas.ac1",
+            "title": "the fx canvas renders the six stage columns with headers, luminous flow band with 3 sine layers, chevrons, separators, and the stage-gradient waveform ribbon, in the mockup's draw order",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "river-canvas.ac2",
+            "title": "the fx layer renders orbs with role core + model glyph + project ring + heat glow, convoy satellites on circular orbits with letters and arrival spirals, and the shelf/doldrums/wreck/sun/sequencer/constellation branches per the mockup",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "river-canvas.ac3",
+            "title": "the fx layer renders waiting, thinking, compacting, broken, and cost micro-states per FR-21, visually distinct from the static amber warn ring",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "river-canvas.ac4",
+            "title": "the effects API (emitSparks, emitRing, emitTicker, playTide, playMerge, playThaw, pulseSun, spawnFromSun, gateFlash) contains thin wrappers over the mockup particle functions; the particle pool never exceeds 1600 and DPR never exceeds 2",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "river-canvas.ac5",
+            "title": "GodView/index.tsx no longer shows the 'Agent scan moved' notice and mounts GodViewConfluence; a container resize re-anchors every orb",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "choreography",
+        "title": "useConfluenceChoreography — real event → effects dispatch, simulator deleted",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- choreography",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "choreography dispatch-table test exits green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "FR-8",
+            "FR-18",
+            "FR-21"
+          ]
+        },
+        "narrative": {
+          "Action": "Translate live data changes into canvas effects, replacing every simulated behavior of the mockup. Rules (decisions made — do not re-litigate): hook event for issue X → emitSparks(X, family) + heat bump 0.06 + specRates[family] += 0.13 + 13% chance of '<id> · <tool>' ticker + 16% chance of feed-style ticker (mockup fireHookEvent constants); stage change between renders → ring + burst in the new stage color AND gateFlash at the crossed column boundary (FR-18); mergeStatus→merging → playMerge; →failed → wreck reclassify only (no extra animation); scheduler yield (yieldedByScheduler or pausedReason starting 'yield:') → playTide(yielded, beneficiary) where beneficiary = the governor-named issue if derivable, else the most recently admitted review orb, else none; shelf orb unpaused → green ring + burst + swim back to WORK; fresh hook event on a stale orb → playThaw; agent.created with role plan (flywheel dispatch) → pulseSun + spawnFromSun. NOTHING runs on a wall-clock timer — no nextTransition/nextTide/nextThaw; ambient motion is a pure function of simT (D-6). Test: a dispatch-table test feeding scripted event sequences to a mocked effects API, asserting each mapping above (fake timers for any debounce)."
+        },
+        "items": [
+          {
+            "id": "choreography.ac1",
+            "title": "the dispatch-table test sends scripted hook/stage/merge/yield/resume/thaw/dispatch events and receives exactly the effects calls enumerated in the Action with the mockup's constants (heat +0.06, rate +0.13, 13%/16% ticker chances)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "choreography.ac2",
+            "title": "a stage transition produces both the orb-local ring+burst and a gateFlash at the crossed boundary",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "choreography.ac3",
+            "title": "the module contains zero setTimeout/setInterval/nextTransition/nextTide/nextThaw — verified by grep in the test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orb-tooltip",
+        "title": "OrbTooltip — hysteresis hover tooltip with the union field set",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/OrbTooltip.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/orb-tooltip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- orb-tooltip",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orb-tooltip tests exit green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-11"
+          ]
+        },
+        "narrative": {
+          "Action": "Port the mockup's #tooltip as a DOM node (pointer-events:none) over the fx canvas. Mouse tracking on the container (mousemove → canvas coords; mouseleave → clear); per-frame pick in the rAF loop using acquireRadius/dropRadius from model.ts so orbiting orbs don't flicker. Populate exactly like the mockup's showTooltip with the union field set: issue id, title, stage/role/project/state chips, model, harness, hook rate, frost %, events fired, stale age, yield reason, warning, convoy members, and the 'click for issue rail →' hint; flip at the right edge like the mockup. CSS goes into confluence/confluence.css — do NOT grow theme.css."
+        },
+        "items": [
+          {
+            "id": "orb-tooltip.ac1",
+            "title": "a synthetic mouse path that crosses the acquire boundary while orbiting produces exactly one tooltip session (hysteresis: no flicker), and mouseleave clears it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orb-tooltip.ac2",
+            "title": "the tooltip shows every union field enumerated in the Action and flips position near the right canvas edge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orb-tooltip.ac3",
+            "title": "the tooltip node applies pointer-events:none and its CSS lives in confluence/confluence.css, not theme.css",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "issue-rail-link",
+        "title": "Orb click → real /issues/<id> drawer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/rail-link.test.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/GodViewConfluence.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- rail-link",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "rail-link test exits green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "Wire canvas click: pickOrb hit → navigate('/issues/' + issueId) which opens the real issue drawer (R-6: App/routes.ts deep-link); miss → no-op. Do NOT port the mockup's issue rail — it was a UX preview (D-3). While the drawer is open the river keeps animating behind it. RTL test on the container: stub a pickOrb hit and assert navigation to /issues/PAN-3447; stub a miss and assert no navigation."
+        },
+        "items": [
+          {
+            "id": "issue-rail-link.ac1",
+            "title": "a stubbed pickOrb hit opens /issues/<id> and a miss produces no navigation (RTL test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "issue-rail-link.ac2",
+            "title": "the diff contains no ported mock rail component — click goes straight to the real drawer route",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "help-fullscreen",
+        "title": "ConfluenceHelp field guide + keybindings + fullscreen",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/ConfluenceHelp.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-13",
+            "FR-14"
+          ]
+        },
+        "narrative": {
+          "Action": "Port buildHelp()'s markup and the #help/.h-* CSS from the mockup verbatim, with the card set covering every union feature: river stages, orbs/glyphs, spark families, convoy, shelf/tide, doldrums/frost, portal/wrecks, sun/sequencer, constellation, hook bus (incl. dark fiber), micro-states, model glyphs, the hook telemetry trace, feed↔orb linking, merge queue, and the data-honesty card (cast real / motion real with provenance). Keybindings on the god-view root, active only while the god view is mounted: h/? toggle the guide, Esc closes overlays, f toggles fullscreen (document.fullscreenElement ? exit : requestFullscreen(root)) with re-layout on fullscreenchange; the top-bar ⛶ button does the same. Render the hint chip ('h / ? field guide · hover orb detail · click issue rail · f fullscreen') bottom-right of the canvas. Never capture keys when help or another modal has focus; never preventDefault beyond h/?/Esc/f."
+        },
+        "items": [
+          {
+            "id": "help-fullscreen.ac1",
+            "title": "h and ? toggle the field guide, Esc closes it, f and the ⛶ button toggle fullscreen with re-layout (manual or RTL keyboard test)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "help-fullscreen.ac2",
+            "title": "the guide renders one card per union feature enumerated in the Action, including the data-honesty card",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "help-fullscreen.ac3",
+            "title": "key handlers stay inert when the god view is unmounted or a modal has focus, and preventDefault applies only to h/?/Esc/f",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "topbar-enrichment",
+        "title": "TopBar full FR-19 stat strip + sidebar SWAP gauge",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/TopBar.tsx",
+            "src/dashboard/frontend/src/components/GodView/InfraGauges.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/confluence.css"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npm test -- confluence"
+          ],
+          "expected_outputs": [
+            "typecheck and lint complete without errors",
+            "confluence tests exit green"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-15",
+            "FR-19",
+            "NFR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend (don't restructure) GodView TopBar.tsx to render left→right per FR-19: clock, events/s with pulse pop on change, events/min ECG (130×30 canvas fed by a 130-sample ring buffer at 500 ms) + count, CPU/MEM/SWAP meter bars, load average, beads WIP/BLOCKED/READY, MERGE Q depth, $/min spend, merges today, tokens today (fmtTokens, e.g. 38.5M), ❄ stale count, oldest idle (fmtAge), active pill, ? HELP button, ⛶ fullscreen button. All values come from useConfluenceData lifted to the page component so canvas and top bar share ONE subscription. Every stat is a read-only read of an existing surface; an unavailable source renders '—' and nothing crashes (NFR-8/D-13). Add a third SWAP gauge to the sidebar's InfraGauges beside CPU/MEM without touching ActivityFeed or CostDonut. New CSS goes to confluence/confluence.css."
+        },
+        "items": [
+          {
+            "id": "topbar-enrichment.ac1",
+            "title": "the top bar renders every FR-19 stat in the enumerated order and events/s pops on change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-enrichment.ac2",
+            "title": "with a store lacking beads/cost slices each affected stat renders '—' and no error surfaces (NFR-8)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "topbar-enrichment.ac3",
+            "title": "the sidebar shows three gauges (CPU, MEM, SWAP) and the ECG canvas draws from a 130-sample 500 ms ring buffer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feed-orb-linking",
+        "title": "Feed-row hover flashes the orb + tooltip; feed-row click opens the issue drawer",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/ActivityFeed.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/FeedTooltip.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/feed-link.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm test -- feed-link",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feed-link tests exit green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-23",
+            "FR-12"
+          ]
+        },
+        "narrative": {
+          "Action": "FR-23: give each sidebar feed row a data-issue attribute (the real ActivityFeed already carries issueId on events). Hovering a row shows a FeedTooltip (issue, source badge, full message, timestamp) AND fires a white expanding flash ring on the matching orb(s) via the canvas effects API; hovering away clears. Clicking a row with an issue navigates to /issues/<id> (real drawer); clicking a row without one is a no-op. Constraint (PRD §10): modify ActivityFeed internals ONLY for this wiring — data attribute, hover/click handlers, tooltip mount — no other feed logic changes."
+        },
+        "items": [
+          {
+            "id": "feed-orb-linking.ac1",
+            "title": "hovering a feed row with data-issue emits the orb flash effect and shows the tooltip with issue, source badge, full message, and timestamp",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-orb-linking.ac2",
+            "title": "clicking a feed row with an issue opens /issues/<id>; clicking an issue-less row opens nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feed-orb-linking.ac3",
+            "title": "the ActivityFeed diff contains only the data-issue attribute, hover/click wiring, and tooltip mount — no other behavior changes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hook-bus",
+        "title": "HookBus.tsx — 21-hook rail with live LEDs, counters, and dark fiber",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/HookBus.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/hookbus.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- hookbus",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hookbus tests exit green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-20",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Build the left rail (FR-20) from the contracts hook inventory (item hook-inventory-contract) — never a hardcoded list in the component (D-11). Render all 21 rows in inventory order with the mockup's styling: wired rows show name + counter + LED; on each hook-stream event with a hookName, bump that row's counter and set the hot class for 420 ms (one setTimeout per row max, cleared on unmount). Unwired rows render dotted/dim with a '—' counter and never change; the dark-fiber footnote renders at the bottom. LED/counter updates are event-driven ONLY — zero per-frame DOM churn (NFR-7). Tests with a scripted stream and vi.useFakeTimers: counters increment on the correct rows; hot appears and clears at 420 ms; unwired rows never change; the rendered wired set equals the contracts helper output."
+        },
+        "items": [
+          {
+            "id": "hook-bus.ac1",
+            "title": "a scripted hook stream produces counter increments on exactly the matching wired rows and the hot class appears then clears at 420 ms under fake timers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-bus.ac2",
+            "title": "the rail renders unwired rows dotted with '—' and they never change across the scripted stream",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-bus.ac3",
+            "title": "the rendered wired set equals the contracts inventory's wired set and the component contains no hardcoded hook list",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hook-bus.ac4",
+            "title": "no rail update runs inside the rAF frame loop (NFR-7) — updates happen only in the event handler",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "bottom-strip",
+        "title": "BottomStrip.tsx — hook telemetry trace + role-count box",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/BottomStrip.tsx",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/bottom-strip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- bottom-strip",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "bottom-strip tests exit green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-22",
+            "NFR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Port drawTrace/recordTrace from the mockup VERBATIM (D-14: the hook telemetry trace, not the parents' Winamp spectrum). One labeled channel per wired hook — same order/colors as the hook bus, derived from the same contracts inventory so rail and trace can never disagree — on a shared 60 s time axis with 10 s gridlines and a pulsing 'now' playhead at the right edge. Real event ticks bucketed at 2 px stack taller/brighter in bursts (alpha .45 + count·.22); each channel shows its per-window rate with zero-event channels dimmed (factor .38); the aggregate events/s band on top uses real per-second buckets with autoscale floor 5 and current + peak labels. Layout constants ship verbatim: gutter 128, aggregate band 22, axis 11. Events come from the hook stream by hookName, pruned to the 60 s window (explicit now — no timers in the math). Every mark is a real event: no decorative idle bands, no fake motion. The role-count box beside the trace renders from the store's role counts. Only the trace canvas redraws per frame (NFR-7)."
+        },
+        "items": [
+          {
+            "id": "bottom-strip.ac1",
+            "title": "a scripted hook event stream produces ticks on the correct labeled channel, stacking taller/brighter for coincident bursts with the verbatim alpha formula",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bottom-strip.ac2",
+            "title": "each channel displays its per-window rate and zero-event channels render dimmed at the .38 factor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bottom-strip.ac3",
+            "title": "the aggregate band shows current + peak labels over per-second buckets with autoscale floor 5, and events older than 60 s are pruned when now advances",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "bottom-strip.ac4",
+            "title": "the channel list equals the contracts inventory's wired set and the role-count box renders the store's role counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "smoke-test",
+        "title": "Confluence smoke test — stubbed 2D + null GL",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/confluence-smoke.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm test -- confluence-smoke",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "confluence-smoke test exits green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-4",
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Render <GodViewConfluence/> with a stubbed canvas 2D context that records calls and a stubbed WebGL context returning null (forcing the NFR-4 fallback), seed the store with 3 orbs (active/shelf/stale), advance one frame, and assert: no throw; drawImage called (trails composite); stage-header fillText calls include PLAN and MERGE; a synthetic mousemove at a stubbed orb position shows the tooltip. Any browser-based (Playwright) verification of the god view must use an isolated browser instance/profile with reproducible setup — never another agent's Playwright session or shared browser state."
+        },
+        "items": [
+          {
+            "id": "smoke-test.ac1",
+            "title": "the smoke test renders the full composition with stubbed contexts and exits without throwing, with drawImage and PLAN/MERGE fillText calls recorded",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-test.ac2",
+            "title": "a synthetic mousemove at a stubbed orb position shows the tooltip in the smoke test",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "smoke-test.ac3",
+            "title": "browser verification uses an isolated Playwright instance — the test file contains no shared-profile or foreign-session references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-god-view",
+        "title": "Docs: GOD-VIEW.md + Mintlify page + CLAUDE.md line + mockup header comments",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T21:55:42Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3447",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/GOD-VIEW.md",
+            "docs/assets/god-view-confluence.png",
+            "reference/god-view.mdx",
+            "CLAUDE.md",
+            "design/style-guide/mockups/god-view-river.html",
+            "design/style-guide/mockups/god-view-spectrum-kimi-code-harness.html",
+            "design/style-guide/mockups/god-view-confluence.html"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "sequential"
+        },
+        "narrative": {
+          "Action": "Write docs/GOD-VIEW.md: what Confluence shows (the full PRD §3 union — river engine, hook bus, micro-states, gradual frost, telemetry trace, feed↔orb linking, enriched top bar), the glyph language (orbs/convoy/shelf/doldrums/portal/sun/trace), the interactions (hover/click/h/?/Esc/f), the data sources (heartbeat ingestion → domain events → /ws/rpc; no polling), and the 'cast real / motion real' contract; embed one mockup screenshot at docs/assets/god-view-confluence.png captured from design/style-guide/mockups/god-view-confluence.html. Add reference/god-view.mdx mirroring the user-facing half. Add one line to the project CLAUDE.md naming Confluence as the /god-view center canvas and pointing at PAN-3447 (note the style-guide exemption, NFR-5). Update header comments in both parent mockups to state Confluence (PAN-3447) supersedes them for production, and in the confluence mockup to state the production port lives in src/dashboard/frontend/src/components/GodView/confluence/."
+        },
+        "items": [
+          {
+            "id": "docs-god-view.ac1",
+            "title": "docs/GOD-VIEW.md covers every PRD §3 feature group, the interactions, the data sources, and the cast-real/motion-real contract, and embeds docs/assets/god-view-confluence.png",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac2",
+            "title": "reference/god-view.mdx shows the user-facing god-view documentation and the CLAUDE.md line names Confluence with a PAN-3447 pointer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-god-view.ac3",
+            "title": "each parent mockup header shows the Confluence (PAN-3447) supersession note and the confluence mockup header shows the production confluence/ path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "hook-inventory-contract",
+        "to": "hook-bus",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-inventory-contract",
+        "to": "bottom-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-model",
+        "to": "confluence-data",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-model",
+        "to": "river-canvas",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-model",
+        "to": "orb-tooltip",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-model",
+        "to": "bottom-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "aurora-shader",
+        "to": "river-canvas",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-stream-shaping",
+        "to": "confluence-data",
+        "type": "informs"
+      },
+      {
+        "from": "confluence-data",
+        "to": "choreography",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-data",
+        "to": "topbar-enrichment",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-data",
+        "to": "hook-bus",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-data",
+        "to": "bottom-strip",
+        "type": "blocks"
+      },
+      {
+        "from": "confluence-data",
+        "to": "feed-orb-linking",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "choreography",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "orb-tooltip",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "issue-rail-link",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "feed-orb-linking",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "help-fullscreen",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "choreography",
+        "to": "smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "orb-tooltip",
+        "to": "smoke-test",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "docs-god-view",
+        "type": "blocks"
+      },
+      {
+        "from": "hook-bus",
+        "to": "docs-god-view",
+        "type": "blocks"
+      },
+      {
+        "from": "bottom-strip",
+        "to": "docs-god-view",
+        "type": "blocks"
+      },
+      {
+        "from": "topbar-enrichment",
+        "to": "docs-god-view",
+        "type": "blocks"
+      },
+      {
+        "from": "river-canvas",
+        "to": "topbar-enrichment",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
