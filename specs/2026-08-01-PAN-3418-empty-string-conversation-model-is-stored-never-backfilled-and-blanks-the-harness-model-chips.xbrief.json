@@ -1,0 +1,428 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:13:37Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3418: Empty-string conversation model is stored, never backfilled, and blanks the harness+model chips (conv 1794 silently ran Opus 5)",
+    "updated": "2026-08-01T15:21:18.714Z"
+  },
+  "plan": {
+    "id": "pan-3418",
+    "title": "Empty-string conversation model is stored, never backfilled, and blanks the harness+model chips",
+    "status": "proposed",
+    "uid": "7251748d-20f9-4acd-bab9-8e6e0bba8f0a",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:13:37Z",
+    "updated": "2026-08-01T15:21:18.714Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3418",
+        "label": "PAN-3418",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "bug",
+      "conversations",
+      "command-deck",
+      "data-integrity",
+      "model-routing"
+    ],
+    "narratives": {
+      "Problem": "A conversation created with model='' (empty string) is permanently wrong: the Command Deck row loses both harness and model chips, and the boot-time backfill can never repair the row because its SQL predicate only matches model IS NULL. Conv 20260801-7889 (conv 1794) silently ran 222/222 assistant turns on claude-opus-5 with no --model flag and no record. 5 live host rows are stuck this way. Four hops cooperate: the frontend fallback default is legitimately '', CommandDeck captures it at mount and never re-seeds after the real model list loads (a last-used model outside the hardcoded FALLBACK_GROUPS fails validation and blanks), the route keeps '' as a supplied value, and the write door's ?? only guards null/undefined.",
+      "Proposal": "Fix each hop in the live code path: (1) handleConversationCreate coerces empty/whitespace model+effort to undefined; (2) the conversation write door (src/lib/overdeck/conversations.ts — NOT the production-dead conversations-db.ts the issue cites) stores NULL via a nullIfEmpty helper; (3) backfillConversationModel widens to (model IS NULL OR model = '') so broken rows self-heal from their transcripts at next dashboard boot; (4) ModelPicker re-seeds its selection via onChange after the real model list resolves, gated on !liveConversation; (5) ConversationRow renders the harness chip independently of the model. The 5 existing broken rows heal through the widened backfill post-deploy (no hand-rolled UPDATEs), verified by a read-only sweep. Each implementation item carries its own regression tests.",
+      "NonGoals": "- No hardcoded conversation-model default anywhere; a model-less conversation stays NULL and its actual model is recorded by the backfill\n- No changes to the production-dead src/lib/database/conversations-db.ts duplicate\n- No rejection of model-less conversation creation (operators may deliberately use their CLI default)\n- No auto-switching of a running conversation's model — the picker re-seed is gated on !liveConversation\n- The missing cost/token figures on young conversation rows (enrichment fills them in later; excluded by the issue)\n- extractModelFromSessionFile first-assistant-model semantics are unchanged; mid-session model switches are out of scope"
+    },
+    "metadata": {
+      "docsJustification": "Bug fix to conversation model/effort storage, backfill, and Command Deck rendering; no user-facing documented surface describes this behavior (verified 2026-08-01: grep of docs/, configuration/, reference/ for backfillConversationModel and default_conversation_model finds only a historical investigation note, docs/overdeck-remodel/investigations/conversations-transcripts-audit.md).",
+      "canonicalFilename": "2026-08-01-PAN-3418-empty-string-conversation-model-is-stored-never-backfilled-and-blanks-the-harness-model-chips.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fix the live write door src/lib/overdeck/conversations.ts, not the issue-cited src/lib/database/conversations-db.ts",
+        "rationale": "The cited module has zero production consumers (git grep + the header comment of tests/unit/lib/database/conversation-workspace-linkage.test.ts confirm); fixing dead code changes nothing in production."
+      },
+      {
+        "summary": "Re-seed the picker from inside ModelPicker via onChange (the issue's option A), gated on !liveConversation",
+        "rationale": "The picker alone knows when its fetch settled and what knownModelIds became; CommandDeck would have to guess the timing. The liveConversation gate prevents auto-switching a running session's model."
+      },
+      {
+        "summary": "Satisfy 'never spawn silently' by recording the model the harness used (widened backfill), not by failing loudly",
+        "rationale": "Operators may deliberately create model-less conversations to use their personal CLI default; rejecting them breaks a legitimate flow. The widened backfill records the actual model from the transcript, and the picker re-seed means new conversations practically always carry an explicit model."
+      },
+      {
+        "summary": "Repair the 5 existing broken rows through the widened backfill at next dashboard boot post-deploy",
+        "rationale": "backfillConversationModel is the write door; hand-rolled UPDATEs are forbidden. The backfill already probes !conv.model rows, so widening its predicate heals every resolvable row automatically."
+      },
+      {
+        "summary": "Apply the same ''-coercion to effort as to model; harness needs none",
+        "rationale": "effort shares the identical store-and-never-heal shape (its SAFE_EFFORT_PATTERN guard is falsy-skipped by ''); harness is validated against the allowed set by resolveAllowedHarness."
+      },
+      {
+        "summary": "Fold regression tests into their implementation items, one new test file per backend item",
+        "rationale": "Tracer-bullet slices carry their own tests; separate new test files avoid parallel-edit conflicts between items 2 and 3 which both touch src/lib/overdeck/conversations.ts."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-coerce-empty-fields",
+        "title": "Coerce empty/whitespace model and effort to undefined at the conversation-create route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-runtime.ts",
+            "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new test file passes: createConversation receives model: undefined and effort: undefined for empty-string request fields"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In handleConversationCreate (src/lib/overdeck/conversation-runtime.ts:885-886), coerce an empty/whitespace-only model and effort to undefined after trim (e.g. body['model'].trim() || undefined), so an empty request field behaves identically to an omitted one. Add tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts: vi.mock the conversations module (capture createConversation opts; stub getConversationByName to null) and the event-store module (emitOnly stub); call handleConversationCreate with model: '' and effort: '  ' and assert createConversation received undefined for both. Assert only on the synchronous createConversation call — the background spawn IIFE catches its own errors."
+        },
+        "items": [
+          {
+            "id": "server-coerce-empty-fields.ac1",
+            "title": "Given a POST body with model: '', when handleConversationCreate runs, then createConversation receives model: undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-coerce-empty-fields.ac2",
+            "title": "Given a POST body with effort: '   ' (whitespace-only), when handleConversationCreate runs, then createConversation receives effort: undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-coerce-empty-fields.ac3",
+            "title": "Given a POST body with a real model id, when handleConversationCreate runs, then createConversation still receives that model id unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "db-writes-null-for-empty",
+        "title": "Conversation write door stores NULL (never '') for model and effort",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "tests/unit/lib/overdeck/conversations-empty-model.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversations-empty-model.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new test file passes: empty/whitespace model and effort persist as NULL; real values persist unchanged"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversations.ts add a module-local helper nullIfEmpty(value: string | undefined): string | null (trim; empty → null) and apply it to model and effort in createConversation (lines 1233-1234, replacing opts.model ?? null / opts.effort ?? null) and to model in reactivateConversationForSpawn (line 1294). This is defense-in-depth at the write door so no caller can ever store ''. Add tests/unit/lib/overdeck/conversations-empty-model.test.ts using setupOverdeckTestDb() from tests/helpers/overdeck-test-db.ts (pattern: tests/unit/lib/database/conversation-workspace-linkage.test.ts). Do NOT touch the production-dead src/lib/database/conversations-db.ts."
+        },
+        "items": [
+          {
+            "id": "db-writes-null-for-empty.ac1",
+            "title": "createConversation with model: '' persists NULL, observable via getConversationByName(name).model === null",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-writes-null-for-empty.ac2",
+            "title": "createConversation with whitespace-only model and with effort: '' persists NULL for both fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-writes-null-for-empty.ac3",
+            "title": "createConversation with model: 'k3' persists 'k3' unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "db-writes-null-for-empty.ac4",
+            "title": "reactivateConversationForSpawn with model: '' stores NULL in the conversations row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "widen-backfill-predicate",
+        "title": "Widen backfillConversationModel to repair empty-string model rows",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "backend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts",
+            "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new test file passes: a row seeded with model='' is repaired; a row with a real model is not overwritten"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/overdeck/conversations.ts:1375-1377 change the predicate to UPDATE conversations SET model = ? WHERE name = ? AND (model IS NULL OR model = '') and update the doc comment (no longer 'only when currently NULL'). The probe in backfillConversationModels (src/lib/overdeck/conversation-runtime.ts:469) already selects !conv.model rows, so no change is needed there. Add tests/unit/lib/overdeck/conversations-model-backfill.test.ts (setupOverdeckTestDb pattern): create a conversation with a real model, force its row to '' via the test DB handle, call backfillConversationModel, assert the model is now the backfilled value; second case asserts a non-empty model is never overwritten."
+        },
+        "items": [
+          {
+            "id": "widen-backfill-predicate.ac1",
+            "title": "Given a conversations row with model = '', when backfillConversationModel(name, 'claude-opus-5') runs, then the row persists 'claude-opus-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "widen-backfill-predicate.ac2",
+            "title": "Given a conversations row with a non-empty model, when backfillConversationModel runs with a different model, then the row preserves its original model",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "harness-chip-independent-of-model",
+        "title": "ConversationRow renders the harness chip independently of model presence",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "new render test passes: harness chip visible with model null; both chips visible with a model present"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx:400-407, lift the harness chip out of the {conv.model && (...)} guard so it renders unconditionally (with the existing conv.harness ?? 'claude-code' fallback), keeping the separator + model chip gated on conv.model. Match the surrounding separator conventions. Add src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx (pattern: sibling ConversationList.test.tsx) rendering a conversation with model: null and one with a model."
+        },
+        "items": [
+          {
+            "id": "harness-chip-independent-of-model.ac1",
+            "title": "Given a conversation with model null and harness 'claude-code', when ConversationRow renders, then it displays the harness chip and no model chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "harness-chip-independent-of-model.ac2",
+            "title": "Given a conversation with model 'k3', when ConversationRow renders, then it displays both the harness chip and the model chip",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "picker-reseeds-after-model-list-load",
+        "title": "ModelPicker re-seeds the new-conversation selection after the real model list resolves",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+            "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "ModelPicker tests pass: onChange fires with the stored non-FALLBACK model after the mount fetch; no onChange from the effect when liveConversation is true"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/chat/ModelPicker.tsx loadModels() (mount effect, lines 204-291), after syncKnownModels(effectiveGroups) and settings resolution, add a re-seed gated on !liveConversation: compute resolved = loadStoredModel(getDefaultConversationModel()); if resolved is truthy, differs from the mount-time value prop, and isKnownModel(resolved), call onChange(resolved, effortLevels of the matching model in effectiveGroups, defaulting to []). This is safe against clobbering a user pick made during the fetch because the parent persists every pick via saveStoredModel, so loadStoredModel returns the fresh pick and the onChange becomes a no-op. Extend src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx: mock the four fetch endpoints the effect calls, seed localStorage 'conv-composer-model' with a model absent from FALLBACK_GROUPS but present in the mocked available-models response, render with value=\"\" and assert onChange eventually receives that model; second case asserts no effect-driven onChange when liveConversation is true."
+        },
+        "items": [
+          {
+            "id": "picker-reseeds-after-model-list-load.ac1",
+            "title": "Given localStorage holds a model absent from FALLBACK_GROUPS but present in the fetched list, when the mount fetch resolves, then the picker calls onChange with that model id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-reseeds-after-model-list-load.ac2",
+            "title": "Given liveConversation is true, when the mount fetch resolves, then the effect never calls onChange",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "picker-reseeds-after-model-list-load.ac3",
+            "title": "Given no stored model and no configured default, when the mount fetch resolves, then the picker does not call onChange (empty stays empty — no hardcoded default)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verify-live-data-repair",
+        "title": "Post-deploy: verify the 5 broken host rows healed through the backfill",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:13:37Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3418",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "node -e \"const { DatabaseSync } = require('node:sqlite'); const db = new DatabaseSync(process.env.HOME + '/.overdeck/overdeck.db', { readOnly: true }); console.log(db.prepare(\\\"SELECT name, model FROM conversations WHERE name = '20260801-7889'\\\").all()); console.log('empty-string rows:', db.prepare(\\\"SELECT COUNT(*) n FROM conversations WHERE model = ''\\\").get().n); db.close();\""
+          ],
+          "expected_outputs": [
+            "20260801-7889 reads model 'claude-opus-5'",
+            "empty-string row count is 0, or every remaining row is listed with an unresolved reason in an issue comment"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "After this issue merges and the dashboard redeploys (the boot triggers startConversationModelBackfill at src/dashboard/server/routes/conversations.ts:188), run the read-only node:sqlite sweep from verify_commands. Confirm conversation 20260801-7889 (conv 1794) now reads claude-opus-5 and zero model='' rows remain. The 5 known broken rows are 20260801-7889, 20260726-3088, 20260720-9741, 20260709-1871, 20260624-1015. If any row remains unresolved (transcript unreadable or no assistant message), comment the row name and reason on PAN-3418 — never guess a model, never hand-roll an UPDATE. This item touches no code; it cannot run before deploy."
+        },
+        "items": [
+          {
+            "id": "verify-live-data-repair.ac1",
+            "title": "Post-deploy read-only sweep shows conversation 20260801-7889 with model 'claude-opus-5'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verify-live-data-repair.ac2",
+            "title": "Post-deploy read-only sweep returns zero conversations rows with model = '', or every remainder is logged with a reason in an issue comment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "db-writes-null-for-empty",
+        "to": "widen-backfill-predicate",
+        "type": "blocks"
+      },
+      {
+        "from": "widen-backfill-predicate",
+        "to": "verify-live-data-repair",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
