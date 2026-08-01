@@ -182,10 +182,10 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T11:23:16.808Z",
+  "updated": "2026-08-01T11:29:21.651Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -193,8 +193,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T11:20:30.455Z",
-    "reviewNotes": "Private Mind Your Now evidence is exposed in the public PR; audit conclusions also lack required merged-diff support and citations.",
+    "updatedAt": "2026-08-01T11:29:21.466Z",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
     "reviewedAtCommit": "231aa1f8c8e9d3c86c63c454cad6bc45454fc3b0",
@@ -342,9 +341,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 758307,
-            "output": 17874,
-            "cacheRead": 8164864,
+            "input": 765513,
+            "output": 21392,
+            "cacheRead": 8943104,
             "cacheWrite": 0
           }
         },
@@ -382,30 +381,30 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 626,
-            "output": 224752,
-            "cacheRead": 119506509,
-            "cacheWrite": 593841
+            "input": 712,
+            "output": 262672,
+            "cacheRead": 146853127,
+            "cacheWrite": 1241780
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8592997,
-          "output": 219658,
-          "cacheRead": 39213056,
+          "input": 8600203,
+          "output": 223176,
+          "cacheRead": 39991296,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 626,
-          "output": 224752,
-          "cacheRead": 119506509,
-          "cacheWrite": 593841
+          "input": 712,
+          "output": 262672,
+          "cacheRead": 146853127,
+          "cacheWrite": 1241780
         }
       },
       "costAtCloseOut": {
-        "usd": 96.795942,
-        "pricingAsOf": "2026-08-01T11:20:30.460Z"
+        "usd": 104.795173,
+        "pricingAsOf": "2026-08-01T11:29:21.518Z"
       }
     },
     "merges": [
@@ -432,7 +431,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
