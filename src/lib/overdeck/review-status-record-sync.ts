@@ -8,6 +8,7 @@ import {
   findFallbackVerdictConflicts,
   pipelineConflictsWithFallbackVerdicts,
   pipelineCoversFallbackVerdicts,
+  staleVerdictSnapshotAgainstLiveCycle,
   type VerdictConflict,
 } from '../pan-dir/pipeline-verdict-merge.js';
 import { resolveProjectFromIssueSync, getProjectSync } from '../projects.js';
@@ -471,6 +472,22 @@ export async function drainWorkspaceVerdictFallback(issueId: string): Promise<bo
   const losers = claims.filter((claim) => claim !== winner);
   const { fallback } = winner;
   const journal = readPipelineSync(issueId);
+  const staleFallback = journal
+    ? staleVerdictSnapshotAgainstLiveCycle(
+        journal as unknown as Record<string, unknown>,
+        fallback.pipeline as unknown as Record<string, unknown>,
+      )
+    : null;
+  if (staleFallback) {
+    console.warn(
+      `[review-status] Refusing stale fallback fold for ${issueId}: `
+      + `live cycle ${new Date(staleFallback.liveCycle).toISOString()} at HEAD ${staleFallback.liveHead ?? 'unknown'} `
+      + `supersedes fallback cycle ${staleFallback.snapshotCycle ? new Date(staleFallback.snapshotCycle).toISOString() : 'unknown'} `
+      + `at HEAD ${staleFallback.snapshotHead ?? 'unknown'}.`,
+    );
+    for (const claim of claims) rmSync(claim.claimPath, { force: true });
+    return true;
+  }
   // PAN-3092: a newer `updatedAt` alone is not evidence the journal carries the
   // verdict — `projectPipeline` stamps it on every write, verdict or not, so a
   // bookkeeping write landing after a contended verdict used to make the drain
@@ -607,7 +624,23 @@ function projectJournalStatus(
   pipeline: PanIssuePipelineRecord | null,
   fallback: WorkspaceVerdictFallback | null,
 ): JournalStatus | null {
-  const fallbackNewer = !!fallback && (!pipeline || (pipeline.updatedAt ?? '') < fallback.updatedAt);
+  const staleFallback = pipeline && fallback
+    ? staleVerdictSnapshotAgainstLiveCycle(
+        pipeline as unknown as Record<string, unknown>,
+        fallback.pipeline as unknown as Record<string, unknown>,
+      )
+    : null;
+  if (staleFallback) {
+    console.warn(
+      `[review-status] Refusing stale workspace fallback for ${pipeline!.issueId}: `
+      + `live cycle ${new Date(staleFallback.liveCycle).toISOString()} at HEAD ${staleFallback.liveHead ?? 'unknown'} `
+      + `supersedes fallback cycle ${staleFallback.snapshotCycle ? new Date(staleFallback.snapshotCycle).toISOString() : 'unknown'} `
+      + `at HEAD ${staleFallback.snapshotHead ?? 'unknown'}.`,
+    );
+  }
+  const fallbackNewer = !!fallback
+    && !staleFallback
+    && (!pipeline || (pipeline.updatedAt ?? '') < fallback.updatedAt);
   if (fallback && fallbackNewer) {
     const base = pipeline ? durableSubset(pipeline) : {};
     const overlay = Object.fromEntries(

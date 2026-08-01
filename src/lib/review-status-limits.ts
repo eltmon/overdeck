@@ -12,3 +12,8 @@
 
 export const REVIEW_STATUS_HISTORY_LIMIT = 20;
 export const REVIEW_STATUS_NOTE_LIMIT = 500;
+
+export function truncateReviewStatusNote(notes: string | undefined): string | undefined {
+  if (!notes || notes.length <= REVIEW_STATUS_NOTE_LIMIT) return notes;
+  return notes.slice(0, REVIEW_STATUS_NOTE_LIMIT - 1) + '…';
+}
