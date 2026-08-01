@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:09:38.249Z",
+  "updated": "2026-08-01T11:09:47.169Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -70,8 +70,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "docs": {
+        "writerId": "agent-pan-3362",
+        "agentId": "agent-pan-3362",
+        "pid": 2467125,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T11:09:47.169Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3362",
@@ -137,6 +145,7 @@
     "cli-command.cli-command.ac1": "completed",
     "cli-command.cli-command.ac2": "completed",
     "cli-command.cli-command.ac3": "completed",
-    "cli-command.cli-command.ac4": "completed"
+    "cli-command.cli-command.ac4": "completed",
+    "docs": "running"
   }
 }
