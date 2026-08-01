@@ -197,18 +197,18 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T18:58:37.103Z",
+  "updated": "2026-08-01T19:04:10.121Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T18:58:36.393Z",
-    "reviewNotes": "effective current-project resolution is missing across the move flow — applied by deacon sweep from on-disk synthesis.md",
+    "updatedAt": "2026-08-01T19:04:09.970Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d",
     "lastVerifiedCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d",
@@ -267,10 +267,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1396,
-            "output": 303320,
-            "cacheRead": 312038219,
-            "cacheWrite": 5821445
+            "input": 1420,
+            "output": 308340,
+            "cacheRead": 321931541,
+            "cacheWrite": 5835521
           }
         }
       },
@@ -288,15 +288,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1396,
-          "output": 303320,
-          "cacheRead": 312038219,
-          "cacheWrite": 5821445
+          "input": 1420,
+          "output": 308340,
+          "cacheRead": 321931541,
+          "cacheWrite": 5835521
         }
       },
       "costAtCloseOut": {
-        "usd": 143.841092,
-        "pricingAsOf": "2026-08-01T18:58:36.411Z"
+        "usd": 145.905196,
+        "pricingAsOf": "2026-08-01T19:04:10.110Z"
       }
     },
     "merges": [
