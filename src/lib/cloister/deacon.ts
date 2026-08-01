@@ -151,7 +151,7 @@ import { OVERDECK_HOME, AGENTS_DIR, sessionFilePath } from '../paths.js';
 import { loadCloisterConfigSync, loadCloisterConfig } from './config.js';
 import { workResumeSlotsAvailable, getConcurrencyLimits, countRunningAgents, resetPatrolDispatchBudget, tryReserveAdvancingSlot, describeRunningAgents } from './concurrency.js';
 import { tryYieldForAdvancingDispatch } from './preemption.js';
-import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync, retireResolvedFeedbackDeliveryStuckFlags } from '../review-status.js';
+import { setReviewStatusSync, loadReviewStatuses, getReviewStatusSync } from '../review-status.js';
 import { needsReviewDispatch } from '../review-dispatch-decision.js';
 import { readIssueRecordSync } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -2669,11 +2669,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reconciledJournalActions = await reconcileInFlightJournals();
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
-
-  const retiredFeedbackStuckActions = retireResolvedFeedbackDeliveryStuckFlags();
-  actions.push(...retiredFeedbackStuckActions);
-  for (const a of retiredFeedbackStuckActions) addLog('action', a, state.patrolCycle);
-
+  for (const a of (await import('./feedback-stuck-retirement.js')).retireResolvedFeedbackDeliveryStuckFlags()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {

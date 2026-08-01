@@ -43,7 +43,8 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, clearFeedbackDeliveryStuck, retireResolvedFeedbackDeliveryStuckFlags, FEEDBACK_DELIVERY_STUCK_REASON, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, clearFeedbackDeliveryStuck, FEEDBACK_DELIVERY_STUCK_REASON, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { retireResolvedFeedbackDeliveryStuckFlags } from '../../../src/lib/cloister/feedback-stuck-retirement.js';
 
 // ============== Tests ==============
 
