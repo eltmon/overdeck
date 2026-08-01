@@ -3,45 +3,43 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T15:30:57.389Z",
-  "updated": "2026-08-01T22:37:44.344Z",
+  "updated": "2026-08-01T23:08:27.605Z",
   "pipeline": {
     "issueId": "PAN-3422",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-01T17:30:39.775Z",
-    "updatedAt": "2026-08-01T22:37:44.297Z",
-    "strikeReadyHead": "b71875e14b9c740aaf8ead9f9d3636f9d0d706cd",
-    "strikeReadyAt": "2026-08-01T22:37:44.295Z",
-    "strikeLandingState": "ready",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "updatedAt": "2026-08-01T23:08:27.561Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 2175875,
-            "output": 213172,
-            "cacheRead": 88655872,
+            "input": 2178573,
+            "output": 213312,
+            "cacheRead": 88921088,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2175875,
-          "output": 213172,
-          "cacheRead": 88655872,
+          "input": 2178573,
+          "output": 213312,
+          "cacheRead": 88921088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 61.602471,
-        "pricingAsOf": "2026-08-01T22:37:44.326Z"
+        "usd": 61.752769,
+        "pricingAsOf": "2026-08-01T23:08:27.579Z"
       }
     },
     "merges": [],
