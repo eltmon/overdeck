@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T16:20:06.737Z",
+  "updated": "2026-08-01T16:22:44.754Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "move-mutation": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 3875244,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:18:54.677Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -81,8 +73,8 @@
         "updatedAt": "2026-08-01T16:06:10.642Z"
       },
       "move-mutation": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T16:18:54.677Z"
+        "reason": "Added move({name, projectKey, projectName}) to useConversationMutations following the favoriteMutation pattern: onMutate cancels+optimistically patches projectKey in the ['conversations'] cache (captures title before the patch for the success toast, matching AC's 'title not id' requirement); onError rolls back from context + toast.error(server message); onSuccess toast.success('Moved <title> to <project>'); onSettled invalidates. 4 new tests: optimistic-apply, rollback-on-error, title-based success toast, settle-invalidation. Full CommandDeck suite (462 tests) passes with no regressions, typecheck/lint clean.",
+        "updatedAt": "2026-08-01T16:22:44.754Z"
       },
       "cli-skill": {
         "reason": "Created sync-sources/skills/pan-conversations/SKILL.md documenting all 9 subcommands (scan/search/list/show/jsonl/move/current/cost/embed/enrich) matching --help output exactly. Adding 'move' to the CLI in the prior commit had drifted packages/contracts/src/composer-commands.generated.ts (caught by lint:slash-commands under full npm run lint); regenerated via npm run generate:slash-commands and included here. scripts/lint-skills.sh and full npm run lint pass clean. Commit 5abf57e2.",
@@ -155,6 +147,17 @@
         "outcome": "completed",
         "reason": "Created sync-sources/skills/pan-conversations/SKILL.md documenting all 9 subcommands (scan/search/list/show/jsonl/move/current/cost/embed/enrich) matching --help output exactly. Adding 'move' to the CLI in the prior commit had drifted packages/contracts/src/composer-commands.generated.ts (caught by lint:slash-commands under full npm run lint); regenerated via npm run generate:slash-commands and included here. scripts/lint-skills.sh and full npm run lint pass clean. Commit 5abf57e2.",
         "releasedAt": "2026-08-01T16:20:06.737Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3875244,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:18:54.677Z",
+        "itemId": "move-mutation",
+        "outcome": "completed",
+        "reason": "Added move({name, projectKey, projectName}) to useConversationMutations following the favoriteMutation pattern: onMutate cancels+optimistically patches projectKey in the ['conversations'] cache (captures title before the patch for the success toast, matching AC's 'title not id' requirement); onError rolls back from context + toast.error(server message); onSuccess toast.success('Moved <title> to <project>'); onSettled invalidates. 4 new tests: optimistic-apply, rollback-on-error, title-based success toast, settle-invalidation. Full CommandDeck suite (462 tests) passes with no regressions, typecheck/lint clean.",
+        "releasedAt": "2026-08-01T16:22:44.754Z"
       }
     ]
   },
@@ -181,9 +184,11 @@
     "cli-move.cli-move.ac2": "completed",
     "cli-move.cli-move.ac3": "completed",
     "cli-move.cli-move.ac4": "completed",
-    "move-mutation": "running",
+    "move-mutation": "completed",
     "cli-skill": "completed",
     "cli-skill.cli-skill.ac1": "completed",
-    "cli-skill.cli-skill.ac2": "completed"
+    "cli-skill.cli-skill.ac2": "completed",
+    "move-mutation.move-mutation.ac1": "completed",
+    "move-mutation.move-mutation.ac2": "completed"
   }
 }
