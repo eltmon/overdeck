@@ -12,9 +12,22 @@
       "timestamp": "2026-08-01T20:44:23.973Z",
       "reason": "end",
       "note": "No deviations from the plan. One anomaly: the full npm test run (1381 files) reported 7 failures, all beforeEach/hook DB-setup timeouts in files I never touched (workspace-commands, memory/cli, git-activity-db, issues, review-status-sync, conversations integration, cost-reconcile-harnesses) — caused by concurrent test runs across other active workspaces on this machine contending for resources. Re-ran all 7 failed files in isolation and they passed cleanly (60/60), confirming no regression.\n\nImplemented all 4 xBRIEF items, one commit each, pushed individually:\n1. finalize-status-event: moved the stop-marking block in completePlanningForIssue to after the PRD gate/spec promotion and added agent.status_changed(stopped, hasLiveTmuxSession) event emission, so the read model converges to the durable truth. Test file deviates from the xBRIEF's stated files_scope (complete-planning.test.ts has no mocking harness for completePlanningForIssue's dependencies) — new tests live in planning-promotion-status-event.test.ts, following the existing full-harness pattern in planning-promotion-marker-cleanup.test.ts.\n2. poller-stops-resurrecting-interactive-agents: exported isInteractiveRoleAgent, added shouldResurrectStoppedAgent as the single resurrection resolver wired into both flip sites, documented the contract in docs/AGENT-STATE-PLANES.md.\n3. pipeline-state-accepts-planned-canonical: added 'planned' to the awaiting-work gate plus a contract comment; new dedicated test file for derivePipelineState.\n4. simple-mode-finished-plan-regressions: added characterization tests locking the no-signal case (no pendingInputKinds at all) that the existing PAN-3330 tests didn't cover.\n\nAll targeted test files pass, typecheck and lint clean throughout."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T21:03Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-01T21:03:37.632Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T21:03:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3338\n\n# Review Synthesis — PAN-3338 — 2026-08-01T21:03:00Z\n\n## Verdict: CHANGES REQUESTED — finalize can publish stale session liveness and can succeed without the required status event\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/context.json\n- Branch: feature/pan-3338\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338\n- HEAD reviewed: 6130a234d93dbc7092d180648083c7e963874469\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness] Non-skipKill finalize records the session as live immediately before killing it — `src/lib/overdeck/planning-promotion.ts:760`\nThe new stopped projection samples `sessionExists(sessionName)` before `completePlanningAutoSpawnAndKill()` runs. On the normal non-`skipKill` path, the later flow deterministically kills that session immediately or after its deferred delay, but no follow-up lifecycle event changes `hasLiveTmuxSession` to `false`. The enrichment poller cannot repair the projection after the session disappears because it processes only tmux-active agents. The read model can therefore retain `status: stopped, hasLiveTmuxSession: true` indefinitely and expose live-session affordances for a dead planning session. Emit the terminal stopped projection after the auto-spawn/kill decision, or emit a second atomic projection when the deferred kill succeeds, and cover both immediate and delayed non-`skipKill` paths.\n\n### [requirements] Successful finalize can persist `stopped` without the required lifecycle event — `src/lib/overdeck/planning-promotion.ts:765`\nFR-1 requires every successful planning completion to emit `agent.status_changed(stopped)` so the event-derived read model agrees with the durable agents-table status. The changed block writes the agent row first, then separately queries tmux and appends the event, while a broad catch suppresses any failure. A transient liveness-query or event-store failure can therefore leave the durable row stopped, the read model running, and the endpoint still returning success—the split-write state this issue is intended to eliminate. Route the transition through the canonical transactional agent projection write door, or otherwise make the row/event outcome atomic and fail closed; add a regression test proving event persistence failure cannot produce a successful finalize with only the row changed. The correctness review's advisory about row/event divergence is deduplicated into this higher-severity requirements blocker.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3338/.pan/review/agent-pan-3338-review-6130a234/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3338 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts"
@@ -47,19 +60,19 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:59:04.060Z",
+  "updated": "2026-08-01T21:03:37.632Z",
   "pipeline": {
     "issueId": "PAN-3338",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-01T20:58:54.777Z",
+    "updatedAt": "2026-08-01T21:03:36.780Z",
+    "reviewNotes": "Finalize can publish stale session liveness and succeed without the required status event",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
-    "reviewRequestedAt": "2026-08-01T20:55:37.668Z",
     "reviewSpawnedAt": "2026-08-01T20:58:54.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -91,6 +104,24 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
+      }
     }
   },
   "closeOut": {
@@ -98,9 +129,41 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 433913,
-            "output": 20569,
-            "cacheRead": 7937536,
+            "input": 711732,
+            "output": 28575,
+            "cacheRead": 11070464,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1740184,
+            "output": 56208,
+            "cacheRead": 15698944,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 1200292,
+            "output": 22957,
+            "cacheRead": 8330240,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1570456,
+            "output": 39503,
+            "cacheRead": 9334784,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1042609,
+            "output": 22411,
+            "cacheRead": 8358912,
             "cacheWrite": 0
           }
         },
@@ -115,9 +178,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 433913,
-          "output": 20569,
-          "cacheRead": 7937536,
+          "input": 6265273,
+          "output": 169654,
+          "cacheRead": 52793344,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -128,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 15.430704,
-        "pricingAsOf": "2026-08-01T20:58:54.867Z"
+        "usd": 71.48795799999999,
+        "pricingAsOf": "2026-08-01T21:03:36.840Z"
       }
     },
     "merges": [
@@ -138,7 +201,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3338",
