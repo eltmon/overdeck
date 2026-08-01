@@ -246,18 +246,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T20:06:25.836Z",
+  "updated": "2026-08-01T20:06:44.934Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T20:06:18.677Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "updatedAt": "2026-08-01T20:06:44.654Z",
+    "reviewNotes": "Dispatch failed: Discovery-ready for PAN-1577 (same-run parent resume): launched 0/4 missing convoy reviewer(s)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
@@ -345,7 +345,7 @@
       },
       "costAtCloseOut": {
         "usd": 163.913628,
-        "pricingAsOf": "2026-08-01T20:06:20.772Z"
+        "pricingAsOf": "2026-08-01T20:06:44.748Z"
       }
     },
     "merges": [
@@ -545,5 +545,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
