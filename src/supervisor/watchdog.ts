@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { readFileSync } from 'node:fs';
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { acquireRestartLock } from '../lib/restart-lock.js';
+import { acquireRestartLock, readRestartLockHolder } from '../lib/restart-lock.js';
 import { writeRestartStatus } from '../lib/restart-status.js';
 import { getOverdeckHome } from '../lib/paths.js';
 import { getBootReconciliationState } from '../lib/overdeck/control-settings.js';
@@ -37,6 +37,9 @@ export interface SupervisorWatchdogStatus {
   restartAttempts: string[];
   gaveUp: boolean;
   lastError: string | null;
+  restartInProgress: boolean;
+  restartBlockedReason: string | null;
+  restartBlockedUntil: string | null;
 }
 
 export type SpawnRestartResult = { pid: number | null; error: string | null; done?: Promise<void> };
@@ -78,6 +81,9 @@ interface InternalState {
   restartAttempts: number[];
   gaveUp: boolean;
   lastError: string | null;
+  restartInProgress: boolean;
+  restartBlockedReason: string | null;
+  restartBlockedUntil: number | null;
 }
 
 interface WatchdogPersistentState {
@@ -185,6 +191,9 @@ export class SupervisorWatchdog {
       restartAttempts: persistedState.restartAttempts,
       gaveUp: persistedState.gaveUp,
       lastError: null,
+      restartInProgress: false,
+      restartBlockedReason: persistedState.gaveUp ? 'watchdog previously gave up; manual intervention required' : null,
+      restartBlockedUntil: null,
     };
   }
 
@@ -210,6 +219,11 @@ export class SupervisorWatchdog {
       restartAttempts: this.state.restartAttempts.map((ts) => new Date(ts).toISOString()),
       gaveUp: this.state.gaveUp,
       lastError: this.state.lastError,
+      restartInProgress: this.state.restartInProgress,
+      restartBlockedReason: this.state.restartBlockedReason,
+      restartBlockedUntil: this.state.restartBlockedUntil === null
+        ? null
+        : new Date(this.state.restartBlockedUntil).toISOString(),
     };
   }
 
@@ -230,6 +244,10 @@ export class SupervisorWatchdog {
     let restartLogReason: string | null = null;
     let restartEligibleForBootGrace = false;
     let foreignDashboard = false;
+    if (!this.state.gaveUp) {
+      this.state.restartBlockedReason = null;
+      this.state.restartBlockedUntil = null;
+    }
     try {
       const response = await this.fetchFn(url, {
         signal: AbortSignal.timeout(this.config.requestTimeoutMs),
@@ -247,8 +265,12 @@ export class SupervisorWatchdog {
         this.state.consecutiveFailures += 1;
         this.state.consecutiveHardFailures = 0;
         this.state.lastError = patrolFailure.message;
-        if (!patrolFailure.restartReady) return;
+        if (!patrolFailure.restartReady) {
+          this.state.restartBlockedReason = `waiting for the deacon patrol grace period: ${patrolFailure.message}`;
+          return;
+        }
         if (this.state.consecutiveFailures < this.config.busyFailThreshold) {
+          this.state.restartBlockedReason = `waiting for ${this.config.busyFailThreshold} consecutive patrol failures (${this.state.consecutiveFailures}/${this.config.busyFailThreshold})`;
           if (this.state.consecutiveFailures === this.config.failThreshold) {
             await this.log(
               `watchdog: deacon patrol heartbeat stale but dashboard health is OK — `
@@ -272,6 +294,8 @@ export class SupervisorWatchdog {
         this.state.restartAttempts = [];
         this.state.gaveUp = false;
         this.state.lastError = null;
+        this.state.restartBlockedReason = null;
+        this.state.restartBlockedUntil = null;
         if (shouldPersistClear) {
           await this.persistState();
         }
@@ -292,6 +316,9 @@ export class SupervisorWatchdog {
       const hardDown = foreignDashboard || this.state.consecutiveHardFailures >= this.config.failThreshold;
       const busyStarved = this.state.consecutiveFailures >= this.config.busyFailThreshold;
       if (!hardDown && !busyStarved) {
+        this.state.restartBlockedReason = this.state.consecutiveHardFailures > 0
+          ? `waiting for ${this.config.failThreshold} consecutive hard failures (${this.state.consecutiveHardFailures}/${this.config.failThreshold})`
+          : `waiting for ${this.config.busyFailThreshold} consecutive timeout failures (${this.state.consecutiveFailures}/${this.config.busyFailThreshold})`;
         if (this.state.consecutiveFailures === this.config.failThreshold) {
           await this.log(
             `watchdog: dashboard slow but alive (${this.state.lastError ?? 'timeout'}) — `
@@ -313,6 +340,8 @@ export class SupervisorWatchdog {
         const error = `NEEDS YOU: watchdog verified a foreign dashboard on port ${this.config.dashboardApiPort} but could not evict it (${eviction.error})`;
         this.state.gaveUp = true;
         this.state.lastError = error;
+        this.state.restartBlockedReason = error;
+        this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
         await Effect.runPromise(writeRestartStatus({
@@ -338,9 +367,12 @@ export class SupervisorWatchdog {
       && !this.state.hasBecomeHealthy
       && startedAt - this.state.bootGraceStartedAt < this.config.bootGraceMs
     ) {
+      const remainingMs = Math.max(0, this.config.bootGraceMs - (startedAt - this.state.bootGraceStartedAt));
+      this.state.restartBlockedReason = `boot grace active after supervisor startup: ${restartLogReason ?? 'dashboard health check failed'}`;
+      this.state.restartBlockedUntil = this.state.bootGraceStartedAt + this.config.bootGraceMs;
       await this.log(
         `watchdog: deferring restart during boot grace (${restartLogReason ?? 'dashboard health check failed'}); `
-        + `${Math.max(0, this.config.bootGraceMs - (startedAt - this.state.bootGraceStartedAt))}ms remaining`,
+        + `${remainingMs}ms remaining`,
       );
       await this.persistState();
       return;
@@ -352,8 +384,10 @@ export class SupervisorWatchdog {
 
     if (!foreignDashboard && this.state.restartAttempts.length >= this.config.maxRestarts) {
       this.state.gaveUp = true;
-      await this.persistState();
       const error = `WATCHDOG GIVING UP — manual intervention required: ${this.state.lastError ?? 'dashboard health check failed'}`;
+      this.state.restartBlockedReason = error;
+      this.state.restartBlockedUntil = null;
+      await this.persistState();
       await this.log(error);
       await Effect.runPromise(writeRestartStatus({
         ts: new Date(startedAt).toISOString(),
@@ -375,6 +409,8 @@ export class SupervisorWatchdog {
         const error = 'NEEDS YOU: watchdog evicted a foreign dashboard but could not restart the primary because the restart lock is held';
         this.state.gaveUp = true;
         this.state.lastError = error;
+        this.state.restartBlockedReason = error;
+        this.state.restartBlockedUntil = null;
         await this.persistState();
         await this.log(error);
         await Effect.runPromise(writeRestartStatus({
@@ -390,10 +426,17 @@ export class SupervisorWatchdog {
         }));
         return;
       }
-      await this.log('watchdog restart skipped: restart lock held');
+      const holder = await Effect.runPromise(readRestartLockHolder());
+      const heldBy = holder ? `PID ${holder.pid} (${holder.caller})` : 'another process';
+      this.state.restartBlockedReason = `restart lock held by ${heldBy}`;
+      this.state.restartBlockedUntil = null;
+      await this.log(`watchdog restart skipped: ${this.state.restartBlockedReason}`);
       return;
     }
 
+    this.state.restartBlockedReason = null;
+    this.state.restartBlockedUntil = null;
+    this.state.restartInProgress = true;
     this.state.restartAttempts.push(startedAt);
     await this.persistState();
     await this.log(
@@ -418,6 +461,7 @@ export class SupervisorWatchdog {
     } catch (error) {
       restartError = error instanceof Error ? error.message : String(error);
     } finally {
+      this.state.restartInProgress = false;
       await lock.release();
     }
 
@@ -440,6 +484,7 @@ export class SupervisorWatchdog {
       pid: process.pid,
     }));
     if (restartError) {
+      this.state.restartBlockedReason = `previous restart failed: ${restartError}`;
       await this.log(`watchdog restart failed: ${restartError}`);
     }
   }
