@@ -49,6 +49,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T11:55:32.793Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-01T12:04:46.557Z"
     }
   ],
   "feedback": [],
@@ -189,7 +194,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T11:55:39.028Z",
+  "updated": "2026-08-01T12:04:46.558Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "reviewing",
