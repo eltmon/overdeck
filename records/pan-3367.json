@@ -311,7 +311,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T13:28:45.204Z",
+  "updated": "2026-08-01T13:33:16.997Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -724,5 +724,6 @@
     "synthesis-report.synthesis-report.ac1": "completed",
     "synthesis-report.synthesis-report.ac2": "completed",
     "synthesis-report.synthesis-report.ac3": "completed"
-  }
+  },
+  "reviewMode": "none"
 }
