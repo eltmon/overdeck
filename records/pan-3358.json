@@ -471,7 +471,7 @@
     "recordedAt": "2026-08-01T00:50:13.550Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T00:50:14.720Z",
+  "updated": "2026-08-01T00:50:18.610Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "pending",
@@ -481,12 +481,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T00:50:14.719Z",
+    "updatedAt": "2026-08-01T00:50:18.571Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
     "lastVerifiedCommit": "f7babead96ca33d596b98f4a2d989b2878f10f8b",
+    "reviewRequestedAt": "2026-08-01T00:50:14.719Z",
     "reviewSpawnedAt": "2026-08-01T00:33:28.909Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -587,8 +588,7 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-01T00:50:13.550Z"
-    },
-    "reviewRequestedAt": "2026-08-01T00:50:14.719Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -666,7 +666,7 @@
       },
       "costAtCloseOut": {
         "usd": 932.223702,
-        "pricingAsOf": "2026-08-01T00:48:56.561Z"
+        "pricingAsOf": "2026-08-01T00:50:18.607Z"
       }
     },
     "merges": [
