@@ -106,15 +106,7 @@
       "timestamp": "2026-08-01T13:06:30.232Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-01T12:11:38Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3367\n\n# Review Synthesis — PAN-3367 — 2026-08-01T12:10:54Z\n\n## Verdict: CHANGES REQUESTED — private Mind Your Now evidence remains exposed through public history and current audit artifacts\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/context.json`\n- Branch: `feature/pan-3367`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367`\n- HEAD reviewed: `8fc98f72936d058da5c07cf7f77032d915a4d507`\n- Cycle number: 2\n- Prior cycle SHA: `231aa1f8c8e9d3c86c63c454cad6bc45454fc3b0`\n- PR commits: 11\n- Cycle commits: 7\n- Scope gate: both blocking findings cite artifacts introduced by this PR\n- Convergence gate: not triggered (applies from cycle 3)\n- Proportionality gate: not triggered (2 blockers; threshold 33)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/security.md` | 1 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [security] Private MYN evidence remains publicly retrievable and reproducible — `docs/audits/pan-3367/evidence/reproduce-worklist.mjs:47`\nThe current tree removes the eight raw MIN archives, but the leaking commit `231aa1f8c8e9d3c86c63c454cad6bc45454fc3b0` remains an ancestor of the public PR head, so unauthenticated readers can still retrieve those blobs. The checked-in generator continues exporting complete event payloads for every project without a visibility check or redaction allowlist, and current artifacts retain private GitLab MR URLs, commit headlines, source paths, line ranges, module names, and implementation details. A deletion commit does not retract published history. Merge must remain blocked until the operator completes the repository host's approved history-purge or clean-branch replacement process, and the public generator and artifacts enforce a confidentiality-safe evidence boundary.\n\n### [requirements] The privacy remediation leaves the approved evidence contract incomplete — `docs/audits/pan-3367/worklist.md:9`\n**Scope: in_pr_scope.** FR-1 requires durable raw event snapshots for every candidate, and the cross-tracker batch requires quoted failure evidence plus independently cited merged-diff support. The revision deliberately omits all eight MIN archives and paraphrases all four MIN criteria, while MIN-858 and MIN-896 still rely materially on earlier specialist or final-review notes for portions of their `satisfied` verdicts. Restoring private payloads to the public repository would repeat the security defect, so this requires an approved confidentiality-safe evidence contract—such as access-controlled immutable artifacts plus sanitized public snapshots—and complete merged-diff evidence for every material clause in MIN-858 and MIN-896.\n\n## Non-blocking Findings\n\n### [correctness] H11 wording overstates the availability of committed MIN evidence — `docs/audits/pan-3367/README.md:101`\nThe text says every affected report reads `evidence/events-<issue>.json.gz`, although the MIN dumps were read locally and deliberately excluded from the public tree. Distinguish committed PAN evidence from locally read private MIN evidence and direct authorized readers to the private evidence references.\n\n### [correctness] An obsolete first audit-complete comment remains authoritative-looking\nThe issue retains an earlier summary with disposable feature-branch links and the obsolete unverifiable-criterion count alongside the corrected comment. The corrected comment satisfies publication requirements, but the earlier one should be marked superseded or updated so the durable operator record has one definitive answer.\n\n### [requirements] Compressed PAN evidence differs from literal xBRIEF filename examples\nThe xBRIEF examples name `events-*.json`, while the committed PAN snapshots use documented lossless `events-*.json.gz`. This naming mismatch does not block the PAN evidence deliverable.\n\n## Clean Sub-roles\n- performance — no production runtime or resource impact; the changes are static audit artifacts and a manually invoked one-shot script.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3367/.pan/review/agent-pan-3367-review-8fc98f72/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3367 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -252,10 +244,10 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T13:06:30.232Z",
+  "updated": "2026-08-01T13:10:50.580Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -263,12 +255,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T12:13:22.227Z",
+    "updatedAt": "2026-08-01T13:10:50.539Z",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
     "reviewedAtCommit": "8fc98f72936d058da5c07cf7f77032d915a4d507",
     "lastVerifiedCommit": "8fc98f72936d058da5c07cf7f77032d915a4d507",
-    "reviewSpawnedAt": "2026-08-01T11:55:30.970Z",
+    "reviewSpawnedAt": "2026-08-01T13:10:50.538Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -451,10 +443,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1060,
-            "output": 340293,
-            "cacheRead": 276766099,
-            "cacheWrite": 2978366
+            "input": 1112,
+            "output": 356044,
+            "cacheRead": 298896242,
+            "cacheWrite": 3006806
           }
         }
       },
@@ -466,15 +458,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1060,
-          "output": 340293,
-          "cacheRead": 276766099,
-          "cacheWrite": 2978366
+          "input": 1112,
+          "output": 356044,
+          "cacheRead": 298896242,
+          "cacheWrite": 3006806
         }
       },
       "costAtCloseOut": {
-        "usd": 178.096507,
-        "pricingAsOf": "2026-08-01T12:13:22.385Z"
+        "usd": 182.751251,
+        "pricingAsOf": "2026-08-01T13:10:50.551Z"
       }
     },
     "merges": [
