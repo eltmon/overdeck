@@ -196,7 +196,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:45:07.233Z",
+  "updated": "2026-08-01T21:46:40.878Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -205,7 +205,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:43:34.379Z",
+    "updatedAt": "2026-08-01T21:46:38.540Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:43:27.436Z",
@@ -277,9 +277,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14067335,
-            "output": 223036,
-            "cacheRead": 44154368,
+            "input": 19099629,
+            "output": 292286,
+            "cacheRead": 56333312,
             "cacheWrite": 0
           }
         },
@@ -317,10 +317,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2170,
-            "output": 114817,
-            "cacheRead": 52914927,
-            "cacheWrite": 1760898
+            "input": 2192,
+            "output": 115398,
+            "cacheRead": 53281863,
+            "cacheWrite": 1903278
           }
         }
       },
@@ -332,21 +332,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18618406,
-          "output": 312633,
-          "cacheRead": 57650688,
+          "input": 23650700,
+          "output": 381883,
+          "cacheRead": 69829632,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2170,
-          "output": 114817,
-          "cacheRead": 52914927,
-          "cacheWrite": 1760898
+          "input": 2192,
+          "output": 115398,
+          "cacheRead": 53281863,
+          "cacheWrite": 1903278
         }
       },
       "costAtCloseOut": {
-        "usd": 139.3799623,
-        "pricingAsOf": "2026-08-01T21:43:38.459Z"
+        "usd": 172.9260003,
+        "pricingAsOf": "2026-08-01T21:46:39.102Z"
       }
     },
     "merges": [
@@ -355,7 +355,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
