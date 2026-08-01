@@ -49,18 +49,18 @@
     "recordedAt": "2026-08-01T23:07:37.721Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:13:02.818Z",
+  "updated": "2026-08-01T23:18:10.673Z",
   "pipeline": {
     "issueId": "PAN-3451",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:13:02.767Z",
+    "updatedAt": "2026-08-01T23:18:10.617Z",
+    "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
-    "reviewRequestedAt": "2026-08-01T23:07:41.571Z",
     "reviewSpawnedAt": "2026-08-01T23:13:02.766Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -89,11 +89,69 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:07:37.721Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 383561,
+            "output": 19617,
+            "cacheRead": 5038592,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 985262,
+            "output": 22386,
+            "cacheRead": 5073920,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 936474,
+            "output": 20617,
+            "cacheRead": 4331520,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 707598,
+            "output": 20523,
+            "cacheRead": 2952192,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 712202,
+            "output": 17181,
+            "cacheRead": 3205120,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 927991,
@@ -105,15 +163,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 927991,
-          "output": 63812,
-          "cacheRead": 34569216,
+          "input": 4653088,
+          "output": 164136,
+          "cacheRead": 55170560,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 23.838923,
-        "pricingAsOf": "2026-08-01T23:13:02.796Z"
+        "usd": 55.7748,
+        "pricingAsOf": "2026-08-01T23:18:10.646Z"
       }
     },
     "merges": [
