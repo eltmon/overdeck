@@ -9,8 +9,10 @@
   font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
   color: var(--muted-foreground); padding: 8px 8px 6px; display: flex; gap: 6px;
 }
-.header .n { margin-left: auto; }
+.header .n { color: var(--foreground); }
+.presence { margin-left: auto; font-size: 10px; text-transform: none; letter-spacing: 0; color: var(--foreground); }
 
+.rowWrap { min-width: 0; }
 .row {
   display: flex; gap: 8px; align-items: flex-start; width: 100%;
   text-align: left; padding: 7px 7px; border-radius: 10px;
@@ -23,6 +25,12 @@
 
 .caret { width: 10px; flex: none; margin-top: 3px; color: var(--muted-foreground); display: grid; place-items: center; }
 .caretBtn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; display: grid; place-items: center; }
+.dotSlot { width: 10px; flex: none; margin-top: 5px; display: grid; place-items: center; }
+.syntheticDot { width: 8px; height: 8px; flex: none; margin: 5px 1px 0; border-radius: 50%; }
+.dot-info { background: var(--info); }
+.dot-ok { background: var(--success); }
+.dot-bad { background: var(--destructive); }
+.dot-muted { background: transparent; border: 1px solid var(--muted-foreground); }
 
 .tile {
   width: 18px; height: 18px; border-radius: 6px; flex: none; margin-top: 1px;
@@ -38,9 +46,11 @@
 .tile.pending { color: var(--muted-foreground); }
 
 .body { flex: 1; min-width: 0; }
-.l1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.name { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status { font-size: 10px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 3px; }
+.l1 { display: flex; align-items: center; gap: 6px; }
+.name { min-width: 0; flex: 1; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.verdict { width: 12px; flex: none; display: grid; place-items: center; color: var(--success-foreground); }
+.cost { margin-left: auto; flex: none; font-family: var(--mono); font-size: 10px; color: var(--signal-cost-foreground); }
+.status { margin-left: auto; font-size: 10px; white-space: nowrap; flex: none; display: inline-flex; align-items: center; gap: 3px; }
 .status.info { color: var(--info-foreground); }
 .status.ok { color: var(--success-foreground); }
 .status.bad { color: var(--destructive-foreground); }
@@ -48,6 +58,8 @@
 .l2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
 .model { font-family: var(--mono); font-size: 10px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sub { font-size: 10px; color: var(--muted-foreground); white-space: nowrap; flex: none; }
+.pausedReason { margin: -2px 8px 4px 36px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--warning-foreground); }
+.reviewChildren { margin-left: 17px; border-left: 1px solid var(--border); padding-left: 5px; }
 
 .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--info); position: relative; display: inline-block; }
 .pulse::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--info) 60%, transparent); animation: agentsLanePulse 1.6s ease-out infinite; }

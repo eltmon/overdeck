@@ -125,7 +125,12 @@ vi.mock('../../activity-logger.js', () => ({
 }));
 vi.mock('../../overdeck/control-settings.js', () => ({ isDeaconGloballyPaused: vi.fn(() => false) }));
 vi.mock('../../overdeck/review-status-sync.js', () => ({ markWorkspaceStuck: vi.fn(), clearWorkspaceStuck: vi.fn() }));
-vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
+vi.mock('../../overdeck/agents.js', () => ({
+  listAllAgentsSync: vi.fn(() => []),
+  removeAgentRecordSync: vi.fn(),
+  tombstoneAgentRecordSync: vi.fn(),
+  RETAINED_TRANSCRIPTS_PHASE: 'retained-transcripts',
+}));
 vi.mock('../../lifecycle/archive-planning.js', () => ({ findWorkspacePath: vi.fn() }));
 vi.mock('../../lifecycle/workflows.js', async () => {
   // PAN-1249: closeOut returns Effect<WorkflowResult>, not Promise.

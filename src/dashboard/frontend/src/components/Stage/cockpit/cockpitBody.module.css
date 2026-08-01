@@ -78,6 +78,13 @@
   align-items: start;
 }
 
+.awarenessRail {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
 /* Tree | main. Tasks move into a slide-over drawer so the conversation owns the
  * width previously reserved for a permanent third column. Narrower panes
  * (<840px, e.g. a split) keep the single stacked column. */
@@ -88,6 +95,10 @@
 
   .missionBody.spineCollapsed {
     grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .awarenessRail {
+    grid-column: 1 / -1;
   }
 
   .spineCollapsed [data-section="verification-gates"] {
@@ -135,53 +146,17 @@
   }
 }
 
-.tasksDrawerLayer {
-  position: absolute;
-  inset: 0;
-  z-index: 60;
-  pointer-events: none;
-}
+@container (min-width: 1180px) {
+  .missionBody {
+    grid-template-columns: minmax(210px, 264px) minmax(0, 1fr) minmax(220px, 280px);
+  }
 
-.tasksDrawerScrim {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  border: 0;
-  background: color-mix(in srgb, var(--background) 38%, transparent);
-  backdrop-filter: blur(2px);
-  pointer-events: auto;
-  cursor: pointer;
-}
+  .missionBody.spineCollapsed {
+    grid-template-columns: 56px minmax(0, 1fr) minmax(220px, 280px);
+  }
 
-.tasksDrawer {
-  position: absolute;
-  inset-block: 0;
-  right: 0;
-  width: min(430px, calc(100% - 28px));
-  overflow-y: auto;
-  border-left: 1px solid color-mix(in srgb, var(--primary) 32%, transparent);
-  background: var(--card);
-  box-shadow: -20px 0 50px color-mix(in srgb, var(--foreground) 18%, transparent);
-  pointer-events: auto;
-}
-
-.tasksDrawerHeader {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--border);
-  background: var(--card);
-  padding: 16px;
-}
-
-.tasksDrawerBody {
-  padding: 14px;
-}
-
-.tasksDrawerBody > aside {
-  position: static;
+  .awarenessRail {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
 }

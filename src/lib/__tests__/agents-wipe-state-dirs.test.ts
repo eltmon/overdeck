@@ -3,8 +3,8 @@
  *
  * The helper is the shared primitive that the work restart-fresh route and
  * the review restart extension both use to clean state before respawning.
- * Its job is narrow: rm -rf the matching agent dirs under
- * ~/.overdeck/agents/ for a given issue, leaving the work agent dir alone
+ * Its job is narrow: clean runtime residue from matching agent dirs under
+ * ~/.overdeck/agents/ while preserving JSONL transcripts, leaving the work agent dir alone
  * (when rolePrefix is set) or vice versa. Workspace, xBRIEF, tasks,
  * .pan/continue.json, the branch, and the commit history are all outside
  * the scope and must be left intact.
@@ -60,7 +60,7 @@ afterEach(() => {
   mkdirSync(TEST_AGENTS_DIR, { recursive: true });
 });
 
-function makeAgentDir(name: string, files: string[] = ['state.json', 'activity.jsonl', 'session.id']) {
+function makeAgentDir(name: string, files: string[] = ['state.json', 'session.id']) {
   const dir = join(TEST_AGENTS_DIR, name);
   mkdirSync(dir, { recursive: true });
   for (const file of files) {
@@ -96,7 +96,7 @@ describe('wipeAgentStateDirs (PAN-1985) — work agent wipe', () => {
     expect(existsSync(otherDir)).toBe(true);
   });
 
-  it('removes every tracked file inside the agent dir (state.json, session.id, activity.jsonl, etc.)', async () => {
+  it('removes runtime residue while preserving every jsonl transcript artifact', async () => {
     const workDir = makeAgentDir('agent-pan-1866', [
       'state.json',
       'session.id',
@@ -118,7 +118,11 @@ describe('wipeAgentStateDirs (PAN-1985) — work agent wipe', () => {
 
     await wipeAgentStateDirs('PAN-1866');
 
-    expect(existsSync(workDir)).toBe(false);
+    expect(existsSync(workDir)).toBe(true);
+    expect(existsSync(join(workDir, 'activity.jsonl'))).toBe(true);
+    expect(existsSync(join(workMailDir, 'inbox.jsonl'))).toBe(true);
+    expect(existsSync(join(workDir, 'state.json'))).toBe(false);
+    expect(existsSync(join(workDir, 'session.id'))).toBe(false);
   });
 });
 

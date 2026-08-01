@@ -121,7 +121,7 @@ describe('pan admin db gc-agents', () => {
 
     await runGcAgents();
 
-    expect(logs.join('\n')).toContain('Reaped 5 agent(s).');
+    expect(logs.join('\n')).toContain('Reaped 5 agent(s); preserved 0 transcript-bearing row(s).');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
       'agent-running-terminal',

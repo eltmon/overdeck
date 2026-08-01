@@ -105,7 +105,7 @@ const HIDDEN_COCKPIT_SECTION_RULES = collectFiles(COCKPIT_COMPONENTS_ROOT, '.css
  * docs/design/mockups/three-issue-views-naming.html — every section the three
  * issue views render today, read straight from that mockup's "Complete
  * component inventory" refreshed after the Tasks migration and PAN-2696
- * (Console 17 + Cockpit 21 + Rail 15).
+ * (Console 17 + Cockpit 22 + Rail 15).
  *
  * These names are hardcoded INDEPENDENTLY of inventory.ts on purpose: the whole
  * point of the gate is that removing a manifest entry — silently dropping a
@@ -135,6 +135,7 @@ const EXPECTED_CONSOLE_SECTIONS = [
 
 const EXPECTED_COCKPIT_SECTIONS = [
   'Header bar',
+  'NeedsYouSlot',
   'Stale-review warning',
   'StatusNarrative',
   'Pipeline Band',
@@ -149,10 +150,10 @@ const EXPECTED_COCKPIT_SECTIONS = [
   'PickupGateCard',
   'PlanMapCard',
   'IssueBlockerSpotlight',
-  'Code tab',
-  'PRD / Timeline / Discussion tabs',
-  'Costs / Artifacts / Ship tabs',
-  'Conversation / Files / Terminal tabs',
+  'Session tab',
+  'Changes tab',
+  'Plan / Activity / Discussion tabs',
+  'Cost / Artifacts / Ship homes',
   'TasksRail / TasksTab',
   'Awareness rail',
 ] as const;
@@ -193,12 +194,12 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     ).toEqual([]);
   });
 
-  it('matches the current independent per-view counts: Console 17, Cockpit 21, Rail 15', () => {
+  it('matches the current independent per-view counts: Console 17, Cockpit 22, Rail 15', () => {
     const byView = (view: string) => ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === view).length;
     expect(byView('console')).toBe(17);
-    expect(byView('cockpit')).toBe(21);
+    expect(byView('cockpit')).toBe(22);
     expect(byView('rail')).toBe(15);
-    expect(ISSUE_VIEW_INVENTORY.length).toBe(53);
+    expect(ISSUE_VIEW_INVENTORY.length).toBe(54);
   });
 
   it('keeps every cockpit density section unchanged and backed by a real visible marker', () => {
@@ -244,20 +245,27 @@ describe('issue-view no-loss inventory (FR-0 surface-lock, PAN-2499)', () => {
     }]);
   });
 
-  it('records the physical homes of the cockpit sections moved by PAN-2842', () => {
-    const homes = new Map(
-      ISSUE_VIEW_INVENTORY
-        .filter((entry) => entry.view === 'cockpit')
-        .map((entry) => [entry.section, entry.home]),
+  it('records the physical homes and folded-surface relocations from PAN-3356', () => {
+    const cockpit = ISSUE_VIEW_INVENTORY.filter((entry) => entry.view === 'cockpit');
+    const homes = new Map(cockpit.map((entry) => [entry.section, entry.home]));
+    const relocations = new Map(
+      cockpit
+        .filter((entry) => entry.actionRelocation)
+        .map((entry) => [entry.section, entry.actionRelocation!.surface]),
     );
     const missionControl = 'src/dashboard/frontend/src/components/Stage/cockpit/IssueMissionControl.tsx';
 
     expect(homes.get('Detail Tabs')).toBe(missionControl);
-    expect(homes.get('Conversation / Files / Terminal tabs')).toBe(missionControl);
+    expect(homes.get('Session tab')).toBe(missionControl);
+    expect(homes.get('Changes tab')).toBe(missionControl);
     expect(homes.get('TasksRail / TasksTab')).toBe(missionControl);
     expect(homes.get('Stale-review warning')).toBe(
       'src/dashboard/frontend/src/components/Stage/cockpit/IssueTreeLane.tsx',
     );
+    expect(relocations.get('Session tab')).toBe('Conversation / Files / Terminal tabs');
+    expect(relocations.get('Changes tab')).toBe('Code / Files / Artifacts tabs');
+    expect(relocations.get('Plan / Activity / Discussion tabs')).toBe('PRD / Timeline / Discussion tabs');
+    expect(relocations.get('Cost / Artifacts / Ship homes')).toBe('Costs / Artifacts / Ship tabs');
   });
 
   it('has no duplicate section names within a density', () => {

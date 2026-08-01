@@ -1,6 +1,6 @@
 import type { AgentSnapshot, SessionNode } from '@overdeck/contracts';
 import type { ReviewStatusData } from '../CommandDeck/ZoneCOverviewTabs/queries';
-import type { IssueShipModel, ShipLogModel } from './types';
+import type { IssueShipModel, OperatorNeedsYou, ShipLogModel } from './types';
 
 /**
  * Issue-view derivations (PAN-2499).
@@ -52,6 +52,25 @@ export function stuckReason(reviewStatus: ReviewStatusData | undefined): string 
   if (reviewStatus?.mergeStatus === 'failed') return 'Merge failed';
   if (reviewStatus?.verificationStatus === 'failed') return 'Verification failed';
   return 'Needs attention';
+}
+
+const OPERATOR_NEED_PRIORITY: Record<OperatorNeedsYou['kind'], number> = {
+  awaiting_input: 0,
+  stuck: 1,
+  troubled: 2,
+  paused: 3,
+  stale_review: 4,
+  blocker: 5,
+  pickup_gate: 6,
+  ready_for_merge: 7,
+  stopped: 8,
+};
+
+/** Sort operator signals into the cockpit's single-slot priority ladder. */
+export function sortOperatorNeeds(items: readonly OperatorNeedsYou[]): OperatorNeedsYou[] {
+  return items.map((item, index) => ({ item, index }))
+    .sort((a, b) => OPERATOR_NEED_PRIORITY[a.item.kind] - OPERATOR_NEED_PRIORITY[b.item.kind] || a.index - b.index)
+    .map(({ item }) => item);
 }
 
 /** Derive the unified ship model from review status and the optional ship log. */

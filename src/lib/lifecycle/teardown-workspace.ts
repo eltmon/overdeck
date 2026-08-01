@@ -25,6 +25,7 @@ import { stepOk, stepSkipped, stepFailed } from './types.js';
 import { findAllWorkspacePaths, findWorkspacePath } from './archive-planning.js';
 import { getContainersReferencingWorkspacePath } from '../workspace-manager.js';
 import { DEVCONTAINER_DIRNAME } from '../workspace/devcontainer-renderer.js';
+import { removeAgentStateDir } from '../agents/state-dir-removal.js';
 
 const execAsync = promisify(exec);
 
@@ -304,7 +305,7 @@ function removeAgentState(issueLower: string): Effect.Effect<StepResult> {
 
 async function removeAgentStateImpl(issueLower: string): Promise<StepResult> {
   const step = 'teardown:agent-state';
-  const { readdir, rm } = await import('fs/promises');
+  const { readdir } = await import('fs/promises');
 
   let entries: string[];
   try {
@@ -322,15 +323,19 @@ async function removeAgentStateImpl(issueLower: string): Promise<StepResult> {
   );
 
   let removed = 0;
+  let preservedTranscripts = 0;
   for (const name of targets) {
     try {
-      await rm(join(AGENTS_DIR, name), { recursive: true, force: true });
-      removed++;
+      const result = await removeAgentStateDir(join(AGENTS_DIR, name));
+      if (result.removedDir || result.preservedTranscripts > 0) removed++;
+      preservedTranscripts += result.preservedTranscripts;
     } catch { /* non-fatal */ }
   }
 
   if (removed > 0) {
-    return stepOk(step, [`Removed ${removed} agent state director${removed === 1 ? 'y' : 'ies'}`]);
+    return stepOk(step, [
+      `Cleaned ${removed} agent state director${removed === 1 ? 'y' : 'ies'} (${preservedTranscripts} transcript files preserved)`,
+    ]);
   }
   return stepSkipped(step, ['No agent state directories found']);
 }

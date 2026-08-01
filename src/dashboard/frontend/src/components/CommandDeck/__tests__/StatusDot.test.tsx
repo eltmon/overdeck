@@ -25,9 +25,29 @@ describe('StatusDot', () => {
     expect(getByTestId('status-dot').classList.contains('anim-alive-dot-waiting')).toBe(true);
   });
 
-  it('applies anim-alive-dot-idle class for idle status', () => {
+  it('preserves the filled, slowly animated idle dot by default', () => {
     const { getByTestId } = render(<StatusDot status="idle" />);
-    expect(getByTestId('status-dot').classList.contains('anim-alive-dot-idle')).toBe(true);
+    const dot = getByTestId('status-dot');
+    expect(dot.className).toContain('anim-alive-dot-idle');
+    expect(dot.style.background).toBe('var(--muted-foreground)');
+    expect(dot.style.borderWidth).toBe('');
+  });
+
+  it('renders cockpit idle as a static hollow neutral dot', () => {
+    const { getByTestId } = render(<StatusDot status="idle" variant="cockpit" />);
+    const dot = getByTestId('status-dot');
+    expect(dot.className).not.toContain('anim-alive-dot');
+    expect(dot.style.background).toBe('transparent');
+    expect(dot.style.borderWidth).toBe('1px');
+    expect(dot.style.borderStyle).toBe('solid');
+    expect(dot.style.borderColor).toBe('var(--muted-foreground)');
+  });
+
+  it('opts cockpit rows into purple review and emerald completion signals', () => {
+    const view = render(<StatusDot status="reviewing" variant="cockpit" />);
+    expect(view.getByTestId('status-dot').style.background).toBe('var(--signal-review)');
+    view.rerender(<StatusDot status="done" variant="cockpit" />);
+    expect(view.getByTestId('status-dot').style.background).toBe('var(--success)');
   });
 
   it('applies no animation class for ended status', () => {

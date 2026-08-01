@@ -22,6 +22,7 @@ import { listStatesCommand, cleanupStatesCommand } from './tracker-handler.js';
 import { migrateConfigCommand } from '../migrate-config.js';
 import { registerStateMigrationCommand } from './state-migrate.js';
 import { registerReconcileLabelsCommand } from './reconcile-labels.js';
+import { registerMigrateLegacyAgentDirsCommand } from './migrate-legacy-agent-dirs.js';
 
 export function registerAdminCommands(program: Command): void {
   const admin = program
@@ -45,6 +46,7 @@ export function registerAdminCommands(program: Command): void {
 
   registerStateMigrationCommand(admin);
   registerReconcileLabelsCommand(admin);
+  registerMigrateLegacyAgentDirsCommand(admin);
 
   // pan admin cloister — lifecycle watchdog
   registerCloisterCommands(admin);

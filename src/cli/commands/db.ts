@@ -12,8 +12,8 @@ import {
   getIssueStageSync,
   isTerminalIssueStage,
   listAllAgentsSync,
-  removeAgentSync,
 } from '../../lib/overdeck/agents.js';
+import { pruneAgentRowsAfterTranscriptCleanup } from '../../lib/cloister/agent-gc.js';
 import {
   DatabaseProvisionerError,
   getDatabaseProvisioner,
@@ -174,11 +174,9 @@ async function gcAgentsCommand(options: { dryRun?: boolean }): Promise<void> {
     return;
   }
 
-  for (const id of ids) {
-    removeAgentSync(id);
-  }
-  console.log(`Reaped ${ids.length} agent(s).`);
-  for (const id of ids) console.log(`  ${id}`);
+  const result = await pruneAgentRowsAfterTranscriptCleanup(candidates);
+  console.log(`Reaped ${result.removed.length} agent(s); preserved ${result.preserved.length} transcript-bearing row(s).`);
+  for (const id of result.removed) console.log(`  ${id}`);
 }
 
 async function snapshotCommand(options: {

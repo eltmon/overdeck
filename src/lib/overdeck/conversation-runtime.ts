@@ -585,7 +585,7 @@ export async function spawnConversationSession(
     const resumeSessionId = resume
       ? await readFile(sessionIdPath, 'utf-8').then((value) => value.trim() || undefined).catch(() => undefined)
       : undefined;
-    await rm(sessionIdPath, { force: true });
+    await rm(sessionIdPath, { force: true }); // PAN-3357: not a dir removal
     acpFields = {
       ...getAcpLauncherFields(tmuxSession, model, cwd, harnessLaunch.binaryPath, 'work'),
       resumeSessionId,

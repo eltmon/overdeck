@@ -9264,3 +9264,161 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **25 close-outs, 18 PRs merged, 22 substrate bugs driven** (14 fixed, merged and closed out; 9 filed).
 - **Every machinery bug I filed this run that was mine to fix is now merged, deployed, and closed out.**
 - **Remaining, none forced:** PAN-3305 (residual gate case — merged work, branch behind main; fix suggested and the merged-PR path already exists), PAN-3313 (operator: CLIProxy second auth entry), PAN-3330/3331/3340/3341 (awaiting operator release), 17 MYN rows out of merge scope, TIN-1, 4 typed blind spots.
+
+## RUN-75 tick 27 (2026-08-01 01:57Z) — loop re-armed after a 26h lapse; paused-agent mystery solved
+
+### The lapse
+
+**No autonomous tick between 2026-07-30 22:56Z (tick 26) and now — roughly 26 hours.** Cause: during the six-strike merge cascade I switched to event-driven monitors and, when they ended (one stopped deliberately, one timed out), **never re-armed a wakeup**. Every "tick" after tick 19 ran only because the operator prompted. The work felt continuous, which is exactly why the gap went unnoticed.
+
+**LESSON: a monitor ending is not a tick, and productivity is not a heartbeat.** Event-driven watching is strictly better than polling *for the thing it watches* — it is not a substitute for the loop. **Always arm the next wakeup at the end of a tick, even when a monitor is also armed.** Now a standing instruction.
+
+### The operator's "ton of paused issues" — answered with data
+
+16 paused agents, grouped by recorded reason:
+
+| Count | Reason |
+| --- | --- |
+| 12 | `awaiting close-out (verify on main)` |
+| 2 | `needs-you: idle-alive — no observable progress across 8 pokes` (07-15) |
+| 1 | `All slot-2 work complete and merged to main` (07-08) |
+| 1 | **(no reason recorded)** (07-08) |
+
+**The pauses are not laziness — they are close-out debt.** `postMergeLifecycle` deliberately pauses the work and planning agents when a branch lands so nothing keeps working on merged code; the pause is correct, and the failure is that close-out never ran behind it. Six issues × 2 agents = 12 of the 16.
+
+Drained this tick: **PAN-3330, PAN-3331, PAN-3340, PAN-3341** (last turn), then **PAN-3363, PAN-3357**, plus **PAN-2687 and PAN-2688**. Paused count **16 → 5**.
+
+**The two 17-day pauses were zombies:** PAN-2687 and PAN-2688 were already **CLOSED on the tracker** while their agents stayed flagged paused since 07-15. Running `pan close` on each reported `✓ prune-agent-rows — Pruned 1 stopped agent row(s)` and cleared them. So **an issue closed without close-out leaves its paused agent rows behind indefinitely**, inflating the operator-visible gate count with work that finished weeks ago.
+
+### Verdict laundering is a week-long pattern, not one incident
+
+Following PAN-3365 (PAN-3356's TESTS FAILED reset away and replaced with a pass), I queried the event log:
+
+- **74** issues had a negative verdict later become `passed/passed` — **misleading**, because that catches the normal rework loop (block → fix → pass). I should not have led with it.
+- **29** match the sharp signature: negative → reset to `pending/pending` → `passed/passed` within 60 minutes.
+- **The discriminator is commits.** Sampled four (PAN-3216, PAN-3230, PAN-3206, PAN-3192): **0 commits between failure and pass in all four**, with the branches verified still present so the zeros are real rather than a deleted-ref artifact.
+
+Dates span 07-25 to 07-28, so this has been running about a week. **LESSON: a count is not a finding until it has a discriminator.** My first number would have sent the operator chasing 74 healthy rework cycles.
+
+### Held deliberately
+
+- **PAN-3356 not closed out.** It is merged and in `post_merge_limbo`, but its acceptance criteria were never verified (PAN-3365) and PAN-3362 — the environment block that made the UAT impossible — is still open. Closing it would stamp "done" on the one issue we know was never checked.
+- PAN-3305 (residual gate case), PAN-3313 (operator: CLIProxy second auth), MIN-908 and 13 MYN zombie PRs (out of merge scope), TIN-1, 4 typed blind spots.
+
+### Also this tick
+
+- **PAN-3363 merged** (PR #3364) — the stale `pan.localhost` fallback at `uat-stack.ts:161` that emitted dead workspace URLs. Strike handed off and closed out.
+- Infra healthy: hook 445/guard=1, leak 0, 29.7 GB free, **load down to 2.6**.
+- **gen-a is now the fresh CLI** (21:27) and gen-b is stale (10:29) — the reverse of yesterday. Reload alternates, so the fresh generation must be checked every tick, never assumed.
+
+## RUN-75 tick 28 (2026-08-01 02:16Z) — close-out debt drained; both remaining pause classes root-caused
+
+- Wakeup armed at end of tick 27 and **this tick fired from it, not from an operator prompt** — the heartbeat is live again.
+- Infra: hook 445/guard=1, leak **0**, 29.7 GB free, PSI 0, **load 1.9**. `gen-a` still the fresh CLI (21:27) vs gen-b (10:29) — checked, not assumed.
+- **Close-out debt is drained.** Read-door sweep across all 12 projects leaves only two `post_merge_limbo` rows in panopticon-cli, both deliberate: **PAN-3305** (residual patch-id gate case) and **PAN-3356** (held — ACs never verified). MIN-908 remains out of merge scope. No new debt accumulated since tick 27, which is the point of draining every tick.
+
+### Both remaining pause classes now have a cause
+
+**LEX-1 (`agent-lex-1-slot-1`, `agent-lex-1-slot-2`, paused 07-08 — 24 days).** Root cause found: LEX-1 is **OPEN** ("Milestone 1: The Persistent Heartbeat"), and lexerra's read door returns `forge_unavailable` — the GitHub App is not configured for `eltmon/lexerra`. So these are paused agents on a live issue in a project Overdeck **cannot reach at all**. Not stale debt and not laziness: they are blocked on the same operator config gap as the lexerra blind spot. Clearing the pause would achieve nothing while the forge is unreachable.
+
+**`agent-pan-3357` still paused after its issue closed.** PAN-3357 is `CLOSED [closed-out]` and close-out reported success, yet its agent row remains `status=stopped, paused=1`. So **`close-out:prune-agent-rows` does not reliably clear paused rows** — it pruned 1 row each for PAN-2687/2688 but left this one. Small, but it is exactly how the operator's gate count silently inflates: every close-out that misses a row leaves a permanent phantom.
+
+**LESSON: "the count went down" is not the same as "the mechanism works."** Draining 16 → 5 felt like the fix, and it mostly was — but one row survived its own close-out, and only checking each remaining row individually surfaced it. A cleanup that is 90% effective still accumulates forever.
+
+### Verdict laundering — evidence extended on PAN-3365
+
+Posted the full analysis. Key correction recorded there: **74 is misleading** (normal rework), **29** match the sharp signature, and the discriminator is commits — **4 of 4 sampled had zero commits between failure and pass**, with branch existence verified so the zeros are not a deleted-ref artifact. Occurrences span 07-25 to 07-28.
+
+**The detector is the fix**: *a pass must not supersede an unresolved negative verdict when no commits landed between them.* One rule, blocks all five known cases, cheap to evaluate at verdict-write time.
+
+Recommended to the operator: dispatch the code-level audit as its own work with the 29-item list as its worklist, rather than 29 shallow reviews — producing unearned green verdicts is the failure being investigated.
+
+---
+
+# HANDOVER — RUN-75 → next orchestrator (Fable 5)
+
+
+Written 2026-08-01 by the outgoing flywheel-orchestrator (Opus 5) at operator request.
+Read this **after** `roles/flywheel.md` and `docs/flywheel-brief.md`, and alongside
+`docs/FLYWHEEL-STATE.md` (ticks 1–28 hold the full narrative and the lessons).
+
+The operator's framing: *"right the ship a bit."* Throughput was not the problem —
+**judgement about what counted as finished was.** Read the failure modes below before
+picking up work; several are mine, and they are the ones most likely to repeat.
+
+---
+
+## 1. What is actually true right now
+
+- `main` is **green**. Live dashboard build tracks it (deploy patrol is working and redeploys unprompted).
+- The **process-leak treadmill is over** (PAN-3294 fix deployed and verified across multiple automated syncs; hook is 445 lines with `guard=1`).
+- **Close-out debt is drained** — paused agents went 16 → 4. Two remaining are LEX-1 (see §4), one is a phantom (see §3).
+- Infra is quiet: leak 0, ~30 GB free, PSI 0, load ~2.
+- **Only one PAN issue is genuinely in flight: PAN-3358** (ship/version step).
+
+## 2. Open work, in priority order
+
+| Issue | What | State |
+| --- | --- | --- |
+| **PAN-3367** | **Code-level audit** of 29 issues whose negative verdict was reset then passed — *did the merged diff satisfy the failing AC?* | Filed, **not dispatched** |
+| **PAN-3365** | The laundering mechanism itself. Fix is one rule: *a pass must not supersede an unresolved negative verdict when no commits landed between them* | Filed, not struck |
+| **PAN-3366** | Tracker resolution ranks `github_repo` above a configured Linear team | `strike-pan-3366` **running** |
+| **PAN-3362** | No way to seed tracker-backed issue fixtures in workspace containers — blocks every UI-redesign UAT | Filed |
+| **PAN-3358** | Ship step: propagate version strings per batch. **Must include UI-configurable settings**, not just `projects.yaml` | In flight |
+| **PAN-3356** | Issue cockpit redesign. **Merged but ACs never verified** — do not close out | Held, operator's call |
+| **PAN-3305** | Residual landing-gate case: merged work whose branch is now *behind* main | Blocked, not forced |
+| **PAN-3313** | CLIProxy benches its only auth on one stream error → ~21–47% of GPT calls fail | **Operator-gated** (needs a second auth entry) |
+
+## 3. Known traps — these bit me, they will bit you
+
+**`git -C` is not cwd hygiene.** I ran `cd <workspace> && npx vitest`, and the Bash cwd persisted for *hours*. Every `git -C` call stayed correct, which is exactly why the drift was invisible — it only surfaced when something read the process cwd. It cost: a state commit landed on a strike branch; `pan reload` refused; and finally a close-out **deleted the directory my shell was standing in**. Use subshells `( cd … && … )`; never a bare `cd`.
+
+**Verify the artifact, then verify it *again*.** A deploy I made was silently reverted four minutes later by a patrol reading a frozen `pan reload` generation. A success message is a claim about a command, not about the world.
+
+**`pan reload` alternates generations, and the `pan` shim does not follow.** Check which generation has the fresh CLI **every tick** (`date -r <gen>/dist/cli/index.js`) — never assume. Invoking a stale CLI made a fix appear not to work when it had merged fine.
+
+**A monitor ending is not a tick.** I moved to event-driven watching during a merge cascade and never re-armed a wakeup; **the loop then went ~26 hours with no autonomous tick** while feeling productive, because operator prompts kept arriving. Always arm the next wakeup at the end of every tick, even when a monitor is armed.
+
+**Flat cost has at least three meanings** — finished, wedged, or blocked on a long tool call. Read the **pane text**, not the cost delta. The `agents` table's `cost_so_far` is **0 for every row** and is not a signal; the pane footer is.
+
+**"The count went down" ≠ "the mechanism works."** Draining paused agents 16 → 5 looked like a fix, but `agent-pan-3357` survived its own successful close-out — `close-out:prune-agent-rows` does not reliably clear *paused* rows. That is how the gate count silently inflates. Verify per row.
+
+**A count is not a finding until it has a discriminator.** I nearly reported "74 suspicious issues" when most were healthy rework. The discriminator was *commits between failure and pass*. Also verify the branch still exists — a deleted ref returns 0 commits and manufactures a false positive.
+
+**Five concurrent Opus strikes drove load to 55** and manufactured ~64 contention-only test failures that each agent then had to triage. Staggering beats parallelism when everything gates on one host.
+
+## 4. Operator corrections I received — do not re-litigate
+
+- **"Why are you not fixing whatever is wrong?"** I filed nine issues and struck almost none, then declared quiescence while holding dispatchable work. *Filing is recordkeeping; the fix is the point.* If a filed machinery bug has no strike in flight, that is a failed tick.
+- **"Why wait for next tick?"** The wakeup is a floor, not a schedule. Act when there is something to act on.
+- **Pauses are not laziness.** 12 of 16 were `awaiting close-out (verify on main)` — correct post-merge behaviour with close-out never run behind it. **Drain close-out debt every tick.**
+- **Lexerra is an early POC and should not be in the pipeline at all.** Beyond PAN-3366's precedence bug, its pipeline scope is wrong. Its two agents have been paused since 07-08.
+- **"Everything else should have been moving."** Throughput was the complaint. Do not let one investigation stall the fleet.
+
+## 5. The judgement call I would keep
+
+I refused every `--accept-*` override — 25 close-outs, zero overrides — and held PAN-3356 rather than rubber-stamp unverified work. **Keep that.** The overrides are the operator's lever; the machinery fix that makes them unnecessary is yours to dispatch. That distinction is the single most useful rule I applied, and PAN-3365 exists because a test agent held the same line.
+
+## 6. Suggested first moves
+
+1. Confirm infra + drain any `post_merge_limbo` (habit, every tick).
+2. Drive **PAN-3366** to merge (running).
+3. Strike **PAN-3365** — the guard is one cheap rule and it stops the bleeding.
+4. Dispatch **PAN-3367** as real work with full context; do not attempt 29 shallow reviews.
+5. Decide lexerra's pipeline scope with the operator's POC framing in mind.
+6. Drive **PAN-3358**, checking the UI-configurability requirement is in the plan.
+
+Everything else is either operator-gated (PAN-3313) or deliberately held (PAN-3356, PAN-3305).
+
+## RUN-75 tick 29 (2026-08-01 02:34Z) — steady state; PAN-3358 is large but sound
+
+- Infra: hook 445/guard=1, leak **0**, 28.7 GB, load 2.4. gen-a still the fresh CLI (21:27) — checked, not assumed.
+- Sweep: **no new close-out debt**. panopticon-cli holds only PAN-3305 (blocked), PAN-3356 (held — ACs unverified), PAN-3358 (in flight), PAN-3366 (struck). MIN-908 + 13 zombie PRs out of merge scope; TIN-1 backlog.
+- **`strike-pan-3366`** (tracker precedence) healthy: ctx 32%, $2.33, +74/-11, still writing, not pushed.
+- **PAN-3358 flagged then cleared.** Its agent showed **$152.76, +7374/-1185, 25 commits, ctx 88%** — which on a "propagate version strings" issue reads like runaway scope. Checked the file breakdown before saying so, and it is coherent: `version-ship.ts` (382) + `version-ship-deps.ts` (530) + `ship-record.ts` (250) for the step, `projects.ts` (+356/-67) for the `version_sync` config, **`ProjectSettingsDisclosure.tsx` (+305) for the operator-required UI configurability**, `dod-gate-ship.test.ts` (206) for the DoD row, ~1,440 lines of tests, and a `no-loss-matrix.ts` entry. Roughly half the diff is tests.
+- **LESSON: cost and diff size are not scope signals on their own.** $152 and +7,374 lines looked alarming; the file list showed a proportionate implementation of config + ship step + DoD row + UI, with the no-loss matrix updated. **Read what changed before judging how much changed** — the same discipline as reading a pane instead of a cost delta.
+- Watch item: PAN-3358 is at **ctx 88%** with 25 unpushed commits on a clean tree. If it compacts badly the work is committed and safe, but it should push soon.
+
+### Handover status
+
+Handover to the incoming Fable 5 orchestrator is **prepared and durable** (appended above, pushed as `992b762bcb`). `roles.flywheel.model` is now `claude-fable-5`; config backed up at `~/.overdeck/config.yaml.bak-run75-handover`. **The switch takes effect on the next spawn** — `pan flywheel start` refuses while this session is alive (singleton invariant, working correctly). Continuing to tick until the operator ends this session rather than letting the loop go dark.
