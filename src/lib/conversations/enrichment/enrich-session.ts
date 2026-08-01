@@ -315,7 +315,7 @@ function buildCodexExcerpt(lines: string[], options: ExcerptOptions = {}): strin
  * Dispatches by discovered session harness. Claude Code remains the default
  * parser so legacy rows and missing harness values keep byte-identical output.
  */
-function buildConversationExcerpt(
+export function buildConversationExcerpt(
   lines: string[],
   options: ExcerptOptions & { session?: Pick<DiscoveredSession, 'harness'> | null } = {},
 ): string {

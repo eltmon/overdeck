@@ -14,8 +14,8 @@ import {
   resolveProjectFromIssueSync,
   listProjectsSync,
   getProjectSync,
-  setProjectAutoMergeDefaultSync,
-  setProjectSwarmPolicySync,
+  setProjectAutoMergeDefault,
+  setProjectSwarmPolicy,
   validateVersionSyncConfig,
   type ProjectConfig,
   type VersionSyncConfig,
@@ -907,7 +907,7 @@ const postProjectAutoMergeDefaultRoute = HttpRouter.add(
     if (v !== 'auto' && v !== 'hold' && v !== null) {
       return jsonResponse({ error: "value must be 'auto', 'hold', or null" }, { status: 400 });
     }
-    setProjectAutoMergeDefaultSync(key, v);
+    yield* Effect.promise(() => setProjectAutoMergeDefault(key, v));
     return jsonResponse({ value: v });
   })),
 );
@@ -928,7 +928,7 @@ const postProjectSwarmPolicyRoute = HttpRouter.add('POST', '/api/projects/:proje
     ...(typeof body.value?.maxSlots === 'number' ? { maxSlots: body.value.maxSlots } : {}),
     ...(typeof body.value?.autoAdvance === 'boolean' ? { autoAdvance: body.value.autoAdvance } : {}),
   };
-  setProjectSwarmPolicySync(key, value); return jsonResponse({ configured: value });
+  yield* Effect.promise(() => setProjectSwarmPolicy(key, value)); return jsonResponse({ configured: value });
 })));
 const getIssueSwarmPolicyRoute = HttpRouter.add('GET', '/api/issues/:issueId/swarm-policy', httpHandler(Effect.gen(function* () {
   const issueId = ((yield* HttpRouter.params)['issueId'] ?? '').toUpperCase();

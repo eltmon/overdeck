@@ -4,7 +4,7 @@ import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import { httpHandler } from './http-handler.js';
 import { jsonResponse } from '../http-helpers.js';
-import { getProjectSync, setProjectMergeTrainSync } from '../../../lib/projects.js';
+import { getProjectSync, setProjectMergeTrain } from '../../../lib/projects.js';
 import { readProjectJsonBody } from './projects.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 
@@ -38,18 +38,21 @@ const postProjectMergeTrainRoute = HttpRouter.add(
 
     const params = yield* HttpRouter.params;
     const key = params['projectKey'] ?? '';
-    if (!getProjectSync(key)) return jsonResponse({ error: 'Project not found' }, { status: 404 });
+    const project = getProjectSync(key);
+    if (!project) return jsonResponse({ error: 'Project not found' }, { status: 404 });
     const body = (yield* readProjectJsonBody) as { value?: unknown };
     const v = body.value;
     if (v !== 'enabled' && v !== 'disabled' && v !== null) {
       return jsonResponse({ error: "value must be 'enabled', 'disabled', or null" }, { status: 400 });
     }
     const { isMergeTrainEnabledForProject } = yield* Effect.promise(() => import('../../../lib/overdeck/merge-sync.js'));
-    setProjectMergeTrainSync(key, v);
-    const updated = getProjectSync(key);
+    yield* Effect.promise(() => setProjectMergeTrain(key, v));
+    const updated = { ...project };
+    if (v === null) delete updated.merge_train;
+    else updated.merge_train = v;
     return jsonResponse({
       value: v,
-      effective: updated ? isMergeTrainEnabledForProject(updated) : false,
+      effective: isMergeTrainEnabledForProject(updated),
     });
   })),
 );

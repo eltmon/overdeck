@@ -564,16 +564,26 @@ export function registerProjectSync(key: string, projectConfig: ProjectConfig): 
  * removes the field so the project falls through to the global require-UAT
  * setting. Preserves all other project config.
  */
+function setProjectAutoMergeDefaultMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: 'auto' | 'hold' | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
+  if (value === null) delete updated.auto_merge_default;
+  else updated.auto_merge_default = value;
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
+}
+
 export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
-  updateProjectsConfigSync(config => {
-    const project = config.projects[key];
-    if (!project) throw new Error(`Unknown project: ${key}`);
-    const updated: ProjectConfig = { ...project };
-    if (value === null) delete updated.auto_merge_default;
-    else updated.auto_merge_default = value;
-    config.projects[key] = updated;
-    return { config, result: undefined, changed: true };
-  });
+  updateProjectsConfigSync(config => setProjectAutoMergeDefaultMutation(config, key, value));
+}
+
+export async function setProjectAutoMergeDefault(key: string, value: 'auto' | 'hold' | null): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectAutoMergeDefaultMutation(config, key, value));
 }
 
 function prepareProjectRename(
@@ -630,33 +640,56 @@ export function renameProjectSync(key: string, newName: string): void {
   });
 }
 
+function setProjectSwarmPolicyMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: Omit<SwarmConfig, 'hotspots'> | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
+  const hotspots = project.swarm?.hotspots;
+  if (value === null && !hotspots?.length) delete updated.swarm;
+  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
+}
+
 export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
-  updateProjectsConfigSync(config => {
-    const project = config.projects[key];
-    if (!project) throw new Error(`Unknown project: ${key}`);
-    const updated: ProjectConfig = { ...project };
-    const hotspots = project.swarm?.hotspots;
-    if (value === null && !hotspots?.length) delete updated.swarm;
-    else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
-    config.projects[key] = updated;
-    return { config, result: undefined, changed: true };
-  });
+  updateProjectsConfigSync(config => setProjectSwarmPolicyMutation(config, key, value));
+}
+
+export async function setProjectSwarmPolicy(
+  key: string,
+  value: Omit<SwarmConfig, 'hotspots'> | null,
+): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectSwarmPolicyMutation(config, key, value));
 }
 
 /**
  * PAN-1696: Set or clear the per-project merge-train override.
  * Pass 'enabled' or 'disabled' to override the global flag, or null to use the global setting.
  */
+function setProjectMergeTrainMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: 'enabled' | 'disabled' | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
+  if (value === null) delete updated.merge_train;
+  else updated.merge_train = value;
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
+}
+
 export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
-  updateProjectsConfigSync(config => {
-    const project = config.projects[key];
-    if (!project) throw new Error(`Unknown project: ${key}`);
-    const updated: ProjectConfig = { ...project };
-    if (value === null) delete updated.merge_train;
-    else updated.merge_train = value;
-    config.projects[key] = updated;
-    return { config, result: undefined, changed: true };
-  });
+  updateProjectsConfigSync(config => setProjectMergeTrainMutation(config, key, value));
+}
+
+export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disabled' | null): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectMergeTrainMutation(config, key, value));
 }
 
 /**

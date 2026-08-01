@@ -29,6 +29,7 @@ let versionShipOutcome: {
   at: string;
 } | null;
 let versionSyncValidationErrors: string[] | null;
+let versionSyncLoadFails: boolean;
 /** The server-computed effective flag on the aggregate payloads. */
 let mergeTrainAggregateEnabled: boolean;
 
@@ -50,6 +51,7 @@ describe('ProjectSettingsDisclosure', () => {
     versionSyncConfig = null;
     versionShipOutcome = null;
     versionSyncValidationErrors = null;
+    versionSyncLoadFails = false;
     mergeTrainAggregateEnabled = true;
     fetchControl = installStrictFetchMock(({ method, url, init }) => {
       if (method === 'GET' && url === '/api/projects/overdeck/auto-merge-default') {
@@ -76,6 +78,7 @@ describe('ProjectSettingsDisclosure', () => {
         return Response.json({ value: mergeTrainValue, effective: mergeTrainValue === null ? mergeTrainEffective : mergeTrainValue !== 'disabled' });
       }
       if (method === 'GET' && url === '/api/projects/overdeck/version-sync') {
+        if (versionSyncLoadFails) return Response.json({ error: 'registry unavailable' }, { status: 503 });
         return Response.json({ config: versionSyncConfig, lastOutcome: versionShipOutcome });
       }
       if (method === 'PUT' && url === '/api/projects/overdeck/version-sync') {
@@ -290,6 +293,21 @@ describe('ProjectSettingsDisclosure', () => {
       'This project skips ship: no version_sync is declared, so batch promotes will not touch version strings.',
     )).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Configure version sync' })).toBeInTheDocument();
+  });
+
+  it('shows a retryable load error without exposing empty configuration controls', async () => {
+    versionSyncLoadFails = true;
+    renderDisclosure();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Could not load version ship configuration: registry unavailable',
+    );
+    expect(screen.queryByRole('button', { name: 'Configure version sync' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remove version sync' })).not.toBeInTheDocument();
+
+    versionSyncLoadFails = false;
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByRole('button', { name: 'Configure version sync' })).toBeInTheDocument();
   });
 
   it('edits and saves the structured version_sync block explicitly', async () => {

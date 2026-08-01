@@ -461,7 +461,7 @@ Version ship**. A `pending` promoted batch also remains visible on the batch
 card until the operator ships a version. Batch and settings API payloads omit
 operational `error` and `reason` text; they expose the status, fixed failure
 code, version, batch, timestamp, and path evidence needed by the UI, while raw
-command and Git diagnostics are bounded before linear-time credential redaction
+command and Git diagnostics are scanned for credentials before bounded sampling
 and stay only in local logs.
 
 Configure the block by hand in `projects.yaml` or through **Project settings →
@@ -474,9 +474,11 @@ comments whose association cannot be preserved. Every project-registry mutation
 holds one shared lock across its read, transformation, and atomic write, so a
 rename or policy update cannot overwrite a concurrent version configuration.
 The writer flushes a same-directory temporary file, atomically renames it, and
-flushes the directory. Lock files record the process ID plus process start time,
-so a confirmed-dead owner is reclaimed after a crash while a live owner remains
-exclusive. An unset project says plainly that it skips
+flushes the directory. A kernel advisory lock serializes processes and is released
+automatically when its owning file descriptor closes or its process crashes, so
+there is no stale-lock takeover race. Dashboard setting routes await the async
+lock/read/write/fsync path rather than blocking the Node event loop. An unset
+project says plainly that it skips
 ship rather than showing an empty form, and the section displays the latest
 `passed`, `pending`, `partial`, or `failed` outcome.
 

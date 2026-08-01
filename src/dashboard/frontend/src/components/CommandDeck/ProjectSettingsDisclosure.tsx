@@ -129,7 +129,7 @@ function VersionShipOutcomeView({ outcome }: { outcome: VersionShipOutcome | nul
 function VersionShipSettings({ projectKey }: { projectKey: string }) {
   const queryClient = useQueryClient();
   const queryKey = ['project-version-sync', projectKey] as const;
-  const { data, isLoading } = useQuery({
+  const { data, error, isError, isFetching, isLoading, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<VersionSyncPayload> => {
       const res = await fetch(`/api/projects/${encodeURIComponent(projectKey)}/version-sync`);
@@ -191,6 +191,11 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
 
       {isLoading ? (
         <p className="mt-2 text-[11px] text-muted-foreground">Loading version ship…</p>
+      ) : isError ? (
+        <div className="mt-2 text-[11px] text-red-400" role="alert">
+          <p>Could not load version ship configuration: {error instanceof Error ? error.message : 'unknown error'}</p>
+          <button type="button" disabled={isFetching} onClick={() => void refetch()} className="mt-1 font-medium text-primary hover:underline disabled:opacity-50">{isFetching ? 'Retrying…' : 'Retry'}</button>
+        </div>
       ) : editing ? (
         <div className="mt-3 space-y-3">
           <div className="grid gap-2 sm:grid-cols-3">
@@ -292,10 +297,12 @@ function VersionShipSettings({ projectKey }: { projectKey: string }) {
         </div>
       )}
 
-      <div className="mt-3 border-t border-border pt-2">
-        <div className="mb-1 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Latest outcome</div>
-        <VersionShipOutcomeView outcome={data?.lastOutcome ?? null} />
-      </div>
+      {!isError && (
+        <div className="mt-3 border-t border-border pt-2">
+          <div className="mb-1 text-[9.5px] font-bold uppercase tracking-wider text-muted-foreground">Latest outcome</div>
+          <VersionShipOutcomeView outcome={data?.lastOutcome ?? null} />
+        </div>
+      )}
     </section>
   );
 }

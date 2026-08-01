@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 
 const { TEST_HOME } = vi.hoisted(() => {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -65,11 +67,6 @@ const COMMENT_VERSION_SYNC = {
   expect: [{ path: 'package.json', pattern: 'version' }],
   push: ['.'],
 } satisfies VersionSyncConfig;
-
-function processStartTime(pid: number): string {
-  const stat = readFileSync(`/proc/${pid}/stat`, 'utf-8');
-  return stat.slice(stat.lastIndexOf(')') + 2).trim().split(/\s+/)[19]!;
-}
 
 beforeEach(() => {
   mkdirSync(TEST_HOME, { recursive: true });
@@ -216,7 +213,7 @@ describe('setProjectVersionSync', () => {
     const parsed = loadProjectsConfigSync();
     expect(parsed.projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
     expect(parsed.projects.beta?.version_sync).toEqual(COMMENT_VERSION_SYNC);
-    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml']);
+    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml', 'projects.yaml.lock']);
   });
 
   it('holds the lock across read and transform so a queued save reads the renamed project', async () => {
@@ -255,32 +252,65 @@ describe('setProjectVersionSync', () => {
     expect(parsed.projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
   });
 
-  it('leaves the durable registry intact when another writer owns the shared lock', () => {
+  it('releases the in-process queue after directory setup fails', async () => {
     const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
-    const owner = `${JSON.stringify({ pid: process.pid, startTime: processStartTime(process.pid) })}\n`;
-    writeFileSync(`${PROJECTS_CONFIG_FILE}.lock`, owner, 'utf-8');
+    const notDirectory = join(TEST_HOME, 'not-a-directory');
+    writeFileSync(notDirectory, 'file', 'utf-8');
 
-    expect(() => saveProjectsConfigSync({
-      projects: { beta: { name: 'Beta', path: '/repo/beta' } },
-    })).toThrow('projects.yaml is already being modified');
-    expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
-    expect(readFileSync(`${PROJECTS_CONFIG_FILE}.lock`, 'utf-8')).toBe(owner);
+    await expect(updateProjectsConfigText(
+      join(notDirectory, 'projects.yaml'),
+      'projects: {}\n',
+      content => ({ content, result: undefined }),
+    )).rejects.toBeDefined();
+
+    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
+    expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
   });
 
-  it('reclaims a stale projects-config lock only after confirming its owner is dead', async () => {
+  it('leaves the durable registry intact when another process owns the kernel lock', () => {
     const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
-    writeFileSync(
-      `${PROJECTS_CONFIG_FILE}.lock`,
-      `${JSON.stringify({ pid: 999_999_999, startTime: 'dead-owner' })}\n`,
-      'utf-8',
-    );
+    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
+    const fd = openSync(lock, 'a+', 0o600);
+    const acquired = spawnSync('flock', ['-n', '3'], { stdio: ['ignore', 'ignore', 'pipe', fd] });
+    expect(acquired.status).toBe(0);
+
+    try {
+      expect(() => saveProjectsConfigSync({
+        projects: { beta: { name: 'Beta', path: '/repo/beta' } },
+      })).toThrow('projects.yaml is already being modified');
+      expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
+    } finally {
+      closeSync(fd);
+    }
+  });
+
+  it('allows only one external contender and releases the lock when its owner exits', () => {
+    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
+    const fd = openSync(lock, 'a+', 0o600);
+    expect(spawnSync('flock', ['-n', '3'], { stdio: ['ignore', 'ignore', 'pipe', fd] }).status).toBe(0);
+
+    const contenderA = spawnSync('flock', ['-n', lock, 'true']);
+    const contenderB = spawnSync('flock', ['-n', lock, 'true']);
+    expect(contenderA.status).toBe(1);
+    expect(contenderB.status).toBe(1);
+
+    closeSync(fd);
+    expect(spawnSync('flock', ['-n', lock, 'true']).status).toBe(0);
+  });
+
+  it('recovers automatically after a lock-owning process is killed', async () => {
+    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
+    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
+    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
+    const killed = spawnSync('flock', [lock, 'sh', '-c', 'kill -9 $$']);
+    expect(killed.status).not.toBe(0);
 
     await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
 
     expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
-    expect(readdirSync(TEST_HOME)).toEqual(['projects.yaml']);
+    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml', 'projects.yaml.lock']);
   });
 
   it('rejects a flow-style project without changing the file', async () => {
