@@ -627,3 +627,10 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 
 - **PAN-3404 landed** (#3405 squash, test lane green on the fix branch itself) and handed off. Lazy-clock fix covers 4 files. Main CI watch armed on the merge — on green: drain PAN-1889/3392/3393 close-outs + re-run #3402's poisoned test lane + close out PAN-3404 itself once deployed.
 - Red-main duration: ~12:00Z detonation → ~13:05Z merge (~65 min from detonation to fix-on-main, root cause to file:line in ~25 min).
+
+## RUN-79 tick 15 (2026-08-01 ~13:15Z) — main GREEN, deployed, ALL close-outs drained; 4/4 implementation-verified; auto-closeout gap named
+
+- Main re-greened (133aa316e9 success), **I deployed via pan reload** (live = 133aa316e9), and **PAN-1889, PAN-3392, PAN-3393, PAN-3404 all closed out** (8-row DoD each, no overrides). Run totals: 9 PAN issues landed+closed today + MIN-929/MIN-908 + 6 zombie drains.
+- **Implementation verification (operator-requested), 2 parallel reviewers, all CONFIRMED**: 1889 (threshold in pan flywheel report + verbatim-preservation test), 3404 (4 lazy-clock sites + repo-wide grep clean), 3392 (null-state logs, start fallback through the agents endpoint, needs-you only on double exhaustion, demanded tests present), 3393 (patrol retirement via write door, merged-aware /unstick, pan unstick CLI + skill). Two scoped observations recorded: 1889's summarizer does no lesson-folding (not an AC); 3393's auto-retirement covers feedback_delivery_needs_you+merged only — other stuck reasons still never retire (follow-up candidate).
+- **WHY THE OPERATOR HAD TO ASK (named gap): `close_out.auto` is OFF.** The deacon auto-closeout patrol EXISTS (deacon-auto-closeout, config close_out.auto + auto_delay_minutes) and is disabled — no close_out section in config.yaml. With it ON, merge → deploy-patrol → auto-closeout is fully mechanical (DoD gate still enforces every row). Recommended to operator; their call to enable.
+- My own gap this run: the re-green watch covered CI but not the deploy row — the drain would have waited for the deploy patrol. Lesson: arm watches on the LAST gate in the chain, not the first.
