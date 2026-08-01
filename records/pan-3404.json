@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T12:26:04.571Z",
-  "updated": "2026-08-01T12:53:48.893Z",
+  "updated": "2026-08-01T12:53:59.082Z",
   "pipeline": {
     "issueId": "PAN-3404",
     "reviewStatus": "passed",
@@ -11,9 +11,9 @@
     "verificationStatus": "skipped",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T12:53:46.923Z",
+    "updatedAt": "2026-08-01T12:53:58.980Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)"
   },
@@ -22,24 +22,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 357030,
-            "output": 24187,
-            "cacheRead": 9931264,
+            "input": 389913,
+            "output": 25696,
+            "cacheRead": 10548736,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 357030,
-          "output": 24187,
-          "cacheRead": 9931264,
+          "input": 389913,
+          "output": 25696,
+          "cacheRead": 10548736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 7.476392,
-        "pricingAsOf": "2026-08-01T12:53:48.883Z"
+        "usd": 7.994813,
+        "pricingAsOf": "2026-08-01T12:53:59.000Z"
       }
     },
     "merges": [],
