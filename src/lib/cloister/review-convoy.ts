@@ -154,6 +154,16 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
    * prompt cache instead of re-reading the diff and files at full price.
    */
   forkedSessionId?: string;
+  /**
+   * The synthesis parent's OWN session id (the fork source). On non-Anthropic
+   * models routed through CLIProxy, the launcher exports
+   * ANTHROPIC_CUSTOM_HEADERS="X-Claude-Code-Session-Id: <this>" so the forked
+   * reviewer shares the parent's Codex prompt-cache scope. Without it, CLIProxy
+   * (v7.2.x) derives the scope from the reviewer's own session header and the
+   * replayed prefix can never hit the parent's cache (proven 2026-08-01: same
+   * bytes + parent scope = 97% cached; own scope = 0).
+   */
+  forkParentSessionId?: string;
 }): Promise<{ success: boolean; message: string; error?: string; sessionId?: string }> {
   try {
     const { saveAgentState, spawnRun, getAgentStateSync, getLatestSessionIdSync, resumeAgent, stopAgent } = await import('../agents.js');
@@ -250,6 +260,19 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
           '',
         ].join('\n')
       : '';
+    // Share the parent's CLIProxy prompt-cache scope (see forkParentSessionId doc).
+    // ANTHROPIC_CUSTOM_HEADERS overrides the header Claude Code sends natively.
+    // Anthropic-routed models skip this: their cache is content-addressed and the
+    // spoofed session header would only distort Anthropic-side attribution.
+    let forkScopeHeaderExport: string | undefined;
+    if (opts.forkedSessionId && opts.forkParentSessionId) {
+      try {
+        const { getProviderForModelSync } = await import('../providers.js');
+        if (getProviderForModelSync(model).name !== 'anthropic') {
+          forkScopeHeaderExport = `export ANTHROPIC_CUSTOM_HEADERS="X-Claude-Code-Session-Id: ${opts.forkParentSessionId}"`;
+        }
+      } catch { /* provider lookup failure — spawn without the scope header */ }
+    }
     const reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
     const spawnOptions = {
       workspace: opts.workspace,
@@ -258,6 +281,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
       model,
       harness: opts.harness,
       ...(opts.forkedSessionId ? { resumeSessionId: opts.forkedSessionId } : {}),
+      ...(forkScopeHeaderExport ? { extraEnvExports: [forkScopeHeaderExport] } : {}),
       // Persist every signal-routing field before tmux launch. A later
       // running-state cache write may contend, but the reviewer can still
       // finish and the Stop-hook can still deliver REVIEWER_READY.
@@ -373,7 +397,7 @@ export async function computeConvoyScope(issueId: string, workspace: string): Pr
  * fork is not possible — caller degrades to a fresh independent spawn (NFR-2).
  * The source JSONL is copied, never modified.
  */
-async function forkParentSessionForReviewer(parentAgentId: string, workspace: string): Promise<string | null> {
+async function forkParentSessionForReviewer(parentAgentId: string, workspace: string): Promise<{ sessionId: string; parentSessionId: string } | null> {
   try {
     const { getLatestSessionIdSync } = await import('../agents.js');
     const parentSessionId = getLatestSessionIdSync(parentAgentId);
@@ -384,7 +408,7 @@ async function forkParentSessionForReviewer(parentAgentId: string, workspace: st
     const { reserveForkSession, copySessionForFork } = await import('../conversations/session-fork.js');
     const reserved = await reserveForkSession(workspace);
     await copySessionForFork(src, reserved.sessionFile, { fullHistory: true });
-    return reserved.sessionId;
+    return { sessionId: reserved.sessionId, parentSessionId };
   } catch (err) {
     console.warn(`[review-agent] Fork from ${parentAgentId} failed (degrading to independent spawn): ${err instanceof Error ? err.message : String(err)}`);
     return null;
@@ -454,13 +478,16 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
     // no resumable prior-cycle session of its own (its OWN context beats a re-fork —
     // PRD decision 3). Every failure degrades to today's independent spawn (NFR-2).
     let forkedSessionId: string | undefined;
+    let forkParentSessionId: string | undefined;
     if (params.forkFromParent && parentState?.harness === 'claude-code' && !params.harness) {
       try {
         const { getLatestSessionIdSync } = await import('../agents.js');
         const reviewerModel = params.model ?? resolveModel('review', subRole, cfg);
         const hasOwnSession = !!getLatestSessionIdSync(reviewerAgentId(params.issueId, subRole));
         if (!hasOwnSession && reviewerModel === parentState.model) {
-          forkedSessionId = (await forkParentSessionForReviewer(params.synthesisAgentId, params.workspace)) ?? undefined;
+          const fork = await forkParentSessionForReviewer(params.synthesisAgentId, params.workspace);
+          forkedSessionId = fork?.sessionId;
+          forkParentSessionId = fork?.parentSessionId;
           if (forkedSessionId) {
             console.log(`[review-agent] Forked ${subRole} reviewer for ${params.issueId} from ${params.synthesisAgentId}'s discovery session (PAN-1862)`);
           }
@@ -479,6 +506,7 @@ export async function launchConvoyReviewersPromise(params: ConvoyLaunchParams): 
       ...(params.model ? { model: params.model } : {}),
       ...(params.harness ? { harness: params.harness } : {}),
       ...(forkedSessionId ? { forkedSessionId } : {}),
+      ...(forkParentSessionId ? { forkParentSessionId } : {}),
       allowHost: params.allowHost ?? false,
     }));
     if (!result.success) {
@@ -526,6 +554,8 @@ export const spawnReviewSubRoleForIssue = (opts: {
   model?: string;
   harness?: RuntimeName;
   allowHost?: boolean;
+  forkedSessionId?: string;
+  forkParentSessionId?: string;
 }): Effect.Effect<{ success: boolean; message: string; error?: string; sessionId?: string }> =>
   Effect.promise(() => spawnReviewSubRoleForIssuePromise(opts));
 
@@ -551,15 +581,26 @@ export async function handleReviewDiscoveryReady(
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
   const { saveAgentState, getAgentStateSync } = await import('../agents.js');
-  const parent = getAgentStateSync(parentId);
-  if (!parent) {
+  const parentState = getAgentStateSync(parentId);
+  if (!parentState) {
     return { success: false, message: `No review parent state for ${normalized} — nothing to fork` };
+  }
+
+  let parent: typeof parentState | null;
+  try {
+    const { resolveReviewParentRunState } = await import('./review-run-recovery.js');
+    parent = await resolveReviewParentRunState(parentState, { persistCurrent: true });
+  } catch (error) {
+    return {
+      success: false,
+      message: `Could not persist active review run state for ${normalized}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (!parent?.workspace || !parent.reviewRunId) {
+    return { success: false, message: `Review parent for ${normalized} is missing workspace/runId state — cannot launch the convoy` };
   }
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
-  if (!workspace || !runId) {
-    return { success: false, message: `Review parent for ${normalized} is missing workspace/runId state — cannot launch the convoy` };
-  }
 
   // PAN-2585: the signal is AUTHORITATIVE. `reviewDiscoveryPending` is persisted only
   // in state.json and is invisible through the DB-backed agent reader, so it must not

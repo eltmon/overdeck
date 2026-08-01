@@ -38,7 +38,7 @@ Before starting work in a Claude Code session, start your message inbox as a bac
 
 ## Bypass shape
 
-Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
 
 This is appropriate only for issues that are:
 

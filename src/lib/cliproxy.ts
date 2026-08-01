@@ -46,7 +46,13 @@ export const CLIPROXY_PORT = 8317;
 export const CLIPROXY_AUTH_TOKEN = 'overdeck-local-cliproxy-key';
 export const CLIPROXY_BASE_URL = `http://${CLIPROXY_HOST}:${CLIPROXY_PORT}`;
 
-const CLIPROXY_RELEASE_VERSION = 'v7.1.39';
+// v7.2.113 (PAN-1862 cache follow-up): derives the Codex prompt_cache_key
+// deterministically from the X-Claude-Code-Session-Id request header instead of
+// v7.1.39's random uuid memoized per (model, metadata.user_id) with a 1h
+// absolute expiry. The old scheme sharded the OpenAI prompt cache per Claude
+// session (user_id embeds the session uuid), rotated keys mid-session every
+// hour, and cold-started all caching on proxy restart.
+const CLIPROXY_RELEASE_VERSION = 'v7.2.113';
 
 export function getCliproxyDir(): string {
   return join(OVERDECK_HOME, 'cliproxy');
