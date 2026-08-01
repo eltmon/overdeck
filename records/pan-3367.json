@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:20:03.292Z",
+  "updated": "2026-08-01T10:30:43.928Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -60,18 +60,33 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "snapshot-evidence": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3367",
         "agentId": "agent-pan-3367",
         "pid": 264958,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:20:03.291Z"
+        "claimedAt": "2026-08-01T10:20:03.291Z",
+        "itemId": "snapshot-evidence",
+        "outcome": "completed",
+        "reason": "Ran the reproduction script (61 candidates over the full surviving event window), computed commit counts for all 25 mandatory + 22 in-window extras via gh/glab PR-commit lists, gzipped the raw event dumps (115MB -> 1.7MB), and wrote worklist.md (30 rows: 25 mandatory + 5 zero-commit derived extras, no overflow). Surfaced 3 findings for downstream batches: the issue body's 4-way zero-commit spot-check only holds for PAN-3216 (PAN-3192/3206/3230 each have 2 in-window commits); rebase/merge noise can inflate raw PR-commit counts; and MYN's frontend is GitLab-hosted, not GitHub as the PRD states.",
+        "releasedAt": "2026-08-01T10:30:43.927Z"
+      }
+    ],
+    "statusReasons": {
+      "snapshot-evidence": {
+        "reason": "Ran the reproduction script (61 candidates over the full surviving event window), computed commit counts for all 25 mandatory + 22 in-window extras via gh/glab PR-commit lists, gzipped the raw event dumps (115MB -> 1.7MB), and wrote worklist.md (30 rows: 25 mandatory + 5 zero-commit derived extras, no overflow). Surfaced 3 findings for downstream batches: the issue body's 4-way zero-commit spot-check only holds for PAN-3216 (PAN-3192/3206/3230 each have 2 in-window commits); rebase/merge noise can inflate raw PR-commit counts; and MYN's frontend is GitLab-hosted, not GitHub as the PRD states.",
+        "updatedAt": "2026-08-01T10:30:43.927Z"
       }
     }
   },
   "statusOverrides": {
-    "snapshot-evidence": "running"
+    "snapshot-evidence": "completed",
+    "snapshot-evidence.snapshot-evidence.ac1": "completed",
+    "snapshot-evidence.snapshot-evidence.ac2": "completed",
+    "snapshot-evidence.snapshot-evidence.ac3": "completed",
+    "snapshot-evidence.snapshot-evidence.ac4": "completed"
   }
 }
