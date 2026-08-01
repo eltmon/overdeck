@@ -98,7 +98,7 @@
     "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:29:22.185Z",
+  "updated": "2026-08-01T12:29:42.045Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -114,7 +114,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
     "lastVerifiedCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
-    "reviewRequestedAt": "2026-08-01T12:28:22.535Z",
+    "reviewRequestedAt": "2026-08-01T12:29:41.661Z",
     "reviewSpawnedAt": "2026-08-01T11:40:59.040Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -147,7 +147,8 @@
         "tests/unit/lib/uat-fixtures/seed.test.ts"
       ],
       "recordedAt": "2026-08-01T12:28:15.326Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-01T12:29:41.661Z"
   },
   "closeOut": {
     "usage": {
