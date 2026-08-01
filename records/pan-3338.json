@@ -90,19 +90,21 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T21:20:18.705Z",
+  "updated": "2026-08-01T21:24:27.304Z",
   "pipeline": {
     "issueId": "PAN-3338",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-01T21:19:42.433Z",
-    "reviewNotes": "Finalize can publish stale session liveness and succeed without the required status event",
+    "updatedAt": "2026-08-01T21:24:27.138Z",
+    "reviewNotes": "Prior liveness and atomicity blockers are fixed; one deferred-correction hardening advisory remains",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
+    "reviewedAtCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78",
     "reviewSpawnedAt": "2026-08-01T21:19:42.433Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -134,6 +136,24 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
+      }
     }
   },
   "closeOut": {
@@ -141,9 +161,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 715758,
-            "output": 28867,
-            "cacheRead": 11356160,
+            "input": 3793329,
+            "output": 98071,
+            "cacheRead": 25546240,
             "cacheWrite": 0
           }
         },
@@ -190,9 +210,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6269299,
-          "output": 169946,
-          "cacheRead": 53079040,
+          "input": 9346870,
+          "output": 239150,
+          "cacheRead": 67269120,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -203,8 +223,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 77.172718,
-        "pricingAsOf": "2026-08-01T21:19:46.265Z"
+        "usd": 101.73173299999999,
+        "pricingAsOf": "2026-08-01T21:24:27.268Z"
       }
     },
     "merges": [
@@ -213,7 +233,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3338",
