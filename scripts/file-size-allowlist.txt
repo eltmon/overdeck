@@ -31,3 +31,4 @@
 1268 src/lib/projects.ts # PAN-3358
 1138 src/dashboard/server/routes/settings.ts # PAN-3388
 1532 src/lib/model-capabilities.ts # PAN-3388
+1029 src/dashboard/server/routes/conversations.ts # PAN-1577

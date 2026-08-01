@@ -29,9 +29,12 @@ import {
   listConversations,
   updateConversationCost,
   updateConversationTitle,
+  setConversationProjectKey,
   canReplaceTitle,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { getProjectSync } from '../projects.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -796,6 +799,37 @@ export function patchConversationTitle(
   }
 
   return { status: 200, body: { success: true } };
+}
+
+/**
+ * Reassign a conversation's project — sets only the project_key override.
+ * Deliberately never touches cwd, the tmux session, or the backing session
+ * file; those stay put so the sacred JSONL is never relocated (PAN-1577).
+ */
+export function handleConversationMove(
+  name: string,
+  body: Record<string, unknown>,
+): { status: number; body: Conversation | { error: string } } {
+  const conv = getConversationByName(name);
+  if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
+
+  const projectKey = typeof body.projectKey === 'string' ? body.projectKey.trim() : '';
+  const projectConfig = projectKey ? getProjectSync(projectKey) : null;
+  if (!projectKey || !projectConfig || !existsSync(projectConfig.path)) {
+    return { status: 400, body: { error: `Unknown project: ${projectKey}` } };
+  }
+
+  if (conv.projectKey === projectKey) {
+    return { status: 200, body: conv };
+  }
+
+  setConversationProjectKey(name, projectKey);
+  getEventStore().emitOnly({
+    type: 'conversation.moved',
+    timestamp: new Date().toISOString(),
+    payload: { conversationName: name, projectKey },
+  });
+  return { status: 200, body: getConversationByName(name) ?? conv };
 }
 
 const retitleInFlight = new Set<string>();
