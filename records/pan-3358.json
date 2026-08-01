@@ -476,10 +476,10 @@
     "recordedAt": "2026-08-01T00:50:13.550Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T00:58:17.370Z",
+  "updated": "2026-08-01T00:58:19.798Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -487,8 +487,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T00:50:57.096Z",
-    "updatedAt": "2026-08-01T00:58:17.334Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
+    "updatedAt": "2026-08-01T00:58:18.038Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3358-review",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
@@ -672,7 +672,7 @@
       },
       "costAtCloseOut": {
         "usd": 934.851396,
-        "pricingAsOf": "2026-08-01T00:58:17.359Z"
+        "pricingAsOf": "2026-08-01T00:58:19.794Z"
       }
     },
     "merges": [
