@@ -88,6 +88,8 @@ export interface AgentRowModel {
   model: string;
   /** Harness that spawned the session (claude-code | pi | codex). */
   harness?: string;
+  /** Session start timestamp used by run-detail surfaces. */
+  startedAt: string;
   /** Formatted cost string, e.g. "$1.23 · 4.5k tok", when available. */
   cost?: string;
   /** Session duration in seconds, or null. */
@@ -137,14 +139,26 @@ export interface IssueResourcesModel {
 }
 
 export interface IssueOperatorModel {
-  /** Non-null when the operator must act before the pipeline can proceed. */
+  /** Legacy primary operator state retained for existing density consumers. */
   needsYou: OperatorNeedsYou | null;
+  /** Every active cockpit needs-you signal, ordered by operator priority. */
+  needsYouItems: OperatorNeedsYou[];
 }
 
 export interface OperatorNeedsYou {
-  kind: 'troubled' | 'paused' | 'stopped' | 'ready_for_merge';
+  kind:
+    | 'awaiting_input'
+    | 'stuck'
+    | 'troubled'
+    | 'paused'
+    | 'stale_review'
+    | 'blocker'
+    | 'pickup_gate'
+    | 'stopped'
+    | 'ready_for_merge';
   sessionId?: string;
   reason?: string;
+  prompt?: string;
 }
 
 /** Raw data sources passed into the view builder. */

@@ -1,4 +1,4 @@
-import { readdir, rm, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
+import { readdir, writeFile as writeFileAsync, mkdir as mkdirAsync } from 'fs/promises';
 import { join } from 'path';
 import { Effect } from 'effect';
 import type { RuntimeName } from '../runtimes/types.js';
@@ -12,6 +12,7 @@ import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } fro
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
 import { normalizeAgentId } from './identity.js';
+import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
 
 export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
@@ -231,7 +232,7 @@ export async function wipeAgentStateDirs(
   }
   for (const name of targets) {
     try {
-      await rm(join(AGENTS_DIR, name), { recursive: true, force: true });
+      await removeAgentStateDir(join(AGENTS_DIR, name));
     } catch { /* non-fatal — best-effort wipe */ }
   }
   return { removed: targets, path: dirPath };

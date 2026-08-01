@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Effect } from 'effect';
@@ -96,6 +96,20 @@ describe('reapIssueResidue', () => {
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git branch -D "feature/pan-2054"')).toBe(true);
     expect(mocks.exec.mock.calls.some((call) => String(call[0]) === 'git push origin --delete "feature/pan-2054"')).toBe(true);
     expect(mocks.killSession).toHaveBeenCalledTimes(4);
+  });
+
+  it('preserves agent JSONL transcripts while reaping runtime residue', async () => {
+    const agentDir = join(mocks.agentsDir, 'agent-pan-2054');
+    const transcriptPath = join(agentDir, 'codex-home', 'sessions', 'rollout.jsonl');
+    mkdirSync(join(agentDir, 'codex-home', 'sessions'), { recursive: true });
+    writeFileSync(transcriptPath, '{"event":"kept"}\n');
+    writeFileSync(join(agentDir, 'state.json'), '{}');
+
+    const actions = await reapIssueResidue(projectPath, 'PAN-2054');
+
+    expect(existsSync(transcriptPath)).toBe(true);
+    expect(existsSync(join(agentDir, 'state.json'))).toBe(false);
+    expect(actions).toContain('cleaned agent state agent-pan-2054 (1 transcript file preserved)');
   });
 
   it('skips disk cleanup when the feature branch is unmerged', async () => {

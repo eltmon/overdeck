@@ -269,6 +269,33 @@ child over stdio and renders a readable event feed into the pane. Deacon still
 patrols the tmux session; it does not treat the Codex child process as a
 separate liveness source.
 
+### Transcript retention
+
+Agent-state cleanup goes through `removeAgentStateDir()` in
+`src/lib/agents/state-dir-removal.ts`. The door deletes runtime residue but
+preserves every nested `*.jsonl` transcript in place; the lint guard rejects
+new direct agent-directory removals outside that door.
+
+Transcripts are retained forever by default. A positive
+`retention.transcript_days` enables the dedicated Deacon sweep, which deletes
+only JSONL files older than the configured age from ended agent state dirs and
+never touches a live tmux session. Terminal agent GC removes runtime residue
+through the same door but retains the registry row while any JSONL remains; the
+row preserves the agent-to-issue link needed to read the durable closed-out
+verdict on a later sweep. The row's `phase` becomes `retained-transcripts`, and
+a matching `.retained-transcripts` marker prevents generic GC from resolving
+or walking that transcript-only tree. Disk-only cleanup reconstructs this
+minimal tombstone from `state.json` before removing runtime residue, or fails
+closed when no identity can be recovered. The explicit expiry sweep
+removes the marker, directory, and row after the final JSONL reaches its cutoff.
+When the setting is absent,
+the sweep is not called and does not traverse the filesystem.
+
+`conv-*` directories remain excluded from automatic agent-state cleanup because
+they are the canonical transcript home for Codex and Pi conversations. The
+explicit transcript sweep may enter one only when the conversation read door
+reports it ended or archived and no live tmux session exists.
+
 ## Transcript-verified resumability (PAN-3194)
 
 A stored Claude session ID is resumable only when its JSONL transcript exists at

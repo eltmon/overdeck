@@ -470,6 +470,15 @@ Key rules:
 - `pan admin db backfill-records` writes permanent records for all in-flight issues.
 - `OVERDECK_NO_RESUME=1` disables event-driven deacon resume/orphan recovery as a kill switch.
 
+Agent-dir deletion goes through `removeAgentStateDir()`, which removes runtime
+residue while preserving every `**/*.jsonl` transcript in place. Transcripts
+are retained forever by default; only an explicit positive
+`retention.transcript_days` enables the ended-agent transcript sweep. Terminal
+registry rows remain in `phase: retained-transcripts` while JSONLs need their
+agent-to-issue link; a `.retained-transcripts` marker prevents repeated generic
+GC reads and walks. Automatic
+cleanup continues to skip `conv-*` dirs entirely.
+
 See [`docs/AGENT-STATE-PLANES.md`](docs/AGENT-STATE-PLANES.md) for the full model.
 
 ## Workspaces & Projects (PAN-1990)

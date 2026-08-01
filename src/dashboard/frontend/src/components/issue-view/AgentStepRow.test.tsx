@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import type { AgentRuntimeSnapshot, SessionNode as SessionNodeType } from '@overdeck/contracts';
 import { AgentStepRow } from './AgentStepRow';
+import { AGENT_ROW_SECTIONS } from './inventory';
 
 vi.mock('lucide-react', async (importOriginal) => {
   const actual = await importOriginal<typeof import('lucide-react')>();
@@ -17,6 +18,7 @@ vi.mock('lucide-react', async (importOriginal) => {
 });
 
 let runtimeById: Record<string, Partial<AgentRuntimeSnapshot>> = {};
+let costSessions: Array<{ sessionId: string; cost: number; tokenCount?: number }> = [];
 
 vi.mock('../../lib/store', () => ({
   useDashboardStore: (selector: (state: { agentRuntimeById: typeof runtimeById }) => unknown) => (
@@ -61,7 +63,7 @@ vi.mock('../shared/ModelPicker/ModelPicker', () => ({
 }));
 
 vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
-  useIssueCostsQuery: () => ({ data: { sessions: [] } }),
+  useIssueCostsQuery: () => ({ data: { sessions: costSessions } }),
   useReviewStatusQuery: () => ({ data: null }),
   useWorkspaceQuery: () => ({ data: null }),
 }));
@@ -69,7 +71,7 @@ vi.mock('../CommandDeck/ZoneCOverviewTabs/queries', () => ({
 vi.mock('../shared/ContextMenu', () => ({
   ContextMenuRoot: ({ children }: { children: ReactNode }) => <>{children}</>,
   ContextMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
-  ContextMenuContent: ({ children }: { children: ReactNode }) => <div data-testid="context-menu">{children}</div>,
+  ContextMenuContent: ({ children, ...props }: { children: ReactNode; 'data-section'?: string }) => <div data-testid="context-menu" {...props}>{children}</div>,
   ContextMenuItem: ({ children, onSelect }: { children: ReactNode; onSelect?: () => void }) => (
     <button type="button" onClick={onSelect}>{children}</button>
   ),
@@ -128,6 +130,8 @@ vi.mock('../Stage/cockpit/agentsLane.module.css', () => ({
     sel: 'sel',
     caret: 'caret',
     caretBtn: 'caretBtn',
+    dotSlot: 'dotSlot',
+    rowWrap: 'rowWrap',
     tile: 'tile',
     work: 'work',
     review: 'review',
@@ -137,11 +141,14 @@ vi.mock('../Stage/cockpit/agentsLane.module.css', () => ({
     body: 'body',
     l1: 'l1',
     name: 'name',
+    verdict: 'verdict',
+    cost: 'cost',
     status: 'status',
     info: 'info',
     muted: 'muted',
     model: 'model',
     sub: 'sub',
+    pausedReason: 'pausedReason',
     spin: 'spin',
   },
 }));
@@ -162,6 +169,7 @@ function makeSession(overrides?: Partial<SessionNodeType>): SessionNodeType {
 describe('AgentStepRow', () => {
   beforeEach(() => {
     runtimeById = {};
+    costSessions = [];
   });
 
   it('renders a cockpit row with label, model, and duration', () => {
@@ -211,7 +219,7 @@ describe('AgentStepRow', () => {
     );
   });
 
-  it('shows a spinner for live activity in cockpit', () => {
+  it('shows a blue active dot for live work in cockpit', () => {
     render(
       <AgentStepRow
         session={makeSession({ presence: 'active', status: 'working' })}
@@ -221,10 +229,10 @@ describe('AgentStepRow', () => {
       />,
     );
 
-    expect(document.querySelector('.spin')).toBeTruthy();
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'active');
   });
 
-  it('does not show a spinner for ended sessions in cockpit', () => {
+  it('shows an emerald done dot for ended sessions in cockpit', () => {
     render(
       <AgentStepRow
         session={makeSession({ presence: 'ended', status: 'stopped' })}
@@ -234,7 +242,45 @@ describe('AgentStepRow', () => {
       />,
     );
 
-    expect(document.querySelector('.spin')).toBeFalsy();
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'done');
+  });
+
+  it('shows a purple specialist dot for a live reviewer', () => {
+    render(
+      <AgentStepRow
+        session={makeSession({ type: 'reviewer', role: 'security', presence: 'active', status: 'working' })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    expect(screen.getByTestId('status-dot')).toHaveAttribute('data-status', 'reviewing');
+  });
+
+  it('preserves all ten agent-row sections in the cockpit row surface', () => {
+    costSessions = [{ sessionId: 'agent-pan-821', cost: 1.25, tokenCount: 2000 }];
+    const { container } = render(
+      <AgentStepRow
+        session={makeSession({
+          type: 'reviewer',
+          role: 'correctness',
+          presence: 'suspended',
+          status: 'stopped',
+          paused: true,
+          pausedReason: 'Waiting for operator',
+          roundMetadata: { latestReviewResult: 'APPROVED' },
+        })}
+        issueId="PAN-821"
+        density="cockpit"
+        onAction={() => {}}
+      />,
+    );
+
+    for (const section of AGENT_ROW_SECTIONS) {
+      expect(container.querySelector(`[data-section="${section}"]`), section).toBeInTheDocument();
+    }
+    expect(screen.getByText('$1.25 · 2k tok')).toHaveClass('cost');
   });
 
   it('renders an approved verdict tick', () => {

@@ -172,7 +172,7 @@ export function stopAgentSync(agentId: string, cause: AgentStopCause = 'system')
   killLauncherProcessSync(normalizedId);
 
   try {
-    rmSync(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true });
+    rmSync(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true }); // PAN-3357: not a dir removal
   } catch {
     // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
   }
@@ -234,7 +234,7 @@ export const stopAgent = (
 
     yield* Effect.promise(async () => {
       try {
-        await rm(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true });
+        await rm(join(AGENTS_DIR, normalizedId, 'git-guard'), { recursive: true, force: true }); // PAN-3357: not a dir removal
       } catch {
         // Non-fatal — stopping the agent must succeed even if guard cleanup fails.
       }

@@ -26,6 +26,7 @@ import { POST_MERGE_RESIDUE_LABELS, WORKFLOW_LABELS } from './lifecycle/close-is
 import { findWorkspacePath } from './lifecycle/archive-planning.js';
 import { teardownWorkspaceDockerByNamePromise } from './workspace-manager/docker.js';
 import { extractNumberSync, extractPrefixSync, normalizeIssueIdSync } from './issue-id.js';
+import { removeAgentStateDir } from './agents/state-dir-removal.js';
 
 const execAsync = promisify(exec);
 
@@ -446,22 +447,28 @@ const CLOSED_OUT_COLOR = '1d4ed8';async function executeCloseOutPromise(ctx: Clo
   // Step 5: Clean up agent state
   try {
     let cleaned = false;
+    let preservedTranscripts = 0;
     const agentDir = join(AGENTS_DIR, `agent-${issueLower}`);
     const planningDir = join(AGENTS_DIR, `planning-${issueLower}`);
 
     if (existsSync(agentDir)) {
-      rmSync(agentDir, { recursive: true, force: true });
+      const result = await removeAgentStateDir(agentDir);
+      preservedTranscripts += result.preservedTranscripts;
       cleaned = true;
     }
     if (existsSync(planningDir)) {
-      rmSync(planningDir, { recursive: true, force: true });
+      const result = await removeAgentStateDir(planningDir);
+      preservedTranscripts += result.preservedTranscripts;
       cleaned = true;
     }
 
+    const transcriptLabel = `transcript file${preservedTranscripts === 1 ? '' : 's'} preserved`;
     steps.push({
       name: 'Clean up agent state',
       status: cleaned ? 'passed' : 'skipped',
-      message: cleaned ? 'Agent state directories removed' : 'No agent state to clean up',
+      message: cleaned
+        ? `Agent state directories cleaned (${preservedTranscripts} ${transcriptLabel})`
+        : 'No agent state to clean up',
     });
   } catch (err) {
     steps.push({ name: 'Clean up agent state', status: 'skipped', message: `Warning: ${(err as Error).message}` });

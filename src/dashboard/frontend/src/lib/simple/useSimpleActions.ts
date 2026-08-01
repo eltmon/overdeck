@@ -74,6 +74,20 @@ export function useSimpleActions() {
     onError,
   });
 
+  const unpause = useMutation({
+    mutationFn: ({ agentId }: { agentId: string }) =>
+      postJson(`/api/agents/${encodeURIComponent(agentId)}/unpause`, {}),
+    onSuccess,
+    onError,
+  });
+
+  const untroubled = useMutation({
+    mutationFn: ({ agentId }: { agentId: string }) =>
+      postJson(`/api/agents/${encodeURIComponent(agentId)}/untroubled`, {}),
+    onSuccess,
+    onError,
+  });
+
   // PAN-3073: clears the persistent review-status stuck flag. Agent recovery
   // (above) cannot touch it — a review-stuck issue needs this door.
   const unstick = useMutation({
@@ -104,5 +118,5 @@ export function useSimpleActions() {
     onError,
   });
 
-  return { tell, answer, recover, unstick, merge, startWork, startPlanning };
+  return { tell, answer, recover, unpause, untroubled, unstick, merge, startWork, startPlanning };
 }

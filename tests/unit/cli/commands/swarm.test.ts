@@ -671,7 +671,7 @@ describe('pan swarm reset (PAN-2214)', () => {
       listSlotAgents: vi.fn(() => (options.slotAgents ?? []) as never),
       listSessionNamesSync: vi.fn(() => options.liveSessions ?? []),
       stopAgentSync: vi.fn(),
-      removeAgentSync: vi.fn(),
+      removeAgent: vi.fn(async () => {}),
       resolveProjectFromIssueSync: vi.fn(() => ({ projectName: 'overdeck', projectPath: '/repo' })),
       clearAllSlotAssignments: vi.fn(),
       clearFailedMergeBlock: vi.fn(),
@@ -789,8 +789,8 @@ describe('pan swarm reset (PAN-2214)', () => {
     const result = await swarmResetCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
-    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-2');
+    expect(deps.removeAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.removeAgent).toHaveBeenCalledWith('agent-pan-2203-slot-2');
     expect(loggedText(deps)).toContain('retired 2 dead slot agent record(s): agent-pan-2203-slot-1, agent-pan-2203-slot-2');
   });
 
@@ -806,12 +806,12 @@ describe('pan swarm reset (PAN-2214)', () => {
     const result = await swarmResetCommand('PAN-2203', {}, deps);
 
     expect(result.ok).toBe(true);
-    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
-    expect(deps.removeAgentSync).not.toHaveBeenCalledWith('agent-pan-2203-slot-2');
+    expect(deps.removeAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.removeAgent).not.toHaveBeenCalledWith('agent-pan-2203-slot-2');
     expect(loggedText(deps)).toContain('Skipped live slot agent session(s): agent-pan-2203-slot-2');
   });
 
-  it('retires through removeAgentSync only so JSONL transcript paths are untouched', async () => {
+  it('retires through removeAgent only so JSONL transcript paths are untouched', async () => {
     const deps = makeResetDeps({
       slotAgents: [
         { slotIndex: 1, agentId: 'agent-pan-2203-slot-1', status: 'stopped' },
@@ -820,7 +820,7 @@ describe('pan swarm reset (PAN-2214)', () => {
 
     await swarmResetCommand('PAN-2203', {}, deps);
 
-    expect(deps.removeAgentSync).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(deps.removeAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
     expect(deps.gitCalls.some(call => call.includes('.jsonl'))).toBe(false);
   });
 
@@ -841,7 +841,7 @@ describe('pan swarm reset (PAN-2214)', () => {
     await expect(swarmResetCommand('PAN-2203', {}, clean)).resolves.toEqual({ ok: true });
     expect(clean.gitCalls.some(cmd => cmd.startsWith('git push'))).toBe(false);
     expect(clean.gitCalls.some(cmd => cmd.startsWith('git branch -D'))).toBe(false);
-    expect(clean.removeAgentSync).not.toHaveBeenCalled();
+    expect(clean.removeAgent).not.toHaveBeenCalled();
     expect(loggedText(clean)).toContain('retired no dead slot agent records');
 
     const merged = makeResetDeps({ slotBranches: { 'feature/pan-2203-slot-1': '0' } });

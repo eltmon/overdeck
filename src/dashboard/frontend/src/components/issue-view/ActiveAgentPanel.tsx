@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import { getHarness } from '@overdeck/contracts';
 import type { AgentSnapshot } from '@overdeck/contracts';
 
-import { AgentTellForm } from '../AgentTellForm';
 import VerbBadge, { type VerbBadgeProps } from '../primitives/VerbBadge';
 import { getFriendlyModelName } from '../../lib/dashboard-utils';
 import { isAwaitingInput } from '../../lib/pendingInput';
@@ -13,6 +11,7 @@ import {
 } from '../../lib/store';
 import { cn } from '../../lib/utils';
 import { ACTIVE_AGENT_PANEL_SECTIONS } from './inventory';
+import { TellComposer } from './TellComposer';
 import { useIssueActions } from '../IssueActionMenu/useIssueActions';
 import { IssueActionDialogHost } from '../IssueActionMenu';
 import { RESUME_WHAT_IT_DOES } from '../../lib/resumeOutcome';
@@ -76,7 +75,6 @@ export function ActiveAgentPanel({
 }: ActiveAgentPanelProps) {
   const agent = useDashboardStore(selectAgentById(agentId));
   const pendingPermissionAgentIds = useDashboardStore(selectPendingPermissionAgentIds);
-  const [sending, setSending] = useState(false);
   // PAN-2975: one resume path — the registry's resumeSession action (same
   // endpoint, same outcome toast, shared copy) instead of a bespoke canned call.
   const issueActions = useIssueActions(agent?.issueId ?? '');
@@ -109,38 +107,6 @@ export function ActiveAgentPanel({
 
   const meta = `${getFriendlyModelName(agent.model)} · ${getHarness(agent)} · spend ${formatSpend(agent.costSoFar)}`;
   const isEffectivelyLive = agent.status === 'running' || agent.status === 'starting';
-
-  const sendTell = async (text: string) => {
-    if (sending) return false;
-
-    setSending(true);
-    try {
-      // PAN-1985 follow-up: route through /resume for non-live agents so the
-      // backend can re-attach to the saved session and deliver the message
-      // in one round trip. /tell assumes a live tmux; for stopped agents
-      // /tell 502s on the echo-confirm. /resume handles spawn-or-revive +
-      // delivery internally.
-      const endpoint = isEffectivelyLive
-        ? `/api/agents/${agentId}/tell`
-        : `/api/agents/${agentId}/resume`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        console.warn(`[active-agent-panel] send ${response.status} ${endpoint}: ${body.slice(0, 300)}`);
-        return false;
-      }
-      return true;
-    } catch (error) {
-      console.error('[active-agent-panel] send error:', error);
-      return false;
-    } finally {
-      setSending(false);
-    }
-  };
 
   return (
     <section
@@ -190,18 +156,7 @@ export function ActiveAgentPanel({
       )}
       {agent?.issueId && <IssueActionDialogHost issueId={agent.issueId} actions={issueActions} />}
 
-      <div
-        data-testid="active-agent-panel-tell"
-        data-section={ACTIVE_AGENT_PANEL_SECTIONS[3]}
-      >
-        <AgentTellForm
-          className="mt-[10px] flex gap-[8px]"
-          sending={sending}
-          onSend={sendTell}
-          ariaLabel={`Tell ${agent.id}`}
-          placeholder={isEffectivelyLive ? 'Tell this agent...' : 'Send a message to resume...'}
-        />
-      </div>
+      <TellComposer agentId={agent.id} isEffectivelyLive={isEffectivelyLive} />
     </section>
   );
 }
