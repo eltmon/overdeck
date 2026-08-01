@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ChevronRight, MessageSquarePlus } from 'lucide-react';
-import type { SessionNode } from '@overdeck/contracts';
+import type { PipelineBucket, SessionNode } from '@overdeck/contracts';
 import { FeatureItem, sessionMatchesFilter, type TreeSessionFilter } from './FeatureItem';
 import type { Harness } from '../../shared/ModelPicker';
 import styles from '../styles/command-deck.module.css';
@@ -70,6 +70,7 @@ export interface ProjectFeature {
   inProgressCount?: number;
   rawTrackerState?: string;
   readyForMerge?: boolean;
+  pipelineBucket?: PipelineBucket;
   specOnlyPlanned?: boolean;
   sessions?: readonly SessionNode[];
   resourceSources?: ResourceSource[];

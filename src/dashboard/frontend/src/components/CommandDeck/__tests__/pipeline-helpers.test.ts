@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectFeature } from '../ProjectTree/ProjectNode';
 import {
   groupPipelineEntries,
+  isNeedsYouFeature,
   isStalledFeature,
   lastActivityAt,
   pipelineChipFor,
+  sublineFor,
 } from '../pipeline-helpers';
 
 const DAYS = 24 * 60 * 60 * 1000;
@@ -41,6 +43,45 @@ function makeFeature(overrides: Partial<ProjectFeature> = {}): ProjectFeature {
 function makeBucket(feature: ProjectFeature) {
   return { feature, reviewStatus: undefined, phase: 'work' as const };
 }
+
+describe('needs-you classification', () => {
+  it('requires the canonical planned-backlog bucket for plan approval', () => {
+    const base = makeFeature({ hasPrd: true, hasState: false });
+
+    expect(isNeedsYouFeature({ ...base, pipelineBucket: 'planned_backlog' }, undefined)).toBe(true);
+    expect(isNeedsYouFeature({ ...base, pipelineBucket: 'in_flight' }, undefined)).toBe(false);
+    expect(isNeedsYouFeature({ ...base, pipelineBucket: 'zombie_pr' }, undefined)).toBe(false);
+    expect(isNeedsYouFeature({ ...base, pipelineBucket: 'clean_terminal' }, undefined)).toBe(false);
+
+    const groups = groupPipelineEntries([makeBucket({ ...base, pipelineBucket: 'zombie_pr' })]);
+    expect(groups.some(group => group.key === 'needs-you')).toBe(false);
+  });
+
+  it('labels a canonical plan approval instead of claiming checks passed', () => {
+    const feature = makeFeature({
+      hasPrd: true,
+      hasState: false,
+      pipelineBucket: 'planned_backlog',
+    });
+
+    expect(sublineFor(makeBucket(feature))).toBe('plan approval pending');
+  });
+
+  it('labels an awaiting planning session as waiting for an answer', () => {
+    const feature = makeFeature({
+      sessions: [{
+        id: 'planning-pan-1',
+        type: 'planning',
+        presence: 'active',
+        awaitingInput: true,
+        model: 'claude-sonnet-5',
+        startedAt: '2026-07-12T00:00:00Z',
+      } as any],
+    });
+
+    expect(sublineFor(makeBucket(feature))).toBe('waiting on your answer');
+  });
+});
 
 describe('isStalledFeature', () => {
   it('returns true when the issue has an artifact signal but no live agent', () => {
