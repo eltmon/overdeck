@@ -71,6 +71,24 @@ function isPiConversation(conversation: Conversation): boolean {
   return conversation.harness === 'ohmypi' || conversation.harness === 'pi';
 }
 
+function resolveComposerEffort(conversation: Conversation): EffortLevel {
+  switch (conversation.effort) {
+    case 'low':
+    case 'medium':
+    case 'high':
+    case 'xhigh':
+    case 'max':
+      return conversation.effort;
+    default:
+      // The browser-global value is a draft default, not canonical session state.
+      // Only use it before a runtime session exists; older conversations whose
+      // effort was never persisted use the operator default instead.
+      return !conversation.sessionAlive && !conversation.claudeSessionId
+        ? loadStoredEffort()
+        : 'high';
+  }
+}
+
 function openComposerUi(
   conversation: Conversation,
   action: 'handoff' | 'fork',
@@ -104,6 +122,7 @@ export function ComposerFooter({
   contextWindowUsage = null,
   agentBusy = false,
 }: ComposerFooterProps) {
+  const resolvedConversationEffort = resolveComposerEffort(conversation);
   const [model, setModel] = useState<string>(conversation.model ?? getDefaultConversationModel());
   // Existing conversations are bound to the harness they were spawned with.
   // Falling back to a global localStorage default here caused the picker to
@@ -113,7 +132,7 @@ export function ComposerFooter({
   // 'claude-code' (the safe runtime) when the conversation has no stored
   // harness; do NOT consult localStorage.
   const [harness, setHarness] = useState<Harness>((conversation.harness === 'pi' ? 'ohmypi' : conversation.harness) ?? 'claude-code');
-  const [effort, setEffort] = useState<EffortLevel>(loadStoredEffort);
+  const [effort, setEffort] = useState<EffortLevel>(resolvedConversationEffort);
   const [deliverAs, setDeliverAs] = useState<DeliverAs>('auto');
   const [compactPending, setCompactPending] = useState(false);
   // `sending`, pending attachments, and their upload pump live in the module-level
@@ -141,6 +160,10 @@ export function ComposerFooter({
   // the currently-mounted conversation immediately (PAN-539 attribution race).
   const currentConversationNameRef = useRef(conversation.name);
   currentConversationNameRef.current = conversation.name;
+
+  useEffect(() => {
+    setEffort(resolvedConversationEffort);
+  }, [conversation.name, resolvedConversationEffort]);
 
   const piConversation = isPiConversation(conversation);
   const isDisabled = !conversation.sessionAlive || sending;
