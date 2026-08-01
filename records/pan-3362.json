@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:32:46.339Z",
+  "updated": "2026-08-01T11:32:49.010Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -31,8 +31,40 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T10:36:01.111Z",
-    "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME."
+    "updatedAt": "2026-08-01T11:32:49.007Z",
+    "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
+    "reviewRequestedAt": "2026-08-01T11:32:49.007Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "packages/contracts/src/composer-commands.generated.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/SKILLS-CONVENTION.md",
+        "docs/WORKSPACE-CONTAINERS.md",
+        "roles/test.md",
+        "src/cli/commands/admin/index.ts",
+        "src/cli/commands/admin/seed-uat-fixtures.ts",
+        "src/lib/uat-fixtures/fixture-data.ts",
+        "src/lib/uat-fixtures/seed.ts",
+        "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
+        "tests/unit/lib/uat-fixtures/seed.test.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/SKILLS-CONVENTION.md",
+        "docs/WORKSPACE-CONTAINERS.md",
+        "packages/contracts/src/composer-commands.generated.ts",
+        "roles/test.md",
+        "src/cli/commands/admin/index.ts",
+        "src/cli/commands/admin/seed-uat-fixtures.ts",
+        "src/lib/uat-fixtures/fixture-data.ts",
+        "src/lib/uat-fixtures/seed.ts",
+        "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
+        "tests/unit/lib/uat-fixtures/seed.test.ts"
+      ],
+      "recordedAt": "2026-08-01T11:32:46.338Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3402"
   },
   "closeOut": {
     "usage": {
