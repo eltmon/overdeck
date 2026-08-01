@@ -9525,3 +9525,19 @@ Operator finished UAT pause and said resume.
 - **Every substrate defect found tonight is now merged**: convoy per-lane recovery (3368), reload false-abort outage (3370), restart-UX truthfulness (3373), laundering Variant A (3365) + Variant B (3377), needs-you phantoms (3379), reviewer freeze + child deadlines (3375). Nine landed issues, zero overrides.
 - **Next wave**: `strike-pan-2952` (reconcile must prefer newer of journal/DB — the remaining half of the laundering machinery, 3/3 fresh evidence) and `planning-pan-3362` (tracker-backed UAT fixtures — unblocks PAN-3356 verification, made urgent by the operator's failed cockpit UAT).
 - PAN-3358 still operator-gated on UAT. Load ~3.5.
+
+## Interim tick 13 (2026-08-01 ~08:30Z) — 50-min dashboard outage found+recovered (PAN-3383); paused/close-out census answered; PAN-3358 + MIN-928 closed out
+
+- **Operator merged PAN-3358 himself** (#3361, 05:26Z, UAT-batch merge) — closed out clean. MIN-928 closed out on retry (its earlier "canonical state unavailable" block was the outage below).
+- **OUTAGE:** deploy patrol built gen-b (07:19, `bf3048484c`), something SIGTERMed the live server ~07:27 **without starting a successor or writing restart-status**, and the **supervisor watched 24 consecutive hard failures with `restartAttempts: []`, `gaveUp: false`** — the watchdog's one job never fired. Manual `pan restart` restored (gen-b, pid 3061308). ~50 min fully dark; this is what made the operator's dashboard buttons "do nothing." Filed **PAN-3383** (both defects: silent watchdog + kill-without-successor in the patrol's restart path — PAN-3370 fixed only pan reload's variant), struck.
+- **Census answer to operator (paused + merged-needs-close-out):** the state is designed post-merge behavior; the accumulation causes are (a) close-out lag — drained: PAN-3358 + MIN-928 tonight; (b) deliberate holds PAN-3356 (ACs unverified) + PAN-3305; (c) **phantom paused rows**: close-out's prune step preserves rows for transcript retention but never clears `paused=1` (agent-pan-3357 paused forever post-close) — same never-retired-flag family; (d) LEX-1 pair, 24 days, operator's lexerra POC call.
+- **PAN-3356 stuck banner root-caused:** `stuck=feedback_delivery_needs_you` set 20:50Z during a feedback loop, condition self-resolved (row: passed/passed/merged) but stuck flags have NO auto-retirement; only close-out clears them and 3356 is deliberately held. Manual doors BOTH broken: `pan unstick` doesn't exist (PAN-3321) and the dashboard's Clear-stuck-gate hits `/unstick` whose handler **resets the lifecycle to pending** — running it on a MERGED issue would corrupt the row (stale-approval guard is wrong for terminal issues). Left the flag in place rather than corrupt state; needs a merged-aware clear path.
+- Fleet: strike-pan-2952 running, planning-pan-3362 running, strike-pan-3383 spawned.
+
+## Interim tick 14 (2026-08-01 ~08:55Z) — PAN-3375 closed out (11 landed+closed); PAN-2952 merged; PAN-3362 planned
+
+- Dashboard health verified first (pid 3061308 gen-b holding) — I'm the watchdog's backstop until PAN-3383 lands.
+- **PAN-3375 closed out** (8-row DoD, no overrides). **Eleven issues landed and closed out this interim run.**
+- **PAN-2952 merged** (#3384, train, `11489f48`): same-process record-rebuild serialization before the filesystem lock — with PAN-3377's verdict-restore + review-status-read guards, all three PAN-2952 asks are covered. Handed to verifying-on-main; close-out on CI+deploy. Observation (not proof): first `pan done --strike` tonight with no journal-write failure.
+- **PAN-3362 planned** (PRD + xBRIEF on overdeck-state) — awaiting operator release; it unblocks PAN-3356 verification.
+- strike-pan-3383 (watchdog no-restart + patrol kill-without-successor) implementing (+69/−7). CPU PSI ~21 from strike suites — contention real but transient; dispatching nothing further this tick.
