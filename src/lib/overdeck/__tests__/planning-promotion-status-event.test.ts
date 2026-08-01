@@ -30,7 +30,9 @@ vi.mock('../../agent-enrichment.js', () => ({
 }));
 vi.mock('../../agents.js', () => ({
   getAgentStateSync: vi.fn(() => testState.agentState),
-  saveAgentStateSync: vi.fn(),
+}));
+vi.mock('../../../dashboard/server/services/agent-projection.js', () => ({
+  saveAgentStateAndEmitEvent: vi.fn(),
 }));
 vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: vi.fn(),
@@ -51,7 +53,7 @@ vi.mock('../../pan-dir/index.js', () => ({
   }),
 }));
 vi.mock('../../planning/spawn-planning-session.js', () => ({
-  resolveAutoSpawnOnFinalize: async () => false,
+  resolveAutoSpawnOnFinalize: async (requested: unknown) => requested === true,
 }));
 vi.mock('../../projects.js', () => ({
   extractTeamPrefix: () => 'PAN',
@@ -66,7 +68,10 @@ vi.mock('../../tracker-utils.js', () => ({
   resolveGitHubIssueSync: () => ({ isGitHub: true, owner: 'eltmon', repo: 'overdeck', number: 3230 }),
 }));
 vi.mock('../../tmux.js', () => ({
-  killSession: () => Effect.void,
+  // Killing the session actually clears sessionAlive so the follow-up
+  // sessionExists() read (immediate or deferred) observes the true post-kill
+  // state, exercising the PAN-3338 correctness fix under test below.
+  killSession: vi.fn(() => { testState.sessionAlive = false; return Effect.void; }),
   sessionExists: vi.fn(() => Effect.succeed(testState.sessionAlive)),
 }));
 vi.mock('../../xbrief/quality-lint.js', () => ({
@@ -77,7 +82,8 @@ vi.mock('../issue-reads.js', () => ({
   resolveIssueProjectPathSync: () => testState.projectPath,
 }));
 
-import { getAgentStateSync, saveAgentStateSync } from '../../agents.js';
+import { getAgentStateSync } from '../../agents.js';
+import { saveAgentStateAndEmitEvent } from '../../../dashboard/server/services/agent-projection.js';
 import { completePlanningForIssue } from '../planning-promotion.js';
 
 const roots: string[] = [];
@@ -129,7 +135,9 @@ function responseJson(response: { body: unknown; status: number }): Record<strin
 
 function serviceDependencies() {
   return {
-    request: {},
+    // bodyAutoSpawn:true routes through validateOrigin(), which reads
+    // headers/method off this object — give it a minimal trusted shape.
+    request: { headers: { origin: 'http://127.0.0.1:3011' }, method: 'POST' },
     id: 'PAN-3230',
     body: { noPrd: false, skipKill: true, autoSpawn: false },
     eventStore: { append: vi.fn(() => Effect.void) },
@@ -163,7 +171,7 @@ afterEach(() => {
 });
 
 describe('completePlanningForIssue status event (PAN-3338)', () => {
-  it('appends agent.status_changed(stopped, hasLiveTmuxSession:true) when the skipKill session survives finalize', async () => {
+  it('routes the stopped projection through the atomic write door with hasLiveTmuxSession:true when the skipKill session survives finalize', async () => {
     createWorkspace();
     testState.sessionAlive = true;
     const deps = serviceDependencies();
@@ -173,20 +181,22 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     expect(response.status).toBe(200);
     expect(responseJson(response)).toMatchObject({ success: true, issueId: 'PAN-3230' });
     expect(getAgentStateSync).toHaveBeenCalledWith('planning-pan-3230');
-    expect(saveAgentStateSync).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'planning-pan-3230',
-      status: 'stopped',
-      stoppedAt: expect.any(String),
-    }));
-    expect(deps.eventStore.append).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'agent.status_changed',
-      payload: {
-        agentId: 'planning-pan-3230',
-        status: 'stopped',
-        previousStatus: 'running',
-        hasLiveTmuxSession: true,
-      },
-    }));
+    expect(saveAgentStateAndEmitEvent).toHaveBeenCalledTimes(1);
+    expect(saveAgentStateAndEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'planning-pan-3230', status: 'stopped', stoppedAt: expect.any(String) }),
+      expect.objectContaining({
+        type: 'agent.status_changed',
+        payload: {
+          agentId: 'planning-pan-3230',
+          status: 'stopped',
+          previousStatus: 'running',
+          hasLiveTmuxSession: true,
+        },
+      }),
+    );
+    // No separate row write exists any more — the atomic door is the only
+    // status-mutating call, so a failure in it can never leave a split state.
+    expect(deps.eventStore.append).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'agent.status_changed' }));
   });
 
   it('appends hasLiveTmuxSession:false when the planning session is already gone', async () => {
@@ -197,10 +207,13 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     const response = await completePlanningForIssue(deps);
 
     expect(response.status).toBe(200);
-    expect(deps.eventStore.append).toHaveBeenCalledWith(expect.objectContaining({
-      type: 'agent.status_changed',
-      payload: expect.objectContaining({ status: 'stopped', hasLiveTmuxSession: false }),
-    }));
+    expect(saveAgentStateAndEmitEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        type: 'agent.status_changed',
+        payload: expect.objectContaining({ status: 'stopped', hasLiveTmuxSession: false }),
+      }),
+    );
   });
 
   it('leaves the planning agent running and appends no stopped event when the PRD gate rejects the finalize', async () => {
@@ -211,9 +224,96 @@ describe('completePlanningForIssue status event (PAN-3338)', () => {
     const response = await completePlanningForIssue(deps);
 
     expect(response.status).toBe(422);
-    expect(saveAgentStateSync).not.toHaveBeenCalled();
-    expect(deps.eventStore.append).not.toHaveBeenCalledWith(expect.objectContaining({
-      type: 'agent.status_changed',
-    }));
+    expect(saveAgentStateAndEmitEvent).not.toHaveBeenCalled();
+  });
+
+  /**
+   * [correctness] review finding — sampling sessionExists() before the
+   * auto-spawn/kill decision recorded a pre-kill snapshot that went stale the
+   * instant the immediate-kill path (autoSpawn:true, skipKill:false) actually
+   * killed the session, and nothing ever corrected it (the enrichment poller
+   * only processes tmux-active agents). The projection must run AFTER the
+   * kill has already been awaited.
+   */
+  it('the immediate-kill path (autoSpawn:true) records hasLiveTmuxSession:false, not the pre-kill snapshot', async () => {
+    createWorkspace();
+    testState.sessionAlive = true;
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3230' }), { status: 200 })) as unknown as typeof fetch;
+    try {
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: true };
+
+      const response = await completePlanningForIssue(deps);
+
+      expect(response.status).toBe(200);
+      expect(saveAgentStateAndEmitEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'stopped' }),
+        expect.objectContaining({
+          type: 'agent.status_changed',
+          payload: expect.objectContaining({ status: 'stopped', hasLiveTmuxSession: false }),
+        }),
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  /**
+   * [correctness] review finding — the deferred-kill path (autoSpawn:false,
+   * skipKill:false) kills the session 1.5s after the HTTP response, outside
+   * the request lifecycle entirely. The first projection truthfully reports
+   * the session as still alive at that moment; a second corrective
+   * projection must fire once the deferred kill actually runs, or the read
+   * model is stuck at hasLiveTmuxSession:true forever.
+   */
+  it('the deferred-kill path (autoSpawn:false, skipKill:false) corrects hasLiveTmuxSession once the scheduled kill runs', async () => {
+    vi.useFakeTimers();
+    try {
+      createWorkspace();
+      testState.sessionAlive = true;
+      const deps = serviceDependencies();
+      deps.body = { noPrd: false, skipKill: false, autoSpawn: false };
+
+      const response = await completePlanningForIssue(deps);
+      expect(response.status).toBe(200);
+
+      expect(saveAgentStateAndEmitEvent).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ payload: expect.objectContaining({ hasLiveTmuxSession: true }) }),
+      );
+
+      await vi.advanceTimersByTimeAsync(1500);
+
+      expect(saveAgentStateAndEmitEvent).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ payload: expect.objectContaining({ hasLiveTmuxSession: false }) }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  /**
+   * [requirements] review finding — the previous split write (row write, then
+   * a SEPARATE eventStore.append) let a transient failure leave the
+   * agents-table row stopped with no matching event: the exact DB/read-model
+   * divergence this issue exists to fix. Routing through the transactional
+   * write door means a failure here touches neither the row nor the event —
+   * this test proves the failure is swallowed non-fatally and there is no
+   * fallback path that would perform a partial write.
+   */
+  it('a write-door failure is non-fatal to finalize and has no fallback split-write path', async () => {
+    createWorkspace();
+    testState.sessionAlive = true;
+    vi.mocked(saveAgentStateAndEmitEvent).mockImplementationOnce(() => {
+      throw new Error('simulated transactional failure');
+    });
+    const deps = serviceDependencies();
+
+    const response = await completePlanningForIssue(deps);
+
+    expect(response.status).toBe(200);
+    expect(saveAgentStateAndEmitEvent).toHaveBeenCalledTimes(1);
   });
 });
