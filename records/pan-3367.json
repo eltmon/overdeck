@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:45:20.226Z",
+  "updated": "2026-08-01T10:48:31.654Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,16 +78,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "audit-batch-c": {
-        "writerId": "agent-pan-3367",
-        "agentId": "agent-pan-3367",
-        "pid": 1749524,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:45:20.225Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -121,6 +113,17 @@
         "outcome": "completed",
         "reason": "Audited PAN-2467/2876/3037/3052/3083 — all 5 verdicts satisfied, no follow-ups filed. PAN-2467/2876/3037 each had a genuine review finding (H11 stale-note pattern again) with a precisely matching fix commit confirmed via diff. PAN-3052/3083 are pure infra-retry cases — full event history shows no finding was ever recorded, diff approved from first successful review pass.",
         "releasedAt": "2026-08-01T10:45:11.580Z"
+      },
+      {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 1749524,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:45:20.225Z",
+        "itemId": "audit-batch-c",
+        "outcome": "completed",
+        "reason": "Audited PAN-3097/3109/3110/3114/3115 — all 5 verdicts satisfied, no follow-ups filed. PAN-3097's only real failure was a repo-wide manifest-freshness lint gate unrelated to its own ACs. PAN-3109/3114 are pure infra-retry cases (3114's own re-review note explicitly says no code findings were emitted). PAN-3110/3115 had genuine findings (H11 stale-note pattern) with fix commits matching the finding text almost verbatim, confirmed via diff.",
+        "releasedAt": "2026-08-01T10:48:31.654Z"
       }
     ],
     "statusReasons": {
@@ -135,6 +138,10 @@
       "audit-batch-b": {
         "reason": "Audited PAN-2467/2876/3037/3052/3083 — all 5 verdicts satisfied, no follow-ups filed. PAN-2467/2876/3037 each had a genuine review finding (H11 stale-note pattern again) with a precisely matching fix commit confirmed via diff. PAN-3052/3083 are pure infra-retry cases — full event history shows no finding was ever recorded, diff approved from first successful review pass.",
         "updatedAt": "2026-08-01T10:45:11.580Z"
+      },
+      "audit-batch-c": {
+        "reason": "Audited PAN-3097/3109/3110/3114/3115 — all 5 verdicts satisfied, no follow-ups filed. PAN-3097's only real failure was a repo-wide manifest-freshness lint gate unrelated to its own ACs. PAN-3109/3114 are pure infra-retry cases (3114's own re-review note explicitly says no code findings were emitted). PAN-3110/3115 had genuine findings (H11 stale-note pattern) with fix commits matching the finding text almost verbatim, confirmed via diff.",
+        "updatedAt": "2026-08-01T10:48:31.654Z"
       }
     }
   },
@@ -153,6 +160,9 @@
     "audit-batch-b.audit-batch-b.ac1": "completed",
     "audit-batch-b.audit-batch-b.ac2": "completed",
     "audit-batch-b.audit-batch-b.ac3": "completed",
-    "audit-batch-c": "running"
+    "audit-batch-c": "completed",
+    "audit-batch-c.audit-batch-c.ac1": "completed",
+    "audit-batch-c.audit-batch-c.ac2": "completed",
+    "audit-batch-c.audit-batch-c.ac3": "completed"
   }
 }
