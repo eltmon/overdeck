@@ -1192,6 +1192,11 @@ export function listArchivedConversationNames(): string[] {
   return listArchivedConversations().map((conv) => conv.name);
 }
 
+function nullIfEmpty(value: string | undefined): string | null {
+  const normalized = value?.trim();
+  return normalized || null;
+}
+
 export function createConversation(opts: {
   name: string;
   tmuxSession: string;
@@ -1230,8 +1235,8 @@ export function createConversation(opts: {
       opts.cwd,
       opts.issueId ?? null,
       opts.harness ?? null,
-      opts.model ?? null,
-      opts.effort ?? null,
+      nullIfEmpty(opts.model),
+      nullIfEmpty(opts.effort),
       opts.title ?? null,
       opts.titleSource ?? (opts.title ? 'auto' : null),
       now,
@@ -1291,7 +1296,7 @@ export function reactivateConversationForSpawn(opts: {
     UPDATE conversations
     SET cwd = ?, issue_id = ?, model = ?, harness = ?, archived_at = NULL
     WHERE id = ?
-  `).run(opts.cwd, opts.issueId ?? null, opts.model ?? null, opts.harness ?? null, id);
+  `).run(opts.cwd, opts.issueId ?? null, nullIfEmpty(opts.model), opts.harness ?? null, id);
   if (opts.claudeSessionId) {
     db.prepare(`
       INSERT OR IGNORE INTO conversation_files (conversation_id, harness, locator, created_at)
