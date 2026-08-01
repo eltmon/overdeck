@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:09:31.349Z",
+  "updated": "2026-08-01T20:20:59.176Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,18 +47,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "finalize-status-event": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3338",
         "agentId": "agent-pan-3338",
         "pid": 1628343,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T20:09:31.349Z"
+        "claimedAt": "2026-08-01T20:09:31.349Z",
+        "itemId": "finalize-status-event",
+        "outcome": "completed",
+        "reason": "Moved the stop-marking block after the PRD gate/spec promotion and emit agent.status_changed(stopped, hasLiveTmuxSession) via eventStore.append. New test file planning-promotion-status-event.test.ts covers all 4 ACs (survives-session true/false, PRD-gate rejection leaves agent running, durable stop write persists). Deviated from xBRIEF files_scope: put tests in a new file matching the existing planning-promotion-marker-cleanup.test.ts full-harness pattern rather than complete-planning.test.ts, which has no mocking for completePlanningForIssue's dependencies.",
+        "releasedAt": "2026-08-01T20:20:59.176Z"
+      }
+    ],
+    "statusReasons": {
+      "finalize-status-event": {
+        "reason": "Moved the stop-marking block after the PRD gate/spec promotion and emit agent.status_changed(stopped, hasLiveTmuxSession) via eventStore.append. New test file planning-promotion-status-event.test.ts covers all 4 ACs (survives-session true/false, PRD-gate rejection leaves agent running, durable stop write persists). Deviated from xBRIEF files_scope: put tests in a new file matching the existing planning-promotion-marker-cleanup.test.ts full-harness pattern rather than complete-planning.test.ts, which has no mocking for completePlanningForIssue's dependencies.",
+        "updatedAt": "2026-08-01T20:20:59.176Z"
       }
     }
   },
   "statusOverrides": {
-    "finalize-status-event": "running"
+    "finalize-status-event": "completed",
+    "finalize-status-event.finalize-status-event.ac1": "completed",
+    "finalize-status-event.finalize-status-event.ac2": "completed",
+    "finalize-status-event.finalize-status-event.ac3": "completed",
+    "finalize-status-event.finalize-status-event.ac4": "completed"
   }
 }
