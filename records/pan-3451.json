@@ -88,17 +88,17 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:32:55.691Z",
+  "updated": "2026-08-01T23:33:01.858Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-01T23:32:54.660Z",
+    "updatedAt": "2026-08-01T23:33:01.849Z",
     "reviewNotes": "All four reviewers passed; asynchronous checklist path fixes the prior event-loop blocker",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
@@ -135,24 +135,6 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:25:56.881Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "f0e238ac045590f2454520637aa79daed3d47791"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "f0e238ac045590f2454520637aa79daed3d47791"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "f0e238ac045590f2454520637aa79daed3d47791"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "f0e238ac045590f2454520637aa79daed3d47791"
-      }
     }
   },
   "closeOut": {
@@ -160,9 +142,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3393429,
-            "output": 54285,
-            "cacheRead": 17959424,
+            "input": 3396367,
+            "output": 54523,
+            "cacheRead": 18355712,
             "cacheWrite": 0
           }
         },
@@ -209,15 +191,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 7722378,
-          "output": 209102,
-          "cacheRead": 76550144,
+          "input": 7725316,
+          "output": 209340,
+          "cacheRead": 76946432,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 83.160022,
-        "pricingAsOf": "2026-08-01T23:32:54.719Z"
+        "usd": 83.379996,
+        "pricingAsOf": "2026-08-01T23:33:01.852Z"
       }
     },
     "merges": [
@@ -226,7 +208,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3451",
