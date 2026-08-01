@@ -10,7 +10,7 @@ import { Effect } from 'effect';
 import { BLANKED_PROVIDER_ENV } from '../child-env.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
 import { getClaudePermissionFlagsStringSync, resolvePermissionModeSync, BYPASS_PERMISSION_MODE } from '../claude-permissions.js';
-import { getProjectSync, listProjectsSync } from '../projects.js';
+import { listProjectsAsync, type ProjectConfig } from '../projects.js';
 import { getDefaultCwd } from '../default-cwd.js';
 import {
   listConversations,
@@ -858,11 +858,19 @@ export async function spawnConversationSession(
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
-/** Resolve a project key or display name to its canonical projects.yaml key. */
-export function resolveRegisteredProjectKey(input: string): { key: string } | { error: string } {
-  if (getProjectSync(input)) return { key: input };
-  const byName = listProjectsSync().find((project) => project.config.name === input);
-  return byName ? { key: byName.key } : { error: `Unknown project: ${input}` };
+export interface ResolvedRegisteredProject {
+  key: string;
+  config: ProjectConfig;
+}
+
+/** Resolve a project key or display name without blocking the dashboard event loop. */
+export async function resolveRegisteredProject(
+  input: string,
+): Promise<ResolvedRegisteredProject | { error: string }> {
+  const projects = await listProjectsAsync();
+  const project = projects.find((candidate) => candidate.key === input)
+    ?? projects.find((candidate) => candidate.config.name === input);
+  return project ?? { error: `Unknown project: ${input}` };
 }
 
 /**
@@ -871,15 +879,21 @@ export function resolveRegisteredProjectKey(input: string): { key: string } | { 
  * The Command Deck identifies projects by display name, not yaml key
  * (PAN-2590) — accept either, like GET /api/session-trees does.
  */
-export function resolveProjectCwd(projectKey: string): { cwd: string } | { error: string } {
-  const keyResult = resolveRegisteredProjectKey(projectKey);
-  if ('error' in keyResult) return keyResult;
-  const projectConfig = getProjectSync(keyResult.key);
-  if (!projectConfig) return { error: `Unknown project: ${projectKey}` };
-  if (!projectConfig.path || !existsSync(projectConfig.path)) {
-    return { error: `Project path does not exist: ${projectConfig.path || '(unset)'} (project: ${projectKey})` };
+export async function resolveProjectCwd(
+  projectIdentifier: string,
+): Promise<{ key: string; cwd: string } | { error: string }> {
+  const resolved = await resolveRegisteredProject(projectIdentifier);
+  if ('error' in resolved) return resolved;
+  const projectPath = resolved.config.path;
+  if (!projectPath) {
+    return { error: `Project path does not exist: (unset) (project: ${projectIdentifier})` };
   }
-  return { cwd: projectConfig.path };
+  try {
+    await stat(projectPath);
+  } catch {
+    return { error: `Project path does not exist: ${projectPath} (project: ${projectIdentifier})` };
+  }
+  return { key: resolved.key, cwd: projectPath };
 }
 
 export interface ConversationCreateRequestBody { [key: string]: unknown }
@@ -900,12 +914,10 @@ export async function handleConversationCreate(
     let cwd = getDefaultCwd();
     let canonicalProjectKey: string | undefined;
     if (projectKey) {
-      const keyResult = resolveRegisteredProjectKey(projectKey);
-      if ('error' in keyResult) return jsonResponse({ error: keyResult.error }, { status: 400 });
-      const resolved = resolveProjectCwd(projectKey);
+      const resolved = await resolveProjectCwd(projectKey);
       if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
       cwd = resolved.cwd;
-      canonicalProjectKey = keyResult.key;
+      canonicalProjectKey = resolved.key;
     }
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });

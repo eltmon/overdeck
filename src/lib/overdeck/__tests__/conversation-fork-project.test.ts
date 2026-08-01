@@ -36,45 +36,45 @@ afterAll(() => {
 });
 
 describe('summary-fork project resolution (PAN-3419)', () => {
-  it('inherits an explicit project association from the source conversation', () => {
-    expect(resolveForkProjectKey(undefined, {
+  it('inherits an explicit project association from the source conversation', async () => {
+    await expect(resolveForkProjectKey(undefined, {
       projectKey: 'source-key',
       cwd: join(TEST_HOME, 'isolated-source'),
-    })).toEqual({ projectKey: 'source-key' });
+    })).resolves.toEqual({ projectKey: 'source-key' });
   });
 
-  it('falls back to the project owning the source cwd', () => {
-    expect(resolveForkProjectKey(undefined, {
+  it('falls back to the project owning the source cwd', async () => {
+    await expect(resolveForkProjectKey(undefined, {
       projectKey: null,
       cwd: join(SOURCE_PATH, 'workspaces', 'feature-min-930'),
-    })).toEqual({ projectKey: 'source-key' });
+    })).resolves.toEqual({ projectKey: 'source-key' });
   });
 
-  it('lets an explicit yaml key override the inherited project', () => {
-    expect(resolveForkProjectKey('override-key', {
+  it('lets an explicit yaml key override the inherited project', async () => {
+    await expect(resolveForkProjectKey('override-key', {
       projectKey: 'source-key',
       cwd: SOURCE_PATH,
-    })).toEqual({ projectKey: 'override-key' });
+    })).resolves.toEqual({ projectKey: 'override-key' });
   });
 
-  it('resolves an explicit display name to its canonical yaml key', () => {
-    expect(resolveForkProjectKey('Override Project', {
+  it('resolves an explicit display name to its canonical yaml key', async () => {
+    await expect(resolveForkProjectKey('Override Project', {
       projectKey: 'source-key',
       cwd: SOURCE_PATH,
-    })).toEqual({ projectKey: 'override-key' });
+    })).resolves.toEqual({ projectKey: 'override-key' });
   });
 
-  it('returns a clear error for an unknown explicit project', () => {
-    expect(resolveForkProjectKey('Missing Project', {
+  it('returns a clear error for an unknown explicit project', async () => {
+    await expect(resolveForkProjectKey('Missing Project', {
       projectKey: 'source-key',
       cwd: SOURCE_PATH,
-    })).toEqual({ error: 'Unknown project: Missing Project' });
+    })).resolves.toEqual({ error: 'Unknown project: Missing Project' });
   });
 
-  it('returns no association when the source is unscoped', () => {
-    expect(resolveForkProjectKey(undefined, {
+  it('returns no association when the source is unscoped', async () => {
+    await expect(resolveForkProjectKey(undefined, {
       projectKey: null,
       cwd: join(TEST_HOME, 'outside'),
-    })).toEqual({ projectKey: undefined });
+    })).resolves.toEqual({ projectKey: undefined });
   });
 });

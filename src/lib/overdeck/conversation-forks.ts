@@ -10,7 +10,7 @@ import { HttpServerResponse } from 'effect/unstable/http';
 import { jsonResponse } from '../../dashboard/server/http-helpers.js';
 import { parseIssueIdSync } from '../issue-id.js';
 import { MODEL_ID_PATTERN } from '../model-validation.js';
-import { resolveProjectKeyForCwd } from '../projects.js';
+import { resolveProjectKeyForCwdAsync } from '../projects.js';
 import { issueIdFromBranch } from '../webhook-handlers.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -35,7 +35,7 @@ import {
 import {
   isInsideGitWorkTree,
   resolveAllowedHarness,
-  resolveRegisteredProjectKey,
+  resolveRegisteredProject,
   spawnConversationSession,
   waitForPiTuiReady,
   waitForTmuxSession,
@@ -651,15 +651,16 @@ async function detectIssueIdFromBranch(cwd: string): Promise<string | undefined>
   }
 }
 
-export function resolveForkProjectKey(
+export async function resolveForkProjectKey(
   requested: string | undefined,
   source: Pick<Conversation, 'projectKey' | 'cwd'>,
-): { projectKey?: string } | { error: string } {
+): Promise<{ projectKey?: string } | { error: string }> {
   if (requested !== undefined) {
-    const resolved = resolveRegisteredProjectKey(requested);
+    const resolved = await resolveRegisteredProject(requested);
     return 'error' in resolved ? resolved : { projectKey: resolved.key };
   }
-  return { projectKey: source.projectKey ?? resolveProjectKeyForCwd(source.cwd) ?? undefined };
+  if (source.projectKey) return { projectKey: source.projectKey };
+  return { projectKey: await resolveProjectKeyForCwdAsync(source.cwd) ?? undefined };
 }
 
 export async function handleConversationSummaryFork(
@@ -713,7 +714,7 @@ export async function handleConversationSummaryFork(
     if (requestedProject !== undefined && (typeof requestedProject !== 'string' || !requestedProject.trim())) {
       return jsonResponse({ error: 'Invalid projectKey' }, { status: 400 });
     }
-    const projectResult = resolveForkProjectKey(
+    const projectResult = await resolveForkProjectKey(
       typeof requestedProject === 'string' ? requestedProject.trim() : undefined,
       conv,
     );

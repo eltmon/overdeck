@@ -13,8 +13,8 @@ const NESTED_PATH = join(ROOT_PATH, 'packages', 'nested');
 
 const { getOverdeckDatabaseSync, closeOverdeckDatabaseSync } = await import('../infra.js');
 const { createConversation, getConversationByName, setConversationProjectKey } = await import('../conversations.js');
-const { resolveRegisteredProjectKey } = await import('../conversation-runtime.js');
-const { resolveProjectKeyForCwd } = await import('../../projects.js');
+const { resolveRegisteredProject } = await import('../conversation-runtime.js');
+const { resolveProjectKeyForCwdAsync } = await import('../../projects.js');
 
 beforeAll(() => {
   mkdirSync(NESTED_PATH, { recursive: true });
@@ -49,14 +49,20 @@ describe('conversation project association (PAN-3419)', () => {
     expect(columns).toContainEqual(expect.objectContaining({ name: 'project_key', notnull: 0 }));
   });
 
-  it('resolves yaml keys and display names to the canonical project key', () => {
-    expect(resolveRegisteredProjectKey('root-key')).toEqual({ key: 'root-key' });
-    expect(resolveRegisteredProjectKey('Root Project')).toEqual({ key: 'root-key' });
-    expect(resolveRegisteredProjectKey('missing')).toEqual({ error: 'Unknown project: missing' });
+  it('resolves yaml keys and display names to one canonical project record', async () => {
+    await expect(resolveRegisteredProject('root-key')).resolves.toEqual(expect.objectContaining({
+      key: 'root-key',
+      config: expect.objectContaining({ name: 'Root Project', path: ROOT_PATH }),
+    }));
+    await expect(resolveRegisteredProject('Root Project')).resolves.toEqual(expect.objectContaining({
+      key: 'root-key',
+      config: expect.objectContaining({ name: 'Root Project', path: ROOT_PATH }),
+    }));
+    await expect(resolveRegisteredProject('missing')).resolves.toEqual({ error: 'Unknown project: missing' });
   });
 
-  it('persists and updates an explicit project association through the conversation write door', () => {
-    const resolved = resolveRegisteredProjectKey('Nested Project');
+  it('persists and updates an explicit project association through the conversation write door', async () => {
+    const resolved = await resolveRegisteredProject('Nested Project');
     if ('error' in resolved) throw new Error(resolved.error);
 
     createConversation({
@@ -74,9 +80,9 @@ describe('conversation project association (PAN-3419)', () => {
     expect(getConversationByName('project-associated')?.projectKey).toBeNull();
   });
 
-  it('resolves cwd ownership by the longest registered project path prefix', () => {
-    expect(resolveProjectKeyForCwd(join(NESTED_PATH, 'src'))).toBe('nested-key');
-    expect(resolveProjectKeyForCwd(join(ROOT_PATH, 'other'))).toBe('root-key');
-    expect(resolveProjectKeyForCwd(join(TEST_HOME, 'outside'))).toBeNull();
+  it('resolves cwd ownership asynchronously by the longest registered project path prefix', async () => {
+    await expect(resolveProjectKeyForCwdAsync(join(NESTED_PATH, 'src'))).resolves.toBe('nested-key');
+    await expect(resolveProjectKeyForCwdAsync(join(ROOT_PATH, 'other'))).resolves.toBe('root-key');
+    await expect(resolveProjectKeyForCwdAsync(join(TEST_HOME, 'outside'))).resolves.toBeNull();
   });
 });

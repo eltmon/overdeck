@@ -551,12 +551,14 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
   }));
 }
 
-/** Resolve the registered project owning a cwd via longest path-prefix match. */
-export function resolveProjectKeyForCwd(cwd: string): string | null {
+function resolveProjectKeyForCwdFromProjects(
+  cwd: string,
+  projects: ReadonlyArray<{ key: string; config: ProjectConfig }>,
+): string | null {
   const normalizedCwd = resolve(cwd);
   let bestMatch: { key: string; pathLength: number } | null = null;
 
-  for (const { key, config } of listProjectsSync()) {
+  for (const { key, config } of projects) {
     if (!config.path) continue;
     const projectPath = resolve(config.path);
     const pathPrefix = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
@@ -569,6 +571,16 @@ export function resolveProjectKeyForCwd(cwd: string): string | null {
   }
 
   return bestMatch?.key ?? null;
+}
+
+/** Resolve the registered project owning a cwd via longest path-prefix match. */
+export function resolveProjectKeyForCwd(cwd: string): string | null {
+  return resolveProjectKeyForCwdFromProjects(cwd, listProjectsSync());
+}
+
+/** Async request-path variant of {@link resolveProjectKeyForCwd}. */
+export async function resolveProjectKeyForCwdAsync(cwd: string): Promise<string | null> {
+  return resolveProjectKeyForCwdFromProjects(cwd, await listProjectsAsync());
 }
 
 /**
