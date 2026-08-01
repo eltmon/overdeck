@@ -1,6 +1,9 @@
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { Effect } from 'effect';
 
 import { readFeedbackAgentStates } from '../agents/agent-state-source.js';
+import { getReadableWorkspacePanPaths } from '../pan-dir/continue.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
 import { readIssueRecordSync, type PanIssueRecord } from '../pan-dir/record.js';
 import { updateIssueRecord } from '../pan-dir/record-update.js';
@@ -123,7 +126,11 @@ export async function resolveIssueFeedbackTarget(
   // Operator pauses are the one gate never overridden. Escalating to a human (or any
   // mailbox-style deferred delivery, PAN-2255) is strictly the last resort after
   // resurrection of every candidate has failed.
-  const revive = opts.revivePipelinePausedAgent ?? resurrectAgentForFeedback;
+  const workspacePath = resolved
+    ? join(resolved.projectPath, 'workspaces', `feature-${issueLower}`)
+    : undefined;
+  const revive = opts.revivePipelinePausedAgent
+    ?? ((agentId, reviveIssueId) => resurrectAgentForFeedback(agentId, reviveIssueId, workspacePath));
   const candidates: string[] = [wholeIssueAgentId];
   if (requestedItemId) {
     const assigned = assignments.find(a => a.itemId === requestedItemId);
@@ -157,14 +164,60 @@ export async function resolveIssueFeedbackTarget(
  * - Troubled / failure-backoff → clear the gate loudly and attempt ONE resume. The
  *   failure-tracking machinery re-trips the gate if the agent crashes again, so this
  *   cannot loop unboundedly.
- * - Plain stopped/completed/crashed → resume.
+ * - Plain stopped/completed/crashed → resume, then canonical start if resume fails.
+ * - Missing registry row + healthy workspace continue state → canonical start.
  * - OPERATOR pauses (pan pause, any non-pipeline pausedReason) are never overridden.
  */
-async function resurrectAgentForFeedback(agentId: string, issueId: string): Promise<boolean> {
+async function startAgentForFeedback(
+  agentId: string,
+  issueId: string,
+  workspacePath: string | undefined,
+): Promise<boolean> {
+  if (agentId !== `agent-${issueId.toLowerCase()}`) return false;
+  if (!workspacePath) {
+    console.warn(`[feedback-target] Cannot start ${agentId} for ${issueId} feedback: no configured project workspace`);
+    return false;
+  }
+
+  const continuePath = getReadableWorkspacePanPaths(workspacePath).continuePath;
+  if (!existsSync(workspacePath) || !existsSync(continuePath)) {
+    console.warn(
+      `[feedback-target] Cannot start ${agentId} for ${issueId} feedback: ` +
+      `workspace=${existsSync(workspacePath) ? 'present' : 'missing'}, continue=${existsSync(continuePath) ? 'present' : 'missing'}`,
+    );
+    return false;
+  }
+
+  console.warn(`[feedback-target] Starting ${agentId} for ${issueId} feedback through the canonical work-agent start path`);
+  const { spawnWorkAgentThroughAgentsEndpoint } = await import('./orphan-proposed-reconciler.js');
+  const result = await spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, false, 'resume-agent');
+  if (!result.spawned) {
+    console.warn(
+      `[feedback-target] Failed to start ${agentId} for ${issueId} feedback: ` +
+      `${result.error ?? result.skippedReason ?? 'unknown start failure'}`,
+    );
+    return false;
+  }
+
+  const live = await isLiveSession(agentId);
+  if (!live) {
+    console.warn(`[feedback-target] Start path accepted ${agentId} for ${issueId} feedback, but no live tmux session appeared`);
+  }
+  return live;
+}
+
+async function resurrectAgentForFeedback(
+  agentId: string,
+  issueId: string,
+  workspacePath: string | undefined,
+): Promise<boolean> {
   try {
     const { getAgentStateSync, clearAgentPausedSync, clearAgentTroubledSync } = await import('../agents/agent-state.js');
     const state = getAgentStateSync(agentId);
-    if (!state) return false;
+    if (!state) {
+      console.warn(`[feedback-target] Cannot resume ${agentId} for ${issueId} feedback: agent registry row is missing; trying the start path`);
+      return startAgentForFeedback(agentId, issueId, workspacePath);
+    }
 
     if (state.paused === true) {
       const reason = state.pausedReason ?? '';
@@ -191,10 +244,13 @@ async function resurrectAgentForFeedback(agentId: string, issueId: string): Prom
     const { resumeAgent } = await import('../agents/resume.js');
     const result = await resumeAgent(agentId);
     if (!result.success) {
-      console.warn(`[feedback-target] Failed to resurrect ${agentId} for ${issueId} feedback: ${result.error}`);
-      return false;
+      console.warn(`[feedback-target] Failed to resume ${agentId} for ${issueId} feedback: ${result.error}; trying the start path`);
+      return startAgentForFeedback(agentId, issueId, workspacePath);
     }
-    return isLiveSession(agentId);
+    if (await isLiveSession(agentId)) return true;
+
+    console.warn(`[feedback-target] Resume reported success for ${agentId}, but no live tmux session appeared; trying the start path`);
+    return startAgentForFeedback(agentId, issueId, workspacePath);
   } catch (err) {
     console.warn(`[feedback-target] resurrectAgentForFeedback(${agentId}) failed: ${err instanceof Error ? err.message : String(err)}`);
     return false;

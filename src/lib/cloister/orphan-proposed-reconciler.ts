@@ -280,6 +280,7 @@ export async function spawnWorkAgentThroughAgentsEndpoint(
   issueId: string,
   dashboardOrigin = internalDashboardOrigin(),
   autoSpawnConsentRequired = false,
+  startedBy = 'orphan-proposed-reconciler',
 ): Promise<SpawnWorkAgentResult> {
   const internalToken = getInternalTokenSync();
   const response = await fetch(new URL('/api/agents', dashboardOrigin), {
@@ -292,7 +293,7 @@ export async function spawnWorkAgentThroughAgentsEndpoint(
     body: JSON.stringify({
       issueId,
       role: 'work',
-      startedBy: 'orphan-proposed-reconciler',
+      startedBy,
       autoSpawnConsentRequired,
     }),
   });
