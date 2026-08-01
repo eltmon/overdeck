@@ -217,6 +217,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T22:03:14.693Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T22:14Z] review-agent → CHANGES-REQUESTED — seq 3",
+      "timestamp": "2026-08-01T22:14:34.534Z"
     }
   ],
   "feedback": [
@@ -233,6 +238,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-01T21:53:47Z",
       "markdownBody": "VERIFICATION STUCK for PAN-3396 (attempt 3/3):\n\nFailed check: lint\n\nVerification FAILED at lint (444780ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(1768 chars elided)…\n34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.10 kB\u001b[22m \u001b[2m│ gzip: 7.19 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.16 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m780ms\u001b[39m\n\n> @overdeck/core@0.48.0 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34m\n...(truncated)\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3396 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T22:14:34Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3396\n\n# Review Synthesis — PAN-3396 — 2026-08-01T22:12:56Z\n\n## Verdict: CHANGES REQUESTED — the focused residue tests hang because the execFile mock never invokes its callback, and unmigrated membership reads still repeat synchronous state-home resolution\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/context.json\n- Branch: feature/pan-3396\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n- HEAD reviewed: cd0c267053f41d6fa8e10ae3347ae21a1162b91a\n- Cycle number: 7\n- Prior completed synthesis SHA: 4bd8620af813022475a94b085fdc332d10ad51af\n- PR merge base: 5cd53eaad6250bbd6ca4b38b7af784783fc02d3a\n- PR commits: 18\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/correctness.md | 3 raw; 1 blocking after gates |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/requirements.md | 1 raw; 0 blocking after gates |\n\n## Blocking Findings\n\n### [correctness] The residue test mock leaves every promisified subprocess call pending — `tests/unit/lib/lifecycle/residue.test.ts:10`\nThe current-cycle change replaced the module mock with `vi.hoisted()`, fixing the earlier temporal-dead-zone collection failure, but the mock still returns promises instead of invoking `execFile`'s callback. Production creates `execFileAsync = promisify(execFile)`, so every helper call remains pending and all three focused tests time out without exercising residue behavior. Mock the callback-style contract or inject a promise-based executor before promisification, and remove the unused fake-timer setup because this helper has no retry or delay behavior. The assertion-contract mismatches called out in the same reviewer finding were already identified in the prior synthesis and are not separately promotable this cycle.\n\n### [performance] Unmigrated batch reads still repeat synchronous state-home resolution — `src/lib/pan-dir/record.ts:517`\nThe current-cycle batch-reader rewrite resolves `stateHome` once for migrated projects, but its unmigrated branch calls `getIssueRecordPath(project, id)` inside each candidate task. That helper re-enters `resolveStateReadHomeSync()` and synchronously reads the migration marker, so event-loop blocking still scales with the number of tracker-closed issues carrying open convention PRs/MRs. Resolve migration state asynchronously once per project and derive both migrated and legacy record paths from that result while preserving bounded record-body reads and fail-toward-`zombie_pr` semantics.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: pre-existing, out of PR scope] Completed close-out records bypass residue cleanup — `src/lib/lifecycle/workflows.ts:181`\nThe ordinary idempotent return still occurs before `opts.residueDisposition` is read, so an already-closed-out issue can report a successful no-op while its stale PR/MR remains open. The cited short-circuit is outside the PR diff and was already demoted in the prior completed synthesis, so it cannot block this cycle.\n\n### [correctness] [demoted: previously reviewed, not promotable] Durable disposition persistence drops `kind` — `src/lib/lifecycle/workflows.ts:456`\n`buildResidueDodGate()` and `buildAbandonedDodGate()` produce a structured `kind`, but the record writer persists the raw `{ reason, by }` option and the permanent record type omits the discriminator. The persistence sites did not change after the prior completed synthesis SHA, which explicitly reviewed this defect, so cycle convergence prevents promotion.\n\n### [requirements] [demoted: previously reviewed, not promotable] Residue close-out can report success without the durable terminal marker — `src/lib/lifecycle/workflows.ts:449`\nThe requirements reviewer correctly identifies an in-PR-scope FR-5/NFR-4 gap: the generic terminal-marker catch remains non-fatal, so residue cleanup may close forge artifacts and continue without `pipeline.closedOut`. The residue marker call and non-fatal wrapper were already present at the prior completed synthesis SHA and did not change in this cycle; under the cycle-7 convergence gate, this newly promoted interpretation cannot become a blocker now.\n\n## Clean Sub-roles\n- security\n\n## Convergence Note\nCycle 7 can block only on lines changed after the latest completed synthesis at `4bd8620af813022475a94b085fdc332d10ad51af`; the immediately preceding run at `9715a1b92c315e79232369e3cba02babcb21b34f` produced reviewer reports but no synthesis or final verdict. The callback-incompatible test mock and the batch-reader rewrite both changed after the completed synthesis and are promotable. The idempotent short-circuit is outside the PR diff, while the disposition writer and non-fatal terminal-marker behavior were unchanged since the completed synthesis, so those findings remain advisory. Two blockers are below the proportionality threshold of 54 for 18 PR commits.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-cd0c2670/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3396 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -281,21 +293,20 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:10:44.197Z",
+  "updated": "2026-08-01T22:14:34.535Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T22:10:42.272Z",
-    "reviewNotes": "Residue tests fail during module collection and the membership batch repeats synchronous state-home resolution per issue",
+    "updatedAt": "2026-08-01T22:14:33.872Z",
+    "reviewNotes": "Residue tests hang on a callback-incompatible execFile mock, and unmigrated membership reads still repeat synchronous state-home resolution",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f",
-    "reviewRequestedAt": "2026-08-01T21:59:27.040Z",
     "reviewSpawnedAt": "2026-08-01T21:59:33.800Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -342,6 +353,24 @@
       ],
       "recordedAt": "2026-08-01T21:59:25.816Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "cd0c267053f41d6fa8e10ae3347ae21a1162b91a"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "cd0c267053f41d6fa8e10ae3347ae21a1162b91a"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "cd0c267053f41d6fa8e10ae3347ae21a1162b91a"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "cd0c267053f41d6fa8e10ae3347ae21a1162b91a"
+      }
+    },
     "reviewCycleHistory": [
       {
         "cycle": 1,
@@ -364,9 +393,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26212551,
-            "output": 401173,
-            "cacheRead": 84161536,
+            "input": 26386886,
+            "output": 428808,
+            "cacheRead": 90772480,
             "cacheWrite": 0
           }
         },
@@ -419,9 +448,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 30763622,
-          "output": 490770,
-          "cacheRead": 97657856,
+          "input": 30937957,
+          "output": 518405,
+          "cacheRead": 104268800,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -432,8 +461,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 226.8637043,
-        "pricingAsOf": "2026-08-01T22:10:43.012Z"
+        "usd": 231.8699013,
+        "pricingAsOf": "2026-08-01T22:14:33.901Z"
       }
     },
     "merges": [
