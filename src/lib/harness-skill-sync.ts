@@ -5,6 +5,7 @@ import {
   collectSourceFilesSync,
   compareFileToManifest,
   hashFileSync,
+  pruneStaleManifestEntriesSync,
   readManifestSync,
   setManifestEntry,
   writeManifestSync,
@@ -52,8 +53,9 @@ export function executeAgentSkillsSync(
   };
   const manifestPath = join(dirname(targetSkillsDir), '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);
+  const sourceFiles = collectSourceFilesSync(sourceSkillsDir, '');
 
-  for (const file of collectSourceFilesSync(sourceSkillsDir, '')) {
+  for (const file of sourceFiles) {
     const targetFile = join(targetSkillsDir, file.relativePath);
     const manifestKey = `skills/${file.relativePath}`;
     const status = compareFileToManifest(targetFile, manifestKey, manifest);
@@ -82,6 +84,13 @@ export function executeAgentSkillsSync(
       result.skipped.push(file.relativePath);
     }
   }
+
+  const sourceSet = new Set(sourceFiles.map((file) => `skills/${file.relativePath}`));
+  const pruneResult = pruneStaleManifestEntriesSync(dirname(targetSkillsDir), manifest, sourceSet, {
+    prefixes: ['skills/'],
+  });
+  result.pruned.push(...pruneResult.pruned);
+  result.keptModified.push(...pruneResult.keptModified);
 
   mkdirSync(dirname(manifestPath), { recursive: true });
   writeManifestSync(manifestPath, manifest);

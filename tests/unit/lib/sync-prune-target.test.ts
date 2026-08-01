@@ -154,3 +154,58 @@ describe('executeSyncSync stale target pruning', () => {
     expect(manifest.installed).not.toHaveProperty('rules/beads-dolt-authority.md');
   });
 });
+
+describe('executeAgentSkillsSync stale target pruning', () => {
+  it('deletes and reports a stale manifest-tracked skill', async () => {
+    const targetSkillsDir = join(dirs.base, 'agent-home', 'skills');
+    const sourceSkillsDir = join(dirs.base, 'source-skills');
+    const targetPath = join(targetSkillsDir, 'old-skill', 'SKILL.md');
+    const manifestPath = join(dirs.base, 'agent-home', '.overdeck-manifest.json');
+    write(targetPath, 'old skill\n');
+    write(manifestPath, JSON.stringify({
+      version: 1,
+      managed_by: 'overdeck',
+      installed: {
+        'skills/old-skill/SKILL.md': {
+          hash: hash('old skill\n'), source: 'overdeck', installed_at: '2026-08-01T00:00:00.000Z',
+        },
+      },
+    }));
+
+    const { executeAgentSkillsSync } = await import('../../../src/lib/harness-skill-sync.js');
+    const result = executeAgentSkillsSync({}, targetSkillsDir, sourceSkillsDir);
+
+    expect(result.pruned).toEqual(['skills/old-skill/SKILL.md']);
+    expect(result.keptModified).toEqual([]);
+    expect(existsSync(targetPath)).toBe(false);
+    expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed).toEqual({});
+  });
+
+  it('preserves modified and unmanifested skills while releasing stale ownership', async () => {
+    const targetSkillsDir = join(dirs.base, 'agent-home', 'skills');
+    const sourceSkillsDir = join(dirs.base, 'source-skills');
+    const modifiedPath = join(targetSkillsDir, 'modified', 'SKILL.md');
+    const userPath = join(targetSkillsDir, 'user-skill', 'SKILL.md');
+    const manifestPath = join(dirs.base, 'agent-home', '.overdeck-manifest.json');
+    write(modifiedPath, 'user modified\n');
+    write(userPath, 'user skill\n');
+    write(manifestPath, JSON.stringify({
+      version: 1,
+      managed_by: 'overdeck',
+      installed: {
+        'skills/modified/SKILL.md': {
+          hash: hash('original\n'), source: 'overdeck', installed_at: '2026-08-01T00:00:00.000Z',
+        },
+      },
+    }));
+
+    const { executeAgentSkillsSync } = await import('../../../src/lib/harness-skill-sync.js');
+    const result = executeAgentSkillsSync({}, targetSkillsDir, sourceSkillsDir);
+
+    expect(result.pruned).toEqual([]);
+    expect(result.keptModified).toEqual(['skills/modified/SKILL.md']);
+    expect(readFileSync(modifiedPath, 'utf-8')).toBe('user modified\n');
+    expect(readFileSync(userPath, 'utf-8')).toBe('user skill\n');
+    expect(JSON.parse(readFileSync(manifestPath, 'utf-8')).installed).toEqual({});
+  });
+});
