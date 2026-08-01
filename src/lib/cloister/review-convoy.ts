@@ -502,7 +502,7 @@ export const spawnReviewSubRoleForIssue = (opts: {
  */
 export async function handleReviewDiscoveryReady(
   issueId: string,
-  opts: { source?: string } = {},
+  opts: { source?: string; model?: string; harness?: RuntimeName } = {},
 ): Promise<{ success: boolean; message: string; launched?: number }> {
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
@@ -520,58 +520,59 @@ export async function handleReviewDiscoveryReady(
   // PAN-2585: the signal is AUTHORITATIVE. `reviewDiscoveryPending` is persisted only
   // in state.json and is invisible through the DB-backed agent reader, so it must not
   // gate the launch — gating on it left parents standing by forever for reviewers that
-  // were never forked. Idempotency comes from evidence instead: a live reviewer
-  // session, or a reviewer output already written for the CURRENT run, means the
-  // convoy launched — no-op. No evidence means launch, flag or no flag.
+  // were never forked.
+  //
+  // PAN-3368: idempotency is PER LANE, not convoy-wide. One completed report or one
+  // surviving reviewer proves only that lane launched; treating it as proof for all four
+  // stranded any sibling reviewer that died before writing its report.
+  const { inScope, carried, scope } = await computeConvoyScope(normalized, workspace);
+  let sessions = new Set<string>();
   try {
-    const sessions = await Effect.runPromise(listSessionNames());
-    // PAN-2697: match ONLY the four convoy sub-role sessions. Prefix matching
-    // also caught the always-on review supervisor (agent-<id>-review-supervisor),
-    // which no-op'd every discovery-ready signal and stranded the convoy.
-    const reviewerSessionNames = new Set(
-      REVIEW_SUB_ROLES.map((subRole) => `agent-${normalized.toLowerCase()}-review-${subRole}`),
-    );
-    if (sessions.some(name => reviewerSessionNames.has(name))) {
-      parent.reviewDiscoveryPending = false;
-      await Effect.runPromise(saveAgentState(parent));
-      return { success: true, message: `Convoy already launched for ${normalized} — no-op` };
-    }
-  } catch { /* liveness probe failure — proceed; spawnRun's own guards hold */ }
-  try {
-    const { existsSync } = await import('node:fs');
-    const hasRunOutput = REVIEW_SUB_ROLES.some(subRole =>
-      existsSync(reviewerAgentOutputPath(workspace, runId, subRole)),
-    );
-    if (hasRunOutput) {
-      parent.reviewDiscoveryPending = false;
-      await Effect.runPromise(saveAgentState(parent));
-      return { success: true, message: `Convoy for ${normalized} run ${runId} already produced reviewer output — no-op` };
-    }
-  } catch { /* output probe failure — proceed */ }
+    sessions = new Set(await Effect.runPromise(listSessionNames()));
+  } catch { /* liveness probe failure — spawnRun's own guards hold */ }
+
+  const { existsSync } = await import('node:fs');
+  const reviewersToLaunch = inScope.filter((subRole) => {
+    const reviewerId = reviewerAgentId(normalized, subRole);
+    const reviewer = getAgentStateSync(reviewerId);
+    const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
+    const outputPath = reviewerAgentOutputPath(workspace, runId, subRole);
+    return !sessions.has(reviewerId) && !stateClaimsLive && !existsSync(outputPath);
+  });
+  const carriedToWrite = carried.filter(({ subRole }) =>
+    !existsSync(reviewerAgentOutputPath(workspace, runId, subRole)),
+  );
+
+  if (reviewersToLaunch.length === 0 && carriedToWrite.length === 0) {
+    parent.reviewDiscoveryPending = false;
+    await Effect.runPromise(saveAgentState(parent));
+    return { success: true, message: `Convoy already launched for ${normalized} run ${runId} — no-op` };
+  }
 
   // Clear the pending flag BEFORE launching so a concurrent duplicate signal
-  // short-circuits on the check above / the flag here.
+  // short-circuits on the per-lane evidence above.
   parent.reviewDiscoveryPending = false;
   parent.reviewDiscoveryReadyAt = new Date().toISOString();
   await Effect.runPromise(saveAgentState(parent));
 
-  const { inScope, carried, scope } = await computeConvoyScope(normalized, workspace);
   // The per-issue review-model override has to be re-read here: this path is entered from a
   // signal, not from the parent's spawn opts, so nothing carries `model` in. Read the record
   // rather than `parent.model` — that is the parent's *resolved* model, and forwarding it
   // would override each sub-role's own configured model even with no override set.
   const project = resolveProjectForIssue(normalized);
   const issueReviewModel = project ? readIssueRecordSync(project, normalized)?.reviewModel : undefined;
+  const reviewModel = opts.model ?? issueReviewModel;
   const results = await launchConvoyReviewersPromise({
     issueId: normalized,
     workspace,
     runId,
     synthesisAgentId: parentId,
-    inScope,
-    carried,
+    inScope: reviewersToLaunch,
+    carried: carriedToWrite,
     scope,
     contextManifestPath: parent.reviewContextManifestPath,
-    ...(issueReviewModel ? { model: issueReviewModel } : {}),
+    ...(reviewModel ? { model: reviewModel } : {}),
+    ...(opts.harness ? { harness: opts.harness } : {}),
     allowHost: parent.hostOverride ?? false,
     forkFromParent: true,
   });
@@ -583,10 +584,10 @@ export async function handleReviewDiscoveryReady(
   }
 
   const launched = results.filter(r => r.success).length;
-  const message = `Discovery-ready for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${inScope.length} convoy reviewer(s)${carried.length ? `, carried [${carried.map(c => c.subRole).join(', ')}]` : ''}`;
+  const message = `Discovery-ready for ${normalized}${opts.source ? ` (${opts.source})` : ''}: launched ${launched}/${reviewersToLaunch.length} missing convoy reviewer(s)${carriedToWrite.length ? `, carried [${carriedToWrite.map(c => c.subRole).join(', ')}]` : ''}`;
   console.log(`[review-agent] ${message}`);
   emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: normalized });
-  return { success: launched > 0 || inScope.length === 0, message, launched };
+  return { success: launched === reviewersToLaunch.length, message, launched };
 }
 
 

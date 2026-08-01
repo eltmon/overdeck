@@ -60,6 +60,7 @@ import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
   computeConvoyScope,
+  handleReviewDiscoveryReady,
   launchConvoyReviewersPromise,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
@@ -696,7 +697,25 @@ async function spawnReviewRoleForIssuePromise(
           }
         } catch { /* non-fatal */ }
         if (fullReview) {
-          await spawnConvoyReviewers(reviewAgentId);
+          if (savedReview?.reviewRunId === runId) {
+            // PAN-3368: this is recovery of the current run, not a new review cycle.
+            // Re-dispatch only lanes with neither a live session nor a report; completed
+            // siblings stay intact and the synthesis parent can proceed immediately.
+            const recovery = await handleReviewDiscoveryReady(opts.issueId, {
+              source: 'same-run parent resume',
+              ...(opts.model ? { model: opts.model } : {}),
+              ...(opts.harness ? { harness: opts.harness } : {}),
+            });
+            if (!recovery.success) {
+              return {
+                success: false,
+                message: `Convoy review resumed, but missing reviewer recovery failed: ${recovery.message}`,
+                error: recovery.message,
+              };
+            }
+          } else {
+            await spawnConvoyReviewers(reviewAgentId);
+          }
           return { success: true, message: `Convoy review resumed (session preserved): ${reviewAgentId}` };
         }
         return { success: true, message: `Review resumed (session preserved): ${reviewAgentId}` };
