@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:33:20.365Z",
+  "updated": "2026-08-01T16:33:34.864Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -171,5 +171,32 @@
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac2": "completed",
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac3": "completed",
     "verify-live-data-repair": "cancelled"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+      "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+      "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+      "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+      "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+      "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+      "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+    ],
+    "recordedAt": "2026-08-01T16:33:34.861Z"
   }
 }
