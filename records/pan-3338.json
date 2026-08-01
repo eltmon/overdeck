@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:26:54.893Z",
+  "updated": "2026-08-01T20:30:10.794Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "pipeline-state-accepts-planned-canonical": {
-        "writerId": "agent-pan-3338",
-        "agentId": "agent-pan-3338",
-        "pid": 3697692,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T20:26:54.893Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -79,6 +71,17 @@
         "outcome": "completed",
         "reason": "Exported isInteractiveRoleAgent from agent-enrichment.ts; added shouldResurrectStoppedAgent in agent-enrichment-service.ts as the single resurrection resolver, wired into both the reconcile block and the agent.created projection. 5 new tests cover isInteractiveRoleAgent and shouldResurrectStoppedAgent (plan/conv- exempt, work resurrects, gate conditions). Added the 'Stopped but session-alive' subsection to docs/AGENT-STATE-PLANES.md. All existing agent-enrichment tests (33 + 22) stay green; typecheck clean.",
         "releasedAt": "2026-08-01T20:26:48.291Z"
+      },
+      {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3697692,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:26:54.893Z",
+        "itemId": "pipeline-state-accepts-planned-canonical",
+        "outcome": "completed",
+        "reason": "Added 'planned' to the awaiting-work canonical-state gate in issuePipelineState.ts:66, plus a contract comment stating planning_active derives from durable status not liveness and must not be downgraded by hasPlan. New issue-pipeline-state.test.ts covers all 5 PRD cases (planned/todo/backlog awaiting-work, running-with/without-plan planning_active, no-plan not-awaiting-work). Also re-ran simple-derive.test.ts and simple-foundations.test.ts (which depend on derivePipelineState) to confirm no regressions — all green.",
+        "releasedAt": "2026-08-01T20:30:10.794Z"
       }
     ],
     "statusReasons": {
@@ -89,6 +92,10 @@
       "poller-stops-resurrecting-interactive-agents": {
         "reason": "Exported isInteractiveRoleAgent from agent-enrichment.ts; added shouldResurrectStoppedAgent in agent-enrichment-service.ts as the single resurrection resolver, wired into both the reconcile block and the agent.created projection. 5 new tests cover isInteractiveRoleAgent and shouldResurrectStoppedAgent (plan/conv- exempt, work resurrects, gate conditions). Added the 'Stopped but session-alive' subsection to docs/AGENT-STATE-PLANES.md. All existing agent-enrichment tests (33 + 22) stay green; typecheck clean.",
         "updatedAt": "2026-08-01T20:26:48.291Z"
+      },
+      "pipeline-state-accepts-planned-canonical": {
+        "reason": "Added 'planned' to the awaiting-work canonical-state gate in issuePipelineState.ts:66, plus a contract comment stating planning_active derives from durable status not liveness and must not be downgraded by hasPlan. New issue-pipeline-state.test.ts covers all 5 PRD cases (planned/todo/backlog awaiting-work, running-with/without-plan planning_active, no-plan not-awaiting-work). Also re-ran simple-derive.test.ts and simple-foundations.test.ts (which depend on derivePipelineState) to confirm no regressions — all green.",
+        "updatedAt": "2026-08-01T20:30:10.794Z"
       }
     }
   },
@@ -103,6 +110,9 @@
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac2": "completed",
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac3": "completed",
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac4": "completed",
-    "pipeline-state-accepts-planned-canonical": "running"
+    "pipeline-state-accepts-planned-canonical": "completed",
+    "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac1": "completed",
+    "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac2": "completed",
+    "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac3": "completed"
   }
 }
