@@ -41,9 +41,14 @@ import { randomUUID } from 'node:crypto';
 import { unlink, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { capturePaneText, deliveryVerifyLine, tmuxExecAsync, validateSessionName } from './tmux.js';
+import { capturePaneText, tmuxExecAsync, validateSessionName } from './tmux.js';
 import { MessageDeliveryFailed } from './errors.js';
 import { paneHasBlockingChoiceMenu } from './pane-choice-menu.js';
+import {
+  activeComposerPayloadPresence,
+  type ComposerPayloadPresence,
+  type PaneViewport,
+} from './pane-composer.js';
 
 export const DEDUP_KEY_RE = /^[A-Za-z0-9:_-]+$/;
 
@@ -216,13 +221,6 @@ async function readPendingPayloadState(
   throw new KeyedMarkerVerificationError(sessionName, `${context} payload-state is ${detail} (key "${dedupKey}")`);
 }
 
-type PayloadPresence = 'present' | 'absent' | 'unproven';
-
-interface PaneViewport {
-  text: string;
-  cursorY: number;
-}
-
 async function captureVisiblePane(sessionName: string): Promise<PaneViewport> {
   const [pane, cursor] = await Promise.all([
     tmuxExecAsync(['capture-pane', '-t', sessionName, '-p'], { encoding: 'utf-8' }),
@@ -233,44 +231,16 @@ async function captureVisiblePane(sessionName: string): Promise<PaneViewport> {
   return { text: String(pane.stdout), cursorY };
 }
 
-const PANE_ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
-const COMPOSER_TOP_BOUNDARY = /^\s*[─━═]{6,}/;
-
-function activeComposerRegion(viewport: PaneViewport): string | null {
-  const lines = viewport.text
-    .replace(PANE_ANSI_PATTERN, '')
-    .split('\n')
-    .map(line => line.replace(/\s+$/g, ''));
-  if (lines.every(line => line.trim() === '')) return null;
-  if (viewport.cursorY < 0 || viewport.cursorY >= lines.length) return null;
-
-  let start = viewport.cursorY;
-  for (let index = viewport.cursorY; index >= 0; index -= 1) {
-    if (COMPOSER_TOP_BOUNDARY.test(lines[index]!)) {
-      start = index + 1;
-      break;
-    }
-  }
-  return lines.slice(start, viewport.cursorY + 1).join('\n');
-}
-
 async function pendingPayloadPresence(
   sessionName: string,
   keys: string,
   readViewport: (sessionName: string) => Promise<PaneViewport>,
-): Promise<PayloadPresence> {
-  const verifyLine = deliveryVerifyLine(keys);
-  if (verifyLine.length < 3) return 'unproven';
-
-  let viewport: PaneViewport;
+): Promise<ComposerPayloadPresence> {
   try {
-    viewport = await readViewport(sessionName);
+    return activeComposerPayloadPresence(await readViewport(sessionName), keys);
   } catch {
     return 'unproven';
   }
-  const composer = activeComposerRegion(viewport);
-  if (composer === null) return 'unproven';
-  return composer.includes(verifyLine.slice(0, 40)) ? 'present' : 'absent';
 }
 
 /**
