@@ -58,6 +58,18 @@ import { listEligibleCandidatesByProject } from '../../../lib/flywheel-merge-ord
 import { extractACFromDocument } from '../../../lib/xbrief/acceptance-criteria.js';
 import { findXBriefByIssue, readXBriefDocument } from '../../../lib/xbrief/xbrief-index.js';
 import { findProjectByPathSync, listProjectsSync, resolveProjectFromIssueSync } from '../../../lib/projects.js';
+import type { PanIssueShipRecord } from '../../../lib/pan-dir/record.js';
+import {
+  executeVersionShipForGeneration,
+  persistPendingShipRecords,
+  persistShipRecords,
+  withGenerationShipLock,
+} from '../../../lib/cloister/ship-record.js';
+import {
+  aggregateGenerationShipStatus,
+  loadShipRecords,
+  publicShipStatus,
+} from '../../../lib/cloister/ship-status.js';
 import {
   resolveConfiguredReposSync,
   resolveProjectReposFromResolvedIssueSync,
@@ -526,6 +538,9 @@ export interface UatGenerationPayload {
   members: UatGenerationMemberPayload[];
   heldOut: UatGeneration['heldOut'];
   resolutions: UatGeneration['resolutions'];
+  versionSyncConfigured: boolean;
+  /** Public aggregate omits operational error/reason detail. */
+  shipStatus: Omit<PanIssueShipRecord, 'error' | 'reason'> | null;
   /**
    * Per-repo generation detail, additive (PAN-3093). Always present and
    * non-empty: a monorepo generation projects the single synthesized entry, so
@@ -624,11 +639,16 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
   // projectRootOverride lets the aggregate /api/merge-train/generations route read
   // each tracked project's chain instead of only the dashboard's own repo.
   const root = projectRootOverride ? resolve(projectRootOverride) : projectRoot();
+  const project = findProjectByPathSync(root);
+  const versionSyncConfigured = Boolean(project?.version_sync);
   const chain = listUatGenerationsSync({ projectRoot: root, limit: CHAIN_PAYLOAD_LIMIT });
   if (chain.length === 0) return [];
   const memberIssueIds = new Set(chain.flatMap((gen) => gen.members.map((member) => member.issueId.toUpperCase())));
   // Resolve each member's xBRIEF in ITS OWN project, not the dashboard's repo.
-  const acCache = await loadAcceptanceCriteriaCache(memberIssueIds, root);
+  const [acCache, shipRecords] = await Promise.all([
+    loadAcceptanceCriteriaCache(memberIssueIds, root),
+    project && versionSyncConfigured ? loadShipRecords(project, chain) : Promise.resolve(new Map()),
+  ]);
   const payload: UatGenerationPayload[] = [];
   for (const gen of chain) {
     const probe = await probeUatStack(gen);
@@ -655,6 +675,10 @@ export async function getUatGenerationsPayload(projectRootOverride?: string): Pr
       members,
       heldOut: gen.heldOut,
       resolutions: gen.resolutions,
+      versionSyncConfigured,
+      shipStatus: publicShipStatus(
+        versionSyncConfigured ? aggregateGenerationShipStatus(gen, shipRecords) : null,
+      ),
       repos: (gen.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         branch: r.branch,
@@ -716,6 +740,7 @@ export async function postUatGenerationPromotePayload(
   // signature is what let the per-repo evidence be dropped by the forwarding
   // layer without a type error.
   firePostMerge: UatPromoteDeps['firePostMerge'],
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   // PAN-1696: promote into the generation's OWN project repo. Generation rows carry
   // project_root, so a MIN generation must not be merged against the Overdeck repo.
@@ -774,8 +799,32 @@ export async function postUatGenerationPromotePayload(
     firePostMerge,
     memberEligibility: reviewRecordEligibility,
     recordVerification: (generation, mergeSha) => recordUatPromotionVerdicts(generation, mergeSha),
+    ...(projectConfig?.version_sync
+      ? {
+          runShip: (generation: UatGeneration, requestedVersion: string | undefined) => withGenerationShipLock(
+            generation.name,
+            async () => {
+              // Establish durable batch membership before any command, worktree, or
+              // Git operation can fail. Deferred recovery and the DoD gate then
+              // remain blocking even when propagation never starts.
+              await persistPendingShipRecords(
+                generation,
+                requestedVersion ? 'version ship in progress' : 'no version supplied at promote time',
+              );
+              if (!requestedVersion) return;
+
+              const report = await executeVersionShipForGeneration({
+                generation,
+                project: projectConfig,
+                version: requestedVersion,
+              });
+              await persistShipRecords(generation, report);
+            },
+          ),
+        }
+      : {}),
     log: (msg) => console.log(msg),
-  });
+  }, { shipVersion });
   await notifyFlywheelOfUatPromote(result).catch(() => {});
   return result;
 }

@@ -187,6 +187,9 @@ describe('ProjectOverview', () => {
       if (method === 'GET' && url === '/api/projects/overdeck/swarm-policy') {
         return Response.json({});
       }
+      if (method === 'GET' && url === '/api/projects/overdeck/version-sync') {
+        return Response.json({ config: null, lastOutcome: null });
+      }
       return undefined;
     });
     useDashboardStore.setState({ reviewStatusByIssueId: {} });
@@ -497,6 +500,7 @@ describe('ProjectOverview new-workspace affordance (PAN-3330 FR-6c)', () => {
       if (url === '/api/projects/overdeck/merge-train') return Response.json({ value: null, effective: true });
       if (url === '/api/merge-train/queues' || url === '/api/merge-train/generations') return Response.json([]);
       if (url === '/api/projects/overdeck/swarm-policy') return Response.json({});
+      if (url === '/api/projects/overdeck/version-sync') return Response.json({ config: null, lastOutcome: null });
       return undefined;
     });
     useNewWorkspaceStore.setState({ isOpen: false, presetProjectKey: null });
