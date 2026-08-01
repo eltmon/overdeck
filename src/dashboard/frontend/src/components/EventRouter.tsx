@@ -19,6 +19,7 @@ import { WS_METHODS } from '@overdeck/contracts'
 import { Stream } from 'effect'
 import { loadSnapshotFromCache } from '../lib/snapshotCache'
 import { hideOverlay, showOverlay } from '../recovery'
+import { dispatchBackendReconnected, dispatchBackendReconnecting } from '../lib/backendConnectionEvents'
 
 const SNAPSHOT_FALLBACK_INTERVAL_MS = 2_000
 const SNAPSHOT_FALLBACK_WINDOW_MS = 3 * 60_000
@@ -55,11 +56,12 @@ export function EventRouter() {
   const flushScheduled = useRef(false)
 
   useEffect(() => {
-    let transport = getTransport()
     const coordinator = createRecoveryCoordinator()
     recovery.current = coordinator
     let bootstrapInFlight = false
+    let bootstrapPromise: Promise<boolean> | null = null
     let bootstrapComplete = false
+    let reconnecting = false
     let fallbackInterval: ReturnType<typeof setInterval> | null = null
     let fallbackTimeout: ReturnType<typeof setTimeout> | null = null
     let stalenessTimeout: ReturnType<typeof setTimeout> | null = null
@@ -101,15 +103,26 @@ export function EventRouter() {
       reconnectTimeout = null
     }
 
+    function markBackendReconnecting() {
+      reconnecting = true
+      dispatchBackendReconnecting()
+    }
+
+    function bootstrapWithReconnectRetry() {
+      void bootstrap().then((succeeded) => {
+        if (!succeeded) scheduleReconnectDomainStream()
+      })
+    }
+
     function reconnectDomainStream() {
       if (bootstrapInFlight) return
       stopScheduledReconnect()
+      markBackendReconnecting()
       unsubscribe?.()
       unsubscribe = null
       resetTransport()
-      transport = getTransport()
       subscribeToDomainEvents()
-      bootstrap().catch(console.error)
+      bootstrapWithReconnectRetry()
     }
 
     function scheduleReconnectDomainStream() {
@@ -126,6 +139,7 @@ export function EventRouter() {
       stopStalenessWatchdog()
       stalenessTimeout = setTimeout(() => {
         console.warn('[EventRouter] domain event stream stale — scheduling reconnect')
+        markBackendReconnecting()
         showOverlay('Reconnecting to the dashboard…')
         scheduleReconnectDomainStream()
       }, STREAM_STALENESS_TIMEOUT_MS)
@@ -150,37 +164,51 @@ export function EventRouter() {
     }
 
     // ── Bootstrap: fetch initial snapshot ───────────────────────────────────
-    async function bootstrap() {
-      if (bootstrapInFlight) return
+    function bootstrap(): Promise<boolean> {
+      if (bootstrapPromise) return bootstrapPromise
+
       bootstrapInFlight = true
-      coordinator.beginSnapshotRecovery('bootstrap')
-      try {
-        const snapshot = await transport.request((client) =>
-          (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
-        ) as DashboardSnapshot
-        syncSnapshot(snapshot)
-        // Snapshot carries recent activity now; keep the HTTP backfill as a
-        // non-fatal compatibility path for older cached/server payloads.
-        void seedRecentActivityFromApi()
-        bootstrapComplete = true
-        stopFallbackPoller()
-        const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
-        if (needsReplay) {
-          await replay(snapshot.sequence)
+      bootstrapPromise = (async () => {
+        coordinator.beginSnapshotRecovery('bootstrap')
+        try {
+          const snapshot = await getTransport().request((client) =>
+            (client as PanRpcProtocolClient)[WS_METHODS.getSnapshot]({}),
+          ) as DashboardSnapshot
+          syncSnapshot(snapshot)
+          // Snapshot carries recent activity now; keep the HTTP backfill as a
+          // non-fatal compatibility path for older cached/server payloads.
+          void seedRecentActivityFromApi()
+          bootstrapComplete = true
+          stopFallbackPoller()
+          const needsReplay = coordinator.completeSnapshotRecovery(snapshot.sequence)
+          if (needsReplay) {
+            await replay(snapshot.sequence)
+          }
+          if (reconnecting) {
+            reconnecting = false
+            reconnectAttempt = 0
+            stopScheduledReconnect()
+            hideOverlay()
+            dispatchBackendReconnected()
+          }
+          return true
+        } catch (err) {
+          console.error('[EventRouter] bootstrap failed:', err)
+          coordinator.failRecovery()
+          return false
+        } finally {
+          bootstrapInFlight = false
+          bootstrapPromise = null
         }
-      } catch (err) {
-        console.error('[EventRouter] bootstrap failed:', err)
-        coordinator.failRecovery()
-      } finally {
-        bootstrapInFlight = false
-      }
+      })()
+      return bootstrapPromise
     }
 
     // ── Replay: fetch missed events ──────────────────────────────────────────
     async function replay(fromSequence: number) {
       coordinator.beginReplayRecovery()
       try {
-        const events = await transport.request((client) =>
+        const events = await getTransport().request((client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.replayEvents]({ fromSequence }),
         )
         const typed = (events as DomainEvent[]).filter(isSequencedDomainEvent)
@@ -239,7 +267,7 @@ export function EventRouter() {
       reconnectAttempt = 0
       stopScheduledReconnect()
       resetStalenessWatchdog()
-      hideOverlay()
+      if (!reconnecting) hideOverlay()
       if (!isSequencedDomainEvent(event)) return
 
       const classification = coordinator.classifyDomainEvent(event.sequence)
@@ -262,7 +290,7 @@ export function EventRouter() {
     // ── Subscribe to domain events ────────────────────────────────────────────
     function subscribeToDomainEvents() {
       unsubscribe?.()
-      unsubscribe = transport.subscribe(
+      unsubscribe = getTransport().subscribe(
         (client) =>
           (client as PanRpcProtocolClient)[WS_METHODS.subscribeDomainEvents]({}) as unknown as Stream.Stream<DomainEvent, Error>,
         (event) => handleEvent(event as DomainEvent),
@@ -273,13 +301,10 @@ export function EventRouter() {
           // that were being viewed vanish with "no longer exists" errors.
           onReconnect: () => {
             console.log('[EventRouter] transport reconnected — re-bootstrapping snapshot')
-            hideOverlay()
-            bootstrap()
-            // Broadcast to all useQuery consumers so they re-fetch stale data
-            // (session trees, conversations, costs, etc.)
-            window.dispatchEvent(new CustomEvent('overdeck:reconnected'))
+            bootstrapWithReconnectRetry()
           },
           onRetry: (attempt) => {
+            markBackendReconnecting()
             if (attempt >= UNREACHABLE_OVERLAY_RETRY_ATTEMPTS) {
               showOverlay('Server unreachable — Retry', { label: 'Retry', onClick: reconnectDomainStream })
               return

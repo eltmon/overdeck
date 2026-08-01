@@ -5,17 +5,21 @@ import { INITIAL_READ_MODEL_STATE } from '@overdeck/contracts'
 import { EventRouter, eventRouterReconnectDelayMs } from './EventRouter'
 import { useDashboardStore } from '../lib/store'
 import { installStrictFetchMock } from '../test-utils/strictFetchMock'
+import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from '../lib/backendConnectionEvents'
 
 const wsTransport = vi.hoisted(() => {
+  const request = vi.fn()
+  const subscribe = vi.fn()
   const state = {
-    request: vi.fn(),
-    subscribe: vi.fn(),
+    request,
+    subscribe,
+    currentTransport: { request, subscribe },
     resetTransport: vi.fn(),
     subscribed: null as ((event: DomainEvent) => void) | null,
     subscribeOptions: null as { onReconnect?: () => void; onRetry?: (attempt: number) => void } | null,
     unsubscribe: vi.fn(),
   }
-  state.subscribe.mockImplementation((_connect, listener, options) => {
+  subscribe.mockImplementation((_connect, listener, options) => {
     state.subscribed = listener
     state.subscribeOptions = options
     return state.unsubscribe
@@ -25,10 +29,7 @@ const wsTransport = vi.hoisted(() => {
 const { request, subscribe, resetTransport, unsubscribe } = wsTransport
 
 vi.mock('../lib/wsTransport', () => ({
-  getTransport: () => ({
-    request: wsTransport.request,
-    subscribe: wsTransport.subscribe,
-  }),
+  getTransport: () => wsTransport.currentTransport,
   resetTransport: wsTransport.resetTransport,
 }))
 
@@ -104,6 +105,7 @@ describe('EventRouter memory updates', () => {
     request.mockReset()
     request.mockResolvedValue(snapshot)
     subscribe.mockClear()
+    wsTransport.currentTransport = { request, subscribe }
     resetTransport.mockClear()
     unsubscribe.mockReset()
     wsTransport.subscribed = null
@@ -291,10 +293,79 @@ describe('EventRouter memory updates', () => {
     })
     expect(document.getElementById('pan-recovery-overlay')?.textContent).toContain('Reconnecting to the dashboard…')
 
-    act(() => {
+    await act(async () => {
       wsTransport.subscribeOptions!.onReconnect!()
+      await Promise.resolve()
+      await Promise.resolve()
     })
     expect(document.getElementById('pan-recovery-overlay')).toBeNull()
+  })
+
+  it('re-bootstraps through the live transport before announcing recovery', async () => {
+    const reconnecting = vi.fn()
+    const reconnected = vi.fn()
+    window.addEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
+    window.addEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const freshRequest = vi.fn().mockResolvedValue(snapshot)
+    wsTransport.currentTransport = { request: freshRequest, subscribe }
+
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+    })
+    expect(reconnecting).toHaveBeenCalledTimes(1)
+    expect(reconnected).not.toHaveBeenCalled()
+
+    await act(async () => {
+      wsTransport.subscribeOptions!.onReconnect!()
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    expect(request).toHaveBeenCalledTimes(1)
+    expect(freshRequest).toHaveBeenCalledTimes(1)
+    expect(reconnected).toHaveBeenCalledTimes(1)
+    window.removeEventListener(BACKEND_RECONNECTING_EVENT, reconnecting)
+    window.removeEventListener(BACKEND_RECONNECTED_EVENT, reconnected)
+  })
+
+  it('schedules another reconnect when snapshot bootstrap fails after transport recovery', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    render(<EventRouter />)
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const failedFreshRequest = vi.fn().mockRejectedValue(new Error('snapshot unavailable'))
+    wsTransport.currentTransport = { request: failedFreshRequest, subscribe }
+    act(() => {
+      wsTransport.subscribeOptions!.onRetry!(1)
+      wsTransport.subscribeOptions!.onReconnect!()
+    })
+    await act(async () => {
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_999)
+    })
+    expect(resetTransport).not.toHaveBeenCalled()
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1)
+    })
+    expect(resetTransport).toHaveBeenCalledTimes(1)
+    expect(subscribe).toHaveBeenCalledTimes(2)
+    random.mockRestore()
+    error.mockRestore()
   })
 
   it('shows an actionable retry overlay after repeated reconnect failures', async () => {

@@ -128,8 +128,8 @@ const postRunSyncRoute = HttpRouter.add(
 const getRegisteredProjectsRoute = HttpRouter.add(
   'GET',
   '/api/registered-projects',
-  Effect.try({
-    try: () => {
+  Effect.sync(() => {
+    try {
       const projects = listProjectsSync();
       return jsonResponse(
         projects.map(p => ({
@@ -142,14 +142,13 @@ const getRegisteredProjectsRoute = HttpRouter.add(
           linearProject: (p.config as { linear_project?: string }).linear_project || null,
         })),
       );
-    },
-    catch: (error: unknown) => {
+    } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
       return jsonResponse(
         { error: 'Failed to list projects: ' + msg },
         { status: 500 },
       );
-    },
+    }
   }),
 );
 
