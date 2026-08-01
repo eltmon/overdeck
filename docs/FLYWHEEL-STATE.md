@@ -642,3 +642,10 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - Operator surfaced 2 more dashboard bugs from the PAN-3367 cockpit (tick 15.5): **PAN-3407** (Terminal toggle silent no-op while tmux session verifiably alive) + **PAN-3408** (phantom "waiting for your answer" banner on an actively-working agent; pan answer empty) — both filed with specimens, both struck. Stale reviewer residue on 3367 cleared via abort door.
 - **PAN-3406 (order-book issue titles) filed + started** per operator (planning underway, $1.46).
 - Fleet: strike-3401 $11.44 +185/−81 · strikes 3407/3408 spawning · min-874 $161.49 +5483 (biggest producer) · min-839 $38.96 · pan-3367 rework mid-compaction · PAN-3362 active. Main green. #3402 green awaiting pipeline review.
+
+## RUN-79 tick 17 (2026-08-01 ~13:47Z) — PAN-3362 through verification; PAN-3401 in CI (#3409)
+
+- **PAN-3362 verification PASSED** (worker result clean) — pipeline dispatching its review convoy; merge stays UAT-gated. The PAN-3356 unblock chain is one review+UAT away.
+- **strike-3401 landed via CI path** (PR #3409; local gates load-flaked again — 3rd strike today). Fix: `keep infra contention out of verdicts` — retry+durable-queue on lock failure, same-run supersede after infra-blocked. On merge+deploy: run MIN-864's final clean cycle.
+- strike-3407 building a cockpit test (+137/−3); strike-3408 investigating ($3.38); PAN-3406 planning; pan-3367 rework continuing ($157.68); min-874 $173.06 +6410 (1h17m single task — check its bead progress next tick if diff stalls); min-839 $48.81 +2586.
+- Main green. Fleet 15.
