@@ -659,3 +659,8 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 ## RUN-79 interstitial (~14:20Z) — strike-3408 landed via CI path (#3414); declined the quiet-window serialization ask
 
 strike-3408 reported the load-flake pattern (34 unrelated setup timeouts, load ~30 from overlapping Vitest runs) and asked me to hold other full suites while it waits for a quiet window. Declined the serialization — standing decision: CI arbitrates, local verification is not a gate under saturation (4th strike today). Pushed its committed fix (`738b007393` retire stale input fallback on activity) + opened PR #3414. The suite-contention root cause remains PAN-3344's to fix mechanically, not mine to schedule around.
+
+## RUN-79 tick 19 (2026-08-01 ~14:25Z) — steady state; MIN-864 clean cycle 2/4 reports, no poisoning
+
+- MIN-864 run a04d2574: performance + security reports written, correctness/requirements running — first cycle under the PAN-3401 guard, no infra verdicts so far. #3414 (banner fix) mid-CI. Main CI in_progress (PAN-3401 close-out retries on green).
+- strike-3407 $9.90 ctx 79% (compaction watch) · PAN-3406 working $6.78 · min-874 $202.50 +7976/−428 (diff still growing = real work) · 28 sessions total (convoys included; my dispatched set well under the 20 cap).
