@@ -496,7 +496,7 @@
     "recordedAt": "2026-08-01T00:50:13.550Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T03:00:19.420Z",
+  "updated": "2026-08-01T03:00:24.623Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "reviewing",
@@ -507,7 +507,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T00:50:57.096Z",
-    "updatedAt": "2026-08-01T03:00:17.323Z",
+    "updatedAt": "2026-08-01T03:00:24.529Z",
     "testNotes": "Gates (workspace root, HEAD 570d4777): bun install --frozen-lockfile clean; npm run typecheck (root+hooks+evals+dashboard+frontend) 0 errors; npm run lint 0 errors (only pre-existing rolldown/tsdown build warnings); npm run build clean, dist-externals guard passed. Tests: root `vitest run --changed <merge-base>` 977 files/9177 tests passed (3 skipped); frontend `vitest run --changed <merge-base>` 143 files/1691 tests passed. UAT required: PRD items batch-card-version-input and project-settings-version-sync both carry explicit 'browser UAT observes it' acceptance criteria. Built the workspace dashboard and ran it on a throwaway port (3921) against an isolated OVERDECK_HOME copy (OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) so write-door mutation tests never touched the live shared ~/.overdeck/projects.yaml or the production dashboard on :3011 (confirmed both untouched after). Verified live via Playwright: (1) ProjectSettingsDisclosure 'Version ship' section - unset state renders the explicit 'This project skips ship' posture line (ac1); Save persists a valid block, invalid regex + missing push both render 400 validation errors inline next to the offending field (ac2); Remove version sync returns to skip state (ac4) - byte-diffed the isolated projects.yaml before/after: only the version_sync key was added, and clearing it round-tripped byte-identical to the original, confirming the lossless write door. Partial-outcome rendering (ac3) has no real production ship record yet (feature unshipped) so verified via source (VersionShipOutcomeView 'partial' branch in ProjectSettingsDisclosure.tsx) plus the passing 'shows partial propagation with each failing path' unit test. (2) MergeTrainView batch card - with version_sync configured, 'Merge batch (2) to main' on real train uat/pan-dune-0731 opens a Version (X.Y.Z) input with placeholder 48.8.0; invalid input shows inline 'version must look like 48.8.0' with no network call fired (ac1); empty version shows the exact required copy 'No version supplied - the batch merges without a version bump and each member's ship row will fail until you ship one.' (ac2); a real promoted-but-unshipped batch (uat/pan-cedar-0726, status 'promoted - version pending') renders a 'Ship version' action opening the same validated input (ac3, rendering only - did not submit since that would run the real version-ship command against the project's live main checkout, forbidden by task boundaries); confirmed via API (/api/merge-train/generations) that mind-your-now's real batches carry versionSyncConfigured:false and cross-checked MergeTrainView.tsx's onPromote gating so no new promote UI renders for unconfigured projects (ac4). Did not click any real Merge/Ship/Continue action - all positive-path submissions were verified by inline validation state, network-request absence, and source/test inspection rather than firing real merge or ship endpoints, per the no-merge/no-ship-endpoint boundary. Cleanup: removed the temporary version_sync test config from the isolated projects.yaml (byte-identical round trip confirmed), killed the throwaway dashboard process, confirmed the real ~/.overdeck/projects.yaml was never modified and the live :3011 dashboard (pid unchanged) was never restarted.",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
@@ -692,7 +692,7 @@
       },
       "costAtCloseOut": {
         "usd": 934.851396,
-        "pricingAsOf": "2026-08-01T03:00:19.414Z"
+        "pricingAsOf": "2026-08-01T03:00:24.583Z"
       }
     },
     "merges": [
