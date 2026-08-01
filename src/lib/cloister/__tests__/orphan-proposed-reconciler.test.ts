@@ -978,6 +978,16 @@ describe('orphan proposed spec reconciler', () => {
     });
   });
 
+  it('passes explicit internal provenance to the work-agent start endpoint', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ success: true, agentId: 'agent-pan-3301' }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await spawnWorkAgentThroughAgentsEndpoint('PAN-3301', 'http://127.0.0.1:3011', false, 'resume-agent');
+
+    const [, init] = fetchMock.mock.calls[0];
+    expect(JSON.parse(String(init?.body))).toMatchObject({ startedBy: 'resume-agent' });
+  });
+
   it('distinguishes queued container startup from an accepted work launch', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       success: true,
