@@ -87,11 +87,16 @@
       "timestamp": "2026-08-01T17:32:35.219Z",
       "reason": "end",
       "note": "No deviations from the xBRIEF's actual intent, but the plan's file references were stale on 3 of 6 items (written before recent refactors) and I adapted rather than following them literally: (1) persist-project-key targeted src/lib/database/{schema,conversations-db}.ts, which has zero production importers -- implemented on the live overdeck.db module (src/lib/overdeck/conversations.ts) instead. (2) menu-move assumed ConversationActionMenu.tsx is shared by the 3-dot menu and row right-click; it isn't -- that's only used by the Stage pane-tab menu. Added Move to ConversationRow's actual per-row menu (and to ConversationActionMenu too, for consistency). (3) drag-drop-move named ProjectTree/ProjectNode.tsx as the drop target; that component only ever renders the single currently-selected project's detail view, so it can never be a cross-project drop target -- used the Sidebar's persistent project rail instead, which lists every project simultaneously.\n\nAlso found and reported (not fixed, outside PAN-1577 scope) a fleet-wide state-door outage on the shared overdeck-state worktree: 15 untracked stray draft files blocking every 'pan task claim/done' push across the pipeline, 663 unpushed commits with 612 accumulated restore-commit pairs. Flagged via pan tell; it resolved on its own partway through this session (unclear who/what fixed it).\n\nAll 6 xBRIEF items complete: project_key override column + reads (overdeck.db), conversation.moved domain event, PATCH /api/conversations/:name/move endpoint, frontend grouping precedence (projectKey over cwd), pan conversations move CLI command + pan-conversations skill, shared optimistic move mutation, Move-with-picker in both conversation menus, and native drag-and-drop onto the sidebar project rail.\n\nFull monorepo npm test caught 3 real gaps from my changes (all now fixed): two locked no-loss-audit surfaces needed explicit entries for the new PATCH route, and a skill-set fixture needed regenerating for the new pan-conversations skill. Verified with two full test runs during quieter load and targeted reruns of every affected file; the only test-suite noise seen was environmental -- this machine is at load average 24+ with swap near-exhausted from ~24 other concurrently-running agents, which produces widespread beforeEach hook timeouts unrelated to this branch (confirmed by isolated reruns passing cleanly).\n\nAC4 (browser UAT of both move flows end-to-end) was verified for real: built this branch, ran the dashboard against an isolated throwaway OVERDECK_HOME/port with the deacon disabled (no production interference), and drove both the menu-picker move and native drag-and-drop via a real Playwright session. All 8 scripted checks passed, confirmed by screenshots (sent to the operator) and server-side API verification."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-01T17:38:25.456Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T17:34:31.622Z",
+  "updated": "2026-08-01T17:38:25.456Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
