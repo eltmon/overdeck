@@ -45,11 +45,11 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
     // Upsert main record
     db.prepare(`
       INSERT INTO review_status (
-        issue_id, review_status, test_status, merge_status,
+        issue_id, review_status, test_status, uat_status, merge_status,
         inspect_status, inspect_notes, inspect_started_at, inspect_bead_id,
         verification_status, verification_notes,
         verification_cycle_count, verification_max_cycles,
-        review_notes, test_notes, merge_notes, release_status, release_notes,
+        review_notes, test_notes, uat_notes, merge_notes, release_status, release_notes,
         updated_at, ready_for_merge, auto_requeue_count, merge_retry_count, pr_url,
         pr_head_sha, pr_number,
         stuck, stuck_reason, stuck_at, stuck_details,
@@ -68,11 +68,12 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         auto_merge,
         review_cycle_history
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status         = excluded.review_status,
         test_status           = excluded.test_status,
+        uat_status            = excluded.uat_status,
         merge_status          = excluded.merge_status,
         inspect_status        = excluded.inspect_status,
         inspect_notes         = excluded.inspect_notes,
@@ -84,6 +85,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         verification_max_cycles  = excluded.verification_max_cycles,
         review_notes          = excluded.review_notes,
         test_notes            = excluded.test_notes,
+        uat_notes             = excluded.uat_notes,
         merge_notes           = excluded.merge_notes,
         release_status        = excluded.release_status,
         release_notes         = excluded.release_notes,
@@ -116,6 +118,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.issueId,
       s.reviewStatus,
       s.testStatus,
+      s.uatStatus ?? null,
       s.mergeStatus ?? null,
       s.inspectStatus ?? null,
       s.inspectNotes ?? null,
@@ -127,6 +130,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       s.verificationMaxCycles ?? null,
       s.reviewNotes ?? null,
       s.testNotes ?? null,
+      s.uatNotes ?? null,
       s.mergeNotes ?? null,
       s.releaseStatus ?? null,
       s.releaseNotes ?? null,
@@ -411,6 +415,7 @@ interface DbReviewStatusRow {
   issue_id: string;
   review_status: string;
   test_status: string;
+  uat_status: string | null;
   merge_status: string | null;
   inspect_status: string | null;
   inspect_notes: string | null;
@@ -422,6 +427,7 @@ interface DbReviewStatusRow {
   verification_max_cycles: number | null;
   review_notes: string | null;
   test_notes: string | null;
+  uat_notes: string | null;
   merge_notes: string | null;
   release_status: string | null;
   release_notes: string | null;
@@ -471,6 +477,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     issueId: row.issue_id.toUpperCase(),
     reviewStatus: row.review_status as ReviewStatus['reviewStatus'],
     testStatus: row.test_status as ReviewStatus['testStatus'],
+    uatStatus: row.uat_status as ReviewStatus['uatStatus'] ?? undefined,
     mergeStatus: row.merge_status as ReviewStatus['mergeStatus'] ?? undefined,
     inspectStatus: row.inspect_status as ReviewStatus['inspectStatus'] ?? undefined,
     inspectNotes: row.inspect_notes ?? undefined,
@@ -482,6 +489,7 @@ function rowToReviewStatus(row: DbReviewStatusRow, history: StatusHistoryEntry[]
     verificationMaxCycles: row.verification_max_cycles ?? undefined,
     reviewNotes: row.review_notes ?? undefined,
     testNotes: row.test_notes ?? undefined,
+    uatNotes: row.uat_notes ?? undefined,
     mergeNotes: row.merge_notes ?? undefined,
     releaseStatus: row.release_status as ReviewStatus['releaseStatus'] ?? undefined,
     releaseNotes: row.release_notes ?? undefined,

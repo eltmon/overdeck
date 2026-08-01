@@ -11,7 +11,7 @@ import { encodeClaudeProjectDir, getOverdeckHome } from '../paths.js';
 import { backfillAgentsFromStateJsonSync } from './agent-backfill.js';
 
 // Schema version — increment when making breaking schema changes
-export const SCHEMA_VERSION = 63;
+export const SCHEMA_VERSION = 64;
 
 function tryIdempotentDdl(db: SqliteDatabase, targetVersion: number, statement: string): void {
   try {
@@ -216,6 +216,7 @@ export function initSchema(db: SqliteDatabase): void {
       issue_id              TEXT PRIMARY KEY,
       review_status         TEXT NOT NULL DEFAULT 'pending',
       test_status           TEXT NOT NULL DEFAULT 'pending',
+      uat_status            TEXT,
       merge_status          TEXT,
       inspect_status        TEXT,
       inspect_notes         TEXT,
@@ -227,6 +228,7 @@ export function initSchema(db: SqliteDatabase): void {
       verification_max_cycles   INTEGER,
       review_notes          TEXT,
       test_notes            TEXT,
+      uat_notes             TEXT,
       merge_notes           TEXT,
       release_status        TEXT,
       release_notes         TEXT,
@@ -280,7 +282,7 @@ export function initSchema(db: SqliteDatabase): void {
     CREATE TABLE IF NOT EXISTS status_history (
       id         INTEGER PRIMARY KEY AUTOINCREMENT,
       issue_id   TEXT NOT NULL,
-      type       TEXT NOT NULL,  -- 'review', 'test', 'merge'
+      type       TEXT NOT NULL,  -- 'review', 'test', 'uat', 'merge'
       status     TEXT NOT NULL,
       timestamp  TEXT NOT NULL,
       notes      TEXT,
@@ -1748,6 +1750,12 @@ export function runMigrations(db: SqliteDatabase, dbPath?: string): void {
   if (currentVersion < 63) {
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN review_cycle_history TEXT');
     tryIdempotentDdl(db, 63, 'ALTER TABLE review_status ADD COLUMN conflicts_since TEXT');
+  }
+
+  // v63 -> v64: persist browser UAT independently from automated test gates (PAN-3365).
+  if (currentVersion < 64) {
+    tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_status TEXT');
+    tryIdempotentDdl(db, 64, 'ALTER TABLE review_status ADD COLUMN uat_notes TEXT');
   }
 
   // After all migrations, set the version

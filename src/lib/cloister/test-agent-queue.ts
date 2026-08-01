@@ -42,19 +42,24 @@ Required steps:
 5. Decide whether browser UAT is required from acceptance criteria, issue notes, PR notes, or UI/dashboard wording.
 6. If UAT is required, build and run the dashboard from the workspace above, not from main. If a dashboard from another checkout is already running, stop it and start the workspace-built dashboard.
 7. If UAT is required, use the Playwright MCP tools available to the test role. Do not spawn or wake a separate UAT agent.
-8. As soon as you decide the verdict, FIRST write the deterministic verdict artifact so the pipeline can recover it even if the POST below is interrupted. Write the workspace file .pan/test/result.json with EXACTLY this shape (status is "passed" or "failed"):
-   {"status":"passed","notes":"<commands run, UAT paths exercised, concise evidence>"}
-   Create the .pan/test/ directory if it does not exist. This artifact captures BOTH the gate result and the UAT verdict, and MUST be written BEFORE the POST in the next step.
-9. On success, mark tests passed (server-side shipping handles merge preparation):
+8. Record automated gates and browser UAT as separate verdicts. The top-level status is ONLY the configured automated-gate result. When UAT is required, add uatStatus and uatNotes; omit both when UAT is not required. FIRST write .pan/test/result.json so the pipeline can recover both verdicts if the POST is interrupted:
+   {"status":"passed","notes":"<automated gate evidence>","uatStatus":"passed","uatNotes":"<browser paths and evidence>"}
+   Allowed values for status and uatStatus are "passed" or "failed". A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed", even when status is "passed". Create .pan/test/ if needed and write this artifact BEFORE the POST.
+9. POST the same separate verdicts. Examples:
+   Automated gates pass and required UAT passes:
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
-     -d '{"testStatus":"passed"}'
-10. On failure, mark tests failed with actionable notes:
+     -d '{"testStatus":"passed","testNotes":"<automated gate evidence>","uatStatus":"passed","uatNotes":"<browser evidence>"}'
+   Automated gates pass but required UAT fails or cannot run:
    curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
      -H "Content-Type: application/json" \\
-     -d '{"testStatus":"failed","testNotes":"<commands/UAT failures and exact unmet criteria>"}'
-11. Make exactly ONE POST attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the POST in a loop. Report the failure in your summary and stop.
-12. Report TESTS PASSED or TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
+     -d '{"testStatus":"passed","testNotes":"<automated gate evidence>","uatStatus":"failed","uatNotes":"<blocking condition and exact unmet criteria>"}'
+   Automated gates fail (include UAT fields too if UAT was attempted):
+   curl -s -X POST ${apiUrl}/api/review/${options.issueId}/status \\
+     -H "Content-Type: application/json" \\
+     -d '{"testStatus":"failed","testNotes":"<failing commands and output>"}'
+10. Make exactly ONE POST attempt. If it fails, the .pan/test/result.json artifact from step 8 is the durable verdict and the deacon recovers from it — do NOT retry the POST in a loop. Report the failure in your summary and stop.
+11. Report TESTS PASSED only when automated gates and required UAT passed. Otherwise report TESTS FAILED with commands run, UAT paths exercised, and concise evidence.
 
 Boundaries:
 - Do NOT edit code, tests, fixtures, snapshots, or configuration.

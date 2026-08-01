@@ -164,6 +164,8 @@ describe('restoreReviewStatusFromRecords', () => {
     writeRecord('PAN-1922', {
       reviewStatus: 'passed',
       testStatus: 'passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
       mergeStatus: 'pending',
       inspectStatus: 'passed',
       inspectNotes: 'inspect ok',
@@ -198,6 +200,8 @@ describe('restoreReviewStatusFromRecords', () => {
     expect(status).not.toBeNull();
     expect(status!.reviewStatus).toBe('passed');
     expect(status!.testStatus).toBe('passed');
+    expect(status!.uatStatus).toBe('failed');
+    expect(status!.uatNotes).toBe('workspace has no tracker-backed issue data');
     expect(status!.mergeStatus).toBe('pending');
     expect(status!.inspectStatus).toBe('passed');
     expect(status!.inspectNotes).toBe('inspect ok');
@@ -339,6 +343,8 @@ describe('restoreReviewStatusFromRecords', () => {
       'verification_notes',
       'review_notes',
       'test_notes',
+      'uat_status',
+      'uat_notes',
       'merge_notes',
       'pr_url',
       'pr_head_sha',
