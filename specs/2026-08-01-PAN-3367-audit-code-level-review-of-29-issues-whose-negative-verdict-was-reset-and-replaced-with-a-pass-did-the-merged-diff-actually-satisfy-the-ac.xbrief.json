@@ -4,17 +4,17 @@
     "created": "2026-08-01T03:01:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3367: Audit: code-level review of 29 issues whose negative verdict was reset and replaced with a pass — did the merged diff actually satisfy the AC?",
-    "updated": "2026-08-01T10:19:26.525Z"
+    "updated": "2026-08-01T22:11:32.279Z"
   },
   "plan": {
     "id": "pan-3367",
     "title": "Audit: code-level review of 29 issues whose negative verdict was reset and replaced with a pass — did the merged diff actually satisfy the AC?",
-    "status": "running",
+    "status": "completed",
     "uid": "3ab93f31-ab73-4c22-860d-77e58f7a2bbd",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T03:01:00.000Z",
-    "updated": "2026-08-01T10:19:26.525Z",
+    "updated": "2026-08-01T22:11:32.279Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3367",
@@ -665,5 +665,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
