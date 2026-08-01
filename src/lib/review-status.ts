@@ -944,6 +944,27 @@ export function clearFeedbackDeliveryStuck(issueId: string): void {
 }
 
 /**
+ * Retire feedback-delivery stuck flags whose triggering condition can no longer
+ * block progress. Successful feedback delivery clears the flag at the delivery
+ * site; this patrol safety net handles rows that became terminal without another
+ * delivery attempt.
+ */
+export function retireResolvedFeedbackDeliveryStuckFlags(): string[] {
+  const actions: string[] = [];
+  for (const status of Object.values(loadReviewStatuses())) {
+    if (
+      status.stuck === true
+      && status.stuckReason === FEEDBACK_DELIVERY_STUCK_REASON
+      && status.mergeStatus === 'merged'
+    ) {
+      clearWorkspaceStuck(status.issueId);
+      actions.push(`Retired stale feedback-delivery stuck flag for ${status.issueId}: issue is merged`);
+    }
+  }
+  return actions;
+}
+
+/**
  * Set or clear the operator-requested deacon-ignore flag. When set, Deacon
  * patrol skips the issue entirely on every cycle. Distinct from `stuck`, which
  * is a system-set failure marker that also suppresses patrol.

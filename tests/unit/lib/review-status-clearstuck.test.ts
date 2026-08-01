@@ -43,7 +43,7 @@ afterEach(() => {
 
 // ============== Imports (after mocks are set up) ==============
 
-import { markWorkspaceStuck, clearWorkspaceStuck, clearFeedbackDeliveryStuck, FEEDBACK_DELIVERY_STUCK_REASON, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
+import { markWorkspaceStuck, clearWorkspaceStuck, clearFeedbackDeliveryStuck, retireResolvedFeedbackDeliveryStuckFlags, FEEDBACK_DELIVERY_STUCK_REASON, loadReviewStatuses, setReviewStatusSync } from '../../../src/lib/review-status.js';
 
 // ============== Tests ==============
 
@@ -124,6 +124,29 @@ describe('clearFeedbackDeliveryStuck', () => {
     clearFeedbackDeliveryStuck('PAN-MISSING');
 
     expect(mockNotifyPipeline).not.toHaveBeenCalled();
+  });
+});
+
+describe('retireResolvedFeedbackDeliveryStuckFlags', () => {
+  it('retires merged feedback-delivery flags while preserving active and unrelated gates', () => {
+    setReviewStatusSync('PAN-53', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged' });
+    markWorkspaceStuck('PAN-53', FEEDBACK_DELIVERY_STUCK_REASON);
+    setReviewStatusSync('PAN-54', { reviewStatus: 'blocked', testStatus: 'pending', mergeStatus: 'pending' });
+    markWorkspaceStuck('PAN-54', FEEDBACK_DELIVERY_STUCK_REASON);
+    setReviewStatusSync('PAN-55', { reviewStatus: 'passed', testStatus: 'passed', mergeStatus: 'merged' });
+    markWorkspaceStuck('PAN-55', 'main_diverged');
+    mockNotifyPipeline.mockClear();
+
+    expect(retireResolvedFeedbackDeliveryStuckFlags()).toEqual([
+      'Retired stale feedback-delivery stuck flag for PAN-53: issue is merged',
+    ]);
+
+    const after = loadReviewStatuses();
+    expect(after['PAN-53'].stuck).toBeFalsy();
+    expect(after['PAN-53'].mergeStatus).toBe('merged');
+    expect(after['PAN-54'].stuckReason).toBe(FEEDBACK_DELIVERY_STUCK_REASON);
+    expect(after['PAN-55'].stuckReason).toBe('main_diverged');
+    expect(mockNotifyPipeline).toHaveBeenCalledOnce();
   });
 });
 
