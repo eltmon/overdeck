@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-01T22:45:56.941Z",
+  "updated": "2026-08-01T22:50:21.621Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "agent-skills-prune": {
-        "writerId": "agent-pan-3450",
-        "agentId": "agent-pan-3450",
-        "pid": 87798,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:45:56.941Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3450",
@@ -114,6 +106,17 @@
         "outcome": "completed",
         "reason": "Pruned stale managed skills, agents, and rules from ~/.claude while preserving modified and unmanifested content; current cached rules remain protected.",
         "releasedAt": "2026-08-01T22:45:46.297Z"
+      },
+      {
+        "writerId": "agent-pan-3450",
+        "agentId": "agent-pan-3450",
+        "pid": 87798,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:45:56.941Z",
+        "itemId": "agent-skills-prune",
+        "outcome": "completed",
+        "reason": "Added manifest-safe stale pruning for ~/.agents/skills with modified and unmanifested file preservation and regression tests.",
+        "releasedAt": "2026-08-01T22:50:21.621Z"
       }
     ],
     "statusReasons": {
@@ -128,6 +131,10 @@
       "claude-target-prune": {
         "reason": "Pruned stale managed skills, agents, and rules from ~/.claude while preserving modified and unmanifested content; current cached rules remain protected.",
         "updatedAt": "2026-08-01T22:45:46.297Z"
+      },
+      "agent-skills-prune": {
+        "reason": "Added manifest-safe stale pruning for ~/.agents/skills with modified and unmanifested file preservation and regression tests.",
+        "updatedAt": "2026-08-01T22:50:21.621Z"
       }
     }
   },
@@ -147,6 +154,8 @@
     "claude-target-prune.claude-target-prune.ac1": "completed",
     "claude-target-prune.claude-target-prune.ac2": "completed",
     "claude-target-prune.claude-target-prune.ac3": "completed",
-    "agent-skills-prune": "running"
+    "agent-skills-prune": "completed",
+    "agent-skills-prune.agent-skills-prune.ac1": "completed",
+    "agent-skills-prune.agent-skills-prune.ac2": "completed"
   }
 }
