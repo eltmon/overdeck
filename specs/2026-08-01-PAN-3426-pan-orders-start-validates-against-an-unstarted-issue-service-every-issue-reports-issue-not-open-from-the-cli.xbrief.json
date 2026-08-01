@@ -1,0 +1,314 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T22:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3426: pan orders start validates against an unstarted issue service — every issue reports issue-not-open from the CLI",
+    "updated": "2026-08-01T22:44:49.145Z"
+  },
+  "plan": {
+    "id": "pan-3426",
+    "title": "pan orders start validates against an unstarted issue service — every issue reports issue-not-open from the CLI",
+    "status": "proposed",
+    "uid": "797c5809-876a-4280-82f9-8604acda281f",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T22:40:00.000Z",
+    "updated": "2026-08-01T22:44:49.145Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3426",
+        "label": "PAN-3426",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "orders",
+      "flywheel",
+      "cli",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "pan orders start <book> from a CLI process fails validation with [issue-not-open] for every issue in the book, because the validator's default lookup (liveOrderIssueLookup, src/lib/orders/resolver.ts:41) reads the shared issue service singleton without anything in the CLI process ever calling startSharedIssueService() — the store is empty, getIssues() returns [], and every wanted ID is reported missing. The CLI start path can never pass validation for any book.",
+      "Proposal": "Two additive changes at the single chokepoints. (1) resolveFlywheelOrderStart (src/cli/commands/flywheel-orders.ts:40) becomes async and awaits a new injectable prepareIssueStore dep, defaulting to ensureOrderIssueStore() in the orders read door, which calls startSharedIssueService({ skipPolling: true }) — cached reads, zero tracker API calls (PAN-1817), idempotent via the singleton's memoized start promise. (2) validateBookForStart gains a store probe (orderIssueStoreStatus) used only with the default lookup: when the store is unstarted or empty it emits one actionable issue-store-unavailable block and skips the store-dependent issue-not-open / unresolved-prerequisite checks, instead of N bogus findings.",
+      "NonGoals": "- Fixing the dashboard route's cwd-pinning to the server's own project (filed separately)\n- Changing computeBookProgress or the dispatch gate's lookup behavior\n- A direct cache.db reader for the CLI (rejected — second read path for the same domain)\n- Silencing the one-line 'Tracker polling DISABLED' log from skipPolling starts\n- Tracker cache freshness — validation reads the cache as-is; refreshing is the dashboard poller's job"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Prime the shared issue service in the CLI start path instead of building a separate CLI-safe cache reader",
+        "rationale": "The issue offers both; priming reuses the single read door and the PAN-1817 skipPolling mode designed for read-only cached consumers, avoiding a second read path for the same domain"
+      },
+      {
+        "summary": "resolveFlywheelOrderStart becomes async with an injectable prepareIssueStore dep",
+        "rationale": "The store dependency travels with resolution so future callers cannot repeat the bug; the only caller (flywheel.ts:335) is already async"
+      },
+      {
+        "summary": "Store-unavailable is a block finding, not a warn",
+        "rationale": "With an unreadable store validation has verified nothing; starting a Flywheel run against unverifiable issue state must fail closed, matching the lookup's existing posture"
+      },
+      {
+        "summary": "The store probe applies only when the default lookup is in use",
+        "rationale": "An injected options.issueLookup defines its own truth (tests, route seams); probing the singleton there would produce false store-unavailable blocks"
+      }
+    ],
+    "items": [
+      {
+        "id": "order-issue-store-seam",
+        "title": "Add ensureOrderIssueStore + orderIssueStoreStatus seam to the orders read door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3426",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "cli-start-primes-issue-store",
+            "store-unavailable-finding"
+          ],
+          "files_scope": [
+            "src/lib/orders/resolver.ts",
+            "src/dashboard/server/services/issue-service-singleton.ts",
+            "tests/unit/lib/orders/orders-resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-resolver.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders-resolver.test.ts passes including the new ensureOrderIssueStore / orderIssueStoreStatus cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/services/issue-service-singleton.ts add `export function isSharedIssueServiceStarted(): boolean { return _startPromise !== null; }`. In src/lib/orders/resolver.ts, next to liveOrderIssueLookup (line 41) and using the same lazy-require pattern as lines 46-47, add: (1) `ensureOrderIssueStore(): Promise<void>` which lazy-requires the singleton and awaits `startSharedIssueService({ skipPolling: true })`; (2) `orderIssueStoreStatus(): { started: boolean; issueCount: number }` which lazy-requires the singleton, returns `{ started: isSharedIssueServiceStarted(), issueCount: getIssues({ cycle: 'all', includeCompleted: true }).length }`, and on any thrown error returns `{ started: false, issueCount: 0 }`. Exact before/after snippets are in the PRD (.pan/drafts/PAN-3426.md, WI-1). Add unit tests to tests/unit/lib/orders/orders-resolver.test.ts mocking the singleton module with vi.mock (precedent: tests/unit/lib/reconstruct/reconstruct-cache.test.ts:43-70): ensureOrderIssueStore calls startSharedIssueService with { skipPolling: true }; orderIssueStoreStatus reports started/issueCount from the mock and falls back to { started: false, issueCount: 0 } when the service throws."
+        },
+        "items": [
+          {
+            "id": "order-issue-store-seam.ac1",
+            "title": "ensureOrderIssueStore test validates that startSharedIssueService is called with { skipPolling: true } (zero tracker polling)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-issue-store-seam.ac2",
+            "title": "orderIssueStoreStatus test proves it returns the mocked started flag and issue count, and returns { started: false, issueCount: 0 } when the singleton throws",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-issue-store-seam.ac3",
+            "title": "Zero errors reported when npm run typecheck and npm run lint run",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-start-primes-issue-store",
+        "title": "CLI start path awaits the issue-store prime before validating",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel-orders.ts",
+            "src/cli/commands/flywheel.ts",
+            "tests/unit/cli/flywheel-orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/flywheel-orders.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "flywheel-orders.test.ts passes including the new prime-before-validate ordering case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel-orders.ts: add `prepareIssueStore?: () => Promise<unknown>` to FlywheelOrderStartDeps (lines 12-20) and import ensureOrderIssueStore from '../../lib/orders/resolver.js'. Make resolveFlywheelOrderStart (line 40) async and insert `await (deps.prepareIssueStore ?? ensureOrderIssueStore)();` immediately before the validateBookForStart call (line 51). In src/cli/commands/flywheel.ts:335 change the call to `await resolveFlywheelOrderStart(cwd, options.orders, deps)`. In tests/unit/cli/flywheel-orders.test.ts add `prepareIssueStore: vi.fn(async () => {})` to startDeps() and add a test that records invocation order in both the prepareIssueStore and validateOrderBook stubs and asserts the prime was awaited before validation ran. Do not silence the one-line 'Tracker polling DISABLED' log the real prime prints."
+        },
+        "items": [
+          {
+            "id": "cli-start-primes-issue-store.ac1",
+            "title": "New test proves prepareIssueStore resolves before validateOrderBook is invoked inside startFlywheelRun",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-start-primes-issue-store.ac2",
+            "title": "Full tests/unit/cli/flywheel-orders.test.ts suite passes with the stubbed prepareIssueStore dep",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-start-primes-issue-store.ac3",
+            "title": "No type errors when npm run typecheck runs after resolveFlywheelOrderStart becomes async",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "store-unavailable-finding",
+        "title": "Validator emits one actionable issue-store-unavailable block when the store is empty or unstarted",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/validate.ts",
+            "tests/unit/lib/orders/orders-validate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/orders/orders-validate.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "orders-validate.test.ts passes including the new store-unavailable and populated-store regression cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/orders/validate.ts: add `storeStatus?: () => { started: boolean; issueCount: number }` to the validateBookForStart options (default orderIssueStoreStatus from './resolver.js'). After issueState is computed (line 126), when options.issueLookup is undefined and the probe reports !started || issueCount === 0: push one block `{ code: 'issue-store-unavailable', issue: book.id, message: 'Issue store is unavailable or empty — start the dashboard once (`pan up`) to populate the shared issue cache, then retry' }` and skip the issue-not-open loop (lines 128-138) and the external unresolved-prerequisite branch (lines 153-165). empty-book, duplicate-membership, prerequisite-cycle, and missing-prd checks still run. Tests in tests/unit/lib/orders/orders-validate.test.ts: (1) default lookup with an injected storeStatus reporting unstarted → blocks contains exactly one finding with code issue-store-unavailable and zero issue-not-open / unresolved-prerequisite findings; (2) injected storeStatus reporting populated + injected issueLookup absent → genuinely missing issues still produce issue-not-open (note: tests that inject issueLookup bypass the probe entirely, preserving the existing suite)."
+        },
+        "items": [
+          {
+            "id": "store-unavailable-finding.ac1",
+            "title": "Test validates that an unstarted/empty store emits exactly one issue-store-unavailable block and zero issue-not-open or unresolved-prerequisite findings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-unavailable-finding.ac2",
+            "title": "Test proves a populated store still produces issue-not-open blocks for genuinely missing issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-unavailable-finding.ac3",
+            "title": "The existing orders-validate.test.ts suite passes unchanged, demonstrating the probe does not fire for injected lookups",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-order-books-cli-start",
+        "title": "Document the CLI start prime and the issue-store-unavailable finding in ORDER-BOOKS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:40:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3426",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ORDER-BOOKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In docs/ORDER-BOOKS.md, in the 'Validation before start' section (around lines 71-85): state that the CLI start path (pan orders start / pan flywheel start --orders) primes the shared issue service read-only (skipPolling, zero tracker API calls, PAN-1817) before validating, and document the issue-store-unavailable finding code — when it fires (unstarted or empty store) and the operator remedy (run `pan up` once to populate the shared issue cache, then retry). Keep the line 85 note that the dashboard route and the CLI start path share the same validator and Flywheel start function, extended to mention the shared prime. No skill update: pan orders gains no flags, and scripts/lint-skills.sh cross-checks flags only."
+        },
+        "items": [
+          {
+            "id": "docs-order-books-cli-start.ac1",
+            "title": "docs/ORDER-BOOKS.md records that the CLI start path primes the shared issue service read-only with zero tracker API calls",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-order-books-cli-start.ac2",
+            "title": "docs/ORDER-BOOKS.md covers the issue-store-unavailable finding and names the `pan up` remedy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "order-issue-store-seam",
+        "to": "cli-start-primes-issue-store",
+        "type": "blocks"
+      },
+      {
+        "from": "order-issue-store-seam",
+        "to": "store-unavailable-finding",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3426-pan-orders-start-validates-against-an-unstarted-issue-service-every-issue-reports-issue-not-open-from-the-cli.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
