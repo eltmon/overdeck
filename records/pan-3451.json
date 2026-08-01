@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:07:23.512Z",
+  "updated": "2026-08-01T23:07:37.722Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -138,5 +138,33 @@
     "hooks-doc-checklist-door": "completed",
     "hooks-doc-checklist-door.hooks-doc-checklist-door.ac1": "completed",
     "hooks-doc-checklist-door.hooks-doc-checklist-door.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/routes/agents-no-loss.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/HOOKS.md",
+      "packages/ohmypi-extension/src/__tests__/index.test.ts",
+      "packages/ohmypi-extension/src/index.ts",
+      "packages/pi-extension/src/__tests__/index.test.ts",
+      "packages/pi-extension/src/index.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/HOOKS.md",
+      "packages/ohmypi-extension/src/__tests__/index.test.ts",
+      "packages/ohmypi-extension/src/index.ts",
+      "packages/pi-extension/src/__tests__/index.test.ts",
+      "packages/pi-extension/src/index.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "tests/unit/dashboard/routes/agents-no-loss.test.ts",
+      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+    ],
+    "recordedAt": "2026-08-01T23:07:37.721Z"
   }
 }
