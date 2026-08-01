@@ -12,9 +12,22 @@
       "timestamp": "2026-08-01T20:31:46.669Z",
       "reason": "end",
       "note": "Implementation complete: all 5 xBRIEF tasks delivered with 95 tests passing"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T20:38Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-08-01T20:38:13.123Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T20:38:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3396\n\n# Review Synthesis — PAN-3396 — 2026-08-01T20:46:00Z\n\n## Verdict: CHANGES REQUESTED — `pan close --residue` is passed by the CLI but never consumed by the close-out workflow\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/context.json\n- Branch: feature/pan-3396\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n- HEAD reviewed: 137976e6c728372482d643dc0e74009789d733ff\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR commits: 7\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/correctness.md | 3 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/requirements.md | 1 deduplicated with correctness |\n\n## Blocking Findings\n\n### [correctness, requirements] The residue option is never consumed by the close-out workflow — `src/cli/commands/close.ts:378`\nThe changed CLI passes `residueDisposition` into `closeOut()`, but the workflow recognizes only `abandonDisposition` or the ordinary DoD path. The new `closeResidueConventionPrs()`, `buildResidueDodGate()`, and `markRecordPipelineResidueClosedOutSync()` primitives have no production callers. As shipped, `pan close --residue` either blocks on the ordinary DoD gate or completes through the standard path, leaves the stale PR/MR open, omits the evidence-bearing residue audit and comment, and records `mergeStatus: 'merged'`. This fails xBRIEF items `residue-flag-and-gate` and `residue-ceremony` (FR-4, FR-5, NFR-2, NFR-4). Wire the residue branch through the full workflow and add command/workflow-level tests proving the ordinary gate and merged terminal marker are not used.\n\n### [correctness] The residue forge commands do not match the installed CLI contracts — `src/lib/lifecycle/residue.ts:31`\nThe GitHub close command passes `owner/repo/number` without `--repo`; `glab mr list` uses unsupported `--json` instead of `--output json`; and `glab mr note` passes its message positionally instead of via `--message`. These argument arrays prevent reliable discovery, closure, and annotation once the workflow is wired. Use the verified `gh`/`glab` forms and test the exact argument arrays through an injected command dependency.\n\n### [correctness] Forge failures are reported as verified absence — `src/lib/lifecycle/residue.ts:48`\nBoth per-head blocks catch every lookup, parsing, close, timeout, authentication, and comment error, then return success with “No open convention PRs/MRs found” when no evidence was recorded. That lets close-out mark an issue terminal while a stale artifact remains and can falsely describe cleanup as verified. Require every configured repository/head lookup to succeed, fail the step on lookup or mutation errors, and report absence only after successful empty queries.\n\n### [performance] Membership refresh adds unbounded synchronous record-path work — `src/lib/pipeline-membership-gather.ts:687`\nThe new `Promise.allSettled()` fan-out calls `readIssueRecord()` once per tracker-closed issue with an open PR. Each call resolves the state read home synchronously and re-reads the migration marker before the asynchronous JSON read, while all promises are created without a concurrency limit. Recurring membership refreshes can therefore block the Node event loop and burst filesystem I/O linearly with the candidate population across up to three concurrent project gathers. Add a batch record-read door that resolves the project state home once and reads records asynchronously under the existing bounded-concurrency primitive, preserving fail-toward-`zombie_pr` behavior per record.\n\n## Non-blocking Findings\n\n### [correctness] The residue terminal writer can preserve a stale merge claim — `src/lib/pan-dir/record.ts:901`\n`markRecordPipelineResidueClosedOutSync()` leaves `mergeStatus` untouched rather than ensuring it is absent. An existing record can therefore retain `mergeStatus: 'merged'`, contrary to the residue contract. Explicitly delete the field and add a test seeded with an existing merge status.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-137976e6/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3396 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -62,20 +75,19 @@
     "recordedAt": "2026-08-01T20:31:40.157Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:37:48.938Z",
+  "updated": "2026-08-01T20:38:13.124Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:37:32.045Z",
-    "reviewNotes": "Verification failed at lint",
+    "updatedAt": "2026-08-01T20:38:12.270Z",
+    "reviewNotes": "pan close --residue is not wired into the close-out workflow",
     "verificationNotes": "Verification FAILED at lint (152508ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(71363 chars elided)…\neHint\":null},{\"flags\":\"--force\",\"description\":\"Clear paused and pending-operator-decision gates and start anyway\",\"required\":false,\"valueHint\":null},{\"flags\":\"--fresh\",\"description\":\"Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill\",\"required\":false,\"valueHint\":null},{\"flags\":\"--host\",\"description\":\"Bypass workspace docker stack-health gate and spawn on the host\",\"required\":false,\"valueHint\":null},{\"flags\":\"--yes\",\"description\":\"Confirm --host in non-interactive contexts\",\"required\":false,\"valueHint\":null},{\"flags\":\"--off-book\",\"description\":\"Allow one work-agent dispatch outside the active order book and log the override\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Lifecycle\"},\n   {\"id\":\"pan-strike\",\"path\":[\"strike\"],\"display\":\"/pan strike\",\"description\":\"Spawn strike agent(s) — implement and push a strike branch for Deacon to land throug\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewRequestedAt": "2026-08-01T20:31:43.095Z",
     "reviewSpawnedAt": "2026-08-01T20:33:39.223Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -122,6 +134,24 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-08-01T20:31:40.157Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "137976e6c728372482d643dc0e74009789d733ff"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "137976e6c728372482d643dc0e74009789d733ff"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "137976e6c728372482d643dc0e74009789d733ff"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "137976e6c728372482d643dc0e74009789d733ff"
+      }
     }
   },
   "closeOut": {
@@ -137,9 +167,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 369205,
-            "output": 8268,
-            "cacheRead": 3697664,
+            "input": 387889,
+            "output": 12924,
+            "cacheRead": 4120064,
             "cacheWrite": 0
           }
         },
@@ -192,9 +222,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4920276,
-          "output": 97865,
-          "cacheRead": 17193984,
+          "input": 4938960,
+          "output": 102521,
+          "cacheRead": 17616384,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -205,8 +235,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 39.7464273,
-        "pricingAsOf": "2026-08-01T20:37:45.521Z"
+        "usd": 40.1907273,
+        "pricingAsOf": "2026-08-01T20:38:12.314Z"
       }
     },
     "merges": [
