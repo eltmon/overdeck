@@ -347,9 +347,27 @@
       "timestamp": "2026-08-01T23:46:23.173Z",
       "reason": "end",
       "note": "Fixed residue test assertions to match implementation contract"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T23:47Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-08-01T23:47:49.358Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-01T23:47:49.689Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-08-01T23:47:49Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-3396 (attempt 1/3):\n\nFailed check: test\n\nVerification FAILED at test (1224874ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/overdeck/bootstrap.test.ts (4 tests | 1 failed) 16839ms\n     × AC2: snapshot sequence advances when EventBus emits — no direct store polling 12097ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 17353ms\n     × emits, reads, and streams events through EventBusLive 12100ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 2 failed) 27916ms\n     × ignores extra tables and columns and succeeds in query-only mode 11922ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 11138ms (retry x1)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 8882ms\n     × searches observations with issue, tag, workspace, and sibling filters 5705ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 2 failed) 28396ms\n     × replays gap-fill events from the events transport 12216ms (retry x1)\n     × fails replay with SnapshotRequired when the requested offset predates retained events 11259ms (retry x1)\n\n Test Files  145 passed (145)\n      Tests  1755 passed (1755)\n   Start at  19:38:48\n   Duration  53.66s (transform 10.11s, setup 22.84s, import 80.32s, tests 43.91s, environment 41.82s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-gFWoCX/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn \n…(1816 chars elided)…\nting workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XU4XBn/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n...(truncated)\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-3396 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-3396 -m \"Fixed test\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm `pan show PAN-3396` or `pan review pending` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts"
@@ -399,7 +417,7 @@
     "recordedAt": "2026-08-01T23:46:16.725Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:46:51.014Z",
+  "updated": "2026-08-01T23:47:49.689Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
