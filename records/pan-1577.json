@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:57:07.020Z",
+  "updated": "2026-08-01T16:06:10.643Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "cli-move": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 1709201,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:57:07.020Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -77,8 +69,8 @@
         "updatedAt": "2026-08-01T15:56:34.715Z"
       },
       "cli-move": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T15:57:07.020Z"
+        "reason": "Added pan conversations move <query> <projectKey>. Resolver: exact getConversationByName first, then unique fuzzy title match over listConversations(); non-zero exit with clear message for no-match or ambiguous match (lists candidates). PATCHes the move endpoint via getDashboardApiUrlSync, prints resolved title + old->new project labels (via getProjectSync name lookup), handles ECONNREFUSED as 'Dashboard not running'. Follows show.ts/reset-review.ts chalk+exitCli conventions. 8 new tests (exact match, fuzzy match, success labels, no-match, ambiguous, unknown-project, dashboard-down, command registration) all pass; typecheck/lint clean. Commit ccca029.",
+        "updatedAt": "2026-08-01T16:06:10.642Z"
       }
     },
     "claimHistory": [
@@ -125,6 +117,17 @@
         "outcome": "completed",
         "reason": "Conversation type gains projectKey (ConversationList.tsx). isUnscopedConversation, resolveConversationProjectName, and the projectConversations bucketing loop in CommandDeck/index.tsx all check the override first, falling back to cwd inference only when null -- unit-tested precedence (5 new tests in projectsData.test.ts covering override-wins, override-set-but-unmatched=unscoped, null-falls-back-to-cwd, no-match, neither-set). ac2 (live re-group on conversation.moved) was already satisfied by the moved-event item's reducer case bumping conversationsListRevision, which ConversationList's existing effect already invalidates the ['conversations'] query on. Full frontend typecheck/lint clean, 458 CommandDeck tests + 14 Sidebar tests pass with no regressions. File-size allowlist bumped for CommandDeck/index.tsx (1597->1618). Commit 2c30e8d.",
         "releasedAt": "2026-08-01T15:56:34.715Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 1709201,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:57:07.020Z",
+        "itemId": "cli-move",
+        "outcome": "completed",
+        "reason": "Added pan conversations move <query> <projectKey>. Resolver: exact getConversationByName first, then unique fuzzy title match over listConversations(); non-zero exit with clear message for no-match or ambiguous match (lists candidates). PATCHes the move endpoint via getDashboardApiUrlSync, prints resolved title + old->new project labels (via getProjectSync name lookup), handles ECONNREFUSED as 'Dashboard not running'. Follows show.ts/reset-review.ts chalk+exitCli conventions. 8 new tests (exact match, fuzzy match, success labels, no-match, ambiguous, unknown-project, dashboard-down, command registration) all pass; typecheck/lint clean. Commit ccca029.",
+        "releasedAt": "2026-08-01T16:06:10.642Z"
       }
     ]
   },
@@ -146,6 +149,10 @@
     "frontend-grouping-foundation": "completed",
     "frontend-grouping-foundation.frontend-grouping-foundation.ac1": "completed",
     "frontend-grouping-foundation.frontend-grouping-foundation.ac2": "completed",
-    "cli-move": "running"
+    "cli-move": "completed",
+    "cli-move.cli-move.ac1": "completed",
+    "cli-move.cli-move.ac2": "completed",
+    "cli-move.cli-move.ac3": "completed",
+    "cli-move.cli-move.ac4": "completed"
   }
 }
