@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-01T22:55:36.378Z",
+  "updated": "2026-08-01T23:05:48.297Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "sync-cli-reporting": {
-        "writerId": "agent-pan-3450",
-        "agentId": "agent-pan-3450",
-        "pid": 424463,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:55:36.378Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3450",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Added manifest-safe pruning to workspace .claude merges with modified and unmanifested file preservation and regression tests.",
         "releasedAt": "2026-08-01T22:55:18.600Z"
+      },
+      {
+        "writerId": "agent-pan-3450",
+        "agentId": "agent-pan-3450",
+        "pid": 424463,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:55:36.378Z",
+        "itemId": "sync-cli-reporting",
+        "outcome": "completed",
+        "reason": "Added cache and distribution prune counts plus preserved modified-file detail output, with command-level regression tests and updated result mocks.",
+        "releasedAt": "2026-08-01T23:05:48.297Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "workspace-merge-prune": {
         "reason": "Added manifest-safe pruning to workspace .claude merges with modified and unmanifested file preservation and regression tests.",
         "updatedAt": "2026-08-01T22:55:18.600Z"
+      },
+      "sync-cli-reporting": {
+        "reason": "Added cache and distribution prune counts plus preserved modified-file detail output, with command-level regression tests and updated result mocks.",
+        "updatedAt": "2026-08-01T23:05:48.297Z"
       }
     }
   },
@@ -183,6 +190,8 @@
     "workspace-merge-prune": "completed",
     "workspace-merge-prune.workspace-merge-prune.ac1": "completed",
     "workspace-merge-prune.workspace-merge-prune.ac2": "completed",
-    "sync-cli-reporting": "running"
+    "sync-cli-reporting": "completed",
+    "sync-cli-reporting.sync-cli-reporting.ac1": "completed",
+    "sync-cli-reporting.sync-cli-reporting.ac2": "completed"
   }
 }
