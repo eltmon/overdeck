@@ -788,6 +788,14 @@ function swarmIneligibleReasons(readiness: SwarmReadinessVerdict): string[] {
     reasons.push(`only ${slotEligibleCount} slot-eligible item${slotEligibleCount === 1 ? '' : 's'} found; swarm dispatch requires at least 2`);
   }
 
+  // Per-item lines explain WHY an ineligible plan cannot dispatch. They are
+  // diagnostics, not gates: a plan that passes the aggregate checks above may
+  // legitimately contain readiness:'sequential' items (the tri-state contract;
+  // e.g. PAN-3092 shipped 6 ready + 1 sequential). The Deacon's dispatch gate
+  // (deacon-swarm.ts dispatchEligible) checks only the aggregates — refusing
+  // here on any non-eligible item made every mixed plan un-swarmable (PAN-3447).
+  if (reasons.length === 0) return reasons;
+
   for (const item of readiness.items.filter(item => !item.slotEligible)) {
     if (item.missingScope) reasons.push(`${item.id}: missing files_scope`);
     else if (item.scopeConfidence === 'low') reasons.push(`${item.id}: files_scope confidence is low`);

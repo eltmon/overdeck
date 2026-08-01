@@ -132,15 +132,12 @@ body{color:var(--gv-text-primary);font-family:var(--gv-font-display)}
 .gauge .g-val small{font-size:8px;letter-spacing:.12em;color:var(--gv-text-dim);font-weight:400}
 .gauge-sub{text-align:center;font-size:8.5px;color:var(--gv-text-dim);font-family:var(--gv-font-mono);margin-top:-2px}
 
-/* ── Bottom strip: spectrum + oscilloscope + roles (Winamp section) ─ */
-#bottom{flex:0 0 88px;display:flex;gap:8px}
-#specbox{flex:1 1 auto;position:relative;overflow:hidden;padding:6px 10px 4px}
-#spectrum{position:absolute;inset:6px 10px 16px;width:calc(100% - 20px);height:calc(100% - 22px)}
-#specbox .cap{position:absolute;left:10px;bottom:3px;font-family:var(--gv-font-mono);font-size:8px;letter-spacing:.18em;color:var(--gv-text-dim)}
-#specbox .cap b{color:var(--gv-green)}
-#scopebox{width:225px;flex:0 0 auto;position:relative;overflow:hidden;padding:6px 10px 4px}
-#scope{position:absolute;inset:6px 10px 16px;width:calc(100% - 20px);height:calc(100% - 22px)}
-#scopebox .cap{position:absolute;left:10px;bottom:3px;font-family:var(--gv-font-mono);font-size:8px;letter-spacing:.18em;color:var(--gv-text-dim)}
+/* ── Bottom strip: hook telemetry trace + roles ─────────────────── */
+#bottom{flex:0 0 140px;display:flex;gap:8px}
+#tracebox{flex:1 1 auto;position:relative;overflow:hidden;padding:6px 10px 4px}
+#trace{position:absolute;inset:6px 10px 16px;width:calc(100% - 20px);height:calc(100% - 22px)}
+#tracebox .cap{position:absolute;left:10px;bottom:3px;font-family:var(--gv-font-mono);font-size:8px;letter-spacing:.18em;color:var(--gv-text-dim)}
+#tracebox .cap b{color:var(--gv-green)}
 #rolebox{width:148px;flex:0 0 auto;padding:8px 10px;display:flex;flex-direction:column;gap:2.5px;justify-content:center}
 #rolebox div{display:flex;align-items:center;gap:6px;font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-secondary)}
 #rolebox i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
@@ -329,13 +326,9 @@ body{color:var(--gv-text-primary);font-family:var(--gv-font-display)}
   </div>
 
   <footer id="bottom">
-    <div id="specbox" class="glass">
-      <canvas id="spectrum"></canvas>
-      <div class="cap">HOOK SPECTRUM · <b>PreToolUse ▸ PostToolUse ▸ Fail ▸ Stop ▸ Notify ▸ Prompt ▸ Compact ▸ Permission ▸ Session</b></div>
-    </div>
-    <div id="scopebox" class="glass">
-      <canvas id="scope"></canvas>
-      <div class="cap">EVENT WAVEFORM</div>
+    <div id="tracebox" class="glass">
+      <canvas id="trace"></canvas>
+      <div class="cap">HOOK TELEMETRY · <b>one channel per wired hook · last 60 s · right edge = now</b></div>
     </div>
     <div id="rolebox" class="glass"></div>
   </footer>
@@ -573,7 +566,6 @@ const particles = [];
 const pulses = [];
 const tickers = [];
 const gateFlashes = [];
-const specRates = {}; for (const k of HOOK_KEYS) specRates[k] = 0;
 let mergesToday = SNAP.mergesToday || 0;
 let tokensToday = SNAP.tokensToday || 0;
 let energy = .35;                       // EMA of activity, drives shader + waves
@@ -704,7 +696,7 @@ function fireHook(name) {
   if (!h || !h.wired) return;
   h.count++; h.hotT = performance.now();
   h.el.classList.add('hot'); h.ctEl.textContent = h.count;
-  spectrumBump(name);
+  recordTrace(name);
 }
 setInterval(() => { // LED cool-down
   const now = performance.now();
@@ -842,7 +834,6 @@ function fireHookEvent(orb) {
   const hk = HOOKS[bk];
   const tool = hk.tools[Math.floor(Math.random() * hk.tools.length)];
   const detail = TOOL_DETAILS[bk][Math.floor(Math.random() * TOOL_DETAILS[bk].length)];
-  specRates[bk] = Math.min(1, specRates[bk] + .13);
 
   if (roll < .40) {                     /* PreToolUse — the fast pace of tool calls */
     fireHook('PreToolUse');
@@ -1004,7 +995,6 @@ function frame(now) {
     if (Math.random() < .4) fireHookEvent(pickWeighted(actives, weight));
   }
   // decay
-  for (const k of HOOK_KEYS) specRates[k] *= Math.pow(.5, dt / 1.6);
   for (const o of orbs) o.heat = Math.max(o.state === 'stale' ? .04 : .12, o.heat * Math.pow(.5, dt / 9));
   // events/min window + energy EMA
   const cutoff = now - 60000;
@@ -1215,8 +1205,7 @@ function frame(now) {
     }
   }
 
-  drawSpectrumStrip(dt);
-  drawScope();
+  drawTrace();
 
   /* ── HUD ── */
   hudTick(evm);
@@ -1676,66 +1665,123 @@ function drawTide() {
   fx.fillText('GOVERNOR', tide.x - 52, L.riverTop - 36);
 }
 
-/* ═══════════ BOTTOM STRIP — hook-band spectrum analyzer + oscilloscope ═══════════
-   The analyzer is the sum: Spectrum Deck's per-hook-name band bumps + segmented
-   Winamp bars + falling peak caps, riding the River's family-rate + energy baseline. */
-const specC = document.getElementById('spectrum'), specX = specC.getContext('2d');
-const scopeC = document.getElementById('scope'), scopeX = scopeC.getContext('2d');
-const NB = 64, bH = new Float32Array(NB), bT = new Float32Array(NB), bP = new Float32Array(NB);
-const HOOK_BAND = { PreToolUse: 6, PostToolUse: 15, PostToolUseFailure: 23, Stop: 30, Notification: 36,
-                    UserPromptSubmit: 42, PreCompact: 48, PostCompact: 52, PermissionRequest: 57, SessionStart: 61 };
-function spectrumBump(name) {
-  const b = HOOK_BAND[name]; if (b == null) return;
-  for (const [off, amt] of [[0, 24 + Math.random()*20], [-2, 7 + Math.random()*9], [2, 7 + Math.random()*9], [-5, 2 + Math.random()*5], [5, 2 + Math.random()*5]]) {
-    const i = Math.max(0, Math.min(NB - 1, b + off));
-    bT[i] = Math.min(100, bT[i] + amt);
-  }
+/* ═══════════ BOTTOM STRIP — hook telemetry trace (operator redesign, D-14) ═══════════
+   A logic-analyzer for the harness: one labeled channel per wired hook (same
+   order + colors as the HOOK BUS rail), a shared 60 s time axis with "now" at
+   the right edge, real event ticks only — no decorative bands. The cyan band
+   on top is aggregate events/s in real units (absorbs the old oscilloscope). */
+const traceC = document.getElementById('trace'), traceX = traceC.getContext('2d');
+const TRACE_WINDOW = 60000;                     // ms of history on the X axis
+const traceEvents = [];                         // {name, t} — wired hooks only
+function recordTrace(name) {
+  traceEvents.push({ name, t: performance.now() });
+  if (traceEvents.length > 4000) traceEvents.splice(0, 500);
 }
+const TRACE_ROWS = HOOKBUS.filter(h => h.wired);
 function sizeAux() {
-  for (const [c, x] of [[specC, specX], [scopeC, scopeX]]) {
-    c.width = Math.floor(c.clientWidth * DPR); c.height = Math.floor(c.clientHeight * DPR);
-    x.setTransform(DPR, 0, 0, DPR, 0, 0);
-  }
+  traceC.width = Math.floor(traceC.clientWidth * DPR);
+  traceC.height = Math.floor(traceC.clientHeight * DPR);
+  traceX.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
-function drawSpectrumStrip(dt) {
-  const w = specC.clientWidth, h = specC.clientHeight;
-  specX.clearRect(0, 0, w, h);
-  const bw = w / NB;
-  // family-rate floor: each bar also rides its cycling hook-family rate (river)
-  for (let i = 0; i < NB; i++) {
-    const famRate = specRates[HOOK_KEYS[i % HOOK_KEYS.length]] || 0;
-    const idle = 7 + 5 * Math.sin(simT * 2.2 + i * .55) + energy * 9 + famRate * 22;
-    bT[i] = Math.max(bT[i] - dt * 20, idle);
-    bH[i] += (bT[i] - bH[i]) * (bT[i] > bH[i] ? dt * 20 : dt * 5);
-    bP[i] = Math.max(bP[i] - dt * 24, bH[i]);
-    const v = Math.max(0, Math.min(1, bH[i] / 100));
-    const col = v > .72 ? '#ff2d7c' : v > .48 ? '#00d4ff' : '#39ff14';
-    specX.fillStyle = hexA(col, .92);
-    const top = h - v * h;
-    for (let yy = h; yy > top + 2; yy -= 5) specX.fillRect(i * bw + 1, yy - 3.6, bw - 2, 3.2);
-    const pv = Math.max(0, Math.min(1, bP[i] / 100));
-    specX.fillStyle = 'rgba(255,255,255,.75)';
-    specX.fillRect(i * bw + 1, h - pv * h - 2, bw - 2, 1.8);
+function drawTrace() {
+  const w = traceC.clientWidth, h = traceC.clientHeight;
+  traceX.clearRect(0, 0, w, h);
+  const now = performance.now();
+  while (traceEvents.length && traceEvents[0].t < now - TRACE_WINDOW - 1000) traceEvents.shift();
+  const gutter = 128, axisH = 11, bandH = 22, gap = 3;
+  const px0 = gutter, px1 = w - 6, pw = px1 - px0;
+  const rowsY0 = bandH + gap, rowsH = h - rowsY0 - axisH;
+  const rowH = rowsH / TRACE_ROWS.length;
+
+  /* time grid — a gridline every 10 s, pulsing "now" playhead at the right edge */
+  traceX.font = '600 6.5px "JetBrains Mono"'; traceX.textAlign = 'center';
+  for (let s = 10; s < 60; s += 10) {
+    const x = px1 - (s / 60) * pw;
+    traceX.strokeStyle = 'rgba(0,212,255,.07)'; traceX.lineWidth = 1;
+    traceX.beginPath(); traceX.moveTo(x, 2); traceX.lineTo(x, h - axisH + 2); traceX.stroke();
+    traceX.fillStyle = 'rgba(74,90,122,.9)';
+    traceX.fillText('-' + s + 's', x, h - 2);
   }
-}
-const SCOPE_N = 220, scopeBuf = new Float32Array(SCOPE_N).fill(.3);
-let scopeI = 0;
-function drawScope() {
-  const w = scopeC.clientWidth, h = scopeC.clientHeight;
-  scopeX.clearRect(0, 0, w, h);
-  scopeBuf[scopeI] = energy; scopeI = (scopeI + 1) % SCOPE_N;
-  scopeX.strokeStyle = 'rgba(0,212,255,.85)'; scopeX.lineWidth = 1.4;
-  scopeX.shadowColor = 'rgba(0,212,255,.8)'; scopeX.shadowBlur = 6;
-  scopeX.beginPath();
-  for (let i = 0; i < SCOPE_N; i++) {
-    const v = scopeBuf[(scopeI + i) % SCOPE_N];
-    const x = i / SCOPE_N * w;
-    const y = h * .55 - (v - .32) * h * 1.5 + Math.sin(i * .28 + simT * 9) * 1.6 * energy;
-    i === 0 ? scopeX.moveTo(x, y) : scopeX.lineTo(x, y);
+  const nowPulse = .6 + .4 * Math.sin(simT * 4);
+  traceX.strokeStyle = `rgba(0,212,255,${.25 + nowPulse * .3})`; traceX.lineWidth = 1.5;
+  traceX.beginPath(); traceX.moveTo(px1, 2); traceX.lineTo(px1, h - axisH + 2); traceX.stroke();
+  traceX.fillStyle = 'rgba(0,212,255,.8)';
+  traceX.fillText('now', px1 - 4, h - 2);
+  traceX.textAlign = 'left';
+
+  /* aggregate events/s band — real per-second buckets, autoscaled */
+  const SECS = 60, buckets = new Array(SECS).fill(0);
+  for (const e of traceEvents) {
+    const i = Math.floor((now - e.t) / 1000);
+    if (i >= 0 && i < SECS) buckets[SECS - 1 - i]++;
   }
-  scopeX.stroke(); scopeX.shadowBlur = 0;
-  scopeX.strokeStyle = 'rgba(122,138,170,.15)'; scopeX.lineWidth = 1;
-  scopeX.beginPath(); scopeX.moveTo(0, h * .55); scopeX.lineTo(w, h * .55); scopeX.stroke();
+  const maxB = Math.max(5, ...buckets);
+  traceX.beginPath();
+  traceX.moveTo(px0, bandH);
+  for (let i = 0; i < SECS; i++) {
+    const x = px0 + (i / (SECS - 1)) * pw;
+    traceX.lineTo(x, bandH - (buckets[i] / maxB) * (bandH - 3));
+  }
+  traceX.lineTo(px1, bandH); traceX.closePath();
+  traceX.fillStyle = 'rgba(0,212,255,.10)'; traceX.fill();
+  traceX.beginPath();
+  for (let i = 0; i < SECS; i++) {
+    const x = px0 + (i / (SECS - 1)) * pw;
+    const y = bandH - (buckets[i] / maxB) * (bandH - 3);
+    i ? traceX.lineTo(x, y) : traceX.moveTo(x, y);
+  }
+  traceX.strokeStyle = 'rgba(0,212,255,.75)'; traceX.lineWidth = 1.3;
+  traceX.shadowColor = 'rgba(0,212,255,.6)'; traceX.shadowBlur = 4;
+  traceX.stroke(); traceX.shadowBlur = 0;
+  traceX.font = '600 7px "JetBrains Mono"';
+  traceX.fillStyle = 'rgba(122,138,170,.9)';
+  traceX.fillText('TOTAL', 4, bandH - 13);
+  traceX.fillStyle = 'rgba(0,212,255,.95)';
+  traceX.fillText(buckets[SECS - 1] + ' ev/s · peak ' + maxB, 4, bandH - 4);
+
+  /* per-hook channels — a dim channel with 0 events is itself information */
+  const counts = {};
+  for (const e of traceEvents) counts[e.name] = (counts[e.name] || 0) + 1;
+  TRACE_ROWS.forEach((hk, r) => {
+    const y0 = rowsY0 + r * rowH, cy = y0 + rowH / 2;
+    const n = counts[hk.name] || 0;
+    const dim = n ? 1 : .38;
+    traceX.strokeStyle = 'rgba(30,38,56,.5)';
+    traceX.beginPath(); traceX.moveTo(px0, y0 + rowH); traceX.lineTo(px1, y0 + rowH); traceX.stroke();
+    // gutter: color chip + hook name + rate over the visible window
+    traceX.globalAlpha = dim;
+    traceX.fillStyle = hk.c;
+    traceX.fillRect(4, cy - 2.5, 5, 5);
+    traceX.font = '600 7px "JetBrains Mono"';
+    traceX.fillStyle = '#bfe9ff';
+    traceX.fillText(hk.name, 13, cy + 2.5);
+    traceX.textAlign = 'right';
+    traceX.fillStyle = n ? '#e8edf8' : '#4a5a7a';
+    traceX.fillText(n + '/m', gutter - 8, cy + 2.5);
+    traceX.textAlign = 'left';
+    traceX.globalAlpha = 1;
+    // faint channel baseline
+    traceX.strokeStyle = hexA(hk.c, .10 + (n ? .08 : 0));
+    traceX.beginPath(); traceX.moveTo(px0, cy); traceX.lineTo(px1, cy); traceX.stroke();
+    // event ticks — 2 px time buckets; bursts stack into taller, brighter marks
+    const bw2 = 2, nb = Math.ceil(pw / bw2), rowBuckets = new Float32Array(nb);
+    for (const e of traceEvents) {
+      if (e.name !== hk.name) continue;
+      const x = px1 - ((now - e.t) / TRACE_WINDOW) * pw;
+      if (x < px0) continue;
+      rowBuckets[Math.min(nb - 1, Math.floor((x - px0) / bw2))]++;
+    }
+    for (let i = 0; i < nb; i++) {
+      const c = rowBuckets[i];
+      if (!c) continue;
+      const th = Math.min(rowH - 2, 2.5 + c * 1.8);
+      traceX.globalAlpha = Math.min(1, .45 + c * .22);
+      traceX.fillStyle = hk.c;
+      traceX.shadowColor = hk.c; traceX.shadowBlur = 3;
+      traceX.fillRect(px0 + i * bw2, cy - th / 2, 1.6, th);
+    }
+    traceX.shadowBlur = 0; traceX.globalAlpha = 1;
+  });
 }
 
 /* ════════════════════════ HUD TICK ════════════════════════ */
@@ -1996,8 +2042,8 @@ function buildHelp() {
         <p>One twinkling star per live <b>conv-* conversation</b> session — ambient human-agent work happening outside the pipeline river.</p></div>
       <div class="h-card"><h4 style="color:var(--gv-green)">Hook Bus · Dark Fiber</h4>
         <p>The left rail lists <b>all 21 harness hook events</b>. Wired hooks flash their LED and count every firing. <b>Dotted names are dark fiber</b> — hooks that exist upstream (SubagentStart/Stop, InstructionsLoaded, SessionEnd …) but are not wired into Overdeck yet. Wire one and its LED lights up.</p></div>
-      <div class="h-card"><h4 style="color:var(--gv-green)">Winamp Strip</h4>
-        <p>The bottom analyzer is pure Winamp: <b>64 segmented bands</b> — every hook event spikes its named band (PreToolUse ▸ … ▸ SessionStart) riding a family-rate baseline; white caps are falling peak-holds; color climbs green → cyan → pink with height. The <b>oscilloscope</b> beside it is aggregate event energy — the deck's heartbeat. Role counts sit to its right.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-green)">Hook Telemetry</h4>
+        <p>The bottom strip is a <b>logic-analyzer for the harness</b>: one labeled channel per wired hook (same order and colors as the hook bus), sharing a <b>60-second time axis</b> — the right edge is now. Every tick is a real event; bursts stack taller and brighter; the number on each channel is its rate over the window, and a dim channel means <b>zero events</b> — quiet failure/permission rows are good news. The cyan band on top is <b>aggregate events/s</b> with its 60 s history and peak. Role counts sit to its right.</p></div>
       <div class="h-card"><h4 style="color:var(--gv-blue)">Top Bar</h4>
         <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · CPU/MEM/SWAP meters · load · beads <b>WIP/BLOCKED/READY</b> · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p></div>
       <div class="h-card"><h4 style="color:var(--gv-blue)">Sidebar</h4>

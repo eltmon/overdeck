@@ -106,6 +106,26 @@ describe('pan swarm command', () => {
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('missing files_scope'));
   });
 
+  it('dispatches a mixed plan: sequential items are diagnostics, not gates (PAN-3447)', async () => {
+    const doc = makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+      {
+        id: 'wi-seq',
+        title: 'Intentionally serialized work',
+        status: 'pending',
+        metadata: { readiness: 'sequential', files_scope: ['src/c.ts'], files_scope_confidence: 'high' },
+      },
+    ]);
+    const deps = makeDeps(doc);
+
+    const result = await swarmCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
+    expect(deps.console.error).not.toHaveBeenCalledWith(expect.stringContaining('not swarm eligible'));
+  });
+
   it('ensures the workspace and dispatches through coordinateSwarmSlots with real reconcile (PAN-2214)', async () => {
     const doc = makeDoc([
       makeEligibleItem('wi-1', 'src/a.ts'),
