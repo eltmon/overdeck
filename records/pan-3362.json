@@ -134,7 +134,7 @@
     "recordedAt": "2026-08-01T13:04:50.271Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T13:05:07.606Z",
+  "updated": "2026-08-01T13:05:18.557Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -145,7 +145,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T13:05:01.169Z",
-    "updatedAt": "2026-08-01T13:05:02.373Z",
+    "updatedAt": "2026-08-01T13:05:18.493Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
@@ -251,7 +251,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.901902,
-        "pricingAsOf": "2026-08-01T13:05:07.602Z"
+        "pricingAsOf": "2026-08-01T13:05:18.550Z"
       }
     },
     "merges": [
