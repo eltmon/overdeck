@@ -12,11 +12,44 @@
       "timestamp": "2026-08-01T22:15:53.446Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-01T23:07:45.645Z",
+      "reason": "end",
+      "note": "Standard npm test hit 18 unrelated 5-second DB setup timeouts under verified host CPU saturation (run queue 31 on 24 cores); the complete root and frontend suites passed with 30-second hook/test timeouts. Initial Pi/ohmypi commits omitted the planned workspace guard, issue payload, marker rename, and fetch-failure case; follow-up commits corrected both forks symmetrically. Delivered the authenticated plan-checklist endpoint, canonical completion evidence for Pi and ohmypi, residue removal, regression tests, and HOOKS documentation."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "tests/unit/dashboard/routes/agents-no-loss.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/HOOKS.md",
+      "packages/ohmypi-extension/src/__tests__/index.test.ts",
+      "packages/ohmypi-extension/src/index.ts",
+      "packages/pi-extension/src/__tests__/index.test.ts",
+      "packages/pi-extension/src/index.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/HOOKS.md",
+      "packages/ohmypi-extension/src/__tests__/index.test.ts",
+      "packages/ohmypi-extension/src/index.ts",
+      "packages/pi-extension/src/__tests__/index.test.ts",
+      "packages/pi-extension/src/index.ts",
+      "src/dashboard/server/routes/agents.ts",
+      "src/dashboard/server/routes/agents/runtime-events.ts",
+      "tests/unit/dashboard/routes/agents-no-loss.test.ts",
+      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+    ],
+    "recordedAt": "2026-08-01T23:07:37.721Z"
+  },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:07:41.574Z",
+  "updated": "2026-08-01T23:07:45.699Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -25,7 +58,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:07:41.571Z",
+    "updatedAt": "2026-08-01T23:07:45.641Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewRequestedAt": "2026-08-01T23:07:41.571Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -54,19 +88,36 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:07:37.721Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3458"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "openai/gpt-5.6-sol": {
+            "input": 925053,
+            "output": 62880,
+            "cacheRead": 33690624,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 925053,
+          "output": 62880,
+          "cacheRead": 33690624,
+          "cacheWrite": 0
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-01T22:15:39.215Z"
+        "usd": 23.356977,
+        "pricingAsOf": "2026-08-01T23:07:45.679Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3458"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -168,33 +219,5 @@
     "hooks-doc-checklist-door": "completed",
     "hooks-doc-checklist-door.hooks-doc-checklist-door.ac1": "completed",
     "hooks-doc-checklist-door.hooks-doc-checklist-door.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "tests/unit/dashboard/routes/agents-no-loss.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/HOOKS.md",
-      "packages/ohmypi-extension/src/__tests__/index.test.ts",
-      "packages/ohmypi-extension/src/index.ts",
-      "packages/pi-extension/src/__tests__/index.test.ts",
-      "packages/pi-extension/src/index.ts",
-      "src/dashboard/server/routes/agents.ts",
-      "src/dashboard/server/routes/agents/runtime-events.ts",
-      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/HOOKS.md",
-      "packages/ohmypi-extension/src/__tests__/index.test.ts",
-      "packages/ohmypi-extension/src/index.ts",
-      "packages/pi-extension/src/__tests__/index.test.ts",
-      "packages/pi-extension/src/index.ts",
-      "src/dashboard/server/routes/agents.ts",
-      "src/dashboard/server/routes/agents/runtime-events.ts",
-      "tests/unit/dashboard/routes/agents-no-loss.test.ts",
-      "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
-    ],
-    "recordedAt": "2026-08-01T23:07:37.721Z"
   }
 }
