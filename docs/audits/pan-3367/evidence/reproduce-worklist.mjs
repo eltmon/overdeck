@@ -17,6 +17,16 @@ for (const r of rows) {
 }
 const HOUR = 3600e3;
 const NEG = (s) => { const [a, b] = s.split('/'); return ['failed','blocked'].includes(a) || ['failed','blocked'].includes(b); };
+// Confidentiality allowlist: this script writes into a PUBLIC repository
+// (eltmon/overdeck). Only dump raw event payloads for issue prefixes whose
+// underlying source repository is also public. Every other prefix (e.g.
+// MIN- for the private mind-your-now/mind-your-now-backend repos) gets its
+// candidate metadata recorded but NOT a raw payload dump — raw payloads can
+// embed private source paths, diff snippets, and review commentary. This
+// was a real disclosure (PAN-3367 review cycle 1/2, 2026-08-01): the
+// original version of this script dumped MIN-* payloads unconditionally.
+const PUBLIC_ISSUE_PREFIXES = ['PAN-'];
+const isPublicIssue = (issueId) => PUBLIC_ISSUE_PREFIXES.some((p) => issueId.startsWith(p));
 const candidates = [];
 mkdirSync('docs/audits/pan-3367/evidence', { recursive: true });
 for (const [id, evs] of byIssue) {
@@ -43,7 +53,12 @@ for (const [id, evs] of byIssue) {
     }
   }
   if (!hit) continue;
+  hit.evidenceDumped = isPublicIssue(id);
   candidates.push(hit);
+  if (!isPublicIssue(id)) {
+    console.error(`${id}: SKIPPED raw payload dump — not a public-repo issue prefix (confidentiality allowlist)`);
+    continue;
+  }
   // Dump the issue's full raw event series verbatim — this is the forensic evidence.
   writeFileSync(`docs/audits/pan-3367/evidence/events-${id.toLowerCase()}.json`,
     JSON.stringify(evs.map((e) => e.raw), null, 1));

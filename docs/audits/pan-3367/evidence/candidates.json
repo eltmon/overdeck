@@ -6,7 +6,8 @@
   "passAt": "2026-07-25T13:30:24.102Z",
   "minutes": 43,
   "negNotes": "Agent re-review request (1/25): Fixed review issues",
-  "resetAt": "2026-07-25T12:50:55.030Z"
+  "resetAt": "2026-07-25T12:50:55.030Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "MIN-858",
@@ -15,7 +16,8 @@
   "passAt": "2026-07-25T13:07:47.534Z",
   "minutes": 16,
   "negNotes": null,
-  "resetAt": "2026-07-25T12:57:45.130Z"
+  "resetAt": "2026-07-25T12:57:45.130Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-3052",
@@ -24,7 +26,8 @@
   "passAt": "2026-07-25T13:15:05.225Z",
   "minutes": 23,
   "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3052-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3052 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3052-review -e OVERDECK_ISSUE_ID=PAN-3052 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3052-review/launcher.sh\nduplicate session: agent-pan-3052-review\n",
-  "resetAt": "2026-07-25T12:55:14.605Z"
+  "resetAt": "2026-07-25T12:55:14.605Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-901",
@@ -33,7 +36,8 @@
   "passAt": "2026-07-25T13:08:06.763Z",
   "minutes": 16,
   "negNotes": "Vite defines server.watch twice, so the later property overwrites the new .pnpm-store exclusion and the ENOSPC mitigation never takes effect.",
-  "resetAt": "2026-07-25T12:54:03.350Z"
+  "resetAt": "2026-07-25T12:54:03.350Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-3055",
@@ -42,7 +46,8 @@
   "passAt": "2026-07-25T13:18:48.056Z",
   "minutes": 26,
   "negNotes": "Verification failed at typecheck",
-  "resetAt": "2026-07-25T12:56:31.811Z"
+  "resetAt": "2026-07-25T12:56:31.811Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-891",
@@ -51,7 +56,8 @@
   "passAt": "2026-07-25T13:44:34.987Z",
   "minutes": 51,
   "negNotes": "Agent re-review request (1/25): Fixed review issues",
-  "resetAt": "2026-07-25T13:04:47.715Z"
+  "resetAt": "2026-07-25T13:04:47.715Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-2467",
@@ -59,8 +65,9 @@
   "negAt": "2026-07-25T22:34:35.893Z",
   "passAt": "2026-07-25T23:22:15.348Z",
   "minutes": 48,
-  "negNotes": "Review dispatch skipped — already running: agent-pan-2467-review",
-  "resetAt": "2026-07-25T22:47:49.624Z"
+  "negNotes": "Review dispatch skipped \u2014 already running: agent-pan-2467-review",
+  "resetAt": "2026-07-25T22:47:49.624Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3037",
@@ -69,7 +76,8 @@
   "passAt": "2026-07-25T23:31:49.741Z",
   "minutes": 53,
   "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3037-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3037-review -e OVERDECK_ISSUE_ID=PAN-3037 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3037-review/launcher.sh\nduplicate session: agent-pan-3037-review\n",
-  "resetAt": "2026-07-25T23:03:49.515Z"
+  "resetAt": "2026-07-25T23:03:49.515Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3076",
@@ -78,7 +86,8 @@
   "passAt": "2026-07-26T00:00:33.233Z",
   "minutes": 60,
   "negNotes": "Unchanged HEAD still preserves passed review on failed Git inspection; write-site guard still misses raw writes in allowlisted files",
-  "resetAt": "2026-07-25T23:09:28.933Z"
+  "resetAt": "2026-07-25T23:09:28.933Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3083",
@@ -87,7 +96,8 @@
   "passAt": "2026-07-26T00:17:07.793Z",
   "minutes": 22,
   "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3083-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3083-review -e OVERDECK_ISSUE_ID=PAN-3083 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3083-review/launcher.sh\nduplicate session: agent-pan-3083-review\n",
-  "resetAt": "2026-07-25T23:58:02.288Z"
+  "resetAt": "2026-07-25T23:58:02.288Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-896",
@@ -96,7 +106,8 @@
   "passAt": "2026-07-26T02:38:31.158Z",
   "minutes": 44,
   "negNotes": null,
-  "resetAt": "2026-07-26T01:55:12.065Z"
+  "resetAt": "2026-07-26T01:55:12.065Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-3097",
@@ -105,7 +116,8 @@
   "passAt": "2026-07-26T03:50:03.364Z",
   "minutes": 20,
   "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
-  "resetAt": "2026-07-26T03:30:55.924Z"
+  "resetAt": "2026-07-26T03:30:55.924Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-879",
@@ -114,7 +126,8 @@
   "passAt": "2026-07-26T06:41:35.735Z",
   "minutes": 43,
   "negNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
-  "resetAt": "2026-07-26T06:20:38.473Z"
+  "resetAt": "2026-07-26T06:20:38.473Z",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-3109",
@@ -123,7 +136,8 @@
   "passAt": "2026-07-26T06:50:05.157Z",
   "minutes": 22,
   "negNotes": null,
-  "resetAt": "2026-07-26T06:30:31.344Z"
+  "resetAt": "2026-07-26T06:30:31.344Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3114",
@@ -132,7 +146,8 @@
   "passAt": "2026-07-26T11:09:56.090Z",
   "minutes": 32,
   "negNotes": "Review role spawn failed: write failed for agents-db:agent-pan-3114-review: database is locked",
-  "resetAt": "2026-07-26T10:39:12.236Z"
+  "resetAt": "2026-07-26T10:39:12.236Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-2997",
@@ -141,7 +156,8 @@
   "passAt": "2026-07-26T11:43:52.744Z",
   "minutes": 44,
   "negNotes": "Poison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.",
-  "resetAt": "2026-07-26T11:19:49.380Z"
+  "resetAt": "2026-07-26T11:19:49.380Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-1696",
@@ -150,7 +166,8 @@
   "passAt": "2026-07-26T11:55:30.928Z",
   "minutes": 34,
   "negNotes": "Approved at f8bb608b: invalid project fields now fail closed, the collapsed cockpit summary includes generation status and Awaiting Merge navigation, and focused verification plus CI are green. Report: .pan/review/agent-pan-1696-review-f8bb608b/review.md",
-  "resetAt": "2026-07-26T11:49:57.471Z"
+  "resetAt": "2026-07-26T11:49:57.471Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3115",
@@ -159,7 +176,8 @@
   "passAt": "2026-07-26T12:00:33.370Z",
   "minutes": 38,
   "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3115-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3115 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3115-review -e OVERDECK_ISSUE_ID=PAN-3115 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-71 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3115-review/launcher.sh\nduplicate session: agent-pan-3115-review\n",
-  "resetAt": "2026-07-26T11:26:17.938Z"
+  "resetAt": "2026-07-26T11:26:17.938Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3110",
@@ -168,7 +186,8 @@
   "passAt": "2026-07-26T12:43:15.248Z",
   "minutes": 41,
   "negNotes": null,
-  "resetAt": "2026-07-26T12:02:45.956Z"
+  "resetAt": "2026-07-26T12:02:45.956Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3128",
@@ -177,7 +196,8 @@
   "passAt": "2026-07-26T15:38:54.181Z",
   "minutes": 54,
   "negNotes": "Agent re-review request (2/25): Fixed review issues",
-  "resetAt": "2026-07-26T14:58:02.407Z"
+  "resetAt": "2026-07-26T14:58:02.407Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3135",
@@ -186,7 +206,8 @@
   "passAt": "2026-07-26T16:04:50.648Z",
   "minutes": 51,
   "negNotes": "Agent re-review request (1/25): Fixed review issues",
-  "resetAt": "2026-07-26T15:25:12.800Z"
+  "resetAt": "2026-07-26T15:25:12.800Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3147",
@@ -195,7 +216,8 @@
   "passAt": "2026-07-26T18:18:47.373Z",
   "minutes": 28,
   "negNotes": null,
-  "resetAt": "2026-07-26T17:52:55.279Z"
+  "resetAt": "2026-07-26T17:52:55.279Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3093",
@@ -204,7 +226,8 @@
   "passAt": "2026-07-26T19:09:28.090Z",
   "minutes": 33,
   "negNotes": "The configured branch-prefix fix reaches assembly but not reconciler anchors, so valid custom-prefix generations are invalidated",
-  "resetAt": "2026-07-26T18:46:48.193Z"
+  "resetAt": "2026-07-26T18:46:48.193Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3138",
@@ -213,7 +236,8 @@
   "passAt": "2026-07-26T19:40:34.905Z",
   "minutes": 54,
   "negNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
-  "resetAt": "2026-07-26T19:11:46.473Z"
+  "resetAt": "2026-07-26T19:11:46.473Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3155",
@@ -222,7 +246,8 @@
   "passAt": "2026-07-26T21:22:35.349Z",
   "minutes": 42,
   "negNotes": null,
-  "resetAt": "2026-07-26T20:40:54.244Z"
+  "resetAt": "2026-07-26T20:40:54.244Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3158",
@@ -231,7 +256,8 @@
   "passAt": "2026-07-26T21:10:09.850Z",
   "minutes": 21,
   "negNotes": "Verification failed at test",
-  "resetAt": "2026-07-26T20:51:00.705Z"
+  "resetAt": "2026-07-26T20:51:00.705Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3162",
@@ -240,7 +266,8 @@
   "passAt": "2026-07-26T23:49:19.571Z",
   "minutes": 51,
   "negNotes": "PR HEAD is unchanged and still contains both prior correctness blockers; the uncommitted rework also leaves a reverse merge-set lost-update race",
-  "resetAt": "2026-07-26T23:06:55.746Z"
+  "resetAt": "2026-07-26T23:06:55.746Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3192",
@@ -249,7 +276,8 @@
   "passAt": "2026-07-27T06:10:50.739Z",
   "minutes": 35,
   "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy.",
-  "resetAt": "2026-07-27T05:50:13.044Z"
+  "resetAt": "2026-07-27T05:50:13.044Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3184",
@@ -258,7 +286,8 @@
   "passAt": "2026-07-27T06:56:52.947Z",
   "minutes": 52,
   "negNotes": "FR-3 measures clean-shutdown freshness at grace expiry instead of bootStartedAt; the required marker round-trip test is also missing",
-  "resetAt": "2026-07-27T06:35:01.334Z"
+  "resetAt": "2026-07-27T06:35:01.334Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3183",
@@ -267,7 +296,8 @@
   "passAt": "2026-07-27T07:24:10.918Z",
   "minutes": 53,
   "negNotes": null,
-  "resetAt": "2026-07-27T07:06:08.383Z"
+  "resetAt": "2026-07-27T07:06:08.383Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-2876",
@@ -276,7 +306,8 @@
   "passAt": "2026-07-27T07:42:31.368Z",
   "minutes": 35,
   "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T06:44:15.236Z by flywheel-orchestrator). It re-runs automatically after the deploy.",
-  "resetAt": "2026-07-27T07:14:35.226Z"
+  "resetAt": "2026-07-27T07:14:35.226Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3187",
@@ -285,7 +316,8 @@
   "passAt": "2026-07-27T07:53:24.734Z",
   "minutes": 45,
   "negNotes": "The recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols.",
-  "resetAt": "2026-07-27T07:31:36.718Z"
+  "resetAt": "2026-07-27T07:31:36.718Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3111",
@@ -294,7 +326,8 @@
   "passAt": "2026-07-27T11:53:55.192Z",
   "minutes": 41,
   "negNotes": "Agent re-review request (2/25): Fixed cycle-4 findings",
-  "resetAt": "2026-07-27T11:40:50.144Z"
+  "resetAt": "2026-07-27T11:40:50.144Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3154",
@@ -303,7 +336,8 @@
   "passAt": "2026-07-27T12:47:17.566Z",
   "minutes": 55,
   "negNotes": "Verification failed at test",
-  "resetAt": "2026-07-27T11:55:34.230Z"
+  "resetAt": "2026-07-27T11:55:34.230Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3151",
@@ -312,7 +346,8 @@
   "passAt": "2026-07-27T12:52:41.940Z",
   "minutes": 56,
   "negNotes": "Verification failed at typecheck",
-  "resetAt": "2026-07-27T11:56:33.827Z"
+  "resetAt": "2026-07-27T11:56:33.827Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3206",
@@ -321,7 +356,8 @@
   "passAt": "2026-07-27T19:29:51.362Z",
   "minutes": 53,
   "negNotes": "Verification error: Verification worker 2045091 exited before writing a result",
-  "resetAt": "2026-07-27T18:45:43.531Z"
+  "resetAt": "2026-07-27T18:45:43.531Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3216",
@@ -330,7 +366,8 @@
   "passAt": "2026-07-28T07:25:42.825Z",
   "minutes": 45,
   "negNotes": "Verification error: Verification worker 1874133 exited before writing a result",
-  "resetAt": "2026-07-28T07:07:50.045Z"
+  "resetAt": "2026-07-28T07:07:50.045Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3025",
@@ -339,7 +376,8 @@
   "passAt": "2026-07-28T09:44:14.524Z",
   "minutes": 55,
   "negNotes": null,
-  "resetAt": "2026-07-28T08:50:18.055Z"
+  "resetAt": "2026-07-28T08:50:18.055Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3215",
@@ -348,7 +386,8 @@
   "passAt": "2026-07-28T10:52:18.014Z",
   "minutes": 48,
   "negNotes": "Verification infrastructure error: Verification worker 466058 exited before writing a result",
-  "resetAt": "2026-07-28T10:38:47.150Z"
+  "resetAt": "2026-07-28T10:38:47.150Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3092",
@@ -357,7 +396,8 @@
   "passAt": "2026-07-28T12:23:04.769Z",
   "minutes": 47,
   "negNotes": "Verification infrastructure error: Verification worker 1786496 exited before writing a result",
-  "resetAt": "2026-07-28T11:46:50.036Z"
+  "resetAt": "2026-07-28T11:46:50.036Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3049",
@@ -366,7 +406,8 @@
   "passAt": "2026-07-28T17:12:06.549Z",
   "minutes": 30,
   "negNotes": "Review role spawn failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it.",
-  "resetAt": "2026-07-28T16:42:28.850Z"
+  "resetAt": "2026-07-28T16:42:28.850Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-2882",
@@ -375,7 +416,8 @@
   "passAt": "2026-07-28T18:52:00.654Z",
   "minutes": 39,
   "negNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage",
-  "resetAt": "2026-07-28T18:21:38.436Z"
+  "resetAt": "2026-07-28T18:21:38.436Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3230",
@@ -384,7 +426,8 @@
   "passAt": "2026-07-28T20:05:45.836Z",
   "minutes": 58,
   "negNotes": null,
-  "resetAt": "2026-07-28T19:11:38.189Z"
+  "resetAt": "2026-07-28T19:11:38.189Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3233",
@@ -393,7 +436,8 @@
   "passAt": "2026-07-28T21:42:09.459Z",
   "minutes": 32,
   "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
-  "resetAt": "2026-07-28T21:21:48.850Z"
+  "resetAt": "2026-07-28T21:21:48.850Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3229",
@@ -402,7 +446,8 @@
   "passAt": "2026-07-28T22:47:12.090Z",
   "minutes": 17,
   "negNotes": "Review role spawn failed: Role run agent-pan-3229-review already running. Use 'pan tell' to message it.",
-  "resetAt": "2026-07-28T22:37:00.723Z"
+  "resetAt": "2026-07-28T22:37:00.723Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3231",
@@ -411,7 +456,8 @@
   "passAt": "2026-07-29T03:56:19.346Z",
   "minutes": 55,
   "negNotes": "Tasks viewer omits xBRIEF sub-items, and the PRD modal does not move focus into the dialog.",
-  "resetAt": "2026-07-29T03:08:36.295Z"
+  "resetAt": "2026-07-29T03:08:36.295Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3254",
@@ -420,7 +466,8 @@
   "passAt": "2026-07-29T03:53:06.428Z",
   "minutes": 16,
   "negNotes": null,
-  "resetAt": "2026-07-29T03:39:47.690Z"
+  "resetAt": "2026-07-29T03:39:47.690Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-1837",
@@ -429,7 +476,8 @@
   "passAt": "2026-07-29T05:07:46.616Z",
   "minutes": 36,
   "negNotes": "Agent re-review request (3/25): Fixed review issues",
-  "resetAt": "2026-07-29T04:52:18.360Z"
+  "resetAt": "2026-07-29T04:52:18.360Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3232",
@@ -438,7 +486,8 @@
   "passAt": "2026-07-29T06:09:30.370Z",
   "minutes": 52,
   "negNotes": "Agent re-review request (2/25): FR-7 test coverage complete. Branch has 3 auto-commits for file-size-allowlist sync. Ready for review.",
-  "resetAt": "2026-07-29T05:20:40.928Z"
+  "resetAt": "2026-07-29T05:20:40.928Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-1990",
@@ -447,7 +496,8 @@
   "passAt": "2026-07-29T09:50:27.230Z",
   "minutes": 55,
   "negNotes": "Agent re-review request (2/25): Fixed review issues",
-  "resetAt": "2026-07-29T09:00:32.311Z"
+  "resetAt": "2026-07-29T09:00:32.311Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3293",
@@ -456,7 +506,8 @@
   "passAt": "2026-07-30T06:40:35.740Z",
   "minutes": 42,
   "negNotes": "Verification error: Verification worker 1805023 exited before writing a result",
-  "resetAt": "2026-07-30T06:05:47.471Z"
+  "resetAt": "2026-07-30T06:05:47.471Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3296",
@@ -465,7 +516,8 @@
   "passAt": "2026-07-30T06:32:43.144Z",
   "minutes": 33,
   "negNotes": "Verification error: Verification worker 1849970 exited before writing a result",
-  "resetAt": "2026-07-30T06:09:32.161Z"
+  "resetAt": "2026-07-30T06:09:32.161Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3291",
@@ -474,7 +526,8 @@
   "passAt": "2026-07-30T07:26:01.056Z",
   "minutes": 52,
   "negNotes": "CLI escalation ignores the configured dashboard URL and activity delivery can defeat the record durability deadline.",
-  "resetAt": "2026-07-30T06:41:31.360Z"
+  "resetAt": "2026-07-30T06:41:31.360Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3260",
@@ -482,8 +535,9 @@
   "negAt": "2026-07-30T10:03:26.231Z",
   "passAt": "2026-07-30T10:47:01.694Z",
   "minutes": 44,
-  "negNotes": "Gates: typecheck clean (root+hooks+evals+dashboard+frontend guards), lint clean (npm run lint exit 0), contracts build clean. Root suite `OVERDECK_VERIFICATION=1 npx vitest run --no-file-parallelism`: 1275/1279 files passed, 11965/12023 tests passed, but exit 1 due to 1 failed suite: src/lib/__tests__/compute-agent-enrichment.test.ts (ReferenceError: agents is not defined). Root-caused: this file is IDENTICAL to origin/main (git diff origin/main -- <file> is empty against local main ref, but local `main` ref is 2 commits stale vs origin/main); origin/main commit ec2a83a667 'fix(test): point compute-agent-enrichment refs at the split agent modules (PAN-3265)' already fixes this exact bug and has not been picked up by this branch yet (git merge-base --is-ancestor ec2a83a667 HEAD -> not an ancestor). Not caused by PAN-3260's own diff (no changes to that file on this branch). Frontend suite (cd src/dashboard/frontend && npx vitest run): 278/278 files, 2585/2585 tests passed clean, covering EditorPane.tsx and MarkdownFileLink.tsx directly. UAT: built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance on port 3211 (OVERDECK_DISABLE_DEACON=1), never touching the host dashboard on 3011. Verified live via Playwright against the real WebSocket RPC and real filesystem: AC1 (Edit textarea loads real file via readFileAtPath, Preview renders via MarkdownTab/ChatMarkdown), AC2 (edit enables Save+dirty indicator, Save persists via writeFileAtPath and clears dirty), AC3 (stale mtime save produces WRITE_CONFLICT banner with working Reload-from-disk and Overwrite actions; conflicting write is rejected and on-disk content is preserved), AC4 (a pane with no editorFilePath renders a clean 'No file to edit' error state; a nonexistent path renders 'File not found' — neither crashes). AC5 (self-heal survival) covered by the existing passing EditorPane.test.tsx test plus repeated real page reloads during this session not stripping the issueId-less editor pane. Chip left-click/right-click behavior (chip-internal-default, chip-context-menu xBRIEF items) verified via the full passing MarkdownFileLink.test.tsx suite (mocked-transport unit tests) since no live chip could be safely exercised in the running dashboard without composing a real chat message that would spawn a new live agent/conversation on the shared host, which is out of test-role scope. IMPORTANT DISCLOSURE: while the isolated peer dashboard (port 3211) was running, it unexpectedly picked up and executed a live durable-review verification retry (quality gates: install/typecheck/lint/build) for an unrelated issue, PAN-3232, against PAN-3232's own workspace, from shared state in ~/.overdeck/verification-workers/ -- despite OVERDECK_DISABLE_DEACON=1. This was killed immediately on discovery (~4 min in); no result file was written by the killed attempt and the host dashboard's own worker (running from its real deployment path) has since correctly picked up a fresh retry for PAN-3232 with no observed corruption. This reveals that 'peer/OVERDECK_DISABLE_DEACON=1' mode does not fully suppress durable-review verification-worker dispatch and should be filed as a follow-up gap for the operator. Net verdict: FAILED because the configured root test-suite gate does not currently pass on this branch (stale-base issue, fix already on origin/main) -- rebase/sync-main onto origin/main (picking up commit ec2a83a667) and re-run tests. All work covered by this issue's own xBRIEF items (contracts, server file door, editor pane, stage deck context, chip default, chip context menu, docs) is otherwise fully verified and working, both via unit/component tests and live UAT.",
-  "resetAt": "2026-07-30T10:30:16.610Z"
+  "negNotes": "Gates: typecheck clean (root+hooks+evals+dashboard+frontend guards), lint clean (npm run lint exit 0), contracts build clean. Root suite `OVERDECK_VERIFICATION=1 npx vitest run --no-file-parallelism`: 1275/1279 files passed, 11965/12023 tests passed, but exit 1 due to 1 failed suite: src/lib/__tests__/compute-agent-enrichment.test.ts (ReferenceError: agents is not defined). Root-caused: this file is IDENTICAL to origin/main (git diff origin/main -- <file> is empty against local main ref, but local `main` ref is 2 commits stale vs origin/main); origin/main commit ec2a83a667 'fix(test): point compute-agent-enrichment refs at the split agent modules (PAN-3265)' already fixes this exact bug and has not been picked up by this branch yet (git merge-base --is-ancestor ec2a83a667 HEAD -> not an ancestor). Not caused by PAN-3260's own diff (no changes to that file on this branch). Frontend suite (cd src/dashboard/frontend && npx vitest run): 278/278 files, 2585/2585 tests passed clean, covering EditorPane.tsx and MarkdownFileLink.tsx directly. UAT: built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance on port 3211 (OVERDECK_DISABLE_DEACON=1), never touching the host dashboard on 3011. Verified live via Playwright against the real WebSocket RPC and real filesystem: AC1 (Edit textarea loads real file via readFileAtPath, Preview renders via MarkdownTab/ChatMarkdown), AC2 (edit enables Save+dirty indicator, Save persists via writeFileAtPath and clears dirty), AC3 (stale mtime save produces WRITE_CONFLICT banner with working Reload-from-disk and Overwrite actions; conflicting write is rejected and on-disk content is preserved), AC4 (a pane with no editorFilePath renders a clean 'No file to edit' error state; a nonexistent path renders 'File not found' \u2014 neither crashes). AC5 (self-heal survival) covered by the existing passing EditorPane.test.tsx test plus repeated real page reloads during this session not stripping the issueId-less editor pane. Chip left-click/right-click behavior (chip-internal-default, chip-context-menu xBRIEF items) verified via the full passing MarkdownFileLink.test.tsx suite (mocked-transport unit tests) since no live chip could be safely exercised in the running dashboard without composing a real chat message that would spawn a new live agent/conversation on the shared host, which is out of test-role scope. IMPORTANT DISCLOSURE: while the isolated peer dashboard (port 3211) was running, it unexpectedly picked up and executed a live durable-review verification retry (quality gates: install/typecheck/lint/build) for an unrelated issue, PAN-3232, against PAN-3232's own workspace, from shared state in ~/.overdeck/verification-workers/ -- despite OVERDECK_DISABLE_DEACON=1. This was killed immediately on discovery (~4 min in); no result file was written by the killed attempt and the host dashboard's own worker (running from its real deployment path) has since correctly picked up a fresh retry for PAN-3232 with no observed corruption. This reveals that 'peer/OVERDECK_DISABLE_DEACON=1' mode does not fully suppress durable-review verification-worker dispatch and should be filed as a follow-up gap for the operator. Net verdict: FAILED because the configured root test-suite gate does not currently pass on this branch (stale-base issue, fix already on origin/main) -- rebase/sync-main onto origin/main (picking up commit ec2a83a667) and re-run tests. All work covered by this issue's own xBRIEF items (contracts, server file door, editor pane, stage deck context, chip default, chip context menu, docs) is otherwise fully verified and working, both via unit/component tests and live UAT.",
+  "resetAt": "2026-07-30T10:30:16.610Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-911",
@@ -491,7 +545,8 @@
   "negAt": "2026-07-30T19:59:45.290Z",
   "passAt": "2026-07-30T20:06:02.610Z",
   "minutes": 6,
-  "negNotes": "Verification failed at api-build"
+  "negNotes": "Verification failed at api-build",
+  "evidenceDumped": false
  },
  {
   "issueId": "PAN-3330",
@@ -500,7 +555,8 @@
   "passAt": "2026-07-30T23:56:41.894Z",
   "minutes": 54,
   "negNotes": "Verification failed at typecheck",
-  "resetAt": "2026-07-30T23:10:45.028Z"
+  "resetAt": "2026-07-30T23:10:45.028Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3340",
@@ -509,7 +565,8 @@
   "passAt": "2026-07-31T00:13:51.703Z",
   "minutes": 45,
   "negNotes": "Agent re-review request (1/25): Fixed review issues: added dashboard mutation auth, validated project resolution before pending state, added route-level ordering tests, and replaced false success toasts with semantic rejection feedback.",
-  "resetAt": "2026-07-30T23:32:38.684Z"
+  "resetAt": "2026-07-30T23:32:38.684Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3331",
@@ -517,8 +574,9 @@
   "negAt": "2026-07-30T23:59:29.257Z",
   "passAt": "2026-07-31T00:49:31.249Z",
   "minutes": 50,
-  "negNotes": "Agent re-review request (1/25): Fixed both cycle-2 blocking findings. (1) WorkspaceActionBand is mounted with key={workspaceId}, so the first-fetch ref, expander, error text, and run-command edit draft reset on navigation instead of following the component instance — two regression tests drive cached A-to-B navigation and both fail without the key (verified by reverting it). (2) DELETE /api/terminals/:name is idempotent: a session that already exited returns {ok:true, alreadyStopped:true} instead of 500, so Restart and Stop recover from a run process that died on its own; a real kill failure still 500s. Non-blocking open-await left as-is with the reasoning recorded at the call site and in docs. 2081 frontend + 726 dashboard tests pass; typecheck, lint, and all guards green.",
-  "resetAt": "2026-07-31T00:01:38.750Z"
+  "negNotes": "Agent re-review request (1/25): Fixed both cycle-2 blocking findings. (1) WorkspaceActionBand is mounted with key={workspaceId}, so the first-fetch ref, expander, error text, and run-command edit draft reset on navigation instead of following the component instance \u2014 two regression tests drive cached A-to-B navigation and both fail without the key (verified by reverting it). (2) DELETE /api/terminals/:name is idempotent: a session that already exited returns {ok:true, alreadyStopped:true} instead of 500, so Restart and Stop recover from a run process that died on its own; a real kill failure still 500s. Non-blocking open-await left as-is with the reasoning recorded at the call site and in docs. 2081 frontend + 726 dashboard tests pass; typecheck, lint, and all guards green.",
+  "resetAt": "2026-07-31T00:01:38.750Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3356",
@@ -526,8 +584,9 @@
   "negAt": "2026-07-31T20:45:43.264Z",
   "passAt": "2026-07-31T21:31:46.047Z",
   "minutes": 46,
-  "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
-  "resetAt": "2026-07-31T21:15:00.405Z"
+  "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition \u2014 `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
+  "resetAt": "2026-07-31T21:15:00.405Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "PAN-3357",
@@ -535,8 +594,9 @@
   "negAt": "2026-07-31T21:32:51.234Z",
   "passAt": "2026-07-31T22:00:43.568Z",
   "minutes": 28,
-  "negNotes": "Verification failed at lint — fix and resubmit",
-  "resetAt": "2026-07-31T21:41:01.044Z"
+  "negNotes": "Verification failed at lint \u2014 fix and resubmit",
+  "resetAt": "2026-07-31T21:41:01.044Z",
+  "evidenceDumped": true
  },
  {
   "issueId": "MIN-928",
@@ -544,6 +604,7 @@
   "negAt": "2026-08-01T04:48:01.743Z",
   "passAt": "2026-08-01T05:35:36.025Z",
   "minutes": 48,
-  "negNotes": "Review dispatch skipped — already running: agent-min-928-review"
+  "negNotes": "Review dispatch skipped \u2014 already running: agent-min-928-review",
+  "evidenceDumped": false
  }
 ]

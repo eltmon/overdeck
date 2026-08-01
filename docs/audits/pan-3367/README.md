@@ -99,8 +99,13 @@ why a "0 commits in the recorded window" signal, taken alone, is not proof of an
   infra-flavored note instead of the real finding, because the reproduction script's state-collapse keeps
   only the first note per contiguous `reviewStatus/testStatus` run. Confirmed for roughly a third of the
   mandatory issues (PAN-3192, PAN-3206, PAN-3230, PAN-3110, PAN-3115, PAN-3155, PAN-3183, MIN-858,
-  MIN-896, and all five derived extras) — every affected report reads the full
-  `evidence/events-<issue>.json.gz` dump rather than trusting the worklist row.
+  MIN-896, and all five derived extras). For the affected **PAN** issues, every report reads the full
+  committed `evidence/events-<issue>.json.gz` dump rather than trusting the worklist row — that dump is
+  public, reproducible evidence anyone can inspect. For the affected **MIN** issues (MIN-858, MIN-896),
+  the same full-history read happened, but against a raw event dump generated locally and never committed
+  to this public repository (see the confidentiality note in each `min-*.md` report) — the finding text
+  quoted in those reports is independently reproducible only by someone with `mind-your-now` access
+  re-running the (also-committed) generator locally, not from this repo's own tree.
 - **H12 — transient passes.** A `passed/passed` state can revert to `blocked/passed` milliseconds to
   minutes later when a re-review immediately surfaces a regression or an unrelated new finding. Confirmed
   for MIN-879 (a fix for one PostHog-identity bug introduced a second one, caught and fixed 14 minutes
