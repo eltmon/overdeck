@@ -254,6 +254,12 @@ export function ConversationRow({
     <>
     <button
       className={itemClass}
+      draggable
+      style={{ cursor: 'grab' }}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/json', JSON.stringify({ name: conv.name, projectKey: conv.projectKey ?? null }));
+      }}
       onClick={() => onSelect(conv.name)}
       onContextMenu={(e) => {
         e.preventDefault();

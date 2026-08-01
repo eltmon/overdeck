@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, type DragEvent } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import {
   Home, LayoutGrid, Bot, Server,
@@ -10,6 +10,7 @@ import type { LucideIcon } from 'lucide-react';
 import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, NO_PROJECT_KEY, NO_PROJECT_LABEL, type RegisteredProjectLite } from './CommandDeck/projectsData';
 import { OverdeckMark } from './OverdeckMark';
 import { fetchConversations } from './CommandDeck/ConversationList';
+import { useConversationMutations } from './CommandDeck/useConversationMutations';
 import { FreshnessIndicator } from './FreshnessIndicator';
 import { useTheme } from '../hooks/useTheme';
 import { usePlannedBacklogVisibility } from '../hooks/usePlannedBacklogVisibility';
@@ -247,6 +248,32 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
     () => sidebarConversations.some((c) => isUnscopedConversation(c, registeredProjects)),
     [sidebarConversations, registeredProjects],
   );
+
+  // PAN-1577: drag a conversation row onto a sidebar project to move it.
+  const conversationMutations = useConversationMutations(null, () => {});
+  const [dragOverProjectKey, setDragOverProjectKey] = useState<string | null>(null);
+  const handleProjectDragOver = useCallback((e: DragEvent<HTMLButtonElement>, key: string) => {
+    if (!e.dataTransfer.types.includes('application/json')) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setDragOverProjectKey(key);
+  }, []);
+  const handleProjectDragLeave = useCallback((key: string) => {
+    setDragOverProjectKey((cur) => (cur === key ? null : cur));
+  }, []);
+  const handleProjectDrop = useCallback((e: DragEvent<HTMLButtonElement>, key: string, name: string) => {
+    e.preventDefault();
+    setDragOverProjectKey(null);
+    const raw = e.dataTransfer.getData('application/json');
+    if (!raw) return;
+    try {
+      const payload = JSON.parse(raw) as { name: string; projectKey: string | null };
+      if (payload.projectKey === key) return;
+      conversationMutations.move({ name: payload.name, projectKey: key, projectName: name });
+    } catch {
+      // malformed drag payload — ignore
+    }
+  }, [conversationMutations]);
 
   // PAN-1990: Workspaces rail — first-class workspaces/projects domain, distinct
   // from the "Projects" rail above (registered pan.projects.yaml entries).
@@ -690,6 +717,9 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                     <button
                       key={project.path}
                       onClick={() => { onSelectProject?.(project.name); setMobileOpen(false); }}
+                      onDragOver={(e) => handleProjectDragOver(e, project.key)}
+                      onDragLeave={() => handleProjectDragLeave(project.key)}
+                      onDrop={(e) => handleProjectDrop(e, project.key, project.name)}
                       title={project.name}
                       data-testid={`sidebar-project-${project.name}`}
                       className={`
@@ -698,6 +728,7 @@ export function Sidebar({ activeTab, onTabChange, onSearchOpen, selectedProject 
                           ? 'bg-accent text-foreground border-primary'
                           : 'text-muted-foreground hover:bg-accent hover:text-foreground border-transparent'
                         }
+                        ${dragOverProjectKey === project.key ? 'ring-2 ring-primary ring-inset bg-accent' : ''}
                       `}
                     >
                       <span

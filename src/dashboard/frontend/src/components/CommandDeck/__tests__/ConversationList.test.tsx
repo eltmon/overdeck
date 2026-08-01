@@ -501,3 +501,49 @@ describe('ConversationList move flow (PAN-1577)', () => {
     });
   });
 });
+
+// ─── Drag-drop move (PAN-1577) ─────────────────────────────────────────────
+
+function fakeDataTransfer() {
+  const store = new Map<string, string>();
+  return {
+    effectAllowed: 'uninitialized',
+    dropEffect: 'none',
+    get types() { return Array.from(store.keys()); },
+    setData: (type: string, value: string) => { store.set(type, value); },
+    getData: (type: string) => store.get(type) ?? '',
+  };
+}
+
+describe('ConversationRow drag source (PAN-1577)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('is draggable and carries {name, projectKey} as the drag payload (ac2)', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    const row = screen.getByTitle('test-conv');
+    expect(row).toHaveAttribute('draggable', 'true');
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(row, { dataTransfer });
+
+    expect(dataTransfer.getData('application/json')).toBe(
+      JSON.stringify({ name: 'test-conv', projectKey: 'krux' }),
+    );
+  });
+});
