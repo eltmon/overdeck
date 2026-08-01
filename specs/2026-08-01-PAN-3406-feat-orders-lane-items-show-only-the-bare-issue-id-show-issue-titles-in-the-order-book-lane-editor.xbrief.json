@@ -4,17 +4,17 @@
     "created": "2026-08-01T13:25:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3406: feat(orders): lane items show only the bare issue ID — show issue titles in the order-book lane editor",
-    "updated": "2026-08-01T13:32:46.835Z"
+    "updated": "2026-08-01T14:51:29.831Z"
   },
   "plan": {
     "id": "pan-3406",
     "title": "feat(orders): lane items show only the bare issue ID — show issue titles in the order-book lane editor",
-    "status": "running",
+    "status": "completed",
     "uid": "d0e4b928-d018-4c94-abea-d93ee8f30fc1",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T13:25:00.000Z",
-    "updated": "2026-08-01T13:32:46.835Z",
+    "updated": "2026-08-01T14:51:29.831Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3406",
@@ -191,5 +191,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
