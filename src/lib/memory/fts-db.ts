@@ -166,17 +166,20 @@ function failPendingRequests(error: Error): void {
   pendingRequests.clear();
 }
 
-function memoryFtsWorkerUrl(): URL {
-  if (import.meta.url.endsWith('/dist/cli/index.js')) {
-    return new URL('../lib/memory/fts-worker.js', import.meta.url);
+function memoryFtsWorkerUrl(moduleUrl = import.meta.url): URL {
+  if (moduleUrl.endsWith('.ts')) return new URL('./fts-worker.ts', moduleUrl);
+
+  const distMarker = '/dist/';
+  const distIndex = moduleUrl.lastIndexOf(distMarker);
+  if (distIndex !== -1) {
+    const distRoot = moduleUrl.slice(0, distIndex + distMarker.length);
+    const workerPath = moduleUrl.startsWith(`${distRoot}dashboard/`)
+      ? 'dashboard/memory-fts-worker.js'
+      : 'lib/memory/fts-worker.js';
+    return new URL(workerPath, distRoot);
   }
-  if (import.meta.url.endsWith('/dist/index.js') || /\/dist\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
-    return new URL('./lib/memory/fts-worker.js', import.meta.url);
-  }
-  if (import.meta.url.endsWith('/dist/dashboard/server.js') || /\/dist\/dashboard\/fts-db-[^/]+\.js$/.test(import.meta.url)) {
-    return new URL('./memory-fts-worker.js', import.meta.url);
-  }
-  return import.meta.url.endsWith('.ts')
-    ? new URL('./fts-worker.ts', import.meta.url)
-    : new URL('./fts-worker.js', import.meta.url);
+
+  return new URL('./fts-worker.js', moduleUrl);
 }
+
+export const __testInternals = { memoryFtsWorkerUrl };
