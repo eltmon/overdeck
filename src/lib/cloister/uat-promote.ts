@@ -129,6 +129,11 @@ export interface UatPromoteDeps {
    */
   memberEligibility(issueId: string): { eligible: boolean; reason?: string };
   recordVerification?: (generation: UatGeneration, mergeSha: string) => void;
+  runShip?: (
+    generation: UatGeneration,
+    shipVersion: string | undefined,
+    promotedRepos: readonly UatGenerationRepo[],
+  ) => Promise<void>;
   log?: (msg: string) => void;
 }
 
@@ -161,6 +166,7 @@ export async function promoteUatGeneration(
   name: string,
   projectRoot: string,
   deps: UatPromoteDeps,
+  options: { shipVersion?: string } = {},
 ): Promise<PromoteResult> {
   const log = deps.log ?? (() => {});
 
@@ -191,7 +197,7 @@ export async function promoteUatGeneration(
   }
 
   if (deps.polyrepoGit) {
-    return promotePolyrepo(gen, projectRoot, deps, deps.polyrepoGit, log);
+    return promotePolyrepo(gen, projectRoot, deps, deps.polyrepoGit, log, options.shipVersion);
   }
 
   const mainSha = await deps.git.fetchMain();
@@ -237,7 +243,7 @@ export async function promoteUatGeneration(
 
   // The batch is on main: this generation is done, every other live
   // generation is stale by definition (main moved).
-  return finishPromote(gen, projectRoot, deps, mergeSha, log);
+  return finishPromote(gen, projectRoot, deps, mergeSha, log, false, options.shipVersion);
 }
 
 /**
@@ -336,6 +342,7 @@ async function promotePolyrepo(
   deps: UatPromoteDeps,
   repoGit: ReadonlyMap<string, PolyrepoRepoPromoteGit>,
   log: (msg: string) => void,
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   const allRepos = [...(gen.repos ?? [])].sort((a, b) => a.mergeOrder - b.mergeOrder);
   if (allRepos.length === 0) {
@@ -442,7 +449,15 @@ async function promotePolyrepo(
     // would leave a fully-published batch permanently unfinalizable: never
     // promoted, no verdicts recorded, no stack teardown, no post-merge.
     log(`[uat-promote] ${gen.name}: every repo already published — finalizing`);
-    return finishPromote(withRepos(gen, recovered), projectRoot, deps, landedMergeRef(recovered), log, true);
+    return finishPromote(
+      withRepos(gen, recovered),
+      projectRoot,
+      deps,
+      landedMergeRef(recovered),
+      log,
+      true,
+      shipVersion,
+    );
   }
 
   const missing = pending.filter((r) => !repoGit.has(r.repoKey));
@@ -579,7 +594,7 @@ async function promotePolyrepo(
     })),
   };
 
-  return finishPromote(promotedGen, projectRoot, deps, mergeSha, log, true);
+  return finishPromote(promotedGen, projectRoot, deps, mergeSha, log, true, shipVersion);
 }
 
 /**
@@ -594,6 +609,7 @@ async function finishPromote(
   mergeSha: string,
   log: (msg: string) => void,
   isPolyrepoGeneration = false,
+  shipVersion?: string,
 ): Promise<PromoteResult> {
   // The one place a generation becomes terminal, so the completeness invariant
   // is enforced here rather than at each caller: a polyrepo batch is finalized
@@ -615,13 +631,40 @@ async function finishPromote(
     }
   }
 
-  deps.store.update(gen.name, { status: 'promoted' });
+  const promotedAt = (deps.now?.() ?? new Date()).toISOString();
+  const promotedRepos: UatGenerationRepo[] = isPolyrepoGeneration
+    ? (gen.repos ?? [])
+    : [{
+        ...(gen.repos?.[0] ?? {
+          repoKey: projectRoot.replace(/\/+$/, '').split('/').pop() || projectRoot,
+          repoPath: projectRoot,
+          branch: gen.name,
+          baseSha: gen.baseSha,
+          targetBranch: 'main',
+          worktreePath: gen.worktreePath,
+          mergeOrder: 0,
+        }),
+        repoPath: projectRoot,
+        targetBranch: 'main',
+        promotedAt,
+        mergeSha,
+      }];
+  const promotedGeneration: UatGeneration = { ...gen, status: 'promoted', repos: promotedRepos };
+
+  // Persist the exact landed refs before any ship work. Deferred ship must root
+  // its worktrees at these commits rather than the ambient primary checkout.
+  deps.store.update(gen.name, { status: 'promoted', repos: promotedRepos });
   try {
-    deps.recordVerification?.(gen, mergeSha);
+    deps.recordVerification?.(promotedGeneration, mergeSha);
   } catch (err) {
     log(`[uat-promote] ${gen.name}: verification verdict recording failed after merge: ${err instanceof Error ? err.message : String(err)}`);
   }
-  await deps.teardownStack(gen).catch((err) => {
+  try {
+    await deps.runShip?.(promotedGeneration, shipVersion, promotedRepos);
+  } catch (err) {
+    log(`[uat-promote] ${gen.name}: version ship settlement failed after merge: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  await deps.teardownStack(promotedGeneration).catch((err) => {
     log(`[uat-promote] ${gen.name}: stack teardown failed: ${err instanceof Error ? err.message : String(err)}`);
   });
 
@@ -648,7 +691,7 @@ async function finishPromote(
   // a subset, which would advance every member's lifecycle having proven only
   // some of the repos their work landed in.
   const verifiedMergedRepos = isPolyrepoGeneration
-    ? (gen.repos ?? []).map((r) => ({
+    ? (promotedGeneration.repos ?? []).map((r) => ({
         repoKey: r.repoKey,
         repoPath: r.repoPath,
         mergeSha: r.mergeSha!,
