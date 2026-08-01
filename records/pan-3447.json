@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T22:53:40.485Z",
+  "updated": "2026-08-01T22:53:49.613Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "hook-inventory-contract": {
-        "writerId": "agent-pan-3447-slot-1",
-        "agentId": "agent-pan-3447-slot-1",
-        "pid": 368115,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:53:40.485Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -96,12 +88,23 @@
         "outcome": "released",
         "reason": "stale claim released (deacon-swarm dead)",
         "releasedAt": "2026-08-01T22:28:11.475Z"
+      },
+      {
+        "writerId": "agent-pan-3447-slot-1",
+        "agentId": "agent-pan-3447-slot-1",
+        "pid": 368115,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:53:40.485Z",
+        "itemId": "hook-inventory-contract",
+        "outcome": "completed",
+        "reason": "Implemented and verified 21-hook contracts inventory with registration parity guard",
+        "releasedAt": "2026-08-01T22:53:49.613Z"
       }
     ],
     "statusReasons": {
       "hook-inventory-contract": {
-        "reason": "Reconcile registered slot assignment before completion",
-        "updatedAt": "2026-08-01T22:53:40.485Z"
+        "reason": "Implemented and verified 21-hook contracts inventory with registration parity guard",
+        "updatedAt": "2026-08-01T22:53:49.613Z"
       },
       "confluence-model": {
         "reason": "stale claim released (deacon-swarm dead)",
@@ -110,8 +113,11 @@
     }
   },
   "statusOverrides": {
-    "hook-inventory-contract": "running",
-    "confluence-model": "pending"
+    "hook-inventory-contract": "completed",
+    "confluence-model": "pending",
+    "hook-inventory-contract.hook-inventory-contract.ac1": "completed",
+    "hook-inventory-contract.hook-inventory-contract.ac2": "completed",
+    "hook-inventory-contract.hook-inventory-contract.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
