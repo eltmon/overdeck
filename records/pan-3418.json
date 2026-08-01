@@ -66,7 +66,7 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:52:24.722Z",
+  "updated": "2026-08-01T19:10:10.418Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "blocked",
@@ -180,7 +180,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "k3[1m]",
   "recoveryTrips": [
     {
       "issue": "PAN-3418",
