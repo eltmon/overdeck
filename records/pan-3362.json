@@ -32,6 +32,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T11:49Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-01T11:49:23.864Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T11:57Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-08-01T11:57:39.323Z"
     }
   ],
   "feedback": [
@@ -40,6 +45,13 @@
       "specialist": "review-agent",
       "outcome": "changes-requested",
       "timestamp": "2026-08-01T11:49:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3362\n\n# Review Synthesis — PAN-3362 — 2026-08-01T11:49:00Z\n\n## Verdict: CHANGES REQUESTED — public `--force` permits the explicitly forbidden host-seeding path\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/context.json`\n- Branch: `feature/pan-3362`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362`\n- HEAD reviewed: `4809667cd4d4bbd1215915a3fad822e01b4c2604`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/requirements.md` | 2 |\n\nThe correctness idempotency finding and the matching requirements finding describe the same defect, so they are consolidated below. Both unique blockers cite lines added by this PR. This is cycle 1, so no convergence demotions apply. Two unique blockers across five PR commits do not trigger the proportionality gate.\n\n## Blocking Findings\n\n### [requirements] Public `--force` exposes the explicitly forbidden host-seeding path — `src/cli/commands/admin/seed-uat-fixtures.ts:132`\nThe manifest's must-not constraints prohibit seeding the host dashboard or any non-container `OVERDECK_HOME`, and prohibit registering the fixture project on the host. The new public `--force` option bypasses `assertContainerEnvUnlessForced()` and then runs every fixture write, including `registerProjectSync()`, against the current home. The unit test explicitly proves this forbidden path succeeds. Remove the public bypass and make the writer fail closed whenever the container markers are absent; tests can continue using temporary homes with the container marker set.\n\n### [correctness, requirements] Re-seeding appends duplicate activity history — `src/lib/uat-fixtures/seed.ts:90`\n`fixtureActivityEntries()` supplies no stable IDs, while `emitActivityEntryDurable()` assigns a fresh UUID to each entry. Every seed invocation therefore appends four additional visible lifecycle events even though the command and documentation promise idempotency. Give the fixture entries stable IDs, write them through the existing at-most-once activity door, and extend the repeat-run test to verify exactly four durable/visible fixture activity entries remain after two seeds.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nThe requirements reviewer classified the filesystem-listing authentication exclusion and the PAN-2809 terminal-Playwright exclusion as whole-feature scope. This PR correctly does not implement either item, so they do not affect the verdict.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3362 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T11:57:39Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-3362\n\n# Review Synthesis — PAN-3362 — 2026-08-01T11:49:00Z\n\n## Verdict: CHANGES REQUESTED — public `--force` permits the explicitly forbidden host-seeding path\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/context.json`\n- Branch: `feature/pan-3362`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362`\n- HEAD reviewed: `4809667cd4d4bbd1215915a3fad822e01b4c2604`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/correctness.md` | 1 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/requirements.md` | 2 |\n\nThe correctness idempotency finding and the matching requirements finding describe the same defect, so they are consolidated below. Both unique blockers cite lines added by this PR. This is cycle 1, so no convergence demotions apply. Two unique blockers across five PR commits do not trigger the proportionality gate.\n\n## Blocking Findings\n\n### [requirements] Public `--force` exposes the explicitly forbidden host-seeding path — `src/cli/commands/admin/seed-uat-fixtures.ts:132`\nThe manifest's must-not constraints prohibit seeding the host dashboard or any non-container `OVERDECK_HOME`, and prohibit registering the fixture project on the host. The new public `--force` option bypasses `assertContainerEnvUnlessForced()` and then runs every fixture write, including `registerProjectSync()`, against the current home. The unit test explicitly proves this forbidden path succeeds. Remove the public bypass and make the writer fail closed whenever the container markers are absent; tests can continue using temporary homes with the container marker set.\n\n### [correctness, requirements] Re-seeding appends duplicate activity history — `src/lib/uat-fixtures/seed.ts:90`\n`fixtureActivityEntries()` supplies no stable IDs, while `emitActivityEntryDurable()` assigns a fresh UUID to each entry. Every seed invocation therefore appends four additional visible lifecycle events even though the command and documentation promise idempotency. Give the fixture entries stable IDs, write them through the existing at-most-once activity door, and extend the repeat-run test to verify exactly four durable/visible fixture activity entries remain after two seeds.\n\n## Non-blocking Findings\nNone.\n\n## Scope Note\nThe requirements reviewer classified the filesystem-listing authentication exclusion and the PAN-2809 terminal-Playwright exclusion as whole-feature scope. This PR correctly does not implement either item, so they do not affect the verdict.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-4809667c/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3362 -m \"Fixed review issues\"`"
     }
   ],
@@ -74,10 +86,10 @@
     "recordedAt": "2026-08-01T11:32:46.338Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:57:23.532Z",
+  "updated": "2026-08-01T11:57:39.324Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -85,7 +97,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:33:25.155Z",
-    "updatedAt": "2026-08-01T11:57:23.283Z",
+    "updatedAt": "2026-08-01T11:57:38.688Z",
+    "reviewNotes": "public `--force` permits the explicitly forbidden host-seeding path",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
@@ -190,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.210884,
-        "pricingAsOf": "2026-08-01T11:57:23.481Z"
+        "pricingAsOf": "2026-08-01T11:57:38.721Z"
       }
     },
     "merges": [
