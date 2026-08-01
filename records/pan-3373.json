@@ -3,20 +3,19 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T03:57:20.524Z",
-  "updated": "2026-08-01T05:17:47.619Z",
+  "updated": "2026-08-01T05:17:51.177Z",
   "pipeline": {
     "issueId": "PAN-3373",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "skipped",
-    "mergeStatus": "pending",
-    "mergeStep": "verifying",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T05:17:47.580Z",
+    "updatedAt": "2026-08-01T05:17:48.111Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)",
-    "mergeNotes": "Stale strike signal: recorded HEAD 1f048108082760aac0d0abf23f6c681e5d9158df differs from origin/strike/pan-3373 at 7f27c8bb502f55028ff083c3e7fcd06837701043",
     "strikeReadyHead": "1f048108082760aac0d0abf23f6c681e5d9158df",
     "strikeReadyAt": "2026-08-01T04:52:37.211Z",
     "strikeLandingState": "recovering",
@@ -53,7 +52,7 @@
       },
       "costAtCloseOut": {
         "usd": 30.721747,
-        "pricingAsOf": "2026-08-01T05:17:47.595Z"
+        "pricingAsOf": "2026-08-01T05:17:51.173Z"
       }
     },
     "merges": [],
