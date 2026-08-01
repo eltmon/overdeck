@@ -74,10 +74,10 @@
     "recordedAt": "2026-08-01T11:32:46.338Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:52:16.577Z",
+  "updated": "2026-08-01T11:57:23.532Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -85,8 +85,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:33:25.155Z",
-    "updatedAt": "2026-08-01T11:49:29.481Z",
-    "reviewNotes": "Public --force permits forbidden host seeding; repeat seeds also duplicate activity history",
+    "updatedAt": "2026-08-01T11:57:23.283Z",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "reviewedAtCommit": "4809667cd4d4bbd1215915a3fad822e01b4c2604",
@@ -128,9 +127,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 249379,
-            "output": 6344,
-            "cacheRead": 3007488,
+            "input": 255381,
+            "output": 12012,
+            "cacheRead": 3643392,
             "cacheWrite": 0
           }
         },
@@ -168,30 +167,30 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 534,
-            "output": 127677,
-            "cacheRead": 77921925,
-            "cacheWrite": 1248420
+            "input": 600,
+            "output": 145679,
+            "cacheRead": 93098543,
+            "cacheWrite": 1709356
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2758714,
-          "output": 91942,
-          "cacheRead": 19579904,
+          "input": 2764716,
+          "output": 97610,
+          "cacheRead": 20215808,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 534,
-          "output": 127677,
-          "cacheRead": 77921925,
-          "cacheWrite": 1248420
+          "input": 600,
+          "output": 145679,
+          "cacheRead": 93098543,
+          "cacheWrite": 1709356
         }
       },
       "costAtCloseOut": {
-        "usd": 46.325066,
-        "pricingAsOf": "2026-08-01T11:49:29.488Z"
+        "usd": 51.210884,
+        "pricingAsOf": "2026-08-01T11:57:23.481Z"
       }
     },
     "merges": [
@@ -200,7 +199,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3362",
