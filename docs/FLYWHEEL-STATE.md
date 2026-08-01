@@ -732,3 +732,10 @@ Escalation chain: Monitor 5.9GB → 3.5GB avail with PSI 12.77 (real stalling). 
 - **strike-3416 landed via CI path** (PR #3425 — shared specialist session tree builder; 7th load-flake preemption). strike-3422 root cause confirmed, implementing (+249/−47 in pty-supervisor area).
 - Verification gates green on PAN-3362/PAN-3367/MIN-864; review/test specialist verdicts still converging server-side — ready set empty, UAT candidate null (correct, not a wedge). MIN-839 rework crunching ($19.95, slow delta — recheck). MIN-874 hardening OAuth state (50m task, $18.40 fresh session).
 - Memory stable post-restart (no Monitor events ~15 min): server churns to ~1.9GB then GC reclaims. Dispatch freeze still on for NEW strikes (3417/3397/3396 queued) until an hour of stability.
+
+## RUN-79 tick 26 (2026-08-01 ~16:30Z) — HERMES CAMPAIGN ADOPTED: order book folded in, both lane heads live
+
+- **Operator campaign handoff**: order book `2026-08-01-myn-hermes-smoke-test-remediation` (5 issues from today's Hermes smoke test), status=ready, laneAConcurrency=1. Book membership = release per pickup-gate doctrine. PRDs FINAL on drafts/ — no re-derivation.
+- **Lane A (myn api, serial): agent-min-930 STARTED** — P0 token leak, highest urgency across ALL projects (overrode the memory dispatch freeze on emergency class); then MIN-932 → MIN-933 (932 first, shared project-DTO design). **Lane B (hermes repo, serial): agent-min-931 STARTED** (27 items, WI-1/WI-2 first); then MIN-934 (hard dep on 931's guarded_write, same files).
+- Completion condition: all five terminal → `pan orders show` from the myn root + mark book complete. Campaign rules live in the myn project's flywheel-brief.
+- Non-campaign fleet unchanged: #3425 in CI, strike-3422 implementing, 3362/3367/864 verdicts converging, MIN-839 reworking. Memory stable (~35 min quiet). Freeze stays for non-campaign strikes (3417/3397/3396).
