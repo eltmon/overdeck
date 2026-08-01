@@ -2,7 +2,7 @@
   "issueId": "PAN-3367",
   "schemaVersion": 2,
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T02:43:56.891Z",
+  "updated": "2026-08-01T02:43:58.135Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -35,5 +35,7 @@
       "note": "Planning session started for PAN-3367: Audit: code-level review of 29 issues whose negative verdict was reset and replaced with a pass — did the merged diff actually satisfy the AC?",
       "timestamp": "2026-08-01T02:43:56.891Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
