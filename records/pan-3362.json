@@ -126,19 +126,19 @@
     "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:44:32.560Z",
+  "updated": "2026-08-01T12:46:48.638Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T12:29:41.661Z",
-    "updatedAt": "2026-08-01T12:44:32.259Z",
-    "reviewNotes": "Unrelated Deacon transcript-retention behavior violates the explicit PAN-3362 scope constraint",
+    "updatedAt": "2026-08-01T12:46:48.596Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed cycle-2 review findings: removed the out-of-scope transcript-retention.ts fix (reverted — it's already tracked and being fixed independently as PAN-3404, PR #3405) so this branch's diff returns to its actual scope, and made seedUatFixturesLocal fail loud when emitActivityEntryOnce returns an outcome other than appended/duplicate instead of silently reporting a failed persist as success.",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "lastVerifiedCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
@@ -221,10 +221,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 768,
-            "output": 183549,
-            "cacheRead": 136781041,
-            "cacheWrite": 3290658
+            "input": 782,
+            "output": 184750,
+            "cacheRead": 140944557,
+            "cacheWrite": 3293395
           }
         }
       },
@@ -236,15 +236,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 768,
-          "output": 183549,
-          "cacheRead": 136781041,
-          "cacheWrite": 3290658
+          "input": 782,
+          "output": 184750,
+          "cacheRead": 140944557,
+          "cacheWrite": 3293395
         }
       },
       "costAtCloseOut": {
-        "usd": 88.95527,
-        "pricingAsOf": "2026-08-01T12:44:32.323Z"
+        "usd": 89.806854,
+        "pricingAsOf": "2026-08-01T12:46:48.633Z"
       }
     },
     "merges": [
