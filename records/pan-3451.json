@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T22:16:25.528Z",
+  "updated": "2026-08-01T22:25:20.268Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -53,18 +53,33 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "add-plan-checklist-endpoint": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3451",
         "agentId": "agent-pan-3451",
         "pid": 2762891,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:16:25.528Z"
+        "claimedAt": "2026-08-01T22:16:25.528Z",
+        "itemId": "add-plan-checklist-endpoint",
+        "outcome": "completed",
+        "reason": "Added authenticated agent plan-checklist endpoint, route registration, and complete/incomplete/auth/422 regression coverage",
+        "releasedAt": "2026-08-01T22:25:20.268Z"
+      }
+    ],
+    "statusReasons": {
+      "add-plan-checklist-endpoint": {
+        "reason": "Added authenticated agent plan-checklist endpoint, route registration, and complete/incomplete/auth/422 regression coverage",
+        "updatedAt": "2026-08-01T22:25:20.268Z"
       }
     }
   },
   "statusOverrides": {
-    "add-plan-checklist-endpoint": "running"
+    "add-plan-checklist-endpoint": "completed",
+    "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac1": "completed",
+    "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac2": "completed",
+    "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac3": "completed",
+    "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac4": "completed"
   }
 }
