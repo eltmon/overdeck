@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T22:30:07.699Z",
+  "updated": "2026-08-01T22:32:54.035Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "ohmypi-extension-checklist-door": {
-        "writerId": "agent-pan-3451",
-        "agentId": "agent-pan-3451",
-        "pid": 3556491,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:30:07.698Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3451",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Pi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
         "releasedAt": "2026-08-01T22:29:52.349Z"
+      },
+      {
+        "writerId": "agent-pan-3451",
+        "agentId": "agent-pan-3451",
+        "pid": 3556491,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:30:07.698Z",
+        "itemId": "ohmypi-extension-checklist-door",
+        "outcome": "completed",
+        "reason": "ohmypi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
+        "releasedAt": "2026-08-01T22:32:54.035Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "pi-extension-checklist-door": {
         "reason": "Pi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
         "updatedAt": "2026-08-01T22:29:52.349Z"
+      },
+      "ohmypi-extension-checklist-door": {
+        "reason": "ohmypi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
+        "updatedAt": "2026-08-01T22:32:54.035Z"
       }
     }
   },
@@ -108,6 +115,10 @@
     "pi-extension-checklist-door.pi-extension-checklist-door.ac1": "completed",
     "pi-extension-checklist-door.pi-extension-checklist-door.ac2": "completed",
     "pi-extension-checklist-door.pi-extension-checklist-door.ac3": "completed",
-    "ohmypi-extension-checklist-door": "running"
+    "ohmypi-extension-checklist-door": "completed",
+    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac1": "completed",
+    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac2": "completed",
+    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac3": "completed",
+    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac4": "completed"
   }
 }
