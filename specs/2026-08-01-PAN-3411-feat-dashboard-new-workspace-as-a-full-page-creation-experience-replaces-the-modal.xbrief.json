@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:41:02Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3411: feat(dashboard): New Workspace as a full-page creation experience (replaces the modal)",
-    "updated": "2026-08-01T16:00:21.074Z"
+    "updated": "2026-08-01T16:00:54.508Z"
   },
   "plan": {
     "id": "pan-3411",
     "title": "feat(dashboard): New Workspace as a full-page creation experience (replaces the modal)",
-    "status": "proposed",
+    "status": "running",
     "uid": "37a8c7ac-07c8-487a-82c3-90bc59eb6a7f",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-01T15:41:02Z",
-    "updated": "2026-08-01T16:00:21.074Z",
+    "updated": "2026-08-01T16:00:54.508Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3411",
@@ -1089,5 +1089,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
