@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T16:37:25.450Z",
+  "updated": "2026-08-01T17:02:26.580Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "drag-drop-move": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 1303653,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:37:25.447Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -93,8 +85,8 @@
         "updatedAt": "2026-08-01T16:37:10.487Z"
       },
       "drag-drop-move": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T16:37:25.447Z"
+        "reason": "ConversationRow is a native HTML5 drag source (draggable, cursor:grab, onDragStart carries {name,projectKey} JSON). Drop target is the Sidebar's persistent project rail button (NOT ProjectTree/ProjectNode.tsx as the xBRIEF assumed -- that component only ever renders the single currently-selected project's detail tree, so it can never be a cross-project drop target; the sidebar rail lists every registered project simultaneously, which is what a user would actually drag onto). onDragOver highlights the hovered project (ring-2), onDrop calls the shared move mutation unless payload.projectKey already matches the target (no-op, no mutation call). 7 new Vitest tests (drag payload, highlight+clear, mutation-fires, no-op). Full frontend suite passes (2900/2901; 1 pre-existing unrelated failure in tiered-crews.test.ts, a model-pricing assertion untouched by this branch). AC4 (browser UAT of both flows end-to-end) verified via a real isolated Playwright run against this branch's built dist, using its own throwaway OVERDECK_HOME/port with the deacon disabled (no production interference): all 8 checks passed -- menu-picker move (TestProj->SecondProj) and native drag-drop (SecondProj->TestProj), each confirmed via visible success toast AND server-side projectKey verification through the API. Screenshots sent to the operator. Commit 99a6422.",
+        "updatedAt": "2026-08-01T17:02:26.580Z"
       }
     },
     "claimHistory": [
@@ -185,6 +177,17 @@
         "outcome": "completed",
         "reason": "Added Move item + project-picker submenu to ConversationRow's 3-dot/right-click menu (the actual per-row menu; discovered ConversationActionMenu.tsx is NOT shared with it as the xBRIEF assumed -- it's only used by the Stage pane-tab context menu, so added Move there too for consistency). Current project (conversation.projectKey) is indicated+disabled in the picker; selecting another calls mutations.move. Registered-projects lifted to ConversationList level and passed as a prop (avoids N duplicate per-row fetches; fixed a pre-existing fetch-count test by pre-seeding the query in the shared test client helper). 4 new tests (3-dot picker, right-click picker, current-project disabled, mutation fires on select); full CommandDeck suite (466 tests) passes; typecheck/lint clean. Commit d520d87.",
         "releasedAt": "2026-08-01T16:37:10.487Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 1303653,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:37:25.447Z",
+        "itemId": "drag-drop-move",
+        "outcome": "completed",
+        "reason": "ConversationRow is a native HTML5 drag source (draggable, cursor:grab, onDragStart carries {name,projectKey} JSON). Drop target is the Sidebar's persistent project rail button (NOT ProjectTree/ProjectNode.tsx as the xBRIEF assumed -- that component only ever renders the single currently-selected project's detail tree, so it can never be a cross-project drop target; the sidebar rail lists every registered project simultaneously, which is what a user would actually drag onto). onDragOver highlights the hovered project (ring-2), onDrop calls the shared move mutation unless payload.projectKey already matches the target (no-op, no mutation call). 7 new Vitest tests (drag payload, highlight+clear, mutation-fires, no-op). Full frontend suite passes (2900/2901; 1 pre-existing unrelated failure in tiered-crews.test.ts, a model-pricing assertion untouched by this branch). AC4 (browser UAT of both flows end-to-end) verified via a real isolated Playwright run against this branch's built dist, using its own throwaway OVERDECK_HOME/port with the deacon disabled (no production interference): all 8 checks passed -- menu-picker move (TestProj->SecondProj) and native drag-drop (SecondProj->TestProj), each confirmed via visible success toast AND server-side projectKey verification through the API. Screenshots sent to the operator. Commit 99a6422.",
+        "releasedAt": "2026-08-01T17:02:26.580Z"
       }
     ]
   },
@@ -220,6 +223,10 @@
     "menu-move": "completed",
     "menu-move.menu-move.ac1": "completed",
     "menu-move.menu-move.ac2": "completed",
-    "drag-drop-move": "running"
+    "drag-drop-move": "completed",
+    "drag-drop-move.drag-drop-move.ac1": "completed",
+    "drag-drop-move.drag-drop-move.ac2": "completed",
+    "drag-drop-move.drag-drop-move.ac3": "completed",
+    "drag-drop-move.drag-drop-move.ac4": "completed"
   }
 }
