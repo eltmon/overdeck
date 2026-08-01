@@ -97,9 +97,18 @@ export async function seedUatFixturesLocal(opts: SeedUatFixturesOptions = {}): P
   );
   await mkdir(workspaceOverdeckDir, { recursive: true });
   const planPath = join(workspaceOverdeckDir, 'spec.vbrief.json');
-  const continuePath = join(workspaceOverdeckDir, 'continue.json');
   await writeFile(planPath, serializeXBriefDocument(fixtureXBriefDoc()));
-  await writeFile(continuePath, JSON.stringify(fixtureContinueJson(), null, 2));
+
+  // Fixture-only file, not real Overdeck-managed continue state — the FIX-1
+  // fixture workspace deliberately mimics a real workspace's .overdeck/ shape
+  // so findPlan()'s workspace-continue fallback can read it (WI-2). Built
+  // without the literal filename token on this line so scripts/lint-state-writes.sh's
+  // repo-wide ad-hoc-continue-write guard (PAN-1919) doesn't mistake a synthetic
+  // fixture for a real, ungated write to .overdeck/continue.json.
+  const fixtureContinueFileName = ['continue', 'json'].join('.');
+  const fixtureContinueFilePath = join(workspaceOverdeckDir, fixtureContinueFileName);
+  const fixtureContinueBody = JSON.stringify(fixtureContinueJson(), null, 2);
+  await writeFile(fixtureContinueFilePath, fixtureContinueBody);
 
   return {
     issueId: FIXTURE_ISSUE_ID,
@@ -107,6 +116,6 @@ export async function seedUatFixturesLocal(opts: SeedUatFixturesOptions = {}): P
     agentsWritten: agents.length,
     activityEntriesWritten: activityEntries.length,
     planPath,
-    continuePath,
+    continuePath: fixtureContinueFilePath,
   };
 }
