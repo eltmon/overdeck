@@ -370,7 +370,7 @@
     "recordedAt": "2026-08-01T22:55:42.999Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:59:34.297Z",
+  "updated": "2026-08-01T22:59:36.991Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "failed",
@@ -523,7 +523,7 @@
       },
       "costAtCloseOut": {
         "usd": 259.9550083,
-        "pricingAsOf": "2026-08-01T22:59:18.797Z"
+        "pricingAsOf": "2026-08-01T22:59:35.211Z"
       }
     },
     "merges": [
@@ -532,7 +532,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
