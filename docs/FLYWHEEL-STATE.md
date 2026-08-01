@@ -698,3 +698,10 @@ strike-3408 messaged for a gate exception 45 min AFTER I merged its fix (#3414) 
 ## RUN-79 interstitial (~15:05Z) — strike-3420 scope-abort accepted; PAN-3420 rerouted to planning
 
 Operator-filed **PAN-3420** (closed-out issues render as never-started — post-close-out history wipe, observed on MIN-929 minutes after its close-out). The strike ABORTED WITHOUT EDITS, correctly: it verified SIX independent live-only read paths (nulled journal, wrong-source drawer badges, snapshot-agents conversations, cleared review_status history, transient activity arrays, removed cv.json) — this is the two-door tenet applied to issue history, needing a unified durable issue-history resolver + no-loss regression, not a precision fix. Findings preserved as an issue comment (PRD input); `pan plan PAN-3420 --auto` dispatched. NOTE the meta-point: today's close-out sprint (16 issues) made this class VISIBLE — every close-out wipes the operator-facing history of the work just completed. High operator-value plan.
+
+## RUN-79 tick 22 (2026-08-01 ~15:15Z) — PAN-3407 landed; MIN-874 wedge #4 → composer-submit class FILED (PAN-3422); strike-3413 via CI (#3421)
+
+- **PAN-3407 landed** (#3415 squash `318f63d663`, handed off — the journal fallback line fired again mid-handoff, 3rd today; retry confirmed). Close-out on CI+deploy.
+- **MIN-874 was the 4th composer-wedge specimen** (post-compaction resume nudge visibly unsubmitted, 2.5h idle at $242; sub-branches all pushed so nothing lost) → `--fresh` (new session working, $0.28). **Filed PAN-3422** with the testable mechanism: paneHasBlockingChoiceMenu() false-positives would produce paste-without-Enter systematically — 4/4 specimens match. Its bucket anomaly (planned_backlog) likely reflects the pushed-branch/no-unique-vs-main resolver view — recheck after agent progresses.
+- **strike-3413** (operator-filed, record-reconcile orphaned-drafts fix): same load-flake gate story (6th) → pushed + **PR #3421**, CI arbitrates.
+- PAN-3420 planning underway (unified issue-history resolver). PAN-3408 close-out still waiting on a green main run containing its merge (CI was in_progress).
