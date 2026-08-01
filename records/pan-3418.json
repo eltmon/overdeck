@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:31:22.762Z",
+  "updated": "2026-08-01T16:31:57.299Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,7 +53,7 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
+    "sequence": 13,
     "claims": {},
     "claimHistory": [
       {
@@ -145,8 +145,8 @@
         "updatedAt": "2026-08-01T15:57:12.968Z"
       },
       "verify-live-data-repair": {
-        "reason": "Post-deploy verification cannot run before this branch is reviewed, merged, deployed, and the dashboard boot backfill executes; current read-only sweep still shows 20260801-7889 model='' and 5 empty-string rows",
-        "updatedAt": "2026-08-01T15:58:43.605Z"
+        "reason": "Moved out of the pre-merge work graph: this read-only verification is only executable after merge, deploy, and dashboard boot; verify-on-main/close-out remains responsible for confirming the five rows heal",
+        "updatedAt": "2026-08-01T16:31:57.298Z"
       }
     }
   },
@@ -170,6 +170,6 @@
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac1": "completed",
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac2": "completed",
     "picker-reseeds-after-model-list-load.picker-reseeds-after-model-list-load.ac3": "completed",
-    "verify-live-data-repair": "blocked"
+    "verify-live-data-repair": "cancelled"
   }
 }
