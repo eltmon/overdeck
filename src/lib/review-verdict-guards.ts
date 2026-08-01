@@ -1,10 +1,24 @@
-import type { ReviewStatus } from './review-status-reconcile.js';
-import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
+interface ReviewGuardStatus {
+  stuck?: boolean;
+  stuckReason?: string;
+  stuckAt?: string;
+  stuckDetails?: string;
+  reviewedAtCommit?: string;
+  lastVerifiedCommit?: string;
+}
 
-type StuckFields = Pick<ReviewStatus, 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails'>;
+interface ReviewGuardUpdate {
+  reviewStatus?: string;
+  testStatus?: string;
+  reviewedAtCommit?: string;
+  lastVerifiedCommit?: string;
+  reviewerVerdicts?: Partial<Record<string, { atCommit?: string }>>;
+}
+
+type StuckFields = Pick<ReviewGuardStatus, 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails'>;
 
 export function clearSupersededReviewInfrastructureFailure(
-  status: ReviewStatus | null,
+  status: ReviewGuardStatus | null,
 ): Partial<StuckFields> {
   if (status?.stuckReason !== 'review_infrastructure_failure') return {};
   return {
@@ -22,8 +36,8 @@ interface VerdictEvidenceHeadMismatch {
 }
 
 function findVerdictEvidenceHeadMismatch(
-  status: ReviewStatus,
-  update: ReviewStatusUpdate,
+  status: ReviewGuardStatus,
+  update: ReviewGuardUpdate,
 ): VerdictEvidenceHeadMismatch | null {
   const terminalReview = update.reviewStatus !== undefined
     && ['passed', 'blocked', 'failed', 'skipped'].includes(update.reviewStatus);
@@ -54,8 +68,8 @@ function findVerdictEvidenceHeadMismatch(
 
 export function rejectVerdictEvidenceHeadMismatch(
   issueId: string,
-  status: ReviewStatus,
-  update: ReviewStatusUpdate,
+  status: ReviewGuardStatus,
+  update: ReviewGuardUpdate,
   onReject: () => void,
 ): boolean {
   const mismatch = findVerdictEvidenceHeadMismatch(status, update);
