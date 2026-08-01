@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:35:39.161Z",
+  "updated": "2026-08-01T10:41:15.635Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,16 +78,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "audit-batch-a": {
-        "writerId": "agent-pan-3367",
-        "agentId": "agent-pan-3367",
-        "pid": 1090683,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:32:33.432Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -99,12 +91,27 @@
         "outcome": "completed",
         "reason": "Ran the reproduction script (61 candidates over the full surviving event window), computed commit counts for all 25 mandatory + 22 in-window extras via gh/glab PR-commit lists, gzipped the raw event dumps (115MB -> 1.7MB), and wrote worklist.md (30 rows: 25 mandatory + 5 zero-commit derived extras, no overflow). Surfaced 3 findings for downstream batches: the issue body's 4-way zero-commit spot-check only holds for PAN-3216 (PAN-3192/3206/3230 each have 2 in-window commits); rebase/merge noise can inflate raw PR-commit counts; and MYN's frontend is GitLab-hosted, not GitHub as the PRD states.",
         "releasedAt": "2026-08-01T10:30:43.927Z"
+      },
+      {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 1090683,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:32:33.432Z",
+        "itemId": "audit-batch-a",
+        "outcome": "completed",
+        "reason": "Audited PAN-3216/3230/3206/3192/3356 — all 5 verdicts satisfied, no follow-ups filed. Every flagged review finding has a genuine, file-scoped fix commit confirmed present on main and (where recorded) an explicit reviewer resolution note naming the same defect. Discovered H11: the worklist's negNotes cell can be stale for multi-round episodes (collapse-dedup keeps only the first note per state run) — confirmed for 3/5 issues here by reading the full events-<issue>.json.gz dumps instead. PAN-3356's report separates the audited finding (satisfied) from the broader cockpit ACs (still cannot-determine, PAN-3362 open).",
+        "releasedAt": "2026-08-01T10:41:15.635Z"
       }
     ],
     "statusReasons": {
       "snapshot-evidence": {
         "reason": "Ran the reproduction script (61 candidates over the full surviving event window), computed commit counts for all 25 mandatory + 22 in-window extras via gh/glab PR-commit lists, gzipped the raw event dumps (115MB -> 1.7MB), and wrote worklist.md (30 rows: 25 mandatory + 5 zero-commit derived extras, no overflow). Surfaced 3 findings for downstream batches: the issue body's 4-way zero-commit spot-check only holds for PAN-3216 (PAN-3192/3206/3230 each have 2 in-window commits); rebase/merge noise can inflate raw PR-commit counts; and MYN's frontend is GitLab-hosted, not GitHub as the PRD states.",
         "updatedAt": "2026-08-01T10:30:43.927Z"
+      },
+      "audit-batch-a": {
+        "reason": "Audited PAN-3216/3230/3206/3192/3356 — all 5 verdicts satisfied, no follow-ups filed. Every flagged review finding has a genuine, file-scoped fix commit confirmed present on main and (where recorded) an explicit reviewer resolution note naming the same defect. Discovered H11: the worklist's negNotes cell can be stale for multi-round episodes (collapse-dedup keeps only the first note per state run) — confirmed for 3/5 issues here by reading the full events-<issue>.json.gz dumps instead. PAN-3356's report separates the audited finding (satisfied) from the broader cockpit ACs (still cannot-determine, PAN-3362 open).",
+        "updatedAt": "2026-08-01T10:41:15.635Z"
       }
     }
   },
@@ -114,6 +121,10 @@
     "snapshot-evidence.snapshot-evidence.ac2": "completed",
     "snapshot-evidence.snapshot-evidence.ac3": "completed",
     "snapshot-evidence.snapshot-evidence.ac4": "completed",
-    "audit-batch-a": "running"
+    "audit-batch-a": "completed",
+    "audit-batch-a.audit-batch-a.ac1": "completed",
+    "audit-batch-a.audit-batch-a.ac2": "completed",
+    "audit-batch-a.audit-batch-a.ac3": "completed",
+    "audit-batch-a.audit-batch-a.ac4": "completed"
   }
 }
