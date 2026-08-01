@@ -17,9 +17,22 @@
       "timestamp": "2026-08-01T23:07:45.645Z",
       "reason": "end",
       "note": "Standard npm test hit 18 unrelated 5-second DB setup timeouts under verified host CPU saturation (run queue 31 on 24 cores); the complete root and frontend suites passed with 30-second hook/test timeouts. Initial Pi/ohmypi commits omitted the planned workspace guard, issue payload, marker rename, and fetch-failure case; follow-up commits corrected both forks symmetrically. Delivered the authenticated plan-checklist endpoint, canonical completion evidence for Pi and ohmypi, residue removal, regression tests, and HOOKS documentation."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T23:18Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-01T23:18:11.351Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T23:18:11Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3451\n\n# Review Synthesis — PAN-3451 — 2026-08-01T23:30:00Z\n\n## Verdict: CHANGES REQUESTED — the new checklist route performs synchronous plan and record reads on the dashboard event loop\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/context.json\n- Branch: feature/pan-3451\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451\n- HEAD reviewed: 23c9bb23203555981d7dafc9cca1db1ff3e88346\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Checklist requests block the dashboard event loop — `src/dashboard/server/routes/agents/runtime-events.ts:195`\nThe added route calls `checkIncompletePlanItemsPromise()` from the HTTP request path, but that helper immediately executes `checkIncompletePlanItemsSync()`. The synchronous path reaches `readWorkspacePlanSync()`, canonical spec directory enumeration, plan-file reads, and status-overlay record reads. Wrapping that call in `Effect.promise` does not move the filesystem work off Node's event loop, so every Pi or OhMyPi `turn_end` can pause dashboard HTTP handling, WebSockets, terminal traffic, and Deacon polling while the plan resolves. This finding is inside the PR diff and blocks cycle 1.\n\nAdd a server-safe asynchronous checklist helper backed by the asynchronous workspace-plan resolver and a shared pure checklist evaluator. Keep the synchronous helper only for callers that require its existing CLI contract; do not present synchronous filesystem work as asynchronous through `Promise` or `Effect.promise`.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- correctness\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3451/.pan/review/agent-pan-3451-review-23c9bb23/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3451 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "tests/unit/dashboard/routes/agents-no-loss.test.ts"
@@ -49,7 +62,7 @@
     "recordedAt": "2026-08-01T23:07:37.721Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:18:10.673Z",
+  "updated": "2026-08-01T23:18:11.351Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "blocked",
