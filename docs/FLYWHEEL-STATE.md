@@ -2,10 +2,12 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
-> Historical-path note (PAN-2541): entries below are an append-only incident log.
-> References to `.pan/records/`, `.pan/specs/`, and `.pan/drafts/` describe the
-> legacy layout that existed when each event occurred; current permanent state
-> lives in `records/`, `specs/`, and `drafts/` on `overdeck-state`.
+`pan flywheel report` compacts this working copy when it exceeds 1,000 lines or 120 KiB. The curated sections and latest three runs remain verbatim; older run detail becomes one line per run. Compaction never deletes history — the original detail remains available through `git log --follow docs/FLYWHEEL-STATE.md`.
+
+> Historical-path note (PAN-2541): references to `.pan/records/`, `.pan/specs/`,
+> and `.pan/drafts/` describe the legacy layout that existed when each event
+> occurred; current permanent state lives in `records/`, `specs/`, and `drafts/`
+> on `overdeck-state`.
 
 ## Substrate fixes
 
@@ -586,3 +588,57 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **MIN-929: review verdict announced but never recorded.** Parent printed "Review passed after cycle-3 convergence gate" + synthesis written ~1.5h ago, yet no test dispatch, no ready flip, health monitor still nudging the idle work agent — the signal step silently failed (synthesis-present variant of REVIEWER_READY-never-landed). `pan review restart MIN-929` resumed the parent (per-lane idempotency re-runs nothing). VERIFY next tick: verdict recorded + test dispatched; if the signal fails twice, file the specimen with pane+transcript evidence.
 - #3400 (PAN-3393) test lane pending. PAN-3392 close-out still deploy-gated (live e7911e9c predates its merge).
 - Fresh MIN-864 session working ($0.70, new review convoy live since 07:32). pan-3362 $32.93 post-compaction continuing. pan-3367 $68.51 audit (COST WATCH — biggest spender of the run). min-874 $58.32 out 3.4k. min-839 $17.34 +782/−67.
+
+## RUN-79 tick 9 (2026-08-01 ~11:55Z) — PAN-3393 LANDED (stuck-flag machinery fixed); cost + crash-restore watch
+
+- **PAN-3393 landed** (#3400 squash `2a04120c02`, handed off): stuck flags auto-retire, /unstick is merged-aware, `pan unstick` exists (PAN-3321 gap closed). Close-out on CI+deploy. #3403 (PAN-1889) test lane in CI.
+- **Crash-restore cluster**: pan-3367, pan-3362, MIN-929's work agent all show "prior process ended unexpectedly" restores this tick. No OOM lines visible; RAM 50.6/64GB (13.5GB avail). Likely the deploy-window restarts; all restored and continuing. Watch for recurrence — if another cluster appears without a deploy, investigate the killer.
+- **COST WATCH: pan-3367 at $93.93** (29-issue audit, +2343/−391 docs; crashed+restored at ctx 82%). min-874 $75.68 +3343/−211. Cost limits are warn-only per operator policy — flagging, not stopping. Both producing proportionate output.
+- MIN-929 verdict signal still not confirmed post-re-drive (parent idle again; sessions recreated 07:36/07:47). NEXT TICK: hard-verify via durable record; if the signal failed twice, file the synthesis-present signal-loss specimen.
+- PAN-3392 close-out deploy-gated. MIN-864 fresh session + convoy progressing slowly ($0.86).
+
+## RUN-79 tick 10 (2026-08-01 ~12:05Z) — operator promoted uat/min-crow-0801 (MIN-929); fresh sweep + close-out driven
+
+- **Operator promoted MIN-929** to MYN main (fe@e8b6f61 api@74aca93 + 4 more repos). Close-out attempted immediately: blocked ONLY on the still-running post-merge lifecycle (mergeStatus merged, agent-min-929 still registered) — no override taken, retry next tick. The tick-8/9 verdict-signal question is moot for merge purposes (operator promoted), but the signal-loss specimen remains real for the machinery.
+- Fresh membership sweep re-derived: PAN pipeline = 1889/3392/3393 post_merge (close-outs pending deploy or CI), 3362/3367 in_flight, 3356 held; MYN = MIN-864 (fresh review cycle), 874/839 working, 929 merged-pending-close, 7 recordless zombies (PAN-3396); TIN-1 planned; 4 typed blind spots (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable GitHub App 404s).
+- **Clean UAT batch = EMPTY** (uat-candidate null; nobody review+test passed post-promote). Nothing assembled — correct, not an omission.
+
+## RUN-79 tick 11 (2026-08-01 ~12:25Z) — 🔴 RED MAIN root-caused (time-bomb test) → PAN-3404 struck; MIN-929 closed out
+
+- **RED MAIN P0**: transcript-retention test failing every run since exactly 12:00Z. Root cause verified to file:line — `transcript-retention.ts:75` captures `now: Date.now` BY REFERENCE at module load, so fake timers never intercept it; the sweep cutoff runs on the REAL clock. Fixtures (fake NOW 07-31T12:00, newEnded mtime 07-30T12:00) agreed with the real clock until real 08-01T12:00Z, then `cutoff = realNow−2d` crossed the fixture mtime → deterministic failure everywhere (local repro confirmed; last green run started 11:47Z). A time bomb from authoring, not a regression — the "breaking range" was docs-only. Filed **PAN-3404** (blocks-main) + struck. Fix: lazy `now: () => Date.now()` + audit the capture pattern repo-wide.
+- **MIN-929 closed out** (3rd attempt): post-merge lifecycle never paused the leftover work agent (defect specimen — MYN promote path); `pan pause` with attribution cleared the running-agent DoD blocker, close-out clean, NO --accept overrides.
+- PAN-1889/3392/3393 close-outs now ALSO gated on red main — they queue behind PAN-3404.
+- **COST: pan-3367 at $113.75** (ctx 87%, +2432/−425). pan-3362 $54.33. Warn-only policy — surfacing, not stopping.
+- MIN-864 fresh session slow-progressing ($1.47). Load moderate.
+
+## RUN-79 tick 12 (2026-08-01 ~12:40Z) — PAN-3404 fix in CI (#3405); time bomb poisons ALL open PRs until it lands
+
+- **strike-3404 fix reviewed + pushed by me** (PR #3405): audit found the `now: Date.now` capture pattern in FOUR files (transcript-retention, pipeline-membership service, deacon-auto-merge-reconcile, deacon-stuck-merging) — all now lazy `() => Date.now()`. #3405's own test lane contains the fix so it can go green; **every OTHER open PR's test lane inherits the wall-clock detonation** — #3402 (pan-3362's UAT fixtures PR, in CI now) will fail through no fault of its own and needs a lane re-run post-merge.
+- pan-3362 NOT wedged — it submitted PR #3402 and is monitoring. min-874 $132.93 +4161/−327 (huge but moving). pan-3367 $123.90 crash-restored AGAIN (2nd), min-839 also restored — second cluster, no deploy this time, no OOM lines visible in journalctl, RAM fine (17.5GB avail). Killer unidentified; watching (kernel log needs sudo).
+- MIN-864 crawling ($1.89). Close-outs for 1889/3392/3393 still queued behind red main.
+
+## RUN-79 tick 13 (2026-08-01 ~12:50Z) — MIN-864 cycle-2 verdict is ANOTHER infra-failure verdict; PAN-3401 struck; #3405 watch armed
+
+- **MIN-864 cycle-2: CHANGES REQUESTED for "correctness reviewer failed — agents database was locked"** — the PAN-3401 class detonating one cycle after filing (3rd DB-lock specimen today). Synthesis also jumped the gun: it declared the verdict while the deacon's per-lane relaunch of correctness was LIVE (restart door refused: "already running"). When the lane reports, the cycle needs re-synthesis — verify next tick. **strike-pan-3401 dispatched** (verdicts must never encode infra outcomes; same-run supersede for infra signals).
+- #3405 (red-main fix) test lane in progress — background watch armed, merging on flip. #3402's lane will need a re-run after (wall-clock poisoning).
+- min-874 $137.29 +4470/−328 (Java debrief service — huge but continuously producing).
+
+## RUN-79 tick 14 (2026-08-01 ~13:05Z) — PAN-3404 MERGED (650f7ef4d0): time bomb defused, main re-green watch armed
+
+- **PAN-3404 landed** (#3405 squash, test lane green on the fix branch itself) and handed off. Lazy-clock fix covers 4 files. Main CI watch armed on the merge — on green: drain PAN-1889/3392/3393 close-outs + re-run #3402's poisoned test lane + close out PAN-3404 itself once deployed.
+- Red-main duration: ~12:00Z detonation → ~13:05Z merge (~65 min from detonation to fix-on-main, root cause to file:line in ~25 min).
+
+## RUN-79 tick 15 (2026-08-01 ~13:15Z) — main GREEN, deployed, ALL close-outs drained; 4/4 implementation-verified; auto-closeout gap named
+
+- Main re-greened (133aa316e9 success), **I deployed via pan reload** (live = 133aa316e9), and **PAN-1889, PAN-3392, PAN-3393, PAN-3404 all closed out** (8-row DoD each, no overrides). Run totals: 9 PAN issues landed+closed today + MIN-929/MIN-908 + 6 zombie drains.
+- **Implementation verification (operator-requested), 2 parallel reviewers, all CONFIRMED**: 1889 (threshold in pan flywheel report + verbatim-preservation test), 3404 (4 lazy-clock sites + repo-wide grep clean), 3392 (null-state logs, start fallback through the agents endpoint, needs-you only on double exhaustion, demanded tests present), 3393 (patrol retirement via write door, merged-aware /unstick, pan unstick CLI + skill). Two scoped observations recorded: 1889's summarizer does no lesson-folding (not an AC); 3393's auto-retirement covers feedback_delivery_needs_you+merged only — other stuck reasons still never retire (follow-up candidate).
+- **WHY THE OPERATOR HAD TO ASK (named gap): `close_out.auto` is OFF.** The deacon auto-closeout patrol EXISTS (deacon-auto-closeout, config close_out.auto + auto_delay_minutes) and is disabled — no close_out section in config.yaml. With it ON, merge → deploy-patrol → auto-closeout is fully mechanical (DoD gate still enforces every row). Recommended to operator; their call to enable.
+- My own gap this run: the re-green watch covered CI but not the deploy row — the drain would have waited for the deploy patrol. Lesson: arm watches on the LAST gate in the chain, not the first.
+
+## RUN-79 tick 16 (2026-08-01 ~13:30Z) — self-correction on #3402 ownership; MIN-864 held for the PAN-3401 fix; operator-reported bug pair struck
+
+- **Correction of my own tick prompt**: PR #3402 (PAN-3362) is normal-pipeline work, NOT a strike merge I own — the agent is still working ($86.96, pushing); review/test/UAT gate its merge. "Merge on green" applies only to strikes I spawned.
+- **MIN-864 decision**: correctness re-run produced its report (3,975B, 09:18) but the run is durably blocked (signal-once) — re-synthesis needs a fresh cycle, and cycles 1+2 were BOTH poisoned by DB-lock infra verdicts (PAN-3401 class, 2/2). Holding the final cycle until strike-pan-3401 lands+deploys (its fix: write retry + no infra verdicts + same-run supersede), then one clean abort+request. Avoids burning a third 4-reviewer convoy on a coin-flip.
+- Operator surfaced 2 more dashboard bugs from the PAN-3367 cockpit (tick 15.5): **PAN-3407** (Terminal toggle silent no-op while tmux session verifiably alive) + **PAN-3408** (phantom "waiting for your answer" banner on an actively-working agent; pan answer empty) — both filed with specimens, both struck. Stale reviewer residue on 3367 cleared via abort door.
+- **PAN-3406 (order-book issue titles) filed + started** per operator (planning underway, $1.46).
+- Fleet: strike-3401 $11.44 +185/−81 · strikes 3407/3408 spawning · min-874 $161.49 +5483 (biggest producer) · min-839 $38.96 · pan-3367 rework mid-compaction · PAN-3362 active. Main green. #3402 green awaiting pipeline review.

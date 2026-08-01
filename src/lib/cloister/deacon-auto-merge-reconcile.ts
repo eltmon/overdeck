@@ -200,7 +200,7 @@ export async function reconcileAutoMergeRowsWithDeps(
 
 export async function reconcileAutoMergeRows(): Promise<string[]> {
   return reconcileAutoMergeRowsWithDeps({
-    now: Date.now,
+    now: () => Date.now(),
     listProblemAutoMerges,
     listActiveAutoMerges,
     cancelPending,

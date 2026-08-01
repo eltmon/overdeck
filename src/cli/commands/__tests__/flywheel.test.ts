@@ -697,16 +697,97 @@ describe('flywheel CLI commands', () => {
     expect(process.exitCode).toBeUndefined();
   });
 
-  it('commits orchestrator-authored changes to FLYWHEEL-STATE.md', async () => {
+  it('commits orchestrator-authored changes to FLYWHEEL-STATE.md without rewriting state below the retention threshold', async () => {
     const repoDir = await createReportRepo(tempDir);
     await writeLatestFlywheelStatus(validStatus);
-    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), '# Flywheel State\n\nFirst observation.\n', 'utf8');
+    const state = '# Flywheel State\n\nFirst observation.\n';
+    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), state, 'utf8');
 
     await flywheelReportCommand({ cwd: repoDir });
 
     expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 1');
     expect(await git(repoDir, ['diff-tree', '--no-commit-id', '--name-only', '-r', 'HEAD'])).toBe('docs/FLYWHEEL-STATE.md');
-    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toContain('First observation.');
+    expect(await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8')).toBe(state);
+  });
+
+  it('compacts older run detail over the retention threshold while preserving curated sections and the latest three runs', async () => {
+    const repoDir = await createReportRepo(tempDir);
+    await writeLatestFlywheelStatus({ ...validStatus, runId: 'RUN-4' });
+    const oldDetail = Array.from({ length: 12_000 }, (_, index) => `old detail ${index} PAN-101`).join('\n');
+    const state = [
+      '# Flywheel State',
+      '',
+      'Durable memory.',
+      '',
+      '## Substrate fixes',
+      '',
+      'SUBSTRATE-CURATED',
+      '',
+      '## Recurring patterns to watch',
+      '',
+      'PATTERNS-CURATED',
+      '',
+      '## Cross-run operational gotchas',
+      '',
+      'GOTCHAS-CURATED',
+      '',
+      '## Parked items',
+      '',
+      'PARKED-CURATED',
+      '',
+      '## Compacted run log (RUN-0)',
+      '',
+      '- **RUN-0 (2026-04-30)** — existing old summary',
+      '',
+      '## Compacted run log (RUN-5)',
+      '',
+      '- **RUN-5 (2026-05-05)** — existing later summary',
+      '',
+      '## RUN-6 … RUN-7 (2026-05-06 → 2026-05-07) — compacted summary',
+      '',
+      'GROUPED-SUMMARY-VERBATIM',
+      '',
+      '## Recent runs',
+      '',
+      'Recent detail follows.',
+      '',
+      '## RUN-1 tick 9 (2026-05-01) — old run completed PAN-101',
+      '',
+      oldDetail,
+      '',
+      '## RUN-2 tick 1 (2026-05-02) — second run',
+      '',
+      'RUN-2-VERBATIM',
+      '',
+      '## RUN-3 tick 1 (2026-05-03) — third run',
+      '',
+      'RUN-3-VERBATIM',
+      '',
+      '## RUN-4 tick 1 (2026-05-04) — fourth run',
+      '',
+      'RUN-4-VERBATIM',
+      '',
+    ].join('\n');
+    await writeFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), state, 'utf8');
+
+    await flywheelReportCommand({ cwd: repoDir });
+
+    const compacted = await readFile(join(repoDir, 'docs', 'FLYWHEEL-STATE.md'), 'utf8');
+    expect(compacted).toContain('SUBSTRATE-CURATED');
+    expect(compacted).toContain('PATTERNS-CURATED');
+    expect(compacted).toContain('GOTCHAS-CURATED');
+    expect(compacted).toContain('PARKED-CURATED');
+    expect(compacted.match(/^## Compacted run log/gm)).toHaveLength(1);
+    expect(compacted).toContain('- **RUN-0 (2026-04-30)** — existing old summary');
+    expect(compacted).toContain('- **RUN-5 (2026-05-05)** — existing later summary');
+    expect(compacted).toContain('## RUN-6 … RUN-7 (2026-05-06 → 2026-05-07) — compacted summary\n\nGROUPED-SUMMARY-VERBATIM');
+    expect(compacted).toContain('- **RUN-1 (2026-05-01)** — old run completed PAN-101; key issues: PAN-101');
+    expect(compacted).not.toContain('old detail 11999');
+    expect(compacted).toContain('## RUN-2 tick 1 (2026-05-02) — second run\n\nRUN-2-VERBATIM');
+    expect(compacted).toContain('## RUN-3 tick 1 (2026-05-03) — third run\n\nRUN-3-VERBATIM');
+    expect(compacted).toContain('## RUN-4 tick 1 (2026-05-04) — fourth run\n\nRUN-4-VERBATIM');
+    expect(compacted).toContain('compaction never deletes repository history');
+    expect(await git(repoDir, ['log', '-1', '--format=%s'])).toBe('docs(flywheel): run 4');
   });
 
   it('does not create a commit when FLYWHEEL-STATE.md is unchanged', async () => {

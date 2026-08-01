@@ -28,6 +28,7 @@ import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import {
   getReviewStatusSync,
   setReviewStatusSync as setReviewStatusBase,
+  clearWorkspaceStuck,
   markWorkspaceStuck,
   setDeaconIgnored,
   setAutoMerge,
@@ -229,14 +230,15 @@ export type UnstickGitRepairState =
 /**
  * Core logic for POST /api/workspaces/:issueId/unstick.
  *
- * Validates preconditions (workspace exists, workspace is stuck, git state is
- * repaired), clears the persistent stuck marker, and invalidates stale
- * review/test results by resetting the lifecycle to pending.
+ * Active workspaces must exist and have repaired git state before the stuck
+ * marker is cleared and stale review/test results are invalidated. A merged row
+ * is already terminal, so its stale stuck marker is cleared without requiring a
+ * workspace and without changing lifecycle verdicts.
  *
- * The recovery path changes the project's main-branch state by committing,
- * pushing, fast-forwarding, or otherwise reconciling it. Keeping
+ * The active recovery path changes the project's main-branch state by
+ * committing, pushing, fast-forwarding, or otherwise reconciling it. Keeping
  * reviewStatus=passed after that would let the UI present a stale approval.
- * One atomic setReviewStatus() call clears stuck state and resets the
+ * One atomic setReviewStatus() call clears stuck state and resets the active
  * lifecycle in a single DB write and a single notifyPipeline event.
  *
  * gitRepairState must be pre-verified by the caller (async git check). An
@@ -251,11 +253,17 @@ export function processUnstickRequest(
   currentStatus: ReturnType<typeof getReviewStatusSync>,
   gitRepairState: UnstickGitRepairState,
 ): UnstickResult {
-  if (!workspaceExists) {
+  const isMerged = currentStatus?.mergeStatus === 'merged';
+  if (!workspaceExists && !isMerged) {
     return { httpStatus: 404, body: { success: false, error: 'Workspace does not exist' } };
   }
   if (!currentStatus?.stuck) {
     return { httpStatus: 400, body: { success: false, error: `Workspace ${issueId} is not stuck` } };
+  }
+  if (isMerged) {
+    clearWorkspaceStuck(issueId);
+    console.log(`[unstick] Cleared stale stuck flag for merged issue ${issueId} (was: ${currentStatus.stuckReason ?? 'unknown'})`);
+    return { httpStatus: 200, body: { success: true, issueId, previousReason: currentStatus.stuckReason } };
   }
   // Enforce that the operator has actually repaired the git state before we
   // clear the stuck flag. If project main still has local-only commits, remote
@@ -558,12 +566,14 @@ const postWorkspaceUnstickRoute = HttpRouter.add(
     // PAN-794: review_infrastructure_failure is unrelated to git divergence —
     // skip the git safe-state check so operators can unstick review-infra
     // workspaces without touching the project's main branch.
-    const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
-    const projectPath = getProjectPath(undefined, issuePrefix);
-    const skipGitCheck = current?.stuckReason === 'review_infrastructure_failure';
+    const skipGitCheck = current?.mergeStatus === 'merged'
+      || current?.stuckReason === 'review_infrastructure_failure';
     const gitRepairState = skipGitCheck
       ? { safe: true } as const
-      : yield* Effect.promise(() => checkProjectGitRepairState(projectPath));
+      : yield* Effect.promise(() => {
+          const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
+          return checkProjectGitRepairState(getProjectPath(undefined, issuePrefix));
+        });
 
     const result = processUnstickRequest(issueId, workspaceInfo.exists, current, gitRepairState);
     return jsonResponse(result.body, result.httpStatus !== 200 ? { status: result.httpStatus } : undefined);

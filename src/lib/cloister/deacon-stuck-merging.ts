@@ -154,7 +154,7 @@ export async function reconcileStuckMergingStatesWithDeps(deps: StuckMergingDeps
 
 export async function reconcileStuckMergingStates(): Promise<string[]> {
   return reconcileStuckMergingStatesWithDeps({
-    now: Date.now,
+    now: () => Date.now(),
     loadStatuses: loadReviewStatuses,
     resolveProject: resolveProjectFromIssueSync,
     getMergeSet: getMergeSetSync,
