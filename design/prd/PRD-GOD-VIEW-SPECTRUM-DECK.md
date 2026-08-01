@@ -1,6 +1,6 @@
 # PRD: God View Spectrum Deck
 
-**Issue:** workspace-zorh3
+**Issue:** [eltmon/overdeck#3443](https://github.com/eltmon/overdeck/issues/3443)
 **Author:** Kimi Code CLI (k3 harness)
 **Date:** 2026-08-01
 **Status:** Mockup complete — production implementation pending
