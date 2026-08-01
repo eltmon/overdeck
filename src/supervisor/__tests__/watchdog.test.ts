@@ -133,6 +133,9 @@ describe('SupervisorWatchdog', () => {
       healthy: false,
       consecutiveFailures: 4,
       consecutiveHardFailures: 0,
+      restartInProgress: false,
+      restartBlockedReason: 'waiting for 5 consecutive timeout failures (4/5)',
+      restartBlockedUntil: null,
     });
     expect(logs.some((msg) => msg.includes('deferring restart'))).toBe(true);
 
@@ -184,6 +187,9 @@ describe('SupervisorWatchdog', () => {
       healthy: false,
       consecutiveFailures: 3,
       consecutiveHardFailures: 3,
+      restartInProgress: false,
+      restartBlockedReason: 'boot grace active after supervisor startup: dashboard unreachable',
+      restartBlockedUntil: '2026-05-17T15:35:00.000Z',
     });
     expect(logs.some((msg) => msg.includes('deferring restart during boot grace'))).toBe(true);
   });
@@ -609,8 +615,13 @@ describe('SupervisorWatchdog', () => {
     await watchdog.checkOnce();
 
     expect(spawns.count).toBe(0);
-    expect(watchdog.status().restartAttempts).toEqual([]);
-    expect(logs).toContain('watchdog restart skipped: restart lock held');
+    expect(watchdog.status()).toMatchObject({
+      restartAttempts: [],
+      restartInProgress: false,
+      restartBlockedReason: 'restart lock held by PID 1 (pan reload)',
+      restartBlockedUntil: null,
+    });
+    expect(logs).toContain('watchdog restart skipped: restart lock held by PID 1 (pan reload)');
   });
 
   it('passes the persisted boot id to watchdog restart spawns', async () => {
@@ -679,11 +690,17 @@ describe('SupervisorWatchdog', () => {
       await spawned;
       await vi.advanceTimersByTimeAsync(59_000);
       expect(logs).toContain('watchdog spawned pan restart --dashboard (pid 1001)');
+      expect(watchdog.status()).toMatchObject({
+        restartInProgress: true,
+        restartBlockedReason: null,
+        restartBlockedUntil: null,
+      });
       expect(logs.some((msg) => msg.includes('watchdog restart failed'))).toBe(false);
 
       await vi.advanceTimersByTimeAsync(1_000);
       await check;
 
+      expect(watchdog.status().restartInProgress).toBe(false);
       expect(logs.some((msg) => msg.includes('watchdog restart failed'))).toBe(false);
     } finally {
       vi.useRealTimers();
