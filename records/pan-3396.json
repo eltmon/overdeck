@@ -222,6 +222,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T22:14Z] review-agent → CHANGES-REQUESTED — seq 3",
       "timestamp": "2026-08-01T22:14:34.534Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T22:20:45.163Z"
     }
   ],
   "feedback": [],
@@ -271,20 +276,20 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:20:43.911Z",
+  "updated": "2026-08-01T22:20:45.958Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T22:20:43.132Z",
+    "updatedAt": "2026-08-01T22:20:43.934Z",
     "reviewNotes": "Residue tests hang on a callback-incompatible execFile mock, and unmigrated membership reads still repeat synchronous state-home resolution",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewSpawnedAt": "2026-08-01T21:59:33.800Z",
+    "reviewSpawnedAt": "2026-08-01T22:20:43.932Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -421,7 +426,7 @@
       },
       "costAtCloseOut": {
         "usd": 232.2945213,
-        "pricingAsOf": "2026-08-01T22:20:43.228Z"
+        "pricingAsOf": "2026-08-01T22:20:45.941Z"
       }
     },
     "merges": [
