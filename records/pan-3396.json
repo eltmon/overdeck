@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:03:25.101Z",
+  "updated": "2026-08-01T20:07:55.161Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "gather-closeout-signal": {
-        "writerId": "agent-pan-3396",
-        "agentId": "agent-pan-3396",
-        "pid": 686197,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T20:03:25.101Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3396",
@@ -68,12 +60,27 @@
         "outcome": "completed",
         "reason": "Lens added and tests pass (AC1-AC3)",
         "releasedAt": "2026-08-01T20:03:18.686Z"
+      },
+      {
+        "writerId": "agent-pan-3396",
+        "agentId": "agent-pan-3396",
+        "pid": 686197,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:03:25.101Z",
+        "itemId": "gather-closeout-signal",
+        "outcome": "completed",
+        "reason": "Gather implemented and all tests pass (AC1-AC3)",
+        "releasedAt": "2026-08-01T20:07:55.161Z"
       }
     ],
     "statusReasons": {
       "resolver-terminal-closeout-lens": {
         "reason": "Lens added and tests pass (AC1-AC3)",
         "updatedAt": "2026-08-01T20:03:18.686Z"
+      },
+      "gather-closeout-signal": {
+        "reason": "Gather implemented and all tests pass (AC1-AC3)",
+        "updatedAt": "2026-08-01T20:07:55.161Z"
       }
     }
   },
@@ -82,6 +89,9 @@
     "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac1": "completed",
     "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac2": "completed",
     "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac3": "completed",
-    "gather-closeout-signal": "running"
+    "gather-closeout-signal": "completed",
+    "gather-closeout-signal.gather-closeout-signal.ac1": "completed",
+    "gather-closeout-signal.gather-closeout-signal.ac2": "completed",
+    "gather-closeout-signal.gather-closeout-signal.ac3": "completed"
   }
 }
