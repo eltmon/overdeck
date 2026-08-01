@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T16:20:01.924Z",
+  "updated": "2026-08-01T16:20:06.737Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,7 +49,7 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
+    "sequence": 13,
     "claims": {
       "move-mutation": {
         "writerId": "agent-pan-1577",
@@ -57,13 +57,6 @@
         "pid": 3875244,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-01T16:18:54.677Z"
-      },
-      "cli-skill": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 3965617,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:20:01.924Z"
       }
     },
     "statusReasons": {
@@ -92,8 +85,8 @@
         "updatedAt": "2026-08-01T16:18:54.677Z"
       },
       "cli-skill": {
-        "reason": "already implemented, claiming to record",
-        "updatedAt": "2026-08-01T16:20:01.924Z"
+        "reason": "Created sync-sources/skills/pan-conversations/SKILL.md documenting all 9 subcommands (scan/search/list/show/jsonl/move/current/cost/embed/enrich) matching --help output exactly. Adding 'move' to the CLI in the prior commit had drifted packages/contracts/src/composer-commands.generated.ts (caught by lint:slash-commands under full npm run lint); regenerated via npm run generate:slash-commands and included here. scripts/lint-skills.sh and full npm run lint pass clean. Commit 5abf57e2.",
+        "updatedAt": "2026-08-01T16:20:06.737Z"
       }
     },
     "claimHistory": [
@@ -151,6 +144,17 @@
         "outcome": "completed",
         "reason": "Added pan conversations move <query> <projectKey>. Resolver: exact getConversationByName first, then unique fuzzy title match over listConversations(); non-zero exit with clear message for no-match or ambiguous match (lists candidates). PATCHes the move endpoint via getDashboardApiUrlSync, prints resolved title + old->new project labels (via getProjectSync name lookup), handles ECONNREFUSED as 'Dashboard not running'. Follows show.ts/reset-review.ts chalk+exitCli conventions. 8 new tests (exact match, fuzzy match, success labels, no-match, ambiguous, unknown-project, dashboard-down, command registration) all pass; typecheck/lint clean. Commit ccca029.",
         "releasedAt": "2026-08-01T16:06:10.642Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3965617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:20:01.924Z",
+        "itemId": "cli-skill",
+        "outcome": "completed",
+        "reason": "Created sync-sources/skills/pan-conversations/SKILL.md documenting all 9 subcommands (scan/search/list/show/jsonl/move/current/cost/embed/enrich) matching --help output exactly. Adding 'move' to the CLI in the prior commit had drifted packages/contracts/src/composer-commands.generated.ts (caught by lint:slash-commands under full npm run lint); regenerated via npm run generate:slash-commands and included here. scripts/lint-skills.sh and full npm run lint pass clean. Commit 5abf57e2.",
+        "releasedAt": "2026-08-01T16:20:06.737Z"
       }
     ]
   },
@@ -178,6 +182,8 @@
     "cli-move.cli-move.ac3": "completed",
     "cli-move.cli-move.ac4": "completed",
     "move-mutation": "running",
-    "cli-skill": "running"
+    "cli-skill": "completed",
+    "cli-skill.cli-skill.ac1": "completed",
+    "cli-skill.cli-skill.ac2": "completed"
   }
 }
