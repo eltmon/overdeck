@@ -134,7 +134,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:16:28.096Z",
+  "updated": "2026-08-01T21:16:34.367Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "blocked",
@@ -143,10 +143,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:16:27.316Z",
+    "updatedAt": "2026-08-01T21:16:34.347Z",
     "reviewNotes": "Correctness reviewer failed; residue forge addressing, audit evidence, partial-failure handling, and record-read batching remain blocked",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewedAtCommit": "137976e6c728372482d643dc0e74009789d733ff",
+    "reviewedAtCommit": "52c615cc2954d1b47837374742958da15606c094",
     "reviewSpawnedAt": "2026-08-01T21:09:43.292Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -192,20 +192,6 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-08-01T20:47:00.998Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "52c615cc2954d1b47837374742958da15606c094"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "52c615cc2954d1b47837374742958da15606c094"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "52c615cc2954d1b47837374742958da15606c094"
-      }
     }
   },
   "closeOut": {
@@ -290,7 +276,7 @@
       },
       "costAtCloseOut": {
         "usd": 88.9824293,
-        "pricingAsOf": "2026-08-01T21:16:27.370Z"
+        "pricingAsOf": "2026-08-01T21:16:34.357Z"
       }
     },
     "merges": [
