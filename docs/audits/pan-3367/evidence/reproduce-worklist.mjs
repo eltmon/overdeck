@@ -25,11 +25,17 @@ for (const [id, evs] of byIssue) {
   for (let i = 0; i < seq.length && !hit; i++) {
     if (!NEG(seq[i].state)) continue;
     let sawPending = false;
+    let resetAtT = null;
     for (let j = i + 1; j < seq.length; j++) {
       if (seq[j].t - seq[i].t > HOUR) break;
-      if (seq[j].state === 'pending/pending') { sawPending = true; continue; }
+      if (seq[j].state === 'pending/pending') {
+        if (!sawPending) resetAtT = seq[j].t; // first reset-to-pending after the negative verdict
+        sawPending = true;
+        continue;
+      }
       if (seq[j].state === 'passed/passed' && sawPending) {
         hit = { issueId: id, negState: seq[i].state, negAt: new Date(seq[i].t).toISOString(),
+                resetAt: new Date(resetAtT).toISOString(),
                 passAt: new Date(seq[j].t).toISOString(), minutes: Math.round((seq[j].t - seq[i].t) / 60e3),
                 negNotes: JSON.parse(seq[i].raw.payload).status.reviewNotes ?? JSON.parse(seq[i].raw.payload).status.testNotes ?? null };
         break;

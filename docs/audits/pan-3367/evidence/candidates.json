@@ -5,7 +5,8 @@
   "negAt": "2026-07-25T12:47:26.766Z",
   "passAt": "2026-07-25T13:30:24.102Z",
   "minutes": 43,
-  "negNotes": "Agent re-review request (1/25): Fixed review issues"
+  "negNotes": "Agent re-review request (1/25): Fixed review issues",
+  "resetAt": "2026-07-25T12:50:55.030Z"
  },
  {
   "issueId": "MIN-858",
@@ -13,7 +14,8 @@
   "negAt": "2026-07-25T12:51:37.111Z",
   "passAt": "2026-07-25T13:07:47.534Z",
   "minutes": 16,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-25T12:57:45.130Z"
  },
  {
   "issueId": "PAN-3052",
@@ -21,7 +23,8 @@
   "negAt": "2026-07-25T12:51:48.999Z",
   "passAt": "2026-07-25T13:15:05.225Z",
   "minutes": 23,
-  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3052-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3052 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3052-review -e OVERDECK_ISSUE_ID=PAN-3052 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3052-review/launcher.sh\nduplicate session: agent-pan-3052-review\n"
+  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3052-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3052 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3052-review -e OVERDECK_ISSUE_ID=PAN-3052 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3052-review/launcher.sh\nduplicate session: agent-pan-3052-review\n",
+  "resetAt": "2026-07-25T12:55:14.605Z"
  },
  {
   "issueId": "MIN-901",
@@ -29,7 +32,8 @@
   "negAt": "2026-07-25T12:52:13.226Z",
   "passAt": "2026-07-25T13:08:06.763Z",
   "minutes": 16,
-  "negNotes": "Vite defines server.watch twice, so the later property overwrites the new .pnpm-store exclusion and the ENOSPC mitigation never takes effect."
+  "negNotes": "Vite defines server.watch twice, so the later property overwrites the new .pnpm-store exclusion and the ENOSPC mitigation never takes effect.",
+  "resetAt": "2026-07-25T12:54:03.350Z"
  },
  {
   "issueId": "PAN-3055",
@@ -37,7 +41,8 @@
   "negAt": "2026-07-25T12:52:37.684Z",
   "passAt": "2026-07-25T13:18:48.056Z",
   "minutes": 26,
-  "negNotes": "Verification failed at typecheck"
+  "negNotes": "Verification failed at typecheck",
+  "resetAt": "2026-07-25T12:56:31.811Z"
  },
  {
   "issueId": "MIN-891",
@@ -45,7 +50,8 @@
   "negAt": "2026-07-25T12:53:58.068Z",
   "passAt": "2026-07-25T13:44:34.987Z",
   "minutes": 51,
-  "negNotes": "Agent re-review request (1/25): Fixed review issues"
+  "negNotes": "Agent re-review request (1/25): Fixed review issues",
+  "resetAt": "2026-07-25T13:04:47.715Z"
  },
  {
   "issueId": "PAN-2467",
@@ -53,7 +59,8 @@
   "negAt": "2026-07-25T22:34:35.893Z",
   "passAt": "2026-07-25T23:22:15.348Z",
   "minutes": 48,
-  "negNotes": "Review dispatch skipped — already running: agent-pan-2467-review"
+  "negNotes": "Review dispatch skipped — already running: agent-pan-2467-review",
+  "resetAt": "2026-07-25T22:47:49.624Z"
  },
  {
   "issueId": "PAN-3037",
@@ -61,7 +68,8 @@
   "negAt": "2026-07-25T22:38:57.993Z",
   "passAt": "2026-07-25T23:31:49.741Z",
   "minutes": 53,
-  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3037-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3037-review -e OVERDECK_ISSUE_ID=PAN-3037 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3037-review/launcher.sh\nduplicate session: agent-pan-3037-review\n"
+  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3037-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3037 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3037-review -e OVERDECK_ISSUE_ID=PAN-3037 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3037-review/launcher.sh\nduplicate session: agent-pan-3037-review\n",
+  "resetAt": "2026-07-25T23:03:49.515Z"
  },
  {
   "issueId": "PAN-3076",
@@ -69,7 +77,8 @@
   "negAt": "2026-07-25T23:00:51.154Z",
   "passAt": "2026-07-26T00:00:33.233Z",
   "minutes": 60,
-  "negNotes": "Unchanged HEAD still preserves passed review on failed Git inspection; write-site guard still misses raw writes in allowlisted files"
+  "negNotes": "Unchanged HEAD still preserves passed review on failed Git inspection; write-site guard still misses raw writes in allowlisted files",
+  "resetAt": "2026-07-25T23:09:28.933Z"
  },
  {
   "issueId": "PAN-3083",
@@ -77,7 +86,8 @@
   "negAt": "2026-07-25T23:55:09.301Z",
   "passAt": "2026-07-26T00:17:07.793Z",
   "minutes": 22,
-  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3083-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3083-review -e OVERDECK_ISSUE_ID=PAN-3083 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3083-review/launcher.sh\nduplicate session: agent-pan-3083-review\n"
+  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3083-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3083 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3083-review -e OVERDECK_ISSUE_ID=PAN-3083 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-70 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3083-review/launcher.sh\nduplicate session: agent-pan-3083-review\n",
+  "resetAt": "2026-07-25T23:58:02.288Z"
  },
  {
   "issueId": "MIN-896",
@@ -85,7 +95,8 @@
   "negAt": "2026-07-26T01:54:56.569Z",
   "passAt": "2026-07-26T02:38:31.158Z",
   "minutes": 44,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-26T01:55:12.065Z"
  },
  {
   "issueId": "PAN-3097",
@@ -93,7 +104,8 @@
   "negAt": "2026-07-26T03:30:18.325Z",
   "passAt": "2026-07-26T03:50:03.364Z",
   "minutes": 20,
-  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n"
+  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf send-keys -t agent-pan-3097-review C-m\ncan't find pane: agent-pan-3097-review\n",
+  "resetAt": "2026-07-26T03:30:55.924Z"
  },
  {
   "issueId": "MIN-879",
@@ -101,7 +113,8 @@
   "negAt": "2026-07-26T05:58:18.535Z",
   "passAt": "2026-07-26T06:41:35.735Z",
   "minutes": 43,
-  "negNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed."
+  "negNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
+  "resetAt": "2026-07-26T06:20:38.473Z"
  },
  {
   "issueId": "PAN-3109",
@@ -109,7 +122,8 @@
   "negAt": "2026-07-26T06:27:58.716Z",
   "passAt": "2026-07-26T06:50:05.157Z",
   "minutes": 22,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-26T06:30:31.344Z"
  },
  {
   "issueId": "PAN-3114",
@@ -117,7 +131,8 @@
   "negAt": "2026-07-26T10:38:07.947Z",
   "passAt": "2026-07-26T11:09:56.090Z",
   "minutes": 32,
-  "negNotes": "Review role spawn failed: write failed for agents-db:agent-pan-3114-review: database is locked"
+  "negNotes": "Review role spawn failed: write failed for agents-db:agent-pan-3114-review: database is locked",
+  "resetAt": "2026-07-26T10:39:12.236Z"
  },
  {
   "issueId": "PAN-2997",
@@ -125,7 +140,8 @@
   "negAt": "2026-07-26T10:59:28.994Z",
   "passAt": "2026-07-26T11:43:52.744Z",
   "minutes": 44,
-  "negNotes": "Poison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered."
+  "negNotes": "Poison-clear and post-clear verification failures escape as generic errors, so repair can be acknowledged as terminal failed before any wake is delivered.",
+  "resetAt": "2026-07-26T11:19:49.380Z"
  },
  {
   "issueId": "PAN-1696",
@@ -133,7 +149,8 @@
   "negAt": "2026-07-26T11:21:55.248Z",
   "passAt": "2026-07-26T11:55:30.928Z",
   "minutes": 34,
-  "negNotes": "Approved at f8bb608b: invalid project fields now fail closed, the collapsed cockpit summary includes generation status and Awaiting Merge navigation, and focused verification plus CI are green. Report: .pan/review/agent-pan-1696-review-f8bb608b/review.md"
+  "negNotes": "Approved at f8bb608b: invalid project fields now fail closed, the collapsed cockpit summary includes generation status and Awaiting Merge navigation, and focused verification plus CI are green. Report: .pan/review/agent-pan-1696-review-f8bb608b/review.md",
+  "resetAt": "2026-07-26T11:49:57.471Z"
  },
  {
   "issueId": "PAN-3115",
@@ -141,7 +158,8 @@
   "negAt": "2026-07-26T11:22:23.081Z",
   "passAt": "2026-07-26T12:00:33.370Z",
   "minutes": 38,
-  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3115-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3115 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3115-review -e OVERDECK_ISSUE_ID=PAN-3115 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-71 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3115-review/launcher.sh\nduplicate session: agent-pan-3115-review\n"
+  "negNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3115-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3115 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3115-review -e OVERDECK_ISSUE_ID=PAN-3115 -e OVERDECK_SESSION_TYPE=review -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-71 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3115-review/launcher.sh\nduplicate session: agent-pan-3115-review\n",
+  "resetAt": "2026-07-26T11:26:17.938Z"
  },
  {
   "issueId": "PAN-3110",
@@ -149,7 +167,8 @@
   "negAt": "2026-07-26T12:02:21.024Z",
   "passAt": "2026-07-26T12:43:15.248Z",
   "minutes": 41,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-26T12:02:45.956Z"
  },
  {
   "issueId": "PAN-3128",
@@ -157,7 +176,8 @@
   "negAt": "2026-07-26T14:45:23.661Z",
   "passAt": "2026-07-26T15:38:54.181Z",
   "minutes": 54,
-  "negNotes": "Agent re-review request (2/25): Fixed review issues"
+  "negNotes": "Agent re-review request (2/25): Fixed review issues",
+  "resetAt": "2026-07-26T14:58:02.407Z"
  },
  {
   "issueId": "PAN-3135",
@@ -165,7 +185,8 @@
   "negAt": "2026-07-26T15:13:46.880Z",
   "passAt": "2026-07-26T16:04:50.648Z",
   "minutes": 51,
-  "negNotes": "Agent re-review request (1/25): Fixed review issues"
+  "negNotes": "Agent re-review request (1/25): Fixed review issues",
+  "resetAt": "2026-07-26T15:25:12.800Z"
  },
  {
   "issueId": "PAN-3147",
@@ -173,7 +194,8 @@
   "negAt": "2026-07-26T17:50:20.814Z",
   "passAt": "2026-07-26T18:18:47.373Z",
   "minutes": 28,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-26T17:52:55.279Z"
  },
  {
   "issueId": "PAN-3093",
@@ -181,7 +203,8 @@
   "negAt": "2026-07-26T18:36:03.067Z",
   "passAt": "2026-07-26T19:09:28.090Z",
   "minutes": 33,
-  "negNotes": "The configured branch-prefix fix reaches assembly but not reconciler anchors, so valid custom-prefix generations are invalidated"
+  "negNotes": "The configured branch-prefix fix reaches assembly but not reconciler anchors, so valid custom-prefix generations are invalidated",
+  "resetAt": "2026-07-26T18:46:48.193Z"
  },
  {
   "issueId": "PAN-3138",
@@ -189,7 +212,8 @@
   "negAt": "2026-07-26T18:46:12.921Z",
   "passAt": "2026-07-26T19:40:34.905Z",
   "minutes": 54,
-  "negNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists"
+  "negNotes": "Claim recovery loses an older lifecycle when a newer pending generation exists",
+  "resetAt": "2026-07-26T19:11:46.473Z"
  },
  {
   "issueId": "PAN-3155",
@@ -197,7 +221,8 @@
   "negAt": "2026-07-26T20:40:40.607Z",
   "passAt": "2026-07-26T21:22:35.349Z",
   "minutes": 42,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-26T20:40:54.244Z"
  },
  {
   "issueId": "PAN-3158",
@@ -205,7 +230,8 @@
   "negAt": "2026-07-26T20:49:03.785Z",
   "passAt": "2026-07-26T21:10:09.850Z",
   "minutes": 21,
-  "negNotes": "Verification failed at test"
+  "negNotes": "Verification failed at test",
+  "resetAt": "2026-07-26T20:51:00.705Z"
  },
  {
   "issueId": "PAN-3162",
@@ -213,7 +239,8 @@
   "negAt": "2026-07-26T22:58:21.722Z",
   "passAt": "2026-07-26T23:49:19.571Z",
   "minutes": 51,
-  "negNotes": "PR HEAD is unchanged and still contains both prior correctness blockers; the uncommitted rework also leaves a reverse merge-set lost-update race"
+  "negNotes": "PR HEAD is unchanged and still contains both prior correctness blockers; the uncommitted rework also leaves a reverse merge-set lost-update race",
+  "resetAt": "2026-07-26T23:06:55.746Z"
  },
  {
   "issueId": "PAN-3192",
@@ -221,7 +248,8 @@
   "negAt": "2026-07-27T05:35:48.544Z",
   "passAt": "2026-07-27T06:10:50.739Z",
   "minutes": 35,
-  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy."
+  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T04:22:17.553Z by deploy-patrol, merge-step0). It re-runs automatically after the deploy.",
+  "resetAt": "2026-07-27T05:50:13.044Z"
  },
  {
   "issueId": "PAN-3184",
@@ -229,7 +257,8 @@
   "negAt": "2026-07-27T06:05:17.116Z",
   "passAt": "2026-07-27T06:56:52.947Z",
   "minutes": 52,
-  "negNotes": "FR-3 measures clean-shutdown freshness at grace expiry instead of bootStartedAt; the required marker round-trip test is also missing"
+  "negNotes": "FR-3 measures clean-shutdown freshness at grace expiry instead of bootStartedAt; the required marker round-trip test is also missing",
+  "resetAt": "2026-07-27T06:35:01.334Z"
  },
  {
   "issueId": "PAN-3183",
@@ -237,7 +266,8 @@
   "negAt": "2026-07-27T06:31:02.917Z",
   "passAt": "2026-07-27T07:24:10.918Z",
   "minutes": 53,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-27T07:06:08.383Z"
  },
  {
   "issueId": "PAN-2876",
@@ -245,7 +275,8 @@
   "negAt": "2026-07-27T07:07:11.808Z",
   "passAt": "2026-07-27T07:42:31.368Z",
   "minutes": 35,
-  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T06:44:15.236Z by flywheel-orchestrator). It re-runs automatically after the deploy."
+  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-27T06:44:15.236Z by flywheel-orchestrator). It re-runs automatically after the deploy.",
+  "resetAt": "2026-07-27T07:14:35.226Z"
  },
  {
   "issueId": "PAN-3187",
@@ -253,7 +284,8 @@
   "negAt": "2026-07-27T07:08:50.061Z",
   "passAt": "2026-07-27T07:53:24.734Z",
   "minutes": 45,
-  "negNotes": "The recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols."
+  "negNotes": "The recurring review sweep performs synchronous record reads and serial tracker calls across every pending request, stalling Deacon patrols.",
+  "resetAt": "2026-07-27T07:31:36.718Z"
  },
  {
   "issueId": "PAN-3111",
@@ -261,7 +293,8 @@
   "negAt": "2026-07-27T11:13:06.782Z",
   "passAt": "2026-07-27T11:53:55.192Z",
   "minutes": 41,
-  "negNotes": "Agent re-review request (2/25): Fixed cycle-4 findings"
+  "negNotes": "Agent re-review request (2/25): Fixed cycle-4 findings",
+  "resetAt": "2026-07-27T11:40:50.144Z"
  },
  {
   "issueId": "PAN-3154",
@@ -269,7 +302,8 @@
   "negAt": "2026-07-27T11:52:17.030Z",
   "passAt": "2026-07-27T12:47:17.566Z",
   "minutes": 55,
-  "negNotes": "Verification failed at test"
+  "negNotes": "Verification failed at test",
+  "resetAt": "2026-07-27T11:55:34.230Z"
  },
  {
   "issueId": "PAN-3151",
@@ -277,7 +311,8 @@
   "negAt": "2026-07-27T11:56:33.800Z",
   "passAt": "2026-07-27T12:52:41.940Z",
   "minutes": 56,
-  "negNotes": "Verification failed at typecheck"
+  "negNotes": "Verification failed at typecheck",
+  "resetAt": "2026-07-27T11:56:33.827Z"
  },
  {
   "issueId": "PAN-3206",
@@ -285,7 +320,8 @@
   "negAt": "2026-07-27T18:37:07.982Z",
   "passAt": "2026-07-27T19:29:51.362Z",
   "minutes": 53,
-  "negNotes": "Verification error: Verification worker 2045091 exited before writing a result"
+  "negNotes": "Verification error: Verification worker 2045091 exited before writing a result",
+  "resetAt": "2026-07-27T18:45:43.531Z"
  },
  {
   "issueId": "PAN-3216",
@@ -293,7 +329,8 @@
   "negAt": "2026-07-28T06:40:30.326Z",
   "passAt": "2026-07-28T07:25:42.825Z",
   "minutes": 45,
-  "negNotes": "Verification error: Verification worker 1874133 exited before writing a result"
+  "negNotes": "Verification error: Verification worker 1874133 exited before writing a result",
+  "resetAt": "2026-07-28T07:07:50.045Z"
  },
  {
   "issueId": "PAN-3025",
@@ -301,7 +338,8 @@
   "negAt": "2026-07-28T08:48:46.946Z",
   "passAt": "2026-07-28T09:44:14.524Z",
   "minutes": 55,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-28T08:50:18.055Z"
  },
  {
   "issueId": "PAN-3215",
@@ -309,7 +347,8 @@
   "negAt": "2026-07-28T10:04:35.691Z",
   "passAt": "2026-07-28T10:52:18.014Z",
   "minutes": 48,
-  "negNotes": "Verification infrastructure error: Verification worker 466058 exited before writing a result"
+  "negNotes": "Verification infrastructure error: Verification worker 466058 exited before writing a result",
+  "resetAt": "2026-07-28T10:38:47.150Z"
  },
  {
   "issueId": "PAN-3092",
@@ -317,7 +356,8 @@
   "negAt": "2026-07-28T11:36:08.704Z",
   "passAt": "2026-07-28T12:23:04.769Z",
   "minutes": 47,
-  "negNotes": "Verification infrastructure error: Verification worker 1786496 exited before writing a result"
+  "negNotes": "Verification infrastructure error: Verification worker 1786496 exited before writing a result",
+  "resetAt": "2026-07-28T11:46:50.036Z"
  },
  {
   "issueId": "PAN-3049",
@@ -325,7 +365,8 @@
   "negAt": "2026-07-28T16:42:28.831Z",
   "passAt": "2026-07-28T17:12:06.549Z",
   "minutes": 30,
-  "negNotes": "Review role spawn failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it."
+  "negNotes": "Review role spawn failed: Role run agent-pan-3049-review already running. Use 'pan tell' to message it.",
+  "resetAt": "2026-07-28T16:42:28.850Z"
  },
  {
   "issueId": "PAN-2882",
@@ -333,7 +374,8 @@
   "negAt": "2026-07-28T18:12:53.685Z",
   "passAt": "2026-07-28T18:52:00.654Z",
   "minutes": 39,
-  "negNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage"
+  "negNotes": "Cycle-3 tests delete the accepted merged-pagination check and still omit aggregate five-call concurrency coverage",
+  "resetAt": "2026-07-28T18:21:38.436Z"
  },
  {
   "issueId": "PAN-3230",
@@ -341,7 +383,8 @@
   "negAt": "2026-07-28T19:07:34.616Z",
   "passAt": "2026-07-28T20:05:45.836Z",
   "minutes": 58,
-  "negNotes": null
+  "negNotes": null,
+  "resetAt": "2026-07-28T19:11:38.189Z"
  },
  {
   "issueId": "PAN-3233",
@@ -349,7 +392,8 @@
   "negAt": "2026-07-28T21:10:01.262Z",
   "passAt": "2026-07-28T21:42:09.459Z",
   "minutes": 32,
-  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy."
+  "negNotes": "Verification deferred: a dashboard deploy is queued (requested 2026-07-28T20:22:39.328Z by deploy-patrol, flywheel-orchestrator, merge-step0). It re-runs automatically after the deploy.",
+  "resetAt": "2026-07-28T21:21:48.850Z"
  },
  {
   "issueId": "PAN-3229",
@@ -357,7 +401,8 @@
   "negAt": "2026-07-28T22:29:59.530Z",
   "passAt": "2026-07-28T22:47:12.090Z",
   "minutes": 17,
-  "negNotes": "Review role spawn failed: Role run agent-pan-3229-review already running. Use 'pan tell' to message it."
+  "negNotes": "Review role spawn failed: Role run agent-pan-3229-review already running. Use 'pan tell' to message it.",
+  "resetAt": "2026-07-28T22:37:00.723Z"
  },
  {
   "issueId": "PAN-3231",
@@ -469,7 +514,8 @@
   "negAt": "2026-07-31T20:45:43.264Z",
   "passAt": "2026-07-31T21:31:46.047Z",
   "minutes": 46,
-  "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`"
+  "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
+  "resetAt": "2026-07-31T21:15:00.405Z"
  },
  {
   "issueId": "PAN-3357",

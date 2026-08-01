@@ -11,7 +11,8 @@
     "commitMethod": "compacted-no-events",
     "commitCount": null,
     "branchExists": null,
-    "error": "events compacted; negAt/passAt unavailable from event log"
+    "error": "events compacted; negAt/passAt unavailable from event log",
+    "resetAt": null
   },
   {
     "issueId": "PAN-2467",
@@ -32,7 +33,8 @@
         "headline": "fix(review): reject unverifiable merge artifacts"
       }
     ],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-25T22:47:49.624Z"
   },
   {
     "issueId": "PAN-2876",
@@ -53,7 +55,8 @@
         "headline": "fix(dashboard): address subagent review findings"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:14:35.226Z"
   },
   {
     "issueId": "PAN-3037",
@@ -84,7 +87,8 @@
         "headline": "test(specialists): expect inspect feedback notes"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-25T23:03:49.515Z"
   },
   {
     "issueId": "PAN-3052",
@@ -99,7 +103,8 @@
     "commitCount": 0,
     "prTotalCommits": 4,
     "inRangeDetail": [],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-25T12:55:14.605Z"
   },
   {
     "issueId": "PAN-3083",
@@ -114,7 +119,8 @@
     "commitCount": 0,
     "prTotalCommits": 9,
     "inRangeDetail": [],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-25T23:58:02.288Z"
   },
   {
     "issueId": "PAN-3097",
@@ -180,7 +186,8 @@
         "headline": "fix(cli): refresh composer command manifest"
       }
     ],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-26T03:30:55.924Z"
   },
   {
     "issueId": "PAN-3109",
@@ -195,7 +202,8 @@
     "commitCount": 0,
     "prTotalCommits": 4,
     "inRangeDetail": [],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-26T06:30:31.344Z"
   },
   {
     "issueId": "PAN-3110",
@@ -221,7 +229,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3110"
       }
     ],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-26T12:02:45.956Z"
   },
   {
     "issueId": "PAN-3114",
@@ -236,7 +245,8 @@
     "commitCount": 0,
     "prTotalCommits": 5,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T10:39:12.236Z"
   },
   {
     "issueId": "PAN-3115",
@@ -262,7 +272,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3115"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:26:17.938Z"
   },
   {
     "issueId": "PAN-3147",
@@ -277,7 +288,8 @@
     "commitCount": 0,
     "prTotalCommits": 1,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T17:52:55.279Z"
   },
   {
     "issueId": "PAN-3155",
@@ -298,7 +310,8 @@
         "headline": "fix: short-circuit deploy dependency checks (PAN-3155)"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T20:40:54.244Z"
   },
   {
     "issueId": "PAN-3158",
@@ -324,7 +337,8 @@
         "headline": "fix(dashboard): scope filtered merge train empty state"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T20:51:00.705Z"
   },
   {
     "issueId": "PAN-3183",
@@ -345,7 +359,8 @@
         "headline": "fix(db): make boot reconciliation commit-aware"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:06:08.383Z"
   },
   {
     "issueId": "PAN-3184",
@@ -416,7 +431,8 @@
         "headline": "test(codex): await request log before cleanup (PAN-3184)"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T06:35:01.334Z"
   },
   {
     "issueId": "PAN-3192",
@@ -442,7 +458,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3192"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T05:50:13.044Z"
   },
   {
     "issueId": "PAN-3206",
@@ -468,7 +485,8 @@
         "headline": "fix(review): harden verdict reconciliation PAN-3206"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T18:45:43.531Z"
   },
   {
     "issueId": "PAN-3216",
@@ -483,7 +501,8 @@
     "commitCount": 0,
     "prTotalCommits": 1,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T07:07:50.045Z"
   },
   {
     "issueId": "PAN-3230",
@@ -509,7 +528,8 @@
         "headline": "fix(infra): close state path review gaps"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T19:11:38.189Z"
   },
   {
     "issueId": "PAN-3356",
@@ -530,7 +550,8 @@
         "headline": "fix(dashboard): clear cockpit stuck state"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-31T21:15:00.405Z"
   },
   {
     "issueId": "MIN-858",
@@ -545,7 +566,8 @@
     "commitCount": 0,
     "prTotalCommits": 1,
     "inRangeDetail": [],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:57:45.130Z"
   },
   {
     "issueId": "MIN-879",
@@ -571,7 +593,8 @@
         "headline": "fix: reset analytics identity on logout (MIN-879)"
       }
     ],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-26T06:20:38.473Z"
   },
   {
     "issueId": "MIN-896",
@@ -597,7 +620,8 @@
         "headline": "fix: address when-first review findings"
       }
     ],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-26T01:55:12.065Z"
   },
   {
     "issueId": "MIN-901",
@@ -612,7 +636,8 @@
     "commitCount": 0,
     "prTotalCommits": 9,
     "inRangeDetail": [],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:54:03.350Z"
   },
   {
     "issueId": "MIN-902",
@@ -643,7 +668,8 @@
         "headline": "fix(dev): keep .pnpm-store out of Vite watcher and eslint traversal"
       }
     ],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T12:50:55.030Z"
   },
   {
     "issueId": "PAN-3055",
@@ -664,7 +690,8 @@
         "headline": "fix(dashboard): type pending reap resolution (PAN-3055)"
       }
     ],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-25T12:56:31.811Z"
   },
   {
     "issueId": "MIN-891",
@@ -685,7 +712,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/min-891"
       }
     ],
-    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)"
+    "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
+    "resetAt": "2026-07-25T13:04:47.715Z"
   },
   {
     "issueId": "PAN-3076",
@@ -700,7 +728,8 @@
     "commitCount": 0,
     "prTotalCommits": 18,
     "inRangeDetail": [],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-25T23:09:28.933Z"
   },
   {
     "issueId": "PAN-2997",
@@ -731,7 +760,8 @@
         "headline": "fix: initial poison read rejects as recoverable marker error (PAN-2997)"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:19:49.380Z"
   },
   {
     "issueId": "PAN-1696",
@@ -757,7 +787,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-1696"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T11:49:57.471Z"
   },
   {
     "issueId": "PAN-3128",
@@ -772,7 +803,8 @@
     "commitCount": 0,
     "prTotalCommits": 10,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T14:58:02.407Z"
   },
   {
     "issueId": "PAN-3135",
@@ -808,7 +840,8 @@
         "headline": "fix: publish deploy queue locks atomically (PAN-3135)"
       }
     ],
-    "branchExists": false
+    "branchExists": false,
+    "resetAt": "2026-07-26T15:25:12.800Z"
   },
   {
     "issueId": "PAN-3093",
@@ -823,7 +856,8 @@
     "commitCount": 0,
     "prTotalCommits": 17,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T18:46:48.193Z"
   },
   {
     "issueId": "PAN-3138",
@@ -854,7 +888,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3138"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T19:11:46.473Z"
   },
   {
     "issueId": "PAN-3162",
@@ -885,7 +920,8 @@
         "headline": "fix: make merge reconciliation atomic (PAN-3162)"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-26T23:06:55.746Z"
   },
   {
     "issueId": "PAN-3187",
@@ -911,7 +947,8 @@
         "headline": "Merge remote-tracking branch 'origin/main' into feature/pan-3187"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T07:31:36.718Z"
   },
   {
     "issueId": "PAN-3111",
@@ -937,7 +974,8 @@
         "headline": "fix: reject contended auto-start consent (PAN-3111)"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:40:50.144Z"
   },
   {
     "issueId": "PAN-3154",
@@ -978,7 +1016,8 @@
         "headline": "chore: correct schema.ts file-size allowlist entry to 1740 lines"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:55:34.230Z"
   },
   {
     "issueId": "PAN-3151",
@@ -1019,7 +1058,8 @@
         "headline": "fix: pass array directly to setReviewStatusSync in regression test (P…"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-27T11:56:33.827Z"
   },
   {
     "issueId": "PAN-3025",
@@ -1090,7 +1130,8 @@
         "headline": "fix: add missing canonical-state mock and strengthen workflow asserti…"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T08:50:18.055Z"
   },
   {
     "issueId": "PAN-3215",
@@ -1111,7 +1152,8 @@
         "headline": "fix: address merge verification review findings"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T10:38:47.150Z"
   },
   {
     "issueId": "PAN-3092",
@@ -1137,7 +1179,8 @@
         "headline": "fix(cloister): fan warnings out concurrently so no episode is starved"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T11:46:50.036Z"
   },
   {
     "issueId": "PAN-3049",
@@ -1152,7 +1195,8 @@
     "commitCount": 0,
     "prTotalCommits": 19,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T16:42:28.850Z"
   },
   {
     "issueId": "PAN-2882",
@@ -1173,7 +1217,8 @@
         "headline": "fix: satisfy GitLab membership review requirements"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T18:21:38.436Z"
   },
   {
     "issueId": "PAN-3233",
@@ -1194,7 +1239,8 @@
         "headline": "fix: address review blocking findings for PAN-3233"
       }
     ],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T21:21:48.850Z"
   },
   {
     "issueId": "PAN-3229",
@@ -1209,6 +1255,7 @@
     "commitCount": 0,
     "prTotalCommits": 14,
     "inRangeDetail": [],
-    "branchExists": true
+    "branchExists": true,
+    "resetAt": "2026-07-28T22:37:00.723Z"
   }
 ]
