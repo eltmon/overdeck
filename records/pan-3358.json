@@ -413,23 +413,23 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T00:08:17.992Z",
+  "updated": "2026-08-01T00:12:36.805Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-08-01T00:08:17.982Z",
+    "updatedAt": "2026-08-01T00:12:36.760Z",
     "reviewNotes": "Projects-config locking unconditionally requires util-linux flock, breaking supported macOS and Windows mutations",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
-    "lastVerifiedCommit": "0ad9598e6081572f0410400dc4d0a2dee1c8f047",
+    "lastVerifiedCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
     "reviewSpawnedAt": "2026-08-01T00:04:24.763Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -521,9 +521,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 53760002,
-            "output": 1291469,
-            "cacheRead": 271762432,
+            "input": 53763392,
+            "output": 1291695,
+            "cacheRead": 272420864,
             "cacheWrite": 0
           }
         },
@@ -569,18 +569,18 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 11159022,
-            "output": 1230920,
-            "cacheRead": 529722368,
+            "input": 11228227,
+            "output": 1269669,
+            "cacheRead": 543337984,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 72742508,
-          "output": 2744467,
-          "cacheRead": 823012864,
+          "input": 72815103,
+          "output": 2783442,
+          "cacheRead": 837286912,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -591,8 +591,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 871.386583,
-        "pricingAsOf": "2026-08-01T00:08:17.988Z"
+        "usd": 880.055832,
+        "pricingAsOf": "2026-08-01T00:12:36.797Z"
       }
     },
     "merges": [
