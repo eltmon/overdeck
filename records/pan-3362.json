@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T10:53:54.607Z",
+  "updated": "2026-08-01T11:09:38.249Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "cli-command": {
-        "writerId": "agent-pan-3362",
-        "agentId": "agent-pan-3362",
-        "pid": 2141929,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:53:54.607Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3362",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "Implemented seedUatFixturesLocal in src/lib/uat-fixtures/seed.ts writing through canonical doors; deviated from PRD by using src/lib/overdeck/review-status-sync.ts instead of the legacy src/lib/database/review-status-db.ts (blocked by the overdeck-boundary lint gate). requiresInspection=false for this item, so proceeding to next.",
         "releasedAt": "2026-08-01T10:53:42.569Z"
+      },
+      {
+        "writerId": "agent-pan-3362",
+        "agentId": "agent-pan-3362",
+        "pid": 2141929,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:53:54.607Z",
+        "itemId": "cli-command",
+        "outcome": "completed",
+        "reason": "Registered pan admin seed-uat-fixtures with host and --local modes in src/cli/commands/admin/seed-uat-fixtures.ts, wired into admin/index.ts, regenerated composer-commands manifest. Also fixed a real state-writes lint false positive discovered in the previously-completed seed-writer item (git-grep-based gate doesn't see untracked files, so the earlier 'clean' lint run was a false negative) — separate fix commit a9fe348644. requiresInspection=false, proceeding to docs item.",
+        "releasedAt": "2026-08-01T11:09:38.249Z"
       }
     ],
     "statusReasons": {
@@ -112,6 +115,10 @@
       "seed-writer": {
         "reason": "Implemented seedUatFixturesLocal in src/lib/uat-fixtures/seed.ts writing through canonical doors; deviated from PRD by using src/lib/overdeck/review-status-sync.ts instead of the legacy src/lib/database/review-status-db.ts (blocked by the overdeck-boundary lint gate). requiresInspection=false for this item, so proceeding to next.",
         "updatedAt": "2026-08-01T10:53:42.569Z"
+      },
+      "cli-command": {
+        "reason": "Registered pan admin seed-uat-fixtures with host and --local modes in src/cli/commands/admin/seed-uat-fixtures.ts, wired into admin/index.ts, regenerated composer-commands manifest. Also fixed a real state-writes lint false positive discovered in the previously-completed seed-writer item (git-grep-based gate doesn't see untracked files, so the earlier 'clean' lint run was a false negative) — separate fix commit a9fe348644. requiresInspection=false, proceeding to docs item.",
+        "updatedAt": "2026-08-01T11:09:38.249Z"
       }
     }
   },
@@ -126,6 +133,10 @@
     "seed-writer.seed-writer.ac2": "completed",
     "seed-writer.seed-writer.ac3": "completed",
     "seed-writer.seed-writer.ac4": "completed",
-    "cli-command": "running"
+    "cli-command": "completed",
+    "cli-command.cli-command.ac1": "completed",
+    "cli-command.cli-command.ac2": "completed",
+    "cli-command.cli-command.ac3": "completed",
+    "cli-command.cli-command.ac4": "completed"
   }
 }
