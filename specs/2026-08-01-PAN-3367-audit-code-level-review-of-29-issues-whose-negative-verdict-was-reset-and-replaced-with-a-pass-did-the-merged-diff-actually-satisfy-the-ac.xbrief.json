@@ -1,0 +1,669 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T03:01:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3367: Audit: code-level review of 29 issues whose negative verdict was reset and replaced with a pass — did the merged diff actually satisfy the AC?",
+    "updated": "2026-08-01T03:12:59.637Z"
+  },
+  "plan": {
+    "id": "pan-3367",
+    "title": "Audit: code-level review of 29 issues whose negative verdict was reset and replaced with a pass — did the merged diff actually satisfy the AC?",
+    "status": "proposed",
+    "uid": "3ab93f31-ab73-4c22-860d-77e58f7a2bbd",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T03:01:00.000Z",
+    "updated": "2026-08-01T03:12:59.637Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3367",
+        "label": "PAN-3367",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3365",
+        "label": "PAN-3365 (companion guard issue)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "audit",
+      "pipeline-integrity",
+      "review-status",
+      "verdict-laundering",
+      "read-only"
+    ],
+    "metadata": {
+      "sizeJustification": "The audit is one logical deliverable split into ~30 small per-issue report files under docs/audits/pan-3367/ so each verdict is independently reviewable; the file count is inherent to the 29-issue worklist, not to subsystem sprawl. files_scope uses narrow per-item globs over that single directory.",
+      "canonicalFilename": "2026-08-01-PAN-3367-audit-code-level-review-of-29-issues-whose-negative-verdict-was-reset-and-replaced-with-a-pass-did-the-merged-diff-actually-satisfy-the-ac.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "PAN-3365 established that a negative review/test verdict can be reset to pending/pending and replaced with passed/passed with zero commits in between — a pass that was never earned. 29 issues match the sharp signature (negative verdict → reset → passed/passed within 60 minutes) spanning 2026-07-25 to 07-28; four spot-checked cases all had zero commits between failure and pass. The operator has found closed issues that were never actually completed. Nobody has checked, per issue, whether the merged diff actually satisfied the acceptance criterion that was failing.",
+      "Proposal": "A read-only forensic audit, executed in eight work items. (1) Snapshot the raw review.status_changed events for every candidate into committed evidence files immediately — the events table has 7-day retention with startup compaction and the oldest evidence is already being deleted (PAN-1525's negative/reset events are gone). (2-7) Six audit batches covering the 25 mandatory issues plus derived zero-commit extras (cap 10): per issue, quote the failing acceptance criterion and the recorded failure reason from named sources, read the merged diff, and record a verdict — satisfied / not satisfied / cannot determine — resting on cited file:line diff evidence. Every not-satisfied verdict gets a follow-up tracker issue (GitHub for PAN, Linear for MIN). (8) A synthesis README with the verdict table, genuine-finding vs environment-blocked classification, follow-up links, and a summary comment posted on PAN-3367. The full method, evidence sources (verified at planning time), reproduction script, report template, and batch assignments are in the PRD at .pan/drafts/PAN-3367.md — read it first.",
+      "NonGoals": "- Re-running or re-verdicting any issue's review/test/verification\n- Fixing any defect found (findings are filed as follow-up issues, not fixed)\n- Changing the pipeline guard mechanism (PAN-3365's scope)\n- Auditing the 74-issue loose negative-then-passed set (normal rework, excluded by the flywheel's analysis)\n- Treating a currently-green test suite as evidence an acceptance criterion is met\n- Closing out PAN-3356 (held deliberately pending this audit and PAN-3362)\n- Filing defect issues for 'cannot determine' verdicts (they record re-verification dependencies instead)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Report lives in the repo at docs/audits/pan-3367/ rather than as issue comments only",
+        "rationale": "The pipeline requires a reviewable diff; docs/audits/ has precedent (AGENT_AUDIT_REPORT.md); committing the raw evidence with the verdicts makes every conclusion re-checkable after the 7-day event compaction deletes the source data."
+      },
+      {
+        "summary": "Worklist = 25 mandatory named issues + derived zero-commit extras capped at 10",
+        "rationale": "The flywheel's exact dedup from its query to 29 is not reconstructible from the issue text (a planning-time reproduction yields 61 candidates over the full window containing all named issues with surviving events); commits-between-failure-and-pass is the flywheel's own stated discriminator, and a cap keeps the audit deep rather than shallow — the issue's own warning is 'not 29 shallow reviews'."
+      },
+      {
+        "summary": "Follow-up issues are filed on the tracker that owns the code (GitHub eltmon/overdeck for PAN, Linear team MIN for MIN)",
+        "rationale": "A defect in MYN product code does not belong on the Overdeck tracker; both trackers are reachable from this machine (gh and Linear key in ~/.overdeck.env verified at planning time)."
+      },
+      {
+        "summary": "'cannot determine' verdicts record re-verification dependencies instead of producing defect follow-ups",
+        "rationale": "An environment-blocked UAT means the AC is unverified, not unmet; filing a defect for an unproven gap is noise, and PAN-3356's dependency (PAN-3362) is already tracked."
+      },
+      {
+        "summary": "Commit counts use the PR/MR commit list filtered by committedDate rather than branch logs",
+        "rationale": "The PR commit list survives branch deletion at close-out; a deleted ref returns 0 commits from a branch log and manufactures a false-positive laundering signal — the issue itself calls out this artifact."
+      },
+      {
+        "summary": "All SQLite access uses Node 22 node:sqlite with { readOnly: true }",
+        "rationale": "The sqlite3 CLI is not installed on this machine, and overdeck.db is live-written by the dashboard; read-only mode is the only safe access pattern."
+      }
+    ],
+    "items": [
+      {
+        "id": "snapshot-evidence",
+        "title": "Snapshot raw verdict events and derive the audit worklist before 7-day compaction deletes more evidence",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3367",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "audit-batch-a",
+            "audit-batch-b",
+            "audit-batch-c",
+            "audit-batch-d",
+            "audit-batch-e",
+            "audit-batch-f",
+            "synthesis-report"
+          ],
+          "files_scope": [
+            "docs/audits/pan-3367/worklist.md",
+            "docs/audits/pan-3367/evidence/*"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/audits/pan-3367/worklist.md && test -f docs/audits/pan-3367/evidence/reproduce-worklist.mjs && ls docs/audits/pan-3367/evidence/events-*.json | wc -l"
+          ],
+          "expected_outputs": [
+            "command exits 0 and prints an events-file count of at least 25"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Read the PRD at .pan/drafts/PAN-3367.md first — it carries the validated reproduction script verbatim and every evidence-source command. Save the script as docs/audits/pan-3367/evidence/reproduce-worklist.mjs, run it with Node 22 from the workspace root (it opens ~/.overdeck/overdeck.db read-only via node:sqlite and writes evidence/candidates.json plus one evidence/events-<issue>.json per candidate with verbatim raw event payloads). Then, per candidate, compute the commit count between the negative verdict and the pass using the PR commit list (gh pr view <n> --repo eltmon/overdeck --json commits, prUrl from ~/.overdeck/state/panopticon-cli/records/<issue>.json pipeline block); use the git branch fallback only after verifying the branch exists with git ls-remote. Write docs/audits/pan-3367/worklist.md: every mandatory issue (the 25 named in PAN-3367) plus derived zero-commit extras (cap 10, largest pass-minus-negative gap first), each row carrying negative-verdict timestamp/state/quoted notes, reset and pass timestamps, commit count + method, branch-existence result, and PR/MR URL — and an explicit explanation of any variance from the expected ~29 total (compaction loss, cap overflow, matcher differences). Commit and push. This item blocks everything else: the events table has 7-day retention with startup compaction and PAN-1525's evidence is already gone."
+        },
+        "items": [
+          {
+            "id": "snapshot-evidence.ac1",
+            "title": "Creates docs/audits/pan-3367/evidence/reproduce-worklist.mjs containing the PRD's reproduction script, and running it with Node 22 produces evidence/candidates.json plus one events-<issue>.json per candidate with verbatim raw event payloads",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-evidence.ac2",
+            "title": "Produces docs/audits/pan-3367/worklist.md whose table covers all 25 issues named in the PAN-3367 body and records per row: negative-verdict timestamp/state/quoted notes, reset and pass timestamps, commit count with method, branch-existence result, and PR/MR URL",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-evidence.ac3",
+            "title": "worklist.md records the final audited-issue count and the explanation for any variance from 29 (e.g. events lost to 7-day compaction, the 10-extra cap, matcher differences)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "snapshot-evidence.ac4",
+            "title": "worklist.md records derived extras limited to zero-commit candidates, capped at 10 selected by largest pass-minus-negative gap, and contains the full qualifying overflow list when more than 10 qualify",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-a",
+        "title": "Audit the four confirmed zero-commit cases and the known-live case: PAN-3216, PAN-3230, PAN-3206, PAN-3192, PAN-3356",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/pan-3216.md",
+            "docs/audits/pan-3367/pan-3230.md",
+            "docs/audits/pan-3367/pan-3206.md",
+            "docs/audits/pan-3367/pan-3192.md",
+            "docs/audits/pan-3367/pan-3356.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in pan-3216 pan-3230 pan-3206 pan-3192 pan-3356; do grep -q '\\*\\*Verdict:\\*\\*' docs/audits/pan-3367/$f.md || exit 1; done && echo batch-a-complete"
+          ],
+          "expected_outputs": [
+            "prints batch-a-complete"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Writes only its own five per-issue report files; no other item touches those paths.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Highest triage rank per the issue: the four spot-checked zero-commit cases (PAN-3216, PAN-3230, PAN-3206, PAN-3192) plus PAN-3356, the known-live case whose cockpit ACs (six-tab IA, needs-you slot, crew spine) were never verified because PAN-3362 is still open. For each issue follow the PRD's five-step method: quote the failing AC (issue body via gh issue view, plus the spec under ~/.overdeck/state/panopticon-cli/specs/ and draft under drafts/ where present), quote the recorded failure reason from the snapshot's negNotes (plus gh pr view --comments when thin), read the merged diff (gh pr diff, PR number from the record's pipeline.prUrl), and write docs/audits/pan-3367/<issue>.md in the PRD's report template with a verdict of satisfied / not satisfied / cannot determine resting on cited file:line diff evidence. Note that PAN-3216's recorded failure is infra-flavored ('Verification worker exited before writing a result') — classify honestly rather than inventing a finding. File a GitHub follow-up issue on eltmon/overdeck for every not-satisfied verdict and link it in the report. PAN-3356's report must record the PAN-3362 re-verification dependency. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-a.ac1",
+            "title": "Creates docs/audits/pan-3367/{pan-3216,pan-3230,pan-3206,pan-3192,pan-3356}.md, each containing the quoted failing AC with its source, the quoted recorded failure reason with its evidence source, a genuine-finding/environment-blocked/unknown classification, and a verdict line of exactly one of satisfied / not satisfied / cannot determine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-a.ac2",
+            "title": "Each report records the merged-diff evidence (PR URL plus file:line references) the verdict rests on — 'tests pass now' is never recorded as evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-a.ac3",
+            "title": "Every not-satisfied verdict in the batch produces a follow-up GitHub issue on eltmon/overdeck whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-a.ac4",
+            "title": "The PAN-3356 report records that its cockpit ACs were never verified and names PAN-3362 as the re-verification dependency",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-b",
+        "title": "Audit PAN-2467, PAN-2876, PAN-3037, PAN-3052, PAN-3083 against their failing acceptance criteria",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/pan-2467.md",
+            "docs/audits/pan-3367/pan-2876.md",
+            "docs/audits/pan-3367/pan-3037.md",
+            "docs/audits/pan-3367/pan-3052.md",
+            "docs/audits/pan-3367/pan-3083.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in pan-2467 pan-2876 pan-3037 pan-3052 pan-3083; do grep -q '\\*\\*Verdict:\\*\\*' docs/audits/pan-3367/$f.md || exit 1; done && echo batch-b-complete"
+          ],
+          "expected_outputs": [
+            "prints batch-b-complete"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Writes only its own five per-issue report files; no other item touches those paths.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD's five-step per-issue method to PAN-2467, PAN-2876, PAN-3037, PAN-3052, PAN-3083 using the snapshot evidence from the snapshot-evidence item: quote the failing AC and the recorded failure reason from named sources, read the merged diff (gh pr diff with the PR from the record's pipeline.prUrl), and write docs/audits/pan-3367/<issue>.md in the PRD template with a satisfied / not satisfied / cannot determine verdict resting on cited file:line diff evidence. File a GitHub follow-up issue for every not-satisfied verdict and link it. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-b.ac1",
+            "title": "Creates docs/audits/pan-3367/{pan-2467,pan-2876,pan-3037,pan-3052,pan-3083}.md, each containing the quoted failing AC with source, the quoted failure reason with source, a classification, and a verdict line of exactly one of satisfied / not satisfied / cannot determine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-b.ac2",
+            "title": "Each report records the merged-diff evidence (PR URL plus file:line references) the verdict rests on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-b.ac3",
+            "title": "Every not-satisfied verdict in the batch produces a follow-up GitHub issue on eltmon/overdeck whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-c",
+        "title": "Audit PAN-3097, PAN-3109, PAN-3110, PAN-3114, PAN-3115 against their failing acceptance criteria",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/pan-3097.md",
+            "docs/audits/pan-3367/pan-3109.md",
+            "docs/audits/pan-3367/pan-3110.md",
+            "docs/audits/pan-3367/pan-3114.md",
+            "docs/audits/pan-3367/pan-3115.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in pan-3097 pan-3109 pan-3110 pan-3114 pan-3115; do grep -q '\\*\\*Verdict:\\*\\*' docs/audits/pan-3367/$f.md || exit 1; done && echo batch-c-complete"
+          ],
+          "expected_outputs": [
+            "prints batch-c-complete"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Writes only its own five per-issue report files; no other item touches those paths.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD's five-step per-issue method to PAN-3097, PAN-3109, PAN-3110, PAN-3114, PAN-3115: quote the failing AC and the recorded failure reason from named sources, read the merged diff via gh pr diff, and write docs/audits/pan-3367/<issue>.md in the PRD template with a satisfied / not satisfied / cannot determine verdict resting on cited file:line diff evidence. File a GitHub follow-up issue for every not-satisfied verdict and link it. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-c.ac1",
+            "title": "Creates docs/audits/pan-3367/{pan-3097,pan-3109,pan-3110,pan-3114,pan-3115}.md, each containing the quoted failing AC with source, the quoted failure reason with source, a classification, and a verdict line of exactly one of satisfied / not satisfied / cannot determine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-c.ac2",
+            "title": "Each report records the merged-diff evidence (PR URL plus file:line references) the verdict rests on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-c.ac3",
+            "title": "Every not-satisfied verdict in the batch produces a follow-up GitHub issue on eltmon/overdeck whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-d",
+        "title": "Audit PAN-3147, PAN-3155, PAN-3158, PAN-3183, PAN-3184 against their failing acceptance criteria",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/pan-3147.md",
+            "docs/audits/pan-3367/pan-3155.md",
+            "docs/audits/pan-3367/pan-3158.md",
+            "docs/audits/pan-3367/pan-3183.md",
+            "docs/audits/pan-3367/pan-3184.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in pan-3147 pan-3155 pan-3158 pan-3183 pan-3184; do grep -q '\\*\\*Verdict:\\*\\*' docs/audits/pan-3367/$f.md || exit 1; done && echo batch-d-complete"
+          ],
+          "expected_outputs": [
+            "prints batch-d-complete"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Writes only its own five per-issue report files; no other item touches those paths.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the PRD's five-step per-issue method to PAN-3147, PAN-3155, PAN-3158, PAN-3183, PAN-3184: quote the failing AC and the recorded failure reason from named sources, read the merged diff via gh pr diff, and write docs/audits/pan-3367/<issue>.md in the PRD template with a satisfied / not satisfied / cannot determine verdict resting on cited file:line diff evidence. File a GitHub follow-up issue for every not-satisfied verdict and link it. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-d.ac1",
+            "title": "Creates docs/audits/pan-3367/{pan-3147,pan-3155,pan-3158,pan-3183,pan-3184}.md, each containing the quoted failing AC with source, the quoted failure reason with source, a classification, and a verdict line of exactly one of satisfied / not satisfied / cannot determine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-d.ac2",
+            "title": "Each report records the merged-diff evidence (PR URL plus file:line references) the verdict rests on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-d.ac3",
+            "title": "Every not-satisfied verdict in the batch produces a follow-up GitHub issue on eltmon/overdeck whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-e",
+        "title": "Audit the cross-tracker batch: PAN-1525 (evidence compacted) and MIN-858, MIN-879, MIN-896, MIN-901 (Linear ACs, MYN repo diffs)",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/pan-1525.md",
+            "docs/audits/pan-3367/min-858.md",
+            "docs/audits/pan-3367/min-879.md",
+            "docs/audits/pan-3367/min-896.md",
+            "docs/audits/pan-3367/min-901.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "for f in pan-1525 min-858 min-879 min-896 min-901; do grep -q '\\*\\*Verdict:\\*\\*' docs/audits/pan-3367/$f.md || exit 1; done && echo batch-e-complete"
+          ],
+          "expected_outputs": [
+            "prints batch-e-complete"
+          ],
+          "readiness": "ready",
+          "parallelSafeReason": "Writes only its own five per-issue report files; no other item touches those paths.",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Cross-tracker batch. PAN-1525: its negative/reset events were already deleted by 7-day compaction (verified at planning time — only passed/passed rows from 2026-07-25T03:06 survive), so its report must rest on the permanent record (~/.overdeck/state/panopticon-cli/records/pan-1525.json, PR #3033) and PR evidence, and must state that the event evidence is lost. MIN issues: read ACs from Linear (curl https://api.linear.app/graphql with LINEAR_API_KEY sourced from ~/.overdeck.env — never print or commit the key), read merged diffs from ~/Projects/myn (GitHub, gh) and ~/Projects/myn-cli (GitLab, glab api — authenticated as eltmon), and the MIN records under ~/.overdeck/state/mind-your-now/records/. Write docs/audits/pan-3367/<issue>.md per the PRD template. File not-satisfied follow-ups on the owning tracker: GitHub for PAN-1525, Linear team MIN for the MIN issues. If Linear or GitLab is unreachable, mark this item blocked and surface — do not silently downgrade verdicts to cannot-determine. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-e.ac1",
+            "title": "Creates docs/audits/pan-3367/{pan-1525,min-858,min-879,min-896,min-901}.md, each containing the quoted failing AC with source, the quoted failure reason with source (or an explicit 'event evidence lost to compaction' note for PAN-1525), a classification, and a verdict line of exactly one of satisfied / not satisfied / cannot determine",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-e.ac2",
+            "title": "Each MIN report records the Linear issue's quoted acceptance criteria and the merged MR/PR diff evidence (file:line) from ~/Projects/myn or ~/Projects/myn-cli that the verdict rests on",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-e.ac3",
+            "title": "Every not-satisfied verdict produces a follow-up on the owning tracker (GitHub eltmon/overdeck for PAN-1525, Linear team MIN for MIN issues) whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "audit-batch-f",
+        "title": "Audit the derived zero-commit extras from worklist.md (0–10 issues), or record that none qualified",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/extras/*.md"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "node -e \"const fs=require('fs');const w=fs.readFileSync('docs/audits/pan-3367/worklist.md','utf8');const m=w.match(/no extras qualified/i);if(m){console.log('no-extras-recorded');process.exit(0)}const ids=[...w.matchAll(/derived extra:\\s*((PAN|MIN)-\\d+)/gi)].map(x=>x[1].toLowerCase());for(const id of ids){if(!fs.existsSync('docs/audits/pan-3367/extras/'+id+'.md')){console.error('missing report for',id);process.exit(1)}}console.log('batch-f-complete')\""
+          ],
+          "expected_outputs": [
+            "prints batch-f-complete, or prints no-extras-recorded when worklist.md records that no extras qualified"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Audit every issue that worklist.md (from the snapshot-evidence item) lists as a derived extra — the zero-commit candidates beyond the mandatory 25, capped at 10. Mark each in worklist.md with the literal prefix 'derived extra: <ID>' so the verify command can enumerate them. Apply the PRD's five-step per-issue method identically to the other batches and write each report at docs/audits/pan-3367/extras/<issue-id>.md per the template (extras live in the extras/ subdirectory so this item's file scope stays disjoint from the named-issue batches). If no extras qualified, record 'no extras qualified' in worklist.md with the candidate counts that justify it and this item is complete with that evidence. File follow-ups for not-satisfied verdicts on the owning tracker. Commit and push."
+        },
+        "items": [
+          {
+            "id": "audit-batch-f.ac1",
+            "title": "Every issue marked 'derived extra:' in worklist.md has a report at docs/audits/pan-3367/extras/<issue>.md with a verdict line and recorded diff evidence — or worklist.md records 'no extras qualified' with the supporting candidate counts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-f.ac2",
+            "title": "Every not-satisfied verdict among the extras produces a follow-up tracker issue whose URL is recorded in the per-issue report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "audit-batch-f.ac3",
+            "title": "worklist.md records the total number of zero-commit candidates that qualified beyond the cap (if any) so the synthesis can flag the overflow for operator triage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "synthesis-report",
+        "title": "Write the synthesis README and post the summary comment on PAN-3367",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T03:01:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3367",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/audits/pan-3367/README.md",
+            "docs/audits/pan-3367/pan-3367-comment.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "test -f docs/audits/pan-3367/README.md && grep -q 'PAN-3367' docs/audits/pan-3367/pan-3367-comment.md && grep -c 'not satisfied\\|satisfied\\|cannot determine' docs/audits/pan-3367/README.md"
+          ],
+          "expected_outputs": [
+            "command exits 0 and prints a verdict-mention count matching the audited-issue count"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "After all audit batches complete, write docs/audits/pan-3367/README.md: a table of every audited issue with its verdict, its genuine-finding/environment-blocked/unknown classification (genuine findings first, per the issue's triage order), and its follow-up link or 'none needed'; then the headline answers — how many merged diffs did NOT satisfy the failing AC, how many ACs remain unverifiable (cannot determine) and what gates their re-verification (e.g. PAN-3362 for PAN-3356), and the variance note versus the expected 29. Then post a summary comment on PAN-3367 (gh issue comment 3367 --repo eltmon/overdeck) linking the report location and the follow-ups filed, and commit the comment text at docs/audits/pan-3367/pan-3367-comment.md. Commit and push."
+        },
+        "items": [
+          {
+            "id": "synthesis-report.ac1",
+            "title": "Creates docs/audits/pan-3367/README.md containing a per-issue verdict table (verdict, classification, follow-up link) covering every audited issue, genuine-finding failures ranked above environment-blocked ones",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synthesis-report.ac2",
+            "title": "README.md records the three headline answers: the count of merged diffs that did not satisfy the failing AC, the count of ACs that remain unverifiable with their re-verification gates, and the variance explanation versus the expected 29-issue worklist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "synthesis-report.ac3",
+            "title": "Posts a summary comment on PAN-3367 linking the report and the follow-up issues filed, and commits the comment text at docs/audits/pan-3367/pan-3367-comment.md",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-a",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-b",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-c",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-d",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-e",
+        "type": "blocks"
+      },
+      {
+        "from": "snapshot-evidence",
+        "to": "audit-batch-f",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-a",
+        "to": "synthesis-report",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-b",
+        "to": "synthesis-report",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-c",
+        "to": "synthesis-report",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-d",
+        "to": "synthesis-report",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-e",
+        "to": "synthesis-report",
+        "type": "blocks"
+      },
+      {
+        "from": "audit-batch-f",
+        "to": "synthesis-report",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
