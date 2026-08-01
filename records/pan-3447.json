@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T22:10:16.193Z",
+  "updated": "2026-08-01T22:11:28.873Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,18 +53,29 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "hook-inventory-contract": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3447",
         "agentId": "agent-pan-3447",
         "pid": 2478152,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:09:05.071Z"
+        "claimedAt": "2026-08-01T22:09:05.071Z",
+        "itemId": "hook-inventory-contract",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3447 dead)",
+        "releasedAt": "2026-08-01T22:11:28.784Z"
+      }
+    ],
+    "statusReasons": {
+      "hook-inventory-contract": {
+        "reason": "stale claim released (agent-pan-3447 dead)",
+        "updatedAt": "2026-08-01T22:11:28.784Z"
       }
     }
   },
   "statusOverrides": {
-    "hook-inventory-contract": "running"
+    "hook-inventory-contract": "pending"
   }
 }
