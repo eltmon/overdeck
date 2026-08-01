@@ -536,7 +536,7 @@
     "recordedAt": "2026-08-01T00:50:13.550Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T06:28:09.943Z",
+  "updated": "2026-08-01T07:22:17.207Z",
   "pipeline": {
     "issueId": "PAN-3358",
     "reviewStatus": "passed",
@@ -548,7 +548,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T00:50:57.096Z",
-    "updatedAt": "2026-08-01T06:28:09.795Z",
+    "updatedAt": "2026-08-01T07:22:17.163Z",
     "reviewNotes": "Approved after convergence gate; current-cycle feature changes have no promotable blockers",
     "testNotes": "Gates (workspace root, HEAD 570d4777): bun install --frozen-lockfile clean; npm run typecheck (root+hooks+evals+dashboard+frontend) 0 errors; npm run lint 0 errors (only pre-existing rolldown/tsdown build warnings); npm run build clean, dist-externals guard passed. Tests: root `vitest run --changed <merge-base>` 977 files/9177 tests passed (3 skipped); frontend `vitest run --changed <merge-base>` 143 files/1691 tests passed. UAT required: PRD items batch-card-version-input and project-settings-version-sync both carry explicit 'browser UAT observes it' acceptance criteria. Built the workspace dashboard and ran it on a throwaway port (3921) against an isolated OVERDECK_HOME copy (OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) so write-door mutation tests never touched the live shared ~/.overdeck/projects.yaml or the production dashboard on :3011 (confirmed both untouched after). Verified live via Playwright: (1) ProjectSettingsDisclosure 'Version ship' section - unset state renders the explicit 'This project skips ship' posture line (ac1); Save persists a valid block, invalid regex + missing push both render 400 validation errors inline next to the offending field (ac2); Remove version sync returns to skip state (ac4) - byte-diffed the isolated projects.yaml before/after: only the version_sync key was added, and clearing it round-tripped byte-identical to the original, confirming the lossless write door. Partial-outcome rendering (ac3) has no real production ship record yet (feature unshipped) so verified via source (VersionShipOutcomeView 'partial' branch in ProjectSettingsDisclosure.tsx) plus the passing 'shows partial propagation with each failing path' unit test. (2) MergeTrainView batch card - with version_sync configured, 'Merge batch (2) to main' on real train uat/pan-dune-0731 opens a Version (X.Y.Z) input with placeholder 48.8.0; invalid input shows inline 'version must look like 48.8.0' with no network call fired (ac1); empty version shows the exact required copy 'No version supplied - the batch merges without a version bump and each member's ship row will fail until you ship one.' (ac2); a real promoted-but-unshipped batch (uat/pan-cedar-0726, status 'promoted - version pending') renders a 'Ship version' action opening the same validated input (ac3, rendering only - did not submit since that would run the real version-ship command against the project's live main checkout, forbidden by task boundaries); confirmed via API (/api/merge-train/generations) that mind-your-now's real batches carry versionSyncConfigured:false and cross-checked MergeTrainView.tsx's onPromote gating so no new promote UI renders for unconfigured projects (ac4). Did not click any real Merge/Ship/Continue action - all positive-path submissions were verified by inline validation state, network-request absence, and source/test inspection rather than firing real merge or ship endpoints, per the no-merge/no-ship-endpoint boundary. Cleanup: removed the temporary version_sync test config from the isolated projects.yaml (byte-identical round trip confirmed), killed the throwaway dashboard process, confirmed the real ~/.overdeck/projects.yaml was never modified and the live :3011 dashboard (pid unchanged) was never restarted.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -657,7 +657,9 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-01T00:50:13.550Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-01T07:22:17.163Z"
   },
   "closeOut": {
     "usage": {
@@ -741,7 +743,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3361"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-01T07:22:17.187Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at e5e53ebaf619a6655bcc7e93f97c310f55a06017",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3361 MERGED at 2026-08-01T05:26:18Z",
+          "status": "pass",
+          "mergedAt": "2026-08-01T05:26:18Z",
+          "mergeCommit": "f20f75f04d90816ca1ef8666c4f8c541d82a53b4"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on f20f75f04d90816ca1ef8666c4f8c541d82a53b4",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 34537249 contains merge f20f75f0",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Cleaned 9 agent state directories (10 transcript files preserved); No strike branch strike/pan-3358 found; Pruned 851 checkpoint ref(s) for agent-pan-3358, planning-pan-3358, strike-pan-3358; No specialist registry entries for PAN-3358"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
