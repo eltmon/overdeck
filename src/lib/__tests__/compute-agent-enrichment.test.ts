@@ -537,4 +537,21 @@ describe('computeAgentEnrichment blocking-prompt resolution', () => {
     expect(e.pendingInputKinds).toEqual([])
     rmSync(dir, { recursive: true, force: true })
   })
+
+  it('retires a stale needs_input fallback once the agent resumes tool activity', async () => {
+    const agentId = 'agent-pan-3367'
+    const dir = arrange(agentId)
+    getAgentRuntimeStateMock.mockReturnValue(
+      Effect.succeed({ state: 'active', resolution: 'needs_input', resolutionCount: 8 }),
+    )
+    detectAwaitingInputForAgentMock.mockReturnValue(Effect.succeed(null))
+
+    const e = await Effect.runPromise(computeAgentEnrichment(agentId, undefined, false, EMPTY_PENDING_INPUTS_SCAN))
+
+    expect(e.hasPendingQuestion).toBe(false)
+    expect(e.pendingQuestionPrompt).toBeUndefined()
+    expect(e.pendingInputKinds).toEqual([])
+    expect(e.resolution).toBe('needs_input')
+    rmSync(dir, { recursive: true, force: true })
+  })
 })
