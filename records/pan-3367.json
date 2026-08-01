@@ -321,10 +321,10 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T15:54:12.946Z",
+  "updated": "2026-08-01T15:54:16.595Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "pending",
+    "reviewStatus": "skipped",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -332,12 +332,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T15:54:12.853Z",
+    "updatedAt": "2026-08-01T15:54:13.472Z",
+    "reviewNotes": "Review mode: none — AI review skipped by configuration; verification gate still enforced",
     "testNotes": "Diff is 100% docs-only: git diff main...HEAD --stat shows every changed file under docs/audits/pan-3367/** (README, worklist, evidence dumps, per-issue reports); IssueMissionControl.tsx/.test.tsx appear in branch history but have zero diff vs main (already landed via a prior main merge). npm run typecheck: exit 0 (dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint: exit 0, all 20 sub-checks green. npm test full run: 25 of 1379 test files failed, all with 'Hook timed out in 5000ms' in setupOverdeckTestDb()/beforeEach (or one projects.yaml lock-contention error) under measured load average 34.25 on a 24-core box with 26-32 concurrent Overdeck agents. Root-caused: re-ran all 25 together — 24/25 passed; re-ran the last (create-intent.test.ts) alone with --no-file-parallelism — 16/16 passed. This PR touches zero source/test files, so the timeouts are not a regression from this change; they match known CPU-storm-induced flakiness on this shared machine. Typecheck, lint, and test all pass on re-verification with no functional failures attributable to this diff.",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
     "lastVerifiedCommit": "8bc7688f2de3328f35e3e6f40890e9c24cafdc17",
-    "reviewSpawnedAt": "2026-08-01T15:51:18.087Z",
+    "reviewSpawnedAt": "2026-08-01T15:54:13.463Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -551,7 +552,7 @@
       },
       "costAtCloseOut": {
         "usd": 246.370829,
-        "pricingAsOf": "2026-08-01T15:54:12.930Z"
+        "pricingAsOf": "2026-08-01T15:54:16.576Z"
       }
     },
     "merges": [
