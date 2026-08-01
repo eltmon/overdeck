@@ -551,15 +551,26 @@ export async function handleReviewDiscoveryReady(
   const normalized = issueId.toUpperCase();
   const parentId = `agent-${normalized.toLowerCase()}-review`;
   const { saveAgentState, getAgentStateSync } = await import('../agents.js');
-  const parent = getAgentStateSync(parentId);
-  if (!parent) {
+  const parentState = getAgentStateSync(parentId);
+  if (!parentState) {
     return { success: false, message: `No review parent state for ${normalized} — nothing to fork` };
+  }
+
+  let parent: typeof parentState | null;
+  try {
+    const { resolveReviewParentRunState } = await import('./review-run-recovery.js');
+    parent = await resolveReviewParentRunState(parentState, { persistCurrent: true });
+  } catch (error) {
+    return {
+      success: false,
+      message: `Could not persist active review run state for ${normalized}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (!parent?.workspace || !parent.reviewRunId) {
+    return { success: false, message: `Review parent for ${normalized} is missing workspace/runId state — cannot launch the convoy` };
   }
   const workspace = parent.workspace;
   const runId = parent.reviewRunId;
-  if (!workspace || !runId) {
-    return { success: false, message: `Review parent for ${normalized} is missing workspace/runId state — cannot launch the convoy` };
-  }
 
   // PAN-2585: the signal is AUTHORITATIVE. `reviewDiscoveryPending` is persisted only
   // in state.json and is invisible through the DB-backed agent reader, so it must not
