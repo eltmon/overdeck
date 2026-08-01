@@ -13,26 +13,37 @@
  * passed through unchanged. The supervisor proxies stdin/stdout/resize between
  * tmux and Claude, and listens on `${OVERDECK_HOME}/sockets/pty-<agentId>.sock`
  * for authenticated HTTP-on-unix POSTs. Socket-injected messages echo to stdout
- * by default so the tmux transcript shows what Cloister sent. Accepted payloads
- * never exceed the shared purge cap, preserving the invariant that an
- * unconfirmed write is fully erased before retry. Permission relay
+ * by default so the tmux transcript shows what Cloister sent. After Enter, the
+ * supervisor checks the cursor-anchored composer and retries once when the
+ * payload is still present. Accepted payloads never exceed the shared purge cap,
+ * preserving the invariant that an unconfirmed write is fully erased before
+ * retry or fallback. Permission relay
  * is intentionally out of scope; existing Channels MCP remains the bidirectional
  * permission path for agents that opt into it.
  */
 
 import * as pty from '@lydell/node-pty';
+import { execFile } from 'node:child_process';
 import { timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { existsSync } from 'node:fs';
 import { appendFile, chmod, mkdir, unlink } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { getOverdeckHome } from '../paths.js';
+import {
+  activeComposerPayloadPresence,
+  type ComposerPayloadPresence,
+  type PaneViewport,
+} from '../pane-composer.js';
 import { PTY_TOKEN_HEADER, readPtyToken } from '../pty-token.js';
 import {
   INPUT_ECHO_CONFIRM_INTERVAL_MS,
   INPUT_ECHO_CONFIRM_ATTEMPTS,
   INPUT_ECHO_CONFIRM_PREFIX_CHARS,
+  INPUT_SUBMIT_CONFIRM_ATTEMPTS,
+  INPUT_SUBMIT_CONFIRM_INTERVAL_MS,
   echoConfirmTimeoutMs,
   inputSettleMs,
   INPUT_PURGE_MAX_CHARS,
@@ -43,6 +54,7 @@ const DEFAULT_COLS = 80;
 const DEFAULT_ROWS = 24;
 const SHUTDOWN_GRACE_MS = 2_000;
 const MAX_REQUEST_BYTES = 1024 * 1024;
+const execFileAsync = promisify(execFile);
 
 export interface PtySupervisorPayload {
   content: string;
@@ -325,10 +337,36 @@ async function purgePtyInput(child: pty.IPty, charCount: number): Promise<void> 
   await sleep(purgeSettleMs(count));
 }
 
+async function captureHostPaneViewport(): Promise<PaneViewport> {
+  const hostTmux = process.env.OVERDECK_HOST_TMUX;
+  const hostPane = process.env.OVERDECK_HOST_TMUX_PANE;
+  if (!hostTmux || !hostPane) throw new Error('host tmux pane is unavailable');
+  const options = {
+    encoding: 'utf8' as const,
+    env: { ...process.env, TMUX: hostTmux },
+  };
+  const [pane, cursor] = await Promise.all([
+    execFileAsync('tmux', ['capture-pane', '-p', '-t', hostPane], options),
+    execFileAsync('tmux', ['display-message', '-p', '-t', hostPane, '#{cursor_y}'], options),
+  ]);
+  const cursorY = Number.parseInt(cursor.stdout.trim(), 10);
+  if (!Number.isInteger(cursorY)) throw new Error('host tmux cursor row is unreadable');
+  return { text: pane.stdout, cursorY };
+}
+
+async function readHostComposerPayloadPresence(content: string): Promise<ComposerPayloadPresence> {
+  return activeComposerPayloadPresence(await captureHostPaneViewport(), content);
+}
+
+export interface InjectPtyMessageDeps {
+  readPayloadPresence?: (content: string) => Promise<ComposerPayloadPresence>;
+}
+
 export async function injectPtyMessage(
   child: pty.IPty,
   agentId: string,
   payload: PtySupervisorPayload,
+  deps: InjectPtyMessageDeps = {},
 ): Promise<void> {
   // Claude Code's TUI distinguishes "pasted text" from "Submit keystroke" by
   // whether bytes arrive in the same PTY read. Writing content + `\r`
@@ -377,6 +415,29 @@ export async function injectPtyMessage(
 
     await sleep(inputSettleMs(trimmed.length));
     child.write('\r');
+
+    if (deps.readPayloadPresence) {
+      for (let attempt = 1; attempt <= INPUT_SUBMIT_CONFIRM_ATTEMPTS; attempt++) {
+        await sleep(INPUT_SUBMIT_CONFIRM_INTERVAL_MS);
+        const presence = await deps.readPayloadPresence(trimmed).catch(() => 'unproven' as const);
+        if (presence !== 'present') break;
+        if (attempt < INPUT_SUBMIT_CONFIRM_ATTEMPTS) {
+          console.warn(
+            `[pty-supervisor] Submitted text is still in ${agentId}'s active composer; ` +
+            `sending standalone Enter again (${attempt}/${INPUT_SUBMIT_CONFIRM_ATTEMPTS - 1}).`,
+          );
+          child.write('\r');
+          continue;
+        }
+
+        // The payload is positively still in the cursor-anchored composer after
+        // every Enter attempt. Erase it before returning 502 so auto delivery may
+        // safely fall back to tmux without stacking a duplicate copy.
+        await purgePtyInput(child, trimmed.length);
+        throw new Error(`submit confirmation failed after ${INPUT_SUBMIT_CONFIRM_ATTEMPTS} Enter attempts`);
+      }
+    }
+
     if (payload.echo !== false) {
       process.stdout.write(trimmed.endsWith('\n') ? trimmed : `${trimmed}\n`);
     }
@@ -389,7 +450,11 @@ export async function injectPtyMessage(
   }
 }
 
-export function createPtySupervisorServer(agentId: string, child: pty.IPty): Server {
+export function createPtySupervisorServer(
+  agentId: string,
+  child: pty.IPty,
+  deps: InjectPtyMessageDeps = {},
+): Server {
   // Per-server dedup memory. A supervisor exit kills the agent with it (H1),
   // so this never needs to survive the supervisor itself — only the
   // dashboard, whose crash between the supervisor's injection and the
@@ -462,7 +527,7 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
       inFlightDedupKeys.set(key, { promise, settle });
 
       try {
-        await injectPtyMessage(child, agentId, payload);
+        await injectPtyMessage(child, agentId, payload, deps);
         // Completed only after a confirmed injection, inside the
         // supervisor's own crash boundary — the dashboard cannot interrupt
         // this ordering.
@@ -481,7 +546,7 @@ export function createPtySupervisorServer(agentId: string, child: pty.IPty): Ser
     }
 
     try {
-      await injectPtyMessage(child, agentId, payload);
+      await injectPtyMessage(child, agentId, payload, deps);
       writeJson(res, 200, 'ok');
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -585,7 +650,9 @@ async function main(): Promise<void> {
   proxyResizeToPty(child);
 
   const socketPath = getPtySupervisorSocketPath(agentId);
-  const server = createPtySupervisorServer(agentId, child);
+  const server = createPtySupervisorServer(agentId, child, {
+    readPayloadPresence: readHostComposerPayloadPresence,
+  });
   let shuttingDown = false;
 
   const childExited = new Promise<{ exitCode: number; signal?: number }>((resolve) => {

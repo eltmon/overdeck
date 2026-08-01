@@ -12,6 +12,8 @@
 export const INPUT_ECHO_CONFIRM_INTERVAL_MS = 50;
 export const INPUT_ECHO_CONFIRM_ATTEMPTS = 2;
 export const INPUT_ECHO_CONFIRM_PREFIX_CHARS = 40;
+export const INPUT_SUBMIT_CONFIRM_ATTEMPTS = 2;
+export const INPUT_SUBMIT_CONFIRM_INTERVAL_MS = 500;
 export const INPUT_PURGE_MAX_CHARS = 262_144;
 export const SUPERVISOR_CLIENT_MARGIN_MS = 2_000;
 const INJECTION_OVERHEAD_MS = 3_000; // PTY writes, log appends, scheduler slack
@@ -38,6 +40,8 @@ export function supervisorInjectionBudgetMs(contentLength: number): number {
     INPUT_ECHO_CONFIRM_ATTEMPTS * echoConfirmTimeoutMs(contentLength) +
     INPUT_ECHO_CONFIRM_ATTEMPTS * purgeSettleMs(clamped) +
     inputSettleMs(contentLength) +
+    INPUT_SUBMIT_CONFIRM_ATTEMPTS * INPUT_SUBMIT_CONFIRM_INTERVAL_MS +
+    purgeSettleMs(clamped) +
     INJECTION_OVERHEAD_MS
   );
 }
