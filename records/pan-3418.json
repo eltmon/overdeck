@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:33:34.864Z",
+  "updated": "2026-08-01T16:33:38.109Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -25,7 +25,36 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T15:22:03.647Z"
+    "updatedAt": "2026-08-01T16:33:38.096Z",
+    "reviewRequestedAt": "2026-08-01T16:33:38.096Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "recordedAt": "2026-08-01T16:33:34.861Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3428"
   },
   "closeOut": {
     "usage": {
