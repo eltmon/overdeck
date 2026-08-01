@@ -1,12 +1,28 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { Issue } from '../../../types';
 import type { OrderBookView } from '../BookStrip';
 import { LaneEditor } from '../LaneEditor';
 
 vi.mock('../../../lib/wsTransport', () => ({
   dashboardMutationJsonHeaders: vi.fn(async () => ({ 'content-type': 'application/json', 'x-overdeck-csrf-token': 'test' })),
 }));
+
+function issue(identifier: string, title: string): Issue {
+  return {
+    id: identifier,
+    identifier,
+    title,
+    status: 'Open',
+    stateType: 'unstarted',
+    priority: 2,
+    labels: [],
+    url: `https://example.test/${identifier}`,
+    createdAt: '2026-07-18T12:00:00.000Z',
+    updatedAt: '2026-07-18T12:00:00.000Z',
+  };
+}
 
 const book: OrderBookView = {
   id: '2026-07-18-editor',
@@ -36,6 +52,23 @@ const book: OrderBookView = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('LaneEditor', () => {
+  it('renders known issue titles case-insensitively and falls back to an empty title slot', () => {
+    render(
+      <LaneEditor
+        book={book}
+        issues={[issue('pan-1', 'Resolve issue titles in order books')]}
+        onBookChange={vi.fn()}
+      />,
+    );
+
+    const title = screen.getByText('Resolve issue titles in order books');
+    expect(title).toHaveClass('truncate', 'text-muted-foreground');
+    expect(title).toHaveAttribute('title', 'Resolve issue titles in order books');
+    expect(screen.getByText('PAN-1')).toBeInTheDocument();
+    expect(screen.getByText('PAN-2')).toBeInTheDocument();
+    expect(screen.getByText('PAN-2').nextElementSibling).toHaveAttribute('aria-hidden', 'true');
+  });
+
   it('persists drag reordering and lane swaps through the order item endpoint', async () => {
     const fetchMock = vi.fn(async () => Response.json(book));
     vi.stubGlobal('fetch', fetchMock);

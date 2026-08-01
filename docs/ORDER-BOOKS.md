@@ -128,7 +128,7 @@ Orders-bound status snapshots add `FlywheelStatus.orders`:
 | `laneBInFlight` | The current Lane B issue, when present. |
 | `drained` | `true` when every item is closed or parked. |
 
-The `/orders` Progress view renders the same mechanical eligibility conditions that the dispatch route enforces. Flywheel and issue-tree widgets are read-only projections that link back to `/orders`; they do not create another editing surface.
+The `/orders` Progress view renders the same mechanical eligibility conditions that the dispatch route enforces. The lane editor resolves each item's issue title at render time from the dashboard issues read model, falls back to the bare ID when the issue is unavailable, and never persists titles in the stored book. Flywheel and issue-tree widgets are read-only projections that link back to `/orders`; they do not create another editing surface.
 
 ## Retrospective and continuation
 
