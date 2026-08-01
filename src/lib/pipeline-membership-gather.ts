@@ -16,6 +16,7 @@ import { listOpenGitLabMergeRequests, listGitLabMergedMergeRequestHeads, type Gi
 import { STALE_PIPELINE_LABELS } from './cloister/label-reconciler.js';
 import { loadConfigSync } from './config.js';
 import { listSpecs } from './pan-dir/specs.js';
+import { readIssueRecord } from './pan-dir/record.js';
 import type { IssueLensSignals } from './pipeline-membership.js';
 import { getIssuePrefix, type ProjectConfig } from './projects.js';
 import { getRepoForge, inferProjectForgeSync } from './project-repos.js';
@@ -283,6 +284,7 @@ export interface PipelineMembershipGatherDeps {
   listIssueStates(owner: string, repo: string, numbers: number[]): Promise<Array<{ number: number; state: 'open' | 'closed' }>>;
   listTrackerIssues(project: ProjectConfig): Promise<ProjectTrackerIssueRow[]>;
   listSpecIssueIds(projectPath: string): Promise<string[]>;
+  hasTerminalCloseOutRecord(project: ProjectConfig, issueId: string): Promise<boolean>;
   run(command: string, args: string[], cwd?: string): Promise<string>;
 }
 
@@ -297,6 +299,14 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   listTrackerIssues: listProjectTrackerIssues,
   listSpecIssueIds: async (projectPath) =>
     (await Effect.runPromise(listSpecs(projectPath))).map((entry) => entry.issueId),
+  hasTerminalCloseOutRecord: async (project, issueId) => {
+    try {
+      const record = await readIssueRecord(project, issueId);
+      return record?.pipeline.closedOut === true;
+    } catch {
+      return false;
+    }
+  },
   run: async (command, args, cwd) => {
     const { stdout } = await execFileAsync(command, args, {
       cwd,
@@ -666,6 +676,27 @@ export async function gatherProjectLensSignals(
     }
   }
 
+  // Probe terminal close-out records for closed issues with open PRs (L7-record lens).
+  // This is done before the expensive merged-head oracle to avoid redundant queries.
+  // Only candidates that are tracker-closed AND have an open PR need probing.
+  const closedCandidatesWithOpenPr = [...candidates].filter(
+    (id) => knownStateByIssue.get(id) === 'closed' && openPrIssues.has(id),
+  );
+  const closedOutRecordIssues = new Set<string>();
+  if (closedCandidatesWithOpenPr.length > 0) {
+    const closedOutResults = await Promise.allSettled(
+      closedCandidatesWithOpenPr.map((id) =>
+        deps.hasTerminalCloseOutRecord(project, id),
+      ),
+    );
+    for (let i = 0; i < closedCandidatesWithOpenPr.length; i++) {
+      const result = closedOutResults[i];
+      if (result.status === 'fulfilled' && result.value) {
+        closedOutRecordIssues.add(closedCandidatesWithOpenPr[i]);
+      }
+    }
+  }
+
   // Closed issues resolve terminal regardless of merged-PR history (unless a PR
   // is still open, already captured above), so only open candidates need the
   // expensive merged-head oracle. This keeps historical refs/specs out of the
@@ -725,7 +756,7 @@ export async function gatherProjectLensSignals(
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasXbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
-    hasTerminalCloseOut: false,
+    hasTerminalCloseOut: closedOutRecordIssues.has(id),
   }));
 }
 
