@@ -118,6 +118,20 @@ Use `pan workspace reap` for bulk cleanup of orphaned broken stacks. It is dry-r
 
 Use rebuild for the workspace you are actively repairing. Use reap for stale, orphaned stacks after reviewing the dry-run output.
 
+## Seeding UAT issue fixtures
+
+A workspace container has no tracker-backed issue data by design: `IssueDataService` runs in skip-polling mode and the container-local `cache.db`/`overdeck.db` start empty, so any UI-redesign acceptance criterion that needs a live issue (open it, look at its tabs, check its agent rows) cannot be verified there out of the box. `pan admin seed-uat-fixtures` closes that gap by seeding one obviously-fake issue, `FIX-1` (reserved project key `uat-fixtures`, reserved prefix `FIX`, `[FIXTURE]` title prefix), with a phase, a branch, a PR, a review convoy, an xBRIEF plan, and activity history — everything a redesigned issue-detail page needs to render.
+
+```bash
+pan admin seed-uat-fixtures <issue-id>   # host mode: seeds that issue's workspace container
+pan admin seed-uat-fixtures --local [--force]   # run inside the container directly
+```
+
+- **Host mode** (`pan admin seed-uat-fixtures <issue-id>`, run from the host) resolves the workspace's compose stack, execs `--local` inside its `server` container, restarts `server`, and polls the container's health endpoint before printing the dashboard URL. Restarting is required: skip-polling mode loads its cache and read model once at boot, so a seed without a restart is invisible.
+- **`--local`** (run by the host wrapper, or manually by an operator already shelled into the container) writes the fixture set into the current `OVERDECK_HOME` through the same canonical write doors as the rest of Overdeck (project registration, the agent-state and review-status doors, the issue cache, activity events) plus a direct file write for the seeded workspace's `.overdeck/spec.vbrief.json` and `.overdeck/continue.json`. It refuses to run outside a detected container (`OVERDECK_DISABLE_DEACON=1` or `CONTAINER_MODE=1`) unless `--force` is passed, so seeding a host `OVERDECK_HOME` by accident is not possible.
+- **Ephemeral across recreate.** The fixture set lives only in the container-local `OVERDECK_HOME`, which does not survive `docker compose up --force-recreate` or a rebuild. Re-run `pan admin seed-uat-fixtures <issue-id>` after any operation that recreates the container.
+- **Obviously fake, always.** Every fixture-identifying literal (project key, prefix, title, PR URL) marks the seeded issue as synthetic. Seeding is idempotent — re-running it leaves exactly one `FIX-1` row in each store — and never touches a tracker or the host's own `OVERDECK_HOME`.
+
 ## Terminal-state stack teardown
 
 Terminal issues (closed/merged) must not leave Docker stacks running. Overdeck has four layers of protection:
