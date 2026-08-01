@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T22:33:15.141Z",
+  "updated": "2026-08-01T22:40:49.670Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "hooks-doc-checklist-door": {
-        "writerId": "agent-pan-3451",
-        "agentId": "agent-pan-3451",
-        "pid": 3756629,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:33:15.140Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3451",
@@ -96,6 +88,17 @@
         "outcome": "completed",
         "reason": "ohmypi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
         "releasedAt": "2026-08-01T22:32:54.035Z"
+      },
+      {
+        "writerId": "agent-pan-3451",
+        "agentId": "agent-pan-3451",
+        "pid": 3756629,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:33:15.140Z",
+        "itemId": "hooks-doc-checklist-door",
+        "outcome": "completed",
+        "reason": "Updated Pi Completion Detection docs to name the plan-checklist endpoint, canonical gate, and all-tasks-closed marker",
+        "releasedAt": "2026-08-01T22:40:49.669Z"
       }
     ],
     "statusReasons": {
@@ -110,6 +113,10 @@
       "ohmypi-extension-checklist-door": {
         "reason": "ohmypi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
         "updatedAt": "2026-08-01T22:32:54.035Z"
+      },
+      "hooks-doc-checklist-door": {
+        "reason": "Updated Pi Completion Detection docs to name the plan-checklist endpoint, canonical gate, and all-tasks-closed marker",
+        "updatedAt": "2026-08-01T22:40:49.669Z"
       }
     }
   },
@@ -128,6 +135,8 @@
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac2": "completed",
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac3": "completed",
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac4": "completed",
-    "hooks-doc-checklist-door": "running"
+    "hooks-doc-checklist-door": "completed",
+    "hooks-doc-checklist-door.hooks-doc-checklist-door.ac1": "completed",
+    "hooks-doc-checklist-door.hooks-doc-checklist-door.ac2": "completed"
   }
 }
