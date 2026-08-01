@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   INPUT_ECHO_CONFIRM_ATTEMPTS,
   INPUT_PURGE_MAX_CHARS,
+  INPUT_SUBMIT_CONFIRM_ATTEMPTS,
+  INPUT_SUBMIT_CONFIRM_INTERVAL_MS,
   SUPERVISOR_CLIENT_MARGIN_MS,
   echoConfirmTimeoutMs,
   inputSettleMs,
@@ -19,7 +21,9 @@ describe('injection budget', () => {
 
   it('preserves the documented floors', () => {
     expect(echoConfirmTimeoutMs(1_024)).toBe(2_600);
-    expect(supervisorInjectionBudgetMs(0)).toBe(2 * 2_500 + 2 * 150 + 300 + 3_000);
+    expect(supervisorInjectionBudgetMs(0)).toBe(
+      2 * 2_500 + 2 * 150 + 300 + 2 * 500 + 150 + 3_000,
+    );
   });
 
   it('caps each payload-scaled wait for a 10 MB payload', () => {
@@ -28,7 +32,7 @@ describe('injection budget', () => {
     expect(echoConfirmTimeoutMs(tenMb)).toBe(15_000);
     expect(inputSettleMs(tenMb)).toBe(2_000);
     expect(purgeSettleMs(tenMb)).toBe(1_000);
-    expect(supervisorInjectionBudgetMs(tenMb)).toBe(37_000);
+    expect(supervisorInjectionBudgetMs(tenMb)).toBe(39_000);
   });
 
   it.each([0, 8 * 1_024, 30 * 1_024, 1_024 * 1_024])(
@@ -38,7 +42,9 @@ describe('injection budget', () => {
       const internalWaitSum =
         INPUT_ECHO_CONFIRM_ATTEMPTS * echoConfirmTimeoutMs(length) +
         INPUT_ECHO_CONFIRM_ATTEMPTS * purgeSettleMs(erased) +
-        inputSettleMs(length);
+        inputSettleMs(length) +
+        INPUT_SUBMIT_CONFIRM_ATTEMPTS * INPUT_SUBMIT_CONFIRM_INTERVAL_MS +
+        purgeSettleMs(erased);
       const clientTimeout = supervisorInjectionBudgetMs(length) + SUPERVISOR_CLIENT_MARGIN_MS;
 
       expect(clientTimeout).toBeGreaterThan(internalWaitSum);
