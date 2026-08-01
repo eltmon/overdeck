@@ -209,7 +209,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:50:01.832Z",
+  "updated": "2026-08-01T21:50:07.983Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "blocked",
@@ -218,9 +218,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:50:00.824Z",
+    "updatedAt": "2026-08-01T21:50:07.972Z",
     "reviewNotes": "Residue tests fail during module collection and the membership batch repeats synchronous state-home resolution per issue",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
+    "reviewedAtCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f",
     "reviewRequestedAt": "2026-08-01T21:43:27.436Z",
     "reviewSpawnedAt": "2026-08-01T21:43:07.062Z",
     "scopeDrift": {
@@ -267,24 +268,6 @@
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
       "recordedAt": "2026-08-01T21:43:26.402Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "d135f7a18c275d4bd9de7f2bb9534adf54438e0f"
-      }
     },
     "reviewCycleHistory": [
       {
@@ -377,7 +360,7 @@
       },
       "costAtCloseOut": {
         "usd": 176.0848353,
-        "pricingAsOf": "2026-08-01T21:50:00.876Z"
+        "pricingAsOf": "2026-08-01T21:50:07.978Z"
       }
     },
     "merges": [
