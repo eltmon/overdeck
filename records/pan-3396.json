@@ -147,9 +147,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T21:43:42.958Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T21:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-01T21:50:01.832Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T21:50:01Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3396\n\n# Review Synthesis — PAN-3396 — 2026-08-01T21:49:25Z\n\n## Verdict: CHANGES REQUESTED — the focused residue test suite cannot load, and the recurring membership batch still repeats synchronous state-home resolution per issue\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/context.json\n- Branch: feature/pan-3396\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n- HEAD reviewed: 4bd8620af813022475a94b085fdc332d10ad51af\n- Cycle number: 5\n- Prior cycle SHA: 97c4ca392bf11b68f8e1a75c72ca61be36eaf985\n- PR commits: 15\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/correctness.md | 3 raw; 1 blocking after gates |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] The new residue unit-test suite fails during module collection — `tests/unit/lib/lifecycle/residue.test.ts:7`\nThe current-cycle mock fix declares `mockExecFile` as a top-level `const` and references it inside a hoisted `vi.mock()` factory. A focused run of `npx vitest run --configLoader runner tests/unit/lib/lifecycle/residue.test.ts` fails before collecting any tests with `ReferenceError: Cannot access 'mockExecFile' before initialization`. The suite therefore cannot establish any residue behavior and the branch cannot pass the project test gate. Use `vi.hoisted()` or another Vitest-compatible module mock, then align the assertions with the production contract: successful empty lookups currently produce evidence and return `skipped: false`, while a first-close failure has no partial-progress details because no successful mutation preceded it.\n\n### [performance] The new record-door batch still resolves the same state home synchronously for every issue — `src/lib/pan-dir/record.ts:496`\n`batchReadIssueRecords()` was added in this cycle to replace the gatherer's direct filesystem path and claims to resolve the state home once, but it calls `readIssueRecord(project, id)` for every candidate. Each call reaches `getIssueRecordPath()` and `resolveStateReadHomeSync()`, which synchronously reads `migration-complete.json`. The ten-item batches cap asynchronous record reads but preserve O(candidate-count) blocking marker reads on the recurring dashboard/Deacon membership path. Resolve the project-scoped state home once behind the canonical record door, derive record paths from that result, and retain bounded asynchronous body reads with individual failures mapping toward `zombie_pr`.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: pre-existing, out of PR scope] Completed close-out records bypass residue cleanup — `src/lib/lifecycle/workflows.ts:183`\nThe ordinary idempotent return still makes the residue path unreachable for an already-closed-out record, which is the population the feature is intended to reconcile. The cited short-circuit is outside the PR diff and was already demoted in cycle 4, so the mandatory scope and convergence gates prevent it from blocking this review.\n\n### [correctness] [demoted: previously reviewed, not promotable] Durable disposition persistence drops `kind` — `src/lib/lifecycle/workflows.ts:456`\n`recordDodGateStep()` still persists the raw `{ reason, by }` option instead of `dodGate.disposition`, and `PanIssueCloseOutRecord` still has no `kind` field. This was explicitly reviewed and demoted in cycle 4, and neither persistence site changed after the prior synthesis SHA, so cycle-5 convergence prevents promotion.\n\n## Clean Sub-roles\n- security\n- requirements\n\n## Convergence Note\nCycle 5 can block only on lines changed after `97c4ca392bf11b68f8e1a75c72ca61be36eaf985`. The test mock and record-door batch helper were both introduced in the current-cycle fixes, so their failures are promotable. The idempotent short-circuit is outside the PR diff, and the durable disposition writer was unchanged since the prior synthesis, so both remain advisory. Two blockers are below the proportionality threshold of 45 for 15 PR commits.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-4bd8620a/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3396 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -196,7 +209,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:50:00.894Z",
+  "updated": "2026-08-01T21:50:01.832Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "blocked",
