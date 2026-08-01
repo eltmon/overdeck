@@ -694,3 +694,21 @@ strike-3408 messaged for a gate exception 45 min AFTER I merged its fix (#3414) 
 
 - **PAN-3406 promoted + closed out** (leftover-agent pause + deploy `6e3cda7a` + clean 8-row DoD): operator request → filed → planned → built → UAT-promoted → closed in ~95 minutes. Second promote today with the lifecycle leaving the work agent running (MIN-929 pattern — the postMergeLifecycle agent-pause gap now has 2 specimens; file next occurrence).
 - Deploy also brings #3414 (banner) live. PAN-3408 close-out waits on main CI green past its merge. Clean UAT batch EMPTY (candidate null — correct). New backlog appeared: MIN-930/MIN-931 planned, PAN-3413 (not mine — investigate provenance next tick). **MIN-874 bucket dropped to planned_backlog despite its +8k branch — verify next tick.**
+
+## RUN-79 interstitial (~15:05Z) — strike-3420 scope-abort accepted; PAN-3420 rerouted to planning
+
+Operator-filed **PAN-3420** (closed-out issues render as never-started — post-close-out history wipe, observed on MIN-929 minutes after its close-out). The strike ABORTED WITHOUT EDITS, correctly: it verified SIX independent live-only read paths (nulled journal, wrong-source drawer badges, snapshot-agents conversations, cleared review_status history, transient activity arrays, removed cv.json) — this is the two-door tenet applied to issue history, needing a unified durable issue-history resolver + no-loss regression, not a precision fix. Findings preserved as an issue comment (PRD input); `pan plan PAN-3420 --auto` dispatched. NOTE the meta-point: today's close-out sprint (16 issues) made this class VISIBLE — every close-out wipes the operator-facing history of the work just completed. High operator-value plan.
+
+## RUN-79 tick 22 (2026-08-01 ~15:15Z) — PAN-3407 landed; MIN-874 wedge #4 → composer-submit class FILED (PAN-3422); strike-3413 via CI (#3421)
+
+- **PAN-3407 landed** (#3415 squash `318f63d663`, handed off — the journal fallback line fired again mid-handoff, 3rd today; retry confirmed). Close-out on CI+deploy.
+- **MIN-874 was the 4th composer-wedge specimen** (post-compaction resume nudge visibly unsubmitted, 2.5h idle at $242; sub-branches all pushed so nothing lost) → `--fresh` (new session working, $0.28). **Filed PAN-3422** with the testable mechanism: paneHasBlockingChoiceMenu() false-positives would produce paste-without-Enter systematically — 4/4 specimens match. Its bucket anomaly (planned_backlog) likely reflects the pushed-branch/no-unique-vs-main resolver view — recheck after agent progresses.
+- **strike-3413** (operator-filed, record-reconcile orphaned-drafts fix): same load-flake gate story (6th) → pushed + **PR #3421**, CI arbitrates.
+- PAN-3420 planning underway (unified issue-history resolver). PAN-3408 close-out still waiting on a green main run containing its merge (CI was in_progress).
+
+## RUN-79 tick 23 (2026-08-01 ~15:35Z) — PAN-3413 landed; strike-3422 dispatched; MIN-839 in organic rework
+
+- **PAN-3413 landed** (#3421 squash `dea43f848b`, handed off) — record reconcile adopts canonical writes. 17th landed issue this run.
+- **strike-pan-3422 dispatched** (composer-submit wedge class — the run's costliest recurring operational failure, ~4h agent time + \$300 today).
+- **MIN-839 review: organic CHANGES REQUESTED** ("reconciliation fails on detached lazy associations before scanning cards") — real code finding, pipeline working as designed; rework beginning. WATCH: its agent showed ctx 0/out 0 post-feedback — if no delta next tick, that's composer-wedge specimen #5 (--fresh + append to PAN-3422).
+- strike-3416 ctx 88% compaction watch. MIN-874 fresh session producing. 3 test phases live (3362/3367/864). Main CI backlog (2 runs in progress) — 3408/3407 close-outs queued behind.

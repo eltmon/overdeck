@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>New Workspace — full-page creation · PAN-3411 mockup</title>
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  @font-face {
+    font-family: "Geist";
+    src: url("fonts/Geist-Variable.woff2") format("woff2");
+    font-weight: 300 900;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Geist Mono";
+    src: url("fonts/GeistMono-Variable.woff2") format("woff2");
+    font-weight: 300 900;
+    font-display: swap;
+  }
+
+  body { font-family: "Geist", system-ui, sans-serif; overflow: hidden; }
+  .gm { font-family: "Geist Mono", SFMono-Regular, Consolas, monospace; }
+
+  .app { display: flex; height: 100vh; }
+  .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+  /* ─── top bar ─── */
+  .topbar { background: transparent; border-bottom: 1px solid var(--border); }
+  .crumbs .title { font-weight: 520; }
+
+  /* ─── creation page ─── */
+  .stage { flex: 1; overflow-y: auto; }
+  .sheet { max-width: 880px; margin: 0 auto; padding: 56px 48px 140px; }
+
+  /* chip row */
+  .chip-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 64px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 38px; padding: 0 14px;
+    border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground);
+    font-family: "Geist", sans-serif; font-size: 13px; font-weight: 450;
+    cursor: pointer; transition: background-color 150ms;
+  }
+  .chip:hover { background: var(--accent); }
+  .chip svg { width: 15px; height: 15px; color: var(--muted-foreground); }
+  .chip .pmark { width: 9px; height: 9px; border-radius: 3px; }
+  .chip.dashed { border-style: dashed; color: var(--muted-foreground); }
+  .chip.selected { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: var(--accent); }
+  .chip.more { color: var(--muted-foreground); }
+
+  /* hero title */
+  .hero-title {
+    width: 100%; border: none; outline: none; background: transparent;
+    font-family: "Geist", sans-serif;
+    font-size: clamp(46px, 6.4vw, 68px);
+    font-weight: 740; letter-spacing: -0.03em; line-height: 1.04;
+    color: var(--foreground); padding: 0; margin-bottom: 28px;
+    caret-color: var(--primary);
+  }
+  .hero-title::placeholder { color: color-mix(in srgb, var(--muted-foreground) 38%, transparent); }
+
+  /* target row */
+  .target-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 40px; }
+  .target-chip {
+    display: inline-flex; align-items: center; gap: 8px;
+    height: 38px; padding: 0 12px;
+    border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground);
+    font-family: "Geist Mono", monospace; font-size: 12.5px;
+    cursor: pointer; transition: background-color 150ms;
+  }
+  .target-chip:hover { background: var(--accent); }
+  .target-chip svg { width: 15px; height: 15px; color: var(--muted-foreground); flex-shrink: 0; }
+  .target-chip .chev { width: 13px; height: 13px; opacity: .6; }
+
+  .mode-toggle { display: inline-flex; background: transparent; border: 1px solid var(--input); border-radius: var(--radius-lg); overflow: hidden; height: 38px; }
+  .mode-toggle button {
+    background: transparent; border: none; padding: 0 14px;
+    font-family: "Geist", sans-serif; font-size: 13px; font-weight: 450;
+    color: var(--muted-foreground); cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    transition: background-color 150ms;
+  }
+  .mode-toggle button svg { width: 14px; height: 14px; }
+  .mode-toggle button.active { background: var(--accent); color: var(--foreground); }
+  .mode-toggle .div { width: 1px; background: var(--border); }
+
+  .advanced {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: none; border: none; cursor: pointer;
+    font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted-foreground); padding: 8px 6px;
+  }
+  .advanced:hover { color: var(--foreground); }
+  .advanced svg { width: 12px; height: 12px; transition: transform 150ms; }
+  .advanced.open svg { transform: rotate(90deg); }
+  .advanced-panel {
+    display: none; width: 100%; margin-top: 10px;
+    align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--muted-foreground);
+  }
+  .advanced-panel.open { display: flex; }
+  .advanced-panel select {
+    background: var(--card); color: var(--foreground);
+    border: 1px solid var(--input); border-radius: var(--radius-md);
+    font-family: "Geist Mono", monospace; font-size: 12px; height: 30px; padding: 0 8px;
+  }
+
+  .hairline { height: 1px; background: var(--border); margin: 0 0 22px; }
+
+  /* status strip */
+  .status-strip { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; min-height: 48px; }
+  .dotline { display: flex; align-items: center; gap: 8px; font-family: "Geist Mono", monospace; font-size: 12px; color: var(--muted-foreground); flex: 1; min-width: 0; flex-wrap: wrap; }
+  .dotline .d { width: 6px; height: 6px; border-radius: 50%; background: var(--success); flex-shrink: 0; }
+  .dotline .d.err { background: var(--destructive); }
+  .dotline .sep { opacity: .45; }
+  .dotline .finding { color: var(--destructive-foreground); }
+
+  .cancel-btn {
+    background: none; border: none; cursor: pointer;
+    font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .14em;
+    color: var(--muted-foreground); padding: 10px 8px;
+  }
+  .cancel-btn:hover { color: var(--foreground); }
+
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    height: 48px; padding: 0 22px;
+    border: none; border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: color-mix(in srgb, var(--primary) 55%, var(--color-white));
+    font-family: "Geist", sans-serif; font-size: 15px; font-weight: 550;
+    cursor: pointer; transition: background-color 150ms, opacity 150ms;
+  }
+  .cta:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+  .cta:disabled { opacity: .38; cursor: not-allowed; }
+  .keycap {
+    display: inline-grid; place-items: center;
+    min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 8%);
+    font-family: "Geist Mono", monospace; font-size: 12px;
+  }
+
+  /* ideas */
+  .ideas-eyebrow {
+    font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase;
+    letter-spacing: .12em; color: var(--muted-foreground); margin: 34px 0 14px;
+  }
+  .ideas { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  @media (max-width: 900px) { .ideas { grid-template-columns: repeat(2, 1fr); } }
+  .idea {
+    background: color-mix(in srgb, var(--color-white) 3%, transparent);
+    border: 1px solid transparent; border-radius: var(--radius-xl);
+    padding: 18px; display: flex; flex-direction: column; gap: 6px;
+    cursor: pointer; transition: background-color 150ms, transform 150ms;
+    text-align: left; font-family: "Geist", sans-serif;
+  }
+  .idea:hover { background: color-mix(in srgb, var(--color-white) 5.5%, transparent); }
+  .idea:active { transform: scale(.985); }
+  .idea .i-eyebrow { font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); }
+  .idea .i-title { font-size: 13.5px; font-weight: 460; color: var(--foreground); line-height: 1.45; }
+
+  /* toast */
+  .toast {
+    position: fixed; bottom: 72px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--popover); border: 1px solid var(--border); border-radius: var(--radius-xl);
+    padding: 12px 18px; font-size: 13px; color: var(--foreground);
+    opacity: 0; pointer-events: none; transition: opacity 250ms, transform 250ms;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 40%);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast .gm { font-size: 11px; color: var(--muted-foreground); }
+
+  /* state toggle in mock chrome */
+  .mock-chrome button {
+    background: transparent; border: none; color: var(--muted-foreground); font: inherit;
+    font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: var(--radius-md);
+    cursor: pointer; transition: background-color 200ms, color 200ms;
+  }
+  .mock-chrome button:hover { background: var(--accent); color: var(--foreground); }
+  .mock-chrome button.current { color: var(--foreground); background: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- app rail -->
+  <div class="rail">
+    <div class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+    </div>
+    <div class="nav" title="Board"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="10" rx="1.5"/></svg></div>
+    <div class="nav active" title="Workspaces"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg></div>
+    <div class="nav" title="Agents"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.5-6 8-6s8 2 8 6"/></svg></div>
+    <div class="nav" title="Costs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></div>
+    <div class="group-label"></div>
+    <div class="nav" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 00-2-1.2L14 3h-4l-.5 2.6a7 7 0 00-2 1.2l-2.4-1-2 3.4 2 1.6A7 7 0 005 12c0 .4 0 .8.1 1.2l-2 1.6 2 3.4 2.4-1a7 7 0 002 1.2L10 21h4l.5-2.6a7 7 0 002-1.2l2.4 1 2-3.4-2-1.6c.07-.4.1-.8.1-1.2z"/></svg></div>
+    <div class="spacer"></div>
+    <div class="avatar">E</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div class="crumbs">
+        <span class="muted">workspaces</span>
+        <span class="sep">/</span>
+        <span class="title">new</span>
+      </div>
+      <div class="tb-spacer"></div>
+      <div class="search">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+        Search or command…
+        <span style="margin-left:auto;" class="gm">⌘K</span>
+      </div>
+    </div>
+
+    <div class="stage">
+      <div class="sheet">
+
+        <!-- 1 · project chip row -->
+        <div class="chip-row" id="chipRow">
+          <button class="chip dashed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            add existing
+          </button>
+          <button class="chip dashed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/><path d="M12 11v6M9 14h6"/></svg>
+            new project
+          </button>
+          <button class="chip selected" data-project="overdeck"><span class="pmark" style="background:var(--signal-review);"></span>overdeck</button>
+          <button class="chip" data-project="mind-your-now"><span class="pmark" style="background:var(--info);"></span>mind-your-now</button>
+          <button class="chip" data-project="auricle"><span class="pmark" style="background:var(--success);"></span>auricle</button>
+          <button class="chip" data-project="krux"><span class="pmark" style="background:var(--warning);"></span>krux</button>
+          <button class="chip" data-project="eltmon-video"><span class="pmark" style="background:var(--signal-cost);"></span>eltmon-video</button>
+          <button class="chip more">
+            more projects
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+        </div>
+
+        <!-- 2 · hero title -->
+        <input class="hero-title" id="heroTitle" placeholder="Untitled workspace" autofocus autocomplete="off" spellcheck="false" />
+
+        <!-- 3 · target row -->
+        <div class="target-row">
+          <button class="target-chip" title="Choose target directory">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+            <span id="targetPath">~/Projects/overdeck</span>
+            <svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+
+          <div class="mode-toggle" id="modeToggle">
+            <button class="active" data-mode="shared">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+              shared
+            </button>
+            <div class="div"></div>
+            <button data-mode="isolated">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/></svg>
+              isolated
+            </button>
+          </div>
+
+          <button class="advanced" id="advancedBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+            advanced
+          </button>
+
+          <div class="advanced-panel" id="advancedPanel">
+            <span>parent branch</span>
+            <select>
+              <option>main</option>
+              <option>feature/pan-3410-style-guide-v2</option>
+              <option>release/0.9.x</option>
+            </select>
+            <span style="opacity:.6;">· isolated workspaces branch from here</span>
+          </div>
+        </div>
+
+        <!-- 4 · hairline -->
+        <div class="hairline"></div>
+
+        <!-- 5 · status strip -->
+        <div class="status-strip">
+          <div class="dotline" id="statusLine">
+            <span class="d" id="statusDot"></span>
+            <span id="statusText">Memory enabled <span class="sep">·</span> <span id="modeSegment">Files shared</span> <span class="sep">·</span> git repository</span>
+          </div>
+          <button class="cancel-btn">Cancel</button>
+          <button class="cta" id="startBtn">Start workspace <span class="keycap">↵</span></button>
+        </div>
+
+        <!-- 6 · hairline -->
+        <div class="hairline"></div>
+
+        <!-- 7 · ideas -->
+        <div class="ideas-eyebrow">Ideas for your next workspace</div>
+        <div class="ideas" id="ideas">
+          <button class="idea" data-title="Nightly dependency-audit sweep">
+            <span class="i-eyebrow">Automate</span>
+            <span class="i-title">Nightly dependency-audit sweep across all registered projects</span>
+          </button>
+          <button class="idea" data-title="Triage the untriaged backlog">
+            <span class="i-eyebrow">Delegate</span>
+            <span class="i-title">Triage the untriaged backlog and draft a priority proposal</span>
+          </button>
+          <button class="idea" data-title="How does the merge train work?">
+            <span class="i-eyebrow">Explore</span>
+            <span class="i-title">Map how the merge train decides dispatch order</span>
+          </button>
+          <button class="idea" data-title="Prototype: kanban swimlanes by project">
+            <span class="i-eyebrow">Build</span>
+            <span class="i-title">Prototype kanban swimlanes grouped by project</span>
+          </button>
+          <button class="idea" data-title="Plan the Q3 cost-governor roadmap">
+            <span class="i-eyebrow">Plan</span>
+            <span class="i-title">Plan the Q3 cost-governor roadmap from open issues</span>
+          </button>
+          <button class="idea" data-title="Redesign the agent card footer">
+            <span class="i-eyebrow">Design</span>
+            <span class="i-title">Redesign the agent card footer around the new style guide</span>
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success-foreground)" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+  <span id="toastText">Workspace created</span>
+  <span class="gm" id="toastMeta">POST /api/workspace-registry → 201</span>
+</div>
+
+<div class="mock-chrome">
+  <span class="label">Mock</span>
+  <a href="style-guide-v2.html">Style guide v2</a>
+  <a href="#" class="current">New Workspace page</a>
+  <span style="width:1px;height:14px;background:var(--border);"></span>
+  <span class="label">Resolution</span>
+  <button id="stateClean" class="current">clean</button>
+  <button id="stateFinding">finding</button>
+</div>
+
+<script>
+  const hero = document.getElementById('heroTitle');
+  const startBtn = document.getElementById('startBtn');
+  const statusText = document.getElementById('statusText');
+  const statusDot = document.getElementById('statusDot');
+  const modeSegment = document.getElementById('modeSegment');
+  const toast = document.getElementById('toast');
+  const toastText = document.getElementById('toastText');
+  let finding = false;
+  let mode = 'shared';
+
+  // project chips (single-select)
+  document.querySelectorAll('#chipRow .chip[data-project]').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('#chipRow .chip[data-project]').forEach(c => c.classList.remove('selected'));
+      chip.classList.add('selected');
+      renderStatus();
+    });
+  });
+
+  // mode toggle
+  document.querySelectorAll('#modeToggle button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modeToggle button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      mode = btn.dataset.mode;
+      renderStatus();
+    });
+  });
+
+  // advanced disclosure
+  const advBtn = document.getElementById('advancedBtn');
+  const advPanel = document.getElementById('advancedPanel');
+  advBtn.addEventListener('click', () => {
+    advBtn.classList.toggle('open');
+    advPanel.classList.toggle('open');
+  });
+
+  // idea cards prefill the hero
+  document.querySelectorAll('.idea').forEach(card => {
+    card.addEventListener('click', () => {
+      hero.value = card.dataset.title;
+      hero.focus();
+      hero.setSelectionRange(hero.value.length, hero.value.length);
+      renderStatus();
+    });
+  });
+
+  // status rendering — the strip IS the validation surface
+  function renderStatus() {
+    if (finding) {
+      statusDot.className = 'd err';
+      statusText.innerHTML = '<span class="finding">Target directory is not a git repository — pick a folder inside a repo or enable “initialize git” in the project settings</span>';
+      startBtn.disabled = true;
+    } else {
+      statusDot.className = 'd';
+      statusText.innerHTML = 'Memory enabled <span class="sep">·</span> ' +
+        (mode === 'shared' ? 'Files shared' : 'Isolated worktree') +
+        ' <span class="sep">·</span> git repository';
+      startBtn.disabled = false;
+    }
+  }
+
+  // clean / finding toggle in the mock chrome
+  const btnClean = document.getElementById('stateClean');
+  const btnFinding = document.getElementById('stateFinding');
+  btnClean.addEventListener('click', () => { finding = false; btnClean.classList.add('current'); btnFinding.classList.remove('current'); renderStatus(); });
+  btnFinding.addEventListener('click', () => { finding = true; btnFinding.classList.add('current'); btnClean.classList.remove('current'); renderStatus(); });
+
+  // submit — Enter anywhere or the CTA
+  let toastTimer;
+  function submit() {
+    if (startBtn.disabled) return;
+    const name = hero.value.trim() || 'untitled-workspace';
+    toastText.textContent = `Workspace “${name}” created — activating…`;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2600);
+  }
+  startBtn.addEventListener('click', submit);
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'SELECT') {
+      e.preventDefault();
+      submit();
+    }
+  });
+
+  renderStatus();
+</script>
+
+</body>
+</html>

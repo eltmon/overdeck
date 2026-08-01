@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="broadsheet">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Style Guide v2 — the Broadsheet theme · PAN-3410 mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300..800&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="_shared.css" />
+<style>
+  @font-face {
+    font-family: "Geist";
+    src: url("fonts/Geist-Variable.woff2") format("woff2");
+    font-weight: 300 900;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Geist Mono";
+    src: url("fonts/GeistMono-Variable.woff2") format("woff2");
+    font-weight: 300 900;
+    font-display: swap;
+  }
+
+  body { font-family: "Geist", system-ui, sans-serif; }
+  .mono, .gm { font-family: "Geist Mono", SFMono-Regular, Consolas, monospace; }
+
+  .page { max-width: 1080px; margin: 0 auto; padding: 0 48px 120px; }
+
+  /* ─── Top bar ─── */
+  .top-bar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 32px; border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+  }
+  .top-bar .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+  .top-bar .brand .mark { width: 24px; height: 24px; display: grid; place-items: center; color: var(--foreground); }
+  .top-bar .crumb { color: var(--muted-foreground); font-size: 13px; }
+  .top-bar .crumb .sep { opacity: .5; margin: 0 6px; }
+  .top-bar .spacer { flex: 1; }
+  .top-bar .meta { font-size: 11px; color: var(--muted-foreground); font-family: "Geist Mono", monospace; }
+
+  /* ─── Hero (display scale) ─── */
+  .hero { padding: 72px 0 56px; }
+  .eyebrow {
+    font-family: "Geist Mono", monospace;
+    font-size: 11px; font-weight: 500;
+    text-transform: uppercase; letter-spacing: .12em;
+    color: var(--muted-foreground);
+  }
+  .display-xl {
+    font-size: clamp(48px, 7vw, 72px);
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+    margin: 14px 0 18px;
+  }
+  .display-lg {
+    font-size: 40px; font-weight: 680;
+    letter-spacing: -0.025em; line-height: 1.05;
+  }
+  .hero-sub { font-size: 16px; color: var(--muted-foreground); max-width: 700px; line-height: 1.55; font-weight: 400; }
+  .hero-sub b { color: var(--foreground); font-weight: 550; }
+
+  /* ─── Sections ─── */
+  section { margin-top: 72px; }
+  .section-eyebrow { font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); margin-bottom: 10px; }
+  .section-title { font-size: 26px; font-weight: 620; letter-spacing: -0.015em; margin: 0 0 6px; }
+  .section-lead { font-size: 14px; color: var(--muted-foreground); max-width: 660px; line-height: 1.55; margin-bottom: 24px; }
+  .section-lead b { color: var(--foreground); font-weight: 550; }
+  .section-lead code { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--foreground); background: var(--accent); padding: 1px 5px; border-radius: var(--radius-sm); }
+
+  /* ─── Tier table ─── */
+  .tiers { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; background: var(--card); }
+  .tier-row { display: grid; grid-template-columns: 150px 1fr 130px 220px; align-items: center; gap: 20px; padding: 16px 24px; border-bottom: 1px solid var(--border); }
+  .tier-row:last-child { border-bottom: none; }
+  .tier-row.head { padding: 10px 24px; background: color-mix(in srgb, var(--background) 94%, var(--color-white)); }
+  .tier-row.head span { font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); }
+  .tier-name { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--foreground); }
+  .tier-sample { overflow: hidden; white-space: nowrap; }
+  .tier-weight { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+  .tier-use { font-size: 12px; color: var(--muted-foreground); }
+
+  /* ─── Pattern cards ─── */
+  .pattern-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .pattern {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);
+    padding: 20px 22px; display: flex; flex-direction: column; gap: 14px;
+  }
+  .pattern .p-head { display: flex; align-items: baseline; justify-content: space-between; }
+  .pattern .p-name { font-size: 14px; font-weight: 560; }
+  .pattern .p-dec { font-family: "Geist Mono", monospace; font-size: 10px; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .1em; }
+  .pattern .p-desc { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+  .pattern .p-desc code { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--foreground); background: var(--accent); padding: 1px 4px; border-radius: var(--radius-sm); }
+  .pattern .p-demo {
+    border: 1px dashed var(--border); border-radius: var(--radius-lg);
+    padding: 22px; display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+    background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+    min-height: 84px;
+  }
+
+  /* D-4 hero placeholder demo */
+  .hero-input-demo {
+    width: 100%; border: none; outline: none; background: transparent;
+    font-family: "Geist", sans-serif;
+    font-size: clamp(28px, 3.4vw, 40px); font-weight: 720; letter-spacing: -0.025em;
+    color: var(--foreground); padding: 0;
+  }
+  .hero-input-demo::placeholder { color: color-mix(in srgb, var(--muted-foreground) 40%, transparent); }
+
+  /* D-6 chips */
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    height: 38px; padding: 0 14px;
+    border: 1px solid var(--input); border-radius: var(--radius-lg);
+    background: transparent; color: var(--foreground);
+    font-family: "Geist", sans-serif; font-size: 13px; font-weight: 450;
+    cursor: pointer; transition: background-color 150ms;
+  }
+  .chip:hover { background: var(--accent); }
+  .chip svg { width: 16px; height: 16px; color: var(--muted-foreground); }
+  .chip.dashed { border-style: dashed; color: var(--muted-foreground); }
+  .chip.selected { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: var(--accent); }
+
+  /* D-7 soft card */
+  .soft-card {
+    background: color-mix(in srgb, var(--color-white) 3%, transparent);
+    border: 1px solid transparent;
+    border-radius: var(--radius-xl);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 6px;
+    cursor: pointer; transition: background-color 150ms;
+    text-align: left; width: 100%;
+  }
+  .soft-card:hover { background: color-mix(in srgb, var(--color-white) 5%, transparent); }
+  .soft-card .sc-eyebrow { font-family: "Geist Mono", monospace; font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); }
+  .soft-card .sc-title { font-size: 14px; font-weight: 480; color: var(--foreground); line-height: 1.4; }
+
+  /* D-8 CTA + keycap */
+  .cta {
+    display: inline-flex; align-items: center; gap: 10px;
+    height: 48px; padding: 0 22px;
+    border: none; border-radius: var(--radius-xl);
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    color: color-mix(in srgb, var(--primary) 55%, var(--color-white));
+    font-family: "Geist", sans-serif; font-size: 15px; font-weight: 550;
+    cursor: pointer; transition: background-color 150ms;
+  }
+  .cta:hover { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+  .keycap {
+    display: inline-grid; place-items: center;
+    min-width: 22px; height: 22px; padding: 0 6px;
+    border-radius: var(--radius-md);
+    background: rgb(255 255 255 / 8%);
+    font-family: "Geist Mono", monospace; font-size: 12px;
+    color: inherit;
+  }
+
+  /* D-9 dot-metadata line */
+  .dotline { display: inline-flex; align-items: center; gap: 8px; font-family: "Geist Mono", monospace; font-size: 12px; color: var(--muted-foreground); }
+  .dotline .d { width: 6px; height: 6px; border-radius: 50%; background: var(--success); }
+  .dotline .d.warn { background: var(--warning); }
+  .dotline .sep { opacity: .45; }
+
+  /* ─── Before / after ─── */
+  .ba-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .ba { border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; background: var(--card); }
+  .ba .ba-head { padding: 10px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; background: color-mix(in srgb, var(--background) 94%, var(--color-white)); }
+  .ba .ba-head .tag { font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); }
+  .ba .ba-head .tag.after { color: var(--success-foreground); }
+  .ba .ba-body { padding: 22px; }
+  .ba.v1 .ba-body { font-family: "DM Sans", system-ui, sans-serif; }
+
+  /* issue card specimen */
+  .issue-card { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; background: color-mix(in srgb, var(--background) 97%, var(--color-white)); }
+  .issue-card .ic-top { display: flex; align-items: center; gap: 8px; }
+  .issue-card .ic-id { font-family: "Geist Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+  .issue-card .ic-title { font-size: 14px; line-height: 1.4; }
+  .v1 .issue-card .ic-title { font-weight: 500; font-family: "DM Sans", system-ui, sans-serif; }
+  .v1 .issue-card .ic-id { font-family: "SF Mono", SFMono-Regular, Consolas, monospace; }
+  .v2 .issue-card .ic-title { font-weight: 520; }
+  .issue-card .ic-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted-foreground); }
+
+  /* workspace header specimen */
+  .ws-header .ws-title-v1 { font-family: "DM Sans", system-ui, sans-serif; font-size: 20px; font-weight: 500; }
+  .ws-header .ws-title-v2 { font-size: 34px; font-weight: 680; letter-spacing: -0.02em; }
+  .ws-header .ws-sub { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+
+  /* ─── Unchanged ─── */
+  .unchanged { border: 1px solid var(--border); border-radius: var(--radius-xl); background: var(--card); padding: 22px 24px; display: flex; flex-direction: column; gap: 14px; }
+  .unchanged .u-row { display: flex; align-items: center; gap: 14px; font-size: 13px; color: var(--muted-foreground); }
+  .unchanged .u-row .check { color: var(--success-foreground); flex-shrink: 0; }
+  .unchanged .u-row b { color: var(--foreground); font-weight: 550; }
+
+  .badge { font-size: 10px; font-weight: 500; letter-spacing: .05em; text-transform: uppercase; padding: 2px 6px; border-radius: var(--radius-md); border: 1px solid; display: inline-flex; align-items: center; gap: 5px; }
+  .badge.work { background: color-mix(in srgb, var(--info) 8%, transparent); border-color: color-mix(in srgb, var(--info) 32%, transparent); color: var(--info-foreground); }
+  .badge.review { background: color-mix(in srgb, var(--warning) 8%, transparent); border-color: color-mix(in srgb, var(--warning) 32%, transparent); color: var(--warning-foreground); }
+  .badge.done { background: color-mix(in srgb, var(--success) 8%, transparent); border-color: color-mix(in srgb, var(--success) 32%, transparent); color: var(--success-foreground); }
+
+  .font-compare { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border); border-radius: var(--radius-xl); overflow: hidden; background: var(--card); }
+  .font-compare .fc { padding: 28px; }
+  .font-compare .fc + .fc { border-left: 1px solid var(--border); }
+  .font-compare .fc .fc-tag { font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); margin-bottom: 14px; }
+  .font-compare .fc .fc-big { font-size: 30px; line-height: 1.15; margin-bottom: 12px; }
+  .font-compare .fc.old .fc-big { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; }
+  .font-compare .fc.new .fc-big { font-weight: 680; letter-spacing: -0.02em; }
+  .font-compare .fc .fc-small { font-size: 13px; color: var(--muted-foreground); line-height: 1.6; }
+  .font-compare .fc.old .fc-small { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; }
+  .font-compare .fc.new .fc-small { font-weight: 450; }
+
+  /* ─── 00 · Overdeck Theme picker (Settings → Appearance) ─── */
+  .theme-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .theme-card {
+    position: relative; text-align: left; cursor: pointer;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);
+    padding: 24px; display: flex; flex-direction: column; gap: 14px;
+    font-family: inherit; transition: border-color 150ms, background-color 150ms;
+  }
+  .theme-card:hover { background: color-mix(in srgb, var(--card) 92%, var(--color-white)); }
+  .theme-card.selected { border-color: color-mix(in srgb, var(--foreground) 40%, transparent); background: color-mix(in srgb, var(--card) 90%, var(--color-white)); }
+  .theme-card .tc-head { display: flex; align-items: center; gap: 10px; }
+  .theme-card .tc-radio {
+    width: 16px; height: 16px; border-radius: 50%;
+    border: 1px solid var(--input); display: grid; place-items: center; flex-shrink: 0;
+  }
+  .theme-card.selected .tc-radio { border-color: var(--primary); }
+  .theme-card.selected .tc-radio::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--primary); }
+  .theme-card .tc-name { font-size: 16px; font-weight: 580; }
+  .theme-card .tc-tag {
+    margin-left: auto; font-family: "Geist Mono", monospace; font-size: 9px; text-transform: uppercase;
+    letter-spacing: .1em; padding: 2px 6px; border-radius: var(--radius-md);
+    border: 1px solid var(--border); color: var(--muted-foreground);
+  }
+  .theme-card .tc-tag.default { color: var(--primary-foreground); border-color: color-mix(in srgb, var(--primary) 32%, transparent); background: color-mix(in srgb, var(--primary) 10%, transparent); }
+  .theme-card .tc-desc { font-size: 12.5px; color: var(--muted-foreground); line-height: 1.5; }
+  .theme-card .tc-specimen {
+    border: 1px dashed var(--border); border-radius: var(--radius-lg);
+    padding: 18px 20px; background: color-mix(in srgb, var(--background) 96%, var(--color-white));
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .tc-specimen .sp-big { line-height: 1.15; }
+  .tc-specimen .sp-small { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+  /* Ledger specimen renders in Ledger's own rules regardless of page theme */
+  .spec-ledger .sp-big { font-family: "DM Sans", system-ui, sans-serif; font-size: 17px; font-weight: 500; }
+  .spec-ledger .sp-small { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; }
+  .spec-ledger .sp-eyebrow { font-family: "DM Sans", system-ui, sans-serif; font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted-foreground); font-weight: 500; }
+  .spec-broadsheet .sp-big { font-family: "Geist", system-ui, sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  .spec-broadsheet .sp-small { font-family: "Geist", system-ui, sans-serif; font-weight: 440; }
+  .spec-broadsheet .sp-eyebrow { font-family: "Geist Mono", monospace; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted-foreground); }
+
+  /* ─── Live Ledger overrides (the data-theme switch, demonstrated) ─── */
+  html[data-theme="ledger"] body { font-family: "DM Sans", system-ui, sans-serif; }
+  html[data-theme="ledger"] .display-xl { font-size: 30px; font-weight: 500; letter-spacing: 0; line-height: 1.2; }
+  html[data-theme="ledger"] .display-lg { font-size: 20px; font-weight: 500; letter-spacing: 0; }
+  html[data-theme="ledger"] .section-title { font-size: 18px; font-weight: 500; letter-spacing: 0; }
+  html[data-theme="ledger"] .top-bar .brand { font-weight: 500; }
+  html[data-theme="ledger"] .hero-input-demo { font-family: "DM Sans", system-ui, sans-serif; font-size: 22px; font-weight: 500; letter-spacing: 0; }
+  html[data-theme="ledger"] .fc.new .fc-big { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; letter-spacing: 0; }
+  html[data-theme="ledger"] .fc.new .fc-small { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; }
+  html[data-theme="ledger"] .ws-header .ws-title-v2 { font-family: "DM Sans", system-ui, sans-serif; font-size: 20px; font-weight: 500; letter-spacing: 0; }
+  html[data-theme="ledger"] .v2 .issue-card .ic-title { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; }
+  html[data-theme="ledger"] .tier-sample { font-weight: 500 !important; font-size: 15px !important; letter-spacing: 0 !important; }
+  html[data-theme="ledger"] .tier-sample .eyebrow { font-family: "DM Sans", system-ui, sans-serif; }
+  html[data-theme="ledger"] .eyebrow,
+  html[data-theme="ledger"] .section-eyebrow,
+  html[data-theme="ledger"] .ideas-eyebrow { font-family: "DM Sans", system-ui, sans-serif; font-weight: 500; letter-spacing: .1em; }
+  html[data-theme="ledger"] .dotline,
+  html[data-theme="ledger"] .tier-name,
+  html[data-theme="ledger"] .tier-weight { font-family: "SF Mono", SFMono-Regular, Consolas, monospace; }
+  html[data-theme="ledger"] .theme-card .tc-name,
+  html[data-theme="ledger"] .pattern .p-name { font-weight: 500; }
+  /* theme cards + specimens keep their own fonts under either page theme */
+  html[data-theme="ledger"] .spec-broadsheet .sp-big { font-family: "Geist", system-ui, sans-serif; font-weight: 700; letter-spacing: -0.02em; }
+  html[data-theme="ledger"] .spec-broadsheet .sp-small { font-family: "Geist", system-ui, sans-serif; font-weight: 440; }
+  html[data-theme="ledger"] .spec-broadsheet .sp-eyebrow { font-family: "Geist Mono", monospace; }
+
+  .mock-chrome button {
+    background: transparent; border: none; color: var(--muted-foreground); font: inherit;
+    font-size: 11px; font-weight: 500; padding: 4px 8px; border-radius: var(--radius-md);
+    cursor: pointer; transition: background-color 200ms, color 200ms;
+  }
+  .mock-chrome button:hover { background: var(--accent); color: var(--foreground); }
+  .mock-chrome button.current { color: var(--foreground); background: var(--accent); }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="brand">
+    <span class="mark">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/></svg>
+    </span>
+    Overdeck
+  </div>
+  <div class="crumb">design <span class="sep">/</span> mockups <span class="sep">/</span> <span style="color:var(--foreground)">style guide v2</span></div>
+  <div class="spacer"></div>
+  <div class="meta">PAN-3410 · draft PRD</div>
+</div>
+
+<div class="page">
+
+  <div class="hero">
+    <div class="eyebrow">Style guide v2 · the Broadsheet theme</div>
+    <h1 class="display-xl">Pages, not panels.</h1>
+    <p class="hero-sub">
+      Style v2 ships as a <b>selectable theme, not a cutover</b>. The current style becomes <b>Ledger</b> —
+      DM Sans, flat weight, panel-first — and stays as a first-class legacy option. The new style is
+      <b>Broadsheet</b>: Geist, a real weight hierarchy with display tiers, <b>chips</b>, <b>soft cards</b>,
+      <b>hero placeholders</b>, <b>keycap CTAs</b>, and <b>dot-metadata lines</b>. Color discipline, semantic
+      tokens, and the badge tint formula are identical in both — this is a typography revision, not a rebrand.
+    </p>
+  </div>
+
+  <!-- ═══ 00 · The setting ═══ -->
+  <section style="margin-top:0;">
+    <div class="section-eyebrow">00 · The setting — Overdeck Theme</div>
+    <h2 class="section-title">One picker, two design languages</h2>
+    <p class="section-lead">
+      Settings → Appearance gains an <b>Overdeck Theme</b> picker (<code>ui.theme</code> in
+      <code>~/.overdeck/config.yaml</code>, default <code>broadsheet</code>). The choice is carried by a single
+      <code>data-theme</code> attribute on the document root, so switching is instant — no restart, no rebuild.
+      Click either card to flip this whole page between the two themes.
+    </p>
+    <div class="theme-cards">
+      <button class="theme-card" data-theme-card="ledger">
+        <span class="tc-head">
+          <span class="tc-radio"></span>
+          <span class="tc-name">Ledger</span>
+          <span class="tc-tag">Legacy</span>
+        </span>
+        <span class="tc-desc">The dashboard as it is today. DM Sans at a single weight, panel-first, maximally dense. Frozen — receives bug fixes only, no new patterns.</span>
+        <span class="tc-specimen spec-ledger">
+          <span class="sp-eyebrow">Pipeline</span>
+          <span class="sp-big">Review convoy synthesizes four findings</span>
+          <span class="sp-small">Every surface at font-medium. Hierarchy from size and color, never weight. Mono for identifiers only.</span>
+        </span>
+      </button>
+      <button class="theme-card selected" data-theme-card="broadsheet">
+        <span class="tc-head">
+          <span class="tc-radio"></span>
+          <span class="tc-name">Broadsheet</span>
+          <span class="tc-tag default">Default</span>
+        </span>
+        <span class="tc-desc">The new design language. Geist with tiered weights and a display scale, plus the chip / soft-card / keycap vocabulary. All new patterns land here.</span>
+        <span class="tc-specimen spec-broadsheet">
+          <span class="sp-eyebrow">Pipeline</span>
+          <span class="sp-big">Review convoy synthesizes four findings</span>
+          <span class="sp-small">Weight carries hierarchy inside its tier. Geist Mono gains eyebrow labels and quiet metadata lines.</span>
+        </span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══ 01 · Typefaces ═══ -->
+  <section>
+    <div class="section-eyebrow">01 · Typefaces — D-1</div>
+    <h2 class="section-title">Geist &amp; Geist Mono, self-hosted</h2>
+    <p class="section-lead">
+      One variable <code>woff2</code> per family, self-hosted with licenses — Geist + Geist Mono for Broadsheet,
+      DM Sans + Space Grotesk for Ledger, all four shipping with the app (~350KB total). The Google Fonts
+      <code>&lt;link&gt;</code> is removed: zero external font requests in either theme.
+    </p>
+    <div class="font-compare">
+      <div class="fc old">
+        <div class="fc-tag">Before · DM Sans, capped at 500</div>
+        <div class="fc-big">Review convoy synthesizes four findings</div>
+        <div class="fc-small">Every surface sets the same weight, so hierarchy comes from size alone. Nothing can read as a page — everything reads as a panel. Mono is reserved for identifiers only.</div>
+      </div>
+      <div class="fc new">
+        <div class="fc-tag">After · Geist, tiered weights</div>
+        <div class="fc-big">Review convoy synthesizes four findings</div>
+        <div class="fc-small">Weight now carries hierarchy inside its tier — and Geist Mono gains a second sanctioned role: uppercase eyebrow labels and quiet metadata lines.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 02 · Weight tiers ═══ -->
+  <section>
+    <div class="section-eyebrow">02 · Weight hierarchy &amp; display scale — D-2, D-3</div>
+    <h2 class="section-title">No bold outside its tier</h2>
+    <p class="section-lead">
+      The old rule “no bold anywhere” becomes <b>“no bold outside its tier.”</b> Display tiers are the only
+      place weights above 600 may appear, and they are named theme utilities, never ad-hoc arbitrary values.
+    </p>
+    <div class="tiers">
+      <div class="tier-row head"><span>Tier</span><span>Sample</span><span>Weight</span><span>Use</span></div>
+      <div class="tier-row">
+        <span class="tier-name">display-xl</span>
+        <span class="tier-sample" style="font-size:34px; font-weight:750; letter-spacing:-0.025em;">Untitled workspace</span>
+        <span class="tier-weight">700–800</span>
+        <span class="tier-use">page heroes, hero-editable titles</span>
+      </div>
+      <div class="tier-row">
+        <span class="tier-name">display-lg</span>
+        <span class="tier-sample" style="font-size:26px; font-weight:680; letter-spacing:-0.02em;">Pipeline overview</span>
+        <span class="tier-weight">650–700</span>
+        <span class="tier-use">section heroes, view headers</span>
+      </div>
+      <div class="tier-row">
+        <span class="tier-name">heading</span>
+        <span class="tier-sample" style="font-size:17px; font-weight:580;">Merge queue</span>
+        <span class="tier-weight">500–600</span>
+        <span class="tier-use">section &amp; card headings</span>
+      </div>
+      <div class="tier-row">
+        <span class="tier-name">body / ui</span>
+        <span class="tier-sample" style="font-size:14px; font-weight:440;">The default weight for everything else.</span>
+        <span class="tier-weight">400–500</span>
+        <span class="tier-use">body text, nav, buttons, labels</span>
+      </div>
+      <div class="tier-row">
+        <span class="tier-name">eyebrow</span>
+        <span class="tier-sample"><span class="eyebrow">Getting started</span></span>
+        <span class="tier-weight">500 mono</span>
+        <span class="tier-use">kickers, categories, quiet buttons</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 03 · New patterns ═══ -->
+  <section>
+    <div class="section-eyebrow">03 · New patterns — D-4 through D-9</div>
+    <h2 class="section-title">The vocabulary the guide was missing</h2>
+    <p class="section-lead">
+      Six patterns, each with a copy-paste class recipe in the law file. Live renderings below —
+      the input and cards on this page are functional.
+    </p>
+    <div class="pattern-grid">
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Hero placeholder</span><span class="p-dec">D-4</span></div>
+        <div class="p-demo" style="padding:26px 30px;">
+          <input class="hero-input-demo" placeholder="Untitled workspace" />
+        </div>
+        <div class="p-desc">A chromeless editable title — no border, no fill at rest — whose placeholder renders at full <code>display</code> size in <code>muted/40</code> ink. The name of the thing becomes the page.</div>
+      </div>
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Chips · default, dashed, selected</span><span class="p-dec">D-6</span></div>
+        <div class="p-demo">
+          <button class="chip dashed">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            add existing
+          </button>
+          <button class="chip">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+            mind-your-now
+          </button>
+          <button class="chip selected">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/></svg>
+            overdeck
+          </button>
+        </div>
+        <div class="p-desc">Bordered <code>rounded-lg</code> pill-adjacent buttons with a leading 16px icon. <code>border-dashed</code> marks the additive action; selection is a strengthened border plus subtle fill. Hover changes fill only, never color.</div>
+      </div>
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Soft card</span><span class="p-dec">D-7</span></div>
+        <div class="p-demo">
+          <button class="soft-card" style="max-width:280px;">
+            <span class="sc-eyebrow">Automate</span>
+            <span class="sc-title">Nightly dependency-audit sweep across all registered projects</span>
+          </button>
+        </div>
+        <div class="p-desc">A <code>rounded-xl</code> card with a muted fill, optional hairline border, and generous padding — an eyebrow category over a short title. The sanctioned pattern for suggestion, idea, and preview cards.</div>
+      </div>
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Large CTA + keycap</span><span class="p-dec">D-8</span></div>
+        <div class="p-demo">
+          <button class="cta">Start workspace <span class="keycap">↵</span></button>
+        </div>
+        <div class="p-desc">A new <code>cta</code> tier: <code>h-12</code>, <code>rounded-xl</code>, soft primary fill at rest, solid on hover. Optional trailing keycap hint. One per view — the single-primary rule is unchanged.</div>
+      </div>
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Dot-metadata line</span><span class="p-dec">D-9</span></div>
+        <div class="p-demo">
+          <span class="dotline"><span class="d"></span>Memory enabled <span class="sep">·</span> Files shared <span class="sep">·</span> git repository</span>
+        </div>
+        <div class="p-desc">A 6px semantic status dot plus quiet Geist Mono text, segments separated by <code>·</code>. For ambient state summaries — never for anything that demands action.</div>
+      </div>
+
+      <div class="pattern">
+        <div class="p-head"><span class="p-name">Eyebrow label</span><span class="p-dec">D-5</span></div>
+        <div class="p-demo" style="flex-direction:column; gap:8px;">
+          <span class="eyebrow">Ideas for your next workspace</span>
+          <span class="eyebrow" style="letter-spacing:.14em;">Cancel</span>
+        </div>
+        <div class="p-desc">Uppercase Geist Mono, 11px, wide tracking, muted. Sanctioned as card categories, kicker labels, and quiet text-buttons. This deliberately widens mono beyond identifiers — the mono rule is rewritten to name both uses.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ═══ 04 · Before / after ═══ -->
+  <section>
+    <div class="section-eyebrow">04 · Bounded migration — D-12</div>
+    <h2 class="section-title">Same surfaces, new type</h2>
+    <p class="section-lead">
+      The migration is mechanical — font-family swap plus heading-weight adjustments where tiers now apply.
+      No component is restyled to the new patterns here; consumers adopt them per-feature (PAN-3411 first).
+    </p>
+
+    <div class="ba-grid" style="margin-bottom:16px;">
+      <div class="ba v1">
+        <div class="ba-head"><span class="tag">Before · issue card</span><span class="tag">DM Sans · flat 500</span></div>
+        <div class="ba-body">
+          <div class="issue-card">
+            <div class="ic-top">
+              <span class="prio high" style="width:12px;height:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v16m0-16l-5 5m5-5l5 5"/></svg></span>
+              <span class="ic-id">PAN-3410</span>
+              <span class="badge review">Review</span>
+            </div>
+            <div class="ic-title">Style guide v2 — Geist type system, display scale, chips, soft cards</div>
+            <div class="ic-meta"><span>agent-3410 · editing STYLE-GUIDE.md</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="ba v2">
+        <div class="ba-head"><span class="tag after">After · issue card</span><span class="tag">Geist · tiered</span></div>
+        <div class="ba-body">
+          <div class="issue-card">
+            <div class="ic-top">
+              <span class="prio high" style="width:12px;height:12px;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 4v16m0-16l-5 5m5-5l5 5"/></svg></span>
+              <span class="ic-id">PAN-3410</span>
+              <span class="badge review">Review</span>
+            </div>
+            <div class="ic-title">Style guide v2 — Geist type system, display scale, chips, soft cards</div>
+            <div class="ic-meta"><span class="dotline" style="font-size:11px;"><span class="d" style="background:var(--warning);"></span>agent-3410 <span class="sep">·</span> editing STYLE-GUIDE.md</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ba-grid">
+      <div class="ba v1">
+        <div class="ba-head"><span class="tag">Before · workspace header</span></div>
+        <div class="ba-body">
+          <div class="ws-header">
+            <div class="ws-title-v1">nightly-audit</div>
+            <div class="ws-sub" style="font-family:'DM Sans',system-ui,sans-serif;">scratch · mind-your-now · ~/Projects/myn-audit</div>
+          </div>
+        </div>
+      </div>
+      <div class="ba v2">
+        <div class="ba-head"><span class="tag after">After · workspace header</span></div>
+        <div class="ba-body">
+          <div class="ws-header">
+            <div class="ws-title-v2">nightly-audit</div>
+            <div class="ws-sub"><span class="dotline" style="font-size:11px;"><span class="d"></span>scratch <span class="sep">·</span> mind-your-now <span class="sep">·</span> ~/Projects/myn-audit</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 05 · Unchanged ═══ -->
+  <section>
+    <div class="section-eyebrow">05 · What does not change — D-11</div>
+    <h2 class="section-title">The restraint stays</h2>
+    <p class="section-lead">Stated verbatim in both docs so agents don't over-rotate.</p>
+    <div class="unchanged">
+      <div class="u-row">
+        <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <span><b>Semantic tokens only</b> — no hardcoded hex, no <span class="gm" style="font-size:11px;">bg-gray-*</span>, no decorative color.</span>
+      </div>
+      <div class="u-row">
+        <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <span><b>Color discipline</b> — one colored signal per row; amber / blue / emerald / red keep their meanings.</span>
+      </div>
+      <div class="u-row">
+        <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><b>Badge tint formula</b> — 8% bg / 32% border stays; radius moves <span class="gm" style="font-size:11px;">rounded-sm → rounded-md</span> as the single deliberate texture change.</span>
+        <span class="badge work">Work</span><span class="badge review">Review</span><span class="badge done">Done</span>
+      </div>
+      <div class="u-row">
+        <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <span><b>Single primary CTA per view</b> — the new large <span class="gm" style="font-size:11px;">cta</span> tier obeys the same rule.</span>
+      </div>
+      <div class="u-row">
+        <svg class="check" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
+        <span><b>Depth through tonal shifts</b> — borders stay hairline, shadows stay absent.</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ 06 · Doctrine ═══ -->
+  <section>
+    <div class="section-eyebrow">06 · Page-not-modal doctrine — D-10</div>
+    <h2 class="section-title">Creation flows are pages</h2>
+    <p class="section-lead">
+      Major creation and composition flows render as <b>routed full pages</b>; modals are reserved for
+      confirmations and quick forms of four fields or fewer. PAN-3411 executes this for workspace creation —
+      open its mockup to see every pattern on this page composed into a real surface.
+    </p>
+    <a href="new-workspace-page.html" class="cta" style="text-decoration:none;">Open the New Workspace mockup <span class="keycap">→</span></a>
+  </section>
+
+</div>
+
+<div class="mock-chrome">
+  <span class="label">Mock</span>
+  <a href="style-guide-v2.html" class="current">Style guide v2</a>
+  <a href="new-workspace-page.html">New Workspace page</a>
+  <span style="width:1px;height:14px;background:var(--border);"></span>
+  <span class="label">Overdeck Theme</span>
+  <button id="thLedger">Ledger</button>
+  <button id="thBroad" class="current">Broadsheet</button>
+</div>
+
+<script>
+  // The D-14 contract, demonstrated: one data-theme attribute flip restyles the page.
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t;
+    document.querySelectorAll('.theme-card').forEach(c =>
+      c.classList.toggle('selected', c.dataset.themeCard === t));
+    document.getElementById('thLedger').classList.toggle('current', t === 'ledger');
+    document.getElementById('thBroad').classList.toggle('current', t === 'broadsheet');
+  }
+  document.getElementById('thLedger').addEventListener('click', () => setTheme('ledger'));
+  document.getElementById('thBroad').addEventListener('click', () => setTheme('broadsheet'));
+  document.querySelectorAll('.theme-card').forEach(c =>
+    c.addEventListener('click', () => setTheme(c.dataset.themeCard)));
+  const initial = new URLSearchParams(location.search).get('theme');
+  if (initial === 'ledger' || initial === 'broadsheet') setTheme(initial);
+</script>
+
+</body>
+</html>
