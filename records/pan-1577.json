@@ -259,7 +259,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T20:07:23.627Z",
+  "updated": "2026-08-01T20:15:49.245Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "blocked",
@@ -269,8 +269,22 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T20:07:23.609Z",
+    "updatedAt": "2026-08-01T20:15:49.207Z",
     "reviewNotes": "All four current-cycle convoy reviewers failed to start",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since abaf4bf (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-08-01T20:15:44.409Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "abaf4bfbec7e7a55f73f5a81973c9561419c8626",
+      "detectedAt": "2026-08-01T20:15:44.409Z",
+      "paths": [
+        "scripts/file-size-allowlist.txt"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
@@ -289,9 +303,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3786591,
-            "output": 57200,
-            "cacheRead": 13609984,
+            "input": 5624259,
+            "output": 69373,
+            "cacheRead": 14685696,
             "cacheWrite": 0
           }
         },
@@ -329,10 +343,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1458,
-            "output": 321301,
-            "cacheRead": 336349079,
-            "cacheWrite": 7474532
+            "input": 1472,
+            "output": 326304,
+            "cacheRead": 342392170,
+            "cacheWrite": 7485990
           }
         }
       },
@@ -344,21 +358,21 @@
           "cacheWrite": 120026
         },
         "openai/gpt-5.6-sol": {
-          "input": 9135089,
-          "output": 190468,
-          "cacheRead": 41418240,
+          "input": 10972757,
+          "output": 202641,
+          "cacheRead": 42493952,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1458,
-          "output": 321301,
-          "cacheRead": 336349079,
-          "cacheWrite": 7474532
+          "input": 1472,
+          "output": 326304,
+          "cacheRead": 342392170,
+          "cacheWrite": 7485990
         }
       },
       "costAtCloseOut": {
-        "usd": 163.913628,
-        "pricingAsOf": "2026-08-01T20:07:23.618Z"
+        "usd": 175.292335,
+        "pricingAsOf": "2026-08-01T20:15:49.225Z"
       }
     },
     "merges": [
