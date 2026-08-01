@@ -739,3 +739,9 @@ Escalation chain: Monitor 5.9GB → 3.5GB avail with PSI 12.77 (real stalling). 
 - **Lane A (myn api, serial): agent-min-930 STARTED** — P0 token leak, highest urgency across ALL projects (overrode the memory dispatch freeze on emergency class); then MIN-932 → MIN-933 (932 first, shared project-DTO design). **Lane B (hermes repo, serial): agent-min-931 STARTED** (27 items, WI-1/WI-2 first); then MIN-934 (hard dep on 931's guarded_write, same files).
 - Completion condition: all five terminal → `pan orders show` from the myn root + mark book complete. Campaign rules live in the myn project's flywheel-brief.
 - Non-campaign fleet unchanged: #3425 in CI, strike-3422 implementing, 3362/3367/864 verdicts converging, MIN-839 reworking. Memory stable (~35 min quiet). Freeze stays for non-campaign strikes (3417/3397/3396).
+
+## RUN-79 tick 27 (2026-08-01 ~16:45Z) — campaign heads verified advancing; PAN-3416 landed
+
+- **Both Hermes heads producing**: MIN-930 (P0 token leak) +49/−39 first commits; MIN-931 +503/−18 (WI-1/2). Serial tails queue mechanically.
+- **PAN-3416 landed** (#3425 squash `706492b6e8`, handed off) — issue-tree crew now shows live review/test sessions. Close-out on CI+deploy. strike-3422 committed + rebased, in gates (~ready next tick).
+- Ready set still empty (3362/3367/864 verdicts converging). Memory: watch retuned (<4GB or PSI>5) after a benign 5.9GB/PSI-0.12 fire from campaign stack spin-up; freeze-lift decision deferred while campaign warms up.
