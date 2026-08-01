@@ -7,12 +7,13 @@ export type DodRowId =
   | 'merged'
   | 'post-merge'
   | 'main-verify'
+  | 'ship'
   | 'deploy'
   | 'teardown';
 
 export interface DodRowDef {
   id: DodRowId;
-  num: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  num: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   title: string;
   expected: string;
   overridable: boolean;
@@ -56,15 +57,22 @@ export const DOD_ROWS: readonly DodRowDef[] = [
     overridable: true,
   },
   {
-    id: 'deploy',
+    id: 'ship',
     num: 7,
+    title: 'Version strings propagated',
+    expected: 'every declared version_sync.expect path reports the batch version',
+    overridable: true,
+  },
+  {
+    id: 'deploy',
+    num: 8,
     title: 'Deployed',
     expected: 'live server build includes the merged commit',
     overridable: true,
   },
   {
     id: 'teardown',
-    num: 8,
+    num: 9,
     title: 'Close-out teardown verified',
     expected: 'workspace and configured branches removed, planning archived, issue closed, and Docker network removed',
     overridable: false,

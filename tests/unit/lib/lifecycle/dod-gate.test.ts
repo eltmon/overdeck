@@ -921,6 +921,7 @@ describe('assembled Definition-of-Done gate', () => {
       expect(commit).toBe('abc123');
       return makeRow('main-verify');
     },
+    ship: async () => makeRow('ship', 'skip'),
     deploy: async (_ctx: unknown, merge: {
       mergedAt?: string;
       mergeCommit?: string;
@@ -939,10 +940,10 @@ describe('assembled Definition-of-Done gate', () => {
     now: () => '2026-07-15T13:00:00Z',
   });
 
-  it('runs rows one through seven in canonical order and passes a green gate', async () => {
+  it('runs rows one through eight in canonical order and passes a green gate', async () => {
     const gate = await evaluateDodGate(ctx, {}, deps());
     expect(gate.passed).toBe(true);
-    expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 7).map(row => row.id));
+    expect(gate.rows.map(row => row.id)).toEqual(DOD_ROWS.slice(0, 8).map(row => row.id));
   });
 
   it('computes landed and main-verify evidence before passing terminal settlement to verdict rows', async () => {
@@ -971,6 +972,7 @@ describe('assembled Definition-of-Done gate', () => {
         calls.push('main-verify');
         return makeRow('main-verify');
       },
+      ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => {
         calls.push('tracker-closed');
         return true;
@@ -1002,6 +1004,7 @@ describe('assembled Definition-of-Done gate', () => {
       merged: async () => ({ ...makeRow('merged'), mergeCommit: 'abc123' }),
       postMerge: async () => makeRow('post-merge'),
       mainVerify: async () => makeRow('main-verify'),
+      ship: async () => makeRow('ship', 'skip'),
       deploy: async () => makeRow('deploy'),
       now: () => '2026-07-15T13:00:00Z',
     });
@@ -1027,6 +1030,7 @@ describe('assembled Definition-of-Done gate', () => {
       merged: async () => ({ ...makeRow('merged'), mergedAt: '2026-07-15T12:00:00Z' }),
       postMerge: async () => makeRow('post-merge'),
       mainVerify: async () => makeRow('main-verify', 'skip'),
+      ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
       deploy: deploySpy,
       now: () => '2026-07-15T13:00:00Z',
@@ -1038,7 +1042,7 @@ describe('assembled Definition-of-Done gate', () => {
     }));
     expect(gate.rows.map(row => [row.id, row.status])).toEqual([
       ['review', 'pass'], ['tests', 'pass'], ['verification', 'pass'], ['merged', 'pass'],
-      ['post-merge', 'pass'], ['main-verify', 'skip'], ['deploy', 'skip'],
+      ['post-merge', 'pass'], ['main-verify', 'skip'], ['ship', 'skip'], ['deploy', 'skip'],
     ]);
     expect(gate.passed).toBe(true);
   });
@@ -1078,6 +1082,7 @@ describe('assembled Definition-of-Done gate', () => {
         listAgents: () => [],
       }),
       mainVerify: async () => makeRow('main-verify', 'skip'),
+      ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
       deploy: async () => makeRow('deploy', 'skip'),
       now: () => '2026-07-15T13:00:00Z',
@@ -1114,6 +1119,7 @@ describe('assembled Definition-of-Done gate', () => {
         readStrikeLanded: () => true,
       }),
       mainVerify: async () => makeRow('main-verify'),
+      ship: async () => makeRow('ship', 'skip'),
       trackerClosed: async () => false,
       deploy: async () => makeRow('deploy'),
       now: () => '2026-07-26T23:00:00Z',
@@ -1123,7 +1129,7 @@ describe('assembled Definition-of-Done gate', () => {
     // Row 8 is appended by the close-out workflow once teardown succeeds; the gate
     // itself owns rows 1–7, and none of them may be a silent pass for a strike.
     expect(gate.rows).toHaveLength(DOD_ROWS.length - 1);
-    expect(gate.rows.filter(row => row.status === 'skip').map(row => row.id)).toEqual(['review', 'tests', 'post-merge']);
+    expect(gate.rows.filter(row => row.status === 'skip').map(row => row.id)).toEqual(['review', 'tests', 'post-merge', 'ship']);
     for (const id of ['review', 'tests', 'post-merge'] as const) {
       expect(gate.rows.find(row => row.id === id)?.observed).toContain('strike');
     }

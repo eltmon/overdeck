@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { acceptFlagFor, DOD_ROWS } from '../../../../src/lib/lifecycle/dod.js';
 
 describe('DOD_ROWS', () => {
-  it('defines the eight uniquely identified rows in order', () => {
+  it('defines the nine uniquely identified rows in order', () => {
     expect(DOD_ROWS.map(row => row.id)).toEqual([
       'review',
       'tests',
@@ -10,15 +10,17 @@ describe('DOD_ROWS', () => {
       'merged',
       'post-merge',
       'main-verify',
+      'ship',
       'deploy',
       'teardown',
     ]);
     expect(new Set(DOD_ROWS.map(row => row.id)).size).toBe(DOD_ROWS.length);
-    expect(DOD_ROWS.map(row => row.num)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    expect(DOD_ROWS.map(row => row.num)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
   });
 
-  it('allows overrides for rows one through seven only', () => {
+  it('allows overrides for rows one through eight only', () => {
     expect(DOD_ROWS.map(row => row.overridable)).toEqual([
+      true,
       true,
       true,
       true,
@@ -38,6 +40,7 @@ describe('DOD_ROWS', () => {
       '--accept-merged',
       '--accept-post-merge',
       '--accept-main-verify',
+      '--accept-ship',
       '--accept-deploy',
     ]);
   });
