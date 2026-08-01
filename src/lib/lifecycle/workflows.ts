@@ -207,20 +207,105 @@ export function closeOut(
     });
     allSteps.push(uatEvidenceStep);
 
-    // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
-    // PAN-3211: an abandoned disposition skips the gate entirely (PAN-3211).
-    // PAN-3396: a residue disposition also skips the gate and closes stale PRs/MRs.
+    // 1. Collect residue evidence BEFORE building the gate (if residue disposition)
     const abandon = opts.abandonDisposition;
     const residue = opts.residueDisposition;
+    let residueEvidence: string[] = [];
+    let trackerClosedEvidence: string[] = [];
+
+    if (residue) {
+      // Pre-verify tracker is closed for residue disposition
+      try {
+        const { isTrackerIssueClosed } = await import('../cloister/issue-closed.js');
+        const isClosed = yield* Effect.promise(() => isTrackerIssueClosed(ctx.issueId));
+        if (!isClosed) {
+          allSteps.push(stepFailed('close-out:residue-precondition', 'Residue disposition requires the tracker issue to be already closed'));
+          return buildResult('close-out', ctx.issueId, allSteps, start);
+        }
+        trackerClosedEvidence.push('Tracker issue verified closed');
+      } catch (err) {
+        allSteps.push(stepFailed('close-out:residue-precondition', `Could not verify tracker closure: ${err instanceof Error ? err.message : String(err)}`));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Resolve forge coordinates and close stale PRs/MRs
+      const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
+      if (!prRepos || prRepos.length === 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', 'Could not resolve any configured repositories for residue cleanup'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Resolve all GitHub and GitLab coordinates
+      const githubPaths = prRepos.filter(r => r.forge === 'github').map(r => r.repoPath);
+      const gitlabPaths = prRepos.filter(r => r.forge === 'gitlab').map(r => r.repoPath);
+
+      const resolveCoords = yield* Effect.promise(async () => {
+        const githubRepos: string[] = [];
+        const gitlabRepos: string[] = [];
+        const errors: string[] = [];
+
+        for (const repoPath of githubPaths) {
+          const coords = await extractGitHubCoordinates(repoPath);
+          if (coords) {
+            githubRepos.push(coords);
+          } else {
+            errors.push(`GitHub coordinate extraction failed for ${repoPath}`);
+          }
+        }
+
+        for (const repoPath of gitlabPaths) {
+          const proj = await extractGitLabProject(repoPath);
+          if (proj) {
+            gitlabRepos.push(proj);
+          } else {
+            errors.push(`GitLab project extraction failed for ${repoPath}`);
+          }
+        }
+
+        return { githubRepos, gitlabRepos, errors };
+      });
+
+      // Fail if any configured repository could not be resolved
+      if (resolveCoords.errors.length > 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', `Could not resolve all forge coordinates: ${resolveCoords.errors.join('; ')}`));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Fail if no repositories were successfully resolved
+      if (resolveCoords.githubRepos.length === 0 && resolveCoords.gitlabRepos.length === 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', 'No forge coordinates were resolved for residue cleanup'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Execute residue cleanup
+      const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
+        issueId: ctx.issueId,
+        projectPath: ctx.projectPath,
+        github: resolveCoords.githubRepos.length > 0 ? { repos: resolveCoords.githubRepos } : undefined,
+        gitlab: resolveCoords.gitlabRepos.length > 0 ? { projects: resolveCoords.gitlabRepos } : undefined,
+      }));
+      allSteps.push(residueStep);
+      if (!residueStep.success && !residueStep.skipped) {
+        allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+      residueEvidence = residueStep.details ?? [];
+    }
+
+    // 2. Build the Definition-of-Done gate with collected evidence
     let dodGate: DodGateResult = abandon
       ? buildAbandonedDodGate(abandon.reason, abandon.by)
       : residue
-      ? buildResidueDodGate(residue.reason, residue.by, ['Closing stale convention PRs/MRs with no merge claim'])
+      ? buildResidueDodGate(residue.reason, residue.by, [
+          ...trackerClosedEvidence,
+          ...residueEvidence,
+        ])
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
           verifyMerged: verifyBranchMergedImpl,
         }));
+
     for (const row of dodGate.rows) {
       const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
       if (row.acceptedBy) {
@@ -247,50 +332,8 @@ export function closeOut(
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
 
-    // 1.5. Close stale convention PRs/MRs for residue disposition (PAN-3396)
-    // Collect evidence from actual cleanup before updating the gate.
-    let residueEvidence: string[] = [];
-    if (residue) {
-      const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
-      if (prRepos && prRepos.length > 0) {
-        // Resolve forge coordinates from local repo paths
-        const githubPaths = prRepos.filter(r => r.forge === 'github').map(r => r.repoPath);
-        const gitlabPaths = prRepos.filter(r => r.forge === 'gitlab').map(r => r.repoPath);
-
-        const resolveCoords = yield* Effect.promise(async () => {
-          let githubRepo: string | undefined;
-          let gitlabRepos: string[] = [];
-
-          for (const repoPath of githubPaths) {
-            const coords = await extractGitHubCoordinates(repoPath);
-            if (coords) {
-              githubRepo = coords;
-              break;
-            }
-          }
-
-          for (const repoPath of gitlabPaths) {
-            const proj = await extractGitLabProject(repoPath);
-            if (proj) gitlabRepos.push(proj);
-          }
-
-          return { githubRepo, gitlabRepos };
-        });
-
-        const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
-          issueId: ctx.issueId,
-          projectPath: ctx.projectPath,
-          github: resolveCoords.githubRepo,
-          gitlab: resolveCoords.gitlabRepos.length > 0 ? { projects: resolveCoords.gitlabRepos } : undefined,
-        }));
-        allSteps.push(residueStep);
-        if (!residueStep.success && !residueStep.skipped) {
-          allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
-          return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
-        }
-        residueEvidence = residueStep.details ?? [];
-      }
-    }
+    // 3. Move PRD + archive workspace artifacts
+    // (Note: step numbering adjusted due to upfront residue cleanup)
 
     // 2. Move PRD + archive workspace artifacts
     const archiveSteps = yield* archivePlanning(ctx, opts);

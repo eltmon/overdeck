@@ -1,9 +1,18 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+
+// Mock execFile before importing the module
+const mockExecFile = vi.fn();
+
+vi.mock('child_process', () => ({
+  execFile: mockExecFile,
+}));
+
 import { closeResidueConventionPrs } from '../../../../src/lib/lifecycle/residue.js';
 
 describe('closeResidueConventionPrs', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    mockExecFile.mockClear();
   });
 
   afterEach(() => {
@@ -11,24 +20,23 @@ describe('closeResidueConventionPrs', () => {
   });
 
   it('returns stepSkipped when no open PRs/MRs found', async () => {
-    vi.mocked(vi.hoisted(() => require('child_process')).execFile, true);
+    mockExecFile.mockResolvedValue({ stdout: JSON.stringify([]) });
 
     const result = await closeResidueConventionPrs({
       issueId: 'PAN-123',
       projectPath: '/project',
-      github: 'eltmon/overdeck',
+      github: { repos: ['eltmon/overdeck'] },
     });
 
     expect(result.step).toBe('Close stale convention PRs/MRs');
     expect(result.success).toBe(true);
     expect(result.skipped).toBe(true);
-    expect(result.details).toContain('No open convention PRs/MRs found');
+    expect(result.details).toContain('No open GitHub PRs found on eltmon/overdeck/feature/pan-123');
   });
 
   it('fails on any repository operation errors while preserving partial progress', async () => {
-    // Mock execFile to succeed on first call, fail on second
     let callCount = 0;
-    const mockExecFile = vi.fn().mockImplementation(async () => {
+    mockExecFile.mockImplementation(async () => {
       callCount++;
       if (callCount === 1) {
         // First call (GitHub PR list) succeeds
@@ -38,14 +46,10 @@ describe('closeResidueConventionPrs', () => {
       throw new Error('GitHub API rate limit exceeded');
     });
 
-    vi.doMock('child_process', () => ({
-      execFile: mockExecFile,
-    }));
-
     const result = await closeResidueConventionPrs({
       issueId: 'PAN-123',
       projectPath: '/project',
-      github: 'eltmon/overdeck',
+      github: { repos: ['eltmon/overdeck'] },
     });
 
     // Should fail due to the close error, even though the list succeeded
@@ -54,5 +58,24 @@ describe('closeResidueConventionPrs', () => {
     expect(result.error).toContain('GitHub API rate limit exceeded');
     expect(result.details).toBeDefined();
     expect(result.details?.[0]).toContain('Partial progress');
+  });
+
+  it('fails when coordinate extraction fails for required repositories', async () => {
+    mockExecFile.mockImplementation(async (cmd, args) => {
+      // Fail git remote calls, but allow gh/glab calls
+      if (cmd === 'git') {
+        throw new Error('git remote URL not found');
+      }
+      return { stdout: JSON.stringify([]) };
+    });
+
+    const result = await closeResidueConventionPrs({
+      issueId: 'PAN-123',
+      projectPath: '/project',
+      github: { repos: ['eltmon/overdeck'] },
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.skipped).toBe(true);
   });
 });

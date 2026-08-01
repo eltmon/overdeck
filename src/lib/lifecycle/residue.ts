@@ -58,7 +58,7 @@ export async function extractGitLabProject(repoPath: string): Promise<string | n
 export interface CloseResidueConventionPrsContext {
   issueId: string;
   projectPath: string;
-  github?: string;  // owner/repo path for GitHub
+  github?: { repos: string[] };  // owner/repo paths for GitHub
   gitlab?: { projects: string[] };  // GitLab project paths
 }
 
@@ -70,42 +70,44 @@ export async function closeResidueConventionPrs(
   const issueIdLower = ctx.issueId.toLowerCase();
   const possibleHeads = [`feature/${issueIdLower}`, `strike/${issueIdLower}`];
 
-  // GitHub PR close — resolve forge coordinates and close all found
-  if (ctx.github) {
-    for (const head of possibleHeads) {
-      try {
-        const { stdout } = await execFileAsync('gh', [
-          'pr', 'list',
-          '--repo', ctx.github,
-          '--head', head,
-          '--state', 'open',
-          '--json', 'number',
-        ], { encoding: 'utf-8', timeout: 15_000 });
+  // GitHub PR close — handle all configured repositories
+  if (ctx.github?.repos) {
+    for (const githubRepo of ctx.github.repos) {
+      for (const head of possibleHeads) {
+        try {
+          const { stdout } = await execFileAsync('gh', [
+            'pr', 'list',
+            '--repo', githubRepo,
+            '--head', head,
+            '--state', 'open',
+            '--json', 'number',
+          ], { encoding: 'utf-8', timeout: 15_000 });
 
-        const prs = JSON.parse(stdout) as Array<{ number: number }>;
-        if (prs.length === 0) {
-          evidence.push(`No open GitHub PRs found on ${head}`);
-        }
-        for (const pr of prs) {
-          try {
-            await execFileAsync('gh', [
-              'pr', 'close',
-              `${pr.number}`,
-              '--repo', ctx.github,
-              '--comment', 'Closing stale residue PR with no merge claim — issue closed out without merge landing.',
-            ], { encoding: 'utf-8', timeout: 15_000 });
-            evidence.push(`Closed GitHub PR #${pr.number} on ${head}`);
-          } catch (err) {
-            fatalErrors.push(`GitHub PR #${pr.number} close failed: ${err instanceof Error ? err.message : String(err)}`);
+          const prs = JSON.parse(stdout) as Array<{ number: number }>;
+          if (prs.length === 0) {
+            evidence.push(`No open GitHub PRs found on ${githubRepo}/${head}`);
           }
+          for (const pr of prs) {
+            try {
+              await execFileAsync('gh', [
+                'pr', 'close',
+                `${pr.number}`,
+                '--repo', githubRepo,
+                '--comment', 'Closing stale residue PR with no merge claim — issue closed out without merge landing.',
+              ], { encoding: 'utf-8', timeout: 15_000 });
+              evidence.push(`Closed GitHub PR #${pr.number} on ${githubRepo}/${head}`);
+            } catch (err) {
+              fatalErrors.push(`GitHub PR #${pr.number} close failed on ${githubRepo}: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          }
+        } catch (err) {
+          fatalErrors.push(`GitHub PR lookup for ${githubRepo}/${head} failed: ${err instanceof Error ? err.message : String(err)}`);
         }
-      } catch (err) {
-        fatalErrors.push(`GitHub PR lookup for ${head} failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
-  // GitLab MR close — resolve forge coordinates and close all found
+  // GitLab MR close — write note BEFORE closing to ensure auditability on retry
   if (ctx.gitlab?.projects) {
     for (const glProject of ctx.gitlab.projects) {
       for (const head of possibleHeads) {
@@ -124,13 +126,7 @@ export async function closeResidueConventionPrs(
           }
           for (const mr of mrs) {
             try {
-              await execFileAsync('glab', [
-                'mr', 'close',
-                '--repo', glProject,
-                String(mr.iid),
-              ], { encoding: 'utf-8', timeout: 15_000 });
-
-              // Add a note with honest comment
+              // Write the audit note BEFORE closing to ensure it's recorded
               await execFileAsync('glab', [
                 'mr', 'note',
                 '--repo', glProject,
@@ -138,9 +134,16 @@ export async function closeResidueConventionPrs(
                 '--message', 'Closing stale residue MR with no merge claim — issue closed out without merge landing.',
               ], { encoding: 'utf-8', timeout: 15_000 });
 
-              evidence.push(`Closed GitLab MR !${mr.iid} on ${head}`);
+              // Now close the MR
+              await execFileAsync('glab', [
+                'mr', 'close',
+                '--repo', glProject,
+                String(mr.iid),
+              ], { encoding: 'utf-8', timeout: 15_000 });
+
+              evidence.push(`Closed GitLab MR !${mr.iid} on ${glProject}/${head}`);
             } catch (err) {
-              fatalErrors.push(`GitLab MR !${mr.iid} close failed: ${err instanceof Error ? err.message : String(err)}`);
+              fatalErrors.push(`GitLab MR !${mr.iid} operation failed on ${glProject}: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
         } catch (err) {

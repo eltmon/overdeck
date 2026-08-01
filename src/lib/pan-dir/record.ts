@@ -478,6 +478,30 @@ export async function readIssueRecord(
   }
 }
 
+/**
+ * Batch-read issue records with bounded concurrency to avoid event-loop starvation.
+ * Resolves the state home once per project, then reads records asynchronously.
+ */
+export async function batchReadIssueRecords(
+  project: ProjectConfig,
+  issueIds: string[],
+): Promise<Map<string, PanIssueRecord | null>> {
+  const result = new Map<string, PanIssueRecord | null>();
+
+  const batchSize = 10;
+  for (let i = 0; i < issueIds.length; i += batchSize) {
+    const batch = issueIds.slice(i, i + batchSize);
+    await Promise.allSettled(
+      batch.map(async (id) => {
+        const record = await readIssueRecord(project, id);
+        result.set(id, record);
+      }),
+    );
+  }
+
+  return result;
+}
+
 export function readIssueRecordSync(project: ProjectConfig, issueId: string): PanIssueRecord | null {
   const path = getIssueRecordPath(project, issueId);
   try {
