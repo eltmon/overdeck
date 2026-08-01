@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DialogProvider } from './components/DialogProvider';
 import App, {
@@ -15,6 +15,7 @@ import App, {
   serializeConversationViewModes,
 } from './App';
 import { useDashboardStore } from './lib/store';
+import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from './lib/backendConnectionEvents';
 
 const {
   mockDashboardState,
@@ -410,6 +411,25 @@ describe('App primary routing', () => {
     window.history.replaceState(null, '', '/command-deck/panopticon-cli');
     renderApp();
     expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+  });
+
+  it('suppresses definitive route states until EventRouter restores the snapshot', async () => {
+    window.history.replaceState(null, '', '/command-deck/panopticon-cli');
+    renderApp();
+    expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli');
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTING_EVENT));
+    });
+
+    expect(screen.getByRole('status')).toHaveTextContent('Waiting for backend data');
+    expect(screen.queryByTestId('selected-project')).toBeNull();
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent(BACKEND_RECONNECTED_EVENT));
+    });
+
+    await waitFor(() => expect(screen.getByTestId('selected-project')).toHaveTextContent('panopticon-cli'));
   });
 
   it('updates the URL when a command deck project is selected', () => {
