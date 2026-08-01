@@ -16,6 +16,7 @@ import {
   hashFileSync,
   setManifestEntry,
   compareFileToManifest,
+  pruneStaleManifestEntriesSync,
 } from './manifest.js';
 import { FsError } from './errors.js';
 
@@ -90,6 +91,9 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
     { sourceDir: CACHE_AGENTS_DIR, targetSubdir: 'agents' },
     { sourceDir: CACHE_RULES_DIR, targetSubdir: 'rules' },
   ];
+  const sourceSet = new Set(sources.flatMap(({ sourceDir, targetSubdir }) =>
+    collectSourceFilesSync(sourceDir, '').map((file) => `${targetSubdir}/${file.relativePath}`),
+  ));
 
   for (const { sourceDir, targetSubdir } of sources) {
     if (!existsSync(sourceDir)) continue;
@@ -133,6 +137,12 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
       }
     }
   }
+
+  const pruneResult = pruneStaleManifestEntriesSync(claudeDir, manifest, sourceSet, {
+    prefixes: ['skills/', 'agents/', 'rules/'],
+  });
+  result.pruned.push(...pruneResult.pruned);
+  result.keptModified.push(...pruneResult.keptModified);
 
   // Write updated manifest
   writeManifestSync(manifestPath, manifest);
