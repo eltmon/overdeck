@@ -4,17 +4,17 @@
     "created": "2026-07-30T21:25:08Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3340: Dashboard: Review action should open a submenu to pick review mode (Full / Quick / None)",
-    "updated": "2026-07-30T21:31:48.876Z"
+    "updated": "2026-08-01T01:40:33.837Z"
   },
   "plan": {
     "id": "pan-3340",
     "title": "Dashboard: Review action should open a submenu to pick review mode (Full / Quick / None)",
-    "status": "running",
+    "status": "completed",
     "uid": "83cdcdbe-bac4-41ea-a57a-77b27389f779",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-30T21:25:08Z",
-    "updated": "2026-07-30T21:31:48.876Z",
+    "updated": "2026-08-01T01:40:33.837Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3340",
@@ -422,5 +422,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
