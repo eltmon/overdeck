@@ -9310,3 +9310,25 @@ Dates span 07-25 to 07-28, so this has been running about a week. **LESSON: a co
 - **PAN-3363 merged** (PR #3364) — the stale `pan.localhost` fallback at `uat-stack.ts:161` that emitted dead workspace URLs. Strike handed off and closed out.
 - Infra healthy: hook 445/guard=1, leak 0, 29.7 GB free, **load down to 2.6**.
 - **gen-a is now the fresh CLI** (21:27) and gen-b is stale (10:29) — the reverse of yesterday. Reload alternates, so the fresh generation must be checked every tick, never assumed.
+
+## RUN-75 tick 28 (2026-08-01 02:16Z) — close-out debt drained; both remaining pause classes root-caused
+
+- Wakeup armed at end of tick 27 and **this tick fired from it, not from an operator prompt** — the heartbeat is live again.
+- Infra: hook 445/guard=1, leak **0**, 29.7 GB free, PSI 0, **load 1.9**. `gen-a` still the fresh CLI (21:27) vs gen-b (10:29) — checked, not assumed.
+- **Close-out debt is drained.** Read-door sweep across all 12 projects leaves only two `post_merge_limbo` rows in panopticon-cli, both deliberate: **PAN-3305** (residual patch-id gate case) and **PAN-3356** (held — ACs never verified). MIN-908 remains out of merge scope. No new debt accumulated since tick 27, which is the point of draining every tick.
+
+### Both remaining pause classes now have a cause
+
+**LEX-1 (`agent-lex-1-slot-1`, `agent-lex-1-slot-2`, paused 07-08 — 24 days).** Root cause found: LEX-1 is **OPEN** ("Milestone 1: The Persistent Heartbeat"), and lexerra's read door returns `forge_unavailable` — the GitHub App is not configured for `eltmon/lexerra`. So these are paused agents on a live issue in a project Overdeck **cannot reach at all**. Not stale debt and not laziness: they are blocked on the same operator config gap as the lexerra blind spot. Clearing the pause would achieve nothing while the forge is unreachable.
+
+**`agent-pan-3357` still paused after its issue closed.** PAN-3357 is `CLOSED [closed-out]` and close-out reported success, yet its agent row remains `status=stopped, paused=1`. So **`close-out:prune-agent-rows` does not reliably clear paused rows** — it pruned 1 row each for PAN-2687/2688 but left this one. Small, but it is exactly how the operator's gate count silently inflates: every close-out that misses a row leaves a permanent phantom.
+
+**LESSON: "the count went down" is not the same as "the mechanism works."** Draining 16 → 5 felt like the fix, and it mostly was — but one row survived its own close-out, and only checking each remaining row individually surfaced it. A cleanup that is 90% effective still accumulates forever.
+
+### Verdict laundering — evidence extended on PAN-3365
+
+Posted the full analysis. Key correction recorded there: **74 is misleading** (normal rework), **29** match the sharp signature, and the discriminator is commits — **4 of 4 sampled had zero commits between failure and pass**, with branch existence verified so the zeros are not a deleted-ref artifact. Occurrences span 07-25 to 07-28.
+
+**The detector is the fix**: *a pass must not supersede an unresolved negative verdict when no commits landed between them.* One rule, blocks all five known cases, cheap to evaluate at verdict-write time.
+
+Recommended to the operator: dispatch the code-level audit as its own work with the 29-item list as its worklist, rather than 29 shallow reviews — producing unearned green verdicts is the failure being investigated.
