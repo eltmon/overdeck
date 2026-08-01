@@ -9518,3 +9518,10 @@ Operator finished UAT pause and said resume.
 - **PAN-3379 reviewed**: needs-you classification now requires the canonical `pipelineBucket` from the membership resolver (terminal/zombie buckets can never classify as needs-you) and captions are derived labels ("plan approval") instead of the frozen "all checks passed". Render-time derivation from the canonical read door — structurally kills the phantom class rather than sweeping a store. Small surgical diff (+59/−14) + 41 lines of tests. PR #3381.
 - **PAN-3375 reviewed**: deacon convoy monitor now (1) detects a warm-resumed reviewer whose activity mirror never advances → kill + per-lane respawn via the PAN-3368 door, bounded by `reviewRetryAttempt`; (2) enforces child `reviewDeadlineAt` with a single-lane retry before REVIEWER_FAILED. Fake-timer tests per repo rule (+185 test lines).
 - Both PRs in CI with a combined background watch; land + close out on green. Load back to ~3.
+
+## Interim tick 12 (2026-08-01 ~07:50Z) — PAN-3379 closed out; PAN-3375 merged; next wave dispatched (PAN-2952 strike, PAN-3362 plan)
+
+- **PAN-3379 landed, deployed (live build = its merge commit), closed out** — the operator's "Needs you" phantoms are structurally dead: classification requires the canonical pipeline bucket. **PAN-3375 merged** (`239b80b51f`, I squash-merged after the train didn't take it) and handed to verifying-on-main; close-out pending main CI + deploy.
+- **Every substrate defect found tonight is now merged**: convoy per-lane recovery (3368), reload false-abort outage (3370), restart-UX truthfulness (3373), laundering Variant A (3365) + Variant B (3377), needs-you phantoms (3379), reviewer freeze + child deadlines (3375). Nine landed issues, zero overrides.
+- **Next wave**: `strike-pan-2952` (reconcile must prefer newer of journal/DB — the remaining half of the laundering machinery, 3/3 fresh evidence) and `planning-pan-3362` (tracker-backed UAT fixtures — unblocks PAN-3356 verification, made urgent by the operator's failed cockpit UAT).
+- PAN-3358 still operator-gated on UAT. Load ~3.5.
