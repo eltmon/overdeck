@@ -1,0 +1,31 @@
+{
+  "issueId": "PAN-3367",
+  "schemaVersion": 2,
+  "created": "2026-08-01T02:43:33.946Z",
+  "updated": "2026-08-01T02:43:33.946Z",
+  "pipeline": {
+    "issueId": "PAN-3367",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-01T02:43:33.946Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-3367",
+      "recoveryPath": "autonomous-plan-dispatch",
+      "obligationGeneration": "in_planning",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-01T02:43:33.944Z"
+    }
+  ]
+}
