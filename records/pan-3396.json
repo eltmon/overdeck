@@ -162,6 +162,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-01T21:53:47.668Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T21:54:16.044Z"
     }
   ],
   "feedback": [
@@ -226,7 +231,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:54:11.153Z",
+  "updated": "2026-08-01T21:54:16.300Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "failed",
@@ -387,7 +392,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
