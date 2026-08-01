@@ -61,6 +61,7 @@ const conversationsTable = sqliteTable('conversations', {
   forkFallbackReason:  text('fork_fallback_reason'),
   deliveryMethod:      text('delivery_method'),
   spawnError:          text('spawn_error'),
+  projectKey:          text('project_key'),
 });
 
 const conversationFilesTable = sqliteTable('conversation_files', {
@@ -670,6 +671,8 @@ export interface LegacyConversation {
   forkRequest: string | null;
   forkRetryCount: number;
   workspaceId: string | null;
+  /** Explicit project assignment override. Null = fall back to deriving the project from cwd. */
+  projectKey: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -758,6 +761,7 @@ interface LegacyConversationRow {
   delivery_method: string | null;
   spawn_error: string | null;
   workspace_id: string | null;
+  project_key: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -792,6 +796,7 @@ const LEGACY_CONVERSATION_SELECT = `
     c.delivery_method,
     c.spawn_error,
     c.workspace_id,
+    c.project_key,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -917,6 +922,7 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     forkRequest: row.fork_request ?? null,
     forkRetryCount: row.fork_retry_count ?? 0,
     workspaceId: row.workspace_id ?? null,
+    projectKey: row.project_key ?? null,
   };
 }
 
@@ -1353,6 +1359,11 @@ export function setConversationEffort(name: string, effort: string | null): void
 
 export function setConversationHarness(name: string, harness: RuntimeName): void {
   overdeckDb().prepare(`UPDATE conversations SET harness = ? WHERE name = ?`).run(harness, name);
+}
+
+/** Set (or clear, with null) the project assignment override for a conversation. */
+export function setConversationProjectKey(name: string, projectKey: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET project_key = ? WHERE name = ?`).run(projectKey, name);
 }
 
 export function setConversationClaudeSessionId(name: string, claudeSessionId: string): void {

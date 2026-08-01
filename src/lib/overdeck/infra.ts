@@ -77,6 +77,9 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'pinned_docs', column: 'id' },
     { table: 'conversations', column: 'workspace_id' },
     { table: 'agents', column: 'workspace_id' },
+    // PAN-1577: explicit project assignment override for moving a conversation
+    // between projects without relying on cwd-derived grouping.
+    { table: 'conversations', column: 'project_key' },
     // PAN-3331: the quick-action band's per-workspace run command.
     { table: 'workspaces', column: 'run_command' },
   ],
@@ -201,6 +204,9 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');
   ensureWorkspaceTablesSync(db);
+  // PAN-1577: explicit project assignment override for moving a conversation
+  // between projects without relying on cwd-derived grouping.
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
 }
 
 /**
