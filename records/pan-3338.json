@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:21:11.506Z",
+  "updated": "2026-08-01T20:26:48.291Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "poller-stops-resurrecting-interactive-agents": {
-        "writerId": "agent-pan-3338",
-        "agentId": "agent-pan-3338",
-        "pid": 3343403,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T20:21:11.506Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -68,12 +60,27 @@
         "outcome": "completed",
         "reason": "Moved the stop-marking block after the PRD gate/spec promotion and emit agent.status_changed(stopped, hasLiveTmuxSession) via eventStore.append. New test file planning-promotion-status-event.test.ts covers all 4 ACs (survives-session true/false, PRD-gate rejection leaves agent running, durable stop write persists). Deviated from xBRIEF files_scope: put tests in a new file matching the existing planning-promotion-marker-cleanup.test.ts full-harness pattern rather than complete-planning.test.ts, which has no mocking for completePlanningForIssue's dependencies.",
         "releasedAt": "2026-08-01T20:20:59.176Z"
+      },
+      {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3343403,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:21:11.506Z",
+        "itemId": "poller-stops-resurrecting-interactive-agents",
+        "outcome": "completed",
+        "reason": "Exported isInteractiveRoleAgent from agent-enrichment.ts; added shouldResurrectStoppedAgent in agent-enrichment-service.ts as the single resurrection resolver, wired into both the reconcile block and the agent.created projection. 5 new tests cover isInteractiveRoleAgent and shouldResurrectStoppedAgent (plan/conv- exempt, work resurrects, gate conditions). Added the 'Stopped but session-alive' subsection to docs/AGENT-STATE-PLANES.md. All existing agent-enrichment tests (33 + 22) stay green; typecheck clean.",
+        "releasedAt": "2026-08-01T20:26:48.291Z"
       }
     ],
     "statusReasons": {
       "finalize-status-event": {
         "reason": "Moved the stop-marking block after the PRD gate/spec promotion and emit agent.status_changed(stopped, hasLiveTmuxSession) via eventStore.append. New test file planning-promotion-status-event.test.ts covers all 4 ACs (survives-session true/false, PRD-gate rejection leaves agent running, durable stop write persists). Deviated from xBRIEF files_scope: put tests in a new file matching the existing planning-promotion-marker-cleanup.test.ts full-harness pattern rather than complete-planning.test.ts, which has no mocking for completePlanningForIssue's dependencies.",
         "updatedAt": "2026-08-01T20:20:59.176Z"
+      },
+      "poller-stops-resurrecting-interactive-agents": {
+        "reason": "Exported isInteractiveRoleAgent from agent-enrichment.ts; added shouldResurrectStoppedAgent in agent-enrichment-service.ts as the single resurrection resolver, wired into both the reconcile block and the agent.created projection. 5 new tests cover isInteractiveRoleAgent and shouldResurrectStoppedAgent (plan/conv- exempt, work resurrects, gate conditions). Added the 'Stopped but session-alive' subsection to docs/AGENT-STATE-PLANES.md. All existing agent-enrichment tests (33 + 22) stay green; typecheck clean.",
+        "updatedAt": "2026-08-01T20:26:48.291Z"
       }
     }
   },
@@ -83,6 +90,10 @@
     "finalize-status-event.finalize-status-event.ac2": "completed",
     "finalize-status-event.finalize-status-event.ac3": "completed",
     "finalize-status-event.finalize-status-event.ac4": "completed",
-    "poller-stops-resurrecting-interactive-agents": "running"
+    "poller-stops-resurrecting-interactive-agents": "completed",
+    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac1": "completed",
+    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac2": "completed",
+    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac3": "completed",
+    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac4": "completed"
   }
 }
