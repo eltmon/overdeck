@@ -412,7 +412,7 @@
     "recordedAt": "2026-08-01T23:46:16.725Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:48:18.454Z",
+  "updated": "2026-08-01T23:48:42.000Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "passed",
@@ -540,18 +540,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 36,
-            "output": 10194,
-            "cacheRead": 2998777,
-            "cacheWrite": 203584
+            "input": 44,
+            "output": 11081,
+            "cacheRead": 3349898,
+            "cacheWrite": 322006
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3062,
-            "output": 148445,
-            "cacheRead": 71905260,
-            "cacheWrite": 3565705
+            "input": 3088,
+            "output": 149064,
+            "cacheRead": 72153477,
+            "cacheWrite": 3662326
           }
         }
       },
@@ -569,21 +569,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 36,
-          "output": 10194,
-          "cacheRead": 2998777,
-          "cacheWrite": 203584
+          "input": 44,
+          "output": 11081,
+          "cacheRead": 3349898,
+          "cacheWrite": 322006
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3062,
-          "output": 148445,
-          "cacheRead": 71905260,
-          "cacheWrite": 3565705
+          "input": 3088,
+          "output": 149064,
+          "cacheRead": 72153477,
+          "cacheWrite": 3662326
         }
       },
       "costAtCloseOut": {
-        "usd": 311.6359323,
-        "pricingAsOf": "2026-08-01T23:48:12.518Z"
+        "usd": 312.1598153,
+        "pricingAsOf": "2026-08-01T23:48:41.991Z"
       }
     },
     "merges": [
