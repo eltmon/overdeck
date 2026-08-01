@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:39:36.265Z",
+  "updated": "2026-08-01T15:43:33.322Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "widen-backfill-predicate": {
-        "writerId": "agent-pan-3418",
-        "agentId": "agent-pan-3418",
-        "pid": 3786148,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:39:36.265Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Normalized model and effort at the conversations write door, including reactivation; added database-backed regression coverage",
         "releasedAt": "2026-08-01T15:39:14.428Z"
+      },
+      {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 3786148,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:39:36.265Z",
+        "itemId": "widen-backfill-predicate",
+        "outcome": "completed",
+        "reason": "Expanded the write-door backfill predicate to repair NULL and empty models while preserving known values; added database regression tests",
+        "releasedAt": "2026-08-01T15:43:33.322Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "db-writes-null-for-empty": {
         "reason": "Normalized model and effort at the conversations write door, including reactivation; added database-backed regression coverage",
         "updatedAt": "2026-08-01T15:39:14.428Z"
+      },
+      "widen-backfill-predicate": {
+        "reason": "Expanded the write-door backfill predicate to repair NULL and empty models while preserving known values; added database regression tests",
+        "updatedAt": "2026-08-01T15:43:33.322Z"
       }
     }
   },
@@ -108,6 +115,8 @@
     "db-writes-null-for-empty.db-writes-null-for-empty.ac2": "completed",
     "db-writes-null-for-empty.db-writes-null-for-empty.ac3": "completed",
     "db-writes-null-for-empty.db-writes-null-for-empty.ac4": "completed",
-    "widen-backfill-predicate": "running"
+    "widen-backfill-predicate": "completed",
+    "widen-backfill-predicate.widen-backfill-predicate.ac1": "completed",
+    "widen-backfill-predicate.widen-backfill-predicate.ac2": "completed"
   }
 }
