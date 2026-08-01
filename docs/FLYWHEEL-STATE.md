@@ -9565,3 +9565,14 @@ Operator finished UAT pause and said resume.
 
 - Dashboard healthy (pid 4135575 holding, 3rd tick). Main CI green. Load ~7. post_merge_limbo drained.
 - strike-pan-3386 in verify with real progress delta ($7.9→$11.2, +256/−92). Nothing else dispatchable — the remaining queue is entirely operator-gated (release PAN-3362 / PAN-3367; PAN-3356 hold; lexerra scope; PAN-3313 second auth).
+
+---
+
+# INTERIM RUN END (2026-08-01 ~10:35Z) — operator reactivating the real flywheel
+
+Heartbeat stopped at operator direction; no monitors or background watches remain. **The incoming orchestrator inherits:**
+
+1. **strike-pan-3386 in verify** (initiator logging + always-start-successor + hung-holder surrender). On its readiness signal: review the diff, land (train usually merges on green), `pan done PAN-3386 --strike`, close out when deployed + main CI green. Whoever spawns a strike owns its merge — I spawned this one; ownership transfers with this note.
+2. **Operator-gated queue:** PAN-3362 + PAN-3367 planned, awaiting release; PAN-3356 held (ACs unverified — its first real UAT FAILED, evidence on the issue; PAN-3362 unblocks proper verification); PAN-3305 held; lexerra scope; PAN-3313 second CLIProxy auth.
+3. **Watch items:** the deploy-patrol restart path failed once tonight (PAN-3383 incident, ~50-min outage) and self-healed three times since — intermittent; the watchdog now states its blocking reason, so read `:3012/status` when the dashboard is dark. `pan close`/`pan done` journal-write failures should be gone (PAN-2952) — if the PAN-2583 fallback line reappears, that's a regression signal. Stuck gates have no auto-retirement and BOTH manual clear doors are broken for merged issues (`pan unstick` missing per PAN-3321; `/unstick` route resets lifecycle to pending — corrupting for merged rows): needs a merged-aware clear path, not yet filed as its own issue.
+4. **Interim totals:** 13 issues landed and closed out (PAN-3365, 3366, 3368, 3370, 3373, 3375, 3377, 3379, 3383, 2952, 3358, MIN-928, + drains), both verdict-laundering variants guarded and live, 2 outages recovered, 0 DoD overrides, 0 `--accept-*`.
