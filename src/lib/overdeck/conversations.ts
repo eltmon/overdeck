@@ -1371,9 +1371,9 @@ export function updateConversationDeliveryMethod(name: string, method: 'auto' | 
     .prepare(`UPDATE conversations SET delivery_method = ? WHERE name = ?`)
     .run(method, name);
 }
-
+// Repair missing or empty model metadata without overwriting known models.
 export function backfillConversationModel(name: string, model: string): void {
-  overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ? AND model IS NULL`).run(model, name);
+  overdeckDb().prepare(`UPDATE conversations SET model = ? WHERE name = ? AND (model IS NULL OR model = '')`).run(model, name);
 }
 
 export function updateForkStatus(name: string, status: string | null, error?: string): void {
