@@ -74,7 +74,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:47:01.000Z",
+  "updated": "2026-08-01T20:47:01.920Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -83,7 +83,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:46:58.209Z",
+    "updatedAt": "2026-08-01T20:47:01.917Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed all blocking review issues: wired residue through workflow, fixed forge commands, fixed error handling, optimized record-read concurrency, and fixed mergeStatus deletion",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -91,10 +91,7 @@
     "reviewSpawnedAt": "2026-08-01T20:33:39.223Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
-      "declaredScopeUntouched": [
-        "scripts/file-size-allowlist.txt",
-        "src/lib/lifecycle/workflows.ts"
-      ],
+      "declaredScopeUntouched": [],
       "declaredScope": [
         "docs/DEFINITION-OF-DONE.md",
         "docs/PIPELINE-MEMBERSHIP.md",
@@ -118,11 +115,13 @@
       "actualChangedFiles": [
         "docs/DEFINITION-OF-DONE.md",
         "docs/PIPELINE-MEMBERSHIP.md",
+        "scripts/file-size-allowlist.txt",
         "src/cli/commands/close.ts",
         "src/lib/__tests__/pipeline-membership.test.ts",
         "src/lib/lifecycle/dod.ts",
         "src/lib/lifecycle/residue.ts",
         "src/lib/lifecycle/types.ts",
+        "src/lib/lifecycle/workflows.ts",
         "src/lib/pan-dir/record.ts",
         "src/lib/pipeline-membership-gather.ts",
         "src/lib/pipeline-membership.ts",
@@ -133,8 +132,9 @@
         "tests/unit/lib/pan-dir/record-close-out.test.ts",
         "tests/unit/lib/pipeline-membership-gather.test.ts"
       ],
-      "recordedAt": "2026-08-01T20:31:40.157Z"
-    }
+      "recordedAt": "2026-08-01T20:47:00.998Z"
+    },
+    "reviewRequestedAt": "2026-08-01T20:47:01.917Z"
   },
   "closeOut": {
     "usage": {
