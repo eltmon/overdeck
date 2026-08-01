@@ -9499,3 +9499,10 @@ Operator finished UAT pause and said resume.
 - **PAN-3373 closed out** (8-row DoD, no overrides) — operator's restart-UX report went screenshot → merged → closed in ~4h.
 - **PAN-3377 strike ready + reviewed**: write-door guard `rejectVerdictEvidenceHeadMismatch` cross-anchors gates (terminal review evidence vs lastVerifiedCommit; terminal test evidence vs reviewedAtCommit); verdict-restore refuses stale snapshots against a live cycle with a loud two-head warn; fallback-sweep merge gets the same comparator. PR #3380 in CI (watch armed).
 - **Flywheel-succession question raised by operator.** My recommendation, delivered: start the real `pan flywheel start` run (Fable 5 config already active for next spawn); I stay as supervising conversation. Awaiting the operator's go — heartbeat continues with a stand-down check if the singleton appears.
+
+## Interim tick 9 (2026-08-01 ~06:40Z) — PAN-3377 merged (both laundering variants now guarded); strikes dispatched for PAN-3379 + PAN-3375
+
+- **PAN-3377 merged** (#3380, train, `34976119e7`) and handed to verifying-on-main. **Both laundering variants are now structurally guarded once deployed**: A (PAN-3365 — failed UAT survives and blocks merge) + B (PAN-3377 — verdicts commit-anchored, verdict-restore refuses stale snapshots over a live cycle with a loud two-head warn). Close-out pending main CI (in_progress on the merge commit) + deploy.
+- **Fleet re-saturated**: `strike-pan-3379` (needs-you escalations never retire; captions must derive from canonical state) and `strike-pan-3375` (warm-resume kickoff loss + child reviewer deadline enforcement wired to the PAN-3368 per-lane door) dispatched. Both vetted: disjoint code areas, aligned with the two-door tenet.
+- Load spike to ~21 = parallel vitest workers (verification on the PAN-3377 merge); CPU PSI 5.8, fine.
+- Still no `pan flywheel start` from the operator — continuing interim loop with stand-down check each tick.
