@@ -18,7 +18,7 @@
  */
 
 import { Effect } from 'effect';
-import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW } from './model-context-windows.js';
+import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW } from './model-context-windows.js';
 import { ModelId } from './settings.js';
 import type { SubscriptionPlan } from './subscription-types.js';
 
@@ -110,7 +110,7 @@ type CapabilityModelId = ModelId;
 
 // CLIProxy context ceilings live in their own module so this table stays a table;
 // re-exported here because they are part of the capability contract.
-export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW } from './model-context-windows.js';
+export { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, apiLaunchModelIdSync, isGpt56LongContextVariantSync } from './model-context-windows.js';
 
 export interface ModelCapability {
   /** Model identifier */
@@ -522,14 +522,37 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 65,
       'context-length': 95,
     },
-    notes: 'OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Effective Claude Code/CLIProxy ceiling is 372K (CLIPROXY_GPT56_CONTEXT_WINDOW), 1M marketing context.',
+    notes: 'OpenAI flagship (July 2026). New default. Successor to GPT-5.5 with improved agentic/shell coding. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388); use gpt-5.6-sol[372k] to opt into the long window. 1M marketing context.',
+  },
+
+  'gpt-5.6-sol[372k]': {
+    model: 'gpt-5.6-sol[372k]',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Sol 372K',
+    costPer1MTokens: 17.5, // $5.00 in / $30.00 out — 2x in / 1.5x out past 272K input
+    contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 98,
+      'code-review': 95,
+      debugging: 97,
+      planning: 96,
+      documentation: 93,
+      testing: 95,
+      security: 92,
+      performance: 93,
+      synthesis: 95,
+      speed: 65,
+      'context-length': 96,
+    },
+    notes: 'gpt-5.6-sol with the opt-in 372K long-context pin (CLIPROXY_GPT56_LONG_CONTEXT_WINDOW). Requests past 272K input bill at 2x in / 1.5x out for the full request — accept that cost only for long-research work (PAN-3388). Launch door strips the [372k] suffix; the API sees gpt-5.6-sol.',
   },
 
   'gpt-5.6-terra': {
     model: 'gpt-5.6-terra',
     provider: 'openai',
     displayName: 'GPT-5.6 Terra',
-    costPer1MTokens: 8.75, // $2.50 in / $15.00 out
+    costPer1MTokens: 7, // $2.00 in / $12.00 out (PAN-3388: was wrongly listed at $2.50/$15)
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
     skills: {
@@ -545,14 +568,37 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 70,
       'context-length': 95,
     },
-    notes: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at roughly half the cost. Effective Claude Code/CLIProxy ceiling is 372K (CLIPROXY_GPT56_CONTEXT_WINDOW), 1M marketing context.',
+    notes: 'OpenAI balanced tier (July 2026). GPT-5.5-competitive at lower cost. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388); use gpt-5.6-terra[372k] to opt into the long window. 1M marketing context.',
+  },
+
+  'gpt-5.6-terra[372k]': {
+    model: 'gpt-5.6-terra[372k]',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Terra 372K',
+    costPer1MTokens: 7, // $2.00 in / $12.00 out — 2x in / 1.5x out past 272K input
+    contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 97,
+      'code-review': 94,
+      debugging: 96,
+      planning: 95,
+      documentation: 92,
+      testing: 94,
+      security: 91,
+      performance: 92,
+      synthesis: 94,
+      speed: 70,
+      'context-length': 96,
+    },
+    notes: 'gpt-5.6-terra with the opt-in 372K long-context pin (CLIPROXY_GPT56_LONG_CONTEXT_WINDOW). Requests past 272K input bill at 2x in / 1.5x out for the full request (PAN-3388). Launch door strips the [372k] suffix; the API sees gpt-5.6-terra.',
   },
 
   'gpt-5.6-luna': {
     model: 'gpt-5.6-luna',
     provider: 'openai',
     displayName: 'GPT-5.6 Luna',
-    costPer1MTokens: 3.5, // $1.00 in / $6.00 out
+    costPer1MTokens: 0.7, // $0.20 in / $1.20 out (PAN-3388: was wrongly listed at $1/$6)
     contextWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
     minTier: 'plus',
     skills: {
@@ -568,7 +614,30 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
       speed: 90,
       'context-length': 90,
     },
-    notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Effective Claude Code/CLIProxy ceiling is 372K (CLIPROXY_GPT56_CONTEXT_WINDOW), 1M marketing context.",
+    notes: "OpenAI fastest/cheapest tier (July 2026). Successor to GPT-5.4 Mini's market position. Pinned to the 272K billing tier (CLIPROXY_GPT56_CONTEXT_WINDOW) — >272K input is billed 2x in / 1.5x out for the full request (PAN-3388); use gpt-5.6-luna[372k] to opt into the long window. 1M marketing context.",
+  },
+
+  'gpt-5.6-luna[372k]': {
+    model: 'gpt-5.6-luna[372k]',
+    provider: 'openai',
+    displayName: 'GPT-5.6 Luna 372K',
+    costPer1MTokens: 0.7, // $0.20 in / $1.20 out — 2x in / 1.5x out past 272K input
+    contextWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
+    minTier: 'plus',
+    skills: {
+      'code-generation': 82,
+      'code-review': 78,
+      debugging: 76,
+      planning: 72,
+      documentation: 80,
+      testing: 76,
+      security: 68,
+      performance: 72,
+      synthesis: 75,
+      speed: 90,
+      'context-length': 92,
+    },
+    notes: 'gpt-5.6-luna with the opt-in 372K long-context pin (CLIPROXY_GPT56_LONG_CONTEXT_WINDOW). Requests past 272K input bill at 2x in / 1.5x out for the full request (PAN-3388). Launch door strips the [372k] suffix; the API sees gpt-5.6-luna.',
   },
 
   'gpt-5.5': {

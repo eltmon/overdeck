@@ -277,16 +277,18 @@ describe('agents auth routing', () => {
     expect(result).toContain('export ANTHROPIC_AUTH_TOKEN="overdeck-local-cliproxy-key"');
   });
 
+  // PAN-3388: bare ids pin to the 272K billing tier; [372k] variants opt into
+  // the 372K long window.
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])(
-    'applies the 372K Claude Code context policy to %s launchers and direct spawns',
+    'applies the 272K billing-tier context policy to %s launchers and direct spawns',
     async (model) => {
       mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
 
       const providerExports = await getProviderExportsForModel(model);
       expect(providerExports).toContain('unset CLAUDE_CODE_MAX_CONTEXT_TOKENS');
       expect(providerExports).toContain('unset CLAUDE_CODE_AUTO_COMPACT_WINDOW');
-      expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
-      expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+      expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
+      expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
 
       const launcher = generateLauncherScriptSync({
         role: 'work',
@@ -294,8 +296,26 @@ describe('agents auth routing', () => {
         providerExports,
         baseCommand: `claude --agent pan-work-agent --model '${model}'`,
       });
-      expect(launcher).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
-      expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
+      expect(launcher).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="272000"');
+      expect(launcher).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="272000"');
+
+      const spawnEnv = await buildSpawnEnvForModel(model, {
+        CLAUDE_CODE_MAX_CONTEXT_TOKENS: '999999',
+        CLAUDE_CODE_AUTO_COMPACT_WINDOW: '999999',
+      });
+      expect(spawnEnv.CLAUDE_CODE_MAX_CONTEXT_TOKENS).toBe('272000');
+      expect(spawnEnv.CLAUDE_CODE_AUTO_COMPACT_WINDOW).toBe('272000');
+    },
+  );
+
+  it.each(['gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'])(
+    'applies the 372K long-context policy to %s launchers and direct spawns',
+    async (model) => {
+      mockOpenAIAuthStatus.mockReturnValue({ loggedIn: true });
+
+      const providerExports = await getProviderExportsForModel(model);
+      expect(providerExports).toContain('export CLAUDE_CODE_MAX_CONTEXT_TOKENS="372000"');
+      expect(providerExports).toContain('export CLAUDE_CODE_AUTO_COMPACT_WINDOW="372000"');
 
       const spawnEnv = await buildSpawnEnvForModel(model, {
         CLAUDE_CODE_MAX_CONTEXT_TOKENS: '999999',

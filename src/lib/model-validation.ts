@@ -1,5 +1,7 @@
 import { Data, Effect } from 'effect';
 
+import { apiLaunchModelIdSync } from './model-context-windows.js';
+
 export const MODEL_ID_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._:/@-]|\[|\]){0,127}$/;
 
 /** Tagged error for model-validation Effect variants. */
@@ -31,7 +33,11 @@ export function requireModelOverrideSync(value: unknown): string {
 
 export function shellQuoteModelIdSync(model: string): string {
   const normalized = requireModelOverrideSync(model);
-  return `'${normalized.replace(/'/g, `'\\''`)}'`;
+  // Overdeck-side context-variant suffixes (e.g. gpt-5.6-sol[372k]) exist only
+  // for pins and pickers — no harness CLI or backend knows them, so every
+  // command builder gets the base API id here, the single launch-arg door.
+  const launchId = apiLaunchModelIdSync(normalized);
+  return `'${launchId.replace(/'/g, `'\\''`)}'`;
 }
 
 // ─── Effect variants (PAN-1249) ───────────────────────────────────────────────

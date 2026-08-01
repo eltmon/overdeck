@@ -66,7 +66,7 @@ const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
 }
 
 /** Models that are gated to ChatGPT subscription auth only (no API-key path). */
-const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'])
+const SUBSCRIPTION_ONLY_OPENAI_MODELS = new Set(['gpt-5.5', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'])
 
 /**
  * Check whether a (model, authMode) pair is allowed, independent of harness.

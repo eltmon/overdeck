@@ -108,6 +108,10 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'gpt-5.6-sol': { apiModel: 'gpt-5.6-sol' },
   'gpt-5.6-terra': { apiModel: 'gpt-5.6-terra' },
   'gpt-5.6-luna': { apiModel: 'gpt-5.6-luna' },
+  // PAN-3388: long-context variants — the API only knows the base ids.
+  'gpt-5.6-sol[372k]': { apiModel: 'gpt-5.6-sol' },
+  'gpt-5.6-terra[372k]': { apiModel: 'gpt-5.6-terra' },
+  'gpt-5.6-luna[372k]': { apiModel: 'gpt-5.6-luna' },
   'gpt-5.5-pro': { apiModel: 'gpt-5.5-pro' },
   'gpt-5.5': { apiModel: 'gpt-5.5' },
   'gpt-5.4-pro': { apiModel: 'gpt-5.4-pro' },

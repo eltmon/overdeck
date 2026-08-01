@@ -8,7 +8,7 @@ import { getOpenAIAuthStatus } from '../openai-auth.js';
 import { ensureOpenAICompatibleProxyRunning } from '../openai-compatible-proxy.js';
 import { validateProviderHealth } from '../provider-health.js';
 import { getProviderEnvSync, getProviderForModelSync } from '../providers.js';
-import { CLIPROXY_GPT56_CONTEXT_WINDOW, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
+import { CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, GPT56_LONG_CONTEXT_VARIANTS, hasModelCapabilitySync, getModelCapabilitySync, resolveModelIdSync } from '../model-capabilities.js';
 import type { Role } from './agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
@@ -126,8 +126,10 @@ const PROVIDER_ENV_KEYS = [
 // used to disagree (372K here, 150K in model-capabilities), so the dashboard
 // meter and the Deacon's proactive compaction scored GPT-5.6 agents against a
 // window 2.5x smaller than the one the harness was actually given.
-const GPT_56_CODEX_CLIENT_CONTEXT_WINDOW = CLIPROXY_GPT56_CONTEXT_WINDOW;
+// PAN-3388: bare ids pin to the 272K billing tier; [372k] variants opt into
+// the long window at 2x-input/1.5x-output quota burn past 272K.
 const GPT_56_MODELS = new Set(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna']);
+const GPT_56_LONG_MODELS = new Set(Object.keys(GPT56_LONG_CONTEXT_VARIANTS));
 const KIMI_K3_MODELS = new Set(['k3', 'k3[1m]']);
 
 interface ClaudeCodeContextPolicy {
@@ -140,10 +142,16 @@ export function getClaudeCodeContextPolicyForModel(model: string): ClaudeCodeCon
   if (provider.name === 'anthropic') return {};
 
   const resolvedModel = resolveModelIdSync(model);
+  if (GPT_56_LONG_MODELS.has(resolvedModel)) {
+    return {
+      autoCompactWindow: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
+      maxContextTokens: CLIPROXY_GPT56_LONG_CONTEXT_WINDOW,
+    };
+  }
   if (GPT_56_MODELS.has(resolvedModel)) {
     return {
-      autoCompactWindow: GPT_56_CODEX_CLIENT_CONTEXT_WINDOW,
-      maxContextTokens: GPT_56_CODEX_CLIENT_CONTEXT_WINDOW,
+      autoCompactWindow: CLIPROXY_GPT56_CONTEXT_WINDOW,
+      maxContextTokens: CLIPROXY_GPT56_CONTEXT_WINDOW,
     };
   }
   if (!hasModelCapabilitySync(resolvedModel)) return {};

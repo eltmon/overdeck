@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, MODEL_CAPABILITIES } from '../model-capabilities.js';
+import { CLIPROXY_CODEX_CONTEXT_WINDOW, CLIPROXY_GPT56_CONTEXT_WINDOW, CLIPROXY_GPT56_LONG_CONTEXT_WINDOW, MODEL_CAPABILITIES } from '../model-capabilities.js';
 
 describe('model capabilities', () => {
   it('locks gpt-5.5 contextWindow to the CLIProxy Codex ceiling', () => {
@@ -16,20 +16,32 @@ describe('model capabilities', () => {
     expect(gpt55.notes).not.toContain('200K');
   });
 
+  // PAN-3388: bare ids pin to the 272K billing tier (>272K input bills 2x/1.5x
+  // for the full request); [372k] variants opt into the long window.
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
-    'locks %s contextWindow to the GPT-5.6 CLIProxy ceiling',
+    'locks %s contextWindow to the GPT-5.6 billing-tier ceiling',
     (model) => {
       const capability = MODEL_CAPABILITIES[model];
       expect(capability).toBeDefined();
       expect(capability.contextWindow).toBe(CLIPROXY_GPT56_CONTEXT_WINDOW);
+      expect(capability.contextWindow).toBe(272_000);
+    },
+  );
+
+  it.each(['gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]'] as const)(
+    'locks %s contextWindow to the long-context ceiling',
+    (model) => {
+      const capability = MODEL_CAPABILITIES[model];
+      expect(capability).toBeDefined();
+      expect(capability.contextWindow).toBe(CLIPROXY_GPT56_LONG_CONTEXT_WINDOW);
       expect(capability.contextWindow).toBe(372_000);
     },
   );
 
   it.each(['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna'] as const)(
-    'documents the effective CLIProxy ceiling consistently in %s notes',
+    'documents the billing tier consistently in %s notes',
     (model) => {
-      expect(MODEL_CAPABILITIES[model].notes).toContain('372K');
+      expect(MODEL_CAPABILITIES[model].notes).toContain('272K');
       expect(MODEL_CAPABILITIES[model].notes).not.toContain('150K');
     },
   );
@@ -37,12 +49,26 @@ describe('model capabilities', () => {
   // PAN-3057: the harness pin and the capability table are one number. If these
   // drift again, the dashboard meter and the Deacon's proactive compaction score
   // GPT-5.6 agents against a window the harness was never given.
-  it('feeds the same GPT-5.6 window to the harness env exports and the capability table', async () => {
-    const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
-    const policy = getClaudeCodeContextPolicyForModel('gpt-5.6-sol');
+  it.each(['gpt-5.6-sol', 'gpt-5.6-sol[372k]'] as const)(
+    'feeds the same GPT-5.6 window to the harness env exports and the capability table for %s',
+    async (model) => {
+      const { getClaudeCodeContextPolicyForModel } = await import('../agents/provider-env.js');
+      const policy = getClaudeCodeContextPolicyForModel(model);
 
-    expect(policy.maxContextTokens).toBe(MODEL_CAPABILITIES['gpt-5.6-sol'].contextWindow);
-    expect(policy.autoCompactWindow).toBe(MODEL_CAPABILITIES['gpt-5.6-sol'].contextWindow);
+      expect(policy.maxContextTokens).toBe(MODEL_CAPABILITIES[model].contextWindow);
+      expect(policy.autoCompactWindow).toBe(MODEL_CAPABILITIES[model].contextWindow);
+    },
+  );
+
+  // PAN-3388: the [372k] suffix is Overdeck-side only — the launch door must
+  // hand every harness CLI the base API id.
+  it('strips the [372k] suffix at the shell-quote launch door', async () => {
+    const { shellQuoteModelIdSync } = await import('../model-validation.js');
+    expect(shellQuoteModelIdSync('gpt-5.6-sol[372k]')).toBe("'gpt-5.6-sol'");
+    expect(shellQuoteModelIdSync('gpt-5.6-terra[372k]')).toBe("'gpt-5.6-terra'");
+    expect(shellQuoteModelIdSync('gpt-5.6-luna[372k]')).toBe("'gpt-5.6-luna'");
+    // Kimi's [1m] suffix is a real endpoint alias and must pass through.
+    expect(shellQuoteModelIdSync('k3[1m]')).toBe("'k3[1m]'");
   });
 
   it('exposes QuantumLlama capabilities with spec display names and windows (PAN-3252)', () => {

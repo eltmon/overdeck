@@ -96,8 +96,11 @@ const FALLBACK_GROUPS: ModelGroup[] = [
     label: 'OpenAI',
     models: [
       { id: 'gpt-5.6-sol', label: 'GPT-5.6 Sol', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-sol[372k]', label: 'GPT-5.6 Sol 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.6-terra', label: 'GPT-5.6 Terra', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-terra[372k]', label: 'GPT-5.6 Terra 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.6-luna', label: 'GPT-5.6 Luna', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
+      { id: 'gpt-5.6-luna[372k]', label: 'GPT-5.6 Luna 372K', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.5', label: 'GPT-5.5', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
       { id: 'gpt-5.4', label: 'GPT-5.4', provider: 'openai', costDisplay: '$0/1M', effortLevels: [] },
     ],

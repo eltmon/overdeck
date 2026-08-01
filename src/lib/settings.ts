@@ -10,6 +10,11 @@ export type OpenAIModel =
   | 'gpt-5.6-sol'
   | 'gpt-5.6-terra'
   | 'gpt-5.6-luna'
+  // PAN-3388: Overdeck-side long-context variants — same API models, pinned to
+  // 372K instead of the 272K billing tier. The launch door strips the suffix.
+  | 'gpt-5.6-sol[372k]'
+  | 'gpt-5.6-terra[372k]'
+  | 'gpt-5.6-luna[372k]'
   | 'gpt-5.5'
   | 'gpt-5.4'
   | 'gpt-5.4-mini'
@@ -260,7 +265,7 @@ export function getAvailableModelsSync(settings: SettingsConfig): {
   ];
 
   const openaiModels: OpenAIModel[] = settings.api_keys.openai
-    ? ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2']
+    ? ['gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.6-luna', 'gpt-5.6-sol[372k]', 'gpt-5.6-terra[372k]', 'gpt-5.6-luna[372k]', 'gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini', 'gpt-5.3-codex', 'gpt-5.3-codex-spark', 'gpt-5.2']
     : [];
 
   const googleModels: GoogleModel[] = settings.api_keys.google
