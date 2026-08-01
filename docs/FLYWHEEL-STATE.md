@@ -9264,3 +9264,49 @@ So there was **one** fault, not two: cwd drift from a `cd` into a workspace. My 
 - **25 close-outs, 18 PRs merged, 22 substrate bugs driven** (14 fixed, merged and closed out; 9 filed).
 - **Every machinery bug I filed this run that was mine to fix is now merged, deployed, and closed out.**
 - **Remaining, none forced:** PAN-3305 (residual gate case — merged work, branch behind main; fix suggested and the merged-PR path already exists), PAN-3313 (operator: CLIProxy second auth entry), PAN-3330/3331/3340/3341 (awaiting operator release), 17 MYN rows out of merge scope, TIN-1, 4 typed blind spots.
+
+## RUN-75 tick 27 (2026-08-01 01:57Z) — loop re-armed after a 26h lapse; paused-agent mystery solved
+
+### The lapse
+
+**No autonomous tick between 2026-07-30 22:56Z (tick 26) and now — roughly 26 hours.** Cause: during the six-strike merge cascade I switched to event-driven monitors and, when they ended (one stopped deliberately, one timed out), **never re-armed a wakeup**. Every "tick" after tick 19 ran only because the operator prompted. The work felt continuous, which is exactly why the gap went unnoticed.
+
+**LESSON: a monitor ending is not a tick, and productivity is not a heartbeat.** Event-driven watching is strictly better than polling *for the thing it watches* — it is not a substitute for the loop. **Always arm the next wakeup at the end of a tick, even when a monitor is also armed.** Now a standing instruction.
+
+### The operator's "ton of paused issues" — answered with data
+
+16 paused agents, grouped by recorded reason:
+
+| Count | Reason |
+| --- | --- |
+| 12 | `awaiting close-out (verify on main)` |
+| 2 | `needs-you: idle-alive — no observable progress across 8 pokes` (07-15) |
+| 1 | `All slot-2 work complete and merged to main` (07-08) |
+| 1 | **(no reason recorded)** (07-08) |
+
+**The pauses are not laziness — they are close-out debt.** `postMergeLifecycle` deliberately pauses the work and planning agents when a branch lands so nothing keeps working on merged code; the pause is correct, and the failure is that close-out never ran behind it. Six issues × 2 agents = 12 of the 16.
+
+Drained this tick: **PAN-3330, PAN-3331, PAN-3340, PAN-3341** (last turn), then **PAN-3363, PAN-3357**, plus **PAN-2687 and PAN-2688**. Paused count **16 → 5**.
+
+**The two 17-day pauses were zombies:** PAN-2687 and PAN-2688 were already **CLOSED on the tracker** while their agents stayed flagged paused since 07-15. Running `pan close` on each reported `✓ prune-agent-rows — Pruned 1 stopped agent row(s)` and cleared them. So **an issue closed without close-out leaves its paused agent rows behind indefinitely**, inflating the operator-visible gate count with work that finished weeks ago.
+
+### Verdict laundering is a week-long pattern, not one incident
+
+Following PAN-3365 (PAN-3356's TESTS FAILED reset away and replaced with a pass), I queried the event log:
+
+- **74** issues had a negative verdict later become `passed/passed` — **misleading**, because that catches the normal rework loop (block → fix → pass). I should not have led with it.
+- **29** match the sharp signature: negative → reset to `pending/pending` → `passed/passed` within 60 minutes.
+- **The discriminator is commits.** Sampled four (PAN-3216, PAN-3230, PAN-3206, PAN-3192): **0 commits between failure and pass in all four**, with the branches verified still present so the zeros are real rather than a deleted-ref artifact.
+
+Dates span 07-25 to 07-28, so this has been running about a week. **LESSON: a count is not a finding until it has a discriminator.** My first number would have sent the operator chasing 74 healthy rework cycles.
+
+### Held deliberately
+
+- **PAN-3356 not closed out.** It is merged and in `post_merge_limbo`, but its acceptance criteria were never verified (PAN-3365) and PAN-3362 — the environment block that made the UAT impossible — is still open. Closing it would stamp "done" on the one issue we know was never checked.
+- PAN-3305 (residual gate case), PAN-3313 (operator: CLIProxy second auth), MIN-908 and 13 MYN zombie PRs (out of merge scope), TIN-1, 4 typed blind spots.
+
+### Also this tick
+
+- **PAN-3363 merged** (PR #3364) — the stale `pan.localhost` fallback at `uat-stack.ts:161` that emitted dead workspace URLs. Strike handed off and closed out.
+- Infra healthy: hook 445/guard=1, leak 0, 29.7 GB free, **load down to 2.6**.
+- **gen-a is now the fresh CLI** (21:27) and gen-b is stale (10:29) — the reverse of yesterday. Reload alternates, so the fresh generation must be checked every tick, never assumed.
