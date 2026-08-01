@@ -9554,3 +9554,9 @@ Operator finished UAT pause and said resume.
 - **PAN-3383 merged** (#3385, train, `419851706f`) and the deploy patrol self-healed onto it (pid 4135575) — the watchdog now states its blocking reason on every deferral. Close-out pending main CI on the merge commit.
 - **strike-pan-3386 dispatched** (initiator persistent logging + always-start-successor in the patrol restart path + hung-holder lock surrender) — fleet was drained, load 2.6.
 - Interim scoreboard: 12 landed+closed, PAN-3383 at verify-on-main, 1 strike in flight, PAN-3362 + PAN-3367 planned awaiting release, PAN-3356 held (ACs), PAN-3305 held.
+
+## Interim tick 17 (2026-08-01 ~10:05Z) — PAN-3383 closed out (13 landed+closed); PAN-3386 in verify
+
+- Dashboard healthy (pid 4135575 holding). **PAN-3383 closed out** (main CI green past the merge; 8-row DoD, no overrides).
+- strike-pan-3386 (+246/−86) in its verify phase — the last in-flight item of the interim run besides operator-gated holds.
+- Current outstanding: PAN-3386 (verify), PAN-3362 + PAN-3367 planned awaiting operator release, PAN-3356 held (ACs unverified — fixture work PAN-3362 unblocks it), PAN-3305 held, lexerra scope = operator call, PAN-3313 operator-gated.
