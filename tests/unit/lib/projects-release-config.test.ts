@@ -1,7 +1,8 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { describe, expect, it, beforeEach, afterEach } from 'vitest';
+import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   getProjectSync,
+  loadProjectsConfigSync,
   PROJECTS_CONFIG_FILE,
   saveProjectsConfigSync,
   type ReleaseConfig,
@@ -57,6 +58,15 @@ projects:
         },
       },
     } satisfies ReleaseConfig);
+  });
+
+  it('throws when projects.yaml cannot be parsed instead of returning an empty registry', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    writeProjectsYaml('projects: [');
+
+    expect(() => loadProjectsConfigSync()).toThrow();
+
+    consoleError.mockRestore();
   });
 
   it('leaves release undefined when the section is absent', () => {

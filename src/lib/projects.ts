@@ -283,7 +283,7 @@ export function loadProjectsConfigSync(): ProjectsConfig {
     return config;
   } catch (error: any) {
     console.error(`Failed to parse projects.yaml: ${error.message}`);
-    return { projects: {} };
+    throw error;
   }
 }
 
