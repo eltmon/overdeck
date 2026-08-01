@@ -416,8 +416,8 @@ program
 program
   .command('untroubled <id>')
   .description('Clear an agent troubled gate without spawning it')
-  .action(untroubledCommand); registerUnstickCommand(program);
-
+  .action(untroubledCommand);
+registerUnstickCommand(program);
 program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
