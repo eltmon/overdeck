@@ -2,7 +2,7 @@
   "issueId": "PAN-3367",
   "schemaVersion": 2,
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T02:43:58.135Z",
+  "updated": "2026-08-01T03:13:07.574Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -26,6 +26,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-01T02:43:33.944Z"
+    },
+    {
+      "issue": "PAN-3367",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-01T03:13:07.572Z"
     }
   ],
   "sessionHistory": [
