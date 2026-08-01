@@ -90,6 +90,91 @@ body{background:var(--gv-bg);color:var(--gv-text-primary);font-family:var(--gv-f
 
 #error-overlay{position:fixed;top:6px;left:6px;z-index:99;background:#4d0f1f;color:#ffb3c2;font:12px monospace;
   padding:8px 10px;border-radius:8px;display:none;max-width:60vw;white-space:pre-wrap}
+
+/* ── Hover tooltip ───────────────────────────────────────────────── */
+#tooltip{position:absolute;z-index:20;display:none;pointer-events:none;min-width:230px;max-width:300px;
+  background:rgba(13,18,32,.92);backdrop-filter:blur(14px);border:1px solid rgba(0,212,255,.25);border-radius:12px;
+  padding:10px 12px;box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(0,212,255,.08)}
+#tooltip .t-id{font-family:var(--gv-font-mono);font-weight:700;font-size:14px;color:var(--gv-blue)}
+#tooltip .t-title{font-size:11px;color:var(--gv-text-secondary);margin-top:2px;line-height:1.3}
+#tooltip .t-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.chip{font-family:var(--gv-font-mono);font-size:9px;letter-spacing:.08em;padding:2px 7px;border-radius:999px;border:1px solid}
+#tooltip .t-row{display:flex;justify-content:space-between;font-family:var(--gv-font-mono);font-size:11px;margin-top:5px;color:var(--gv-text-secondary)}
+#tooltip .t-row b{color:var(--gv-text-primary);font-weight:600}
+#tooltip .t-hint{margin-top:8px;font-size:9px;letter-spacing:.1em;color:var(--gv-text-dim);text-transform:uppercase}
+
+/* ── Issue rail (mock of the dashboard issue drawer) ─────────────── */
+#rail{position:absolute;top:0;left:0;bottom:0;width:390px;z-index:30;display:flex;flex-direction:column;gap:12px;
+  background:rgba(11,15,27,.94);backdrop-filter:blur(18px);border-right:1px solid rgba(0,212,255,.2);
+  padding:16px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.22,1,.36,1);overflow-y:auto}
+#rail.open{transform:translateX(0)}
+#rail .r-head{display:flex;align-items:center;gap:10px}
+#rail .r-id{font-family:var(--gv-font-mono);font-weight:700;font-size:16px}
+#rail .r-close{margin-left:auto;background:none;border:1px solid var(--gv-border);color:var(--gv-text-secondary);
+  border-radius:8px;width:26px;height:26px;cursor:pointer;font-size:13px}
+#rail .r-close:hover{border-color:var(--gv-blue);color:var(--gv-blue)}
+#rail .r-title{font-size:11px;color:var(--gv-text-secondary);line-height:1.4}
+#rail .r-chips{display:flex;gap:5px;flex-wrap:wrap}
+#rail h4{font-size:9px;letter-spacing:.16em;color:var(--gv-text-dim);text-transform:uppercase;margin-top:4px}
+#rail .stepper{display:flex;align-items:center;gap:0}
+#rail .step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+#rail .step .s-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--gv-text-dim);background:transparent}
+#rail .step .s-name{font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-dim)}
+#rail .step.done .s-dot{background:var(--gv-green);border-color:var(--gv-green);box-shadow:0 0 8px rgba(57,255,20,.5)}
+#rail .step.done .s-name{color:var(--gv-green)}
+#rail .step.now .s-dot{background:var(--gv-blue);border-color:var(--gv-blue);box-shadow:0 0 10px var(--gv-blue);animation:gvPulse 1.6s infinite}
+#rail .step.now .s-name{color:var(--gv-blue)}
+#rail .s-bar{flex:1;height:1px;background:var(--gv-border);margin:0 2px 14px}
+#rail .agent-row{display:flex;align-items:center;gap:8px;font-family:var(--gv-font-mono);font-size:11px;padding:6px 8px;
+  border:1px solid var(--gv-border);border-radius:8px;margin-top:5px}
+#rail .agent-row .a-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+#rail .agent-row .a-model{margin-left:auto;color:var(--gv-text-dim);font-size:9px}
+#rail .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#rail .stat{border:1px solid var(--gv-border);border-radius:8px;padding:7px 9px}
+#rail .stat .sv{font-family:var(--gv-font-mono);font-size:14px;font-weight:600}
+#rail .stat .sk{font-size:9px;letter-spacing:.12em;color:var(--gv-text-dim);text-transform:uppercase}
+#rail .banner{font-family:var(--gv-font-mono);font-size:11px;padding:8px 10px;border-radius:8px;line-height:1.4}
+#rail .r-actions{display:flex;gap:8px;margin-top:auto;padding-top:10px}
+#rail .r-btn{flex:1;text-align:center;font-family:var(--gv-font-mono);font-size:11px;font-weight:600;padding:9px 0;
+  border-radius:9px;text-decoration:none;border:1px solid rgba(0,212,255,.4);color:var(--gv-blue);background:rgba(0,212,255,.08)}
+#rail .r-btn:hover{background:rgba(0,212,255,.18)}
+#rail .r-btn.ghost{border-color:var(--gv-border);color:var(--gv-text-secondary);background:transparent}
+#rail .r-btn.ghost:hover{border-color:var(--gv-text-secondary)}
+
+/* ── Help overlay ────────────────────────────────────────────────── */
+#help{position:absolute;inset:0;z-index:40;display:none;align-items:center;justify-content:center;
+  background:rgba(4,6,13,.72);backdrop-filter:blur(10px)}
+#help.open{display:flex}
+#help .h-panel{width:min(1120px,94%);max-height:92%;overflow-y:auto;background:rgba(13,18,32,.96);
+  border:1px solid rgba(0,212,255,.28);border-radius:18px;padding:22px 26px;
+  box-shadow:0 20px 80px rgba(0,0,0,.7),0 0 50px rgba(0,212,255,.06)}
+#help .h-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--gv-border);padding-bottom:10px;margin-bottom:14px}
+#help .h-title{font-size:18px;font-weight:700;letter-spacing:.1em;color:var(--gv-blue)}
+#help .h-sub{font-family:var(--gv-font-mono);font-size:11px;color:var(--gv-text-dim)}
+#help .h-close{margin-left:auto;background:none;border:1px solid var(--gv-border);color:var(--gv-text-secondary);
+  border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px}
+#help .h-close:hover{border-color:var(--gv-blue);color:var(--gv-blue)}
+#help .h-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+#help .h-card{border:1px solid var(--gv-border);border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.015)}
+#help .h-card h4{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+#help .h-card p{font-size:11px;line-height:1.5;color:var(--gv-text-secondary)}
+#help .h-card p+p{margin-top:4px}
+#help .h-card b{color:var(--gv-text-primary)}
+#help .h-demo{display:flex;align-items:center;gap:8px;margin:7px 0 3px;flex-wrap:wrap}
+#help .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#help .legend-ring{width:12px;height:12px;border-radius:50%;border:2px solid;flex-shrink:0;background:transparent}
+#help .legend-lbl{font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-secondary)}
+#help kbd{font-family:var(--gv-font-mono);font-size:9px;background:rgba(255,255,255,.07);border:1px solid var(--gv-border);
+  border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--gv-text-primary)}
+#help .h-foot{margin-top:14px;padding-top:10px;border-top:1px solid var(--gv-border);
+  font-family:var(--gv-font-mono);font-size:11px;color:var(--gv-text-dim);display:flex;gap:18px;flex-wrap:wrap}
+
+/* ── Hint chip ───────────────────────────────────────────────────── */
+#hint{position:absolute;right:12px;bottom:62px;z-index:15;font-family:var(--gv-font-mono);font-size:9px;
+  color:var(--gv-text-dim);background:rgba(13,18,32,.7);border:1px solid var(--gv-border);border-radius:999px;
+  padding:5px 11px;letter-spacing:.06em;pointer-events:none}
+#hint b{color:var(--gv-blue)}
+#stage-wrap.orb-hover #fx{cursor:pointer}
 </style>
 </head>
 <body>
@@ -127,6 +212,10 @@ body{background:var(--gv-bg);color:var(--gv-text-primary);font-family:var(--gv-f
       <canvas id="fx"></canvas>
       <div id="crt"></div>
       <div id="vignette"></div>
+      <div id="tooltip"></div>
+      <aside id="rail"></aside>
+      <div id="help"><div class="h-panel" id="help-panel"></div></div>
+      <div id="hint"><b>h / ?</b> field guide · <b>hover</b> orb detail · <b>click</b> issue rail · <b>f</b> fullscreen</div>
     </section>
 
     <aside id="sidebar">
@@ -340,6 +429,9 @@ function spawnOrb(def, opts = {}) {
     yieldT: 0, // >0 while animating to/from shelf
     yieldReason: def.yieldReason || null,
     warn: def.warn || null,
+    model: def.model || null,
+    harness: def.harness || null,
+    labels: def.labels || [],
     radius: 11 + Math.random() * 3,
   };
   orbs.push(orb); // push first: positionOrb indexes into the live array for spreads
@@ -739,6 +831,25 @@ function frame(now) {
   drawConstellation();
   drawSequencer();
 
+  /* hover tracking — orbs move, so re-pick every frame (with stickiness) */
+  if (mouse.inside) {
+    let hit = pickOrb(mouse.x, mouse.y);
+    if (!hit && hoverOrb) {
+      // hysteresis: a hot orb orbits under a still cursor — only drop hover
+      // when the cursor is clearly outside the orb's whole dance circle
+      const dx = mouse.x - hoverOrb.x, dy = mouse.y - hoverOrb.y;
+      const dropR = Math.max(52, hoverOrb.radius * 4.2);
+      if (dx * dx + dy * dy < dropR * dropR) hit = hoverOrb;
+    }
+    if (hit !== hoverOrb) {
+      hoverOrb = hit;
+      wrap.classList.toggle('orb-hover', !!hit);
+      if (hit) showTooltip(hit); else hideTooltip();
+    } else if (hit) {
+      positionTooltip(hit);
+    }
+  }
+
   /* ── HUD ── */
   hudTick(evm);
   requestAnimationFrame(frame);
@@ -1116,9 +1227,180 @@ function hudTick(evm) {
   document.getElementById('gcpu-sub').textContent = 'load ' + (SNAP.system.loadAvg || '—');
   document.getElementById('gmem-sub').textContent = (SNAP.system.memUsedGB || '—') + ' / ' + (SNAP.system.memTotalGB || '—') + ' GB';
   ecgBuf.push(evm); ecgBuf.shift(); drawECG();
+  if (railOrb) renderRail(); // keep the open rail live as orbs advance
 }
+
+/* mouse state for hover picking */
+const mouse = { x: 0, y: 0, inside: false };
 function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
 function fmtTokens(t) { return t >= 1e6 ? (t / 1e6).toFixed(1) + 'M' : Math.round(t / 1e3) + 'k'; }
+
+/* ════════════════════════ INTERACTION: hover tooltip / issue rail / help ════════════════════════ */
+const tooltipEl = document.getElementById('tooltip');
+const railEl = document.getElementById('rail');
+const helpEl = document.getElementById('help');
+let hoverOrb = null, railOrb = null;
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function trackerUrl(id) {
+  const m = /^PAN-(\d+)$/.exec(id);
+  return m ? `https://github.com/eltmon/overdeck/issues/${m[1]}` : null;
+}
+function dashboardUrl(id) { return `https://overdeck.localhost/issues/${encodeURIComponent(id)}`; }
+
+function pickOrb(mx, my) {
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    const r = Math.max(18, o.radius * 1.9);
+    const dx = mx - o.x, dy = my - o.y;
+    if (dx * dx + dy * dy < r * r) return o;
+  }
+  return null;
+}
+
+function chipRow(o) {
+  const rc = ROLE_COLORS[o.role] || '#7a8aaa', pc = PROJECT_RING[o.project] || '#7a8aaa', sc = STAGE_COLORS[o.stage] || '#7a8aaa';
+  const stateTxt = o.state === 'stale' ? 'stale ❄' : o.state === 'shelf' ? 'yielded ⏸' : o.state === 'failed' ? 'merge failed ✗' : 'active';
+  return `<span class="chip" style="color:${sc};border-color:${sc}66;background:${sc}14">${o.stage}</span>
+    <span class="chip" style="color:${rc};border-color:${rc}66;background:${rc}14">${o.role}</span>
+    <span class="chip" style="color:${pc};border-color:${pc}66;background:${pc}14">${o.project}</span>
+    <span class="chip" style="color:var(--gv-text-secondary);border-color:var(--gv-border)">${stateTxt}</span>`;
+}
+
+function showTooltip(o) {
+  const heatEv = Math.round(o.heat * 34);
+  let rows = `<div class="t-id" style="color:${PROJECT_RING[o.project]}">${esc(o.id)}</div>`;
+  if (o.title) rows += `<div class="t-title">${esc(o.title)}</div>`;
+  rows += `<div class="t-chips">${chipRow(o)}</div>`;
+  if (o.model) rows += `<div class="t-row"><span>model</span><b>${esc(o.model)}</b></div>`;
+  if (o.harness) rows += `<div class="t-row"><span>harness</span><b>${esc(o.harness)}</b></div>`;
+  if (o.state === 'active') rows += `<div class="t-row"><span>hook activity</span><b>~${heatEv} ev/min</b></div>`;
+  if (o.state === 'stale') rows += `<div class="t-row"><span>idle for</span><b>❄ ${fmtAge(o.staleMin)}</b></div>`;
+  if (o.yieldReason) rows += `<div class="t-row"><span>yield</span><b>${esc(o.yieldReason)}</b></div>`;
+  if (o.warn) rows += `<div class="t-row"><span>⚠ warning</span><b>${esc(o.warn)}</b></div>`;
+  if (o.convoy) rows += `<div class="t-row"><span>convoy</span><b>${o.convoy.map(s => esc(s.role)).join(' · ')}</b></div>`;
+  if (o.state === 'failed') rows += `<div class="t-row"><span>merge</span><b>failed — needs operator</b></div>`;
+  rows += `<div class="t-hint">click for issue rail →</div>`;
+  tooltipEl.innerHTML = rows;
+  tooltipEl.style.display = 'block';
+  positionTooltip(o);
+}
+function positionTooltip(o) {
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  let x = o.x + 20, y = o.y - th / 2;
+  if (x + tw > W - 8) x = o.x - tw - 20;
+  y = Math.max(8, Math.min(H - th - 8, y));
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top = y + 'px';
+}
+function hideTooltip() { tooltipEl.style.display = 'none'; }
+
+function openRail(o) {
+  railOrb = o;
+  renderRail();
+  railEl.classList.add('open');
+}
+function closeRail() { railOrb = null; railEl.classList.remove('open'); }
+
+function renderRail() {
+  if (!railOrb) return;
+  const o = railOrb;
+  const pc = PROJECT_RING[o.project];
+  const stageI = stageIdx(o.stage);
+  const siblings = orbs.filter(q => q.id === o.id && q !== o);
+  const tUrl = trackerUrl(o.id);
+
+  const stepper = STAGES.map((s, i) => {
+    const cls = i < stageI ? 'done' : i === stageI ? 'now' : '';
+    return `<div class="step ${cls}"><div class="s-dot"></div><div class="s-name">${s}</div></div>${i < STAGES.length - 1 ? '<div class="s-bar"></div>' : ''}`;
+  }).join('');
+
+  const agentRow = (role, model, state, color) =>
+    `<div class="agent-row"><span class="a-dot" style="background:${color};box-shadow:0 0 6px ${color}"></span>
+      <span>${esc(role)}</span><span style="color:var(--gv-text-dim)">· ${esc(state)}</span>
+      <span class="a-model">${model ? esc(model) : ''}</span></div>`;
+
+  let agentsHtml = agentRow(o.role, o.model, o.state === 'active' ? 'running' : o.state, ROLE_COLORS[o.role]);
+  if (o.convoy) for (const s of o.convoy) agentsHtml += agentRow('review:' + s.role, o.model, 'running', '#ffb800');
+  for (const q of siblings) agentsHtml += agentRow(q.role, q.model, q.state === 'shelf' ? 'yielded ⏸' : q.state, ROLE_COLORS[q.role]);
+
+  const labels = (o.labels || []).map(l => `<span class="chip" style="color:var(--gv-text-secondary);border-color:var(--gv-border)">${esc(l)}</span>`).join('');
+
+  let banners = '';
+  if (o.yieldReason) banners += `<div class="banner" style="background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.3);color:var(--gv-amber)">⏸ ${esc(o.yieldReason)}</div>`;
+  if (o.warn) banners += `<div class="banner" style="background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.3);color:var(--gv-amber)">⚠ ${esc(o.warn)}</div>`;
+  if (o.state === 'failed') banners += `<div class="banner" style="background:rgba(255,45,124,.08);border:1px solid rgba(255,45,124,.35);color:var(--gv-pink)">✗ merge to main failed — pick up the wreck manually</div>`;
+  if (o.state === 'stale') banners += `<div class="banner" style="background:rgba(159,199,255,.06);border:1px solid rgba(159,199,255,.25);color:#9fc7ff">❄ frozen — no hook activity for ${fmtAge(o.staleMin)}. A thaw re-attaches an agent.</div>`;
+
+  railEl.innerHTML = `
+    <div class="r-head"><span class="r-id" style="color:${pc}">${esc(o.id)}</span>
+      <button class="r-close" title="Close (Esc)">✕</button></div>
+    ${o.title ? `<div class="r-title">${esc(o.title)}</div>` : ''}
+    <div class="r-chips">${chipRow(o)}</div>
+    ${labels ? `<div class="r-chips">${labels}</div>` : ''}
+    <h4>pipeline</h4>
+    <div class="stepper">${stepper}</div>
+    <h4>agents on this issue</h4>
+    ${agentsHtml}
+    <h4>vitals</h4>
+    <div class="stat-grid">
+      <div class="stat"><div class="sv" style="color:var(--gv-blue)">${o.state === 'active' ? '~' + Math.round(o.heat * 34) + '/min' : '—'}</div><div class="sk">hook events</div></div>
+      <div class="stat"><div class="sv" style="color:${o.state === 'stale' ? '#9fc7ff' : 'var(--gv-green)'}">${o.state === 'stale' ? '❄ ' + fmtAge(o.staleMin) : 'live'}</div><div class="sk">freshness</div></div>
+    </div>
+    ${banners}
+    <div class="r-actions">
+      <a class="r-btn" href="${dashboardUrl(o.id)}" target="_blank" rel="noopener">Open in dashboard →</a>
+      ${tUrl ? `<a class="r-btn ghost" href="${tUrl}" target="_blank" rel="noopener">Tracker ↗</a>` : ''}
+    </div>`;
+  railEl.querySelector('.r-close').addEventListener('click', closeRail);
+}
+
+function buildHelp() {
+  const rc = r => `<span class="legend-dot" style="background:${ROLE_COLORS[r]};box-shadow:0 0 6px ${ROLE_COLORS[r]}"></span><span class="legend-lbl">${r}</span>`;
+  const hk = k => `<span class="legend-dot" style="background:${HOOKS[k].color};box-shadow:0 0 6px ${HOOKS[k].color}"></span><span class="legend-lbl">${HOOKS[k].label}</span>`;
+  document.getElementById('help-panel').innerHTML = `
+    <div class="h-head"><span class="h-title">RIVER — FIELD GUIDE</span>
+      <span class="h-sub">everything on this canvas, decoded</span>
+      <button class="h-close" title="Close (Esc)">✕</button></div>
+    <div class="h-grid">
+      <div class="h-card"><h4 style="color:var(--gv-blue)">The River</h4>
+        <p>The pipeline is a luminous canal flowing <b>left → right</b> through stage columns: PLAN · WORK · REVIEW · TEST · VERIFY · MERGE. Scrolling chevrons show flow direction; the number under each stage name is its live orb count. Orbs bob on sine waves whose amplitude rises with global activity.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Issue Orbs</h4>
+        <p>Every glowing orb is one <b>issue</b> (labeled PAN-#### / MIN-###). <b>Core color = the role working it</b>; <b>ring color = project</b> (cyan overdeck, magenta Mind Your Now); <b>size + glow = activity heat</b>. A white-hot core means it's burning right now.</p>
+        <div class="h-demo">${rc('plan')}${rc('work')}${rc('review')}${rc('test')}${rc('ship')}${rc('strike')}${rc('flywheel')}${rc('sequencer')}</div></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Motion</h4>
+        <p>Calm orbs drift gently around their anchor. <b>Hot orbs orbit in frantic little circles</b> — the busier the agent, the crazier the dance. Fading comet-trails show where an orb has been. When an issue advances stage, its orb swims right leaving a wake.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Hook Sparks</h4>
+        <p>Each burst of sparks is a <b>harness hook event</b> — one per tool call or lifecycle beat. Color tells you the family:</p>
+        <div class="h-demo">${hk('tool_read')}${hk('tool_write')}${hk('tool_exec')}</div>
+        <div class="h-demo">${hk('tool_web')}${hk('tool_agent')}${hk('lifecycle')}</div></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">Review Convoys</h4>
+        <p>An issue in review is a <b>nucleus with orbiting satellites</b>: <b>S</b>ecurity · <b>C</b>orrectness · <b>P</b>erformance · <b>R</b>equirements · <b>Σ</b>ynthesis. An arc flashes when that reviewer posts a verdict. MIN-839 is running the full five-member convoy right now.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">The Shelf &amp; Governor Tides</h4>
+        <p>When the preemptive scheduler or memory governor needs a slot, an <b>amber tide sweeps the river</b> and the yielded orb sinks onto the ⏸ SHELF with its reason attached ("making room for review of MIN-874"). A green flash marks an agent resumed into the freed slot.</p></div>
+      <div class="h-card"><h4 style="color:#9fc7ff">The Doldrums</h4>
+        <p>Issues with no hook activity <b>sink, desaturate, and freeze over</b> — icy rims, frost crystals, idle-age labels (10h … 24d). The caption counts every frozen issue (111 right now). A thaw steams an orb back up into WORK.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-text-primary)">Merge Portal &amp; Wrecks</h4>
+        <p>The white slit at the right edge is <b>main</b>. A merging orb accelerates through it as a comet — the burst is the merge landing. <b>✗ blinking pink hulls are merge-failed wrecks</b> (PAN-2869, PAN-2833, PAN-3122) awaiting a human tow.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-purple)">Flywheel Sun &amp; Sequencer</h4>
+        <p>The purple sun top-left is the <b>flywheel orchestrator</b>; a ring pulse means it dispatched new work, and moments later a fresh orb enters PLAN. The small dashed metronome beside it is the <b>sequencer</b>.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Conversation Constellation</h4>
+        <p>One twinkling star per live <b>conv-* conversation</b> session (19 right now) — ambient human-agent work happening outside the pipeline river.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-green)">Hook Spectrum</h4>
+        <p>The bottom analyzer is pure Winamp: bars are <b>per-hook-family event rates</b> (read / write / exec / web / subagent / lifecycle cycling), peaks hold and fall slowly. When the system is quiet it idles on a gentle sine; when agents swarm, it spikes.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Top Bar</h4>
+        <p>Clock · CPU/MEM pills · an <b>ECG of events/min</b> with live count · merges today · tokens today · ❄ stale count · oldest-idle timer · active-agents pill · total registry · fullscreen <b>⛶</b>.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Sidebar</h4>
+        <p>The activity feed narrates events as they fire (dot color = source kind). The donut is the live role mix; gauges are host CPU/MEM with load and used/total beneath.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">Data Honesty</h4>
+        <p>The <b>cast is real</b> — every orb, stage, convoy, yield, wreck, and idle age is a genuine snapshot of this machine captured ${new Date(SNAP.capturedAt).toLocaleString()}. The <b>motion is simulated</b>: sparks and choreography fire at the measured ~${SNAP.eventsPerMinute}/min baseline, not from the live event socket. The production version swaps the simulator for the real hook-event stream.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Keys &amp; Mouse</h4>
+        <p><kbd>h</kbd> / <kbd>?</kbd> this guide · <kbd>Esc</kbd> close panels · <kbd>f</kbd> fullscreen · <b>hover</b> an orb for its vitals · <b>click</b> an orb for its issue rail (with live links into the dashboard and tracker).</p></div>
+    </div>
+    <div class="h-foot"><span><kbd>h</kbd>/<kbd>?</kbd> toggle</span><span><kbd>Esc</kbd> close</span><span><kbd>f</kbd> fullscreen</span><span>snapshot ${new Date(SNAP.capturedAt).toLocaleTimeString()}</span></div>`;
+  document.querySelector('#help .h-close').addEventListener('click', () => helpEl.classList.remove('open'));
+}
+function toggleHelp() { helpEl.classList.toggle('open'); }
 
 /* ════════════════════════ BOOT ════════════════════════ */
 function boot() {
@@ -1127,7 +1409,7 @@ function boot() {
   expectedShelf = Math.max(1, (SNAP.paused || []).length);
   for (const iss of SNAP.issues) spawnOrb(iss);
   for (const p of (SNAP.paused || [])) {
-    const o = spawnOrb({ id: p.id, project: p.project, role: p.role, stage: 'WORK', heat: .15, yieldReason: p.yieldReason }, { state: 'shelf' });
+    const o = spawnOrb({ id: p.id, project: p.project, role: p.role, stage: 'WORK', heat: .15, yieldReason: p.yieldReason, model: p.model, harness: p.harness }, { state: 'shelf' });
     o.x = o.tx; o.y = L.shelfY;
   }
   for (const f of (SNAP.failed || [])) {
@@ -1150,6 +1432,28 @@ function boot() {
     setTimeout(resize, 350);
   });
   document.addEventListener('fullscreenchange', () => setTimeout(resize, 120));
+
+  /* interaction wiring */
+  buildHelp();
+  wrap.addEventListener('mousemove', e => {
+    const r = wrap.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.inside = true;
+  });
+  wrap.addEventListener('mouseleave', () => {
+    mouse.inside = false; hoverOrb = null; hideTooltip(); wrap.classList.remove('orb-hover');
+  });
+  wrap.addEventListener('click', e => {
+    if (helpEl.classList.contains('open')) return;
+    if (e.target.closest('#rail') || e.target.closest('#help-panel')) return;
+    const r = wrap.getBoundingClientRect();
+    const hit = pickOrb(e.clientX - r.left, e.clientY - r.top);
+    if (hit) openRail(hit); else closeRail();
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === '?' || e.key === 'h') { toggleHelp(); }
+    else if (e.key === 'Escape') { helpEl.classList.remove('open'); closeRail(); }
+    else if (e.key === 'f') { document.getElementById('fs-btn').click(); }
+  });
   requestAnimationFrame(frame);
 }
 boot();

@@ -783,3 +783,41 @@ PSI avg10 hit 94 (thrashing) at 1.9GB avail: server ballooned AGAIN (743MB→2.4
 - **strike-3431 root cause: unbounded conversation watcher accumulation** (`20fa53c952 fix(dashboard): bound conversation watcher memory`) → **PR #3434** (8th CI-arbitrated landing). Matches the load-dependence observation: current calmer fleet shows NO leak curve (523MB at 38min, DOWN from 752).
 - MIN-930 $7.30 +907/−100 (P0 strong). **MIN-931: verification FAILED post-handoff, feedback delivered** — its composer shows the feedback text; with PAN-3422's submission-verification LIVE, this is the first real-world test of the fix. If the text sits unsubmitted next tick → regression signal on 3422.
 - Server RSS healthy. No merge-ready set. Yield backlog 9 (stable — MIN-874's convoy still holds slots pending rework redispatch).
+
+## RUN-79 tick 33 (2026-08-01 ~18:25Z) — PAN-3422 fix PASSED first live test; campaign healthy
+
+- **MIN-931's verification feedback submitted and processed** — the first real-world exercise of the supervisor Enter-verification fix: no wedge, agent reworking ($9.77, +1301/−201). The 4-specimen composer class appears structurally dead.
+- MIN-930 P0 advancing ($8.14, +912/−104). #3434 (leak fix) test lane in CI. Fleet 29 agents, memory healthy.
+
+## RUN-79 tick 34 (2026-08-01 ~18:45Z) — PAN-3431 leak fix LANDED + DEPLOYED
+
+- **PAN-3431 landed** (#3434 squash `e5c9897ffd`, handed off) **and deployed** — conversation watchers bounded; the balloon class that forced two emergency restarts is structurally closed pending soak validation. Close-out next tick on merge-commit CI.
+- Campaign: MIN-931 $11.26 +1591/−205 (rework productive); MIN-930 $9.10, diff static at +912 (plateau watch — one more tick before intervening; it may be running gates).
+
+## RUN-79 tick 35 (2026-08-01 ~19:05Z) — PAN-3431 closed out (25 total); partial freeze-lift (strike-3417 dispatched)
+
+- **PAN-3431 closed out** — leak fix live and soaking clean (644MB at 19min under 30-agent load). Campaign heads active (930 cooking, 931 $12.49). No ready set.
+- **Partial freeze-lift**: dispatched strike-3417 (strike merged-awareness — stops the moot-burn waste class). Holding 3397/3396 until campaign heads land — admission-gap fixes (PAN-3344/3429) still pending, 30 agents live.
+
+## RUN-79 tick 36 (2026-08-01 ~20:05Z) — RESUMED after operator pause; P0 PAN-3436 unblocked; campaign Lane A advanced
+
+Session resumed (monitors re-armed as one combined memory+RSS+liveness watch). **Config change noted: `require_uat_before_merge` is now FALSE** — merges are schedulable this run, no longer UAT-gated. Ready set currently empty, so nothing to schedule yet.
+
+- **While paused, a reboot incident produced P0 PAN-3436**: supervisor watchdog serially SIGTERMed every dashboard as "foreign" while its own replacement spawn failed the non-primary-checkout guard — dashboard unable to stay up until the supervisor was stopped. Its strike had the fix committed (`ba020bf2ff survive stale deployment cwd`) but **stalled**: git guard blocks rebase, `pan sync-main` rejects strike workspaces as unregistered. Correct refusal by the agent. **I pushed + opened PR #3438** (a mergeable branch needs no rebase) and filed **PAN-3440** for the missing sanctioned strike-sync path (merge-based sync is permitted but undocumented folklore).
+- **MIN-930 (campaign P0 token leak) COMPLETED and handed off** while paused. Lane A advanced serially: **MIN-932 started** (auto-planning → work). MIN-931 continues Lane B ($1.39 fresh session post-rework).
+- Server RSS 1936MB at 18min under 31 sessions — higher than the 644MB post-fix reading; combined monitor will trip at 3GB. Watch for leak-fix regression vs. legitimate load.
+- New non-campaign issues appeared while paused (PAN-3419/3423/3436, MIN-923/924) — triage next tick.
+
+## RUN-79 tick 37 (2026-08-01 ~20:20Z) — 🏁 CAMPAIGN P0 SHIPPED: MIN-930 promoted + closed out
+
+- **Operator promoted uat/min-crow-0801** (7 repos incl. hermes-plugin) carrying **MIN-930 — the Hermes campaign's P0 token leak, the highest-urgency item across all projects** — plus MIN-922. **Both closed out clean** (no leftover-agent block this time: MIN-930 had already handed off, MIN-922 likewise — the postMergeLifecycle pause gap did NOT recur, 2 promotes without it).
+- Campaign status: Lane A = MIN-930 ✅ shipped → MIN-932 planning → MIN-933 queued. Lane B = MIN-931 reworking → MIN-934 queued (hard dep). **1 of 5 campaign issues terminal.**
+- Full read-door sweep re-derived: 13 PAN + 22 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable). Clean UAT batch EMPTY (candidate null) — correct.
+- NOTE: scratchpad was cleared by the session restart; status snapshot rebuilt from live state (FLYWHEEL-STATE.md was the recovery source — the durable-memory design working as intended).
+- P0 PAN-3436 PR #3438 in CI. UAT gate now OFF → eligible merges get scheduled as the ready set fills.
+
+## RUN-79 tick 38 (2026-08-01 ~20:40Z) — P0 PAN-3436 LANDED; leak fix INCOMPLETE (reopened + re-struck)
+
+- **P0 PAN-3436 landed** (#3438 squash `9847ceb60e`, handed off) — supervisor no longer serially evicts dashboards after a reboot. Deploy + close-out next tick.
+- **LEAK NOT CLOSED — self-correction.** My tick-35 "soaking clean (644MB at 19min)" was a LOW-LOAD window, not proof. Current build post-fix: 1936MB@18min → **2591MB@47min = ~22MB/min sustained**. A second growth path survives the watcher bound. Reopened PAN-3431 with the three-point curve + heap-diff directive (15min vs 45min snapshots under load), suspects: #3414 per-agent activity polling, event-store arrays, #3400 patrol structures. **Re-struck.** LESSON (repeat of the reviewer-cost lesson): a single favorable reading under different load is not verification — require a TREND at comparable load.
+- MIN-931 review convoy live (4 lanes spawned 16:36). MIN-932 planning deep ($5.83, +833). Campaign healthy.

@@ -20,6 +20,15 @@
         "value": "space grotesk",
         "createdAt": "2026-08-01T16:40:00.000Z",
         "reason": "Space Grotesk is the god-view surface's existing production theme font (src/dashboard/frontend/src/components/GodView/theme.css, PAN-341); the operator explicitly directed keeping the god view's current styles, so mockups for that surface must match it"
+      },
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "design/style-guide/mockups/god-view-river.html"
+        ],
+        "createdAt": "2026-08-01T20:26:45.357Z",
+        "reason": "God view is an operator-mandated neon/Winamp visualizer surface that intentionally breaks the dashboard style guide; its shipped production theme (GodView/theme.css: gv-glow drop-shadow, gv-topbar box-shadow 0 0 20px var(--gv-border-glow), gvNeonPulse) already uses colored glows on dark backgrounds as the surface's design language"
       }
     ]
   }

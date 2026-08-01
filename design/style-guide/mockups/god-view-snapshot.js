@@ -8,39 +8,39 @@ window.GODVIEW_SNAPSHOT = {
   staleTotal: 111,
   issues: [
     /* ── PLAN column — 7 planning agents (k3) ── */
-    { id: 'MIN-923',  project: 'myn',      stage: 'PLAN', role: 'plan', heat: .92, title: 'planning' },
-    { id: 'MIN-924',  project: 'myn',      stage: 'PLAN', role: 'plan', heat: .88, title: 'planning' },
-    { id: 'PAN-3410', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .8,  title: 'style guide v2' },
-    { id: 'PAN-3411', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .76, title: 'new-workspace page' },
-    { id: 'PAN-3423', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .7,  title: 'SystemHealthPill popover' },
-    { id: 'PAN-3396', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .66, title: 'zombie_pr membership' },
-    { id: 'PAN-3338', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .58, title: 'plan-state bug' },
+    { id: 'MIN-923',  project: 'myn',      stage: 'PLAN', role: 'plan', heat: .92, model: 'k3[1m]', harness: 'claude-code', title: null },
+    { id: 'MIN-924',  project: 'myn',      stage: 'PLAN', role: 'plan', heat: .88, model: 'k3[1m]', harness: 'claude-code', title: null },
+    { id: 'PAN-3410', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .8,  model: 'k3[1m]', harness: 'claude-code', title: 'style guide v2 — Geist type system, display scale, chips, soft cards', labels: ['planning','planned'] },
+    { id: 'PAN-3411', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .76, model: 'k3[1m]', harness: 'claude-code', title: 'New Workspace as a full-page creation experience (replaces the modal)', labels: ['planning','planned'] },
+    { id: 'PAN-3423', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .7,  model: 'k3[1m]', harness: 'claude-code', title: 'Redesign SystemHealthPill popover: attention-grouped reasons, metered vitals', labels: ['enhancement','planning','planned'] },
+    { id: 'PAN-3396', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .66, model: 'k3[1m]', harness: 'claude-code', title: 'bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline', labels: ['bug','planning','planned','substrate-improvement'] },
+    { id: 'PAN-3338', project: 'overdeck', stage: 'PLAN', role: 'plan', heat: .58, model: 'k3[1m]', harness: 'claude-code', title: "Finished plan agent reads as 'still planning' once its idle signal is cleared", labels: ['bug','planning','planned'] },
 
     /* ── WORK column — work agents + 3 live strikes ── */
-    { id: 'PAN-3419', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .95, title: 'handoff --project' },
-    { id: 'PAN-3418', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .9,  title: 'empty model blanks chips' },
-    { id: 'PAN-3422', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .93, title: 'delivery submit wedge' },
-    { id: 'PAN-3420', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .85, title: 'closed-out renders new' },
-    { id: 'PAN-3416', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .8,  title: 'issue-tree omits reviews' },
-    { id: 'PAN-1577', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .68, title: 'legacy work' },
-    { id: 'MIN-930',  project: 'myn',      stage: 'WORK', role: 'work',   heat: .34, title: '', staleMin: 0 },
-    { id: 'MIN-931',  project: 'myn',      stage: 'WORK', role: 'work',   heat: .3,  title: '', staleMin: 0 },
+    { id: 'PAN-3419', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .95, model: 'gpt-5.6-sol', harness: 'claude-code', title: 'pan handoff has no --project: isolated --cwd lands successors outside all registered projects', labels: ['bug','in-progress'] },
+    { id: 'PAN-3418', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .9,  model: 'gpt-5.6-sol', harness: 'claude-code', title: 'Empty-string conversation model is stored, never backfilled, blanks harness+model chips', labels: ['bug','in-progress'] },
+    { id: 'PAN-3422', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .93, model: 'gpt-5.6-sol', harness: 'claude-code', title: 'bug(delivery): nudge/feedback text lands in agent composer but is never submitted', labels: ['bug','substrate-improvement'] },
+    { id: 'PAN-3420', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .85, model: 'gpt-5.6-sol', harness: 'claude-code', title: 'Dashboard + pan show render a completed, closed-out issue as never-started', labels: ['planned'] },
+    { id: 'PAN-3416', project: 'overdeck', stage: 'WORK', role: 'strike', heat: .8,  model: 'gpt-5.6-sol', harness: 'claude-code', title: 'bug(dashboard): MYN issue-tree crew omits live review sessions', labels: ['bug'] },
+    { id: 'PAN-1577', project: 'overdeck', stage: 'WORK', role: 'work',   heat: .68, model: 'claude-sonnet-5', harness: 'claude-code', title: null },
+    { id: 'MIN-930',  project: 'myn',      stage: 'WORK', role: 'work',   heat: .34, model: null, harness: null, title: null },
+    { id: 'MIN-931',  project: 'myn',      stage: 'WORK', role: 'work',   heat: .3,  model: null, harness: null, title: null },
 
     /* ── REVIEW column — convoys live right now ── */
-    { id: 'MIN-839', project: 'myn', stage: 'REVIEW', role: 'review', heat: .98, title: 'full convoy',
+    { id: 'MIN-839', project: 'myn', stage: 'REVIEW', role: 'review', heat: .98, model: 'gpt-5.6-sol', harness: 'claude-code', title: null,
       convoy: ['security','correctness','performance','requirements','synthesis'] },
-    { id: 'MIN-874', project: 'myn', stage: 'REVIEW', role: 'review', heat: .86, title: 'synthesis review',
+    { id: 'MIN-874', project: 'myn', stage: 'REVIEW', role: 'review', heat: .86, model: 'gpt-5.6-sol', harness: 'claude-code', title: null,
       convoy: ['synthesis'] },
-    { id: 'MIN-864', project: 'myn', stage: 'REVIEW', role: 'review', heat: .8, title: 'synthesis review',
+    { id: 'MIN-864', project: 'myn', stage: 'REVIEW', role: 'review', heat: .8, model: 'gpt-5.6-sol', harness: 'claude-code', title: null,
       convoy: ['synthesis'] },
 
     /* ── TEST column ── */
-    { id: 'PAN-3367', project: 'overdeck', stage: 'TEST', role: 'test', heat: .88, title: 'audit of 29 resets' },
-    { id: 'PAN-3362', project: 'overdeck', stage: 'TEST', role: 'test', heat: .5,  title: 'tracker fixtures', warn: 'stack exited 0' },
+    { id: 'PAN-3367', project: 'overdeck', stage: 'TEST', role: 'test', heat: .88, model: 'claude-sonnet-5', harness: 'claude-code', title: 'Audit: code-level review of 29 issues whose negative verdict was reset to a pass', labels: ['in-review'] },
+    { id: 'PAN-3362', project: 'overdeck', stage: 'TEST', role: 'test', heat: .5,  model: 'claude-sonnet-5', harness: 'claude-code', title: 'No way to seed tracker-backed issue fixtures in workspace containers', labels: ['in-review'], warn: 'stack exited 0' },
 
     /* ── VERIFY column — merged, close-out pending, strikes still on them ── */
-    { id: 'PAN-3413', project: 'overdeck', stage: 'VERIFY', role: 'ship', heat: .62, title: 'record reconcile fix' },
-    { id: 'PAN-3407', project: 'overdeck', stage: 'VERIFY', role: 'ship', heat: .5,  title: 'terminal toggle' },
+    { id: 'PAN-3413', project: 'overdeck', stage: 'VERIFY', role: 'ship', heat: .62, model: 'gpt-5.6-sol', harness: 'claude-code', title: 'fix(state): record reconcile rejects orphaned canonical drafts, blocks pan done', labels: ['bug','needs-close-out','merged'] },
+    { id: 'PAN-3407', project: 'overdeck', stage: 'VERIFY', role: 'ship', heat: .5,  model: 'gpt-5.6-sol', harness: 'claude-code', title: 'bug(dashboard): cockpit Terminal toggle does nothing while tmux session is alive', labels: ['bug','needs-close-out','merged'] },
 
     /* ── DOLDRUMS — 8 emissaries of the 111 frozen ── */
     { id: 'PAN-1204', project: 'overdeck', stage: 'WORK', role: 'work', heat: .1, staleMin: 593 },
@@ -53,7 +53,7 @@ window.GODVIEW_SNAPSHOT = {
     { id: 'PAN-2692', project: 'overdeck', stage: 'WORK', role: 'work', heat: .1, staleMin: 24570 },
   ],
   paused: [
-    { id: 'MIN-864', project: 'myn', role: 'work', yieldReason: 'yield: making room for review of MIN-874', idleMin: 28 },
+    { id: 'MIN-864', project: 'myn', role: 'work', model: 'gpt-5.6-sol', harness: 'claude-code', yieldReason: 'yield: making room for review of MIN-874', idleMin: 28 },
   ],
   failed: [
     { id: 'PAN-2869', project: 'overdeck' },

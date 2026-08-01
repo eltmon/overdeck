@@ -34,6 +34,7 @@ describe('supervisor restart spawner', () => {
     const spawnFn = vi.fn(() => child as never);
     const spawnRestart = createSupervisorRestartSpawner({
       panBinary: 'pan',
+      cwd: '/primary/overdeck',
       log: vi.fn(),
       spawnFn: spawnFn as never,
     });
@@ -42,6 +43,7 @@ describe('supervisor restart spawner', () => {
 
     expect(result).toMatchObject({ pid: 4242, error: null });
     expect(spawnFn).toHaveBeenCalledWith('pan', buildSupervisorRestartArgs(), expect.objectContaining({
+      cwd: '/primary/overdeck',
       detached: true,
       stdio: ['ignore', 'pipe', 'pipe'],
       env: expect.objectContaining({

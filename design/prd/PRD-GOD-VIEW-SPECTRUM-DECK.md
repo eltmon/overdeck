@@ -1,3 +1,389 @@
+# PRD: God View Spectrum Deck
+
+**Issue:** [eltmon/overdeck#3443](https://github.com/eltmon/overdeck/issues/3443)
+**Author:** Kimi Code CLI (k3 harness)
+**Date:** 2026-08-01
+**Status:** Mockup complete — production implementation pending
+**Mockup:** `design/style-guide/mockups/god-view-spectrum-kimi-code-harness.html`
+**Motion preview:** `design/style-guide/mockups/god-view-spectrum-kimi-code-harness.preview.gif`
+**Companion concept:** `design/style-guide/mockups/god-view-river.html` (built independently by conv 1841, Claude Code harness)
+
+---
+
+## 1. Executive Summary
+
+The Spectrum Deck is a full-screen, Winamp-grade activity visualizer for the Overdeck
+god-view (`/god-view`). It turns the pipeline into living art: every running agent is a
+glowing orb that drifts through pipeline lanes (PLAN → WORK → REVIEW → TEST → MERGE),
+review convoys appear as orbiting satellites, stale issues frost over with ice and snow,
+the scheduler's resource-yielding parks agents on a shelf, and merged issues launch as
+comets. A WebGL fragment shader renders a nebula + synthwave perspective grid behind
+everything, a 56-band spectrum analyzer and oscilloscope dance to the event stream, and
+a "hook bus" rail shows every agent-harness hook firing live — including hooks that exist
+upstream but are not yet wired into Overdeck.
+
+Everything is inspectable: hovering any orb or activity-feed row shows a critical-info
+tooltip, and clicking slides in an **issue rail** with pipeline stage, all agents on the
+issue, convoy makeup, and recent per-issue events. A `?` help overlay explains the whole
+deck as a field guide.
+
+The mockup is a single self-contained HTML file (zero build step, zero dependencies beyond
+Google Fonts). It embeds a **real snapshot** of Overdeck captured at build time
+(2026-08-01 ~15:52 UTC) and drives it with a perpetual event simulator. The production
+version keeps the layout and swaps the simulator for the real push stream
+(SSE `/events/stream` / WebSocket `/ws/rpc`) — see §11.
+
+## 2. Motivation
+
+The current god-view center panel is a placeholder: *"Agent scan moved to the Agents fleet
+view."* The operator brief asked for something **VERY creative**:
+
+- See issue identifiers (PAN-####, MIN-####) and **visually** how active they are.
+- Show events from **all agent harness hooks** — *"maybe even ones that we aren't using"*.
+- See **staleness** (no activity for a while) at a glance.
+- Represent **pipeline stages** (planning, reviewing with reviewer convoys visually
+  represented, etc.).
+- Represent the scheduler **pausing agents to free resources** so another issue can get
+  into a review cycle.
+- Keep the existing top bar (with more data) and the right-hand activity list; the empty
+  center becomes the canvas. Fullscreen-capable. Old-school **Winamp visualizer** energy,
+  GPU shaders, spectacular — the god-view is explicitly allowed to break the style guide.
+
+## 3. Goals / Non-Goals
+
+**Goals**
+
+- Single-file static mockup that renders the *real* current system state (agents, issues,
+  roles, models, convoys, staleness, system load) and never sits still.
+- Every visual element maps to a real concept in the Overdeck codebase (roles, hook events,
+  activity sources, pipeline stages, scheduler yields, review convoys, merge queue).
+- Fully inspectable via hover + click, and self-explanatory via a built-in help overlay.
+- Reproducible: this document plus the embedded reference implementation is sufficient for
+  a junior developer to rebuild the mockup exactly.
+
+**Non-goals**
+
+- Not wired to live data (it is a `file://` static mockup; production wiring is §11).
+- Not a React component yet; no dashboard build integration.
+- No editing/control actions (pausing real agents, etc.) — read-only visualization.
+
+## 4. Data Sources (build-time snapshot)
+
+| Data | Source | Used for |
+|---|---|---|
+| Running agents (26): id, issue, role, model, runtime | `pan status` | `SNAPSHOT` array → orbs |
+| Special states | `pan status` output inspection | MIN-839 3-reviewer convoy, PAN-3419 convoy forming, MIN-864 test agent stale 1.8 d, PAN-3362 broken stack |
+| Recent activity events | `GET http://localhost:3011/api/activity` | Activity-feed seed entries (the 15:49 dashboard-restart storm) |
+| System health | `GET http://localhost:3011/api/godview/system-health` + `/proc` fallback | CPU/MEM/SWAP gauges, load average (46 on 24 cores, MEM 82 %, SWAP 100 %) |
+| Beads counts | `bd stats` | Top-bar WIP 32 · BLOCKED 456 · READY 356 |
+| Merge queue | `GET /api/merge-queue`, `GET /api/merge-train/queues` | MERGE Q 0 (queue drains/refills in the simulator) |
+| Harness hook inventory (wired vs unwired) | `src/lib/claude-hooks-registration.ts`, `sync-sources/hooks/` | HOOK BUS rail (§6.5) |
+| God-view theme tokens | `src/dashboard/frontend/src/components/GodView/theme.css` (PAN-341) | Color/type system (§5) |
+
+### 4.1 The `SNAPSHOT` array (26 agents, all real at capture time)
+
+Each entry: `{id, issue, role, model, mins (runtime minutes), idle (minutes since last
+activity), ...flags}`. Special flags:
+
+| Flag | Meaning | On |
+|---|---|---|
+| `orch:true` | Render in the orchestrator band (large portal rings) | flywheel-orchestrator (RUN-79), sequencer-runner |
+| `convoy:[{label,model}…]` | Satellites already in orbit (review convoy) | agent-min-839 (LEAD, CORRECTNESS, PERFORMANCE) |
+| `convoyForming:true` | Satellite spirals in and settles into orbit | agent-pan-3419 (REVIEW-SUP) |
+| `frozen:true` | Permanently deep-frosted (stale showcase) | agent-min-864-test (idle 2572 min ≈ 1.8 d) |
+| `broken:true` | Red hazard ring + error sparks | agent-pan-3362-test (stack exited) |
+| `slow:true` | Event rate × 0.06 → frosts and thaws cyclically | agent-pan-3367 |
+
+Roles present: `plan` (5), `work` (8), `review` (5), `test` (3), `strike` (3),
+`flywheel` (1), `sequencer` (1). Models present: `sonnet`, `gpt`, `opus`, `fable`, `k3`.
+
+### 4.2 Stage mapping
+
+`stageOf(agent)` → lane index: `plan→0`, `work|strike→1`, `review→2`, `test→3`,
+everything else (only merge transients) `→4`. Orchestrators are pinned to lane 0's x-axis
+but rendered in the orchestrator band (`o.a.orch` branch takes precedence in positioning).
+**Implementation note:** the guard `a.orch ? 0 : …` in `stageOf` is load-bearing — without
+it orchestrators fall through to lane 4 and trigger phantom merges (this bug existed and
+was fixed during development).
+
+## 5. Visual Design System
+
+All tokens come from the god-view design system (`theme.css`, PAN-341); the style guide is
+deliberately broken everywhere else per the brief.
+
+```
+--gv-bg:#0a0e1a  --gv-surface:rgba(21,27,43,.62)  --gv-border:rgba(30,38,56,.8)
+--gv-blue:#00d4ff  --gv-pink:#ff2d7c  --gv-green:#39ff14
+--gv-amber:#ffb800 --gv-purple:#9d4edd --gv-orange:#ff7700  --gv-red:#ff4444
+text: #e8edf8 / #7a8aaa / #4a5a7a
+fonts: 'Space Grotesk' (display), 'JetBrains Mono' (mono) — Google Fonts CDN
+```
+
+Role → color: plan=blue, work=green, review=pink, test=amber, strike=red, flywheel=purple,
+sequencer=orange. Model → glyph letter in orb core: `S`=sonnet, `G`=gpt-5.6, `O`=opus,
+`F`=fable, `K`=k3 (kimi). Paused agents show `⏸` instead.
+
+**Layout grid** (full-window flex column, 10-12 px padding, 8 px gaps):
+
+```
+┌──────────────────────────── TOP BAR (glass, ~46 px) ───────────────────────────┐
+│ ⚡GOD VIEW | clock | EV/S | CPU MEM SWAP bars | LOAD | WIP BLOCKED READY | MERGE Q│
+│   | $/min | (26 active · 182 total) | ? HELP | ⛶ FULLSCREEN                     │
+├── HOOK BUS ─┬──────────────────────── STAGE ────────────────────────┬─ SIDEBAR ──┤
+│  212 px     │  WebGL behind everything; 2D canvas on top            │  262 px    │
+│  wired LEDs │  orchestrator band → 5 lanes → parked shelf (bottom)  │ feed/donut │
+│  unwired —  │                                                       │ /gauges    │
+├─────────────┴──────── SPECTRUM (flex) ────────┬── SCOPE 230px ─┬── ROLES 150px ─┤
+└──────────────────────── 92 px bottom strip ────────────────────────────────────┘
+```
+
+Fixed overlays: CRT scanlines (`repeating-linear-gradient`, `mix-blend-mode:multiply`),
+vignette, help overlay (z-index 45), tooltip (44), issue rail (absolute inside stage, 25).
+
+## 6. System-by-System Specification
+
+### 6.1 WebGL background (`#gl`, fullscreen, behind all panels)
+
+- Fullscreen triangle, GLSL ES 1.0, no extensions. Uniforms: `u_res`, `u_time`, `u_energy`.
+- **Nebula:** 5-octave fbm value noise, domain-warped
+  (`warp = fbm(p*2.2 - t*.6,.3); n = fbm(p*1.55 + (t,-t*.7) + warp*.85)`), colored in three
+  bands — deep blue base, magenta ridges, cyan filaments via `pow(smoothstep(.60,.985,n),3)`.
+  All brightness terms scale with `u_energy`.
+- **Stars:** `hash(floor(p*220))` threshold `>.9975`, twinkle by `sin(u_time*2.2+hash*40)`.
+- **Perspective grid floor:** below horizon `uv.y < .58`. Depth `z = 1/(horizon-uv.y)`;
+  grid coords `(p.x*z*.85, z*.5 - u_time*1.35)`; line mask from `abs(fract(gp)-.5)` with
+  width scaled by z; fade `exp(-z*.62) * smoothstep(0,.05,horizon-uv.y)`; cyan
+  `vec3(0,.48,.66)` plus a two-color horizon glow line.
+- **Finish:** scanline shimmer (`col *= .965+.035*sin(fragY*1.7+t*7)`) and radial vignette.
+- `u_energy` is smoothed event energy: `energyTarget = clamp(.24 + eventsPerSec*.085, .2, 1.5)`,
+  `energy = lerp(energy, target, dt*2)`. Fallback if WebGL unavailable: CSS radial gradient.
+
+### 6.2 Stage geometry
+
+Canvas resized to `#stagewrap` box at `devicePixelRatio` (capped 1.75), all drawing in CSS
+pixels via `setTransform(DPR,0,0,DPR,0,0)`.
+
+- Orchestrator band: `L.orchY = 46`. Lane headers: `L.headY = 100`. Lane area:
+  `L.top = 118 … L.bot = H-44`. Lane width `L.laneW = W/5`, centers `laneCx(i) = laneW*(i+.5)`,
+  boundaries `gateX(i) = laneW*i`.
+- Lane headers show stage name (alpha pulses with summed orb activity in that lane) and
+  `N in flight` (MERGE shows `queue N`). Dashed separators + chevron gates at boundaries.
+- **Parked shelf:** dashed rounded rect at `x = SW-194 … SW-24`, `y = L.bot-46`, height 34,
+  label `PARKED · YIELDED BY SCHEDULER` above it. (It lives bottom-right because the MERGE
+  lane is usually empty — an earlier top-right placement collided with the MERGE header.)
+
+### 6.3 Orbs
+
+Per-frame position (unless merging): organic wave drift —
+
+```
+x = laneCx(stage) + sin(t*.45+phase)*laneHalfW + sin(t*1.6+phase2)*9
+y = L.top + baseY*laneSpan + sin(t*.75+phase*1.3)*13 + sin(t*2.05+phase2)*5
+```
+
+smoothed with `lerp(current, target, dt*2.2)` (`dt*3` when flying to the park shelf).
+Trails: last 22 positions (34 for comets), polyline fading along length.
+
+Orb anatomy (radius `big`: orch 20, convoy parent 13, normal 11; pulse
+`1 + sin(t*3+phase)*.10*(activity+.25)`, minus compaction contraction):
+
+1. **Glow** — radial gradient, `R*3.4`, alpha scales with `activity`.
+2. **Core** — white-hot center → role color → transparent; role-color rim stroke.
+3. **Model glyph** — single letter, mono, `#0a0e1a`.
+4. **Labels** — issue id (mono 9.5 px) + tag line below: normally `role · runtime`,
+   replaced by `STALE 1.8d` / `⚠ STACK BROKEN` / `paused · yield` / `stale Nm` when applicable.
+5. **States** — waiting: amber dashed rotating ring (R+6); thinking: white inner arc
+   (`arc(R*.55, t*4, t*4+2.2)`); broken: red flicker ring + random error sparks;
+   orchestrator: two rotating dashed rings (R+9, R+17, opposite directions).
+6. **Frost** — `idleMin` accrues at 2 "minutes" per real second of no events;
+   `frost = clamp((idleMin-90)/420, 0, 1)`. Color mixes role→`#bfe3ff`, a 6-spike frost
+   crown grows at R+2…R+4+7·frost, snow particles fall when frost > .55. Any event resets
+   `idleMin=0` (instant thaw). `frozen:true` pins frost at 1.
+7. **Satellites** — orbit parent at radius 46 (ellipse ×.62), dashed orbit path, pink
+   6.5 px moons with model glyph + label. `arriving` satellites spawn at r≈220-230 and
+   decay 36 px/s until r=44, then settle (feed: "convoy satellite in orbit").
+8. **Selection/flash rings** — selected orb: white dashed rotating ring R+9. Flash (feed
+   hover): expanding white ring R+5 → R+17 over ~0.7 s.
+
+### 6.4 Event simulator
+
+Per orb per frame: fire with probability `rate·dt`. Base rates (events/s): work .75,
+plan .5, review .45, test .4, strike .7, flywheel .3, sequencer .2 — ×0.12 while waiting,
+×0.06 when `slow:true`, 0 while paused/merging/frozen. Each event: resets idle, bumps
+`activity`, `S.evCount`, `o.ev`, then a branch:
+
+| roll | Hook fired | Visual | Feed (sampled) |
+|---|---|---|---|
+| < .40 | PreToolUse | 6 spark particles | 8 %: `PreToolUse · <tool>` |
+| < .62 | PostToolUse | 2 sparks | 16 %: `$` particle + cost bump |
+| < .655 | PostToolUseFailure | 3 red sparks | always: tool failed — auto-retry |
+| < .735 | Notification | amber ring; orb `waiting` 4-9 s | always: waiting — tool_permission/user_question/disambiguation |
+| < .815 | UserPromptSubmit | orb `thinking` 2.5-6 s | — |
+| < .895 | Stop | role-color ring | 30 %: turn complete · resolution=working |
+| < .96 | PreCompact → (900 ms) PostCompact | orb contracts, orange ring | always: context compaction complete |
+| else | (cost) | `$` particle rises, costRate += .05 | 40 %: cost-event · tokens billed |
+
+Global schedulers (setInterval):
+
+- **19 s** — stage advance: random eligible orb (not orch/frozen/merging/paused/no
+  satellites, stageIdx < 4) → `advanceStage`: stageIdx++, gate flash, feed
+  `issue.transitioned → <LANE>`, Stop hook. Reaching lane 4 dwells 1.5-3.5 s (MERGE Q++)
+  then **comet**: accelerates upward shedding sparks, feed `ship merged — merge queue flush ✓`
+  (MERGE Q--), respawns in PLAN with a fresh issue from
+  `['PAN-3425','PAN-3428','PAN-3431','MIN-930','MIN-937','MIN-945']` and role `plan`.
+- **31 s** — scheduler yield: if < 2 parked, park a random work orb
+  (11-22 s): feed `sequencer paused <id> — freeing a slot for the review cycle`,
+  Notification hook; auto-resume with SessionStart hook + ring.
+- **13 s** — orchestrator ambience: flywheel ring + feed `tick — scanning pipeline (RUN-79)`
+  or sequencer `evaluating priorities · admission check`.
+- **26 s** — PermissionRequest on a random active orb → waiting 3-7 s, feed entry.
+
+### 6.5 Hook bus (left rail, 212 px)
+
+Lists all 21 hook events discovered in the codebase audit. Wired (10): PreToolUse,
+PostToolUse, PostToolUseFailure, Stop, SessionStart, Notification, UserPromptSubmit,
+PreCompact, PostCompact, PermissionRequest — each with an LED that flashes its color and a
+running counter (`fireHook(name)` → count++, `.hot` class 420 ms, `spectrumBump(name)`).
+Unwired (11, dotted underline, `—` counter): SessionEnd, SubagentStart, SubagentStop,
+StopFailure, PermissionDenied, TaskCreated, TaskCompleted, TeammateIdle, ConfigChange,
+WorktreeCreate, InstructionsLoaded. Footnote explains: *"Dotted = hook exists upstream but
+is not wired into Overdeck — dark fiber, ready to light up."*
+
+### 6.6 Spectrum analyzer + oscilloscope (bottom strip)
+
+- **Spectrum:** 56 bands. `HOOK_BAND` maps hook names to band centers (PreToolUse 5,
+  PostToolUse 13, PostToolUseFailure 20, Stop 26, Notification 31, UserPromptSubmit 37,
+  PreCompact 43, PostCompact 46, PermissionRequest 50, SessionStart 53). `spectrumBump`
+  adds energy to the center band (24-44) and neighbors (±2: 7-16, ±5: 2-7). Per frame:
+  targets decay toward a dancing baseline (`7 + 5 sin(t*2.2+i*.55) + energy*9`), heights
+  chase targets (fast up ×20, slow down ×5), peak caps fall at 24/s. Bars drawn as 3.2 px
+  segments with 1.4 px gaps; color by height: green → blue → pink; white peak caps.
+- **Oscilloscope:** 220-sample ring buffer of `S.energy`, cyan glow line with center
+  reference, slight high-frequency jitter.
+
+### 6.7 Activity feed + per-issue log
+
+Right sidebar feed: max 13 rows, each `{src, msg, issue, color, age}` with slide-in
+animation; ages re-render every second. Seeded with the real 15:49 restart-storm events
+(dashboard stopping → production start → cleared stuck merges → flywheel reload → migration
+refusals → Deacon/cloister starts → start-agent spawn phases). Every `feedAdd` also writes
+to `issueLog[issue]` (cap 10, stripped of HTML) — this powers the rail's RECENT EVENTS and
+the feed tooltips (`dataset.issue/src/c/fullmsg`).
+
+### 6.8 Tooltip + issue rail
+
+- **Tooltip (`#tip`, fixed):** shared by orbs and feed rows; positioned at cursor +16/+14,
+  flipped inward near edges. Orb card: issue + role badge, agent id, model, lane, runtime,
+  state, idle+frost %, events fired, convoy, `CLICK FOR ISSUE RAIL →`. Feed card: issue +
+  source badge, full message, exact timestamp.
+- **Orb hit-testing:** `mousemove` on the stage canvas, squared-distance check against each
+  orb's radius +9 px; sets `cursor:pointer`.
+- **Issue rail (`#rail`, 298 px, slides in over stage right):** header (issue + stage badge
+  + ✕), pipeline stage stepper (done=green, current=blue glow), AGENTS cards (role chip,
+  agent id, model/lane/runtime/state/idle/events/convoy), RECENT EVENTS (last 8 from
+  `issueLog`), footer `pan show <issue>`. Re-renders every second while open (ages stay
+  fresh). Multiple agents on one issue (e.g. PAN-3367 work + test) each get a card; the
+  stage stepper shows the furthest lane. Close via ✕, Esc, or selecting another issue.
+
+### 6.9 Help overlay (`?` / `h` / `? HELP` button / Esc / click-anywhere-to-close)
+
+Blurred backdrop + 2-column card grid: WHAT YOU'RE LOOKING AT (data provenance + event-driven
+architecture note), THE STAGE · PIPELINE LANES, READING THE MOTION (all six motion
+meanings), FROST = STALENESS, HOOK BUS, BOTTOM STRIP · WINAMP SECTION, TOP BAR & SIDEBAR,
+plus a footer with the key map and snapshot timestamp.
+
+### 6.10 Top bar tickers
+
+Clock (`en-GB`, 1 s). Every 1.5 s: CPU `58+7 sin(t*.5)±3`, MEM `82.2+1.1 sin(t*.23)±.3`,
+LOAD `46+2.4 sin(t*.35)±1` — bars + gauge rings (SVG `stroke-dashoffset` on r=26 circle,
+circumference 163.4). SWAP pinned 100 %. EV/S counts simulator events per wall-clock second
+(`S.lastEvSec` **must** be initialized from `performance.now()`, not `Date.now()` — mixing
+the two clocks resets the counter every frame; this bug existed and was fixed). Cost decays
+toward $2.40/min, bumped by cost events.
+
+## 7. Interaction & Keyboard Map
+
+| Input | Effect |
+|---|---|
+| hover orb | critical-info tooltip; cursor pointer |
+| click orb | open issue rail + selection ring |
+| hover feed row | message tooltip + flash matching orb(s) on stage |
+| click feed row | open issue rail for that issue |
+| `?` or `h` | toggle help field guide |
+| `f` or ⛶ button | fullscreen |
+| `Esc` | close help / close rail |
+
+## 8. Reproduction Guide (junior-developer proof)
+
+1. Create an empty file, e.g. `god-view-spectrum-kimi-code-harness.html`.
+2. Copy **Appendix A** into it verbatim. It is the complete reference implementation —
+   no other files, build steps, or dependencies are required (Google Fonts loads from CDN;
+   if offline it falls back to system fonts).
+3. Open in any Chromium/Firefox browser: `google-chrome --start-maximized file:///path/to/file`.
+4. Expected within 60 s: orbs drifting in lanes, hook LEDs flashing, spectrum dancing,
+   a stage transition (gate flash) ≈ every 19 s, a scheduler park ≈ every 31 s, merge
+   comets occasionally, MIN-864 frozen with snow, MIN-839's three satellites in orbit.
+5. Interactions: hover/click orbs and feed rows; `?` for help; `f` for fullscreen.
+
+To re-skin or re-data: edit only the `SNAPSHOT`, `HOOKS`, `ROLE`, `GLYPH`, and seed
+`feedAdd(...)` calls at the top of the script — every visual derives from them.
+
+## 9. Verification & QA
+
+- **Syntax:** extract the `<script>` block and `node --check` it (the repo's tooling does
+  this via a 6-line python extraction; see commit history).
+- **Runtime:** Playwright (`NODE_PATH=<repo>/node_modules node script.js`) — load the file,
+  wait 2.5-48 s, assert zero `pageerror`s, screenshot at multiple timestamps to prove
+  motion. Hover/click tested with synthetic mouse: tooltip on MIN-839, rail open, feed-row
+  tooltip, Esc closes rail.
+- **Motion proof:** `ffmpeg -y -i capture.webm -t 12 -vf
+  "fps=12,scale=800:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=96[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4" -loop 0 preview.gif`.
+- Known-good artifacts: `…preview.gif` (12 s) in the mockups directory.
+
+## 10. File Manifest
+
+| File | Purpose |
+|---|---|
+| `design/style-guide/mockups/god-view-spectrum-kimi-code-harness.html` | the mockup (1158 lines, self-contained) |
+| `design/style-guide/mockups/god-view-spectrum-kimi-code-harness.preview.gif` | 12 s motion preview |
+| `design/prd/PRD-GOD-VIEW-SPECTRUM-DECK.md` | this document |
+
+## 11. Production Wiring Path (not in mockup scope)
+
+The simulator exists because a static file cannot see the live system. In production the
+same visuals bind to the real event-driven push stream — **no polling**:
+
+1. Harness hooks fire on the agent side (`sync-sources/hooks/*`) and POST to
+   `POST /api/agents/:id/heartbeat` with kinds: `activity`, `thinking_start/stop`,
+   `waiting_start/clear`, `message_received`, `model_set`, `cost-event`, `resolution_set`,
+   `context_saturation_changed` (`src/dashboard/server/services/agent-event-utils.ts`).
+2. The server reduces these into domain events (`packages/contracts/src/events.ts`) and
+   pushes them over WebSocket `/ws/rpc` and the public SSE stream
+   `GET /events/stream?types=…` (supports `Last-Event-ID` resume).
+3. The dashboard frontend reduces them into the zustand `DashboardStore`
+   (`src/dashboard/frontend/src/lib/store.ts`); god-view already consumes it via
+   `useGodViewSocket` (`src/dashboard/frontend/src/hooks/useGodViewSocket.ts`).
+4. React implementation sketch: `GodViewPage` swaps its placeholder div for
+   `<SpectrumDeck>`; a `useSpectrumEvents()` hook subscribes to the store's
+   `recentActivity` + agent runtime snapshots and feeds the same orb/particle/spectrum
+   primitives (portable as-is — they are plain canvas/GL with no framework deps).
+5. Useful endpoints for the rail: `GET /api/agents` (list), `GET /api/activity`,
+   `GET /api/godview/system-health`, `GET /api/health/agents`, `GET /api/merge-queue`.
+
+The unwired-hook dark fiber (SessionEnd, SubagentStart/Stop, TaskCreated/Completed,
+InstructionsLoaded, …) has zero references in `src/` today; wiring any of them later only
+requires adding a script to `OVERDECK_HOOK_REGISTRATIONS` in
+`src/lib/claude-hooks-registration.ts` — the rail's counter for it lights up automatically
+once events flow.
+
+---
+
+## 12. Appendix A — Complete Reference Implementation (verbatim)
+
+The entire mockup, exactly as committed in
+`design/style-guide/mockups/god-view-spectrum-kimi-code-harness.html`:
+
+```html
 <!doctype html>
 <html lang="en" class="dark">
 <head>
@@ -1369,3 +1755,6 @@ requestAnimationFrame(frame);
 </script>
 </body>
 </html>
+```
+
+*End of reference implementation. Reproduce by copying Appendix A into an `.html` file — no build step required.*
