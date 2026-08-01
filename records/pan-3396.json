@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T19:59:31.484Z",
+  "updated": "2026-08-01T20:03:18.686Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -47,18 +47,32 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "resolver-terminal-closeout-lens": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3396",
         "agentId": "agent-pan-3396",
         "pid": 326875,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T19:59:31.484Z"
+        "claimedAt": "2026-08-01T19:59:31.484Z",
+        "itemId": "resolver-terminal-closeout-lens",
+        "outcome": "completed",
+        "reason": "Lens added and tests pass (AC1-AC3)",
+        "releasedAt": "2026-08-01T20:03:18.686Z"
+      }
+    ],
+    "statusReasons": {
+      "resolver-terminal-closeout-lens": {
+        "reason": "Lens added and tests pass (AC1-AC3)",
+        "updatedAt": "2026-08-01T20:03:18.686Z"
       }
     }
   },
   "statusOverrides": {
-    "resolver-terminal-closeout-lens": "running"
+    "resolver-terminal-closeout-lens": "completed",
+    "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac1": "completed",
+    "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac2": "completed",
+    "resolver-terminal-closeout-lens.resolver-terminal-closeout-lens.ac3": "completed"
   }
 }
