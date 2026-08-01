@@ -2,7 +2,7 @@
   "issueId": "PAN-3396",
   "schemaVersion": 2,
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T15:18:03.204Z",
+  "updated": "2026-08-01T15:18:05.411Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3396: bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline and offers no disposition path for recordless pre-record-era rows",
       "timestamp": "2026-08-01T15:18:03.204Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
