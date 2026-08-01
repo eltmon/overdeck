@@ -684,3 +684,13 @@ Operator screenshot: MYN tree shows no Review crew rows while agent-min-839-revi
 ## RUN-79 interstitial (~14:50Z) — strike-3408 was grinding moot gates post-merge; paused; merged-awareness gap filed (PAN-3417)
 
 strike-3408 messaged for a gate exception 45 min AFTER I merged its fix (#3414) — no merged-awareness in the strike loop. Paused with attribution (burn stopped). Its measurement was valuable: fixture beforeEach ~4.4s under load vs fixed 5s hook timeout → appended to PAN-3344 (now 6 affected gate runs today). Filed **PAN-3417** (strike agents keep verifying after their branch lands; 3 specimens: 3389/3390 pan-monitor-blind ~1h each, 3408 gate-looping) — the tick-4 watch item now has enough evidence. Not struck yet — fleet at capacity with PAN-3416; queue behind current strikes.
+
+## RUN-79 tick 21 (2026-08-01 ~14:55Z) — operator promoted uat/pan-sable-0801 (PAN-3406); closed out same hour as filing
+
+- **PAN-3406 promoted + closed out** (leftover-agent pause + deploy `6e3cda7a` + clean 8-row DoD): operator request → filed → planned → built → UAT-promoted → closed in ~95 minutes. Second promote today with the lifecycle leaving the work agent running (MIN-929 pattern — the postMergeLifecycle agent-pause gap now has 2 specimens; file next occurrence).
+- Deploy also brings #3414 (banner) live. PAN-3408 close-out waits on main CI green past its merge. Clean UAT batch EMPTY (candidate null — correct). New backlog appeared: MIN-930/MIN-931 planned, PAN-3413 (not mine — investigate provenance next tick). **MIN-874 bucket dropped to planned_backlog despite its +8k branch — verify next tick.**
+
+## RUN-79 tick 21 (2026-08-01 ~14:55Z) — operator promoted uat/pan-sable-0801 (PAN-3406); closed out same hour as filing
+
+- **PAN-3406 promoted + closed out** (leftover-agent pause + deploy `6e3cda7a` + clean 8-row DoD): operator request → filed → planned → built → UAT-promoted → closed in ~95 minutes. Second promote today with the lifecycle leaving the work agent running (MIN-929 pattern — the postMergeLifecycle agent-pause gap now has 2 specimens; file next occurrence).
+- Deploy also brings #3414 (banner) live. PAN-3408 close-out waits on main CI green past its merge. Clean UAT batch EMPTY (candidate null — correct). New backlog appeared: MIN-930/MIN-931 planned, PAN-3413 (not mine — investigate provenance next tick). **MIN-874 bucket dropped to planned_backlog despite its +8k branch — verify next tick.**
