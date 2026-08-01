@@ -50,9 +50,24 @@ async function readConvoySubRoleTemplate(subRole: string): Promise<string> {
 
 
 const REVIEWER_TIMEOUT_MS = 20 * 60 * 1000;
+const REVIEWER_SPAWN_BACKOFF_DELAYS_MS = [100, 250, 500, 1_000, 2_000] as const;
 
 function reviewerAgentId(issueId: string, subRole: ReviewSubRole): string {
   return `agent-${issueId.toLowerCase()}-review-${subRole}`;
+}
+
+function isReviewerStateWriteContention(error: unknown, agentId: string): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes(`agents-db:${agentId}`)
+    && /database is locked|SQLITE_BUSY/i.test(message);
+}
+
+async function reviewerSessionIsLive(agentId: string): Promise<boolean> {
+  try {
+    return (await Effect.runPromise(listSessionNames())).includes(agentId);
+  } catch {
+    return false;
+  }
 }
 
 function reviewerAgentOutputPath(workspace: string, runId: string, subRole: ReviewSubRole): string {
@@ -235,29 +250,52 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
           '',
         ].join('\n')
       : '';
-    const run = await spawnRun(opts.issueId, 'review', {
+    const reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+    const spawnOptions = {
       workspace: opts.workspace,
       subRole: opts.subRole,
       prompt: forkedPreface + prompt,
       model,
       harness: opts.harness,
       ...(opts.forkedSessionId ? { resumeSessionId: opts.forkedSessionId } : {}),
-      // PAN-977: thread the synthesis wiring up front so the generated launcher
-      // owns the REVIEWER_READY/FAILED/TIMEOUT signal deterministically.
+      // Persist every signal-routing field before tmux launch. A later
+      // running-state cache write may contend, but the reviewer can still
+      // finish and the Stop-hook can still deliver REVIEWER_READY.
+      reviewRunId: opts.runId,
       reviewSynthesisAgentId: synthesisAgentId,
       reviewOutputPath: outputPath,
+      reviewDeadlineAt,
+      reviewForkedFromParent: !!opts.forkedSessionId,
       allowHost: opts.allowHost ?? false,
-      startedBy: 'review-convoy',
-    });
-    run.reviewSubRole = opts.subRole;
-    run.reviewRunId = opts.runId;
-    run.reviewOutputPath = outputPath;
-    run.reviewSynthesisAgentId = synthesisAgentId;
-    run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
-    delete run.reviewMonitorSignaled;
-    delete run.reviewRetryAttempt;
-    if (opts.forkedSessionId) run.reviewForkedFromParent = true;
-    await Effect.runPromise(saveAgentState(run));
+      startedBy: 'review-convoy' as const,
+    };
+    const agentId = reviewerAgentId(opts.issueId, opts.subRole);
+    let run: Awaited<ReturnType<typeof spawnRun>>;
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        run = await spawnRun(opts.issueId, 'review', spawnOptions);
+        break;
+      } catch (err) {
+        if (!isReviewerStateWriteContention(err, agentId)) throw err;
+        if (await reviewerSessionIsLive(agentId)) {
+          console.warn(
+            `[review-agent] ${agentId} launched but its running-state cache write was contended; `
+            + 'waiting for its report instead of emitting REVIEWER_FAILED',
+          );
+          return {
+            success: true,
+            message: `Review ${opts.subRole} launched with deferred cache reconciliation: ${agentId}`,
+            sessionId: agentId,
+          };
+        }
+        const delay = REVIEWER_SPAWN_BACKOFF_DELAYS_MS[attempt];
+        if (delay === undefined) throw err;
+        console.warn(
+          `[review-agent] ${agentId} state write was contended before launch; retrying in ${delay}ms`,
+        );
+        await new Promise<void>((resolve) => { setTimeout(resolve, delay); });
+      }
+    }
     try {
       const { notifyPipelineSync } = await import('../pipeline-notifier.js');
       notifyPipelineSync({ type: 'reviewer_started', issueId: opts.issueId, role: opts.subRole, sessionName: run.id });

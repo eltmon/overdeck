@@ -34,6 +34,8 @@ import {
 
 const {
   mockKillSessionAsync,
+  mockListSessionNames,
+  mockListSessionNamesEffect,
   mockSaveAgentStateAsync,
   mockSpawnRun,
   mockMessageAgent,
@@ -54,6 +56,8 @@ const {
   mockWipeAgentStateDirs,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
+  mockListSessionNames: vi.fn().mockReturnValue([]),
+  mockListSessionNamesEffect: vi.fn(),
   mockSaveAgentStateAsync: vi.fn().mockResolvedValue(undefined),
   mockSpawnRun: vi.fn().mockResolvedValue({ id: 'agent-pan-1059-review-security' }),
   mockMessageAgent: vi.fn().mockResolvedValue(undefined),
@@ -78,7 +82,7 @@ vi.mock('../../../src/lib/tmux.js', async () => {
   const actual = await vi.importActual('../../../src/lib/tmux.js');
   return {
     ...actual as object,
-    listSessionNames: vi.fn(() => Effect.succeed([])),
+    listSessionNames: mockListSessionNamesEffect,
     sessionExists: vi.fn(() => Effect.succeed(false)),
     sessionExistsSync: vi.fn(() => Effect.succeed(false)),
     killSession: (...args: Parameters<typeof mockKillSessionAsync>) => Effect.promise(() => mockKillSessionAsync(...args)),
@@ -148,6 +152,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
   mockKillSessionAsync.mockResolvedValue(undefined);
+  mockListSessionNames.mockReturnValue([]);
+  mockListSessionNamesEffect.mockImplementation(() => Effect.sync(() => mockListSessionNames()));
   mockSaveAgentStateAsync.mockResolvedValue(undefined);
   mockMessageAgent.mockResolvedValue(undefined);
   mockGetAgentState.mockReturnValue(null);
@@ -893,9 +899,7 @@ describe('convoy orchestration', () => {
       allowHost: false,
       reviewOutputPath: expectedOutput,
     }));
-    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
-      reviewOutputPath: expectedOutput,
-    }));
+    expect(mockSaveAgentStateAsync).not.toHaveBeenCalled();
   });
 
   it('spawns a reviewer as a review sub-role session with the resolved model', async () => {
@@ -920,21 +924,79 @@ describe('convoy orchestration', () => {
       model: 'configured-reviewer-model',
       allowHost: false,
       prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
-    }));
-    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
-      id: 'agent-pan-1059-review-security',
-      reviewSubRole: 'security',
       reviewRunId: REVIEW_AGENT_RUN_ID,
       reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
       reviewSynthesisAgentId: 'agent-pan-1059-review',
       reviewDeadlineAt: expect.any(String),
     }));
+    expect(mockSaveAgentStateAsync).not.toHaveBeenCalled();
     expect(mockNotifyPipeline).toHaveBeenCalledWith({
       type: 'reviewer_started',
       issueId: 'PAN-1059',
       role: 'security',
       sessionName: 'agent-pan-1059-review-security',
     });
+  });
+
+  it('keeps a live reviewer eligible after a transient agents DB lock', async () => {
+    const reviewerId = 'agent-pan-1059-review-security';
+    mockSpawnRun.mockRejectedValueOnce(
+      new Error(`write failed for agents-db:${reviewerId}: database is locked`),
+    );
+    mockListSessionNames.mockReturnValue([reviewerId]);
+
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+      subRole: 'security',
+      runId: REVIEW_AGENT_RUN_ID,
+      outputPath: '/tmp/pan-review-agent-test-security.md',
+      contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      message: `Review security launched with deferred cache reconciliation: ${reviewerId}`,
+      sessionId: reviewerId,
+    });
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      reviewSynthesisAgentId: 'agent-pan-1059-review',
+      reviewOutputPath: '/tmp/pan-review-agent-test-security.md',
+      reviewDeadlineAt: expect.any(String),
+    }));
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+  });
+
+  it('retries a pre-launch agents DB lock without emitting reviewer failure', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout'] });
+    try {
+      const reviewerId = 'agent-pan-1059-review-security';
+      mockSpawnRun
+        .mockRejectedValueOnce(new Error(`write failed for agents-db:${reviewerId}: SQLITE_BUSY`))
+        .mockResolvedValueOnce({ id: reviewerId });
+
+      const resultPromise = Effect.runPromise(spawnReviewSubRoleForIssue({
+        issueId: 'PAN-1059',
+        workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+        subRole: 'security',
+        runId: REVIEW_AGENT_RUN_ID,
+        outputPath: '/tmp/pan-review-agent-test-security.md',
+      }));
+      while (mockSpawnRun.mock.calls.length === 0) {
+        await new Promise<void>((resolve) => { setImmediate(resolve); });
+      }
+      await vi.advanceTimersByTimeAsync(100);
+
+      await expect(resultPromise).resolves.toMatchObject({
+        success: true,
+        sessionId: reviewerId,
+      });
+      expect(mockSpawnRun).toHaveBeenCalledTimes(2);
+      expect(mockMessageAgent).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('stops an idle-alive reviewer before fresh-spawning the new prompt', async () => {
