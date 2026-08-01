@@ -24,7 +24,7 @@ export interface PipelineMembershipService {
 }
 
 export function createPipelineMembershipService(
-  deps: PipelineMembershipServiceDeps = { gather: gatherProjectLensSignals, now: Date.now },
+  deps: PipelineMembershipServiceDeps = { gather: gatherProjectLensSignals, now: () => Date.now() },
 ): PipelineMembershipService {
   const cachedGather = createSettledTtlPromiseCache<string, PipelineMembership[]>(PIPELINE_MEMBERSHIP_TTL_MS, deps.now);
   const service = async (project: ProjectConfig): Promise<PipelineMembership[]> =>
@@ -133,7 +133,7 @@ export function readPipelineMembershipSnapshotsForProjects(
 export function getPipelineMembershipSnapshotsForProjects(
   projects: ProjectConfig[],
   getMembership: MembershipLookup = getProjectPipelineMembership,
-  now = Date.now,
+  now = () => Date.now(),
 ): ProjectPipelineMembershipResult[] {
   const results = readPipelineMembershipSnapshotsForProjects(projects);
   for (const project of projects) {
@@ -151,7 +151,7 @@ export function getPipelineMembershipSnapshotsForProjects(
 export async function getPipelineMembershipSnapshotsForResourceDiscovery(
   projects: ProjectConfig[],
   getMembership: MembershipLookup = getProjectPipelineMembership,
-  now = Date.now,
+  now = () => Date.now(),
 ): Promise<ProjectPipelineMembershipResult[]> {
   return Promise.all(projects.map(async (project) => {
     const existing = membershipSnapshots.get(project.path);
@@ -183,7 +183,7 @@ export async function getPipelineMembershipSnapshotsForResourceDiscovery(
 export async function refreshMembershipSnapshotsForProjects(
   projects: ProjectConfig[],
   getMembership = getProjectPipelineMembership,
-  now = Date.now,
+  now = () => Date.now(),
 ): Promise<void> {
   await Promise.all(projects.map(async (project) => {
     getMembership.invalidate(project.path);
