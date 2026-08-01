@@ -39,6 +39,7 @@ import {
   writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
 import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
 import {
@@ -216,7 +217,6 @@ export function closeOut(
     if (residue) {
       // Pre-verify tracker is closed for residue disposition
       try {
-        const { isTrackerIssueClosed } = await import('../cloister/issue-closed.js');
         const isClosed = yield* Effect.promise(() => isTrackerIssueClosed(ctx.issueId));
         if (!isClosed) {
           allSteps.push(stepFailed('close-out:residue-precondition', 'Residue disposition requires the tracker issue to be already closed'));

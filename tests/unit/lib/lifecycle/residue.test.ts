@@ -15,16 +15,18 @@ import { closeResidueConventionPrs } from '../../../../src/lib/lifecycle/residue
 
 describe('closeResidueConventionPrs', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
     mockExecFile.mockClear();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    // no fake timers needed — this helper has no retry/delay logic
   });
 
   it('returns stepSkipped when no open PRs/MRs found', async () => {
-    mockExecFile.mockResolvedValue({ stdout: JSON.stringify([]) });
+    // Mock callback-style invocation: fn(cmd, args, opts, callback)
+    mockExecFile.mockImplementation((cmd, args, opts, callback) => {
+      callback(null, { stdout: JSON.stringify([]) });
+    });
 
     const result = await closeResidueConventionPrs({
       issueId: 'PAN-123',
@@ -40,14 +42,15 @@ describe('closeResidueConventionPrs', () => {
 
   it('fails on any repository operation errors while preserving partial progress', async () => {
     let callCount = 0;
-    mockExecFile.mockImplementation(async () => {
+    mockExecFile.mockImplementation((cmd, args, opts, callback) => {
       callCount++;
       if (callCount === 1) {
         // First call (GitHub PR list) succeeds
-        return { stdout: JSON.stringify([{ number: 123 }]) };
+        callback(null, { stdout: JSON.stringify([{ number: 123 }]) });
+      } else {
+        // Second call (GitHub PR close) fails
+        callback(new Error('GitHub API rate limit exceeded'));
       }
-      // Second call (GitHub PR close) fails
-      throw new Error('GitHub API rate limit exceeded');
     });
 
     const result = await closeResidueConventionPrs({
@@ -65,12 +68,13 @@ describe('closeResidueConventionPrs', () => {
   });
 
   it('fails when coordinate extraction fails for required repositories', async () => {
-    mockExecFile.mockImplementation(async (cmd, args) => {
+    mockExecFile.mockImplementation((cmd, args, opts, callback) => {
       // Fail git remote calls, but allow gh/glab calls
       if (cmd === 'git') {
-        throw new Error('git remote URL not found');
+        callback(new Error('git remote URL not found'));
+      } else {
+        callback(null, { stdout: JSON.stringify([]) });
       }
-      return { stdout: JSON.stringify([]) };
     });
 
     const result = await closeResidueConventionPrs({

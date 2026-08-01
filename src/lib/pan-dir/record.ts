@@ -489,10 +489,8 @@ export async function batchReadIssueRecords(
 ): Promise<Map<string, PanIssueRecord | null>> {
   const result = new Map<string, PanIssueRecord | null>();
 
-  // Resolve state home once per project — single synchronous marker read
-  const { resolveStateReadHomeSync } = await import('./state-read-home.js');
+  // Resolve state home once per project — single synchronous marker read, never repeated
   const stateHome = resolveStateReadHomeSync(project);
-  const RECORD_DIRNAME = 'records';
   const recordsDir = stateHome.migrated
     ? join(stateHome.root, RECORD_DIRNAME)
     : null;
@@ -515,8 +513,9 @@ export async function batchReadIssueRecords(
               record = null;
             }
           } else {
-            // Unmigrated: use legacy path resolution (still avoids repeated marker reads)
-            const legacyPath = getIssueRecordPath(project, id);
+            // Unmigrated: derive legacy path from already-resolved state home
+            const basePath = getIssueRecordBasePath(project, id);
+            const legacyPath = join(basePath, '.pan', RECORD_DIRNAME, `${id.toLowerCase()}.json`);
             try {
               const raw = await fsp.readFile(legacyPath, 'utf-8');
               record = JSON.parse(raw) as PanIssueRecord;
