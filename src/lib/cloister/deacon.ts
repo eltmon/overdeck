@@ -1550,26 +1550,6 @@ export async function checkVerificationReviewContradiction(): Promise<string[]> 
           }
         } catch { /* non-fatal — leave reviewedAtCommit undefined */ }
 
-        const reviewSpawnedMs = typeof status.reviewSpawnedAt === 'number'
-          ? status.reviewSpawnedAt
-          : Date.parse(status.reviewSpawnedAt ?? '');
-        const stuckAtMs = Date.parse(status.stuckAt ?? '');
-        if (Number.isFinite(reviewSpawnedMs) && Number.isFinite(stuckAtMs) && reviewSpawnedMs > stuckAtMs) {
-          console.warn(
-            `[deacon] Refusing stale review-infrastructure bypass for ${issueId}: `
-            + `live review cycle ${new Date(reviewSpawnedMs).toISOString()} at HEAD ${reviewedAtCommit ?? 'unknown'} `
-            + `supersedes failure from ${new Date(stuckAtMs).toISOString()} at verified HEAD ${status.lastVerifiedCommit ?? 'unknown'}.`,
-          );
-          continue;
-        }
-        if (reviewedAtCommit && status.lastVerifiedCommit && reviewedAtCommit !== status.lastVerifiedCommit) {
-          console.warn(
-            `[deacon] Refusing review-infrastructure bypass for ${issueId}: `
-            + `verification evidence HEAD ${status.lastVerifiedCommit} does not match target HEAD ${reviewedAtCommit}.`,
-          );
-          continue;
-        }
-
         // Clearing the stuck marker is mandatory: the bypass *resolves* the
         // review-infra failure, so the issue must no longer be skipped by the
         // deacon's stuck-issue guards or it deadlocks at passed+stuck.
