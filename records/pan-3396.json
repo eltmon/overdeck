@@ -22,6 +22,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T20:50Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-08-01T20:50:41.161Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-01T20:50:41.472Z"
     }
   ],
   "feedback": [
@@ -86,7 +91,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:50:41.162Z",
+  "updated": "2026-08-01T20:50:41.472Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
