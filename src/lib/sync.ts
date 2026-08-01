@@ -393,13 +393,10 @@ export interface SyncOptions {
 }
 
 export interface SyncResult {
-  created: string[];
-  updated: string[];
-  adopted: string[];
-  skipped: string[];
+  created: string[]; updated: string[];
+  adopted: string[]; skipped: string[];
   conflicts: string[];
-  pruned: string[];
-  keptModified: string[];
+  pruned: string[]; keptModified: string[];
   diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
 }
 
@@ -422,10 +419,8 @@ export interface SyncResult {
  */
 export function executeSyncSync(options: SyncOptions = {}): SyncResult {
   const result: SyncResult = {
-    created: [],
-    updated: [],
-    adopted: [],
-    skipped: [],
+    created: [], updated: [],
+    adopted: [], skipped: [],
     conflicts: [],
     pruned: [],
     keptModified: [],
