@@ -1,0 +1,825 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:31:24Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3410: design(dashboard): style guide v2 — Geist type system, display scale, chips, soft cards, page-not-modal doctrine",
+    "updated": "2026-08-01T15:54:55.533Z"
+  },
+  "plan": {
+    "id": "pan-3410",
+    "title": "design(dashboard): style guide v2 — Geist type system, display scale, chips, soft cards, page-not-modal doctrine",
+    "status": "proposed",
+    "uid": "07629d7d-5992-4dbd-ba6b-eb977bc4787d",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:31:24Z",
+    "updated": "2026-08-01T15:54:55.533Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3410",
+        "label": "PAN-3410",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3411",
+        "label": "PAN-3411 (first Broadsheet consumer)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "design-system",
+      "frontend",
+      "style-guide",
+      "theming"
+    ],
+    "narratives": {
+      "Problem": "The current style guide caps ALL type at font-medium and defines no display tier, so no dashboard surface can read as a page — everything reads as a panel, and creation flows land as cramped dialogs because the system has no vocabulary for anything bigger. Separately, all fonts load from the Google Fonts CDN.",
+      "Proposal": "Ship the v2 vocabulary as a selectable appearance theme, not a cutover: 'Overdeck Theme' (ui.theme in ~/.overdeck/config.yaml + a two-card picker in Settings → Appearance) chooses between Ledger (current style, frozen legacy) and Broadsheet (new default: Geist/Geist Mono variable typefaces, tiered weights, display scale, hero placeholders, eyebrow labels, chips, soft cards, keycap CTAs, dot-metadata lines). A single data-theme attribute on the document root carries the theme; Broadsheet-only utilities resolve to Ledger-safe fallbacks so v2-vocabulary surfaces degrade but never break under Ledger. All four font families self-host; the Google Fonts links are removed. The page-not-modal doctrine lands as a named guide rule (PAN-3411 is its first consumer). Color discipline, semantic tokens, and the badge tint formula stay identical in both themes.",
+      "NonGoals": "- Color palette changes\n- Component-by-component restyling to the new patterns (per-feature adoption; PAN-3411 first)\n- Dark-mode rework — the dark/light subsystem (useTheme, ui-theme.json, .dark class) is untouched except naming disambiguation\n- Per-user or per-project themes (the setting is per-instance)\n- Additional themes beyond Ledger and Broadsheet\n- Any backend change beyond the ui.theme config schema key and its settings-API surfacing\n- Migrating NewProjectModal to a page (follow-up issue only, folded into item user-docs-appearance)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Keep the PRD's ui.theme YAML key but name ALL new code identifiers 'DesignLanguage' (type DesignLanguage, useDesignLanguage(), localStorage overdeck.ui.designLanguage); rewrite the stale schema.ts:429 comment.",
+        "rationale": "The dark/light subsystem already owns UiTheme/useTheme/overdeck.ui.theme/ui-theme.json/PUT /api/settings/ui-theme; the PRD is authoritative on the YAML surface, so the collision is resolved at the code-identifier layer."
+      },
+      {
+        "summary": "Boot-before-paint mirrors the dark/light flash-prevention pattern: inline index.html script sets data-theme from a localStorage mirror (default broadsheet); useDesignLanguage reconciles from GET /api/settings on mount.",
+        "rationale": "Satisfies NFR-4 (instant switch, no boot flash) without blocking first paint on a network fetch, reusing a proven in-repo pattern (index.html:12-21, useTheme.ts)."
+      },
+      {
+        "summary": "Fonts live in src/dashboard/frontend/public/fonts/; the Geist pair is copied from the committed design/style-guide/mockups/fonts/; DM Sans + Space Grotesk variable woff2 come from an OFL source at implementation time.",
+        "rationale": "public/ is the existing Vite static-asset path; the Geist files are already reviewed and committed at ~57KB each, well inside the 500KB NFR budget."
+      },
+      {
+        "summary": "Broadsheet --font-mono = 'Geist Mono Variable' with the SF Mono stack as in-stack fallback; identifiers and eyebrows both consume var(--font-mono).",
+        "rationale": "Directly implements PRD D-1 ('mono is Geist Mono Variable' + 'SF Mono stack remains the terminal/code fallback') and D-5 (eyebrow is Geist Mono) without a second mono token."
+      },
+      {
+        "summary": "User-facing docs = new configuration/appearance.mdx plus a docs.json nav entry.",
+        "rationale": "No appearance/settings doc exists today (verified: configuration/ has 14 pages, none for appearance); a new page is the smallest additive change."
+      },
+      {
+        "summary": "Badge radius rounded-sm→rounded-md applies only under [data-theme=\"broadsheet\"]; Ledger badges stay rounded-sm.",
+        "rationale": "PRD D-11 sanctions exactly one texture change; scoping it to Broadsheet preserves the Ledger pixel-parity regression bar (D-12)."
+      },
+      {
+        "summary": "'Pixel-parity' for Ledger is defined as computed-style + layout/box parity, not glyph rasterization parity.",
+        "rationale": "Google serves unicode-range-subsetted woff2; self-hosting DM Sans makes byte-identical rasterization unachievable by construction, so layout parity is the only honest bar (recorded as PRD D-22)."
+      }
+    ],
+    "items": [
+      {
+        "id": "self-host-fonts",
+        "title": "Self-host all four font families; remove Google Fonts CDN links",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/public/fonts/Geist-Variable.woff2",
+            "src/dashboard/frontend/public/fonts/GeistMono-Variable.woff2",
+            "src/dashboard/frontend/public/fonts/DMSans-Variable.woff2",
+            "src/dashboard/frontend/public/fonts/SpaceGrotesk-Variable.woff2",
+            "src/dashboard/frontend/public/fonts/OFL-*.txt",
+            "src/dashboard/frontend/index.html",
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/recovery.test.ts",
+            "tests/unit/dashboard/fonts-local.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/dashboard/fonts-local.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "fonts-local.test.ts passes (no external font hosts; all font files exist)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/public/fonts/ and place four variable woff2 files plus an OFL.txt license per family: copy Geist-Variable.woff2 and GeistMono-Variable.woff2 from the already-committed design/style-guide/mockups/fonts/; fetch DM Sans and Space Grotesk variable woff2 from an OFL source (google/fonts GitHub repo or fontsource). Add @font-face declarations in src/dashboard/frontend/src/index.css (variable font-weight ranges, font-display: swap) for all four families. Delete the four Google Fonts tags at src/dashboard/frontend/index.html:8-11 (both preconnects, the preload, and the stylesheet link). Update src/dashboard/frontend/src/recovery.test.ts, which currently asserts Google Fonts URLs, to assert the self-hosted equivalent (keep the coverage, change the expectation). Add tests/unit/dashboard/fonts-local.test.ts: greps index.html and index.css for fonts.googleapis.com/fonts.gstatic.com and asserts absence, asserts every woff2 + license file exists on disk, and asserts total woff2 size ≤ 500KB."
+        },
+        "items": [
+          {
+            "id": "self-host-fonts.ac1",
+            "title": "Given the frontend source, when index.html and index.css are grepped, then they contain zero fonts.googleapis.com or fonts.gstatic.com references",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-host-fonts.ac2",
+            "title": "index.css contains @font-face declarations for all four families (Geist Variable, Geist Mono Variable, DM Sans, Space Grotesk) with variable font-weight ranges and font-display: swap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-host-fonts.ac3",
+            "title": "src/dashboard/frontend/public/fonts/ contains all four woff2 files plus OFL license files, and their combined size stays ≤ 500KB",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "self-host-fonts.ac4",
+            "title": "tests/unit/dashboard/fonts-local.test.ts passes and recovery.test.ts passes with its font assertion updated (not deleted)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "theme-token-scope",
+        "title": "Introduce data-theme token scope: font CSS variables, display/eyebrow utilities with Ledger fallbacks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "design-language-hook",
+            "appearance-theme-picker",
+            "broadsheet-mechanical-migration",
+            "law-file-rewrite"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/tailwind.config.js"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run build"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "frontend builds; computed font-family on body is DM Sans at :root and Geist under [data-theme=\"broadsheet\"]"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/index.css define --font-sans, --font-display, and --font-mono CSS variables: :root carries today's exact Ledger values (--font-sans: \"DM Sans\", system-ui, sans-serif; --font-display: \"Space Grotesk\", system-ui, sans-serif; --font-mono: the current SF Mono-first stack), and [data-theme=\"broadsheet\"] overrides them (--font-sans: \"Geist Variable\", system-ui, sans-serif; --font-display: \"Geist Variable\", system-ui, sans-serif; --font-mono: \"Geist Mono Variable\", \"SF Mono\", \"SFMono-Regular\", Consolas, \"Liberation Mono\", monospace). Repoint the three fontFamily entries in src/dashboard/frontend/tailwind.config.js:67-71 at the variables. Add the named Broadsheet utilities as CSS component classes (port the values from the working prototype at design/style-guide/mockups/style-guide-v2.html lines 44-66 and 252-253 — do not reinvent): .display-xl (clamp(48px, 7vw, 72px), tracking-tight, font-weight 700-800), .display-lg (~40px, weight 650-700), .eyebrow (var(--font-mono), 11px, uppercase, letter-spacing 0.12em, text-muted-foreground). Under [data-theme=\"ledger\"] (and by default at :root) the same utilities resolve to the Ledger-safe fallbacks: display-xl → text-xl font-medium, display-lg → text-lg font-medium, eyebrow → text-xs uppercase tracking-wider font-medium. Intermediate weights (480, 650) are set via CSS font-weight on the named utility only — never ad-hoc font-[480] classes. No !important, no hex."
+        },
+        "items": [
+          {
+            "id": "theme-token-scope.ac1",
+            "title": "Given data-theme is unset or 'ledger', when body and the sidebar wordmark computed styles are read, then font-family resolves to DM Sans and Space Grotesk respectively (today's exact values)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-token-scope.ac2",
+            "title": "Given data-theme='broadsheet', when body computed style is read, then font-family resolves to Geist Variable and var(--font-mono) starts with Geist Mono Variable",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-token-scope.ac3",
+            "title": "Each named utility (display-xl, display-lg, eyebrow) renders at Broadsheet scale under [data-theme=\"broadsheet\"] and falls back to Ledger-safe scale (text-xl/text-lg/text-xs, font-medium) otherwise",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "theme-token-scope.ac4",
+            "title": "The diff contains no !important and no hardcoded hex colors, and tailwind.config.js fontFamily entries consume the CSS variables",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ui-theme-config-key",
+        "title": "Add ui.theme config key (ledger|broadsheet, default broadsheet) with loud invalid-value failure",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/merge.ts",
+            "src/lib/config-yaml/defaults.ts",
+            "src/lib/__tests__/config-yaml-ui-theme.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/config-yaml-ui-theme.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ui-theme config tests pass (default, round-trip, invalid-error)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "Following the exact pattern of open_in_editor_command: add theme?: 'ledger' | 'broadsheet' to UiConfig in src/lib/config-yaml/schema.ts:429-436 and theme: DesignLanguage to the resolved shape at schema.ts:932; export type DesignLanguage = 'ledger' | 'broadsheet' from schema.ts. Set the default to 'broadsheet' in src/lib/config-yaml/defaults.ts:223-224 and src/lib/config-yaml/merge.ts:201-202. In merge.ts beside the parse at lines 697-699: if config.ui?.theme is present and is not 'ledger' or 'broadsheet', throw ConfigError (see src/lib/errors.ts, imported in load.ts) with a message naming ui.theme and the allowed values — deliberately NOT the silent-drop pattern used for other enums (no-hardcoded-fallback rule). Rewrite the stale comment at schema.ts:429 to name both subsystems: dark/light lives in ~/.overdeck/ui-theme.json; the design language lives here as ui.theme. Add src/lib/__tests__/config-yaml-ui-theme.test.ts: unset resolves to broadsheet, 'ledger' and 'broadsheet' round-trip, an invalid value throws the loud error."
+        },
+        "items": [
+          {
+            "id": "ui-theme-config-key.ac1",
+            "title": "Given config.yaml has no ui.theme key, when config resolves, then ui.theme defaults to 'broadsheet'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-theme-config-key.ac2",
+            "title": "Given config.yaml sets ui.theme to 'ledger' or 'broadsheet', when config resolves, then the value round-trips unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-theme-config-key.ac3",
+            "title": "Given config.yaml sets ui.theme to any other value, when config resolves, then resolution throws an error whose message names ui.theme and the allowed values ledger|broadsheet",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ui-theme-config-key.ac4",
+            "title": "schema.ts exports DesignLanguage and its UiConfig comment contains both subsystem names (dark/light at ~/.overdeck/ui-theme.json and the ui.theme design-language key)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "settings-api-ui-theme",
+        "title": "Surface ui.theme through GET/PUT /api/settings with validation and no-loss save",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/settings-api.ts",
+            "src/lib/__tests__/settings-api.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/settings-api.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "settings-api tests pass including new ui.theme cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/settings-api.ts: add ui?: { theme?: 'ledger' | 'broadsheet' } to ApiSettingsConfig (line 121). loadSettingsApi (line 635) populates ui.theme from the resolved config. validateSettingsApi (line 1110) rejects any other value with an error naming ui.theme and the allowed values (surfaces as 400 from PUT /api/settings in src/dashboard/server/routes/settings.ts:877-906 — no route change needed, validation flows through). saveSettingsApiPromise (line 867) writes ui.theme into the yamlConfig ui block AND preserves the existing ui.open_in_editor_command from the current config (no-loss: a theme write must never blank the editor command). Extend src/lib/__tests__/settings-api.test.ts: GET includes resolved ui.theme; PUT with a valid value persists; PUT with an invalid value fails validation; PUT with ui.theme preserves a pre-existing open_in_editor_command."
+        },
+        "items": [
+          {
+            "id": "settings-api-ui-theme.ac1",
+            "title": "GET /api/settings payload includes ui.theme resolved from config (default broadsheet when unset)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-ui-theme.ac2",
+            "title": "PUT /api/settings with ui.theme 'ledger' persists the value to config.yaml and a reload returns it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-ui-theme.ac3",
+            "title": "PUT /api/settings with an invalid ui.theme value fails validation with an error naming ui.theme and the allowed values (route returns 400)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "settings-api-ui-theme.ac4",
+            "title": "Given ui.open_in_editor_command is set, when ui.theme is saved, then the editor command survives in config.yaml unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "design-language-hook",
+        "title": "Add useDesignLanguage hook + index.html boot script applying data-theme before first paint",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/hooks/useDesignLanguage.ts",
+            "src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts",
+            "src/dashboard/frontend/index.html",
+            "src/dashboard/frontend/src/main.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "hook tests pass (apply, storage mirror, server reconcile)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/hooks/useDesignLanguage.ts mirroring the structure of src/dashboard/frontend/src/hooks/useTheme.ts (zustand store, same file conventions, but NEVER importing or touching useTheme/ui-theme): state designLanguage: 'ledger' | 'broadsheet'; applyDesignLanguage() sets document.documentElement.dataset.theme; localStorage mirror key 'overdeck.ui.designLanguage'; a setter that PUTs { ui: { theme } } through /api/settings (merge semantics — read current settings first or send a partial the server merges; follow how SettingsPage.tsx:150 saves) and flips the attribute immediately on success; on mount, reconcile from GET /api/settings ui.theme and re-stamp the mirror. In src/dashboard/frontend/index.html add an inline script beside the existing flash-prevention block (lines 12-21) that sets documentElement.dataset.theme from the localStorage mirror, defaulting to 'broadsheet', before React mounts. Mount the hook's reconcile once at app root (src/dashboard/frontend/src/main.tsx or App-level — match where useTheme is initialized). Tests mirror src/dashboard/frontend/src/hooks/__tests__/useTheme.test.ts: attribute application, mirror round-trip, server reconcile, default broadsheet."
+        },
+        "items": [
+          {
+            "id": "design-language-hook.ac1",
+            "title": "Given a fresh profile with no mirror, when index.html parses, then documentElement has data-theme='broadsheet' before React mounts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-language-hook.ac2",
+            "title": "When the setter resolves, then documentElement.dataset.theme flips immediately without a page reload and the mirror persists the new value",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-language-hook.ac3",
+            "title": "Given the server config says 'ledger' and the mirror says 'broadsheet', when the app mounts, then the hook reconciles to 'ledger' and re-stamps the mirror",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "design-language-hook.ac4",
+            "title": "useDesignLanguage.test.ts passes and the diff never imports from useTheme.ts or src/lib/ui-theme.ts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "appearance-theme-picker",
+        "title": "Settings → Appearance: Overdeck Theme two-card picker with live mini-specimens",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/Settings/sections/AppearanceSection.tsx",
+            "src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/Settings",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "Settings component tests pass including the picker",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/components/Settings/sections/AppearanceSection.tsx (currently 40 lines, rendered from SettingsPage.tsx:643) add an 'Overdeck Theme' block above the existing shimmer toggle: two selectable cards, Ledger and Broadsheet, each showing the theme name, a one-line description (Ledger: 'The classic dense monitoring style'; Broadsheet: 'The new editorial style — Geist type, display scale, chips, soft cards'), and a live mini-specimen (a small title + eyebrow + chip sample) whose container carries its own data-theme attribute so both specimens render in their own fonts side by side regardless of the active theme. Selection writes through useDesignLanguage(). The selected card shows the selected-chip treatment (border-foreground/40 + bg-muted). The existing 'Ready to Merge shimmer' toggle is preserved verbatim (no-loss). Add a component test under src/dashboard/frontend/src/components/Settings/__tests__/: both cards render with specimens, clicking Broadsheet flips documentElement.dataset.theme and issues the settings write, selection persists across a simulated reload (mirror + server round-trip mocked)."
+        },
+        "items": [
+          {
+            "id": "appearance-theme-picker.ac1",
+            "title": "The Appearance section renders two theme cards, each with name, one-line description, and a mini-specimen that renders in that theme's own fonts (specimen container carries its own data-theme)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-theme-picker.ac2",
+            "title": "When the Broadsheet card is clicked, then documentElement.dataset.theme flips immediately and the selection persists across reload via the settings write + mirror",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-theme-picker.ac3",
+            "title": "The selected card displays the selected treatment (border-foreground/40 + bg-muted) and the other card displays unselected",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "appearance-theme-picker.ac4",
+            "title": "The existing 'Ready to Merge shimmer' toggle renders and functions unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "law-file-rewrite",
+        "title": "Rewrite design/style-guide/STYLE-GUIDE.md for both themes (tier table, pattern recipes, doctrine, governance)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "docs",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "design/style-guide/STYLE-GUIDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -c 'Broadsheet' design/style-guide/STYLE-GUIDE.md",
+            "grep -c 'Ledger' design/style-guide/STYLE-GUIDE.md"
+          ],
+          "expected_outputs": [
+            "law file contains the Themes section, tier table, D-4..D-10 recipes, D-11 unchanged list, and page-not-modal doctrine"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite design/style-guide/STYLE-GUIDE.md (1137 lines today; section map in the PRD's verified-state item 1). Add a new top-level 'Themes' section near the top: Overdeck Theme setting (ui.theme + Settings → Appearance picker), Ledger marked LEGACY (bug fixes only, no new patterns), Broadsheet as default, the data-theme scoping model, and the D-15 governance rule (new surfaces use v2 vocabulary and rely on Ledger-safe fallbacks, never conditional markup). Rewrite §2 Typography: both font stacks, the weight-tier table (body 400-500, headings 500-600, display-only 600-800; Ledger = flat font-medium cap), the display scale (display-xl/display-lg values), the rewritten mono rule (identifiers + eyebrows under Broadsheet; identifiers-only under Ledger), and the self-hosted font-loading section replacing the Google Fonts snippet. Add the pattern recipes with copy-paste class blocks and one canonical example each, marked Broadsheet-only: hero placeholder (D-4), eyebrow (D-5), chip + dashed + selected (D-6), soft card (D-7), CTA + keycap (D-8), dot-metadata line (D-9). Add the page-not-modal doctrine (D-10) as a named rule in §7 Dialogs/Modals. Add the D-11 unchanged-rules list verbatim. Document the Broadsheet-scoped badge radius change (rounded-sm → rounded-md) in §5/§7 Badges with the rationale. Bump the guide version to v2.0 and mark the Ledger ruleset as the frozen legacy baseline."
+        },
+        "items": [
+          {
+            "id": "law-file-rewrite.ac1",
+            "title": "The guide contains a Themes section that names Ledger (legacy) and Broadsheet (default), the ui.theme setting, the data-theme scoping model, and the both-themes governance rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "law-file-rewrite.ac2",
+            "title": "The Typography section contains the explicit weight-tier table and states that weights above 600 are display-tier-only under Broadsheet while Ledger keeps the flat font-medium cap",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "law-file-rewrite.ac3",
+            "title": "The guide shows each D-4..D-9 pattern with a copy-paste class recipe, one canonical example, and a Broadsheet-only marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "law-file-rewrite.ac4",
+            "title": "The Dialogs/Modals section contains the page-not-modal doctrine (creation flows are routed pages; modals for confirmations and ≤4-field forms) and the D-11 unchanged-rules list appears verbatim",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "skill-rewrite",
+        "title": "Rewrite pan-style-guide SKILL.md consistently with the v2 law and sync",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/dev-skills/pan-style-guide/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint",
+            "pan sync"
+          ],
+          "expected_outputs": [
+            "lint-skills passes (skill frontmatter/flags consistent)",
+            "pan sync distributes the updated skill without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite sync-sources/dev-skills/pan-style-guide/SKILL.md (123 lines today) to distill the v2 law: update the frontmatter description (it currently promises 'Prevents … Inter/bold fonts' — restate for the tiered-weight era: no bold outside its tier), update 'Sources of truth' (law is now v2.0; add design/style-guide/mockups/style-guide-v2.html as the Broadsheet visual reference beside system-map.html), rewrite the Typography memorization block for both themes (Ledger rules verbatim as the legacy baseline; Broadsheet tier table), keep the signal-color table and color-restraint rules unchanged (D-11), add the Broadsheet-only pattern names (eyebrow, chip, soft card, keycap, dot-metadata) with one-line rules, add the page-not-modal doctrine, and add the theme rule: new surfaces use v2 vocabulary with Ledger-safe fallbacks, never conditional markup. Update the review-grep line to the new violation set (font-bold|font-semibold outside display tiers, Inter, rounded-full.*badge, slate-, hardcoded font-family). Run pan sync to distribute."
+        },
+        "items": [
+          {
+            "id": "skill-rewrite.ac1",
+            "title": "The skill contains the same tier table, pattern names, and governance wording as the law file",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rewrite.ac2",
+            "title": "The skill preserves the signal-color table and color-restraint sections unchanged (D-11)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "skill-rewrite.ac3",
+            "title": "scripts/lint-skills.sh (via npm run lint) passes and pan sync completes, distributing the updated skill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "user-docs-appearance",
+        "title": "Publish configuration/appearance.mdx (+ docs.json nav) and file the NewProjectModal-page follow-up issue",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "configuration/appearance.mdx",
+            "docs.json"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "python3 -c \"import json; json.load(open('docs.json'))\"",
+            "gh issue list --repo eltmon/overdeck --search \"NewProjectModal page\" --limit 5"
+          ],
+          "expected_outputs": [
+            "docs.json parses as valid JSON and includes configuration/appearance in the configuration group",
+            "the new NewProjectModal-page follow-up issue exists and references PAN-3410"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create configuration/appearance.mdx in the Mintlify voice of its neighbors (read configuration/context-layers.mdx for the frontmatter and tone): document the Overdeck Theme setting — what Ledger and Broadsheet are, that Ledger is the frozen legacy theme, the ui.theme YAML key (enum, default broadsheet, loud invalid-value error), the Settings → Appearance two-card picker with live specimens, that the switch is instant (no restart/rebuild), the data-theme model in one paragraph, the page-not-modal doctrine summary, and the theme governance rule (new patterns land in Broadsheet only). Add \"configuration/appearance\" to the configuration group in docs.json (currently docs.json:100-109), inserted after \"configuration/context-layers\". Then run gh issue create --repo eltmon/overdeck for 'design(dashboard): migrate NewProjectModal to a full page (page-not-modal doctrine)'. Body: references PAN-3410 and its PRD (blob/overdeck-state/drafts/pan-3410.md), names NewProjectModal.tsx as the target, states the doctrine rule (creation flows are routed pages; modals for confirmations and ≤4-field forms), and notes the page must be authored against Broadsheet primitives with Ledger-safe fallbacks per D-13. Add a comment on PAN-3410 linking the new issue number."
+        },
+        "items": [
+          {
+            "id": "user-docs-appearance.ac1",
+            "title": "configuration/appearance.mdx covers ui.theme (enum ledger|broadsheet, default broadsheet, loud invalid error) and the Settings picker behavior",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-appearance.ac2",
+            "title": "The page contains the page-not-modal doctrine and the Broadsheet-only governance rule in plain operator language",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-appearance.ac3",
+            "title": "docs.json parses as valid JSON and contains configuration/appearance inside the configuration group",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "user-docs-appearance.ac4",
+            "title": "A new GitHub issue for the NewProjectModal page migration references PAN-3410 and the doctrine, and PAN-3410 contains a comment linking the new issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "broadsheet-mechanical-migration",
+        "title": "Sweep hardcoded font-family declarations to tokens; Broadsheet badge radius; two-theme screenshot proof",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:31:24Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3410",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/index.css",
+            "src/dashboard/frontend/src/recovery.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
+            "tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint",
+            "npx vitest run tests/e2e/styleguide-conformance.spec.ts"
+          ],
+          "expected_outputs": [
+            "typecheck and lint pass",
+            "conformance spec passes with token-based font assertions",
+            "grep finds no hardcoded font-family outside @font-face and token definitions"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Bounded per D-12 — Ledger rendering stays byte-for-byte today's styles; the sweep only removes duplication and wires tokens. Replace the hardcoded font-family declarations with the token utilities/variables: src/dashboard/frontend/src/index.css:138 (body → var(--font-sans)), index.css:197 (.terminal-output → var(--font-mono) keeping the terminal fallback semantics), src/dashboard/frontend/src/recovery.tsx, src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css, and src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx (find the exact declarations by grepping each file for 'DM Sans'/'font-family' at implementation time; the planning-verified grep hit list is in the PRD). Implement the Broadsheet-scoped badge radius change (rounded-sm → rounded-md only under [data-theme=\"broadsheet\"], e.g. a --badge-radius token or scoped override); Ledger badges stay rounded-sm. Update tests/e2e/styleguide-conformance.spec.ts font assertions to token-based expectations without deleting coverage. Then run the Playwright screenshot pass (isolated browser profile, no shared state): capture the sidebar, an issue card, and the WorkspaceView header in BOTH themes; assert Ledger has computed-style and layout/box parity with pre-change captures (D-22 parity definition — glyph rasterization variance from self-hosted DM Sans is documented, not a regression) and Broadsheet shows only the intended type changes with no layout breakage. Attach the six screenshots to the PR."
+        },
+        "items": [
+          {
+            "id": "broadsheet-mechanical-migration.ac1",
+            "title": "A grep of src/dashboard/frontend/src for hardcoded font-family declarations finds none outside @font-face blocks and the token definitions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "broadsheet-mechanical-migration.ac2",
+            "title": "Each badge renders rounded-md under [data-theme=\"broadsheet\"] and remains rounded-sm under Ledger",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "broadsheet-mechanical-migration.ac3",
+            "title": "tests/e2e/styleguide-conformance.spec.ts passes with its font assertions expressed against tokens",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "broadsheet-mechanical-migration.ac4",
+            "title": "The PR contains six screenshots (sidebar, issue card, WorkspaceView header × Ledger and Broadsheet) showing Ledger layout parity per D-22 and Broadsheet's intended type changes with no layout breakage",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "self-host-fonts",
+        "to": "theme-token-scope",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-token-scope",
+        "to": "design-language-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-token-scope",
+        "to": "appearance-theme-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-token-scope",
+        "to": "broadsheet-mechanical-migration",
+        "type": "blocks"
+      },
+      {
+        "from": "theme-token-scope",
+        "to": "law-file-rewrite",
+        "type": "informs"
+      },
+      {
+        "from": "ui-theme-config-key",
+        "to": "settings-api-ui-theme",
+        "type": "blocks"
+      },
+      {
+        "from": "settings-api-ui-theme",
+        "to": "design-language-hook",
+        "type": "blocks"
+      },
+      {
+        "from": "design-language-hook",
+        "to": "appearance-theme-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "law-file-rewrite",
+        "to": "skill-rewrite",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "The issue body defines this as one deliverable set: theme plumbing, fonts, the law-file and skill rewrites, and the bounded migration are a single feature — a selectable theme shipped without its config key, picker, fonts, or law-file update is not usable, and the slices are not independently shippable (fonts without tokens are dead assets; a config key without the picker is unreachable; docs without the feature describe nothing). The 8 subsystems (src/dashboard frontend, src/lib config+settings-api, tests, design law, bundled skill, user docs) are the irreducible span of that one feature, not separable workstreams.",
+      "canonicalFilename": "2026-08-01-PAN-3410-design-dashboard-style-guide-v2-geist-type-system-display-scale-chips-soft-cards-page-not-modal-doctrine.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
