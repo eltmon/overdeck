@@ -16,24 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:31:19.096Z",
+  "updated": "2026-08-01T10:31:26.111Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T10:19:19.452Z"
+    "updatedAt": "2026-08-01T10:31:26.090Z",
+    "inspectNotes": "Inspecting item snapshot-evidence"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "work": {
+          "anthropic/claude-sonnet-5": {
+            "input": 134,
+            "output": 48142,
+            "cacheRead": 12542869,
+            "cacheWrite": 248882
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-sonnet-5": {
+          "input": 134,
+          "output": 48142,
+          "cacheRead": 12542869,
+          "cacheWrite": 248882
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-01T10:19:19.490Z"
+        "usd": 3.612473,
+        "pricingAsOf": "2026-08-01T10:31:26.098Z"
       }
     },
     "merges": [],
@@ -58,7 +76,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-opus-5",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 2,
     "claims": {},
