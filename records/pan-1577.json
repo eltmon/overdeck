@@ -197,18 +197,19 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T19:09:18.515Z",
+  "updated": "2026-08-01T19:39:15.248Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T17:55:06.837Z",
-    "updatedAt": "2026-08-01T19:04:10.906Z",
+    "updatedAt": "2026-08-01T19:39:14.955Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d",
     "lastVerifiedCommit": "4f4017c42752007bc103f8a3466a7e6fee75763d",
@@ -267,10 +268,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1420,
-            "output": 308340,
-            "cacheRead": 321931541,
-            "cacheWrite": 5835521
+            "input": 1436,
+            "output": 313672,
+            "cacheRead": 327810205,
+            "cacheWrite": 6640266
           }
         }
       },
@@ -288,15 +289,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1420,
-          "output": 308340,
-          "cacheRead": 321931541,
-          "cacheWrite": 5835521
+          "input": 1436,
+          "output": 313672,
+          "cacheRead": 327810205,
+          "cacheWrite": 6640266
         }
       },
       "costAtCloseOut": {
-        "usd": 145.905196,
-        "pricingAsOf": "2026-08-01T19:04:12.429Z"
+        "usd": 149.146143,
+        "pricingAsOf": "2026-08-01T19:39:15.011Z"
       }
     },
     "merges": [
@@ -496,5 +497,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
