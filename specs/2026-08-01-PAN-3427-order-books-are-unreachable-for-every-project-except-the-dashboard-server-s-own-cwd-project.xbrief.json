@@ -1,0 +1,710 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T22:45:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3427: Order books are unreachable for every project except the dashboard server's own cwd project",
+    "updated": "2026-08-01T22:49:34.088Z"
+  },
+  "plan": {
+    "id": "pan-3427",
+    "title": "Order books are unreachable for every project except the dashboard server's own cwd project",
+    "status": "proposed",
+    "uid": "d0967214-d95b-419c-ab46-90d175f68316",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T22:45:00.000Z",
+    "updated": "2026-08-01T22:49:34.088Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3427",
+        "label": "PAN-3427",
+        "type": "issue"
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "One user-visible defect with three inseparable legs (routes, CLI queue verb, continuation): shipping any subset leaves the reported repro broken — a non-server-project book stays stuck in draft without the CLI verb, a ready book still starves without cross-project continuation, and the UI remains blind without the route param. The 7-subsystem spread comes from thin per-surface items (routes, CLI, resolver, frontend, docs, skill, tests), not from an under-decomposed epic; every item is a small vertical slice of the same reachability fix, and CLAUDE.md's complete-features rule forbids splitting it into sibling issues that each leave order books unusable cross-project.",
+      "canonicalFilename": "2026-08-01-PAN-3427-order-books-are-unreachable-for-every-project-except-the-dashboard-server-s-own-cwd-project.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "tags": [
+      "orders",
+      "flywheel",
+      "multi-project",
+      "dashboard",
+      "cli"
+    ],
+    "narratives": {
+      "Problem": "Order books are per-project state on each project's overdeck-state branch, but every supported surface resolves 'the' state root from one ambient cwd: dashboard /api/orders* routes use the server process's cwd (src/dashboard/server/routes/orders.ts:61), the /orders UI fetches bare routes, the CLI has no draft→ready 'queue' verb, and flywheel-complete only advances the completing run's own state root (src/cli/commands/flywheel-complete.ts:105). Combined with the machine-level flywheel singleton, a ready book in another project starves indefinitely: it cannot start now and nothing will ever start it later.",
+      "Proposal": "Three coordinated fixes per the issue's fix direction, plus two coherence fixes: (1) all /api/orders* routes accept ?project=<registry key> resolved through the projects registry (default: server cwd project), the list envelope and book projection carry a `project` field, and single-book GET scans other projects' state roots on miss; (2) the dashboard start route launches the flywheel with cwd = the book's project root; (3) every pan orders verb gains --project <key> and a new `pan orders queue <id>` performs draft→ready through the write door; (4) flywheel-complete, finding no ready book locally, scans other registered projects' state roots in registry order and starts the first ready book in its own project with its default brief; (5) the /orders page gains a project picker fed by the existing /api/registered-projects endpoint; (6) the 'first ready book in queue order' read moves into the orders read door as firstReadyBookInQueue, reused by writer.advanceQueue.",
+      "NonGoals": "- No aggregate cross-project book list view; the list route and UI stay single-project, switched by the picker.\n- No deacon patrol that auto-starts ready books while the flywheel is idle; cross-project start happens at completion-continuation time or by explicit operator action only.\n- PAN-3426 (CLI orders start validates against an unstarted issue service) is a separate issue and stays open.\n- No change to the machine-level flywheel singleton or per-project concurrency.\n- No per-project book counts or status badges in the picker.\n- No changes to dispatch-gate.ts/eligibility.ts: they resolve the book via launch.workspace, which is already the book's project root once FR-4 lands.\n- No tracker/PRD changes to how books reference issues; a book's items remain issues of its own project."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Query param (?project=<key>) rather than a path segment for route project selection.",
+        "rationale": "Follows existing precedent (/api/workspace-registry/project-targets?project=, /api/orders/backlog-candidates?limit=), is purely additive, and keeps old URLs working (NFR-1)."
+      },
+      {
+        "summary": "Continuation scans all tracked projects, not gated on the run's scope.",
+        "rationale": "A ready order book is an explicit operator release (docs/ORDER-BOOKS.md: book membership counts as operator release for the pickup gate); flywheel scope governs backlog pickup, not curated queues. The issue names this as its first option."
+      },
+      {
+        "summary": "Cross-project continuation passes no brief option, resolving the target project's default docs/flywheel-brief.md.",
+        "rationale": "requireFlywheelBrief enforces brief-inside-project-root containment; reusing the completing run's briefPath across projects would violate containment or silently run the wrong project's brief."
+      },
+      {
+        "summary": "No new orders-projects endpoint for the picker.",
+        "rationale": "The picker gets options from the existing GET /api/registered-projects (already cached in the frontend) and the default selection from the new `project` field on the GET /api/orders envelope — one less surface to maintain."
+      },
+      {
+        "summary": "Single-book GET scans other projects' state roots on miss rather than returning 404.",
+        "rationale": "Keeps the Flywheel-page OrderBookModule and deep links correct when the active run's book lives in another project, without forcing every consumer to know the book's project up front."
+      },
+      {
+        "summary": "--project <key> added to every pan orders verb, not just the new queue verb.",
+        "rationale": "The issue is that books are unreachable; a queue-only flag would leave add/show/move cwd-bound. One shared stateRootFor extension makes this mechanical."
+      }
+    ],
+    "items": [
+      {
+        "id": "routes-project-param",
+        "title": "Accept ?project=<key> on every /api/orders* route, resolved through the projects registry",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3427",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "routes-book-scan",
+            "routes-start-project-cwd",
+            "frontend-project-picker"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "orders route test file passes including new project-param cases"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/orders.ts: replace stateRootFor(deps) (line 61) with resolveOrdersStateRoot(deps, projectKey?) — deps.stateRoot still wins (test injection); a given projectKey resolves getProjectSync(key) → resolveStateReadHomeSync(project, key).root, and an unknown key throws 'Unknown project: <key>' (add 'unknown project' to the 400 regex in errorResult at line 74); absent keeps today's cwd behavior. Thread the optional projectKey through every payload function and through buildOrdersReadSnapshot/enrichedBook. Parse `project` from URL search params in every route in makeOrdersRouteLayer (same pattern as `limit` in the backlog-candidates route, lines 469-479). getOrdersPayload returns { project: <resolved key via projectKey() from src/lib/project-key.ts>, books: [...] }; omit the field on the deps.stateRoot injection path. PRD: .pan/drafts/PAN-3427.md WI-1."
+        },
+        "items": [
+          {
+            "id": "routes-project-param.ac1",
+            "title": "Given a registered second project with a book, when GET /api/orders?project=<key> is called, then the response returns that project's books and a `project` field naming <key>",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-project-param.ac2",
+            "title": "When any /api/orders* route receives ?project=<unknown-key>, then it returns HTTP 400 with a message containing 'Unknown project: <unknown-key>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-project-param.ac3",
+            "title": "When no project parameter is passed, then every route resolves the server cwd project exactly as before (existing route tests pass unmodified)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-project-param.ac4",
+            "title": "New tests in src/dashboard/server/routes/__tests__/orders.test.ts cover explicit-key resolution, unknown-key 400, and the envelope `project` field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-book-scan",
+        "title": "GET /api/orders/:id falls back to scanning other projects' state roots on miss",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "orders route test file passes including cross-project scan cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/orders.ts: getOrderPayload(bookId, deps, projectKey?) — when projectKey is absent and the book is not in the default state root, iterate listProjectsSync() in registry order, skip the default project, and return the first book found via getBook(resolveStateReadHomeSync(config, key).root, bookId); none found → the same 'Order book not found' 404 as today. The enrichedBook projection gains `project: <key>` naming the root actually read (default path included, when resolvable). Explicit ?project= never scans. List route stays single-project. PRD: .pan/drafts/PAN-3427.md WI-2."
+        },
+        "items": [
+          {
+            "id": "routes-book-scan.ac1",
+            "title": "Given a book that exists only in a second project's state root, when GET /api/orders/<id> is called without a project param, then it returns 200 with `project` naming that project's key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-book-scan.ac2",
+            "title": "When the book exists in no registered project, then GET /api/orders/<id> returns the same 404 'Order book not found' as today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-book-scan.ac3",
+            "title": "When ?project=<key> is passed explicitly, then no scan occurs and a missing book in that project returns 404",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "routes-start-project-cwd",
+        "title": "Dashboard start route launches the Flywheel in the book's project root",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/orders.ts",
+            "src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/server/routes/__tests__/orders.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "orders route test file passes including start-cwd case"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/orders.ts: change defaultStartOrderBook (line 273) to accept the resolved ProjectConfig and call startFlywheelRun({ cwd: resolveProjectPath(project), orders: book.id }) instead of process.cwd(). postOrderStartPayload resolves { stateRoot, project } together (extend the WI-1 helper to return both) and passes project to deps.startOrderBook ?? defaultStartOrderBook; validation still runs against the book's own state root. resolveProjectPath (src/lib/projects.ts:790) returns the primary worktree root — required because startFlywheelRun uses options.cwd verbatim. PRD: .pan/drafts/PAN-3427.md WI-3."
+        },
+        "items": [
+          {
+            "id": "routes-start-project-cwd.ac1",
+            "title": "Given a valid ready book in a non-default project, when POST /api/orders/:id/start succeeds, then startFlywheelRun is invoked with cwd equal to that project's resolveProjectPath root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-start-project-cwd.ac2",
+            "title": "When the book is in the default server project, then start behaves exactly as today (cwd = server project root)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "routes-start-project-cwd.ac3",
+            "title": "Validation blocks still return HTTP 422 with findings before any start attempt, resolved against the book's own state root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-project-option",
+        "title": "Add --project <key> to every pan orders subcommand",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts",
+            "sync-sources/skills/pan-orders/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CLI orders tests pass including --project cases",
+            "lint-skills passes with the updated pan-orders skill"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/orders.ts: extend stateRootFor(deps) (line 35) with the same registry resolution as the routes (getProjectSync → resolveStateReadHomeSync(project, key).root; unknown key throws 'Unknown project: <key>'); deps.stateRoot and cwd behavior unchanged. Add .option('--project <key>', 'Resolve the order book in another registered project') to every subcommand in createOrdersCommand (lines 211-272) and thread it through the runOrders* functions via the options/deps objects. Update sync-sources/skills/pan-orders/SKILL.md in the SAME commit (scripts/lint-skills.sh enforces flag parity). PRD: .pan/drafts/PAN-3427.md WI-4."
+        },
+        "items": [
+          {
+            "id": "cli-project-option.ac1",
+            "title": "When pan orders list --project <key> runs from an unrelated cwd, then it lists the books in <key>'s state root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-option.ac2",
+            "title": "When --project names an unregistered key, then the command exits non-zero with 'Unknown project: <key>'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-option.ac3",
+            "title": "When --project is omitted, then every verb resolves the state root from cwd exactly as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-option.ac4",
+            "title": "sync-sources/skills/pan-orders/SKILL.md documents --project in the same commit and scripts/lint-skills.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-queue-verb",
+        "title": "Add pan orders queue <id> (draft→ready through the write door)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/orders.ts",
+            "tests/unit/cli/orders.test.ts",
+            "sync-sources/skills/pan-orders/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/orders.test.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "CLI orders tests pass including queue cases",
+            "lint-skills passes with the updated pan-orders skill"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/orders.ts: add runOrdersQueue(bookId, deps) — requireBook, refuse unless book.status === 'draft' with 'Order book <id> must be draft before it can be queued' (mirrors the PATCH guard at src/dashboard/server/routes/orders.ts:317), then setStatus(stateRoot, bookId, 'ready') from src/lib/orders/writer.ts. Register `queue <id>` in createOrdersCommand ('Mark a draft order book ready for dispatch') with the --project flag, printing the updated book via formatBook. Update sync-sources/skills/pan-orders/SKILL.md in the SAME commit. PRD: .pan/drafts/PAN-3427.md WI-5."
+        },
+        "items": [
+          {
+            "id": "cli-queue-verb.ac1",
+            "title": "Given a draft book, when pan orders queue <id> runs, then the book persists status 'ready' through the orders write door",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-queue-verb.ac2",
+            "title": "Given a non-draft book, when pan orders queue <id> runs, then it exits non-zero with a message containing 'must be draft before it can be queued'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-queue-verb.ac3",
+            "title": "When pan orders queue <id> --project <key> runs from an unrelated cwd, then it persists status 'ready' on the book in <key>'s state root",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-queue-verb.ac4",
+            "title": "sync-sources/skills/pan-orders/SKILL.md documents the queue verb in the same commit and scripts/lint-skills.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "resolver-first-ready",
+        "title": "Move the first-ready-book queue read into the orders read door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "refactor",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/orders/resolver.ts",
+            "src/lib/orders/writer.ts",
+            "tests/unit/lib/orders/orders-resolver.test.ts",
+            "tests/unit/lib/orders/orders-writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/lib/orders/"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "all tests/unit/lib/orders/ suites pass"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Add firstReadyBookInQueue(stateRoot): OrderBook | null to src/lib/orders/resolver.ts — iterate readOrderBookIndex(stateRoot) (from src/lib/orders/io.ts, same import the writer uses) and return the first getBook with status 'ready', else null. Rewrite the loop in writer.advanceQueue (src/lib/orders/writer.ts:215-220) to call it after marking the completing book complete. Behavior must be identical: existing orders-writer tests for advanceQueue stay green unmodified. Add resolver-level tests: queue order respected, draft/running books skipped, empty queue → null. PRD: .pan/drafts/PAN-3427.md WI-6."
+        },
+        "items": [
+          {
+            "id": "resolver-first-ready.ac1",
+            "title": "firstReadyBookInQueue returns the first 'ready' book in index.json queue order, skipping draft/running/drained/complete books, and returns null when none is ready",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-first-ready.ac2",
+            "title": "When advanceQueue runs against a queue holding multiple ready books, then it returns the one firstReadyBookInQueue produces — the first in index.json order — with no behavior change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "flywheel-cross-project-continuation",
+        "title": "flywheel-complete scans all tracked projects' ready queues for continuation",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/flywheel-complete.ts",
+            "tests/unit/cli/flywheel-complete.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/cli/flywheel-complete.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "flywheel-complete tests pass including cross-project continuation cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/flywheel-complete.ts: after advanceQueue(stateRoot, book.id) returns null (line 123), iterate listProjectsSync() in registry order, skip the completing project (compare resolved state roots), and call firstReadyBookInQueue on each project's resolveStateReadHomeSync root; first hit wins. Start it with deps.start({ cwd: resolveProjectPath(project), orders: nextBook.id }) — NO brief option (decision D3: the target project's default brief resolves via requireFlywheelBrief). Same-project hits keep today's startOptions ({ cwd: launch.workspace, brief: launch.briefPath }). CompleteFlywheelResult gains optional nextProjectKey?: string; the next-book console line appends ' (project: <key>)' only when the continuation crossed projects. Add dep seams listProjects and firstReady on CompleteFlywheelDeps following the file's existing pattern. PRD: .pan/drafts/PAN-3427.md WI-7."
+        },
+        "items": [
+          {
+            "id": "flywheel-cross-project-continuation.ac1",
+            "title": "Given no ready book in the completing project and a ready book in a second project, when completeFlywheelRun advances, then deps.start is called with cwd = the second project's resolveProjectPath root, orders = that book's id, and no brief property",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cross-project-continuation.ac2",
+            "title": "Given a ready book in the completing project's own queue, when completeFlywheelRun advances, then the local book starts with today's startOptions and no cross-project scan occurs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cross-project-continuation.ac3",
+            "title": "Given no ready book in any registered project, when completeFlywheelRun advances, then it falls through to the existing backlog/needs-you branches unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "flywheel-cross-project-continuation.ac4",
+            "title": "The next-book console output names the project only when continuation crossed projects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "frontend-project-picker",
+        "title": "/orders page project picker threaded through every orders fetch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+            "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+            "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "OrderBookPage tests pass including picker cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/pages/OrderBookPage.tsx: fetch registered projects with React Query queryKey ['registered-projects'] (shared cache; pattern at src/dashboard/frontend/src/App.tsx:765-768). Add a picker in the page header (match the page's existing control styling): options = registered projects; default = the `project` field from the GET /api/orders envelope, falling back to the first option; initialize from the ?project= URL search param when present and write the selection back to the URL for deep-linking. Thread ?project=<key> through every fetch the page makes (list, single book, preview-brief, start, item mutations, backlog-candidates) — always send the resolved key. Changing the selection clears selectedId and refetches. In src/dashboard/frontend/src/components/orders/OrderBookModule.tsx, extend OrderBookProjection (line 11) with project?: string and point the existing back-link at /orders?project=<key> when present. PRD: .pan/drafts/PAN-3427.md WI-8."
+        },
+        "items": [
+          {
+            "id": "frontend-project-picker.ac1",
+            "title": "The /orders page renders a project picker listing every project returned by /api/registered-projects",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-project-picker.ac2",
+            "title": "When the operator selects a different project, then the page sends every orders fetch with ?project=<key> in the URL and renders that project's books",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-project-picker.ac3",
+            "title": "When the page loads from a /orders?project=<key> URL, then the picker displays <key> as the current selection",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "frontend-project-picker.ac4",
+            "title": "OrderBookModule links back to /orders?project=<key> when the projection carries a project field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-order-books",
+        "title": "Document project-scoped order books in ORDER-BOOKS.md and the operator guide",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:45:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3427",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ORDER-BOOKS.md",
+            "configuration/order-books.mdx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint completes with no new errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-10"
+          ]
+        },
+        "narrative": {
+          "Action": "docs/ORDER-BOOKS.md: the HTTP surface section gains the `project` query parameter (with the unknown-key 400 and the single-book scan-on-miss), the lifecycle continuation table gains the cross-project row (scans all tracked projects in registry order, starts in the target project with its default brief), and the CLI coverage gains `pan orders queue` and `--project <key>`. configuration/order-books.mdx: operator guide gains the project picker, pan orders queue, --project, and a paragraph on cross-project continuation including the rule that continuation scans all tracked projects regardless of run scope. PRD: .pan/drafts/PAN-3427.md WI-9."
+        },
+        "items": [
+          {
+            "id": "docs-order-books.ac1",
+            "title": "docs/ORDER-BOOKS.md contains the project query parameter, the single-book scan, the queue verb, and --project in its HTTP-surface and CLI sections, and shows the cross-project continuation row in its lifecycle table",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-order-books.ac2",
+            "title": "configuration/order-books.mdx shows the picker, pan orders queue, --project, and states that continuation scans all tracked projects regardless of run scope",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "routes-project-param",
+        "to": "routes-book-scan",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-project-param",
+        "to": "routes-start-project-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-book-scan",
+        "to": "routes-start-project-cwd",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-project-param",
+        "to": "frontend-project-picker",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-project-option",
+        "to": "cli-queue-verb",
+        "type": "blocks"
+      },
+      {
+        "from": "resolver-first-ready",
+        "to": "flywheel-cross-project-continuation",
+        "type": "blocks"
+      },
+      {
+        "from": "routes-start-project-cwd",
+        "to": "docs-order-books",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-queue-verb",
+        "to": "docs-order-books",
+        "type": "blocks"
+      },
+      {
+        "from": "flywheel-cross-project-continuation",
+        "to": "docs-order-books",
+        "type": "blocks"
+      },
+      {
+        "from": "frontend-project-picker",
+        "to": "docs-order-books",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
