@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-01T14:13:33.878Z",
+  "updated": "2026-08-01T14:13:36.552Z",
   "pipeline": {
     "issueId": "PAN-3406",
     "reviewStatus": "pending",
@@ -25,7 +25,26 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T13:32:36.390Z"
+    "updatedAt": "2026-08-01T14:13:36.549Z",
+    "reviewRequestedAt": "2026-08-01T14:13:36.549Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "docs/ORDER-BOOKS.md",
+        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+        "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+        "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
+      ],
+      "actualChangedFiles": [
+        "docs/ORDER-BOOKS.md",
+        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+        "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+        "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
+      ],
+      "recordedAt": "2026-08-01T14:13:33.877Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3412"
   },
   "closeOut": {
     "usage": {
