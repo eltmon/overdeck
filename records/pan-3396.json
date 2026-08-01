@@ -176,7 +176,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:43:31.998Z",
+  "updated": "2026-08-01T21:43:35.008Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -185,7 +185,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:43:31.920Z",
+    "updatedAt": "2026-08-01T21:43:32.173Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:43:27.436Z",
@@ -326,7 +326,7 @@
       },
       "costAtCloseOut": {
         "usd": 139.1418063,
-        "pricingAsOf": "2026-08-01T21:43:31.987Z"
+        "pricingAsOf": "2026-08-01T21:43:34.983Z"
       }
     },
     "merges": [
