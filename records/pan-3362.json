@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T10:19:06.992Z",
+  "updated": "2026-08-01T10:19:31.121Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -50,5 +50,20 @@
       "open": true,
       "needsYouEmittedAt": "2026-08-01T07:36:32.192Z"
     }
-  ]
+  ],
+  "tasks": {
+    "sequence": 1,
+    "claims": {
+      "fixture-data": {
+        "writerId": "agent-pan-3362",
+        "agentId": "agent-pan-3362",
+        "pid": 228146,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:19:31.120Z"
+      }
+    }
+  },
+  "statusOverrides": {
+    "fixture-data": "running"
+  }
 }
