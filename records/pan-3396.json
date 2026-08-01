@@ -101,16 +101,16 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:55:48.557Z",
+  "updated": "2026-08-01T21:08:46.246Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:52:54.712Z",
+    "updatedAt": "2026-08-01T21:08:44.531Z",
     "reviewNotes": "Verification failed at typecheck",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "137976e6c728372482d643dc0e74009789d733ff",
@@ -175,9 +175,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 391309,
-            "output": 13166,
-            "cacheRead": 4413952,
+            "input": 3750835,
+            "output": 76063,
+            "cacheRead": 16477696,
             "cacheWrite": 0
           }
         },
@@ -215,10 +215,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1536,
-            "output": 76906,
-            "cacheRead": 38450476,
-            "cacheWrite": 1020070
+            "input": 1667,
+            "output": 79694,
+            "cacheRead": 42201467,
+            "cacheWrite": 1191024
           }
         }
       },
@@ -230,21 +230,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4942380,
-          "output": 102763,
-          "cacheRead": 17910272,
+          "input": 8301906,
+          "output": 165660,
+          "cacheRead": 29974016,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1536,
-          "output": 76906,
-          "cacheRead": 38450476,
-          "cacheWrite": 1020070
+          "input": 1667,
+          "output": 79694,
+          "cacheRead": 42201467,
+          "cacheWrite": 1191024
         }
       },
       "costAtCloseOut": {
-        "usd": 42.2708583,
-        "pricingAsOf": "2026-08-01T20:52:54.725Z"
+        "usd": 67.59013230000001,
+        "pricingAsOf": "2026-08-01T21:08:45.155Z"
       }
     },
     "merges": [
@@ -253,7 +253,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
