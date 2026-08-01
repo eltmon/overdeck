@@ -670,6 +670,7 @@ export interface LegacyConversation {
   forkRequest: string | null;
   forkRetryCount: number;
   workspaceId: string | null;
+  projectKey: string | null;
 }
 
 export interface ArchivedConversationWithEnrichment {
@@ -758,6 +759,7 @@ interface LegacyConversationRow {
   delivery_method: string | null;
   spawn_error: string | null;
   workspace_id: string | null;
+  project_key: string | null;
 }
 
 const LEGACY_CONVERSATION_SELECT = `
@@ -792,6 +794,7 @@ const LEGACY_CONVERSATION_SELECT = `
     c.delivery_method,
     c.spawn_error,
     c.workspace_id,
+    c.project_key,
     (
       SELECT cf.locator
       FROM conversation_files cf
@@ -917,6 +920,7 @@ function rowToLegacyConversation(row: LegacyConversationRow): LegacyConversation
     forkRequest: row.fork_request ?? null,
     forkRetryCount: row.fork_retry_count ?? 0,
     workspaceId: row.workspace_id ?? null,
+    projectKey: row.project_key ?? null,
   };
 }
 
@@ -1208,6 +1212,8 @@ export function createConversation(opts: {
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
   /** PAN-1990: explicit workspace id. Falls back to resolveWorkspaceForCwd(cwd) when omitted. */
   workspaceId?: string | null;
+  /** PAN-3419: explicit registered-project association; never inferred from cwd at write time. */
+  projectKey?: string | null;
 }): LegacyConversation {
   const db = overdeckDb();
   const id = randomUUID();
@@ -1222,8 +1228,8 @@ export function createConversation(opts: {
     db.prepare(`
       INSERT INTO conversations
         (id, name, cwd, issue_id, harness, model, effort, title, title_source, created_at, archived_at,
-         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?)
+         tmux_session, status, fork_status, fork_retry_count, delivery_method, spawn_error, workspace_id, project_key)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'active', ?, 0, ?, ?, ?, ?)
     `).run(
       id,
       opts.name,
@@ -1240,6 +1246,7 @@ export function createConversation(opts: {
       opts.deliveryMethod ?? null,
       null,  // spawn_error starts null
       workspaceId,
+      opts.projectKey ?? null,
     );
     if (opts.claudeSessionId) {
       db.prepare(`
@@ -1353,6 +1360,10 @@ export function setConversationEffort(name: string, effort: string | null): void
 
 export function setConversationHarness(name: string, harness: RuntimeName): void {
   overdeckDb().prepare(`UPDATE conversations SET harness = ? WHERE name = ?`).run(harness, name);
+}
+
+export function setConversationProjectKey(name: string, projectKey: string | null): void {
+  overdeckDb().prepare(`UPDATE conversations SET project_key = ? WHERE name = ?`).run(projectKey, name);
 }
 
 export function setConversationClaudeSessionId(name: string, claudeSessionId: string): void {

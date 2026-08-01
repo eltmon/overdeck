@@ -858,6 +858,13 @@ export async function spawnConversationSession(
   await Effect.runPromise(setOption(tmuxSession, 'destroy-unattached', 'off'));
   await Effect.runPromise(setOption(exactPaneTarget(tmuxSession), 'remain-on-exit', 'on'));
 }
+/** Resolve a project key or display name to its canonical projects.yaml key. */
+export function resolveRegisteredProjectKey(input: string): { key: string } | { error: string } {
+  if (getProjectSync(input)) return { key: input };
+  const byName = listProjectsSync().find((project) => project.config.name === input);
+  return byName ? { key: byName.key } : { error: `Unknown project: ${input}` };
+}
+
 /**
  * Resolve a conversation's cwd from a project identifier.
  *
@@ -865,9 +872,9 @@ export async function spawnConversationSession(
  * (PAN-2590) — accept either, like GET /api/session-trees does.
  */
 export function resolveProjectCwd(projectKey: string): { cwd: string } | { error: string } {
-  const projectConfig = getProjectSync(projectKey)
-    ?? listProjectsSync().find((p) => p.config.name === projectKey)?.config
-    ?? null;
+  const keyResult = resolveRegisteredProjectKey(projectKey);
+  if ('error' in keyResult) return keyResult;
+  const projectConfig = getProjectSync(keyResult.key);
   if (!projectConfig) return { error: `Unknown project: ${projectKey}` };
   if (!projectConfig.path || !existsSync(projectConfig.path)) {
     return { error: `Project path does not exist: ${projectConfig.path || '(unset)'} (project: ${projectKey})` };
@@ -891,10 +898,14 @@ export async function handleConversationCreate(
     if (model && !SAFE_MODEL_PATTERN.test(model)) return jsonResponse({ error: 'Invalid model' }, { status: 400 });
     if (effort && !SAFE_EFFORT_PATTERN.test(effort)) return jsonResponse({ error: 'Invalid effort' }, { status: 400 });
     let cwd = getDefaultCwd();
+    let canonicalProjectKey: string | undefined;
     if (projectKey) {
+      const keyResult = resolveRegisteredProjectKey(projectKey);
+      if ('error' in keyResult) return jsonResponse({ error: keyResult.error }, { status: 400 });
       const resolved = resolveProjectCwd(projectKey);
       if ('error' in resolved) return jsonResponse({ error: resolved.error }, { status: 400 });
       cwd = resolved.cwd;
+      canonicalProjectKey = keyResult.key;
     }
     if (message && message.length > 50_000) {
       return jsonResponse({ error: 'message exceeds maximum length of 50000 characters' }, { status: 400 });
@@ -906,7 +917,7 @@ export async function handleConversationCreate(
     console.log(`[conversations] Creating conversation "${name}" with model=${model ?? 'default'} effort=${effort ?? 'default'} cwd=${cwd}`);
     const MAX_TITLE_LEN = 60;
     const title = message ? message.slice(0, MAX_TITLE_LEN) + (message.length > MAX_TITLE_LEN ? '…' : '') : 'New conversation';
-    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness });
+    const conv = createConversation({ name, tmuxSession, cwd, issueId, claudeSessionId, title, titleSource: message ? 'auto' : 'default', titleSeed: title, model, effort, harness, projectKey: canonicalProjectKey });
     getEventStore().emitOnly({ type: 'conversation.created', timestamp: new Date().toISOString(), payload: { conversationName: name } });
     void (async () => {
       try {

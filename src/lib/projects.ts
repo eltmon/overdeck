@@ -551,6 +551,26 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
   }));
 }
 
+/** Resolve the registered project owning a cwd via longest path-prefix match. */
+export function resolveProjectKeyForCwd(cwd: string): string | null {
+  const normalizedCwd = resolve(cwd);
+  let bestMatch: { key: string; pathLength: number } | null = null;
+
+  for (const { key, config } of listProjectsSync()) {
+    if (!config.path) continue;
+    const projectPath = resolve(config.path);
+    const pathPrefix = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
+    if (
+      (normalizedCwd === projectPath || normalizedCwd.startsWith(pathPrefix))
+      && projectPath.length > (bestMatch?.pathLength ?? -1)
+    ) {
+      bestMatch = { key, pathLength: projectPath.length };
+    }
+  }
+
+  return bestMatch?.key ?? null;
+}
+
 /**
  * Add or update a project in the registry
  */

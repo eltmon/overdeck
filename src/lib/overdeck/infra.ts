@@ -76,6 +76,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'project_targets', column: 'project_id' },
     { table: 'pinned_docs', column: 'id' },
     { table: 'conversations', column: 'workspace_id' },
+    { table: 'conversations', column: 'project_key' },
     { table: 'agents', column: 'workspace_id' },
     // PAN-3331: the quick-action band's per-workspace run command.
     { table: 'workspaces', column: 'run_command' },
@@ -275,6 +276,7 @@ function ensureWorkspaceTablesSync(db: SqliteDatabase): void {
   db.exec('CREATE INDEX IF NOT EXISTS `idx_pinned_docs_scope` ON `pinned_docs` (`scope`, `scope_id`)');
 
   runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `workspace_id` text');
+  runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `workspace_id` text');
   // PAN-3331: the quick-action band's per-workspace run command. Its own column
   // rather than a key inside layout_config, which react-resizable-panels owns
