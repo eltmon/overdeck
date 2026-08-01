@@ -86,18 +86,18 @@
     "recordedAt": "2026-08-01T11:32:46.338Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:02:12.009Z",
+  "updated": "2026-08-01T12:02:14.415Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:33:25.155Z",
-    "updatedAt": "2026-08-01T12:02:11.849Z",
+    "updatedAt": "2026-08-01T12:02:12.818Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed both blocking findings: removed the public --force host-seeding bypass (guard now fails closed unconditionally, matching the NonGoals), and deduped fixture activity history via stable ids + emitActivityEntryOnce (idempotency test now asserts exactly 4 activity.entry events survive two seed runs).",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
@@ -203,7 +203,7 @@
       },
       "costAtCloseOut": {
         "usd": 52.612376,
-        "pricingAsOf": "2026-08-01T12:02:11.921Z"
+        "pricingAsOf": "2026-08-01T12:02:14.410Z"
       }
     },
     "merges": [
