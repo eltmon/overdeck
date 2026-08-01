@@ -16,42 +16,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-01T22:29:49.156Z",
+  "updated": "2026-08-01T22:34:06.928Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T22:29:49.111Z",
-    "inspectNotes": "Inspecting item prune-helper"
+    "updatedAt": "2026-08-01T22:34:03.582Z",
+    "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 631407,
-            "output": 27385,
-            "cacheRead": 9887232,
+            "input": 636783,
+            "output": 27639,
+            "cacheRead": 10442240,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 631407,
-          "output": 27385,
-          "cacheRead": 9887232,
+          "input": 636783,
+          "output": 27639,
+          "cacheRead": 10442240,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 8.922201,
-        "pricingAsOf": "2026-08-01T22:29:49.130Z"
+        "usd": 9.234205,
+        "pricingAsOf": "2026-08-01T22:34:04.065Z"
       }
     },
     "merges": [],
