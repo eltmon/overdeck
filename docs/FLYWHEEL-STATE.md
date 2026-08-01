@@ -610,3 +610,9 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - PAN-1889/3392/3393 close-outs now ALSO gated on red main — they queue behind PAN-3404.
 - **COST: pan-3367 at $113.75** (ctx 87%, +2432/−425). pan-3362 $54.33. Warn-only policy — surfacing, not stopping.
 - MIN-864 fresh session slow-progressing ($1.47). Load moderate.
+
+## RUN-79 tick 12 (2026-08-01 ~12:40Z) — PAN-3404 fix in CI (#3405); time bomb poisons ALL open PRs until it lands
+
+- **strike-3404 fix reviewed + pushed by me** (PR #3405): audit found the `now: Date.now` capture pattern in FOUR files (transcript-retention, pipeline-membership service, deacon-auto-merge-reconcile, deacon-stuck-merging) — all now lazy `() => Date.now()`. #3405's own test lane contains the fix so it can go green; **every OTHER open PR's test lane inherits the wall-clock detonation** — #3402 (pan-3362's UAT fixtures PR, in CI now) will fail through no fault of its own and needs a lane re-run post-merge.
+- pan-3362 NOT wedged — it submitted PR #3402 and is monitoring. min-874 $132.93 +4161/−327 (huge but moving). pan-3367 $123.90 crash-restored AGAIN (2nd), min-839 also restored — second cluster, no deploy this time, no OOM lines visible in journalctl, RAM fine (17.5GB avail). Killer unidentified; watching (kernel log needs sudo).
+- MIN-864 crawling ($1.89). Close-outs for 1889/3392/3393 still queued behind red main.
