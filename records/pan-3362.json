@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:09:47.169Z",
+  "updated": "2026-08-01T11:15:13.823Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "docs": {
-        "writerId": "agent-pan-3362",
-        "agentId": "agent-pan-3362",
-        "pid": 2467125,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T11:09:47.169Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3362",
@@ -113,6 +105,17 @@
         "outcome": "completed",
         "reason": "Registered pan admin seed-uat-fixtures with host and --local modes in src/cli/commands/admin/seed-uat-fixtures.ts, wired into admin/index.ts, regenerated composer-commands manifest. Also fixed a real state-writes lint false positive discovered in the previously-completed seed-writer item (git-grep-based gate doesn't see untracked files, so the earlier 'clean' lint run was a false negative) — separate fix commit a9fe348644. requiresInspection=false, proceeding to docs item.",
         "releasedAt": "2026-08-01T11:09:38.249Z"
+      },
+      {
+        "writerId": "agent-pan-3362",
+        "agentId": "agent-pan-3362",
+        "pid": 2467125,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T11:09:47.169Z",
+        "itemId": "docs",
+        "outcome": "completed",
+        "reason": "Added 'Seeding UAT issue fixtures' section to docs/WORKSPACE-CONTAINERS.md, extended roles/test.md's container-UAT rule with the seed-before-declaring-environment-blocked guidance (Prompt-Change trailer included), added the exclusion row to docs/SKILLS-CONVENTION.md. npm run lint passes clean (including lint-skills and lint-prompt-trailer).",
+        "releasedAt": "2026-08-01T11:15:13.823Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "cli-command": {
         "reason": "Registered pan admin seed-uat-fixtures with host and --local modes in src/cli/commands/admin/seed-uat-fixtures.ts, wired into admin/index.ts, regenerated composer-commands manifest. Also fixed a real state-writes lint false positive discovered in the previously-completed seed-writer item (git-grep-based gate doesn't see untracked files, so the earlier 'clean' lint run was a false negative) — separate fix commit a9fe348644. requiresInspection=false, proceeding to docs item.",
         "updatedAt": "2026-08-01T11:09:38.249Z"
+      },
+      "docs": {
+        "reason": "Added 'Seeding UAT issue fixtures' section to docs/WORKSPACE-CONTAINERS.md, extended roles/test.md's container-UAT rule with the seed-before-declaring-environment-blocked guidance (Prompt-Change trailer included), added the exclusion row to docs/SKILLS-CONVENTION.md. npm run lint passes clean (including lint-skills and lint-prompt-trailer).",
+        "updatedAt": "2026-08-01T11:15:13.823Z"
       }
     }
   },
@@ -146,6 +153,9 @@
     "cli-command.cli-command.ac2": "completed",
     "cli-command.cli-command.ac3": "completed",
     "cli-command.cli-command.ac4": "completed",
-    "docs": "running"
+    "docs": "completed",
+    "docs.docs.ac1": "completed",
+    "docs.docs.ac2": "completed",
+    "docs.docs.ac3": "completed"
   }
 }
