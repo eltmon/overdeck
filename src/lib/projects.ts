@@ -4,13 +4,21 @@
  * Maps Linear team prefixes and labels to project paths for workspace creation.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync, statSync } from 'fs';
-import { mkdir, readFile, stat, writeFile } from 'fs/promises';
+import { existsSync, readFileSync, statSync } from 'fs';
+import { readFile, stat } from 'fs/promises';
 import { join, resolve } from 'path';
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import { Effect } from 'effect';
 import { ConfigParseError, FsError } from './errors.js';
 import { OVERDECK_HOME } from './paths.js';
+import {
+  atomicWriteProjectsConfig,
+  atomicWriteProjectsConfigSync,
+  updateProjectsConfigText,
+  updateProjectsConfigTextSync,
+  withProjectsConfigWrite,
+  withProjectsConfigWriteSync,
+} from './projects-config-write.js';
 import { extractPrefixSync, parseIssueIdSync } from './issue-id.js';
 import type { DatabaseConfig, QualityGateConfig, RepoConfig } from './workspace-config.js';
 import type { AutoResumeConfig } from './cloister/auto-resume-config.js';
@@ -115,6 +123,184 @@ export interface ReleaseConfig {
   components: Record<string, ReleaseComponentConfig>;
 }
 
+export interface VersionSyncConfig {
+  set?: Array<{ path: string; json_field: string }>;
+  replace?: Array<{ path: string; pattern: string; value: '{version}' | '{majorMinor}' }>;
+  command?: string;
+  command_cwd?: string;
+  command_image?: string;
+  expect?: Array<{ path: string; pattern: string }>;
+  commit_message?: string;
+  push?: string[];
+}
+
+export type VersionSyncValidationResult =
+  | { ok: true; config: VersionSyncConfig }
+  | { ok: false; errors: string[] };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function pathEscapesProjectRoot(path: string): boolean {
+  const root = resolve('/project');
+  const resolvedPath = resolve(root, path);
+  return resolvedPath !== root && !resolvedPath.startsWith(`${root}/`);
+}
+
+export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationResult {
+  if (!isRecord(raw)) {
+    return { ok: false, errors: ['version_sync must be an object'] };
+  }
+
+  const errors: string[] = [];
+  const validatePath = (field: string, value: unknown): value is string => {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+      errors.push(`${field} must be a non-empty string`);
+      return false;
+    }
+    if (pathEscapesProjectRoot(value)) {
+      errors.push(`${field} must not escape the project root`);
+      return false;
+    }
+    return true;
+  };
+
+  if (raw.set !== undefined) {
+    if (!Array.isArray(raw.set)) {
+      errors.push('version_sync.set must be an array');
+    } else {
+      raw.set.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          errors.push(`version_sync.set[${index}] must be an object`);
+          return;
+        }
+        validatePath(`version_sync.set[${index}].path`, entry.path);
+        if (typeof entry.json_field !== 'string' || entry.json_field.trim().length === 0) {
+          errors.push(`version_sync.set[${index}].json_field must be a non-empty string`);
+        }
+      });
+    }
+  }
+
+  if (raw.replace !== undefined) {
+    if (!Array.isArray(raw.replace)) {
+      errors.push('version_sync.replace must be an array');
+    } else {
+      raw.replace.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          errors.push(`version_sync.replace[${index}] must be an object`);
+          return;
+        }
+        validatePath(`version_sync.replace[${index}].path`, entry.path);
+        if (typeof entry.pattern !== 'string' || entry.pattern.length === 0) {
+          errors.push(`version_sync.replace[${index}].pattern must be a non-empty string`);
+        } else if (entry.pattern.length > 512) {
+          errors.push(`version_sync.replace[${index}].pattern must be at most 512 characters`);
+        } else if ((entry.pattern.match(/\(\?<version>/g) ?? []).length !== 1) {
+          errors.push(`version_sync.replace[${index}].pattern must contain exactly one named capture (?<version>...)`);
+        } else {
+          try {
+            new RegExp(entry.pattern, 'd');
+          } catch {
+            errors.push(`version_sync.replace[${index}].pattern must be a valid regular expression`);
+          }
+        }
+        if (entry.value !== '{version}' && entry.value !== '{majorMinor}') {
+          errors.push(`version_sync.replace[${index}].value must be {version} or {majorMinor}`);
+        }
+      });
+    }
+  }
+
+  if (raw.expect !== undefined) {
+    if (!Array.isArray(raw.expect)) {
+      errors.push('version_sync.expect must be an array');
+    } else {
+      raw.expect.forEach((entry, index) => {
+        if (!isRecord(entry)) {
+          errors.push(`version_sync.expect[${index}] must be an object`);
+          return;
+        }
+        validatePath(`version_sync.expect[${index}].path`, entry.path);
+        if (typeof entry.pattern !== 'string' || entry.pattern.length === 0) {
+          errors.push(`version_sync.expect[${index}].pattern must be a non-empty string`);
+          return;
+        }
+        if (entry.pattern.length > 512) {
+          errors.push(`version_sync.expect[${index}].pattern must be at most 512 characters`);
+          return;
+        }
+        try {
+          new RegExp(entry.pattern);
+        } catch {
+          errors.push(`version_sync.expect[${index}].pattern must be a valid regular expression`);
+        }
+      });
+    }
+  }
+  if (raw.expect === undefined || (Array.isArray(raw.expect) && raw.expect.length === 0)) {
+    errors.push('version_sync.expect must contain at least one entry');
+  }
+
+  if (
+    Array.isArray(raw.replace)
+    && raw.replace.length > 0
+    && (typeof raw.command !== 'string' || raw.command.trim().length === 0)
+  ) {
+    errors.push('version_sync.command is required when version_sync.replace is set');
+  }
+
+  if (raw.command !== undefined) {
+    if (typeof raw.command !== 'string' || raw.command.trim().length === 0) {
+      errors.push('version_sync.command must be a non-empty string');
+    } else if (/[\r\n]/.test(raw.command)) {
+      errors.push('version_sync.command must be a single command line');
+    }
+  }
+
+  if (raw.command_cwd !== undefined) {
+    validatePath('version_sync.command_cwd', raw.command_cwd);
+  }
+
+  if (raw.command_image !== undefined) {
+    if (
+      typeof raw.command_image !== 'string'
+      || raw.command_image.length > 255
+      || !/^[A-Za-z0-9][A-Za-z0-9._/:@-]*$/.test(raw.command_image)
+    ) {
+      errors.push('version_sync.command_image must be a valid container image reference');
+    }
+  } else if (
+    typeof raw.command === 'string'
+    && raw.command.trim().length > 0
+    && !/[\r\n]/.test(raw.command)
+  ) {
+    errors.push('version_sync.command_image is required when version_sync.command is set');
+  }
+
+  if (raw.commit_message !== undefined) {
+    if (typeof raw.commit_message !== 'string' || raw.commit_message.trim().length === 0) {
+      errors.push('version_sync.commit_message must be a non-empty string');
+    }
+  }
+
+  if (raw.push !== undefined) {
+    if (!Array.isArray(raw.push)) {
+      errors.push('version_sync.push must be an array');
+    } else {
+      raw.push.forEach((path, index) => validatePath(`version_sync.push[${index}]`, path));
+    }
+  }
+  if (raw.push === undefined || (Array.isArray(raw.push) && raw.push.length === 0)) {
+    errors.push('version_sync.push must contain at least one repository');
+  }
+
+  return errors.length > 0
+    ? { ok: false, errors }
+    : { ok: true, config: raw as VersionSyncConfig };
+}
+
 /**
  * Project configuration
  */
@@ -173,6 +359,8 @@ export interface ProjectConfig {
   merge_train?: 'enabled' | 'disabled';
   /** Quality gates run by merge-agent before pushing (lint, typecheck, prod build, etc.) */
   quality_gates?: Record<string, QualityGateConfig>;
+  /** Version-string propagation performed after a UAT batch merge. */
+  version_sync?: VersionSyncConfig;
   /** Release components and rollout checks for coordinated post-merge release. */
   release?: ReleaseConfig;
   /**
@@ -267,6 +455,10 @@ interface ProjectRenamePlan {
 // event loop stalls.
 let _projectsCache: { mtime: number; config: ProjectsConfig } | null = null;
 
+export function invalidateProjectsConfigCache(): void {
+  _projectsCache = null;
+}
+
 export function loadProjectsConfigSync(): ProjectsConfig {
   if (!existsSync(PROJECTS_CONFIG_FILE)) {
     return { projects: {} };
@@ -287,17 +479,64 @@ export function loadProjectsConfigSync(): ProjectsConfig {
   }
 }
 
+interface ProjectsConfigMutation<T> {
+  config: ProjectsConfig;
+  result: T;
+  changed: boolean;
+}
+
+function parseProjectsConfigForUpdate(content: string): ProjectsConfig {
+  try {
+    const config = parseYaml(content) as ProjectsConfig | null;
+    if (!config || typeof config !== 'object' || !config.projects || typeof config.projects !== 'object') {
+      throw new Error('projects.yaml must contain a projects mapping');
+    }
+    return config;
+  } catch (cause) {
+    throw new ConfigParseError({
+      path: PROJECTS_CONFIG_FILE,
+      message: cause instanceof Error ? cause.message : String(cause),
+      cause,
+    });
+  }
+}
+
+function updateProjectsConfigSync<T>(
+  transform: (config: ProjectsConfig) => ProjectsConfigMutation<T>,
+): T {
+  const result = updateProjectsConfigTextSync(PROJECTS_CONFIG_FILE, 'projects: {}\n', content => {
+    const mutation = transform(parseProjectsConfigForUpdate(content));
+    return {
+      content: mutation.changed ? stringifyYaml(mutation.config, { indent: 2 }) : content,
+      result: mutation.result,
+    };
+  });
+  _projectsCache = null;
+  return result;
+}
+
+async function updateProjectsConfigAsync<T>(
+  transform: (config: ProjectsConfig) => ProjectsConfigMutation<T>,
+): Promise<T> {
+  const result = await updateProjectsConfigText(PROJECTS_CONFIG_FILE, 'projects: {}\n', content => {
+    const mutation = transform(parseProjectsConfigForUpdate(content));
+    return {
+      content: mutation.changed ? stringifyYaml(mutation.config, { indent: 2 }) : content,
+      result: mutation.result,
+    };
+  });
+  _projectsCache = null;
+  return result;
+}
+
 /**
  * Save projects configuration
  */
 export function saveProjectsConfigSync(config: ProjectsConfig): void {
-  const dir = OVERDECK_HOME;
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
   const yaml = stringifyYaml(config, { indent: 2 });
-  writeFileSync(PROJECTS_CONFIG_FILE, yaml, 'utf-8');
+  withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
+    atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, yaml);
+  });
   _projectsCache = null;
 }
 
@@ -316,9 +555,10 @@ export function listProjectsSync(): Array<{ key: string; config: ProjectConfig }
  * Add or update a project in the registry
  */
 export function registerProjectSync(key: string, projectConfig: ProjectConfig): void {
-  const config = loadProjectsConfigSync();
-  config.projects[key] = projectConfig;
-  saveProjectsConfigSync(config);
+  updateProjectsConfigSync(config => {
+    config.projects[key] = projectConfig;
+    return { config, result: undefined, changed: true };
+  });
 }
 
 /**
@@ -326,13 +566,26 @@ export function registerProjectSync(key: string, projectConfig: ProjectConfig): 
  * removes the field so the project falls through to the global require-UAT
  * setting. Preserves all other project config.
  */
-export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
-  const config = getProjectSync(key);
-  if (!config) throw new Error(`Unknown project: ${key}`);
-  const updated: ProjectConfig = { ...config };
+function setProjectAutoMergeDefaultMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: 'auto' | 'hold' | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
   if (value === null) delete updated.auto_merge_default;
   else updated.auto_merge_default = value;
-  registerProjectSync(key, updated);
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
+}
+
+export function setProjectAutoMergeDefaultSync(key: string, value: 'auto' | 'hold' | null): void {
+  updateProjectsConfigSync(config => setProjectAutoMergeDefaultMutation(config, key, value));
+}
+
+export async function setProjectAutoMergeDefault(key: string, value: 'auto' | 'hold' | null): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectAutoMergeDefaultMutation(config, key, value));
 }
 
 function prepareProjectRename(
@@ -382,45 +635,74 @@ function prepareProjectRename(
 }
 
 export function renameProjectSync(key: string, newName: string): void {
-  const plan = prepareProjectRename(loadProjectsConfigSync(), key, newName);
-  if (plan instanceof ProjectRenameError) throw plan;
-  if (plan.changed) saveProjectsConfigSync(plan.config);
+  updateProjectsConfigSync(config => {
+    const plan = prepareProjectRename(config, key, newName);
+    if (plan instanceof ProjectRenameError) throw plan;
+    return { config: plan.config, result: undefined, changed: plan.changed };
+  });
+}
+
+function setProjectSwarmPolicyMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: Omit<SwarmConfig, 'hotspots'> | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
+  const hotspots = project.swarm?.hotspots;
+  if (value === null && !hotspots?.length) delete updated.swarm;
+  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
 }
 
 export function setProjectSwarmPolicySync(key: string, value: Omit<SwarmConfig, 'hotspots'> | null): void {
-  const config = getProjectSync(key);
-  if (!config) throw new Error(`Unknown project: ${key}`);
-  const updated: ProjectConfig = { ...config };
-  const hotspots = config.swarm?.hotspots;
-  if (value === null && !hotspots?.length) delete updated.swarm;
-  else updated.swarm = { ...(hotspots?.length ? { hotspots } : {}), ...(value ?? {}) };
-  registerProjectSync(key, updated);
+  updateProjectsConfigSync(config => setProjectSwarmPolicyMutation(config, key, value));
+}
+
+export async function setProjectSwarmPolicy(
+  key: string,
+  value: Omit<SwarmConfig, 'hotspots'> | null,
+): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectSwarmPolicyMutation(config, key, value));
 }
 
 /**
  * PAN-1696: Set or clear the per-project merge-train override.
  * Pass 'enabled' or 'disabled' to override the global flag, or null to use the global setting.
  */
-export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
-  const config = getProjectSync(key);
-  if (!config) throw new Error(`Unknown project: ${key}`);
-  const updated: ProjectConfig = { ...config };
+function setProjectMergeTrainMutation(
+  config: ProjectsConfig,
+  key: string,
+  value: 'enabled' | 'disabled' | null,
+): ProjectsConfigMutation<void> {
+  const project = config.projects[key];
+  if (!project) throw new Error(`Unknown project: ${key}`);
+  const updated: ProjectConfig = { ...project };
   if (value === null) delete updated.merge_train;
   else updated.merge_train = value;
-  registerProjectSync(key, updated);
+  config.projects[key] = updated;
+  return { config, result: undefined, changed: true };
+}
+
+export function setProjectMergeTrainSync(key: string, value: 'enabled' | 'disabled' | null): void {
+  updateProjectsConfigSync(config => setProjectMergeTrainMutation(config, key, value));
+}
+
+export async function setProjectMergeTrain(key: string, value: 'enabled' | 'disabled' | null): Promise<void> {
+  await updateProjectsConfigAsync(config => setProjectMergeTrainMutation(config, key, value));
 }
 
 /**
  * Remove a project from the registry
  */
 export function unregisterProjectSync(key: string): boolean {
-  const config = loadProjectsConfigSync();
-  if (config.projects[key]) {
+  return updateProjectsConfigSync(config => {
+    if (!config.projects[key]) return { config, result: false, changed: false };
     delete config.projects[key];
-    saveProjectsConfigSync(config);
-    return true;
-  }
-  return false;
+    return { config, result: true, changed: true };
+  });
 }
 
 /**
@@ -679,12 +961,11 @@ projects:
   #   linear_team: PAN
 `;
 
-  const dir = OVERDECK_HOME;
-  if (!existsSync(dir)) {
-    mkdirSync(dir, { recursive: true });
-  }
-
-  writeFileSync(PROJECTS_CONFIG_FILE, exampleYaml, 'utf-8');
+  withProjectsConfigWriteSync(PROJECTS_CONFIG_FILE, () => {
+    if (!existsSync(PROJECTS_CONFIG_FILE)) {
+      atomicWriteProjectsConfigSync(PROJECTS_CONFIG_FILE, exampleYaml);
+    }
+  });
   console.log(`Created example projects config at ${PROJECTS_CONFIG_FILE}`);
 }
 
@@ -816,12 +1097,10 @@ export const loadProjectsConfig = (): Effect.Effect<ProjectsConfig, ConfigParseE
 export const saveProjectsConfig = (config: ProjectsConfig): Effect.Effect<void, FsError> =>
   Effect.tryPromise({
     try: async () => {
-      const dir = OVERDECK_HOME;
-      if (!existsSync(dir)) {
-        await mkdir(dir, { recursive: true });
-      }
       const out = stringifyYaml(config, { indent: 2 });
-      await writeFile(PROJECTS_CONFIG_FILE, out, 'utf-8');
+      await withProjectsConfigWrite(PROJECTS_CONFIG_FILE, () => (
+        atomicWriteProjectsConfig(PROJECTS_CONFIG_FILE, out)
+      ));
       _projectsCache = null;
     },
     catch: (cause) =>
@@ -858,36 +1137,46 @@ export const renameProject = (
 ): Effect.Effect<
   { key: string; name: string },
   ProjectRenameError | ConfigParseError | FsError
-> =>
-  Effect.gen(function* () {
-    const plan = prepareProjectRename(
-      yield* loadProjectsConfig(),
-      projectIdentifier,
-      newName,
-    );
-    if (plan instanceof ProjectRenameError) return yield* Effect.fail(plan);
-    if (plan.changed) yield* saveProjectsConfig(plan.config);
-    return { key: plan.key, name: plan.name };
-  });
+> => Effect.tryPromise({
+  try: () => updateProjectsConfigAsync(config => {
+    const plan = prepareProjectRename(config, projectIdentifier, newName);
+    if (plan instanceof ProjectRenameError) throw plan;
+    return {
+      config: plan.config,
+      result: { key: plan.key, name: plan.name },
+      changed: plan.changed,
+    };
+  }),
+  catch: cause => {
+    if (cause instanceof ProjectRenameError || cause instanceof ConfigParseError) return cause;
+    return new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'renameProject', cause });
+  },
+});
 
 /** Effect variant of {@link registerProjectSync}. */
 export const registerProject = (key: string, projectConfig: ProjectConfig): Effect.Effect<void, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.flatMap((config) => {
+  Effect.tryPromise({
+    try: () => updateProjectsConfigAsync(config => {
       config.projects[key] = projectConfig;
-      return saveProjectsConfig(config);
+      return { config, result: undefined, changed: true };
     }),
-  );
+    catch: cause => cause instanceof ConfigParseError
+      ? cause
+      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'registerProject', cause }),
+  });
 
 /** Effect variant of {@link unregisterProjectSync}. */
 export const unregisterProject = (key: string): Effect.Effect<boolean, ConfigParseError | FsError> =>
-  loadProjectsConfig().pipe(
-    Effect.flatMap((config) => {
-      if (!config.projects[key]) return Effect.succeed(false);
+  Effect.tryPromise({
+    try: () => updateProjectsConfigAsync(config => {
+      if (!config.projects[key]) return { config, result: false, changed: false };
       delete config.projects[key];
-      return saveProjectsConfig(config).pipe(Effect.as(true));
+      return { config, result: true, changed: true };
     }),
-  );
+    catch: cause => cause instanceof ConfigParseError
+      ? cause
+      : new FsError({ path: PROJECTS_CONFIG_FILE, operation: 'unregisterProject', cause }),
+  });
 
 /** Effect variant of {@link findProjectByTeamSync}. */
 export const findProjectByTeam = (teamPrefix: string): Effect.Effect<ProjectConfig | null, ConfigParseError | FsError> =>

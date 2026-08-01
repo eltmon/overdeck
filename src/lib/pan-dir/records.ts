@@ -86,7 +86,7 @@ function projectContinue(raw: ContinueFile | null): Pick<PanIssueRecord, 'decisi
 
 // ─── Pipeline projection ──────────────────────────────────────────────────────
 
-function projectPipeline(
+export function projectPipeline(
   issueId: string,
   status: ReviewStatus | null,
   existing?: PanIssuePipelineRecord,
@@ -103,6 +103,7 @@ function projectPipeline(
     mergeStatus: status?.mergeStatus,
     mergeStep: status?.mergeStep,
     releaseStatus: status?.releaseStatus ?? 'pending',
+    ship: existing?.ship,
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,

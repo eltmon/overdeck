@@ -15,10 +15,14 @@ import {
   readIssueRecord,
   resolveProjectForIssue,
   type PanIssuePipelineRecord,
+  type PanIssueShipRecord,
 } from '../pan-dir/record.js';
+import type { ProjectConfig } from '../projects.js';
 import { getAutoCloseOutCanonicalState } from '../cloister/deacon-canonical-state.js';
+import { aggregateGenerationShipStatus, loadShipRecords } from '../cloister/ship-status.js';
 import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { fetchCommitCheckRuns, fetchIssuePullRequest } from '../overdeck/pull-requests.js';
+import { listUatGenerationsSync, type UatGeneration } from '../overdeck/merge-sync.js';
 import { getForgeAdapter } from '../forge.js';
 import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
@@ -154,6 +158,30 @@ const defaultMainVerifyRowDeps: MainVerifyRowDeps = {
   },
 };
 
+interface ShipRowDeps {
+  readProject: (ctx: LifecycleContext) => ProjectConfig | null;
+  readPipeline: (ctx: LifecycleContext) => Promise<PanIssuePipelineRecord | null>;
+  findPromotedBatch: (ctx: LifecycleContext) => UatGeneration | null;
+  readBatchShip: (project: ProjectConfig, generation: UatGeneration) => Promise<PanIssueShipRecord | null>;
+}
+
+const defaultShipRowDeps: ShipRowDeps = {
+  readProject: ctx => resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath),
+  readPipeline: async ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    return (await readIssueRecord(project, ctx.issueId))?.pipeline ?? null;
+  },
+  findPromotedBatch: ctx => {
+    const project = resolveProjectForIssue(ctx.issueId) ?? getProjectConfigFromWorkspacePath(ctx.projectPath);
+    return listUatGenerationsSync({ projectRoot: resolve(project.path), statuses: ['promoted'] })
+      .find(generation => generation.members.some(member => member.issueId.toUpperCase() === ctx.issueId.toUpperCase())) ?? null;
+  },
+  readBatchShip: async (project, generation) => aggregateGenerationShipStatus(
+    generation,
+    await loadShipRecords(project, [generation]),
+  ),
+};
+
 interface DeployRowDeps {
   dashboardUrl: () => string;
   readJson: (url: string) => Promise<Record<string, unknown>>;
@@ -173,6 +201,7 @@ export interface EvaluateDodGateDeps {
   merged: (ctx: LifecycleContext) => MergedDodRowResult | Promise<MergedDodRowResult>;
   postMerge: (ctx: LifecycleContext, merged?: MergedDodRowResult) => DodRowResult | Promise<DodRowResult>;
   mainVerify: (ctx: LifecycleContext, mergeCommit?: string) => DodRowResult | Promise<DodRowResult>;
+  ship: (ctx: LifecycleContext) => DodRowResult | Promise<DodRowResult>;
   deploy: (ctx: LifecycleContext, merge: {
     mergedAt?: string;
     mergeCommit?: string;
@@ -190,6 +219,7 @@ const defaultEvaluateDodGateDeps: EvaluateDodGateDeps = {
   merged: checkMergedRow,
   postMerge: checkPostMergeRow,
   mainVerify: checkMainVerifyRow,
+  ship: checkShipRow,
   deploy: checkDeployRow,
   trackerClosed: isTrackerIssueClosed,
   now: () => new Date().toISOString(),
@@ -635,6 +665,58 @@ export async function checkMainVerifyRow(
   }
 }
 
+export async function checkShipRow(
+  ctx: LifecycleContext,
+  deps: ShipRowDeps = defaultShipRowDeps,
+): Promise<DodRowResult> {
+  const project = deps.readProject(ctx);
+  if (!project?.version_sync) {
+    return result('ship', 'skip', 'project declares no version_sync; ship step not applicable');
+  }
+
+  const promotedBatch = deps.findPromotedBatch(ctx);
+  const ship = promotedBatch
+    ? await deps.readBatchShip(project, promotedBatch)
+    : (await deps.readPipeline(ctx))?.ship;
+  if (!ship) {
+    if (promotedBatch) {
+      return result(
+        'ship',
+        'miss',
+        `batch ${promotedBatch.name} includes this issue but no durable ship settlement was recorded`,
+      );
+    }
+    return result('ship', 'skip', 'merged outside a batch; ship is batch-scoped');
+  }
+  if (ship.status === 'passed') {
+    return result(
+      'ship',
+      'pass',
+      `version ${ship.version ?? 'unknown'} shipped for batch ${ship.batch}; ${ship.paths?.length ?? 0} path(s) verified`,
+    );
+  }
+  if (ship.status === 'pending') {
+    return result(
+      'ship',
+      'miss',
+      `batch ${ship.batch} merged but no version was shipped — use the Ship version action on the batch card for ${ship.batch}`,
+    );
+  }
+  if (ship.status === 'partial') {
+    const failing = ship.paths?.filter(path => !path.ok).map(path => path.path) ?? [];
+    return result(
+      'ship',
+      'miss',
+      `batch ${ship.batch} partially propagated version ${ship.version ?? 'unknown'}; failing paths: ${failing.join(', ') || 'unknown'}`,
+    );
+  }
+  return result(
+    'ship',
+    'miss',
+    `batch ${ship.batch} version ship failed (${ship.errorCode ?? 'unknown-failure'}): ${ship.error ?? ship.reason ?? 'inspect the local dashboard log'}`,
+  );
+}
+
 export async function checkDeployRow(
   ctx: LifecycleContext,
   merge: {
@@ -749,11 +831,12 @@ export async function evaluateDodGate(
     landedWork: merged.status === 'pass',
     mainVerifyStatus: mainVerify.status,
   };
-  const [review, tests, verification, postMerge, deploy] = await Promise.all([
+  const [review, tests, verification, postMerge, ship, deploy] = await Promise.all([
     deps.review(ctx.issueId, settlement),
     deps.tests(ctx.issueId, settlement),
     deps.verification(ctx.issueId, settlement),
     deps.postMerge(ctx, merged),
+    deps.ship(ctx),
     deps.deploy(ctx, {
       mergedAt: merged.mergedAt,
       mergeCommit: merged.mergeCommit,
@@ -761,7 +844,7 @@ export async function evaluateDodGate(
       mainVerifyRowStatus: mainVerify.status,
     }),
   ]);
-  const rows = [review, tests, verification, merged, postMerge, mainVerify, deploy];
+  const rows = [review, tests, verification, merged, postMerge, mainVerify, ship, deploy];
   for (const row of rows) {
     if (row.status === 'miss' && acceptedRows.has(row.id)) {
       row.acceptedBy = { flag: acceptFlagFor(rowDefinition(row.id)), by, at: deps.now() };

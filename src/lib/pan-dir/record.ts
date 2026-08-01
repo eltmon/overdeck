@@ -146,6 +146,19 @@ export interface PanIssueRecoveryTrip {
   open: boolean;
   needsYouEmittedAt?: string;
 }
+
+export interface PanIssueShipRecord {
+  status: 'pending' | 'passed' | 'partial' | 'failed';
+  version?: string;
+  batch: string;
+  paths?: Array<{ path: string; ok: boolean; detail: string }>;
+  errorCode?: import('../cloister/version-ship.js').ShipFailureCode;
+  /** Redacted operator-safe summary only; never raw command or Git output. */
+  error?: string;
+  reason?: string;
+  at: string;
+}
+
 export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   issueId: string;
   reviewStatus: string;
@@ -157,6 +170,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   mergeStatus?: string;
   mergeStep?: string;
   releaseStatus?: string;
+  ship?: PanIssueShipRecord;
   readyForMerge: boolean;
   reviewNotes?: string;
   testNotes?: string;

@@ -22,7 +22,26 @@ const mergeOrderMocks = vi.hoisted(() => ({
 
 const mergeSyncMocks = vi.hoisted(() => ({
   isMergeTrainEnabledForProject: vi.fn(() => true),
+  getUatGenerationSync: vi.fn(() => ({
+    name: 'uat/pan-otter-0610',
+    projectRoot: '/repos/overdeck',
+    status: 'promoted',
+  })),
 }));
+
+const shipRecordMocks = vi.hoisted(() => {
+  class ShipPromotedBatchError extends Error {
+    constructor(readonly reason: string, message: string) {
+      super(message);
+    }
+  }
+  return {
+    ShipPromotedBatchError,
+    shipPromotedBatch: vi.fn(async () => ({
+      status: 'passed', version: '48.8.0', batch: 'uat/pan-otter-0610', paths: [], at: '2026-07-31T00:00:00Z',
+    })),
+  };
+});
 
 const uatTrainMocks = vi.hoisted(() => ({
   getUatGenerationsPayload: vi.fn(async () => []),
@@ -74,6 +93,7 @@ async function realShipMergeBatch(
 vi.mock('../../../../lib/projects.js', () => projectsMocks);
 vi.mock('../../../../lib/flywheel-merge-order.js', () => mergeOrderMocks);
 vi.mock('../../../../lib/overdeck/merge-sync.js', () => mergeSyncMocks);
+vi.mock('../../../../lib/cloister/ship-record.js', () => shipRecordMocks);
 vi.mock('../../services/uat-train.js', () => uatTrainMocks);
 vi.mock('../../../../lib/cloister/merge-batch.js', () => mergeBatchMocks);
 vi.mock('../specialists.js', () => ({ firePostMergeLifecycle: vi.fn(() => true) }));
@@ -242,6 +262,58 @@ describe('PAN-1696 merge-train-routes', () => {
       const [name, fire] = uatTrainMocks.postUatGenerationPromotePayload.mock.calls[0] as [string, unknown];
       expect(name).toBe('uat/pan-otter-0610');
       expect(typeof fire).toBe('function');
+    });
+
+    it('forwards a valid shipVersion and rejects a malformed one without promoting', async () => {
+      const valid = await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/promote',
+        authedInit({ shipVersion: '48.8.0' }),
+      );
+      expect(valid.status).toBe(200);
+      expect(uatTrainMocks.postUatGenerationPromotePayload).toHaveBeenCalledWith(
+        'uat/pan-otter-0610',
+        expect.any(Function),
+        '48.8.0',
+      );
+
+      uatTrainMocks.postUatGenerationPromotePayload.mockClear();
+      const invalid = await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/promote',
+        authedInit({ shipVersion: '48.8' }),
+      );
+      expect(invalid).toEqual({ status: 400, body: { error: 'shipVersion must look like 48.8.0' } });
+      expect(uatTrainMocks.postUatGenerationPromotePayload).not.toHaveBeenCalled();
+    });
+
+    it('ships a deferred version for a promoted batch', async () => {
+      const result = await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/ship',
+        authedInit({ version: '48.8.0' }),
+      );
+      expect(result.status).toBe(200);
+      expect(shipRecordMocks.shipPromotedBatch).toHaveBeenCalledWith({
+        generationName: 'uat/pan-otter-0610',
+        projectRoot: '/repos/overdeck',
+        version: '48.8.0',
+      });
+    });
+
+    it('maps deferred ship wrong-status and missing-config failures', async () => {
+      shipRecordMocks.shipPromotedBatch.mockRejectedValueOnce(
+        new shipRecordMocks.ShipPromotedBatchError('wrong-status', 'batch is ready'),
+      );
+      expect((await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/ship',
+        authedInit({ version: '48.8.0' }),
+      )).status).toBe(409);
+
+      shipRecordMocks.shipPromotedBatch.mockRejectedValueOnce(
+        new shipRecordMocks.ShipPromotedBatchError('not-configured', 'no version_sync'),
+      );
+      expect((await requestMergeTrainRoute(
+        '/api/merge-train/generations/pan-otter-0610/ship',
+        authedInit({ version: '48.8.0' }),
+      )).status).toBe(422);
     });
 
     it('maps a not-found promote to 404 and a conflict to 409', async () => {
