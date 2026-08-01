@@ -321,23 +321,24 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T15:14:42.253Z",
+  "updated": "2026-08-01T15:14:44.794Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "skipped",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T15:14:30.188Z",
-    "reviewNotes": "Review mode: none — AI review skipped by configuration; verification gate still enforced",
+    "updatedAt": "2026-08-01T13:33:27.982Z",
+    "reviewNotes": "Agent re-review request (2/25): Operator explicitly accepted the residual history exposure and approved the paraphrase-only MIN evidence substitute — see docs/audits/pan-3367/worklist.md 'History exposure — accepted risk' and 'Confidentiality-safe evidence contract' sections. Review mode set to none per that authorization.",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
+    "reviewedAtCommit": "e00d4764d2b444ca6b294601025b51e4cd4f1a56",
     "lastVerifiedCommit": "8fc98f72936d058da5c07cf7f77032d915a4d507",
-    "reviewSpawnedAt": "2026-08-01T15:14:21.559Z",
+    "reviewSpawnedAt": "2026-08-01T13:10:50.538Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -518,20 +519,12 @@
             "cacheWrite": 0
           }
         },
-        "test": {
-          "anthropic/claude-sonnet-5": {
-            "input": 4929,
-            "output": 12668,
-            "cacheRead": 4889098,
-            "cacheWrite": 322661
-          }
-        },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1332,
-            "output": 419953,
-            "cacheRead": 340692546,
-            "cacheWrite": 8693317
+            "input": 1238,
+            "output": 397170,
+            "cacheRead": 331063540,
+            "cacheWrite": 8278620
           }
         }
       },
@@ -543,15 +536,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6261,
-          "output": 432621,
-          "cacheRead": 345581644,
-          "cacheWrite": 9015978
+          "input": 1238,
+          "output": 397170,
+          "cacheRead": 331063540,
+          "cacheWrite": 8278620
         }
       },
       "costAtCloseOut": {
-        "usd": 243.159423,
-        "pricingAsOf": "2026-08-01T15:14:42.242Z"
+        "usd": 238.047842,
+        "pricingAsOf": "2026-08-01T13:33:29.612Z"
       }
     },
     "merges": [
