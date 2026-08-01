@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T22:24:14.558Z",
+  "updated": "2026-08-01T22:26:38.419Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "hook-inventory-contract": {
+        "writerId": "deacon-swarm",
+        "agentId": "conv-20260801-2782",
+        "pid": 3321215,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:26:38.418Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -76,6 +84,6 @@
     }
   },
   "statusOverrides": {
-    "hook-inventory-contract": "pending"
+    "hook-inventory-contract": "running"
   }
 }
