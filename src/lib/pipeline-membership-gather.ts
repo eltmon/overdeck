@@ -310,21 +310,40 @@ const defaultDeps: PipelineMembershipGatherDeps = {
   },
   batchHasTerminalCloseOutRecords: async (project, issueIds) => {
     const result = new Map<string, boolean>();
-    // Read records with bounded concurrency to avoid event-loop starvation
+    // Resolve state home once per project, then read records with bounded concurrency
+    const { resolveStateReadHomeSync } = await import('./state-read-home.js');
+    const { join } = await import('path');
+    const { readFile } = await import('fs/promises');
+    const stateHome = resolveStateReadHomeSync(project);
+    const recordsDir = stateHome.migrated
+      ? join(stateHome.root, 'records')
+      : null;
+
     const batchSize = 10;
     for (let i = 0; i < issueIds.length; i += batchSize) {
       const batch = issueIds.slice(i, i + batchSize);
-      const batchResults = await Promise.allSettled(
+      await Promise.allSettled(
         batch.map(async (id) => {
           try {
-            const record = await readIssueRecord(project, id);
-            result.set(id, record?.pipeline.closedOut === true);
+            // If migrated, read directly from state home. Otherwise fall back to readIssueRecord.
+            let record: { pipeline?: { closedOut?: boolean } } | null = null;
+            if (recordsDir) {
+              const path = join(recordsDir, `${id.toLowerCase()}.json`);
+              try {
+                const raw = await readFile(path, 'utf-8');
+                record = JSON.parse(raw);
+              } catch {
+                record = null;
+              }
+            } else {
+              record = await readIssueRecord(project, id);
+            }
+            result.set(id, record?.pipeline?.closedOut === true);
           } catch {
             result.set(id, false);
           }
         }),
       );
-      // Continue regardless of individual failures — populate result from settled promises
     }
     return result;
   },

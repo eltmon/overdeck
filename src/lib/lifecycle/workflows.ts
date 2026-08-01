@@ -40,7 +40,7 @@ import {
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
-import { closeResidueConventionPrs } from './residue.js';
+import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
@@ -212,10 +212,10 @@ export function closeOut(
     // PAN-3396: a residue disposition also skips the gate and closes stale PRs/MRs.
     const abandon = opts.abandonDisposition;
     const residue = opts.residueDisposition;
-    const dodGate: DodGateResult = abandon
+    let dodGate: DodGateResult = abandon
       ? buildAbandonedDodGate(abandon.reason, abandon.by)
       : residue
-      ? buildResidueDodGate(residue.reason, residue.by, ['Close stale convention PRs/MRs with no merge claim'])
+      ? buildResidueDodGate(residue.reason, residue.by, ['Closing stale convention PRs/MRs with no merge claim'])
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
@@ -248,20 +248,47 @@ export function closeOut(
     }
 
     // 1.5. Close stale convention PRs/MRs for residue disposition (PAN-3396)
+    // Collect evidence from actual cleanup before updating the gate.
+    let residueEvidence: string[] = [];
     if (residue) {
       const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
-      const githubRepos = prRepos?.filter(r => r.forge === 'github').map(r => r.repoPath) ?? [];
-      const gitlabRepos = prRepos?.filter(r => r.forge === 'gitlab').map(r => r.repoPath) ?? [];
-      const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
-        issueId: ctx.issueId,
-        projectPath: ctx.projectPath,
-        github: githubRepos[0],
-        gitlab: gitlabRepos.length > 0 ? { projects: gitlabRepos } : undefined,
-      }));
-      allSteps.push(residueStep);
-      if (!residueStep.success && !residueStep.skipped) {
-        allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
-        return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+      if (prRepos && prRepos.length > 0) {
+        // Resolve forge coordinates from local repo paths
+        const githubPaths = prRepos.filter(r => r.forge === 'github').map(r => r.repoPath);
+        const gitlabPaths = prRepos.filter(r => r.forge === 'gitlab').map(r => r.repoPath);
+
+        const resolveCoords = yield* Effect.promise(async () => {
+          let githubRepo: string | undefined;
+          let gitlabRepos: string[] = [];
+
+          for (const repoPath of githubPaths) {
+            const coords = await extractGitHubCoordinates(repoPath);
+            if (coords) {
+              githubRepo = coords;
+              break;
+            }
+          }
+
+          for (const repoPath of gitlabPaths) {
+            const proj = await extractGitLabProject(repoPath);
+            if (proj) gitlabRepos.push(proj);
+          }
+
+          return { githubRepo, gitlabRepos };
+        });
+
+        const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
+          issueId: ctx.issueId,
+          projectPath: ctx.projectPath,
+          github: resolveCoords.githubRepo,
+          gitlab: resolveCoords.gitlabRepos.length > 0 ? { projects: resolveCoords.gitlabRepos } : undefined,
+        }));
+        allSteps.push(residueStep);
+        if (!residueStep.success && !residueStep.skipped) {
+          allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
+          return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
+        }
+        residueEvidence = residueStep.details ?? [];
       }
     }
 
@@ -328,6 +355,15 @@ export function closeOut(
     // 8. Mark durable pipeline terminal before clearing the DB cache.
     const markTerminal = yield* markPipelineClosedOutStep(ctx, residue);
     allSteps.push(markTerminal);
+
+    // Update gate with verified residue evidence before recording if a residue row exists
+    if (residue && residueEvidence.length > 0) {
+      const residueRow = dodGate.rows.find(row => (row.id as string) === 'residue');
+      if (residueRow) {
+        residueRow.observed = residueEvidence.join('; ');
+      }
+    }
+
     const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon, residue);
     allSteps.push(recordDodGate);
     if (!recordDodGate.success) {

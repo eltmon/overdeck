@@ -9,6 +9,52 @@ import type { StepResult } from './types.js';
 
 const execFileAsync = promisify(execFile);
 
+/**
+ * Extract GitHub owner/repo from a repository checkout path.
+ * Reads the git remote URL to resolve forge coordinates.
+ */
+export async function extractGitHubCoordinates(repoPath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C', repoPath,
+      'remote', 'get-url', 'origin',
+    ], { encoding: 'utf-8', timeout: 5_000 });
+
+    const remoteUrl = stdout.trim();
+    const match = remoteUrl.match(/github\.com[:/]([^/]+)\/(.+?)(\.git)?$/);
+    if (match) {
+      const owner = match[1];
+      const repo = match[2];
+      return `${owner}/${repo}`;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract GitLab project path from a repository checkout path.
+ * Reads the git remote URL to resolve forge coordinates.
+ */
+export async function extractGitLabProject(repoPath: string): Promise<string | null> {
+  try {
+    const { stdout } = await execFileAsync('git', [
+      '-C', repoPath,
+      'remote', 'get-url', 'origin',
+    ], { encoding: 'utf-8', timeout: 5_000 });
+
+    const remoteUrl = stdout.trim();
+    const match = remoteUrl.match(/gitlab\.com[:/](.+?)(\.git)?$/);
+    if (match) {
+      return match[1];
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export interface CloseResidueConventionPrsContext {
   issueId: string;
   projectPath: string;
@@ -20,11 +66,11 @@ export async function closeResidueConventionPrs(
   ctx: CloseResidueConventionPrsContext,
 ): Promise<StepResult> {
   const evidence: string[] = [];
-  const errors: string[] = [];
+  const fatalErrors: string[] = [];
   const issueIdLower = ctx.issueId.toLowerCase();
   const possibleHeads = [`feature/${issueIdLower}`, `strike/${issueIdLower}`];
 
-  // GitHub PR close
+  // GitHub PR close — resolve forge coordinates and close all found
   if (ctx.github) {
     for (const head of possibleHeads) {
       try {
@@ -37,22 +83,29 @@ export async function closeResidueConventionPrs(
         ], { encoding: 'utf-8', timeout: 15_000 });
 
         const prs = JSON.parse(stdout) as Array<{ number: number }>;
+        if (prs.length === 0) {
+          evidence.push(`No open GitHub PRs found on ${head}`);
+        }
         for (const pr of prs) {
-          await execFileAsync('gh', [
-            'pr', 'close',
-            `${pr.number}`,
-            '--repo', ctx.github,
-            '--comment', 'Closing stale residue PR with no merge claim — issue closed out without merge landing.',
-          ], { encoding: 'utf-8', timeout: 15_000 });
-          evidence.push(`Closed GitHub PR #${pr.number} on ${head}`);
+          try {
+            await execFileAsync('gh', [
+              'pr', 'close',
+              `${pr.number}`,
+              '--repo', ctx.github,
+              '--comment', 'Closing stale residue PR with no merge claim — issue closed out without merge landing.',
+            ], { encoding: 'utf-8', timeout: 15_000 });
+            evidence.push(`Closed GitHub PR #${pr.number} on ${head}`);
+          } catch (err) {
+            fatalErrors.push(`GitHub PR #${pr.number} close failed: ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
       } catch (err) {
-        errors.push(`GitHub PR list failed for ${head}: ${err instanceof Error ? err.message : String(err)}`);
+        fatalErrors.push(`GitHub PR lookup for ${head} failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
 
-  // GitLab MR close
+  // GitLab MR close — resolve forge coordinates and close all found
   if (ctx.gitlab?.projects) {
     for (const glProject of ctx.gitlab.projects) {
       for (const head of possibleHeads) {
@@ -66,36 +119,45 @@ export async function closeResidueConventionPrs(
           ], { encoding: 'utf-8', timeout: 15_000 });
 
           const mrs = JSON.parse(stdout) as Array<{ iid: number }>;
+          if (mrs.length === 0) {
+            evidence.push(`No open GitLab MRs found on ${glProject}/${head}`);
+          }
           for (const mr of mrs) {
-            await execFileAsync('glab', [
-              'mr', 'close',
-              '--repo', glProject,
-              String(mr.iid),
-            ], { encoding: 'utf-8', timeout: 15_000 });
+            try {
+              await execFileAsync('glab', [
+                'mr', 'close',
+                '--repo', glProject,
+                String(mr.iid),
+              ], { encoding: 'utf-8', timeout: 15_000 });
 
-            // Add a note with honest comment
-            await execFileAsync('glab', [
-              'mr', 'note',
-              '--repo', glProject,
-              String(mr.iid),
-              '--message', 'Closing stale residue MR with no merge claim — issue closed out without merge landing.',
-            ], { encoding: 'utf-8', timeout: 15_000 });
+              // Add a note with honest comment
+              await execFileAsync('glab', [
+                'mr', 'note',
+                '--repo', glProject,
+                String(mr.iid),
+                '--message', 'Closing stale residue MR with no merge claim — issue closed out without merge landing.',
+              ], { encoding: 'utf-8', timeout: 15_000 });
 
-            evidence.push(`Closed GitLab MR !${mr.iid} on ${head}`);
+              evidence.push(`Closed GitLab MR !${mr.iid} on ${head}`);
+            } catch (err) {
+              fatalErrors.push(`GitLab MR !${mr.iid} close failed: ${err instanceof Error ? err.message : String(err)}`);
+            }
           }
         } catch (err) {
-          errors.push(`GitLab MR list failed for ${glProject}/${head}: ${err instanceof Error ? err.message : String(err)}`);
+          fatalErrors.push(`GitLab MR lookup for ${glProject}/${head} failed: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
   }
 
-  if (errors.length > 0 && evidence.length === 0) {
+  // Fail on any repository/operation errors — even if some PRs/MRs closed
+  if (fatalErrors.length > 0) {
     return {
       step: 'Close stale convention PRs/MRs',
       success: false,
       skipped: false,
-      error: `Failed to list/close convention PRs/MRs: ${errors.join('; ')}`,
+      error: `Failed to list/close convention PRs/MRs: ${fatalErrors.join('; ')}`,
+      details: evidence.length > 0 ? [`Partial progress before failure: ${evidence.join('; ')}`] : undefined,
     };
   }
 
@@ -104,7 +166,7 @@ export async function closeResidueConventionPrs(
       step: 'Close stale convention PRs/MRs',
       success: true,
       skipped: true,
-      details: ['No open convention PRs/MRs found'],
+      details: ['No open convention PRs/MRs found on any configured repository'],
     };
   }
 
@@ -112,6 +174,6 @@ export async function closeResidueConventionPrs(
     step: 'Close stale convention PRs/MRs',
     success: true,
     skipped: false,
-    details: [...evidence, ...(errors.length > 0 ? [`Warnings: ${errors.join('; ')}`] : [])],
+    details: evidence,
   };
 }
