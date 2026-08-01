@@ -63,7 +63,7 @@ import { killCommand } from './commands/kill.js';
 import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
-import { untroubledCommand } from './commands/untroubled.js';
+import { untroubledCommand } from './commands/untroubled.js'; import { registerUnstickCommand } from './commands/unstick.js';
 import { forkCommand } from './commands/fork.js';
 import { handoffCommand } from './commands/handoff.js';
 import { unarchiveConversationCommand } from './commands/unarchive-conversation.js';
@@ -417,7 +417,7 @@ program
   .command('untroubled <id>')
   .description('Clear an agent troubled gate without spawning it')
   .action(untroubledCommand);
-
+registerUnstickCommand(program);
 program
   .command('fork [conv]')
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')

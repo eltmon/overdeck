@@ -7,7 +7,7 @@
  *   404  workspace does not exist
  *   400  workspace exists but is not stuck
  *   409  workspace is stuck but git state not yet repaired
- *   200  workspace is stuck, git state verified safe → clear stuck + reset lifecycle → success body
+ *   200  active workspace is repaired → clear stuck + reset lifecycle; merged row → clear stuck only
  *
  * processUnstickRequest() is exported from workspaces.ts following the project's
  * established pattern for route helper extraction (computeStuckCount, parseGitActivityParams,
@@ -94,7 +94,7 @@ import {
   markWorkspaceStuck,
   getReviewStatusFromDbSync,
 } from '../../../../../src/lib/overdeck/review-status-sync.js';
-import { setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
+import { FEEDBACK_DELIVERY_STUCK_REASON, setReviewStatusSync, getReviewStatusSync } from '../../../../../src/lib/review-status.js';
 
 // ─── Route-contract tests ─────────────────────────────────────────────────────
 
@@ -189,6 +189,42 @@ describe('processUnstickRequest — POST /api/workspaces/:issueId/unstick route 
     expect(after?.reviewStatus).toBe('pending');
     expect(after?.testStatus).toBe('pending');
     expect(after?.readyForMerge).toBe(false);
+  });
+
+  it('200: a merged row clears only stuck fields, even after its workspace is gone', () => {
+    const cycleHistory = [
+      { cycle: 1, runId: 'agent-run-1', atCommit: 'abc123', blockingCount: 2, recordedAt: '2026-08-01T10:00:00Z' },
+    ];
+    setReviewStatusSync('PAN-MERGED', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      reviewedAtCommit: 'merged-sha',
+      reviewCycleHistory: cycleHistory,
+    });
+    markWorkspaceStuck('PAN-MERGED', FEEDBACK_DELIVERY_STUCK_REASON);
+    const stuckStatus = getReviewStatusSync('PAN-MERGED');
+
+    const result = processUnstickRequest('PAN-MERGED', false, stuckStatus, {
+      safe: false,
+      advice: 'This must be ignored for terminal rows.',
+    });
+
+    expect(result.httpStatus).toBe(200);
+    const after = getReviewStatusSync('PAN-MERGED');
+    expect(after).toMatchObject({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      verificationStatus: 'passed',
+      mergeStatus: 'merged',
+      readyForMerge: false,
+      reviewedAtCommit: 'merged-sha',
+      reviewCycleHistory: cycleHistory,
+    });
+    expect(after?.stuck).toBeFalsy();
+    expect(after?.stuckReason).toBeUndefined();
   });
 
   it('200: includes previousReason in the response body', () => {
