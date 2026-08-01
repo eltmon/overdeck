@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:26:48.291Z",
+  "updated": "2026-08-01T20:26:54.893Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "pipeline-state-accepts-planned-canonical": {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3697692,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:26:54.893Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -94,6 +102,7 @@
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac1": "completed",
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac2": "completed",
     "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac3": "completed",
-    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac4": "completed"
+    "poller-stops-resurrecting-interactive-agents.poller-stops-resurrecting-interactive-agents.ac4": "completed",
+    "pipeline-state-accepts-planned-canonical": "running"
   }
 }
