@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:30:19.322Z",
+  "updated": "2026-08-01T20:33:43.935Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "simple-mode-finished-plan-regressions": {
-        "writerId": "agent-pan-3338",
-        "agentId": "agent-pan-3338",
-        "pid": 3870332,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T20:30:19.322Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -90,6 +82,17 @@
         "outcome": "completed",
         "reason": "Added 'planned' to the awaiting-work canonical-state gate in issuePipelineState.ts:66, plus a contract comment stating planning_active derives from durable status not liveness and must not be downgraded by hasPlan. New issue-pipeline-state.test.ts covers all 5 PRD cases (planned/todo/backlog awaiting-work, running-with/without-plan planning_active, no-plan not-awaiting-work). Also re-ran simple-derive.test.ts and simple-foundations.test.ts (which depend on derivePipelineState) to confirm no regressions — all green.",
         "releasedAt": "2026-08-01T20:30:10.794Z"
+      },
+      {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3870332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:30:19.322Z",
+        "itemId": "simple-mode-finished-plan-regressions",
+        "outcome": "completed",
+        "reason": "Added 3 characterization tests to simple-derive.test.ts covering the no-signal case (pendingInputKinds: []) that the existing PAN-3330 tests didn't cover (they all fixture agentTurnEnded): stopped signal-less plan+plan renders needs-you/The plan is ready/Start work and buckets into simple-home needsYou as start-work; running plan agent without a plan renders working/Planning; running plan agent with a plan (replan) still renders working. All 19 tests in the file pass; typecheck and lint clean.",
+        "releasedAt": "2026-08-01T20:33:43.935Z"
       }
     ],
     "statusReasons": {
@@ -104,6 +107,10 @@
       "pipeline-state-accepts-planned-canonical": {
         "reason": "Added 'planned' to the awaiting-work canonical-state gate in issuePipelineState.ts:66, plus a contract comment stating planning_active derives from durable status not liveness and must not be downgraded by hasPlan. New issue-pipeline-state.test.ts covers all 5 PRD cases (planned/todo/backlog awaiting-work, running-with/without-plan planning_active, no-plan not-awaiting-work). Also re-ran simple-derive.test.ts and simple-foundations.test.ts (which depend on derivePipelineState) to confirm no regressions — all green.",
         "updatedAt": "2026-08-01T20:30:10.794Z"
+      },
+      "simple-mode-finished-plan-regressions": {
+        "reason": "Added 3 characterization tests to simple-derive.test.ts covering the no-signal case (pendingInputKinds: []) that the existing PAN-3330 tests didn't cover (they all fixture agentTurnEnded): stopped signal-less plan+plan renders needs-you/The plan is ready/Start work and buckets into simple-home needsYou as start-work; running plan agent without a plan renders working/Planning; running plan agent with a plan (replan) still renders working. All 19 tests in the file pass; typecheck and lint clean.",
+        "updatedAt": "2026-08-01T20:33:43.935Z"
       }
     }
   },
@@ -122,6 +129,9 @@
     "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac1": "completed",
     "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac2": "completed",
     "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac3": "completed",
-    "simple-mode-finished-plan-regressions": "running"
+    "simple-mode-finished-plan-regressions": "completed",
+    "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac1": "completed",
+    "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac2": "completed",
+    "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac3": "completed"
   }
 }
