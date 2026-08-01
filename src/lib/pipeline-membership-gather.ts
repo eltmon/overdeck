@@ -725,6 +725,7 @@ export async function gatherProjectLensSignals(
     phaseLabel: STALE_PIPELINE_LABELS.find((label) => labelsByIssue.get(id)?.includes(label)) ?? null,
     hasXbriefSpec: specIssues.has(id),
     explicitlyReady: labelsByIssue.get(id)?.includes('ready') ?? false,
+    hasTerminalCloseOut: false,
   }));
 }
 
