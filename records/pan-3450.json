@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-01T23:05:48.297Z",
+  "updated": "2026-08-01T23:06:01.908Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
@@ -71,8 +71,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "docs-sync-prune": {
+        "writerId": "agent-pan-3450",
+        "agentId": "agent-pan-3450",
+        "pid": 722306,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T23:06:01.908Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3450",
@@ -192,6 +200,7 @@
     "workspace-merge-prune.workspace-merge-prune.ac2": "completed",
     "sync-cli-reporting": "completed",
     "sync-cli-reporting.sync-cli-reporting.ac1": "completed",
-    "sync-cli-reporting.sync-cli-reporting.ac2": "completed"
+    "sync-cli-reporting.sync-cli-reporting.ac2": "completed",
+    "docs-sync-prune": "running"
   }
 }
