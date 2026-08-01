@@ -72,7 +72,11 @@ const defaultDeps: TranscriptRetentionDeps = {
   isTerminalAgent: isTranscriptRetentionTerminalAgent,
   listConversations,
   listArchivedConversations,
-  now: Date.now,
+  // A bare `Date.now` reference is captured once at module import — before
+  // any test installs vi.useFakeTimers() — so it stays pinned to the real
+  // clock even under a faked one. Wrap it so every call reads the current
+  // global Date.now binding.
+  now: () => Date.now(),
   log: (message) => console.log(`[deacon] ${message}`),
 };
 
