@@ -594,3 +594,9 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **COST WATCH: pan-3367 at $93.93** (29-issue audit, +2343/−391 docs; crashed+restored at ctx 82%). min-874 $75.68 +3343/−211. Cost limits are warn-only per operator policy — flagging, not stopping. Both producing proportionate output.
 - MIN-929 verdict signal still not confirmed post-re-drive (parent idle again; sessions recreated 07:36/07:47). NEXT TICK: hard-verify via durable record; if the signal failed twice, file the synthesis-present signal-loss specimen.
 - PAN-3392 close-out deploy-gated. MIN-864 fresh session + convoy progressing slowly ($0.86).
+
+## RUN-79 tick 10 (2026-08-01 ~12:05Z) — operator promoted uat/min-crow-0801 (MIN-929); fresh sweep + close-out driven
+
+- **Operator promoted MIN-929** to MYN main (fe@e8b6f61 api@74aca93 + 4 more repos). Close-out attempted immediately: blocked ONLY on the still-running post-merge lifecycle (mergeStatus merged, agent-min-929 still registered) — no override taken, retry next tick. The tick-8/9 verdict-signal question is moot for merge purposes (operator promoted), but the signal-loss specimen remains real for the machinery.
+- Fresh membership sweep re-derived: PAN pipeline = 1889/3392/3393 post_merge (close-outs pending deploy or CI), 3362/3367 in_flight, 3356 held; MYN = MIN-864 (fresh review cycle), 874/839 working, 929 merged-pending-close, 7 recordless zombies (PAN-3396); TIN-1 planned; 4 typed blind spots (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable GitHub App 404s).
+- **Clean UAT batch = EMPTY** (uat-candidate null; nobody review+test passed post-promote). Nothing assembled — correct, not an omission.
