@@ -1,23 +1,6 @@
 {
   "issueId": "PAN-3362",
   "schemaVersion": 2,
-  "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T10:19:05.640Z",
-  "pipeline": {
-    "issueId": "PAN-3362",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-01T07:10:01.718Z"
-  },
-  "closeOut": {
-    "usage": {
-      "byStage": {},
-      "totals": {}
-    },
-    "merges": [],
-    "ranOn": "eltmon-z790"
-  },
   "sessionHistory": [
     {
       "reason": "planning",
@@ -31,6 +14,31 @@
       "timestamp": "2026-08-01T09:14:05.089Z"
     }
   ],
+  "feedback": [],
+  "created": "2026-08-01T07:10:01.718Z",
+  "updated": "2026-08-01T10:19:06.992Z",
+  "pipeline": {
+    "issueId": "PAN-3362",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-01T10:19:05.657Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {},
+      "costAtCloseOut": {
+        "usd": 0,
+        "pricingAsOf": "2026-08-01T10:19:05.689Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "recoveryTrips": [
