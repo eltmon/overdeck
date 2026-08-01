@@ -176,7 +176,7 @@
     "recordedAt": "2026-08-01T21:43:26.402Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:43:35.008Z",
+  "updated": "2026-08-01T21:43:38.472Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -185,7 +185,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:43:32.173Z",
+    "updatedAt": "2026-08-01T21:43:34.379Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:43:27.436Z",
@@ -257,9 +257,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 14061619,
-            "output": 222928,
-            "cacheRead": 43741696,
+            "input": 14067335,
+            "output": 223036,
+            "cacheRead": 44154368,
             "cacheWrite": 0
           }
         },
@@ -312,9 +312,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18612690,
-          "output": 312525,
-          "cacheRead": 57238016,
+          "input": 18618406,
+          "output": 312633,
+          "cacheRead": 57650688,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -325,8 +325,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 139.1418063,
-        "pricingAsOf": "2026-08-01T21:43:34.983Z"
+        "usd": 139.3799623,
+        "pricingAsOf": "2026-08-01T21:43:38.459Z"
       }
     },
     "merges": [
