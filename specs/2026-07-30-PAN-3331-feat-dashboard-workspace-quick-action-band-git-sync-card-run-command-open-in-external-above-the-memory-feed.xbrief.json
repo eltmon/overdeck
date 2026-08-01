@@ -4,17 +4,17 @@
     "created": "2026-07-30T14:05:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3331: feat(dashboard): workspace quick-action band — git sync card, run command, open-in-external — above the memory feed",
-    "updated": "2026-07-30T20:36:55.054Z"
+    "updated": "2026-08-01T01:40:05.223Z"
   },
   "plan": {
     "id": "pan-3331",
     "title": "feat(dashboard): workspace quick-action band — git sync card, run command, open-in-external — above the memory feed",
-    "status": "running",
+    "status": "completed",
     "uid": "ab762ab9-0459-4c7f-8a83-8ae810bf4160",
     "author": "agent:claude-fable-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-07-30T14:05:00.000Z",
-    "updated": "2026-07-30T20:36:55.054Z",
+    "updated": "2026-08-01T01:40:05.223Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3331",
@@ -599,5 +599,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
