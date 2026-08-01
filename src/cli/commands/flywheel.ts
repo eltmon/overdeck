@@ -35,6 +35,7 @@ import { sessionExists } from '../../lib/tmux.js';
 import { ensureInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../../lib/internal-token.js';
 import { computeMergeQueueFromCandidates, listEligibleCandidatesByProject, type MergeQueueItem } from '../../lib/flywheel-merge-order.js';
 import { DEFAULT_BRIEF_PATH, requireFlywheelBrief, resolvePrimaryWorktreeRoot } from '../../lib/flywheel-start.js';
+import { compactFlywheelStateFile } from '../../lib/flywheel-state-retention.js';
 import { formatMergeBackendStatus, loadMergeBackendStatusForCli } from './flywheel-merge-backend.js';
 import { compensateFailedFlywheelStart, resolveFlywheelOrderBriefOverlay, resolveFlywheelOrderStart, setFlywheelOrderStatus, type FlywheelOrderStartDeps } from './flywheel-orders.js';
 import { createFlywheelCompleteCommand } from './flywheel-complete.js';
@@ -815,17 +816,16 @@ export async function flywheelStopCommand(options: Pick<ReportOptions, 'cwd'> = 
 }
 
 async function buildFlywheelStateReport(status: FlywheelStatus, cwd: string): Promise<string> {
-  // PAN-1696: Compute merge queue from pipeline ready set, not flywheel activePipeline (CLI-flywheel-status, FR-11)
+  // PAN-1696: Compute the merge queue from the pipeline ready set, not flywheel activePipeline.
   const candidates = listEligibleCandidatesByProject(cwd);
-  const mergeQueue = await Effect.runPromise(
-    computeMergeQueueFromCandidates(candidates, cwd).pipe(Effect.provide(nodeServicesLayer)),
-  );
+  const mergeQueue = await Effect.runPromise(computeMergeQueueFromCandidates(candidates, cwd).pipe(Effect.provide(nodeServicesLayer)));
   return formatFlywheelStateReport(status, mergeQueue);
 }
 
 async function persistFlywheelStateReport(status: FlywheelStatus, cwd: string, report: string): Promise<void> {
   const runNumber = runNumberFromRunId(status.runId);
   await writeFile(join(getFlywheelRunDir(status.runId), 'report.md'), report, 'utf8');
+  await compactFlywheelStateFile(cwd);
   const stateChanged = await isFlywheelStateDirty(cwd);
   if (stateChanged) {
     await commitFlywheelStateChanges(cwd, runNumber);
@@ -980,7 +980,7 @@ export function registerFlywheelCommands(program: Command): void {
 
   flywheel
     .command('report')
-    .description('Finalize the active Flywheel run: write report.md, commit FLYWHEEL-STATE.md changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
+    .description('Finalize the active Flywheel run: write report.md, compact over-threshold FLYWHEEL-STATE.md history, commit State changes, and clear the active-run gate. Refuses to run while the orchestrator session is alive (pause or abort first).')
     .option('--force', 'Bypass the orchestrator-alive guard. Intended for the orchestrator role\'s own end-of-run call.')
     .action(flywheelReportCommand);
 

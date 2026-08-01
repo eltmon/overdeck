@@ -2,10 +2,12 @@
 
 Durable cumulative memory across Flywheel orchestrator runs. Status snapshots are ephemeral and live in `~/.overdeck/flywheel/`; this file is for facts that future runs should not have to rediscover.
 
-> Historical-path note (PAN-2541): entries below are an append-only incident log.
-> References to `.pan/records/`, `.pan/specs/`, and `.pan/drafts/` describe the
-> legacy layout that existed when each event occurred; current permanent state
-> lives in `records/`, `specs/`, and `drafts/` on `overdeck-state`.
+`pan flywheel report` compacts this working copy when it exceeds 1,000 lines or 120 KiB. The curated sections and latest three runs remain verbatim; older run detail becomes one line per run. Compaction never deletes history — the original detail remains available through `git log --follow docs/FLYWHEEL-STATE.md`.
+
+> Historical-path note (PAN-2541): references to `.pan/records/`, `.pan/specs/`,
+> and `.pan/drafts/` describe the legacy layout that existed when each event
+> occurred; current permanent state lives in `records/`, `specs/`, and `drafts/`
+> on `overdeck-state`.
 
 ## Substrate fixes
 
