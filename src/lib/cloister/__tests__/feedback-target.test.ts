@@ -5,13 +5,23 @@ import { Effect } from 'effect';
 const tmux = vi.hoisted(() => ({
   liveSessions: new Set<string>(),
 }));
+const filesystem = vi.hoisted(() => ({
+  existingPaths: new Set<string>(),
+}));
+const spawn = vi.hoisted(() => ({
+  workAgent: vi.fn(),
+}));
+vi.mock('fs', async (importOriginal) => ({
+  ...await importOriginal<typeof import('fs')>(),
+  existsSync: (path: string) => filesystem.existingPaths.has(String(path)),
+}));
 vi.mock('../../tmux.js', () => ({
   sessionExists: (name: string) => Effect.succeed(tmux.liveSessions.has(name)),
   listSessionNames: () => Effect.succeed([...tmux.liveSessions]),
 }));
 
 vi.mock('../../projects.js', () => ({
-  resolveProjectFromIssueSync: vi.fn(() => null),
+  resolveProjectFromIssueSync: vi.fn(() => ({ projectKey: 'test', projectPath: '/repo' })),
   getProjectSync: vi.fn(() => null),
 }));
 vi.mock('../../pan-dir/record.js', () => ({
@@ -36,6 +46,9 @@ const resume = vi.hoisted(() => ({
 vi.mock('../../agents/resume.js', () => ({
   resumeAgent: resume.resumeAgent,
 }));
+vi.mock('../work-agent-start.js', () => ({
+  spawnWorkAgentThroughAgentsEndpoint: spawn.workAgent,
+}));
 
 import { resolveIssueFeedbackTarget } from '../feedback-target.js';
 
@@ -46,11 +59,17 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
   beforeEach(() => {
     vi.clearAllMocks();
     tmux.liveSessions.clear();
+    filesystem.existingPaths.clear();
     agentState.states.clear();
     // Default: a successful resume brings the session up.
     resume.resumeAgent.mockImplementation(async (id: string) => {
       tmux.liveSessions.add(id);
       return { success: true };
+    });
+    spawn.workAgent.mockImplementation(async (issueId: string) => {
+      const agentId = `agent-${issueId.toLowerCase()}`;
+      tmux.liveSessions.add(agentId);
+      return { spawned: true, agentId };
     });
   });
 
@@ -115,21 +134,42 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
     expect(target).toEqual({ agentId: AGENT });
   });
 
-  it('parks needs-you only after resurrection fails', async () => {
-    agentState.states.set(AGENT, { id: AGENT, status: 'stopped' });
-    resume.resumeAgent.mockResolvedValue({ success: false, error: 'spawn failed' });
+  it('starts a missing registry agent when its workspace continue state is healthy', async () => {
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999');
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999/.overdeck');
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999/.overdeck/continue.json');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const target = await resolveIssueFeedbackTarget('PAN-9999');
 
-    expect(resume.resumeAgent).toHaveBeenCalled();
+    expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(spawn.workAgent).toHaveBeenCalledWith('PAN-9999', undefined, false, 'resume-agent');
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('agent registry row is missing'));
+    expect(target).toEqual({ agentId: AGENT });
+    warn.mockRestore();
+  });
+
+  it('parks needs-you only after resume and start both fail', async () => {
+    agentState.states.set(AGENT, { id: AGENT, status: 'stopped' });
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999');
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999/.overdeck');
+    filesystem.existingPaths.add('/repo/workspaces/feature-pan-9999/.overdeck/continue.json');
+    resume.resumeAgent.mockResolvedValue({ success: false, error: 'resume failed' });
+    spawn.workAgent.mockResolvedValue({ spawned: false, error: 'start failed' });
+
+    const target = await resolveIssueFeedbackTarget('PAN-9999');
+
+    expect(resume.resumeAgent).toHaveBeenCalledWith(AGENT);
+    expect(spawn.workAgent).toHaveBeenCalledWith('PAN-9999', undefined, false, 'resume-agent');
     expect(target).toMatchObject({ needsYou: true });
     expect((target as { reason: string }).reason).toContain('resurrection');
   });
 
-  it('parks needs-you when no agent state exists at all', async () => {
+  it('parks needs-you when no agent state or continue state exists', async () => {
     const target = await resolveIssueFeedbackTarget('PAN-9999');
 
     expect(resume.resumeAgent).not.toHaveBeenCalled();
+    expect(spawn.workAgent).not.toHaveBeenCalled();
     expect(target).toMatchObject({ needsYou: true });
   });
 });
