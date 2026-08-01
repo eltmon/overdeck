@@ -616,3 +616,9 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **strike-3404 fix reviewed + pushed by me** (PR #3405): audit found the `now: Date.now` capture pattern in FOUR files (transcript-retention, pipeline-membership service, deacon-auto-merge-reconcile, deacon-stuck-merging) — all now lazy `() => Date.now()`. #3405's own test lane contains the fix so it can go green; **every OTHER open PR's test lane inherits the wall-clock detonation** — #3402 (pan-3362's UAT fixtures PR, in CI now) will fail through no fault of its own and needs a lane re-run post-merge.
 - pan-3362 NOT wedged — it submitted PR #3402 and is monitoring. min-874 $132.93 +4161/−327 (huge but moving). pan-3367 $123.90 crash-restored AGAIN (2nd), min-839 also restored — second cluster, no deploy this time, no OOM lines visible in journalctl, RAM fine (17.5GB avail). Killer unidentified; watching (kernel log needs sudo).
 - MIN-864 crawling ($1.89). Close-outs for 1889/3392/3393 still queued behind red main.
+
+## RUN-79 tick 13 (2026-08-01 ~12:50Z) — MIN-864 cycle-2 verdict is ANOTHER infra-failure verdict; PAN-3401 struck; #3405 watch armed
+
+- **MIN-864 cycle-2: CHANGES REQUESTED for "correctness reviewer failed — agents database was locked"** — the PAN-3401 class detonating one cycle after filing (3rd DB-lock specimen today). Synthesis also jumped the gun: it declared the verdict while the deacon's per-lane relaunch of correctness was LIVE (restart door refused: "already running"). When the lane reports, the cycle needs re-synthesis — verify next tick. **strike-pan-3401 dispatched** (verdicts must never encode infra outcomes; same-run supersede for infra signals).
+- #3405 (red-main fix) test lane in progress — background watch armed, merging on flip. #3402's lane will need a re-run after (wall-clock poisoning).
+- min-874 $137.29 +4470/−328 (Java debrief service — huge but continuously producing).
