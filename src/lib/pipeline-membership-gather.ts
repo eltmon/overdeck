@@ -259,14 +259,16 @@ export class PipelineMembershipUnavailableError extends Error {
 async function withUnavailableReason<T>(
   reason: MembershipUnavailableReason,
   operation: () => Promise<T>,
+  context?: string,
 ): Promise<T> {
   try {
     return await operation();
   } catch (error) {
     if (error instanceof PipelineMembershipUnavailableError) throw error;
+    const message = error instanceof Error ? error.message : String(error);
     throw new PipelineMembershipUnavailableError(
       reason,
-      error instanceof Error ? error.message : String(error),
+      context ? `${context}: ${message}` : message,
     );
   }
 }
@@ -512,7 +514,9 @@ export async function gatherProjectLensSignals(
   project: ProjectConfig,
   deps: PipelineMembershipGatherDeps = defaultDeps,
 ): Promise<IssueLensSignals[]> {
-  resolveProjectTrackerType(project);
+  const trackerType = resolveProjectTrackerType(project);
+  const usesGitHubIssueTracker = trackerType === 'github';
+  const trackerContext = `Resolved ${trackerType} tracker for ${project.name}`;
 
   const issuePrefix = getIssuePrefix(project)?.toUpperCase();
   if (!issuePrefix) {
@@ -539,14 +543,14 @@ export async function gatherProjectLensSignals(
     snapshotBranchRefs(repository.path, repository.defaultBranch, branchRefPatterns, deps.run));
 
   const [trackerIssues, openIssues, phaseLabeledIssues, openPrs, openMrs, branches, specIssueIds] = await Promise.all([
-    project.github_repo
+    usesGitHubIssueTracker
       ? Promise.resolve([])
-      : withUnavailableReason('forge_unavailable', () => deps.listTrackerIssues(project)),
-    owner && repo
-      ? withUnavailableReason('forge_unavailable', () => deps.listOpenIssues(owner, repo))
+      : withUnavailableReason('forge_unavailable', () => deps.listTrackerIssues(project), trackerContext),
+    usesGitHubIssueTracker && owner && repo
+      ? withUnavailableReason('forge_unavailable', () => deps.listOpenIssues(owner, repo), trackerContext)
       : Promise.resolve([]),
-    owner && repo
-      ? withUnavailableReason('forge_unavailable', () => deps.listPhaseLabeledIssues(owner, repo))
+    usesGitHubIssueTracker && owner && repo
+      ? withUnavailableReason('forge_unavailable', () => deps.listPhaseLabeledIssues(owner, repo), trackerContext)
       : Promise.resolve([]),
     owner && repo
       ? withUnavailableReason('forge_unavailable', () => deps.listOpenPullRequests(owner, repo))
@@ -636,7 +640,7 @@ export async function gatherProjectLensSignals(
   }
   for (const id of specIssues) candidates.add(id);
 
-  if (owner && repo) {
+  if (usesGitHubIssueTracker && owner && repo) {
     const unknownIssueIds = [...candidates].filter((id) => !knownStateByIssue.has(id));
     const issueStateCandidates = unknownIssueIds.filter((id) =>
       openPrIssues.has(id) || branchIssues.has(id));
@@ -651,6 +655,7 @@ export async function gatherProjectLensSignals(
       ? await withUnavailableReason(
           'forge_unavailable',
           () => deps.listIssueStates(owner, repo, issueStateCandidates.map(issueNumber)),
+          trackerContext,
         )
       : [];
     const stateByNumber = new Map(issueStates.map((entry) => [entry.number, entry.state]));

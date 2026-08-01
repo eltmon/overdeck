@@ -634,6 +634,64 @@ describe('gatherProjectLensSignals', () => {
     expect(mocked.run).toHaveBeenCalledTimes(10);
   });
 
+  it('uses the configured Linear tracker when code is hosted on GitHub', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockResolvedValue([
+      { issueId: 'LEX-1', state: 'open', labels: ['in-progress'] },
+    ]);
+    mocked.listOpenIssues = vi.fn().mockRejectedValue(new Error('GitHub issues must not be queried'));
+    mocked.listPhaseLabeledIssues = vi.fn().mockRejectedValue(new Error('GitHub issue labels must not be queried'));
+    mocked.listOpenPullRequests = vi.fn().mockResolvedValue([{
+      headRefName: 'feature/lex-1', headRepoFullName: 'eltmon/lexerra',
+    }]);
+    mocked.listMergedPullRequestHeads = vi.fn().mockResolvedValue([]);
+    mocked.listSpecIssueIds = vi.fn().mockResolvedValue([]);
+    mocked.run = vi.fn().mockImplementation(async (_command, args, cwd) =>
+      args[0] === 'rev-parse' ? cwd : '');
+    const linearTrackerWithGitHubCode: ProjectConfig = {
+      name: 'lexerra',
+      path: '/lexerra',
+      issue_prefix: 'LEX',
+      tracker: 'linear',
+      github_repo: 'eltmon/lexerra',
+    };
+
+    await expect(gatherProjectLensSignals(linearTrackerWithGitHubCode, mocked)).resolves.toEqual([{
+      issueId: 'LEX-1',
+      issueOpen: true,
+      hasOpenPr: true,
+      hasMergedPr: false,
+      hasConventionBranch: false,
+      branchUnmerged: false,
+      hasMergedBranchWork: false,
+      phaseLabel: 'in-progress',
+      hasXbriefSpec: false,
+      explicitlyReady: false,
+    }]);
+    expect(mocked.listTrackerIssues).toHaveBeenCalledWith(linearTrackerWithGitHubCode);
+    expect(mocked.listOpenIssues).not.toHaveBeenCalled();
+    expect(mocked.listPhaseLabeledIssues).not.toHaveBeenCalled();
+    expect(mocked.listOpenPullRequests).toHaveBeenCalledWith('eltmon', 'lexerra');
+    expect(mocked.listIssueStates).not.toHaveBeenCalled();
+  });
+
+  it('names the resolved tracker when its issue query fails', async () => {
+    const mocked = deps();
+    mocked.listTrackerIssues = vi.fn().mockRejectedValue(new Error('Linear API unavailable'));
+    const linearTrackerWithGitHubCode: ProjectConfig = {
+      name: 'lexerra',
+      path: '/lexerra',
+      issue_prefix: 'LEX',
+      tracker: 'linear',
+      github_repo: 'eltmon/lexerra',
+    };
+
+    await expect(gatherProjectLensSignals(linearTrackerWithGitHubCode, mocked)).rejects.toMatchObject({
+      reason: 'forge_unavailable',
+      message: 'Resolved linear tracker for lexerra: Linear API unavailable',
+    });
+  });
+
   it('classifies a missing GitHub issue prefix', async () => {
     await expect(gatherProjectLensSignals({ ...project, issue_prefix: undefined }, deps()))
       .rejects.toMatchObject({
@@ -673,7 +731,7 @@ describe('gatherProjectLensSignals', () => {
 
     await expect(gatherProjectLensSignals(project, mocked)).rejects.toMatchObject({
       reason: 'forge_unavailable',
-      message: 'HTTP 404',
+      message: 'Resolved github tracker for overdeck: HTTP 404',
     });
   });
 
