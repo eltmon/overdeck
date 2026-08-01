@@ -227,10 +227,10 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T12:12:16.514Z",
+  "updated": "2026-08-01T12:13:22.432Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -238,8 +238,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T12:11:44.831Z",
-    "reviewNotes": "private Mind Your Now evidence remains exposed through public history and current audit artifacts",
+    "updatedAt": "2026-08-01T12:13:22.227Z",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
     "reviewedAtCommit": "8fc98f72936d058da5c07cf7f77032d915a4d507",
@@ -387,9 +386,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6259813,
-            "output": 127383,
-            "cacheRead": 31799296,
+            "input": 6264179,
+            "output": 127669,
+            "cacheRead": 31980544,
             "cacheWrite": 0
           }
         },
@@ -427,30 +426,30 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1046,
-            "output": 333563,
-            "cacheRead": 270955334,
-            "cacheWrite": 2964170
+            "input": 1060,
+            "output": 340293,
+            "cacheRead": 276766099,
+            "cacheWrite": 2978366
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 14094503,
-          "output": 329167,
-          "cacheRead": 62847488,
+          "input": 14098869,
+          "output": 329453,
+          "cacheRead": 63028736,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1046,
-          "output": 333563,
-          "cacheRead": 270955334,
-          "cacheWrite": 2964170
+          "input": 1060,
+          "output": 340293,
+          "cacheRead": 276766099,
+          "cacheWrite": 2978366
         }
       },
       "costAtCloseOut": {
-        "usd": 176.710503,
-        "pricingAsOf": "2026-08-01T12:11:44.851Z"
+        "usd": 178.096507,
+        "pricingAsOf": "2026-08-01T12:13:22.385Z"
       }
     },
     "merges": [
@@ -477,7 +476,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "tasks": {
     "sequence": 16,
     "claims": {},
