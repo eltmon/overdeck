@@ -195,7 +195,7 @@
     "recordedAt": "2026-08-01T18:21:54.888Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T20:12:35.460Z",
+  "updated": "2026-08-01T20:15:59.845Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "reviewing",
@@ -206,9 +206,23 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T18:23:27.074Z",
-    "updatedAt": "2026-08-01T20:12:34.448Z",
+    "updatedAt": "2026-08-01T20:15:59.813Z",
     "reviewNotes": "Synchronous project resolution blocks the dashboard event loop; required conversation 1827 reassignment lacks auditable evidence",
     "inspectNotes": "All 5 ACs verified against tree at c2817141. AC-1: idempotent ALTER at infra.ts:279 inside ensureWorkspaceTablesSync, called from runOverdeckMigrationSync (infra.ts:204) which getOverdeckDatabaseSync runs on every open; runSchemaTopUp swallows duplicate-column so re-open is safe; text column with no default = nullable. AC-2: createConversation INSERT carries project_key (conversations.ts:1231/1249) from handleConversationCreate's canonicalProjectKey; every LegacyConversation read goes through the single LEGACY_CONVERSATION_SELECT which now selects c.project_key, and rowToLegacyConversation maps it to projectKey. AC-3: setConversationProjectKey (conversations.ts:1365) updates via the conversations write door, matching the setConversationHarness pattern, and passes null through. AC-4: getProjectSync is exact-key lookup so a yaml key returns itself and a display name maps to its key via listProjectsSync; unknown input yields 'Unknown project: <input>'. AC-5: resolveProjectKeyForCwd (projects.ts:555) normalizes with resolve(), guards prefix with a trailing slash so sibling dirs cannot false-match, keeps the longest projectPath, returns null outside all registered paths. NFR-1: existing rows get NULL, no read path changes behavior. Non-blocking: handleConversationCreate resolves the key twice (resolveRegisteredProjectKey then resolveProjectCwd re-resolves), and resolveProjectCwd's !projectConfig branch is now unreachable after a successful key resolution.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since abaf4bf (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-08-01T20:15:44.409Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "abaf4bfbec7e7a55f73f5a81973c9561419c8626",
+      "detectedAt": "2026-08-01T20:15:44.409Z",
+      "paths": [
+        "scripts/file-size-allowlist.txt"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "lastVerifiedCommit": "b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9",
     "reviewSpawnedAt": "2026-08-01T20:12:34.446Z",
@@ -354,7 +368,7 @@
       },
       "costAtCloseOut": {
         "usd": 210.060224,
-        "pricingAsOf": "2026-08-01T20:12:34.484Z"
+        "pricingAsOf": "2026-08-01T20:15:59.825Z"
       }
     },
     "merges": [
