@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T16:31:32.518Z",
+  "updated": "2026-08-01T16:42:37.274Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "fork-modal-project": {
-        "writerId": "agent-pan-3419",
-        "agentId": "agent-pan-3419",
-        "pid": 742604,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:31:32.517Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3419",
@@ -136,6 +128,17 @@
         "outcome": "completed",
         "reason": "Extended palette routing cache with conversation projectKey, resolved explicit yaml/display associations before cwd-derived routing, and covered explicit plus fallback behavior",
         "releasedAt": "2026-08-01T16:30:59.590Z"
+      },
+      {
+        "writerId": "agent-pan-3419",
+        "agentId": "agent-pan-3419",
+        "pid": 742604,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:31:32.517Z",
+        "itemId": "fork-modal-project",
+        "outcome": "completed",
+        "reason": "Added a registered-project selector defaulted to the source project, sent explicit yaml keys through every ForkModal host and mutation body, and covered default plus selected behavior",
+        "releasedAt": "2026-08-01T16:42:37.274Z"
       }
     ],
     "statusReasons": {
@@ -158,6 +161,10 @@
       "palette-explicit": {
         "reason": "Extended palette routing cache with conversation projectKey, resolved explicit yaml/display associations before cwd-derived routing, and covered explicit plus fallback behavior",
         "updatedAt": "2026-08-01T16:30:59.590Z"
+      },
+      "fork-modal-project": {
+        "reason": "Added a registered-project selector defaulted to the source project, sent explicit yaml keys through every ForkModal host and mutation body, and covered default plus selected behavior",
+        "updatedAt": "2026-08-01T16:42:37.274Z"
       }
     }
   },
@@ -186,6 +193,9 @@
     "palette-explicit": "completed",
     "palette-explicit.palette-explicit.ac1": "completed",
     "palette-explicit.palette-explicit.ac2": "completed",
-    "fork-modal-project": "running"
+    "fork-modal-project": "completed",
+    "fork-modal-project.fork-modal-project.ac1": "completed",
+    "fork-modal-project.fork-modal-project.ac2": "completed",
+    "fork-modal-project.fork-modal-project.ac3": "completed"
   }
 }
