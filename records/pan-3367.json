@@ -44,6 +44,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-01T11:53:49.432Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T11:55:32.793Z"
     }
   ],
   "feedback": [],
@@ -184,10 +189,10 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T11:55:30.915Z",
+  "updated": "2026-08-01T11:55:33.637Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -195,13 +200,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T11:55:30.217Z",
+    "updatedAt": "2026-08-01T11:55:30.971Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
     "reviewedAtCommit": "231aa1f8c8e9d3c86c63c454cad6bc45454fc3b0",
     "lastVerifiedCommit": "8fc98f72936d058da5c07cf7f77032d915a4d507",
-    "reviewSpawnedAt": "2026-08-01T11:13:21.666Z",
+    "reviewSpawnedAt": "2026-08-01T11:55:30.970Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -407,7 +412,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.562394,
-        "pricingAsOf": "2026-08-01T11:55:30.254Z"
+        "pricingAsOf": "2026-08-01T11:55:33.631Z"
       }
     },
     "merges": [
