@@ -352,6 +352,25 @@ describe('runVersionShip', () => {
     expect(deps.push).not.toHaveBeenCalled();
   });
 
+  it('rejects a whitespace-only commit message before changing files', async () => {
+    const deps = fakeDeps();
+    const report = await runVersionShip({
+      projectRoot: PROJECT_ROOT,
+      config: config({ commit_message: '   ' }),
+      version: '1.2.3',
+      batchName: 'uat/myn-ember-0731',
+      allowedRepos: [allowedRepo('frontend')],
+    }, deps);
+
+    expect(report).toMatchObject({
+      status: 'failed',
+      errorCode: 'path-validation-failed',
+      error: 'version_sync.commit_message must be a non-empty string',
+    });
+    expect(deps.writeVersion).not.toHaveBeenCalled();
+    expect(deps.commit).not.toHaveBeenCalled();
+  });
+
   it('rejects a declared output not covered by exactly one push repository', async () => {
     const deps = fakeDeps();
     const report = await runVersionShip({

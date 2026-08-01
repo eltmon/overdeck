@@ -27,4 +27,4 @@
 1597 src/dashboard/frontend/src/components/CommandDeck/index.tsx # PAN-3232
 1010 src/dashboard/frontend/src/App.tsx # PAN-3330
 1053 src/dashboard/frontend/src/components/CommandPalette.tsx # PAN-3330
-1266 src/lib/projects.ts # PAN-3358
+1268 src/lib/projects.ts # PAN-3358

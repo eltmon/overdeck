@@ -279,8 +279,10 @@ export function validateVersionSyncConfig(raw: unknown): VersionSyncValidationRe
     errors.push('version_sync.command_image is required when version_sync.command is set');
   }
 
-  if (raw.commit_message !== undefined && typeof raw.commit_message !== 'string') {
-    errors.push('version_sync.commit_message must be a string');
+  if (raw.commit_message !== undefined) {
+    if (typeof raw.commit_message !== 'string' || raw.commit_message.trim().length === 0) {
+      errors.push('version_sync.commit_message must be a non-empty string');
+    }
   }
 
   if (raw.push !== undefined) {

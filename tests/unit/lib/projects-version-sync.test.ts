@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { closeSync, mkdirSync, openSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { once } from 'node:events';
 import { join } from 'node:path';
 
 const { TEST_HOME } = vi.hoisted(() => {
@@ -27,6 +28,11 @@ import {
   validateVersionSyncConfig,
   type VersionSyncConfig,
 } from '../../../src/lib/projects.js';
+import {
+  acquireProjectsConfigLock,
+  acquireProjectsConfigLockSync,
+  projectsConfigLockPort,
+} from '../../../src/lib/projects-config-lock.js';
 import { updateProjectsConfigText } from '../../../src/lib/projects-config-write.js';
 import { setProjectVersionSync } from '../../../src/lib/projects-writer.js';
 
@@ -213,7 +219,7 @@ describe('setProjectVersionSync', () => {
     const parsed = loadProjectsConfigSync();
     expect(parsed.projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
     expect(parsed.projects.beta?.version_sync).toEqual(COMMENT_VERSION_SYNC);
-    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml', 'projects.yaml.lock']);
+    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml']);
   });
 
   it('holds the lock across read and transform so a queued save reads the renamed project', async () => {
@@ -268,13 +274,10 @@ describe('setProjectVersionSync', () => {
     expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
   });
 
-  it('leaves the durable registry intact when another process owns the kernel lock', () => {
+  it('leaves the durable registry intact when another writer owns the cross-platform lock', async () => {
     const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
     writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
-    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
-    const fd = openSync(lock, 'a+', 0o600);
-    const acquired = spawnSync('flock', ['-n', '3'], { stdio: ['ignore', 'ignore', 'pipe', fd] });
-    expect(acquired.status).toBe(0);
+    const lock = await acquireProjectsConfigLock(PROJECTS_CONFIG_FILE);
 
     try {
       expect(() => saveProjectsConfigSync({
@@ -282,35 +285,37 @@ describe('setProjectVersionSync', () => {
       })).toThrow('projects.yaml is already being modified');
       expect(readFileSync(PROJECTS_CONFIG_FILE, 'utf-8')).toBe(fixture);
     } finally {
-      closeSync(fd);
+      await lock.release();
     }
   });
 
-  it('allows only one external contender and releases the lock when its owner exits', () => {
-    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
-    const fd = openSync(lock, 'a+', 0o600);
-    expect(spawnSync('flock', ['-n', '3'], { stdio: ['ignore', 'ignore', 'pipe', fd] }).status).toBe(0);
+  it('excludes sync and async contenders until the owner releases', async () => {
+    const lock = await acquireProjectsConfigLock(PROJECTS_CONFIG_FILE);
+    expect(() => acquireProjectsConfigLockSync(PROJECTS_CONFIG_FILE)).toThrow(
+      'projects.yaml is already being modified',
+    );
+    await expect(acquireProjectsConfigLock(PROJECTS_CONFIG_FILE)).rejects.toThrow(
+      'projects.yaml is already being modified',
+    );
 
-    const contenderA = spawnSync('flock', ['-n', lock, 'true']);
-    const contenderB = spawnSync('flock', ['-n', lock, 'true']);
-    expect(contenderA.status).toBe(1);
-    expect(contenderB.status).toBe(1);
-
-    closeSync(fd);
-    expect(spawnSync('flock', ['-n', lock, 'true']).status).toBe(0);
+    await lock.release();
+    const next = acquireProjectsConfigLockSync(PROJECTS_CONFIG_FILE);
+    next.release();
   });
 
-  it('recovers automatically after a lock-owning process is killed', async () => {
-    const fixture = `projects:\n  alpha:\n    name: Alpha\n    path: /repo/alpha\n`;
-    writeFileSync(PROJECTS_CONFIG_FILE, fixture, 'utf-8');
-    const lock = `${PROJECTS_CONFIG_FILE}.lock`;
-    const killed = spawnSync('flock', [lock, 'sh', '-c', 'kill -9 $$']);
-    expect(killed.status).not.toBe(0);
+  it('recovers automatically after a lock-owning process exits', async () => {
+    const port = projectsConfigLockPort(PROJECTS_CONFIG_FILE);
+    const child = spawn(process.execPath, ['-e', [
+      "const { createServer } = require('node:net');",
+      `const server = createServer().listen({ host: '127.0.0.1', port: ${port}, exclusive: true }, () => console.log('ready'));`,
+      "setInterval(() => {}, 1000);",
+    ].join('')], { stdio: ['ignore', 'pipe', 'inherit'] });
+    await once(child.stdout!, 'data');
+    child.kill();
+    await once(child, 'exit');
 
-    await setProjectVersionSync('alpha', COMMENT_VERSION_SYNC);
-
-    expect(loadProjectsConfigSync().projects.alpha?.version_sync).toEqual(COMMENT_VERSION_SYNC);
-    expect(readdirSync(TEST_HOME).sort()).toEqual(['projects.yaml', 'projects.yaml.lock']);
+    const lock = await acquireProjectsConfigLock(PROJECTS_CONFIG_FILE);
+    await lock.release();
   });
 
   it('rejects a flow-style project without changing the file', async () => {
@@ -432,6 +437,19 @@ describe('validateVersionSyncConfig', () => {
     expect(result).toEqual({
       ok: false,
       errors: ['version_sync.set[0].path must not escape the project root'],
+    });
+  });
+
+  it('rejects a whitespace-only commit message', () => {
+    const result = validateVersionSyncConfig({
+      expect: [{ path: 'package.json', pattern: 'version' }],
+      commit_message: '   ',
+      push: ['.'],
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      errors: ['version_sync.commit_message must be a non-empty string'],
     });
   });
 

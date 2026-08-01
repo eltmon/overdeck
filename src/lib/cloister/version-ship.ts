@@ -167,6 +167,15 @@ export async function runVersionShip(
       'version_sync.push must contain at least one repository',
     );
   }
+  if (config.commit_message !== undefined && config.commit_message.trim().length === 0) {
+    return failedReport(
+      version,
+      batchName,
+      at,
+      'path-validation-failed',
+      'version_sync.commit_message must be a non-empty string',
+    );
+  }
   if (config.replace?.length && !config.command) {
     return failedReport(
       version,

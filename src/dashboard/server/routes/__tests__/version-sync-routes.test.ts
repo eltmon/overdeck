@@ -151,6 +151,18 @@ describe('PUT /api/projects/:projectKey/version-sync payload', () => {
     expect(d.writeVersionSync).not.toHaveBeenCalled();
   });
 
+  it('returns 400 and writes nothing for a whitespace-only commit message', async () => {
+    const d = deps();
+    const result = await putProjectVersionSyncPayload('overdeck', {
+      config: { expect: [{ path: 'package.json', pattern: 'version' }], commit_message: '   ', push: ['.'] },
+    }, d);
+    expect(result).toEqual({
+      status: 400,
+      body: { errors: ['version_sync.commit_message must be a non-empty string'] },
+    });
+    expect(d.writeVersionSync).not.toHaveBeenCalled();
+  });
+
   it('returns 404 for an unknown project and names the known keys', async () => {
     const d = deps({ config: null });
     expect(await putProjectVersionSyncPayload('missing', { config: CONFIG }, d)).toEqual({

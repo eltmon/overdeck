@@ -1,4 +1,3 @@
-import { spawn, spawnSync } from 'node:child_process';
 import {
   closeSync,
   constants,
@@ -13,6 +12,10 @@ import {
 } from 'node:fs';
 import { mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
 import { dirname } from 'node:path';
+import {
+  acquireProjectsConfigLock,
+  acquireProjectsConfigLockSync,
+} from './projects-config-lock.js';
 
 interface ProjectsConfigUpdate<T> {
   content: string;
@@ -21,10 +24,6 @@ interface ProjectsConfigUpdate<T> {
 
 let asyncWriteTail = Promise.resolve();
 let tempSequence = 0;
-
-function lockPath(path: string): string {
-  return `${path}.lock`;
-}
 
 function tempPath(path: string): string {
   tempSequence += 1;
@@ -47,49 +46,6 @@ async function existingMode(path: string): Promise<number> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0o600;
     throw error;
   }
-}
-
-function acquireProjectsConfigLockSync(path: string): number {
-  const lock = lockPath(path);
-  const fd = openSync(lock, 'a+', 0o600);
-  const result = spawnSync('flock', ['-n', '3'], {
-    encoding: 'utf-8',
-    stdio: ['ignore', 'ignore', 'pipe', fd],
-  });
-  if (result.status === 0) return fd;
-  closeSync(fd);
-  if (result.error) throw result.error;
-  throw new Error(`projects.yaml is already being modified: ${path}`);
-}
-
-function acquireProjectsConfigLock(path: string): Promise<Awaited<ReturnType<typeof open>>> {
-  return open(lockPath(path), 'a+', 0o600).then(file => new Promise((resolve, reject) => {
-    const child = spawn('flock', ['-n', '3'], {
-      stdio: ['ignore', 'ignore', 'pipe', file.fd],
-    });
-    let stderr = '';
-    let settled = false;
-    child.stderr?.setEncoding('utf-8');
-    child.stderr?.on('data', chunk => {
-      stderr += chunk;
-    });
-    child.once('error', error => {
-      if (settled) return;
-      settled = true;
-      void file.close().finally(() => reject(error));
-    });
-    child.once('exit', code => {
-      if (settled) return;
-      settled = true;
-      if (code === 0) {
-        resolve(file);
-        return;
-      }
-      void file.close().finally(() => reject(new Error(
-        stderr.trim() || `projects.yaml is already being modified: ${path}`,
-      )));
-    });
-  }));
 }
 
 export function atomicWriteProjectsConfigSync(path: string, content: string): void {
@@ -146,11 +102,11 @@ export async function atomicWriteProjectsConfig(path: string, content: string): 
 
 export function withProjectsConfigWriteSync<T>(path: string, write: () => T): T {
   mkdirSync(dirname(path), { recursive: true });
-  const fd = acquireProjectsConfigLockSync(path);
+  const lock = acquireProjectsConfigLockSync(path);
   try {
     return write();
   } finally {
-    closeSync(fd);
+    lock.release();
   }
 }
 
@@ -163,14 +119,14 @@ export async function withProjectsConfigWrite<T>(path: string, write: () => Prom
   asyncWriteTail = previous.catch(() => undefined).then(() => current);
   await previous.catch(() => undefined);
 
-  let file: Awaited<ReturnType<typeof open>> | null = null;
+  let lock: Awaited<ReturnType<typeof acquireProjectsConfigLock>> | null = null;
   try {
     await mkdir(dirname(path), { recursive: true });
-    file = await acquireProjectsConfigLock(path);
+    lock = await acquireProjectsConfigLock(path);
     return await write();
   } finally {
     try {
-      if (file !== null) await file.close();
+      if (lock !== null) await lock.release();
     } finally {
       releaseQueue();
     }

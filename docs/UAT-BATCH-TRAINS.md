@@ -474,10 +474,12 @@ comments whose association cannot be preserved. Every project-registry mutation
 holds one shared lock across its read, transformation, and atomic write, so a
 rename or policy update cannot overwrite a concurrent version configuration.
 The writer flushes a same-directory temporary file, atomically renames it, and
-flushes the directory. A kernel advisory lock serializes processes and is released
-automatically when its owning file descriptor closes or its process crashes, so
-there is no stale-lock takeover race. Dashboard setting routes await the async
-lock/read/write/fsync path rather than blocking the Node event loop. An unset
+flushes the directory. A cross-platform OS mutex binds a deterministic loopback
+port derived from the canonical config path; only one process can own that listener,
+and the operating system releases it automatically when the process exits or
+crashes. This ships with Node on Linux, macOS, and Windows and has no external
+`flock` dependency or stale-lock takeover path. Dashboard setting routes await the
+async lock/read/write/fsync path rather than blocking the Node event loop. An unset
 project says plainly that it skips
 ship rather than showing an empty form, and the section displays the latest
 `passed`, `pending`, `partial`, or `failed` outcome.
