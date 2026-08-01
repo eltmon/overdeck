@@ -1,0 +1,339 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:42:15Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3338: Finished plan agent reads as 'still planning' once its idle signal is cleared",
+    "updated": "2026-08-01T15:48:38.641Z"
+  },
+  "plan": {
+    "id": "pan-3338",
+    "title": "Finished plan agent reads as 'still planning' once its idle signal is cleared",
+    "status": "proposed",
+    "uid": "655b2fbf-5a3b-4b2a-97d9-b699df72583e",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:42:15Z",
+    "updated": "2026-08-01T15:48:38.641Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3338",
+        "label": "PAN-3338",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "read-model",
+      "pipeline-state",
+      "simple-mode",
+      "agent-status"
+    ],
+    "narratives": {
+      "Problem": "A plan agent that finalized hours ago with its tmux session still alive renders in simple mode as 'Planning — The agent is breaking this down into tasks' with no Start work button. Root cause chain (all verified in code): (1) complete-planning marks the planning agent stopped via saveAgentStateSync (planning-promotion.ts:566-575) which emits NO agent.status_changed event, so the read model keeps the spawn-time 'running' forever — the DB-says-stopped / read-model-says-live disagreement; (2) the enrichment poller (agent-enrichment-service.ts:221-242 and :196) rewrites stopped-but-tmux-alive agents to 'running' once per server lifetime, entrenching the lie; (3) derivePipelineState (issuePipelineState.ts:65) keys planning_active on that lied-about status; (4) the one correct display path (64e8ce75bc's isPlanReadyToStart) depends on the agentTurnEnded kind which only exists while the runtime snapshot says idle — and boot reconstruction (reconstruct-cache.ts:107-112) derives activity from status, so any dashboard restart permanently clears idle for a finished plan agent that will never fire another Stop hook.",
+      "Proposal": "Treat the finalize-time stopped status as the durable turn-end signal and route it into the read model (decision D1; the Stop-hook idle activity stays ephemeral). WI-1: complete-planning emits agent.status_changed(stopped, honest hasLiveTmuxSession) after the gates succeed — moved after the PRD gate so a failed finalize no longer marks the agent stopped prematurely (D4). WI-2: the enrichment poller stops resurrecting interactive-role agents (plan, conv-*) from stopped to running, via an exported pure shouldResurrectStoppedAgent helper sharing the isInteractiveRoleAgent predicate with agent-enrichment.ts (D2, D6); docs/AGENT-STATE-PLANES.md gains the stopped-but-session-alive contract. WI-3: derivePipelineState's awaiting-work gate accepts canonical 'planned' alongside todo/backlog (D5) with a contract comment stating planning_active derives from durable status, never process liveness; deliberately NOT gated on !hasPlan so replanning keeps rendering planning_active (D3). WI-4: simple-mode regression tests lock the no-signal projection: stopped signal-less plan agent + written plan renders needs-you 'The plan is ready' + Start work; running plan agent without a plan renders working.",
+      "NonGoals": "- Making the Stop-hook idle activity durable across restarts/DB rebuilds (event-log folding or sidecar persistence in reconstruct-cache.ts) — unnecessary once status is honest; the conv-* turn-end loss on restart is a separate follow-up issue.\n- Changing the stopped→running reconcile for work/review/test/strike roles — standby work agents are a suspected related victim, separate audit.\n- Reaping or killing finished planning sessions — skipKill session lifetime is intentional.\n- Keying plan-ready on hasPlan regardless of agent status (the issue's option 2) — rejected, mislabels replanning (D3).\n- Any change to work.inspect, review convoy, verification gate, or merge machinery."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Chose the issue's 'durable signal' branch, interpreted as: the finalize-time stopped status IS the durable turn-end record — emit it into the read model and stop the poller from overwriting it — rather than persisting the ephemeral Stop-hook idle activity.",
+        "rationale": "Satisfies all three acceptance criteria with no new durable state and no schema change. Persisting idle activity (event-log folding at boot) would not fix the DB/read-model disagreement (AC3), which is caused by the missing finalize event plus the poller flip, and adds machinery the ACs do not require."
+      },
+      {
+        "summary": "Scoped the flip removal to interactive roles (plan, conv-*) using the existing isInteractiveRole predicate from agent-enrichment.ts:673.",
+        "rationale": "For interactive roles, stopped-but-alive is the deliberate post-completion steady state (skipKill finalize; idle conversations). Work/review/test/strike stopped-but-alive is transitional crash recovery where the PAN-1419 reconcile may still be load-bearing; changing it needs its own audit. The issue's AC3 only demands agreement for the stopped-but-session-alive agent in question."
+      },
+      {
+        "summary": "Did NOT gate planning_active on !hasPlan (the issue's option 2).",
+        "rationale": "Replanning runs a plan agent while a spec already exists (deacon-merge.ts:244-248 defers merges while a planning agent runs). Keying plan-ready purely on hasPlan would mislabel an actively replanning agent as ready-to-start — the same class of lie this issue fixes. The durable status fix preserves replanning correctness."
+      },
+      {
+        "summary": "Moved the complete-planning stop-marking to after the PRD gate and spec promotion.",
+        "rationale": "Today it runs before the gates, so a 422 gate failure leaves the agent durably stopped while actually mid-planning. Once the read model honors the stopped status (this fix), that premature stop becomes a user-visible false 'The plan is ready'. Marking stopped only on successful completion is the truthful ordering."
+      }
+    ],
+    "items": [
+      {
+        "id": "finalize-status-event",
+        "title": "Emit agent.status_changed(stopped) at successful complete-planning, after the gates",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:42:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/planning-promotion.ts",
+            "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "new tests assert agent.status_changed(stopped, hasLiveTmuxSession:true) appended on skipKill success, no stopped event on PRD-gate 422",
+            "existing complete-planning kill/skipKill tests stay green",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In completePlanningForIssue (src/lib/overdeck/planning-promotion.ts), move the stop-marking block (currently lines 566-575) down to just before the existing planning.sync eventStore.append (currently :763-767) so the agent is only marked stopped after the PRD gate and spec promotion succeed. After saveAgentStateSync, compute hasLiveTmuxSession honestly via sessionExists(sessionName) (already imported at :28) and append agent.status_changed with payload { agentId: sessionName, status: 'stopped', previousStatus, hasLiveTmuxSession } through options.eventStore — saveAgentStateSync writes DB + state.json but emits no event, so without this the read model keeps the spawn-time 'running' forever. Keep the whole block in the existing try/catch (non-fatal). Before/after snippet is in the PRD (WI-1). Extend complete-planning.test.ts: (1) skipKill success appends agent.status_changed with status 'stopped' and hasLiveTmuxSession true; (2) session already gone emits hasLiveTmuxSession false; (3) PRD-gate 422 appends no stopped event and leaves the agent running; (4) durable stop write (stoppedAt) still persists on success."
+        },
+        "items": [
+          {
+            "id": "finalize-status-event.ac1",
+            "title": "Given a planning session whose tmux session survives (skipKill), when completePlanningForIssue succeeds, then it appends agent.status_changed carrying status 'stopped' and hasLiveTmuxSession true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-status-event.ac2",
+            "title": "When the planning tmux session is already gone at emit time, the appended event carries hasLiveTmuxSession false so the reducer's PAN-1520 wipe applies to dead sessions",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-status-event.ac3",
+            "title": "When the PRD-first gate rejects the finalize, completePlanningForIssue returns 422, preserves the planning agent's running status, and appends no agent.status_changed stopped event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "finalize-status-event.ac4",
+            "title": "The durable stop write (saveAgentStateSync with stoppedAt set) still persists to the agents registry on the success path",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "poller-stops-resurrecting-interactive-agents",
+        "title": "Enrichment poller honors the durable stopped status for interactive roles + documents the contract",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:42:15Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/services/agent-enrichment-service.ts",
+            "src/lib/agent-enrichment.ts",
+            "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "docs/AGENT-STATE-PLANES.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "shouldResurrectStoppedAgent returns false for stopped tmux-live plan and conv- agents, true for stopped tmux-live work agents",
+            "both flip sites (reconcile block and agent.created projection) route through shouldResurrectStoppedAgent",
+            "typecheck and lint complete without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1",
+            "NFR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Export the interactive-role predicate from src/lib/agent-enrichment.ts as isInteractiveRoleAgent(agentId, role?) (role === 'plan' || agentId.startsWith('conv-')) and rewrite the inline predicate at :673 to use it. In src/dashboard/server/services/agent-enrichment-service.ts add an exported pure helper shouldResurrectStoppedAgent(agentId, role, status, tmuxActive): false unless tmuxActive && status === 'stopped' && !isInteractiveRoleAgent(agentId, role). Route BOTH flip sites through it: the reconcile block at :223 and the agent.created status projection at :196. Update the stale comment above the reconcile block to state interactive roles are exempt because stopped-but-alive is their deliberate steady state. Extraction is required because the existing test file only drives exported pure helpers (pollOnce is private). Add tests to agent-enrichment-service.test.ts per the PRD (plan → false, conv- → false, work → true, non-stopped/not-tmux gates → false, isInteractiveRoleAgent cases). Add a 'Stopped but session-alive' subsection to docs/AGENT-STATE-PLANES.md naming status as the durable record, hasLiveTmuxSession as the liveness signal, and shouldResurrectStoppedAgent in agent-enrichment-service.ts as the single resurrection resolver."
+        },
+        "items": [
+          {
+            "id": "poller-stops-resurrecting-interactive-agents.ac1",
+            "title": "shouldResurrectStoppedAgent returns false for every stopped tmux-live agent whose role is plan or whose id starts with conv-, and true for a stopped tmux-live work-role agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-stops-resurrecting-interactive-agents.ac2",
+            "title": "Each flip site (the reconcile block and the agent.created projection) routes its stopped-to-running decision through shouldResurrectStoppedAgent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-stops-resurrecting-interactive-agents.ac3",
+            "title": "agent-enrichment.ts contains a single exported isInteractiveRoleAgent predicate that its turn-end detection applies at the former inline-predicate site",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "poller-stops-resurrecting-interactive-agents.ac4",
+            "title": "docs/AGENT-STATE-PLANES.md contains a 'Stopped but session-alive' passage naming hasLiveTmuxSession as the liveness signal and shouldResurrectStoppedAgent in agent-enrichment-service.ts as the resurrection resolver",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pipeline-state-accepts-planned-canonical",
+        "title": "derivePipelineState awaiting-work gate accepts canonical 'planned' + contract comment + unit tests",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:42:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+            "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/issue-pipeline-state.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "five new derivePipelineState cases pass: planned/backlog/default-open awaiting-work, running-agent planning_active with and without hasPlan, no-plan not-awaiting-work",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/frontend/src/lib/issuePipelineState.ts:65-66, add 'planned' to the canonical states in the planning_done_awaiting_work gate (todo, backlog, planned) and add the contract comment from the PRD: planning_active derives from the plan agent's DURABLE status (finalize flips it to stopped), never from process liveness; a running plan agent is genuinely planning including replanning with an existing spec, so hasPlan must NOT downgrade it (D3). Do not reorder the two checks and do not gate planning_active on !hasPlan. derivePipelineState has no dedicated test file today — create src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts with the five cases from the PRD: (1) stopped plan + hasPlan + 'planned' → planning_done_awaiting_work; (2) stopped plan + hasPlan + 'todo'/'backlog' → planning_done_awaiting_work; (3) running plan + hasPlan + 'todo' → planning_active; (4) running plan + no plan → planning_active; (5) stopped plan + no plan + 'todo' → not planning_done_awaiting_work."
+        },
+        "items": [
+          {
+            "id": "pipeline-state-accepts-planned-canonical.ac1",
+            "title": "derivePipelineState returns planning_done_awaiting_work for a stopped plan agent with hasPlan and canonical state planned, backlog, or the default open state",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-state-accepts-planned-canonical.ac2",
+            "title": "derivePipelineState returns planning_active for a running plan agent whether or not hasPlan is true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pipeline-state-accepts-planned-canonical.ac3",
+            "title": "The new issue-pipeline-state.test.ts passes all five derivePipelineState cases under the frontend Vitest project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "simple-mode-finished-plan-regressions",
+        "title": "Lock the simple-mode projection for the finished-plan no-signal case",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:42:15Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "test",
+          "issueLabel": "pan-3338",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/lib/__tests__/simple-derive.test.ts"
+          ],
+          "expected_outputs": [
+            "stopped signal-less plan agent + hasPlan renders needs-you / 'The plan is ready' / 'Start work' and buckets into simple-home needs-you as start-work",
+            "running plan agent without a plan renders working / 'Planning'; running plan agent with a plan (replan) renders working"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts (match the fixture style commit 64e8ce75bc added) with characterization tests locking this issue's acceptance criteria at the simple-mode layer: (1) stopped plan-role agent, hasPlan true, pendingInputKinds [], canonical todo → display.state 'needs-you', needsYouReason 'start-work', primaryAction 'Start work', title 'The plan is ready'; (2) same fixture → bucketSimpleHome places the issue in needsYou with kind 'start-work'; (3) running plan-role agent, hasPlan false, no kinds → display.state 'working', title 'Planning'; (4) running plan-role agent, hasPlan true, no kinds (replan in flight) → display.state 'working'. These pass once the agent status is honest (items finalize-status-event and poller-stops-resurrecting-interactive-agents make it honest upstream); they exist so a regression in any of the three layers fails here."
+        },
+        "items": [
+          {
+            "id": "simple-mode-finished-plan-regressions.ac1",
+            "title": "A stopped, signal-less plan agent with a written plan renders needs-you / 'The plan is ready' / 'Start work' and buckets into simple-home needs-you as start-work",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-mode-finished-plan-regressions.ac2",
+            "title": "A running plan agent without a written plan renders working / 'Planning'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "simple-mode-finished-plan-regressions.ac3",
+            "title": "A running plan agent with a written plan (replan) renders working, not ready-to-start",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "finalize-status-event",
+        "to": "poller-stops-resurrecting-interactive-agents",
+        "type": "informs"
+      },
+      {
+        "from": "poller-stops-resurrecting-interactive-agents",
+        "to": "simple-mode-finished-plan-regressions",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3338-finished-plan-agent-reads-as-still-planning-once-its-idle-signal-is-cleared.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
