@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-01T14:13:28.698Z",
+  "updated": "2026-08-01T14:13:33.878Z",
   "pipeline": {
     "issueId": "PAN-3406",
     "reviewStatus": "pending",
@@ -100,5 +100,22 @@
     "order-books-doc-title-join": "completed",
     "order-books-doc-title-join.order-books-doc-title-join.ac1": "completed",
     "order-books-doc-title-join.order-books-doc-title-join.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/ORDER-BOOKS.md",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
+    ],
+    "actualChangedFiles": [
+      "docs/ORDER-BOOKS.md",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
+    ],
+    "recordedAt": "2026-08-01T14:13:33.877Z"
   }
 }
