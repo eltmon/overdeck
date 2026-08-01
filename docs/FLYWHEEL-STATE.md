@@ -815,3 +815,9 @@ Session resumed (monitors re-armed as one combined memory+RSS+liveness watch). *
 - Full read-door sweep re-derived: 13 PAN + 22 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable). Clean UAT batch EMPTY (candidate null) — correct.
 - NOTE: scratchpad was cleared by the session restart; status snapshot rebuilt from live state (FLYWHEEL-STATE.md was the recovery source — the durable-memory design working as intended).
 - P0 PAN-3436 PR #3438 in CI. UAT gate now OFF → eligible merges get scheduled as the ready set fills.
+
+## RUN-79 tick 38 (2026-08-01 ~20:40Z) — P0 PAN-3436 LANDED; leak fix INCOMPLETE (reopened + re-struck)
+
+- **P0 PAN-3436 landed** (#3438 squash `9847ceb60e`, handed off) — supervisor no longer serially evicts dashboards after a reboot. Deploy + close-out next tick.
+- **LEAK NOT CLOSED — self-correction.** My tick-35 "soaking clean (644MB at 19min)" was a LOW-LOAD window, not proof. Current build post-fix: 1936MB@18min → **2591MB@47min = ~22MB/min sustained**. A second growth path survives the watcher bound. Reopened PAN-3431 with the three-point curve + heap-diff directive (15min vs 45min snapshots under load), suspects: #3414 per-agent activity polling, event-store arrays, #3400 patrol structures. **Re-struck.** LESSON (repeat of the reviewer-cost lesson): a single favorable reading under different load is not verification — require a TREND at comparable load.
+- MIN-931 review convoy live (4 lanes spawned 16:36). MIN-932 planning deep ($5.83, +833). Campaign healthy.
