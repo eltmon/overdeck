@@ -891,3 +891,9 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **PAN-3422 round-2 PR opened (#3457)** — round 1's PR was already merged, so the compaction fix needed its own. The diff is exactly the right shape: new `src/lib/agents/eaten-message-watcher.ts` (+92) + `messaging.ts` changes (+44) + 69 lines of tests — i.e. a watcher that detects a delivered-but-eaten message rather than trusting keystroke acceptance. Matches the compaction-boundary hypothesis.
 - MIN-932 recovered from its compaction cleanly ($39.61, +2258 — was ctx 0 last tick, now 49% and producing; NOT a wedge). MIN-931 rework strong ($21.24, +1397/−308).
 - Server 2306MB at 28min — slower than the 300MB/min burst (fleet settled from 42 sessions). Consistent with per-session-count scaling. #3449 test lane still running.
+
+## RUN-79 tick 48 (2026-08-01 ~23:10Z) — PAN-3422 round 2 LANDED + DEPLOYED: eaten-message watcher is live
+
+- **PAN-3422 round 2 merged (`64cad73d01`), handed off, and DEPLOYED** — the live server now runs the eaten-message watcher, so a delivery swallowed at the compaction boundary is detected and re-driven instead of leaving an agent wedged at the ❯ prompt with visible unsubmitted text. The run's highest-frequency operational failure (5 manual `--fresh` recoveries today) now has a structural answer covering both variants: keystroke acceptance (round 1) AND turn-actually-started (round 2).
+- Verification standard for calling this class closed, recorded so I do not repeat today's twice-made error: do NOT declare it dead on one clean delivery. Require either (a) a delivery to an agent at >85% context that lands and processes, or (b) 24h with zero specimens. The reload also resets the leak curve as a side benefit.
+- #3449 (reviewRunId) test lane still running — merges on green.
