@@ -117,6 +117,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T21:38Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-08-01T21:38:05.620Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T21:43:08.221Z"
     }
   ],
   "feedback": [],
@@ -166,20 +171,20 @@
     "recordedAt": "2026-08-01T21:32:02.810Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:43:07.039Z",
+  "updated": "2026-08-01T21:43:09.161Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:43:06.656Z",
+    "updatedAt": "2026-08-01T21:43:07.062Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T21:32:03.917Z",
-    "reviewSpawnedAt": "2026-08-01T21:29:28.719Z",
+    "reviewSpawnedAt": "2026-08-01T21:43:07.062Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
       "declaredScopeUntouched": [],
@@ -316,7 +321,7 @@
       },
       "costAtCloseOut": {
         "usd": 137.0368703,
-        "pricingAsOf": "2026-08-01T21:43:06.712Z"
+        "pricingAsOf": "2026-08-01T21:43:09.132Z"
       }
     },
     "merges": [
