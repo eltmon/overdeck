@@ -124,11 +124,11 @@ A workspace container has no tracker-backed issue data by design: `IssueDataServ
 
 ```bash
 pan admin seed-uat-fixtures <issue-id>   # host mode: seeds that issue's workspace container
-pan admin seed-uat-fixtures --local [--force]   # run inside the container directly
+pan admin seed-uat-fixtures --local      # run inside the container directly
 ```
 
 - **Host mode** (`pan admin seed-uat-fixtures <issue-id>`, run from the host) resolves the workspace's compose stack, execs `--local` inside its `server` container, restarts `server`, and polls the container's health endpoint before printing the dashboard URL. Restarting is required: skip-polling mode loads its cache and read model once at boot, so a seed without a restart is invisible.
-- **`--local`** (run by the host wrapper, or manually by an operator already shelled into the container) writes the fixture set into the current `OVERDECK_HOME` through the same canonical write doors as the rest of Overdeck (project registration, the agent-state and review-status doors, the issue cache, activity events) plus a direct file write for the seeded workspace's `.overdeck/spec.vbrief.json` and `.overdeck/continue.json`. It refuses to run outside a detected container (`OVERDECK_DISABLE_DEACON=1` or `CONTAINER_MODE=1`) unless `--force` is passed, so seeding a host `OVERDECK_HOME` by accident is not possible.
+- **`--local`** (run by the host wrapper, or manually by an operator already shelled into the container) writes the fixture set into the current `OVERDECK_HOME` through the same canonical write doors as the rest of Overdeck (project registration, the agent-state and review-status doors, the issue cache, activity events) plus a direct file write for the seeded workspace's `.overdeck/spec.vbrief.json` and `.overdeck/continue.json`. It unconditionally refuses to run outside a detected container (`OVERDECK_DISABLE_DEACON=1` or `CONTAINER_MODE=1`) — there is no override, so seeding a host `OVERDECK_HOME` is not possible.
 - **Ephemeral across recreate.** The fixture set lives only in the container-local `OVERDECK_HOME`, which does not survive `docker compose up --force-recreate` or a rebuild. Re-run `pan admin seed-uat-fixtures <issue-id>` after any operation that recreates the container.
 - **Obviously fake, always.** Every fixture-identifying literal (project key, prefix, title, PR URL) marks the seeded issue as synthetic. Seeding is idempotent — re-running it leaves exactly one `FIX-1` row in each store — and never touches a tracker or the host's own `OVERDECK_HOME`.
 

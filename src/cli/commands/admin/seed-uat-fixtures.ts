@@ -129,17 +129,16 @@ export function registerSeedUatFixturesCommand(admin: Command): void {
       'OVERDECK_HOME — used by the host wrapper, or manually inside a container.',
     )
     .option('--local', 'Seed the current (container-local) OVERDECK_HOME directly, without a host wrapper step')
-    .option('--force', 'With --local, seed even when no container env markers are detected')
-    .action(async (issueId: string | undefined, options: { local?: boolean; force?: boolean }) => {
+    .action(async (issueId: string | undefined, options: { local?: boolean }) => {
       try {
         if (options.local) {
           const { seedUatFixturesLocal } = await import('../../../lib/uat-fixtures/seed.js');
-          const report = await seedUatFixturesLocal({ force: options.force });
+          const report = await seedUatFixturesLocal();
           console.log(JSON.stringify(report, null, 2));
           return;
         }
         if (!issueId) {
-          console.error('Usage: pan admin seed-uat-fixtures <issue-id>  (or: pan admin seed-uat-fixtures --local [--force])');
+          console.error('Usage: pan admin seed-uat-fixtures <issue-id>  (or: pan admin seed-uat-fixtures --local)');
           return exitCli(1);
         }
         await seedUatFixturesHost(issueId);

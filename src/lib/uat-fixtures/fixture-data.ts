@@ -170,10 +170,23 @@ export function fixtureReviewStatus(now: string = new Date().toISOString()): Rev
   };
 }
 
+/**
+ * Stable activity ids, one per fixtureActivityEntries() row. Fed to
+ * emitActivityEntryOnce() as the idempotency key so a re-seed replaces these
+ * four rows in place instead of appending duplicate visible lifecycle events.
+ */
+export const FIXTURE_ACTIVITY_IDS = {
+  workCompleted: 'fix-1-activity-work-completed',
+  reviewApproved: 'fix-1-activity-review-approved',
+  testsPassed: 'fix-1-activity-tests-passed',
+  seeded: 'fix-1-activity-seeded',
+} as const;
+
 /** Builds a short activity history for the fixture issue (work → review → tests). */
-export function fixtureActivityEntries(): EmitActivityOptions[] {
+export function fixtureActivityEntries(): (EmitActivityOptions & { id: string })[] {
   return [
     {
+      id: FIXTURE_ACTIVITY_IDS.workCompleted,
       source: 'work-agent',
       level: 'info',
       status: 'completed',
@@ -181,6 +194,7 @@ export function fixtureActivityEntries(): EmitActivityOptions[] {
       issueId: FIXTURE_ISSUE_ID,
     },
     {
+      id: FIXTURE_ACTIVITY_IDS.reviewApproved,
       source: 'review-specialist',
       level: 'success',
       status: 'completed',
@@ -188,6 +202,7 @@ export function fixtureActivityEntries(): EmitActivityOptions[] {
       issueId: FIXTURE_ISSUE_ID,
     },
     {
+      id: FIXTURE_ACTIVITY_IDS.testsPassed,
       source: 'test-specialist',
       level: 'success',
       status: 'completed',
@@ -195,6 +210,7 @@ export function fixtureActivityEntries(): EmitActivityOptions[] {
       issueId: FIXTURE_ISSUE_ID,
     },
     {
+      id: FIXTURE_ACTIVITY_IDS.seeded,
       source: 'dashboard',
       level: 'info',
       message: `${FIXTURE_TITLE_PREFIX} Fixture seeded for UAT verification`,

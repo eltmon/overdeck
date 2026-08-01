@@ -49,7 +49,7 @@ describe('seedUatFixturesLocal', () => {
 
     const report = await seed.seedUatFixturesLocal();
     expect(report.agentsWritten).toBe(5);
-    expect(report.activityEntriesWritten).toBeGreaterThanOrEqual(3);
+    expect(report.activityEntriesWritten).toBe(4);
 
     const agents = agentStateSync.listOverdeckAgentStatesSync().filter((a) => a.issueId === 'FIX-1');
     expect(agents).toHaveLength(5);
@@ -70,16 +70,15 @@ describe('seedUatFixturesLocal', () => {
     }
   });
 
-  it('rejects without container env markers and names --force, then succeeds with force (AC-2)', async () => {
+  it('rejects without container env markers, with no override (AC-2)', async () => {
     vi.stubEnv('OVERDECK_DISABLE_DEACON', undefined as unknown as string);
     vi.stubEnv('CONTAINER_MODE', undefined as unknown as string);
     const { seed } = await importSeedModules();
 
-    await expect(seed.seedUatFixturesLocal()).rejects.toThrow(/--force/);
-    await expect(seed.seedUatFixturesLocal({ force: true })).resolves.toBeDefined();
+    await expect(seed.seedUatFixturesLocal()).rejects.toThrow(/refuses to seed a non-container OVERDECK_HOME/);
   });
 
-  it('is idempotent: a second run leaves identical row counts in agents, review_status, and the issue cache (AC-3)', async () => {
+  it('is idempotent: a second run leaves identical row counts in agents, review_status, the issue cache, and activity history (AC-3)', async () => {
     const { seed, agentStateSync, reviewStatusSync, cacheServiceModule } = await importSeedModules();
 
     await seed.seedUatFixturesLocal();
@@ -98,6 +97,12 @@ describe('seedUatFixturesLocal', () => {
     } finally {
       cache.close();
     }
+
+    const { getEventStore } = await import('../../../../src/dashboard/server/event-store.js');
+    const fixtureActivityEntries = getEventStore()
+      .queryByType('activity.entry', 1000)
+      .filter((event) => (event.payload as { issueId?: string }).issueId === 'FIX-1');
+    expect(fixtureActivityEntries).toHaveLength(4);
   });
 
   it('persists spec.vbrief.json and continue.json under the fixture workspace and the spec passes the plan reader (AC-4)', async () => {

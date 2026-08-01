@@ -3,8 +3,9 @@
  *
  * Writes the FIX-1 fixture set (built by fixture-data.ts) into the
  * container-local OVERDECK_HOME through the canonical write doors — no raw
- * SQL. Refuses to run outside a workspace container unless explicitly
- * forced, so polluting a host OVERDECK_HOME is a deliberate act.
+ * SQL. Always refuses to run outside a workspace container: seeding the host
+ * dashboard or any non-container OVERDECK_HOME is an explicit NonGoal, so
+ * there is no override (review finding, PAN-3362 cycle 1).
  */
 
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -14,7 +15,7 @@ import { getOverdeckHome } from '../paths.js';
 import { registerProjectSync } from '../projects.js';
 import { saveOverdeckAgentStateSync } from '../overdeck/agent-state-sync.js';
 import { upsertReviewStatusSync } from '../overdeck/review-status-sync.js';
-import { emitActivityEntryDurable } from '../activity-logger.js';
+import { emitActivityEntryOnce } from '../activity-logger.js';
 import { serializeXBriefDocument } from '../xbrief/io.js';
 import {
   FIXTURE_ISSUE_ID,
@@ -28,11 +29,6 @@ import {
   fixtureXBriefDoc,
 } from './fixture-data.js';
 
-export interface SeedUatFixturesOptions {
-  /** Bypass the container-env guard. Also polluting a non-container OVERDECK_HOME is deliberate. */
-  force?: boolean;
-}
-
 export interface SeedReport {
   issueId: string;
   projectKey: string;
@@ -45,15 +41,15 @@ export interface SeedReport {
 /**
  * Refuses to seed outside a workspace container. Both env markers are set by
  * the container compose template (CONTAINER_MODE on frontend, OVERDECK_DISABLE_DEACON
- * on server) — see docs/WORKSPACE-CONTAINERS.md.
+ * on server) — see docs/WORKSPACE-CONTAINERS.md. No override: a real
+ * OVERDECK_HOME must never receive fixture writes.
  */
-function assertContainerEnvUnlessForced(force: boolean | undefined): void {
-  if (force) return;
+function assertContainerEnv(): void {
   if (process.env.OVERDECK_DISABLE_DEACON === '1' || process.env.CONTAINER_MODE === '1') return;
   throw new Error(
     'seedUatFixturesLocal refuses to seed a non-container OVERDECK_HOME (neither ' +
     'OVERDECK_DISABLE_DEACON=1 nor CONTAINER_MODE=1 is set in the environment). ' +
-    'Pass { force: true } (CLI: --force) to seed anyway.',
+    'Run this only inside a workspace container.',
   );
 }
 
@@ -62,8 +58,8 @@ function assertContainerEnvUnlessForced(force: boolean | undefined): void {
  * canonical write doors. Idempotent: every write is an upsert, so re-running
  * leaves identical row counts in agents, review_status, and the issue cache.
  */
-export async function seedUatFixturesLocal(opts: SeedUatFixturesOptions = {}): Promise<SeedReport> {
-  assertContainerEnvUnlessForced(opts.force);
+export async function seedUatFixturesLocal(): Promise<SeedReport> {
+  assertContainerEnv();
 
   const home = getOverdeckHome();
   await mkdir(home, { recursive: true });
@@ -89,7 +85,9 @@ export async function seedUatFixturesLocal(opts: SeedUatFixturesOptions = {}): P
   await initEventStore();
   const activityEntries = fixtureActivityEntries();
   for (const entry of activityEntries) {
-    await emitActivityEntryDurable(entry);
+    // At-most-once by stable id: a re-seed must not append duplicate visible
+    // lifecycle events (review finding, PAN-3362 cycle 1).
+    await emitActivityEntryOnce(entry);
   }
 
   const workspaceOverdeckDir = join(
