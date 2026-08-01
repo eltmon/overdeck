@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:30:22.971Z",
+  "updated": "2026-08-01T15:30:29.618Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,24 +49,16 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "moved-event": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 3237614,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:30:22.970Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
         "updatedAt": "2026-08-01T15:30:13.817Z"
       },
       "moved-event": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T15:30:22.970Z"
+        "reason": "Added conversation.moved event to packages/contracts/src/events.ts (Schema.Struct mirroring conversation.created, added to DomainEvent union) and a reducer case in event-reducers.ts bumping conversationsListRevision. Contracts build clean, full typecheck + lint pass with no new errors. Commit c295eaf.",
+        "updatedAt": "2026-08-01T15:30:29.618Z"
       }
     },
     "claimHistory": [
@@ -80,6 +72,17 @@
         "outcome": "completed",
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
         "releasedAt": "2026-08-01T15:30:13.817Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3237614,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:30:22.970Z",
+        "itemId": "moved-event",
+        "outcome": "completed",
+        "reason": "Added conversation.moved event to packages/contracts/src/events.ts (Schema.Struct mirroring conversation.created, added to DomainEvent union) and a reducer case in event-reducers.ts bumping conversationsListRevision. Contracts build clean, full typecheck + lint pass with no new errors. Commit c295eaf.",
+        "releasedAt": "2026-08-01T15:30:29.618Z"
       }
     ]
   },
@@ -89,6 +92,8 @@
     "persist-project-key.persist-project-key.ac2": "completed",
     "persist-project-key.persist-project-key.ac3": "completed",
     "persist-project-key.persist-project-key.ac4": "completed",
-    "moved-event": "running"
+    "moved-event": "completed",
+    "moved-event.moved-event.ac1": "completed",
+    "moved-event.moved-event.ac2": "completed"
   }
 }
