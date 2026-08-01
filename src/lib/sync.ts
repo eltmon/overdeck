@@ -12,7 +12,7 @@ import {
 import { FsError } from './errors.js';
 import {
   buildManifestFromDirectory, writeManifestSync, readManifestSync, hashFileSync,
-  setManifestEntry, collectSourceFilesSync,
+  setManifestEntry, collectSourceFilesSync, pruneStaleManifestEntriesSync,
   type Manifest,
   compareFileToManifest,
 } from './manifest.js';
@@ -191,6 +191,8 @@ export interface RefreshCacheResult {
   skills: { copied: number; total: number };
   agents: { copied: number; total: number };
   rules: { copied: number; total: number };
+  pruned: string[];
+  keptModified: string[];
 }
 
 /**
@@ -199,9 +201,7 @@ export interface RefreshCacheResult {
 function copyDirectoryRecursive(source: string, dest: string): number {
   if (!existsSync(source)) return 0;
 
-  mkdirSync(dest, { recursive: true });
   let count = 0;
-
   const entries = readdirSync(source, { withFileTypes: true });
   for (const entry of entries) {
     const srcPath = join(source, entry.name);
@@ -209,6 +209,7 @@ function copyDirectoryRecursive(source: string, dest: string): number {
     if (entry.isDirectory()) {
       count += copyDirectoryRecursive(srcPath, dstPath);
     } else if (entry.isFile()) {
+      mkdirSync(dest, { recursive: true });
       copyFileSync(srcPath, dstPath);
       count++;
     }
@@ -226,10 +227,20 @@ function copyDirectoryRecursive(source: string, dest: string): number {
  * This replaces the old "skip if exists" behavior in `pan install`.
  */
 export function refreshCacheSync(): RefreshCacheResult {
+  const oldManifest = readManifestSync(CACHE_MANIFEST);
+  const sourceFiles = [
+    ...collectSourceFilesSync(SYNC_SOURCES.skills, 'skills/'),
+    ...(isDevMode() ? collectSourceFilesSync(SYNC_SOURCES.devSkills, 'skills/') : []),
+    ...collectSourceFilesSync(SYNC_SOURCES.agents, 'agent-definitions/'),
+    ...collectSourceFilesSync(SYNC_SOURCES.rules, 'rules/'),
+  ];
+  const sourceSet = new Set(sourceFiles.map((file) => file.relativePath));
   const result: RefreshCacheResult = {
     skills: { copied: 0, total: 0 },
     agents: { copied: 0, total: 0 },
     rules: { copied: 0, total: 0 },
+    pruned: [],
+    keptModified: [],
   };
 
   // Copy skills from repo to cache (always overwrite)
@@ -237,12 +248,13 @@ export function refreshCacheSync(): RefreshCacheResult {
     const skillDirs = readdirSync(SYNC_SOURCES.skills, { withFileTypes: true })
       .filter((d) => d.isDirectory());
 
-    result.skills.total = skillDirs.length;
     for (const skillDir of skillDirs) {
       const src = join(SYNC_SOURCES.skills, skillDir.name);
       const dst = join(SKILLS_DIR, skillDir.name);
-      copyDirectoryRecursive(src, dst);
-      result.skills.copied++;
+      if (copyDirectoryRecursive(src, dst) > 0) {
+        result.skills.copied++;
+        result.skills.total++;
+      }
     }
   }
 
@@ -254,9 +266,10 @@ export function refreshCacheSync(): RefreshCacheResult {
     for (const skillDir of devSkillDirs) {
       const src = join(SYNC_SOURCES.devSkills, skillDir.name);
       const dst = join(SKILLS_DIR, skillDir.name);
-      copyDirectoryRecursive(src, dst);
-      result.skills.copied++;
-      result.skills.total++;
+      if (copyDirectoryRecursive(src, dst) > 0) {
+        result.skills.copied++;
+        result.skills.total++;
+      }
     }
   }
 
@@ -323,12 +336,27 @@ export function refreshCacheSync(): RefreshCacheResult {
     }
   }
 
-  // Generate cache manifest
+  const cacheBase = join(SKILLS_DIR, '..');
+  const pruneResult = pruneStaleManifestEntriesSync(cacheBase, oldManifest, sourceSet);
+  result.pruned.push(...pruneResult.pruned);
+  result.keptModified.push(...pruneResult.keptModified);
+
+  // Generate cache manifest. Files outside the current bundle retain their old
+  // provenance when known; otherwise they become explicitly user-owned.
   const manifest = buildManifestFromDirectory(
-    join(SKILLS_DIR, '..'),  // ~/.overdeck/
+    cacheBase,
     ['skills', 'agent-definitions', 'rules'],
     'overdeck',
   );
+  for (const [relativePath, entry] of Object.entries(manifest.installed)) {
+    if (sourceSet.has(relativePath)) continue;
+    const previousEntry = oldManifest.installed[relativePath];
+    if (previousEntry) {
+      manifest.installed[relativePath] = { ...previousEntry, hash: hashFileSync(join(cacheBase, relativePath)) };
+    } else {
+      setManifestEntry(manifest, relativePath, entry.hash, 'user');
+    }
+  }
   writeManifestSync(CACHE_MANIFEST, manifest);
 
   return result;
