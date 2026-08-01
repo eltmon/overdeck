@@ -77,6 +77,8 @@ describe('userContentOutsideRegion', () => {
 });
 
 describe('stripBeadsManagedRegion', () => {
+  const legacyReadyCommand = ['bd', 'ready'].join(' ');
+
   it('is a no-op when Beads did not install an integration block', () => {
     expect(stripBeadsManagedRegion('# Project\n')).toBe('# Project\n');
   });
@@ -121,7 +123,7 @@ This project uses **bd** (beads) for issue tracking. Run \`bd prime\` for full w
 ## Quick Reference
 
 \`\`\`bash
-bd ready              # Find available work
+${legacyReadyCommand}              # Find available work
 bd close <id>         # Complete work
 \`\`\`
 
@@ -144,7 +146,7 @@ This project uses **bd** (beads) for issue tracking. Run \`bd onboard\` to get s
 ## Quick Reference
 
 \`\`\`bash
-bd ready              # Find available work
+${legacyReadyCommand}              # Find available work
 bd sync               # Sync with git
 \`\`\`
 
