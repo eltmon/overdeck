@@ -9541,3 +9541,10 @@ Operator finished UAT pause and said resume.
 - **PAN-2952 merged** (#3384, train, `11489f48`): same-process record-rebuild serialization before the filesystem lock — with PAN-3377's verdict-restore + review-status-read guards, all three PAN-2952 asks are covered. Handed to verifying-on-main; close-out on CI+deploy. Observation (not proof): first `pan done --strike` tonight with no journal-write failure.
 - **PAN-3362 planned** (PRD + xBRIEF on overdeck-state) — awaiting operator release; it unblocks PAN-3356 verification.
 - strike-pan-3383 (watchdog no-restart + patrol kill-without-successor) implementing (+69/−7). CPU PSI ~21 from strike suites — contention real but transient; dispatching nothing further this tick.
+
+## Interim tick 15 (2026-08-01 ~09:15Z) — PAN-2952 closed out (12 landed+closed); PAN-3383 scope-split honestly; deploy patrol restart self-healed this time
+
+- Dashboard health first: **deploy patrol restarted onto the PAN-2952 build on its own** (pid 3868881, live = `11489f48`) — the patrol restart path works sometimes; last night's failure mode is intermittent, reinforcing the need for initiator logging.
+- **PAN-2952 closed out** (8-row DoD). Twelve issues landed+closed this interim run.
+- **PAN-3383 strike ready — but it fixed only defect 1** (watchdog self-explanation: `restartBlockedReason`/`restartInProgress`/`blockedUntil` on every deferral branch incl. named lock holder; silent watchdog now impossible). Verified `restart-lock.ts` already breaks dead-holder locks (EPERM-only alive check), so the incident holder was likely alive-and-hung — the new observability will name it next occurrence. **Defect 2 (initiator persistent logging + always-start-successor in the patrol path) NOT addressed — filed PAN-3386 as the split follow-up rather than closing 3383 as fully done.** That's the unearned-done pattern applied to my own close-outs.
+- PR #3385 in CI (watch armed); land + close on green.
