@@ -1,0 +1,612 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3423: Redesign SystemHealthPill popover: attention-grouped reasons, metered vitals, actionable agent alerts",
+    "updated": "2026-08-01T15:50:56.559Z"
+  },
+  "plan": {
+    "id": "pan-3423",
+    "title": "Redesign SystemHealthPill popover: attention-grouped reasons, metered vitals, actionable agent alerts",
+    "status": "proposed",
+    "uid": "0ee6229f-2986-4496-ba57-ef10a521e3b7",
+    "author": "agent:k3[1m]",
+    "sequence": 3,
+    "created": "2026-08-01T15:40:00.000Z",
+    "updated": "2026-08-01T15:50:56.559Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3423",
+        "label": "PAN-3423",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3423.md",
+        "label": "Canonical PRD",
+        "type": "spec"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "frontend",
+      "system-health",
+      "ui-redesign"
+    ],
+    "narratives": {
+      "Problem": "The SystemHealthPill popover presents its most important information — what needs the operator's attention right now — as a flat, undifferentiated bullet list: informational disclaimers sit at the same weight as stall alerts, identical warnings repeat verbatim once per agent, durations render as raw minutes (2946 instead of 49 h), no row names the agent, and no row offers an action. Metric tiles are text-only, three low-value tiles each consume a full grid row, and Top consumers rows have no proportional size cue.",
+      "Proposal": "Redesign the popover per the operator-approved mockup (2026-08-01): a state badge + one-sentence summary answering 'do I need to do anything?', metered 2x2 vitals tiles, a chip row for admitted-agents/containers/relay, a Needs-attention section with severity-dotted rows that group identical-code agent reasons behind a xN badge and carry Open/Kill actions, a collapsed context-notes disclosure for severity:info reasons, and Top-consumers rows with kind badges, proportional memory bars, and LEAKED tags. Grouping/humanization logic lives in a new pure module src/dashboard/frontend/src/lib/system-health-attention.ts. Server-side, agent-inactivity reasons name the agent and humanize the duration at emission (src/lib/agents/health.ts) so every consumer benefits. No contract/schema changes.",
+      "NonGoals": "- No contract or schema changes: packages/contracts/src/system-health.ts is untouched.\n- No changes to health-state derivation/evaluate.ts; stalled keeps server severity 'warning' (red dot is a frontend-only mapping).\n- No changes to HealthDashboard beyond it automatically benefiting from the FR-3 server copy change.\n- No live ticker for the relative updated time; a static per-render relative value is sufficient.\n- No popover width, position, Escape, or outside-click behavior changes (NFR-3).\n- Do not touch the 'produced no activity' warm-resume copy in src/lib/cloister/deacon-review-signals.ts.\n- Do not commit or move the gitignored mockup at .tmp/system-health-panel-redesign-mockup.html.\n- Do not reimplement the kill flow; reuse the existing KillButton."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Co-locate the attention-model unit test at src/dashboard/frontend/src/lib/system-health-attention.test.ts instead of tests/unit/frontend/",
+        "rationale": "The frontend vitest project only includes src/** under the frontend tree and excludes **/tests/**; co-location matches the dominant convention and keeps the happy-dom environment and fixture pattern."
+      },
+      {
+        "summary": "Add new message assertions in agent-health.test.ts rather than updating existing message tests",
+        "rationale": "grep shows no test asserts the old 'produced no activity' message text; existing cases assert only reason.code via toMatchObject."
+      },
+      {
+        "summary": "Open action uses the dashboard store's openIssue(issueId) and closes the popover",
+        "rationale": "store.ts:184 openIssue is the same navigation target the dashboard uses everywhere; no router machinery exists for a direct push."
+      },
+      {
+        "summary": "Keep server severity 'warning' for agent.runtime.inactive.stalled; map it to critical presentation frontend-only",
+        "rationale": "NFR-1 forbids derivation changes; the approved design's red dot for stalled is presentational, keyed on reason.code in the attention module."
+      },
+      {
+        "summary": "Grouped xN rows render no Kill/Open actions",
+        "rationale": "A group has no single kill or navigation target; the sub-line names the agents, and singleton rows carry the actions."
+      },
+      {
+        "summary": "Docs item adds (not rewrites) a popover description in docs/RESOURCE-GOVERNOR.md",
+        "rationale": "Verified 2026-08-01: the doc references SystemHealthPill only in the inotify surfaces line and has no popover-layout description to rewrite; no Mintlify page covers the component."
+      }
+    ],
+    "items": [
+      {
+        "id": "server-inactivity-copy",
+        "title": "Server: name the agent and humanize durations in inactivity reasons",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/health.ts",
+            "src/lib/agents/__tests__/agent-health.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/agents/__tests__/agent-health.test.ts"
+          ],
+          "expected_outputs": [
+            "agent-health.test.ts passes including the new message assertions naming the agent and humanized duration"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/agents/health.ts lines 223-236, change both agent.runtime.inactive.stalled (line 227) and agent.runtime.inactive.warning (line 234) messages from 'The active agent has produced no activity for ${Math.round(inactivityMs / 60_000)} minutes.' to '${input.agentId} has produced no activity for ${humanizeInactivity(inactivityMs)}.' Add humanizeInactivity(ms) in the same file: <60 min -> 'N min', <48 h -> 'N h' (rounded), otherwise 'N d'. The identity field is input.agentId (ClassifyAgentHealthInput.agentId, health.ts:49). Do NOT touch the unrelated 'produced no activity' warm-resume copy in src/lib/cloister/deacon-review-signals.ts. In src/lib/agents/__tests__/agent-health.test.ts (inactivity cases at lines 185-217 currently assert code only), ADD message assertions: a <60-minute case producing 'for 53 min.', the 2946-minute case producing 'for 49 h.', and a >=48 h case producing 'for 3 d.' — each asserting the message starts with the input agentId."
+        },
+        "items": [
+          {
+            "id": "server-inactivity-copy.ac1",
+            "title": "classifyAgentHealth returns an inactivity reason whose message reads '<agentId> has produced no activity for 53 min.' when inactivity is under 60 minutes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-inactivity-copy.ac2",
+            "title": "A ~2946-minute inactivity produces the message suffix 'for 49 h.' and a >=48 h inactivity produces 'for N d.', per humanizeInactivity rounding",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "server-inactivity-copy.ac3",
+            "title": "The warm-resume copy in src/lib/cloister/deacon-review-signals.ts still contains its original 'produced no activity' text unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attention-model-module",
+        "title": "Frontend: pure attention-model module with grouping, context notes, and summary line",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "popover-header-summary-chips",
+            "attention-section"
+          ],
+          "files_scope": [
+            "src/dashboard/frontend/src/lib/system-health-attention.ts",
+            "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run system-health-attention"
+          ],
+          "expected_outputs": [
+            "system-health-attention.test.ts passes covering grouping, context notes, sort order, and both summary variants"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-8",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/dashboard/frontend/src/lib/system-health-attention.ts exporting interface AttentionItem { severity: 'critical' | 'warning'; code: string; title: string; sub: string; agents: string[]; agentId?: string } and three pure functions: buildAttentionItems(snapshot), contextNotes(snapshot) (returns exactly the severity:'info' reasons), and summaryLine(snapshot, items). Grouping: key = reason.code; ONLY agent-domain reasons group — host/admission/service reasons are singletons titled by the reasonLabel() mapping extracted from SystemHealthPill.tsx:77-123 (move it into this module; keep exactly one copy and update the component import). Agent-domain reasons resolve their agent via snapshot.agents by position (agents[i].reasons belongs to agents[i]). Singleton agent rows title as '<agentId> · <issueId>' when AgentHealthSnapshot.issueId is set. Presentation severity: 'critical' when reason.severity is critical OR code is 'agent.runtime.inactive.stalled' (frontend-only mapping; server keeps 'warning'); else 'warning'. agentId is set only when exactly one agent groups into the row. Sort: critical first, then warning; within a severity, stalled before idle. summaryLine synthesizes the FR-8 sentence from item counts + host.metrics.memoryUsedPercent + admission.availableMemoryBytes; a snapshot with no items produces the all-clear variant naming spawn headroom, relay state, and zero stalled agents. Add co-located unit tests at src/dashboard/frontend/src/lib/system-health-attention.test.ts following the createSnapshot() fixture pattern from SystemHealthPill.test.tsx:48."
+        },
+        "items": [
+          {
+            "id": "attention-model-module.ac1",
+            "title": "buildAttentionItems excludes every severity:'info' reason and contextNotes returns exactly those info reasons",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-model-module.ac2",
+            "title": "Two agents sharing a reason code produce one item that contains agents.length 2, no agentId, and a sub-line that shows at most 2 agents plus '+N more'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-model-module.ac3",
+            "title": "buildAttentionItems returns an item with severity 'critical' for code agent.runtime.inactive.stalled and returns it before warning items",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-model-module.ac4",
+            "title": "A healthy snapshot yields an empty items array and summaryLine returns the all-clear variant naming spawn headroom",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "popover-header-summary-chips",
+        "title": "Popover header: state badge, relative updated time, summary line, and chip row",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run SystemHealthPill",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-5",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In SystemHealthPill.tsx popover JSX (lines 342-436): (1) add a state badge pill-with-dot next to the 'System health' title reusing the existing stateClasses() colors (line 47) — Healthy/Warning/Critical; (2) replace the absolute 'Updated {time}' (line 352) with a relative 'Updated Ns ago' computed per render as Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000) — no live ticker; (3) render summaryLine() from system-health-attention.ts in a bordered box below the header per the approved mockup; (4) convert the admitted-agents / containers / relay tiles (lines 385-398) into a single chip row: 'N admitted agent(s)', 'N containers', and a relay chip with status dot — green when running, red when stopped/unavailable, gray when not configured (relay resolution already exists at line 317)."
+        },
+        "items": [
+          {
+            "id": "popover-header-summary-chips.ac1",
+            "title": "The popover header renders a state badge as a pill with a dot using the existing stateClasses colors, and a relative 'Updated Ns ago' time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "popover-header-summary-chips.ac2",
+            "title": "The summaryLine() output renders in a bordered box between the header and the vitals tiles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "popover-header-summary-chips.ac3",
+            "title": "The chip row renders the admitted-agents, containers, and relay values with the relay status dot, and the old tile grid no longer renders",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "vitals-meter-tiles",
+        "title": "Vitals tiles: meter bars, threshold colors, swap historical sub-label",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run SystemHealthPill",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In SystemHealthPill.tsx vitals tiles (lines 364-384), add a 4px meter bar under each of the four tile values (CPU, Memory, Overdeck share, Swap). Bar width is the metric's percent of full (Memory uses host.metrics.memoryUsedPercent; CPU cpuPercent; Swap swapUsedPercent; Overdeck share overdeckMemoryPercent). Bar color: green below 60%, amber 60-85%, red above 85% for CPU/memory/swap; the Overdeck-share bar is neutral blue (attribution, not pressure). A null metric renders 'Unavailable' with NO bar — never a zero bar (null is not zero, contract comment system-health.ts:47-50). Add the swap sub-label 'historical · not live pressure' with an inline info marker."
+        },
+        "items": [
+          {
+            "id": "vitals-meter-tiles.ac1",
+            "title": "Each vitals tile renders a meter bar whose width matches the metric percent and whose color follows the 60/85 thresholds (Overdeck bar neutral blue)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitals-meter-tiles.ac2",
+            "title": "A snapshot with cpuPercent: null renders 'Unavailable' on the CPU tile and no meter bar",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "vitals-meter-tiles.ac3",
+            "title": "The swap tile renders the sub-label 'historical · not live pressure'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "attention-section",
+        "title": "Needs-attention section replaces the bullet list, with context-notes disclosure and row actions",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "frontend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run SystemHealthPill",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the flat bullet list (SystemHealthPill.tsx:401-407) with the Needs-attention section: one severity-dotted row per AttentionItem from buildAttentionItems() (red dot critical, amber warning), grouped rows showing a xN count badge with agent names in the sub-line. Below the rows render a closed-by-default <details> disclosure titled 'N context notes — background, not pressure signals' containing every contextNotes() reason (FR-1). Singleton agent rows (agentId set) with an issueId render an Open action that calls the dashboard store's openIssue(issueId) (src/dashboard/frontend/src/lib/store.ts:184) and closes the popover. Render the existing KillButton on a singleton agent row only when a topConsumers entry matches (killTarget?.kind === 'agent' && killTarget.agentId === item.agentId, fallback consumer.id === item.agentId) — grouped xN rows render NO Kill/Open (no single target). Healthy state: the section is replaced by a single all-clear row (FR-8). Reuse KillButton (lines 157-233); do not reimplement the kill flow."
+        },
+        "items": [
+          {
+            "id": "attention-section.ac1",
+            "title": "Given 2 agents sharing agent.runtime.inactive.warning, the section renders ONE row with a x2 badge instead of two verbatim bullets, and the old bullet box is gone",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-section.ac2",
+            "title": "Given 2 severity:info reasons, they render only inside a closed-by-default details disclosure titled with the count; the main list shows neither",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-section.ac3",
+            "title": "A singleton agent row with an issueId renders an Open action that invokes the store's openIssue with that issueId and closes the popover",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-section.ac4",
+            "title": "A singleton agent row whose agent appears in topConsumers with a killTarget renders the existing KillButton; a xN grouped row renders neither Kill nor Open",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "attention-section.ac5",
+            "title": "A healthy snapshot renders a single all-clear row and no Needs-attention section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "top-consumers-upgrade",
+        "title": "Top consumers: kind badges, proportional memory bars, LEAKED tag and header copy",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/SystemHealthPill.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run SystemHealthPill",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "SystemHealthPill tests pass",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In SystemHealthPill.tsx Top consumers rows (lines 424-436): add a kind badge from consumer.type (container / agent / specialist), a thin proportional memory bar sized memoryGb / max(memoryGb of rendered consumers), and a LEAKED tag plus amber highlight when consumer.leaked === true (the row already gets border-warning/40 bg-warning/10 at line 426 — keep that and add the tag). Change the header text (line 421) from 'Leaked specialists: N' to '⚠ N leaked specialists' when leakedSpecialistCount > 0 and 'No leaks' otherwise. Keep leakedFirstConsumers sorting (lines 290-296), the Show-all button (lines 412-421), and KillButton behavior intact."
+        },
+        "items": [
+          {
+            "id": "top-consumers-upgrade.ac1",
+            "title": "Each consumer row renders a kind badge matching consumer.type and a memory bar proportional to the largest rendered consumer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumers-upgrade.ac2",
+            "title": "A leaked consumer renders a LEAKED tag with the amber row highlight, and the header reads '⚠ N leaked specialists' when N > 0 else 'No leaks'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "top-consumers-upgrade.ac3",
+            "title": "The row list preserves leakedFirstConsumers sorting, the Show-all expander, and KillButton behavior unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "no-loss-and-component-tests",
+        "title": "Update no-loss audit test and SystemHealthPill component tests for the new layout",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+            "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run system-health-ui-no-loss SystemHealthPill",
+            "npm run typecheck",
+            "npm run lint",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "no-loss test green naming every old affordance's new home",
+            "typecheck/lint/test complete with no new failures"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Update src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx so every OLD popover affordance names its NEW home, per the PRD mapping table: reasons bullet box -> Needs-attention rows + context-notes disclosure; admitted-agents tile -> chip row; containers tile -> chip row; relay full-width tile -> relay chip with status dot; 'Leaked specialists: N' header -> '⚠ N leaked' / 'No leaks' header; Kill/Remove buttons unchanged; critical toast + Open action unchanged (FR-9). Update SystemHealthPill.test.tsx where it asserts the old bullet rendering or tile layout (current tile assertions include 'Admitted work agents', 'Containers', 'Webhook relay'). The no-loss test must be UPDATED, never weakened to skip. Add component-level coverage for AC-1/AC-3/AC-5/AC-6 behaviors not already asserted (grouped x2 row, null-metric Unavailable, leaked tag, all-clear row, Open action calling openIssue). Use vi.useFakeTimers() if any test exercises polling/relative-time behavior."
+        },
+        "items": [
+          {
+            "id": "no-loss-and-component-tests.ac1",
+            "title": "system-health-ui-no-loss.test.tsx passes and contains an assertion mapping each old affordance in the PRD table to its new home",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-and-component-tests.ac2",
+            "title": "The assertions covering the critical-state toast, Escape/outside-click close, and popover width survive unmodified and the suite passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "no-loss-and-component-tests.ac3",
+            "title": "npm run typecheck and npm run lint succeed and npm test passes with no new failures",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-resource-governor",
+        "title": "Document the redesigned popover in docs/RESOURCE-GOVERNOR.md",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-08-01T15:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3423",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/RESOURCE-GOVERNOR.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'context notes' docs/RESOURCE-GOVERNOR.md"
+          ],
+          "expected_outputs": [
+            "grep finds the new popover subsection describing the attention list and context notes"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a short 'System health popover' subsection to docs/RESOURCE-GOVERNOR.md under 'System-health domains and state derivation' (after ~line 34) describing the redesigned sections: summary line, metered vitals tiles, chip row, Needs-attention list with grouped rows and row actions, context-notes disclosure, and the upgraded Top consumers. The doc currently references SystemHealthPill only in the inotify surfaces line (254) and has no popover-layout description — this is an addition, not a rewrite. No Mintlify page covers the component (verified by grep across configuration/ and reference/); record that in the close-out notes. Also update the module header comment of SystemHealthPill.tsx if it describes the old layout."
+        },
+        "items": [
+          {
+            "id": "docs-resource-governor.ac1",
+            "title": "docs/RESOURCE-GOVERNOR.md contains a popover subsection that covers the attention list, context-notes disclosure, chip row, and metered vitals",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-resource-governor.ac2",
+            "title": "The edit preserves the existing inotify surfaces line that mentions SystemHealthPill",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "attention-model-module",
+        "to": "popover-header-summary-chips",
+        "type": "blocks"
+      },
+      {
+        "from": "attention-model-module",
+        "to": "attention-section",
+        "type": "blocks"
+      },
+      {
+        "from": "popover-header-summary-chips",
+        "to": "vitals-meter-tiles",
+        "type": "blocks"
+      },
+      {
+        "from": "vitals-meter-tiles",
+        "to": "attention-section",
+        "type": "blocks"
+      },
+      {
+        "from": "attention-section",
+        "to": "top-consumers-upgrade",
+        "type": "blocks"
+      },
+      {
+        "from": "top-consumers-upgrade",
+        "to": "no-loss-and-component-tests",
+        "type": "blocks"
+      },
+      {
+        "from": "no-loss-and-component-tests",
+        "to": "docs-resource-governor",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3423-redesign-systemhealthpill-popover-attention-grouped-reasons-metered-vitals-actionable-agent-alerts.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
