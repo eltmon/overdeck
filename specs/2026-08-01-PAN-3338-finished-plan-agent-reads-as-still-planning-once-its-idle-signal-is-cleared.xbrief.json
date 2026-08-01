@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:42:15Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3338: Finished plan agent reads as 'still planning' once its idle signal is cleared",
-    "updated": "2026-08-01T15:48:38.641Z"
+    "updated": "2026-08-01T20:08:37.116Z"
   },
   "plan": {
     "id": "pan-3338",
     "title": "Finished plan agent reads as 'still planning' once its idle signal is cleared",
-    "status": "proposed",
+    "status": "running",
     "uid": "655b2fbf-5a3b-4b2a-97d9-b699df72583e",
     "author": "agent:k3[1m]",
-    "sequence": 2,
+    "sequence": 3,
     "created": "2026-08-01T15:42:15Z",
-    "updated": "2026-08-01T15:48:38.641Z",
+    "updated": "2026-08-01T20:08:37.116Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3338",
@@ -335,5 +335,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "proposed"
+  "status": "active"
 }
