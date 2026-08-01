@@ -234,6 +234,12 @@ async function spawnRunWithoutConsentClaim(
     slotItemId: options.slotItemId,
     flywheelRunId: flywheelEnv.OVERDECK_FLYWHEEL_RUN_ID,
     startedBy,
+    ...(role === 'review' && options.subRole ? { reviewSubRole: options.subRole } : {}),
+    reviewRunId: options.reviewRunId,
+    reviewSynthesisAgentId: options.reviewSynthesisAgentId,
+    reviewOutputPath: options.reviewOutputPath,
+    reviewDeadlineAt: options.reviewDeadlineAt,
+    reviewForkedFromParent: options.reviewForkedFromParent,
   };
   // PAN-1048 P1: spawnRun is on the dashboard hot path (Effect routes,
   // reactive Cloister scheduler). All disk I/O here uses async fs/promises
@@ -366,15 +372,9 @@ async function spawnRunWithoutConsentClaim(
     }
   }
 
-  // PAN-1557: convoy reviewers are interactive now, so the launcher no longer
-  // owns the REVIEWER_READY/FAILED signal (which previously rode a `claude
-  // --print` process exit). The Stop-hook delivers REVIEWER_READY to the
-  // synthesis agent when the reviewer finishes its turn with a written report;
-  // Deacon's REVIEWER_TIMEOUT remains the failure failsafe. We still persist
-  // the synthesis/output wiring on state.json so the Stop-hook can read it.
-  if (options.reviewSynthesisAgentId) state.reviewSynthesisAgentId = options.reviewSynthesisAgentId;
-  if (options.reviewOutputPath) state.reviewOutputPath = options.reviewOutputPath;
-
+  // PAN-1557: interactive convoy wiring is already present in the initial
+  // AgentState saved before launch, so the Stop-hook can always deliver
+  // REVIEWER_READY even if a later running-state cache write is contended.
   const extraEnvExports = [harnessLaunch.pathExport, ...flywheelEnvExports(flywheelEnv), ...(options.extraEnvExports ?? [])];
   if (role === 'knowledge' && !extraEnvExports.includes('export PATH="$HOME/.overdeck/bin:$PATH"')) {
     extraEnvExports.push('export PATH="$HOME/.overdeck/bin:$PATH"');
