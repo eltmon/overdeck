@@ -848,3 +848,10 @@ Agent reported discovery-ready failing to launch reviewers. Verified on disk: pa
 
 strike-3446 refused to signal ready and reported main's suite RED for an orthogonal reason — CORRECT call, and it caught something I had missed. Verified: `render.test.ts:124,147` ship literal `bd ready` fixtures that `beads-removal-no-loss.test.ts` forbids; CI red on 8519e39408 + 1dc4b9494e. Source: `51fb0d1370` — **the very commit that blocked my tick-39 push** (PAN-3062 specimen), whose stated purpose was stripping bd boilerplate while its fixtures embed the forbidden strings. Filed **PAN-3448** (blocks-main) + struck; fix direction = build fixture text without literal matches, never weaken the guard. strike-3446's own fix pushed as **PR #3447**, merges when main is green.
 LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red main before my own tick sweep did.
+
+## RUN-79 tick 41 (2026-08-01 ~21:50Z) — red-main strike on target; MIN-931 wedge recovery CONFIRMED; PAN-3422 re-struck
+
+- strike-3448 "Fixing forbidden fixture literals" — exactly the prescribed fix (build fixture text without literal matches, guard untouched). Main CI queued on a newer head; watch for green.
+- **MIN-931 fresh session verified working** ($2.97/+46−79 frozen → $5.23/+448−143). Wedge recovery real, not cosmetic.
+- **PAN-3422 re-struck** with the compaction-boundary lead (verify activity delta, not just keystroke acceptance; re-deliver once if the turn never starts). This class has cost 5 manual interventions today — highest-frequency operational failure of the run.
+- MIN-932 deep in Lane A work ($18.10, +1535/−157). Leak strike round 2 still at +42/−92 (small diff, high thought — heap analysis).
