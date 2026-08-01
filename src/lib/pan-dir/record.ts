@@ -480,7 +480,8 @@ export async function readIssueRecord(
 
 /**
  * Batch-read issue records with bounded concurrency to avoid event-loop starvation.
- * Resolves the state home once per project, then reads records asynchronously.
+ * Resolves the state home ONCE per project (synchronously), derives record paths from that,
+ * then reads record bodies asynchronously without repeating state-home resolution.
  */
 export async function batchReadIssueRecords(
   project: ProjectConfig,
@@ -488,13 +489,46 @@ export async function batchReadIssueRecords(
 ): Promise<Map<string, PanIssueRecord | null>> {
   const result = new Map<string, PanIssueRecord | null>();
 
+  // Resolve state home once per project — single synchronous marker read
+  const { resolveStateReadHomeSync } = await import('./state-read-home.js');
+  const stateHome = resolveStateReadHomeSync(project);
+  const RECORD_DIRNAME = 'records';
+  const recordsDir = stateHome.migrated
+    ? join(stateHome.root, RECORD_DIRNAME)
+    : null;
+
   const batchSize = 10;
   for (let i = 0; i < issueIds.length; i += batchSize) {
     const batch = issueIds.slice(i, i + batchSize);
     await Promise.allSettled(
       batch.map(async (id) => {
-        const record = await readIssueRecord(project, id);
-        result.set(id, record);
+        try {
+          let record: PanIssueRecord | null = null;
+
+          if (recordsDir) {
+            // Migrated: read from state home without re-resolving marker
+            const path = join(recordsDir, `${id.toLowerCase()}.json`);
+            try {
+              const raw = await fsp.readFile(path, 'utf-8');
+              record = JSON.parse(raw) as PanIssueRecord;
+            } catch {
+              record = null;
+            }
+          } else {
+            // Unmigrated: use legacy path resolution (still avoids repeated marker reads)
+            const legacyPath = getIssueRecordPath(project, id);
+            try {
+              const raw = await fsp.readFile(legacyPath, 'utf-8');
+              record = JSON.parse(raw) as PanIssueRecord;
+            } catch {
+              record = null;
+            }
+          }
+
+          result.set(id, record);
+        } catch {
+          result.set(id, null);
+        }
       }),
     );
   }

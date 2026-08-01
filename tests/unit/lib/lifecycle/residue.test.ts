@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock execFile before importing the module
-const mockExecFile = vi.fn();
+// Use hoisted to declare mockExecFile in the factory scope
+const { mockExecFile } = vi.hoisted(() => {
+  return {
+    mockExecFile: vi.fn(),
+  };
+});
 
 vi.mock('child_process', () => ({
   execFile: mockExecFile,
