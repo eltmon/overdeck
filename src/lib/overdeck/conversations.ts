@@ -1191,12 +1191,7 @@ export function listArchivedConversationsWithEnrichment(options: ArchivedConvers
 export function listArchivedConversationNames(): string[] {
   return listArchivedConversations().map((conv) => conv.name);
 }
-
-function nullIfEmpty(value: string | undefined): string | null {
-  const normalized = value?.trim();
-  return normalized || null;
-}
-
+const nullIfEmpty = (value: string | undefined): string | null => value?.trim() || null;
 export function createConversation(opts: {
   name: string;
   tmuxSession: string;
