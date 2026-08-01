@@ -2,7 +2,7 @@
   "issueId": "PAN-3338",
   "schemaVersion": 2,
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T15:03:35.593Z",
+  "updated": "2026-08-01T15:03:39.525Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3338: Finished plan agent reads as 'still planning' once its idle signal is cleared",
       "timestamp": "2026-08-01T15:03:35.592Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
