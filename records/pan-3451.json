@@ -66,22 +66,24 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:25:56.882Z",
+  "updated": "2026-08-01T23:25:57.882Z",
   "pipeline": {
     "issueId": "PAN-3451",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:18:17.557Z",
+    "updatedAt": "2026-08-01T23:25:57.880Z",
     "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346",
     "reviewSpawnedAt": "2026-08-01T23:13:02.766Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
+        "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+        "src/lib/work/done-preflight.ts",
         "tests/unit/dashboard/routes/agents-no-loss.test.ts"
       ],
       "declaredScopeUntouched": [],
@@ -103,11 +105,14 @@
         "packages/pi-extension/src/index.ts",
         "src/dashboard/server/routes/agents.ts",
         "src/dashboard/server/routes/agents/runtime-events.ts",
+        "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+        "src/lib/work/done-preflight.ts",
         "tests/unit/dashboard/routes/agents-no-loss.test.ts",
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
-      "recordedAt": "2026-08-01T23:07:37.721Z"
-    }
+      "recordedAt": "2026-08-01T23:25:56.881Z"
+    },
+    "reviewRequestedAt": "2026-08-01T23:25:57.880Z"
   },
   "closeOut": {
     "usage": {
