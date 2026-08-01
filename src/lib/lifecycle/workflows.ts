@@ -215,7 +215,7 @@ export function closeOut(
     const dodGate: DodGateResult = abandon
       ? buildAbandonedDodGate(abandon.reason, abandon.by)
       : residue
-      ? buildResidueDodGate(residue.reason, residue.by)
+      ? buildResidueDodGate(residue.reason, residue.by, ['Close stale convention PRs/MRs with no merge claim'])
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
@@ -249,12 +249,14 @@ export function closeOut(
 
     // 1.5. Close stale convention PRs/MRs for residue disposition (PAN-3396)
     if (residue) {
-      const prRepos = resolveProjectReposForIssueSync(ctx.issueId, ctx.projectPath);
+      const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
+      const githubRepos = prRepos?.filter(r => r.forge === 'github').map(r => r.repoPath) ?? [];
+      const gitlabRepos = prRepos?.filter(r => r.forge === 'gitlab').map(r => r.repoPath) ?? [];
       const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
         issueId: ctx.issueId,
         projectPath: ctx.projectPath,
-        github: prRepos.github ? { owner: prRepos.github.owner, repo: prRepos.github.repo } : undefined,
-        gitlab: prRepos.gitlab?.[0] ? { project: prRepos.gitlab[0] } : undefined,
+        github: githubRepos[0],
+        gitlab: gitlabRepos.length > 0 ? { projects: gitlabRepos } : undefined,
       }));
       allSteps.push(residueStep);
       if (!residueStep.success && !residueStep.skipped) {
