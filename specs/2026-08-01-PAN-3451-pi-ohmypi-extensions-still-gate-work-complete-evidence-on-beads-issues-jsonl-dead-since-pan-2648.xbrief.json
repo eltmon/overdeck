@@ -1,0 +1,337 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T22:09:05.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3451: pi/ohmypi extensions still gate work-complete evidence on .beads/issues.jsonl (dead since PAN-2648)",
+    "updated": "2026-08-01T22:12:03.935Z"
+  },
+  "plan": {
+    "id": "pan-3451",
+    "title": "pi/ohmypi extensions still gate work-complete evidence on .beads/issues.jsonl (dead since PAN-2648)",
+    "status": "proposed",
+    "uid": "90ad9bdb-901a-4e83-9f3e-f611b818934c",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T22:09:05.000Z",
+    "updated": "2026-08-01T22:12:03.935Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3451",
+        "label": "PAN-3451",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "pi",
+      "ohmypi",
+      "harness",
+      "beads-residue",
+      "extensions"
+    ],
+    "narratives": {
+      "Problem": "evidenceClean() in packages/pi-extension/src/index.ts:499 and packages/ohmypi-extension/src/index.ts:506 gates the evidence-clean work-complete path on allIssueBeadsClosed(), which reads <workspace>/.beads/issues.jsonl. Since PAN-2648 removed the beads engine, that file never exists, the read always throws, and the path can never fire. The adjacent xbriefSatisfied() check reads pre-PAN-2541 legacy paths (.pan/spec.vbrief.json, .pan/continue.json) and passes vacuously.",
+      "Proposal": "Add POST /api/agents/:id/plan-checklist to the dashboard runtime-events routes: internal-token authenticated, resolves the agent's workspace/issueId from the agent runtime record via getAgentState, and reports checklist completeness through checkIncompletePlanItemsPromise (the canonical door runVerificationForIssue uses). Both extensions replace evidenceClean() with a postJsonWithTimeout call to that endpoint (fail-soft: any error = not clean, falls through to markers/classifier), delete isClosedBead/beadMatchesIssue/allIssueBeadsClosed/statusComplete/planItemsComplete/xbriefSatisfied, and swap beads-flavored strings ('all beads closed' -> 'all tasks closed'; new work-complete summary). docs/HOOKS.md Pi Completion Detection updated.",
+      "NonGoals": "- Changing runVerificationForIssue() or the pan done preflight (already on the canonical door)\n- Changing classify-completion heuristics or the OVERDECK_WORK_COMPLETE / OVERDECK_SPECIALIST_RESULT protocols\n- Removing historical bead mentions that document the beads migration itself (docs/ohmypi-contract.md)\n- Claude Code Stop-hook completion flow (unaffected)\n- Bootstrapping the repo-wide .pan/context/codebase/ map (absent on main; deferred rather than fabricated from a three-file discovery)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Server-side checklist endpoint instead of mirroring readWorkspacePlanSync in the extensions or shelling out to `pan task`",
+        "rationale": "The canonical resolution (projects.yaml lookup, state read home, spec filename parsing, record statusOverrides) is too much machinery to duplicate into two zero-dependency forks without creating a parallel read path for canonical state, which the one-read-door tenet forbids; the extension already owns an authenticated HTTP channel to the dashboard. The issue's proposed fix explicitly names readWorkspacePlan() semantics and the checkIncompletePlanItemsPromise gate — the endpoint is that door, called remotely."
+      },
+      {
+        "summary": "Endpoint resolves workspace/issueId from the agent runtime record, not the request body",
+        "rationale": "Avoids trusting client-supplied paths on an authenticated but agent-reachable surface; getAgentState is the pattern sibling routes already use."
+      },
+      {
+        "summary": "Also delete xbriefSatisfied/planItemsComplete/statusComplete, not just the three bead helpers",
+        "rationale": "xbriefSatisfied reads pre-PAN-2541 legacy paths and is fully subsumed by the endpoint's canonical check; keeping it as an extra AND would add a stale-path false-negative with no upside."
+      },
+      {
+        "summary": "Swap COMPLETION_PHRASES 'all beads closed' to 'all tasks closed' and update the work-complete summary string",
+        "rationale": "Same-file beads residue from PAN-2648; 'all tasks closed' is the phrasing the classify-completion route already recognizes."
+      },
+      {
+        "summary": "Defer the repo-wide .pan/context/codebase/ bootstrap",
+        "rationale": "The directory is absent on main; writing four canonical architecture files from a three-file surgical discovery would fabricate authority and pollute main. Recorded here rather than silently skipped."
+      }
+    ],
+    "items": [
+      {
+        "id": "add-plan-checklist-endpoint",
+        "title": "Add POST /api/agents/:id/plan-checklist route backed by checkIncompletePlanItemsPromise",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:09:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3451",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "pi-extension-checklist-door",
+            "ohmypi-extension-checklist-door"
+          ],
+          "files_scope": [
+            "src/dashboard/server/routes/agents/runtime-events.ts",
+            "src/dashboard/server/routes/agents.ts",
+            "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run tests/unit/dashboard/server/routes/plan-checklist.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "plan-checklist.test.ts passes all cases (complete, incomplete, unauthenticated)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/agents/runtime-events.ts add postAgentPlanChecklistRoute (POST /api/agents/:id/plan-checklist) next to postAgentClassifyCompletionRoute (line 161): validateAgentRuntimeEventAuth, then resolve the agent via getAgentState(id) (dynamic import of lib/agents.js, same style as the handler at line 188), 422 when state.workspace or state.issueId is missing, then run checkIncompletePlanItemsPromise(state.workspace, state.issueId) from src/lib/work/done-preflight.ts and return { success: true, complete: incomplete.length === 0, incomplete }. Register the route in src/dashboard/server/routes/agents.ts directly after postAgentClassifyCompletionRoute (imports ~lines 40-42, route list ~lines 113-115). Add tests/unit/dashboard/server/routes/plan-checklist.test.ts following the neighboring route-test setup pattern: temp workspace <tmp>/workspaces/feature-pan-3451/ with .overdeck/spec.vbrief.json exercises the findPlanSync legacy-draft fallback without projects.yaml registration. The exact before/after snippet is in PRD drafts/PAN-3451.md work item 1."
+        },
+        "items": [
+          {
+            "id": "add-plan-checklist-endpoint.ac1",
+            "title": "Given an agent whose workspace plan has every item in a terminal status, a POST with the internal token returns HTTP 200 with { success: true, complete: true }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-plan-checklist-endpoint.ac2",
+            "title": "Given a plan with one pending item, the route returns complete: false and the incomplete array names that item id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-plan-checklist-endpoint.ac3",
+            "title": "Given no internal token, the route rejects the request with a 4xx auth response, matching the sibling runtime-event routes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "add-plan-checklist-endpoint.ac4",
+            "title": "Given an agent id with no resolvable workspace or issueId, the route returns 422 with a success:false body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "pi-extension-checklist-door",
+        "title": "pi extension: evidenceClean consults plan-checklist endpoint; delete beads helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:09:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/pi-extension/src/index.ts",
+            "packages/pi-extension/src/__tests__/index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/pi-extension && npm run typecheck",
+            "cd packages/pi-extension && npm test"
+          ],
+          "expected_outputs": [
+            "pi-extension typecheck completes without errors",
+            "pi-extension vitest suite passes including the three rewritten turn_end completion cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-2",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "In packages/pi-extension/src/index.ts: rewrite evidenceClean() (line 499) to POST { issueId } via postJsonWithTimeout to `${getDashboardUrl()}/api/agents/${env.agentId}/plan-checklist` and return result?.['complete'] === true (keeping the existing !issueId || !workspace early-false guard). Delete isClosedBead (444), beadMatchesIssue (449), allIssueBeadsClosed (457), statusComplete (474), planItemsComplete (478), xbriefSatisfied (488). Change the work-complete summary at line 578 to 'All xBRIEF plan items are complete'. Change the COMPLETION_PHRASES entry (537) from 'all beads closed' to 'all tasks closed'. In __tests__/index.test.ts, extend the global fetch stub (lines 33-60) with a per-URL response map exposing ok/json for the plan-checklist URL, and rewrite the two beads-fixture tests (499-526) into: (a) endpoint complete => work-complete POSTed with resolution done; (b) endpoint complete:false => no work-complete; (c) fetch rejects and output carries OVERDECK_WORK_COMPLETE => completion still fires via the structured-marker path. Exact before/after code is in PRD drafts/PAN-3451.md work item 2."
+        },
+        "items": [
+          {
+            "id": "pi-extension-checklist-door.ac1",
+            "title": "Given the plan-checklist endpoint responds complete:true, handleTurnEnd for a work agent POSTs /api/agents/:id/work-complete and a resolution_set done event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-extension-checklist-door.ac2",
+            "title": "Given the endpoint responds complete:false or fetch rejects, handleTurnEnd does not POST work-complete but still completes on an OVERDECK_WORK_COMPLETE output marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "pi-extension-checklist-door.ac3",
+            "title": "git grep -n 'issues.jsonl|allIssueBeadsClosed|beadMatchesIssue|isClosedBead|xbriefSatisfied|all beads closed' packages/pi-extension returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ohmypi-extension-checklist-door",
+        "title": "ohmypi extension: evidenceClean consults plan-checklist endpoint; delete beads helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T22:09:05.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/ohmypi-extension/src/index.ts",
+            "packages/ohmypi-extension/src/__tests__/index.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "cd packages/ohmypi-extension && npm run typecheck",
+            "cd packages/ohmypi-extension && npm test"
+          ],
+          "expected_outputs": [
+            "ohmypi-extension typecheck completes without errors",
+            "ohmypi-extension vitest suite passes including the three rewritten turn_end completion cases"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "FR-4",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Apply the identical change as pi-extension-checklist-door to the ohmypi fork: packages/ohmypi-extension/src/index.ts (isClosedBead line 451, beadMatchesIssue 456, allIssueBeadsClosed 464, evidenceClean ~506, work-complete summary 585, COMPLETION_PHRASES ~544) and packages/ohmypi-extension/src/__tests__/index.test.ts. The packages are deliberate near-identical forks; the diff must mirror the pi item hunk-for-hunk modulo ohmypi naming. See PRD drafts/PAN-3451.md work item 3."
+        },
+        "items": [
+          {
+            "id": "ohmypi-extension-checklist-door.ac1",
+            "title": "Given the plan-checklist endpoint responds complete:true, handleTurnEnd for a work agent POSTs /api/agents/:id/work-complete and a resolution_set done event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ohmypi-extension-checklist-door.ac2",
+            "title": "Given the endpoint responds complete:false or fetch rejects, handleTurnEnd does not POST work-complete but still completes on an OVERDECK_WORK_COMPLETE output marker",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ohmypi-extension-checklist-door.ac3",
+            "title": "git grep -n 'issues.jsonl|allIssueBeadsClosed|beadMatchesIssue|isClosedBead|xbriefSatisfied|all beads closed' packages/ohmypi-extension returns no hits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ohmypi-extension-checklist-door.ac4",
+            "title": "A diff between the ohmypi-extension and pi-extension changes to src/index.ts (after substituting Ohmypi/Pi naming) produces no remaining non-naming hunks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "hooks-doc-checklist-door",
+        "title": "docs/HOOKS.md: Pi Completion Detection documents the plan-checklist endpoint",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T22:09:05.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3451",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/HOOKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'beads' docs/HOOKS.md",
+            "grep -n 'plan-checklist' docs/HOOKS.md"
+          ],
+          "expected_outputs": [
+            "grep for 'beads' in docs/HOOKS.md returns no hits in the Pi Completion Detection section",
+            "grep for 'plan-checklist' in docs/HOOKS.md shows the endpoint named in step 1 of Pi Completion Detection"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite the numbered list in the Pi Completion Detection section of docs/HOOKS.md (lines 135-140): step 1 now reads that the extension POSTs /api/agents/:id/plan-checklist and treats work as complete only when the server reports every xBRIEF checklist item complete through the canonical checkIncompletePlanItemsPromise gate; step 2 lists completion markers OVERDECK_WORK_COMPLETE, Implementation complete, all tasks closed, ready for review. Exact before/after text is in PRD drafts/PAN-3451.md work item 4."
+        },
+        "items": [
+          {
+            "id": "hooks-doc-checklist-door.ac1",
+            "title": "grep -n 'plan-checklist' docs/HOOKS.md returns a hit inside the Pi Completion Detection section, and that step also names the checkIncompletePlanItemsPromise gate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "hooks-doc-checklist-door.ac2",
+            "title": "grep -n 'beads' docs/HOOKS.md returns no hits within the Pi Completion Detection section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "add-plan-checklist-endpoint",
+        "to": "pi-extension-checklist-door",
+        "type": "blocks"
+      },
+      {
+        "from": "add-plan-checklist-endpoint",
+        "to": "ohmypi-extension-checklist-door",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3451-pi-ohmypi-extensions-still-gate-work-complete-evidence-on-beads-issues-jsonl-dead-since-pan-2648.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
