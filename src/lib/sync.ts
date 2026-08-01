@@ -398,6 +398,8 @@ export interface SyncResult {
   adopted: string[];
   skipped: string[];
   conflicts: string[];
+  pruned: string[];
+  keptModified: string[];
   diffs: Array<{ path: string; sourceContent: string; targetContent: string }>;
 }
 
@@ -425,6 +427,8 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
     adopted: [],
     skipped: [],
     conflicts: [],
+    pruned: [],
+    keptModified: [],
     diffs: [],
   };
 

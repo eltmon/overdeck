@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, rmdirSync, writeFileSync } from 'fs';
 import { mkdir, readFile, readdir, writeFile } from 'fs/promises';
-import { join, relative } from 'path';
+import { dirname, join, relative } from 'path';
 import { Effect } from 'effect';
 import { FsError } from './errors.js';
 
@@ -101,6 +101,58 @@ export function setManifestEntry(
  */
 export function removeManifestEntry(manifest: Manifest, relativePath: string): void {
   delete manifest.installed[relativePath];
+}
+
+export interface PruneResult {
+  pruned: string[];
+  keptModified: string[];
+}
+
+/**
+ * Remove stale Overdeck-managed files while preserving user modifications.
+ *
+ * Entries are stale when their manifest path is absent from the current bundled
+ * source set. Modified files lose Overdeck ownership in the manifest but remain
+ * on disk, so later syncs treat them as user-owned.
+ */
+export function pruneStaleManifestEntriesSync(
+  targetBase: string,
+  manifest: Manifest,
+  currentSourceRelPaths: ReadonlySet<string>,
+  opts?: { prefixes?: string[] },
+): PruneResult {
+  const result: PruneResult = { pruned: [], keptModified: [] };
+
+  for (const [relativePath, entry] of Object.entries(manifest.installed)) {
+    if (entry.source !== 'overdeck') continue;
+    if (currentSourceRelPaths.has(relativePath)) continue;
+    if (opts?.prefixes && !opts.prefixes.some((prefix) => relativePath.startsWith(prefix))) continue;
+
+    const targetFile = join(targetBase, relativePath);
+    if (!existsSync(targetFile)) {
+      removeManifestEntry(manifest, relativePath);
+      result.pruned.push(relativePath);
+      continue;
+    }
+
+    if (hashFileSync(targetFile) !== entry.hash) {
+      removeManifestEntry(manifest, relativePath);
+      result.keptModified.push(relativePath);
+      continue;
+    }
+
+    rmSync(targetFile, { force: true });
+    removeManifestEntry(manifest, relativePath);
+    result.pruned.push(relativePath);
+
+    let currentDir = dirname(targetFile);
+    while (currentDir !== targetBase && existsSync(currentDir) && readdirSync(currentDir).length === 0) {
+      rmdirSync(currentDir);
+      currentDir = dirname(currentDir);
+    }
+  }
+
+  return result;
 }
 
 /**

@@ -48,7 +48,7 @@ export function executeAgentSkillsSync(
   sourceSkillsDir: string = SKILLS_DIR,
 ): SyncResult {
   const result: SyncResult = {
-    created: [], updated: [], adopted: [], skipped: [], conflicts: [], diffs: [],
+    created: [], updated: [], adopted: [], skipped: [], conflicts: [], pruned: [], keptModified: [], diffs: [],
   };
   const manifestPath = join(dirname(targetSkillsDir), '.overdeck-manifest.json');
   const manifest = readManifestSync(manifestPath);

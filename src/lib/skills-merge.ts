@@ -24,6 +24,8 @@ export interface MergeResult {
   updated: string[];
   skipped: string[];
   overlayed: string[];
+  pruned: string[];
+  keptModified: string[];
 }
 
 /**
@@ -74,6 +76,8 @@ export function mergeSkillsIntoWorkspaceSync(workspacePath: string): MergeResult
     updated: [],
     skipped: [],
     overlayed: [],
+    pruned: [],
+    keptModified: [],
   };
 
   // Ensure base directories exist
@@ -290,7 +294,9 @@ export function cleanupWorkspaceGitignoreSync(workspacePath: string): {
  * can override global cache skills (but never overwrite user-owned content).
  */
 export function mergePanSkillsIntoWorkspaceSync(projectPath: string, workspacePath: string): MergeResult {
-  const result: MergeResult = { added: [], updated: [], skipped: [], overlayed: [] };
+  const result: MergeResult = {
+    added: [], updated: [], skipped: [], overlayed: [], pruned: [], keptModified: [],
+  };
   const panSkillsDir = join(projectPath, '.pan', 'skills');
   if (!existsSync(panSkillsDir)) return result;
 

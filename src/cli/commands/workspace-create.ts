@@ -302,7 +302,14 @@ export async function createCommand(issueId: string, options: CreateOptions): Pr
     }
 
     // Merge skills, agents, and rules (unless disabled)
-    let skillsResult = { added: [] as string[], updated: [] as string[], skipped: [] as string[], overlayed: [] as string[] };
+    let skillsResult = {
+      added: [] as string[],
+      updated: [] as string[],
+      skipped: [] as string[],
+      overlayed: [] as string[],
+      pruned: [] as string[],
+      keptModified: [] as string[],
+    };
     if (options.skills !== false) {
       spinner.text = 'Merging skills and agents...';
       skillsResult = mergeSkillsIntoWorkspaceSync(workspacePath);
