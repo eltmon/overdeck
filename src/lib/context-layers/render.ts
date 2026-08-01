@@ -21,15 +21,74 @@ export const REGION_END = '<!-- END OVERDECK CONTEXT -->';
 
 const BEADS_REGION = /<!-- BEGIN BEADS INTEGRATION\b[\s\S]*?<!-- END BEADS INTEGRATION -->\s*/g;
 
+/** Pre-rebrand managed region — superseded by the OVERDECK markers, never rewritten since. */
+const LEGACY_PANOPTICON_REGION = /<!-- BEGIN PANOPTICON CONTEXT\b[\s\S]*?<!-- END PANOPTICON CONTEXT -->\s*/g;
+
+/** Headings of sections `bd onboard` writes outside its marked region. */
+const BD_ONBOARD_SECTIONS = /^## (Quick Reference|Landing the Plane \(Session Completion\)|Session Completion)\s*$/;
+
+/** bd CLI invocations that prove a section is bd-onboard boilerplate, not user prose. */
+const BD_COMMAND = /\bbd (ready|show|update|close|sync|prime|onboard|dolt)\b/;
+
+/**
+ * Remove the sections `bd onboard` wrote *without* markers: the
+ * "This project uses **bd** (beads)" intro (plus its architecture blockquote)
+ * and the Quick Reference / session-completion sections. Older bd versions
+ * wrote these as plain markdown, so the marked-region strip never sees them
+ * (PAN-2648 removed only the marked block). A section is dropped only when its
+ * body actually invokes `bd`, so user prose that merely mentions beads —
+ * e.g. the deep-wipe rule's legacy `.beads/` note — is untouched.
+ */
+function stripBeadsOnboardBoilerplate(existing: string): string {
+  const lines = existing.split('\n');
+  const kept: string[] = [];
+  let removed = false;
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    // Intro paragraph + optional architecture blockquote that follows it.
+    if (line.startsWith('This project uses **bd') && line.includes('(beads)')) {
+      i++;
+      while (i < lines.length && (lines[i].trim() === '' || lines[i].startsWith('>'))) i++;
+      removed = true;
+      continue;
+    }
+    // bd-onboard section: heading through the line before the next heading/marker.
+    if (BD_ONBOARD_SECTIONS.test(line)) {
+      let end = i + 1;
+      while (end < lines.length && !/^#{1,2} /.test(lines[end]) && !lines[end].startsWith('<!--')) end++;
+      if (BD_COMMAND.test(lines.slice(i + 1, end).join('\n'))) {
+        i = end;
+        removed = true;
+        continue;
+      }
+    }
+    kept.push(line);
+    i++;
+  }
+  if (!removed) return existing;
+  let cleaned = kept.join('\n').replace(/\n{3,}/g, '\n\n').trimEnd();
+  // bd onboard's file header — drop it when nothing else remains.
+  if (cleaned.trim() === '# Agent Instructions') cleaned = '';
+  return cleaned;
+}
+
 /**
  * Remove bd's generic agent-policy block before Overdeck renders its canonical
  * project context. The Beads block's conservative/minimal profiles forbid the
  * commit and push operations that managed work agents must perform per bead.
- * Its marker makes the ownership unambiguous; hand-authored content remains.
+ * The marked region is owned unambiguously; unmarked bd-onboard boilerplate is
+ * recognized by its verbatim intro/section shapes. Hand-authored content remains.
  */
 export function stripBeadsManagedRegion(existing: string): string {
-  if (!existing.includes('<!-- BEGIN BEADS INTEGRATION')) return existing;
-  return existing.replace(BEADS_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  let cleaned = existing;
+  if (cleaned.includes('<!-- BEGIN BEADS INTEGRATION')) {
+    cleaned = cleaned.replace(BEADS_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  }
+  if (cleaned.includes('This project uses **bd') || BD_COMMAND.test(cleaned)) {
+    cleaned = stripBeadsOnboardBoilerplate(cleaned);
+  }
+  return cleaned;
 }
 
 /**
@@ -42,6 +101,12 @@ export function stripBeadsManagedRegion(existing: string): string {
  */
 export function applyManagedRegion(existing: string, managed: string): string {
   existing = stripBeadsManagedRegion(existing);
+  // Rebrand leftover: a PANOPTICON-marked region is this same managed region
+  // under its old name — orphaned when the markers were renamed, so it would
+  // otherwise persist as a stale duplicate next to the OVERDECK one forever.
+  if (existing.includes('<!-- BEGIN PANOPTICON CONTEXT')) {
+    existing = existing.replace(LEGACY_PANOPTICON_REGION, '').replace(/\n{3,}/g, '\n\n').trimEnd();
+  }
   const region = `${REGION_BEGIN}\n${managed.trim()}\n${REGION_END}`;
   const beginIdx = existing.indexOf(REGION_BEGIN);
   // Use the LAST end-marker, not the first. Layer content may legitimately
