@@ -32,9 +32,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T18:47:26.932Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T18:58Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-01T18:58:23.755Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T18:58:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3419\n\n# Review Synthesis — PAN-3419 — 2026-08-01\n\n## Verdict: CHANGES REQUESTED — synchronous project resolution blocks the dashboard event loop, and the required conversation 1827 reassignment is not evidenced\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/context.json\n- Branch: feature/pan-3419\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419\n- HEAD reviewed: b81c0740c5baf126fe9cbb8b4a4fc52acd0d34c9\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR base: e5c9897ffda249417aa416f8409e5d54b7ed06d5\n- PR commits: 11\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/requirements.md | 1 |\n\n## Blocking Findings\n\n### [performance] Project resolution blocks the dashboard event loop during conversation creation and forks — `src/lib/overdeck/conversation-forks.ts:654`\nThe new request-path resolver calls `resolveRegisteredProjectKey()` or `resolveProjectKeyForCwd()`, which reach `getProjectSync()` / `listProjectsSync()` and therefore `statSync()`, with `readFileSync()` plus YAML parsing on cache misses. The project-scoped conversation-create path also resolves the same project twice. These changed lines are inside the PR diff and run on the Node dashboard's single event loop, so project resolution can delay unrelated HTTP responses, RPC WebSocket updates, and terminal traffic. Replace the request-path sync resolution with asynchronous resolvers based on `loadProjectsConfig()` / `listProjects()`, and return the canonical key and project configuration/path from one resolution.\n\n### [requirements] Required conversation 1827 reassignment has no auditable implementation — xBRIEF `cleanup-conv-1827` / FR-9\nThe manifest requires conversation row 1827 (`20260801-2fc7`) to be associated with `mind-your-now` through the conversation write door. The PR adds the general setter and persistence tests, but no changed artifact or review evidence records the required narrowly scoped write or verifies the resulting `projectKey`. The motivating conversation therefore remains unproven as corrected. Perform the one-time update through the canonical conversation writer and attach reviewable post-write evidence; do not backfill any other existing row.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\n- security\n- correctness\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/.pan/review/agent-pan-3419-review-b81c0740/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3419 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/overdeck-remodel/overdeck-schema.ts",
@@ -115,7 +128,7 @@
     "recordedAt": "2026-08-01T18:21:54.888Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T18:58:23.141Z",
+  "updated": "2026-08-01T18:58:23.756Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "blocked",
