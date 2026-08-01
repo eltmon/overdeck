@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:52:01.946Z",
+  "updated": "2026-08-01T10:59:40.341Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,16 +78,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "audit-batch-e": {
-        "writerId": "agent-pan-3367",
-        "agentId": "agent-pan-3367",
-        "pid": 2074177,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:52:01.945Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -143,6 +135,17 @@
         "outcome": "completed",
         "reason": "Audited PAN-3147/3155/3158/3183/3184 — all 5 verdicts satisfied, no follow-ups filed. PAN-3147 is trivial docs-only with pure infra retries. PAN-3155/3158/3183/3184 each had a genuine finding with a precisely matching fix commit confirmed via diff and regression test. Also re-verified all 20 merge-commit SHAs cited across batch-a through -d against gh pr view after catching two transcription errors while writing this batch.",
         "releasedAt": "2026-08-01T10:51:51.288Z"
+      },
+      {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 2074177,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:52:01.945Z",
+        "itemId": "audit-batch-e",
+        "outcome": "completed",
+        "reason": "Audited PAN-1525 (compacted, reconstructed from GitHub PR-comment chronology, lower confidence stated explicitly) and MIN-858/879/896/901 (Linear ACs, GitLab MR diffs from ~/Projects/myn) — all 5 verdicts satisfied, no follow-ups filed. MIN-858/901 share a confirmed false-positive finding unrelated to either diff. MIN-879 surfaced H12: the worklist's recorded pass can be transient, reverting within milliseconds to a new finding; verified this doesn't affect the 20 issues already audited in batches a-d.",
+        "releasedAt": "2026-08-01T10:59:40.341Z"
       }
     ],
     "statusReasons": {
@@ -165,6 +168,10 @@
       "audit-batch-d": {
         "reason": "Audited PAN-3147/3155/3158/3183/3184 — all 5 verdicts satisfied, no follow-ups filed. PAN-3147 is trivial docs-only with pure infra retries. PAN-3155/3158/3183/3184 each had a genuine finding with a precisely matching fix commit confirmed via diff and regression test. Also re-verified all 20 merge-commit SHAs cited across batch-a through -d against gh pr view after catching two transcription errors while writing this batch.",
         "updatedAt": "2026-08-01T10:51:51.288Z"
+      },
+      "audit-batch-e": {
+        "reason": "Audited PAN-1525 (compacted, reconstructed from GitHub PR-comment chronology, lower confidence stated explicitly) and MIN-858/879/896/901 (Linear ACs, GitLab MR diffs from ~/Projects/myn) — all 5 verdicts satisfied, no follow-ups filed. MIN-858/901 share a confirmed false-positive finding unrelated to either diff. MIN-879 surfaced H12: the worklist's recorded pass can be transient, reverting within milliseconds to a new finding; verified this doesn't affect the 20 issues already audited in batches a-d.",
+        "updatedAt": "2026-08-01T10:59:40.341Z"
       }
     }
   },
@@ -191,6 +198,9 @@
     "audit-batch-d.audit-batch-d.ac1": "completed",
     "audit-batch-d.audit-batch-d.ac2": "completed",
     "audit-batch-d.audit-batch-d.ac3": "completed",
-    "audit-batch-e": "running"
+    "audit-batch-e": "completed",
+    "audit-batch-e.audit-batch-e.ac1": "completed",
+    "audit-batch-e.audit-batch-e.ac2": "completed",
+    "audit-batch-e.audit-batch-e.ac3": "completed"
   }
 }
