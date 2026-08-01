@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:30:39.601Z",
+  "updated": "2026-08-01T15:45:48.999Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "move-endpoint": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 3245900,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:30:39.601Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -69,8 +61,8 @@
         "updatedAt": "2026-08-01T15:30:29.618Z"
       },
       "move-endpoint": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T15:30:39.601Z"
+        "reason": "Added PATCH /api/conversations/:name/move. Logic lives in handleConversationMove (src/lib/overdeck/conversation-reads.ts), mirroring patchConversationTitle; route in conversations.ts just delegates. Covers all 5 ACs: 200+updated conv, 404 unknown conv, 400 'Unknown project: <key>' for both unregistered-key and missing-path cases, 200 no-op+no-emit when already in target project, conversation.moved emitted with {conversationName,projectKey} on real moves, and a dedicated test asserting cwd + claudeSessionId (JSONL pointer) unchanged after move. 7 new tests pass, full typecheck/lint clean, file-size allowlist bumped for routes/conversations.ts (1004->1029, over the 1000 ceiling). Commit 6d0b238.",
+        "updatedAt": "2026-08-01T15:45:48.999Z"
       }
     },
     "claimHistory": [
@@ -95,6 +87,17 @@
         "outcome": "completed",
         "reason": "Added conversation.moved event to packages/contracts/src/events.ts (Schema.Struct mirroring conversation.created, added to DomainEvent union) and a reducer case in event-reducers.ts bumping conversationsListRevision. Contracts build clean, full typecheck + lint pass with no new errors. Commit c295eaf.",
         "releasedAt": "2026-08-01T15:30:29.618Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3245900,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:30:39.601Z",
+        "itemId": "move-endpoint",
+        "outcome": "completed",
+        "reason": "Added PATCH /api/conversations/:name/move. Logic lives in handleConversationMove (src/lib/overdeck/conversation-reads.ts), mirroring patchConversationTitle; route in conversations.ts just delegates. Covers all 5 ACs: 200+updated conv, 404 unknown conv, 400 'Unknown project: <key>' for both unregistered-key and missing-path cases, 200 no-op+no-emit when already in target project, conversation.moved emitted with {conversationName,projectKey} on real moves, and a dedicated test asserting cwd + claudeSessionId (JSONL pointer) unchanged after move. 7 new tests pass, full typecheck/lint clean, file-size allowlist bumped for routes/conversations.ts (1004->1029, over the 1000 ceiling). Commit 6d0b238.",
+        "releasedAt": "2026-08-01T15:45:48.999Z"
       }
     ]
   },
@@ -107,6 +110,11 @@
     "moved-event": "completed",
     "moved-event.moved-event.ac1": "completed",
     "moved-event.moved-event.ac2": "completed",
-    "move-endpoint": "running"
+    "move-endpoint": "completed",
+    "move-endpoint.move-endpoint.ac1": "completed",
+    "move-endpoint.move-endpoint.ac2": "completed",
+    "move-endpoint.move-endpoint.ac3": "completed",
+    "move-endpoint.move-endpoint.ac4": "completed",
+    "move-endpoint.move-endpoint.ac5": "completed"
   }
 }
