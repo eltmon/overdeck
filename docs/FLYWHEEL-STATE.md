@@ -680,3 +680,7 @@ strike-3407 (cockpit terminal reveal + size-ratchet compliance) committed, gates
 ## RUN-79 interstitial (~14:45Z) — operator couldn't see MIN-839/864 reviews; tree crew gap filed+struck (PAN-3416)
 
 Operator screenshot: MYN tree shows no Review crew rows while agent-min-839-review + performance lane are LIVE (3/4 reports written) and MIN-864's review completed APPROVED. Third review-invisibility specimen today (3407 terminal, 3408 banner, now crew rows) — filed **PAN-3416** + struck. Also in-frame: MIN-852/861 "Planning" badges despite this morning's close-outs (PAN-3396 residue family, cross-referenced). MIN-839 work agent yield-paused 21m is designed behavior (self-resumes on slot).
+
+## RUN-79 interstitial (~14:50Z) — strike-3408 was grinding moot gates post-merge; paused; merged-awareness gap filed (PAN-3417)
+
+strike-3408 messaged for a gate exception 45 min AFTER I merged its fix (#3414) — no merged-awareness in the strike loop. Paused with attribution (burn stopped). Its measurement was valuable: fixture beforeEach ~4.4s under load vs fixed 5s hook timeout → appended to PAN-3344 (now 6 affected gate runs today). Filed **PAN-3417** (strike agents keep verifying after their branch lands; 3 specimens: 3389/3390 pan-monitor-blind ~1h each, 3408 gate-looping) — the tick-4 watch item now has enough evidence. Not struck yet — fleet at capacity with PAN-3416; queue behind current strikes.
