@@ -12,11 +12,16 @@
       "reason": "resume",
       "agentModel": "k3[1m]",
       "timestamp": "2026-08-01T09:14:05.089Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-01T11:23:26.413Z"
     }
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:23:23.634Z",
+  "updated": "2026-08-01T11:23:26.413Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
