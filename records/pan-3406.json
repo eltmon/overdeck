@@ -16,40 +16,16 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-01T14:44:49.658Z",
+  "updated": "2026-08-01T14:44:52.726Z",
   "pipeline": {
     "issueId": "PAN-3406",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T14:41:55.117Z",
-    "reviewNotes": "All four reviewers passed with no blocking or non-blocking findings; all 13 in-scope requirements are implemented.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3412",
-    "reviewedAtCommit": "f785268e301734d0a47167409047da9cfc4d9f38",
-    "lastVerifiedCommit": "f785268e301734d0a47167409047da9cfc4d9f38",
-    "reviewSpawnedAt": "2026-08-01T14:36:09.481Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "f785268e301734d0a47167409047da9cfc4d9f38"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "f785268e301734d0a47167409047da9cfc4d9f38"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "f785268e301734d0a47167409047da9cfc4d9f38"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "f785268e301734d0a47167409047da9cfc4d9f38"
-      }
-    }
+    "updatedAt": "2026-08-01T13:32:36.390Z"
   },
   "closeOut": {
     "usage": {
