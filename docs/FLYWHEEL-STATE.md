@@ -712,3 +712,9 @@ Operator-filed **PAN-3420** (closed-out issues render as never-started — post-
 - **strike-pan-3422 dispatched** (composer-submit wedge class — the run's costliest recurring operational failure, ~4h agent time + \$300 today).
 - **MIN-839 review: organic CHANGES REQUESTED** ("reconciliation fails on detached lazy associations before scanning cards") — real code finding, pipeline working as designed; rework beginning. WATCH: its agent showed ctx 0/out 0 post-feedback — if no delta next tick, that's composer-wedge specimen #5 (--fresh + append to PAN-3422).
 - strike-3416 ctx 88% compaction watch. MIN-874 fresh session producing. 3 test phases live (3362/3367/864). Main CI backlog (2 runs in progress) — 3408/3407 close-outs queued behind.
+
+## RUN-79 tick 24 (2026-08-01 ~15:50Z) — 3 more closed out (20 total); memory watch armed per operator
+
+- **PAN-3408, PAN-3407, PAN-3413 all closed out** (deploy `85b623885d` + green CI; 8-row DoD each). **Run totals: 20 issues landed+closed** (12 PAN strikes/fixes + PAN-3406 + MIN-929/908 + 6 zombie drains, minus overlaps: see close-out records).
+- **Operator flagged memory pressure**: verified 53.2/64GB used, 10.9GB avail, PSI low (no stalling). Suspects cleared: "gen-a server" IS the live reload (generation alternation), the pan-1577 tsc was a transient 37s gate. Real load = 4 MYN Java stacks + container vite (legitimate). **Persistent memory Monitor armed** (alerts at <6GB avail or PSI full avg60 >5); close-out drain frees stacks.
+- MIN-839 genuinely reworking ($19.33 delta — NOT specimen 5). strike-3422 editing pty-supervisor.ts (right area). strike-3416 post-compaction $14.54 — readiness check next tick. MIN-874 fresh producing.
