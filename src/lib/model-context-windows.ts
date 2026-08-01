@@ -29,22 +29,66 @@
 export const CLIPROXY_CODEX_CONTEXT_WINDOW = 150_000;
 
 /**
- * Effective context ceiling for the GPT-5.6 family routed through CLIProxy, and
- * the SINGLE source for that number: `getClaudeCodeContextPolicyForModel()` in
+ * Default context pin for the GPT-5.6 family routed through CLIProxy, and the
+ * SINGLE source for that number: `getClaudeCodeContextPolicyForModel()` in
  * `src/lib/agents/provider-env.ts` exports it to the harness as
  * CLAUDE_CODE_MAX_CONTEXT_TOKENS / CLAUDE_CODE_AUTO_COMPACT_WINDOW, and the
- * capability table below feeds the dashboard meter, model-switch safety, and the
+ * capability table feeds the dashboard meter, model-switch safety, and the
  * Deacon's proactive compaction. PAN-3057: those two surfaces disagreed (372K vs
  * gpt-5.5's 150K), which made a 186K session read ~18% full and silently disabled
  * proactive compaction for every GPT-5.6 agent.
  *
- * This is deliberately NOT the Codex CLI number. OpenAI cut the Codex client
- * catalog from 372K to 272K raw (258.4K effective) on 2026-07-13
- * (openai/codex#32806), but that cap is client-side: CLIProxy calls the backend
- * directly and is unaffected. Measured on this route AFTER the cut, gpt-5.6-sol
- * accepted 337,966–339,755 input tokens on eight consecutive days with zero
- * `input exceeds the context window` refusals. That ~338K plateau is Claude Code
- * auto-compacting at ~91% of this pin, so the real backend ceiling is >=340K and
- * has never been reached. Re-measure before lowering it.
+ * PAN-3388: 272K is a BILLING tier, not a capability limit. All three GPT-5.6
+ * models share a 1.05M raw window, but OpenAI prices "prompts with >272K input
+ * tokens at 2x input and 1.5x output for the full request"
+ * (https://developers.openai.com/api/docs/models/gpt-5.6-sol — same note on
+ * -terra and -luna). OpenAI cut Codex's own client window 372K→272K because the
+ * 372K profile "caused more subscription usage to be charged than intended"
+ * (openai/codex#34619) and advises non-Codex harnesses to pin 272K. Defaulting
+ * higher makes every long session burn subscription quota at 2x for its whole
+ * tail, so the bare model ids pin here and auto-compact at ~91% (~248K), under
+ * the tier. Sessions that genuinely need the longer window opt in via the
+ * `[372k]` variants below.
  */
-export const CLIPROXY_GPT56_CONTEXT_WINDOW = 372_000;
+export const CLIPROXY_GPT56_CONTEXT_WINDOW = 272_000;
+
+/**
+ * Opt-in long-context ceiling for the `gpt-5.6-*[372k]` variants. This is the
+ * measured-safe backend ceiling, deliberately NOT the Codex CLI number: the
+ * Codex 272K cap is client-side, CLIProxy calls the backend directly. Measured
+ * on this route after the Codex cut, gpt-5.6-sol accepted 337,966–339,755 input
+ * tokens on eight consecutive days with zero `input exceeds the context window`
+ * refusals — that ~338K plateau is Claude Code auto-compacting at ~91% of this
+ * pin, so the real backend ceiling is >=340K and has never been reached.
+ * Everything past 272K input is billed at 2x input / 1.5x output for the full
+ * request (see above) — the variants exist for operators who accept that cost
+ * for fewer compactions. Re-measure before lowering.
+ */
+export const CLIPROXY_GPT56_LONG_CONTEXT_WINDOW = 372_000;
+
+/**
+ * Overdeck-side long-context variant ids → the API model id the backend knows.
+ * The suffix is meaningful only inside Overdeck (context pins, capability
+ * entries, pickers); CLIProxy and the ChatGPT backend have never heard of it,
+ * so the launch door (`shellQuoteModelIdSync`) strips it via
+ * `apiLaunchModelIdSync()` before the id reaches any harness CLI. Kimi's
+ * `k3[1m]` is NOT in this map — that suffix is a real Kimi endpoint alias.
+ */
+export const GPT56_LONG_CONTEXT_VARIANTS: Record<string, string> = {
+  'gpt-5.6-sol[372k]': 'gpt-5.6-sol',
+  'gpt-5.6-terra[372k]': 'gpt-5.6-terra',
+  'gpt-5.6-luna[372k]': 'gpt-5.6-luna',
+};
+
+/** True when `modelId` is an Overdeck-side GPT-5.6 long-context variant. */
+export function isGpt56LongContextVariantSync(modelId: string): boolean {
+  return modelId in GPT56_LONG_CONTEXT_VARIANTS;
+}
+
+/**
+ * Resolve the model id to launch a harness with: long-context variants map to
+ * their base API model id, everything else passes through unchanged.
+ */
+export function apiLaunchModelIdSync(modelId: string): string {
+  return GPT56_LONG_CONTEXT_VARIANTS[modelId] ?? modelId;
+}

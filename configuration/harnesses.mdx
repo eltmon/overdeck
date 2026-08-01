@@ -42,9 +42,14 @@ Managed Codex sessions use an isolated `CODEX_HOME`. On initialization and resum
 - Works with both subscription auth (Claude Code OAuth) and API-key auth.
 - All role runs (`plan`, `work`, `review`, `test`, `ship`) default here.
 - Proxied models use a dedicated Claude Code context policy rather than copying
-  every value from the generic model registry. GPT-5.6 Sol, Terra, and Luna use
-  the current ChatGPT/Codex-client route's `372000`-token capacity for both
-  `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and `CLAUDE_CODE_AUTO_COMPACT_WINDOW`.
+  every value from the generic model registry. GPT-5.6 Sol, Terra, and Luna
+  default to a `272000`-token pin for both `CLAUDE_CODE_MAX_CONTEXT_TOKENS` and
+  `CLAUDE_CODE_AUTO_COMPACT_WINDOW` — OpenAI bills prompts with more than 272K
+  input tokens at 2x input / 1.5x output for the full request, so the default
+  keeps sessions under that tier. The `gpt-5.6-sol[372k]`, `gpt-5.6-terra[372k]`,
+  and `gpt-5.6-luna[372k]` picker variants opt into a `372000`-token pin for
+  long-research sessions that accept the surcharge; the `[372k]` suffix is
+  Overdeck-side only and is stripped before the model id reaches the API.
   The maximum tells Claude Code the route's capacity; the auto-compact window is
   the capacity used by Claude Code's normal proactive compaction calculation,
   not an instruction to compact at exactly that token count. GPT-5.5 keeps its

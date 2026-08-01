@@ -119,7 +119,10 @@ export function getFriendlyModelName(fullModel: string | undefined | null): stri
   if (backingModel.includes('haiku-3')) return 'Haiku 3';
   if (backingModel.includes('haiku')) return 'Haiku 4.5';
 
-  // OpenAI models
+  // OpenAI models ([372k] long-context variants before their base ids)
+  if (backingModel.includes('gpt-5.6-sol[372k]')) return 'GPT-5.6 Sol 372K';
+  if (backingModel.includes('gpt-5.6-terra[372k]')) return 'GPT-5.6 Terra 372K';
+  if (backingModel.includes('gpt-5.6-luna[372k]')) return 'GPT-5.6 Luna 372K';
   if (backingModel.includes('gpt-5.6-sol')) return 'GPT-5.6 Sol';
   if (backingModel.includes('gpt-5.6-terra')) return 'GPT-5.6 Terra';
   if (backingModel.includes('gpt-5.6-luna')) return 'GPT-5.6 Luna';

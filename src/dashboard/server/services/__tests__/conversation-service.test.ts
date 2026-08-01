@@ -165,7 +165,7 @@ describe('computeContextUsage', () => {
     const { computeContextUsage } = await import('../conversation-service.js');
     const result = await computeContextUsage('/fake/context-gpt56-over.jsonl', 'gpt-5.6-sol');
 
-    expect(result?.contextWindow).toBe(372_000);
+    expect(result?.contextWindow).toBe(272_000);
     expect(result?.percentUsed).toBe(100);
   });
 
