@@ -50,6 +50,7 @@ import {
   type PanIssueUsageRecord,
 } from './record.js';
 import { updateIssueRecord } from './record-update.js';
+import { withIssueRecordLock } from './record-lock.js';
 import { mergePipelineVerdictAware } from './pipeline-verdict-merge.js';
 
 export type {
@@ -352,21 +353,23 @@ export async function updateIssueRecordForIssue(
     const project = getProjectSync(resolved.projectKey);
     if (!project) return false;
 
-    const record = await buildIssueRecord(project, issueId, { reviewStatus });
-    await updateIssueRecord(project, issueId, (fresh) => {
-      // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
-      // anything written to the record during that window would be erased by this
-      // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
-      // slot assignments during the runaway, then wiped item statusOverrides right
-      // after `pan done` — which made every completed item dispatchable again and
-      // re-spawned slots for finished work. Re-read both blocks synchronously
-      // immediately before writing so the freshest values survive the rebuild.
-      if (fresh?.swarm) record.swarm = fresh.swarm;
-      if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
-        record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
-      }
-      record.pipeline = pickNewerPipeline(record.pipeline, fresh?.pipeline);
-      return record;
+    await withIssueRecordLock(issueId, async () => {
+      const record = await buildIssueRecord(project, issueId, { reviewStatus });
+      await updateIssueRecord(project, issueId, (fresh) => {
+        // buildIssueRecord's `existing` snapshot is read at the top of several awaits;
+        // anything written to the record during that window would be erased by this
+        // whole-record write (lost update). Observed twice on PAN-1791: wiped swarm
+        // slot assignments during the runaway, then wiped item statusOverrides right
+        // after `pan done` — which made every completed item dispatchable again and
+        // re-spawned slots for finished work. Re-read both blocks synchronously
+        // immediately before writing so the freshest values survive the rebuild.
+        if (fresh?.swarm) record.swarm = fresh.swarm;
+        if (fresh?.statusOverrides && Object.keys(fresh.statusOverrides).length > 0) {
+          record.statusOverrides = { ...record.statusOverrides, ...fresh.statusOverrides };
+        }
+        record.pipeline = pickNewerPipeline(record.pipeline, fresh?.pipeline);
+        return record;
+      });
     });
     return true;
   } catch (err) {
