@@ -43,6 +43,17 @@ async function requestRegisteredProjects(): Promise<{ status: number; body: unkn
 }
 
 describe('GET /api/registered-projects', () => {
+  it('returns 500 when the project registry cannot be read', async () => {
+    projectsMocks.listProjectsSync.mockImplementationOnce(() => {
+      throw new Error('projects.yaml is temporarily unreadable');
+    });
+
+    await expect(requestRegisteredProjects()).resolves.toEqual({
+      status: 500,
+      body: { error: 'Failed to list projects: projects.yaml is temporarily unreadable' },
+    });
+  });
+
   it('adds membershipQueryable without removing existing project fields', async () => {
     await expect(requestRegisteredProjects()).resolves.toEqual({
       status: 200,

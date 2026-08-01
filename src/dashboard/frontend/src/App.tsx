@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { Toaster, toast } from 'sonner';
+import { RefreshCw } from 'lucide-react';
 import { capture } from './lib/telemetry';
 import { ConfirmationDialog } from './components/ConfirmationDialog';
 import { EmergencyStopOverlay } from './components/EmergencyStopOverlay';
@@ -67,6 +68,7 @@ import { useUiMode } from './lib/simple/uiMode';
 import { isRunningAgentStatus } from './components/AgentPillPopoverRow';
 import { usePendingInputDialogs } from './App/hooks/usePendingInputDialogs';
 import { useDesktopActivityNotifications } from './App/hooks/useDesktopActivityNotifications';
+import { BACKEND_RECONNECTED_EVENT, BACKEND_RECONNECTING_EVENT } from './lib/backendConnectionEvents';
 
 export {
   buildConversationUrl,
@@ -316,6 +318,18 @@ export default function App() {
   }, []);
   // Restart banner: shown when dashboard is in a planned restart (lifecycle active)
   const showRestartBanner = dashboardLifecycle.active;
+  const [eventRouterReconnecting, setEventRouterReconnecting] = useState(false);
+  useEffect(() => {
+    const handleReconnecting = () => setEventRouterReconnecting(true);
+    const handleReconnected = () => setEventRouterReconnecting(false);
+    window.addEventListener(BACKEND_RECONNECTING_EVENT, handleReconnecting);
+    window.addEventListener(BACKEND_RECONNECTED_EVENT, handleReconnected);
+    return () => {
+      window.removeEventListener(BACKEND_RECONNECTING_EVENT, handleReconnecting);
+      window.removeEventListener(BACKEND_RECONNECTED_EVENT, handleReconnected);
+    };
+  }, []);
+  const backendDataUnavailable = showRestartBanner || bannerState === 'down' || eventRouterReconnecting;
 
   // Check tracker status for missing API keys
   const { data: trackerStatus } = useQuery({
@@ -884,34 +898,50 @@ export default function App() {
           data-drawer-open={drawerOpen ? 'true' : undefined}
           className="relative flex-1 flex overflow-hidden data-[drawer-open=true]:before:pointer-events-none data-[drawer-open=true]:before:absolute data-[drawer-open=true]:before:inset-0 data-[drawer-open=true]:before:z-[80] data-[drawer-open=true]:before:bg-primary/[0.04] data-[drawer-open=true]:before:backdrop-blur-[2px]"
         >
-          <AppRoutes
-            activeTab={activeTab}
-            issues={issues}
-            selectedConvId={selectedConvId}
-            conversationViewMode={conversationViewMode}
-            selectedProjectKey={selectedProjectKey}
-            pendingConversationTarget={pendingConversationTarget}
-            cockpitRoute={cockpitRoute}
-            workspaceRouteId={workspaceRouteId}
-            onWorkspaceViewBack={onWorkspaceViewBack}
-            initialSessionKey={initialSessionKey}
-            onOpenWorkspaceHome={handleOpenWorkspaceHome}
-            onNewProject={handleNewProject}
-            onSelectProject={handleSelectProject}
-            onOpenSettings={() => setActiveTab('settings')}
-            onConvIdChange={setSelectedConvId}
-            onConversationViewModeChange={setConversationViewMode}
-            onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
-            onProjectPrefixChange={setSearchProjectPrefix}
-            onCockpitChange={onCockpitChange}
-            onSearchOpen={() => setIsSearchOpen(true)}
-            onTabChange={setActiveTab}
-            onOpenIssue={openIssue}
-            onPlanDialogChange={setPlanDialogIssueId}
-            onSelectAgent={setSelectedAgent}
-            onBacklogIssueAction={handleBacklogIssueAction}
-            keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
-          />
+          {backendDataUnavailable ? (
+            <div role="status" className="flex h-full w-full items-center justify-center bg-background p-8">
+              <div className="flex max-w-md items-start gap-3 text-left">
+                <RefreshCw className="mt-0.5 h-5 w-5 shrink-0 animate-spin text-primary" aria-hidden="true" />
+                <div>
+                  <h2 className="text-sm font-medium text-foreground">
+                    {showRestartBanner ? 'Dashboard is restarting' : 'Waiting for backend data'}
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Live data will return automatically when the backend connection is restored.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <AppRoutes
+              activeTab={activeTab}
+              issues={issues}
+              selectedConvId={selectedConvId}
+              conversationViewMode={conversationViewMode}
+              selectedProjectKey={selectedProjectKey}
+              pendingConversationTarget={pendingConversationTarget}
+              cockpitRoute={cockpitRoute}
+              workspaceRouteId={workspaceRouteId}
+              onWorkspaceViewBack={onWorkspaceViewBack}
+              initialSessionKey={initialSessionKey}
+              onOpenWorkspaceHome={handleOpenWorkspaceHome}
+              onNewProject={handleNewProject}
+              onSelectProject={handleSelectProject}
+              onOpenSettings={() => setActiveTab('settings')}
+              onConvIdChange={setSelectedConvId}
+              onConversationViewModeChange={setConversationViewMode}
+              onPendingConversationTargetConsumed={() => setPendingConversationTarget(null)}
+              onProjectPrefixChange={setSearchProjectPrefix}
+              onCockpitChange={onCockpitChange}
+              onSearchOpen={() => setIsSearchOpen(true)}
+              onTabChange={setActiveTab}
+              onOpenIssue={openIssue}
+              onPlanDialogChange={setPlanDialogIssueId}
+              onSelectAgent={setSelectedAgent}
+              onBacklogIssueAction={handleBacklogIssueAction}
+              keyboardShortcutsDisabled={isSearchOpen || isPaletteOpen}
+            />
+          )}
         </main>
         {/* PAN-1591: in the Command Deck the merged Awareness rail already covers
             this global feed, so don't double it up there. */}
