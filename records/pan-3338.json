@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:44:15.445Z",
+  "updated": "2026-08-01T20:44:20.590Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -20,7 +20,40 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T20:08:28.843Z"
+    "updatedAt": "2026-08-01T20:44:18.025Z",
+    "reviewRequestedAt": "2026-08-01T20:44:18.025Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+      ],
+      "declaredScope": [
+        "docs/AGENT-STATE-PLANES.md",
+        "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+        "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+        "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+        "src/dashboard/server/services/agent-enrichment-service.ts",
+        "src/lib/agent-enrichment.ts",
+        "src/lib/overdeck/planning-promotion.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/AGENT-STATE-PLANES.md",
+        "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+        "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+        "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+        "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+        "src/dashboard/server/services/agent-enrichment-service.ts",
+        "src/lib/agent-enrichment.ts",
+        "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts",
+        "src/lib/overdeck/planning-promotion.ts"
+      ],
+      "recordedAt": "2026-08-01T20:44:15.443Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3444"
   },
   "closeOut": {
     "usage": {
