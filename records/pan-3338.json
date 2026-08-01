@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:20:59.176Z",
+  "updated": "2026-08-01T20:21:11.506Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "poller-stops-resurrecting-interactive-agents": {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3343403,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:21:11.506Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -74,6 +82,7 @@
     "finalize-status-event.finalize-status-event.ac1": "completed",
     "finalize-status-event.finalize-status-event.ac2": "completed",
     "finalize-status-event.finalize-status-event.ac3": "completed",
-    "finalize-status-event.finalize-status-event.ac4": "completed"
+    "finalize-status-event.finalize-status-event.ac4": "completed",
+    "poller-stops-resurrecting-interactive-agents": "running"
   }
 }
