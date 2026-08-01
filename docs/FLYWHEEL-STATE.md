@@ -634,3 +634,18 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **Implementation verification (operator-requested), 2 parallel reviewers, all CONFIRMED**: 1889 (threshold in pan flywheel report + verbatim-preservation test), 3404 (4 lazy-clock sites + repo-wide grep clean), 3392 (null-state logs, start fallback through the agents endpoint, needs-you only on double exhaustion, demanded tests present), 3393 (patrol retirement via write door, merged-aware /unstick, pan unstick CLI + skill). Two scoped observations recorded: 1889's summarizer does no lesson-folding (not an AC); 3393's auto-retirement covers feedback_delivery_needs_you+merged only — other stuck reasons still never retire (follow-up candidate).
 - **WHY THE OPERATOR HAD TO ASK (named gap): `close_out.auto` is OFF.** The deacon auto-closeout patrol EXISTS (deacon-auto-closeout, config close_out.auto + auto_delay_minutes) and is disabled — no close_out section in config.yaml. With it ON, merge → deploy-patrol → auto-closeout is fully mechanical (DoD gate still enforces every row). Recommended to operator; their call to enable.
 - My own gap this run: the re-green watch covered CI but not the deploy row — the drain would have waited for the deploy patrol. Lesson: arm watches on the LAST gate in the chain, not the first.
+
+## RUN-79 tick 16 (2026-08-01 ~13:30Z) — self-correction on #3402 ownership; MIN-864 held for the PAN-3401 fix; operator-reported bug pair struck
+
+- **Correction of my own tick prompt**: PR #3402 (PAN-3362) is normal-pipeline work, NOT a strike merge I own — the agent is still working ($86.96, pushing); review/test/UAT gate its merge. "Merge on green" applies only to strikes I spawned.
+- **MIN-864 decision**: correctness re-run produced its report (3,975B, 09:18) but the run is durably blocked (signal-once) — re-synthesis needs a fresh cycle, and cycles 1+2 were BOTH poisoned by DB-lock infra verdicts (PAN-3401 class, 2/2). Holding the final cycle until strike-pan-3401 lands+deploys (its fix: write retry + no infra verdicts + same-run supersede), then one clean abort+request. Avoids burning a third 4-reviewer convoy on a coin-flip.
+- Operator surfaced 2 more dashboard bugs from the PAN-3367 cockpit (tick 15.5): **PAN-3407** (Terminal toggle silent no-op while tmux session verifiably alive) + **PAN-3408** (phantom "waiting for your answer" banner on an actively-working agent; pan answer empty) — both filed with specimens, both struck. Stale reviewer residue on 3367 cleared via abort door.
+- **PAN-3406 (order-book issue titles) filed + started** per operator (planning underway, $1.46).
+- Fleet: strike-3401 $11.44 +185/−81 · strikes 3407/3408 spawning · min-874 $161.49 +5483 (biggest producer) · min-839 $38.96 · pan-3367 rework mid-compaction · PAN-3362 active. Main green. #3402 green awaiting pipeline review.
+
+## RUN-79 tick 17 (2026-08-01 ~13:47Z) — PAN-3362 through verification; PAN-3401 in CI (#3409)
+
+- **PAN-3362 verification PASSED** (worker result clean) — pipeline dispatching its review convoy; merge stays UAT-gated. The PAN-3356 unblock chain is one review+UAT away.
+- **strike-3401 landed via CI path** (PR #3409; local gates load-flaked again — 3rd strike today). Fix: `keep infra contention out of verdicts` — retry+durable-queue on lock failure, same-run supersede after infra-blocked. On merge+deploy: run MIN-864's final clean cycle.
+- strike-3407 building a cockpit test (+137/−3); strike-3408 investigating ($3.38); PAN-3406 planning; pan-3367 rework continuing ($157.68); min-874 $173.06 +6410 (1h17m single task — check its bead progress next tick if diff stalls); min-839 $48.81 +2586.
+- Main green. Fleet 15.
