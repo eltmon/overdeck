@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:12:08.644Z",
+  "updated": "2026-08-01T20:12:16.332Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "residue-ceremony": {
+        "writerId": "agent-pan-3396",
+        "agentId": "agent-pan-3396",
+        "pid": 2150866,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:12:16.332Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3396",
@@ -111,6 +119,7 @@
     "residue-flag-and-gate": "completed",
     "residue-flag-and-gate.residue-flag-and-gate.ac1": "completed",
     "residue-flag-and-gate.residue-flag-and-gate.ac2": "completed",
-    "residue-flag-and-gate.residue-flag-and-gate.ac3": "completed"
+    "residue-flag-and-gate.residue-flag-and-gate.ac3": "completed",
+    "residue-ceremony": "running"
   }
 }
