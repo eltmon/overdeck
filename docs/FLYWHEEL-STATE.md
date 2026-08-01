@@ -766,3 +766,10 @@ PSI avg10 hit 94 (thrashing) at 1.9GB avail: server ballooned AGAIN (743MB→2.4
 - **Pause audit (10 gates): yield STORM discovered** — 7 work agents simultaneously yielded for ONE review (MIN-874's convoy, live since 16:47Z). Scheduler re-fires yields per patrol without counting existing ones for the same beneficiary. Filed **PAN-3432**. Remaining pauses: 2 lex slots (operator POC), strike-3422 (moot).
 - Main CI in progress (3416 + now 3422 close-outs queue on it + next deploy). Campaign heads advancing. Memory stable (18.8GB).
 - Freeze-lift decision: HOLDING new strikes (3417/3397/3396/3431 is dispatched) — 7 yielded agents will flood back on resume; adding dispatches now would re-trigger contention. Reassess after the yield backlog drains.
+
+## RUN-79 tick 30 (2026-08-01 ~17:30Z) — PAN-3416 + PAN-3422 closed out (24 landed+closed); both operator-pain fixes LIVE
+
+- **Deployed `87bba552dc`** → PAN-3416 (crew rows show live reviews) + PAN-3422 (supervisor verifies Enter submission — composer-wedge class ends) both LIVE and closed out with clean DoD.
+- **MIN-874 review: organic CHANGES REQUESTED** with substantive scope findings (OAuth/fallback/streaming/credential-safety/lifecycle/rollout incomplete) — rework drives server-side; its 7 yield victims free up as the convoy releases slots (PAN-3432 tracks the fan-out defect).
+- Campaign heads advancing post-memory-events (MIN-930 $4.46, MIN-931 $4.31 — modest but moving; trend-check next tick). strike-3431 (server leak) implementing (+175/−13).
+- Run scoreboard: **24 issues landed and closed out**, 19 substrate issues filed (14 fixed+landed same-day), 3 memory crises handled, 2 UAT promotes processed, 1 campaign adopted (5 issues, 2 in flight).
