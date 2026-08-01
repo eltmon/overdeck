@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T15:45:58.246Z",
+  "updated": "2026-08-01T15:56:34.716Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,16 +49,8 @@
     }
   ],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "frontend-grouping-foundation": {
-        "writerId": "agent-pan-1577",
-        "agentId": "agent-pan-1577",
-        "pid": 287315,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:45:58.246Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "statusReasons": {
       "persist-project-key": {
         "reason": "Implemented project_key override on the live overdeck.db conversations module (src/lib/overdeck/conversations.ts), not the dead-code src/lib/database/conversations-db.ts the xBRIEF named -- that module has zero production importers, the live path is conversation-runtime.ts/conversation-list.ts through overdeck/conversations.ts. Added Drizzle column, LegacyConversation/-Row + SELECT + mapper, setConversationProjectKey setter, idempotent runtime top-up + drift-audit sentinel, fresh-DB init migration, and unit tests (default-null/set/overwrite/clear-to-null). projectKey flows to GET /api/conversations via existing enrichConversationList spread. Commits a10f31d, be9cf7d (file-size allowlist bump).",
@@ -73,8 +65,8 @@
         "updatedAt": "2026-08-01T15:45:48.999Z"
       },
       "frontend-grouping-foundation": {
-        "reason": "start",
-        "updatedAt": "2026-08-01T15:45:58.246Z"
+        "reason": "Conversation type gains projectKey (ConversationList.tsx). isUnscopedConversation, resolveConversationProjectName, and the projectConversations bucketing loop in CommandDeck/index.tsx all check the override first, falling back to cwd inference only when null -- unit-tested precedence (5 new tests in projectsData.test.ts covering override-wins, override-set-but-unmatched=unscoped, null-falls-back-to-cwd, no-match, neither-set). ac2 (live re-group on conversation.moved) was already satisfied by the moved-event item's reducer case bumping conversationsListRevision, which ConversationList's existing effect already invalidates the ['conversations'] query on. Full frontend typecheck/lint clean, 458 CommandDeck tests + 14 Sidebar tests pass with no regressions. File-size allowlist bumped for CommandDeck/index.tsx (1597->1618). Commit 2c30e8d.",
+        "updatedAt": "2026-08-01T15:56:34.715Z"
       }
     },
     "claimHistory": [
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Added PATCH /api/conversations/:name/move. Logic lives in handleConversationMove (src/lib/overdeck/conversation-reads.ts), mirroring patchConversationTitle; route in conversations.ts just delegates. Covers all 5 ACs: 200+updated conv, 404 unknown conv, 400 'Unknown project: <key>' for both unregistered-key and missing-path cases, 200 no-op+no-emit when already in target project, conversation.moved emitted with {conversationName,projectKey} on real moves, and a dedicated test asserting cwd + claudeSessionId (JSONL pointer) unchanged after move. 7 new tests pass, full typecheck/lint clean, file-size allowlist bumped for routes/conversations.ts (1004->1029, over the 1000 ceiling). Commit 6d0b238.",
         "releasedAt": "2026-08-01T15:45:48.999Z"
+      },
+      {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 287315,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:45:58.246Z",
+        "itemId": "frontend-grouping-foundation",
+        "outcome": "completed",
+        "reason": "Conversation type gains projectKey (ConversationList.tsx). isUnscopedConversation, resolveConversationProjectName, and the projectConversations bucketing loop in CommandDeck/index.tsx all check the override first, falling back to cwd inference only when null -- unit-tested precedence (5 new tests in projectsData.test.ts covering override-wins, override-set-but-unmatched=unscoped, null-falls-back-to-cwd, no-match, neither-set). ac2 (live re-group on conversation.moved) was already satisfied by the moved-event item's reducer case bumping conversationsListRevision, which ConversationList's existing effect already invalidates the ['conversations'] query on. Full frontend typecheck/lint clean, 458 CommandDeck tests + 14 Sidebar tests pass with no regressions. File-size allowlist bumped for CommandDeck/index.tsx (1597->1618). Commit 2c30e8d.",
+        "releasedAt": "2026-08-01T15:56:34.715Z"
       }
     ]
   },
@@ -128,6 +131,8 @@
     "move-endpoint.move-endpoint.ac3": "completed",
     "move-endpoint.move-endpoint.ac4": "completed",
     "move-endpoint.move-endpoint.ac5": "completed",
-    "frontend-grouping-foundation": "running"
+    "frontend-grouping-foundation": "completed",
+    "frontend-grouping-foundation.frontend-grouping-foundation.ac1": "completed",
+    "frontend-grouping-foundation.frontend-grouping-foundation.ac2": "completed"
   }
 }
