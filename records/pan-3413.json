@@ -1,19 +1,44 @@
 {
   "issueId": "PAN-3413",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-08-01T14:18:31.090Z",
-  "updated": "2026-08-01T14:18:31.091Z",
+  "updated": "2026-08-01T15:30:33.061Z",
   "pipeline": {
     "issueId": "PAN-3413",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T14:18:31.090Z"
+    "updatedAt": "2026-08-01T15:30:33.014Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 661343,
+            "output": 66353,
+            "cacheRead": 14918656,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 661343,
+          "output": 66353,
+          "cacheRead": 14918656,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 12.756632999999999,
+        "pricingAsOf": "2026-08-01T15:30:33.040Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
