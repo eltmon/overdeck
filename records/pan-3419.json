@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T15:36:00.690Z",
+  "updated": "2026-08-01T15:49:42.799Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -53,18 +53,34 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "store-project-key": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3419",
         "agentId": "agent-pan-3419",
         "pid": 3497052,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T15:36:00.690Z"
+        "claimedAt": "2026-08-01T15:36:00.690Z",
+        "itemId": "store-project-key",
+        "outcome": "completed",
+        "reason": "Added nullable conversations.project_key top-up, explicit conversation read/write support, canonical project resolvers, handler canonicalization, and regression coverage",
+        "releasedAt": "2026-08-01T15:49:42.797Z"
+      }
+    ],
+    "statusReasons": {
+      "store-project-key": {
+        "reason": "Added nullable conversations.project_key top-up, explicit conversation read/write support, canonical project resolvers, handler canonicalization, and regression coverage",
+        "updatedAt": "2026-08-01T15:49:42.797Z"
       }
     }
   },
   "statusOverrides": {
-    "store-project-key": "running"
+    "store-project-key": "completed",
+    "store-project-key.store-project-key.ac1": "completed",
+    "store-project-key.store-project-key.ac2": "completed",
+    "store-project-key.store-project-key.ac3": "completed",
+    "store-project-key.store-project-key.ac4": "completed",
+    "store-project-key.store-project-key.ac5": "completed"
   }
 }
