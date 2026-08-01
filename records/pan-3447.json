@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T23:03:16.382Z",
+  "updated": "2026-08-01T23:03:20.524Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "confluence-model": {
-        "writerId": "agent-pan-3447-slot-2",
-        "agentId": "agent-pan-3447-slot-2",
-        "pid": 662138,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T23:03:16.382Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -107,6 +99,16 @@
         "outcome": "completed",
         "reason": "Implemented and verified 21-hook contracts inventory with registration parity guard",
         "releasedAt": "2026-08-01T22:53:49.613Z"
+      },
+      {
+        "writerId": "agent-pan-3447-slot-2",
+        "agentId": "agent-pan-3447-slot-2",
+        "pid": 662138,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T23:03:16.382Z",
+        "itemId": "confluence-model",
+        "outcome": "completed",
+        "releasedAt": "2026-08-01T23:03:20.524Z"
       }
     ],
     "statusReasons": {
@@ -122,10 +124,13 @@
   },
   "statusOverrides": {
     "hook-inventory-contract": "completed",
-    "confluence-model": "running",
+    "confluence-model": "completed",
     "hook-inventory-contract.hook-inventory-contract.ac1": "completed",
     "hook-inventory-contract.hook-inventory-contract.ac2": "completed",
-    "hook-inventory-contract.hook-inventory-contract.ac3": "completed"
+    "hook-inventory-contract.hook-inventory-contract.ac3": "completed",
+    "confluence-model.confluence-model.ac1": "completed",
+    "confluence-model.confluence-model.ac2": "completed",
+    "confluence-model.confluence-model.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
