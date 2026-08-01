@@ -130,6 +130,10 @@ export interface SpawnRunOptions {
    */
   reviewSynthesisAgentId?: string;
   reviewOutputPath?: string;
+  /** Run-scoped reviewer metadata persisted before the tmux session launches. */
+  reviewRunId?: string;
+  reviewDeadlineAt?: string;
+  reviewForkedFromParent?: boolean;
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;
