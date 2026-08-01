@@ -142,6 +142,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T13:22Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-01T13:22:47.874Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-01T13:34:55.429Z"
     }
   ],
   "feedback": [
@@ -184,7 +189,7 @@
     "recordedAt": "2026-08-01T13:04:50.271Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T13:28:26.030Z",
+  "updated": "2026-08-01T13:34:55.430Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
