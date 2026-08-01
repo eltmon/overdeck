@@ -35,6 +35,8 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
+      "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+      "src/lib/work/done-preflight.ts",
       "tests/unit/dashboard/routes/agents-no-loss.test.ts"
     ],
     "declaredScopeUntouched": [],
@@ -56,13 +58,15 @@
       "packages/pi-extension/src/index.ts",
       "src/dashboard/server/routes/agents.ts",
       "src/dashboard/server/routes/agents/runtime-events.ts",
+      "src/lib/work/__tests__/done-preflight-checklist.test.ts",
+      "src/lib/work/done-preflight.ts",
       "tests/unit/dashboard/routes/agents-no-loss.test.ts",
       "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
     ],
-    "recordedAt": "2026-08-01T23:07:37.721Z"
+    "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:25:44.046Z",
+  "updated": "2026-08-01T23:25:56.882Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "blocked",
