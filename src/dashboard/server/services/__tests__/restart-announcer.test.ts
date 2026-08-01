@@ -180,6 +180,20 @@ describe('announceNewRestart', () => {
     expect(t.emitted).toHaveLength(0);
   });
 
+  it('does not announce the pre-SIGTERM stopping phase as a failed restart', async () => {
+    const t = makeDeps({
+      ...watchdogSuccess,
+      trigger: 'pan reload',
+      success: false,
+      phase: 'stopping',
+      initiator: 'deploy-patrol',
+    });
+
+    expect(await announceNewRestart(t.deps)).toBe(false);
+    expect(t.emitted).toHaveLength(0);
+    expect(t.lastAnnounced()).toBeNull();
+  });
+
   it('records but does not announce a stale restart', async () => {
     const t = makeDeps();
     const twoHoursLater = Date.parse(RESTART_TS) + 2 * 60 * 60_000;

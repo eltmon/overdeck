@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { acquireRestartLock, readRestartLockHolder } from '../restart-lock.js';
 
 const originalOverdeckHome = process.env.OVERDECK_HOME;
@@ -92,10 +92,33 @@ describe('restart lock', () => {
     expect(existsSync(lockPath())).toBe(false);
   });
 
-  it('reads the live lock holder from disk', async () => {
-    writeLock({ pid: process.pid, ts: 123, caller: 'reader' });
+  it('clears a live lock whose heartbeat timed out', async () => {
+    writeLock({ pid: process.pid, ts: Date.now() - 5 * 60 * 1000 - 1, caller: 'hung reader' });
 
-    expect(await Effect.runPromise(readRestartLockHolder())).toEqual({ pid: process.pid, ts: 123, caller: 'reader' });
+    expect(await Effect.runPromise(readRestartLockHolder())).toBeNull();
+    expect(existsSync(lockPath())).toBe(false);
+  });
+
+  it('refreshes the lock heartbeat while the owner is making progress', async () => {
+    const handle = await Effect.runPromise(acquireRestartLock('heartbeat owner'));
+    expect(handle).not.toBeNull();
+    const before = JSON.parse(readFileSync(lockPath(), 'utf8')) as { ts: number };
+    const now = vi.spyOn(Date, 'now').mockReturnValue(before.ts + 1_000);
+
+    await handle?.refresh();
+    now.mockRestore();
+
+    const after = JSON.parse(readFileSync(lockPath(), 'utf8')) as { ts: number; caller: string };
+    expect(after.ts).toBeGreaterThan(before.ts);
+    expect(after.caller).toBe('heartbeat owner');
+    await handle?.release();
+  });
+
+  it('reads the fresh live lock holder from disk', async () => {
+    const ts = Date.now();
+    writeLock({ pid: process.pid, ts, caller: 'reader' });
+
+    expect(await Effect.runPromise(readRestartLockHolder())).toEqual({ pid: process.pid, ts, caller: 'reader' });
     expect(readFileSync(lockPath(), 'utf8')).toContain('reader');
   });
 });
