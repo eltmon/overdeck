@@ -193,7 +193,7 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
     if (canResumeReviewer) {
       console.log(`[review-agent] Resuming convoy sub-reviewer ${opts.subRole} for ${opts.issueId} — preserving context (PAN-1862)`);
       const resumeResult = await resumeAgent(reviewerAgent, prompt);
-      if (resumeResult.success) {
+      if (resumeResult.success && resumeResult.messageDelivered !== false) {
         try {
           const resumed = getAgentStateSync(reviewerAgent);
           if (resumed) {
@@ -202,18 +202,22 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
             resumed.reviewOutputPath = outputPath;
             resumed.reviewSynthesisAgentId = synthesisAgentId;
             resumed.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+            delete resumed.reviewMonitorSignaled;
+            delete resumed.reviewRetryAttempt;
             await Effect.runPromise(saveAgentState(resumed));
           }
         } catch { /* non-fatal */ }
         return { success: true, message: `Review ${opts.subRole} resumed (session preserved): ${reviewerAgent}`, sessionId: reviewerAgent };
       }
-      console.warn(`[review-agent] Convoy sub-reviewer ${opts.subRole} resume failed; falling back to a fresh session: ${resumeResult.error}`);
+      const resumeError = resumeResult.messageDelivered === false
+        ? 'continue prompt was not confirmed in the resumed session'
+        : resumeResult.error;
+      console.warn(`[review-agent] Convoy sub-reviewer ${opts.subRole} resume failed; falling back to a fresh session: ${resumeError}`);
       // PAN-2743: Codex reviewers intentionally remain alive at their prompt after
-      // finishing a cycle. resumeAgent correctly refuses to "resume" that healthy
-      // process, but spawnRun cannot replace it while its tmux session still exists.
-      // Stop only this explicit healthy-idle collision before the fresh spawn; other
-      // resume failures already imply no live session and need no teardown.
-      if (resumeResult.error?.includes('it appears healthy')) {
+      // finishing a cycle. A successful process resume whose prompt did not land is
+      // also live but unusable. Stop either live collision before the fresh spawn;
+      // other resume failures already imply no live session and need no teardown.
+      if (resumeResult.messageDelivered === false || resumeResult.error?.includes('it appears healthy')) {
         await Effect.runPromise(stopAgent(reviewerAgent));
       }
     }
@@ -250,6 +254,8 @@ async function spawnReviewSubRoleForIssuePromise(opts: {
     run.reviewOutputPath = outputPath;
     run.reviewSynthesisAgentId = synthesisAgentId;
     run.reviewDeadlineAt = new Date(Date.now() + REVIEWER_TIMEOUT_MS).toISOString();
+    delete run.reviewMonitorSignaled;
+    delete run.reviewRetryAttempt;
     if (opts.forkedSessionId) run.reviewForkedFromParent = true;
     await Effect.runPromise(saveAgentState(run));
     try {

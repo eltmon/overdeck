@@ -966,6 +966,62 @@ describe('convoy orchestration', () => {
     }));
   });
 
+  it('clears prior-cycle monitor state when a reviewer warm-resumes', async () => {
+    const reviewerId = 'agent-pan-1059-review-security';
+    const savedReviewer = {
+      id: reviewerId,
+      model: 'configured-reviewer-model',
+      harness: 'claude-code',
+      reviewMonitorSignaled: 'ready',
+      reviewRetryAttempt: 1,
+    };
+    mockGetAgentState.mockReturnValue(savedReviewer);
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session');
+    mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
+
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+      subRole: 'security',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(savedReviewer).not.toHaveProperty('reviewMonitorSignaled');
+    expect(savedReviewer).not.toHaveProperty('reviewRetryAttempt');
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      reviewDeadlineAt: expect.any(String),
+    }));
+  });
+
+  it('fresh-spawns when a warm resume cannot confirm its prompt landed', async () => {
+    const reviewerId = 'agent-pan-1059-review-security';
+    mockGetAgentState.mockReturnValue({
+      id: reviewerId,
+      model: 'configured-reviewer-model',
+      harness: 'claude-code',
+    });
+    mockGetLatestSessionIdSync.mockReturnValue('saved-session');
+    mockResumeAgent.mockResolvedValue({ success: true, messageDelivered: false });
+
+    const result = await Effect.runPromise(spawnReviewSubRoleForIssue({
+      issueId: 'PAN-1059',
+      workspace: REVIEW_AGENT_SUBROLE_WORKSPACE,
+      subRole: 'security',
+      runId: REVIEW_AGENT_RUN_ID,
+      contextManifestPath: writeReviewManifest(REVIEW_AGENT_SUBROLE_WORKSPACE),
+    }));
+
+    expect(result.success).toBe(true);
+    expect(mockStopAgent).toHaveBeenCalledWith(reviewerId);
+    expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
+      prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
+    }));
+  });
+
   it('re-dispatches only the missing reviewer when sibling reports already exist', async () => {
     const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
     const manifestPath = writeReviewManifest(workspace);
