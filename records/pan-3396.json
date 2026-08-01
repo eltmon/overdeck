@@ -257,6 +257,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T22:32Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-01T22:32:06.817Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T22:40Z] verification-gate → FAILED — seq 3",
+      "timestamp": "2026-08-01T22:40:56.539Z"
     }
   ],
   "feedback": [
@@ -266,6 +271,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-08-01T22:32:06Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-3396\n\n# Review Synthesis — PAN-3396 — 2026-08-01T22:31:06Z\n\n## Verdict: CHANGES REQUESTED — the new legacy batch-path fix still performs synchronous project and workspace resolution for every candidate\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/context.json\n- Branch: feature/pan-3396\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n- HEAD reviewed: 2171cd161b9eb4461351b57620a1ec9497ceaec9\n- Cycle number: 8\n- Prior cycle SHA: cd0c267053f41d6fa8e10ae3347ae21a1162b91a\n- PR merge base: 5cd53eaad6250bbd6ca4b38b7af784783fc02d3a\n- PR commits: 18\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/correctness.md | 4 raw; 0 blocking after gates |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/requirements.md | 1 raw; 0 blocking after gates |\n\n## Blocking Findings\n\n### [performance] Legacy record-path derivation still performs synchronous I/O per candidate — `src/lib/pan-dir/record.ts:517`\nThe current-cycle fix replaces the repeated `getIssueRecordPath()` call with `getIssueRecordBasePath(project, id)`, but that helper re-enters synchronous project resolution and workspace-existence checks for every tracker-closed issue with an open convention PR/MR. The migration marker is no longer reread per issue, yet the recurring dashboard/Deacon membership path still performs multiple blocking filesystem syscalls per candidate before the bounded asynchronous record reads begin. Derive the legacy candidate path directly from the already-resolved `project` and perform any workspace existence probe asynchronously inside the bounded batch.\n\n## Non-blocking Findings\n\n### [correctness] [demoted: pre-existing, out of PR scope] Completed close-out records bypass residue cleanup — `src/lib/lifecycle/workflows.ts:181`\nThe ordinary idempotent return still precedes residue handling, so an already-closed-out issue can report a successful no-op while its stale PR/MR remains open. The cited short-circuit is outside the PR diff and was already demoted in the prior synthesis, so it cannot block this review.\n\n### [correctness] [demoted: previously reviewed, not promotable] Residue close-out persists duplicate teardown rows — `src/lib/lifecycle/workflows.ts:377`\n`buildResidueDodGate()` creates a skipped teardown row and the workflow later appends a passing teardown row, producing duplicate canonical IDs. Neither the disposition-gate construction nor the teardown update changed after the prior synthesis SHA, so cycle-8 convergence prevents this newly raised interaction from becoming a blocker.\n\n### [correctness] [demoted: previously reviewed, not promotable] Residue test assertions contradict the helper contract — `tests/unit/lib/lifecycle/residue.test.ts:39`\nThe current-cycle callback mock correctly fixes the pending-promisify defect, but the unchanged assertions now fail: empty lookups produce evidence and return non-skipped, a first-close failure has no partial-progress mutation, and the coordinate-extraction test never invokes extraction. These assertion mismatches were explicitly identified in the prior synthesis and their cited expectation lines did not change in this cycle, so they remain non-blocking under convergence despite the focused suite being red.\n\n### [correctness] [demoted: previously reviewed, not promotable] Durable disposition persistence drops `kind` — `src/lib/lifecycle/workflows.ts:456`\nThe in-memory gate includes `kind: 'abandon' | 'residue'`, but the write door persists raw `{ reason, by }` options and the permanent record type omits the discriminator. The relevant persistence sites were unchanged after the prior synthesis and were already reviewed, so they cannot be promoted.\n\n### [requirements] [demoted: previously reviewed, not promotable] Residue close-out can report success without the durable terminal marker — `src/lib/lifecycle/workflows.ts:449`\nThe requirements reviewer correctly classifies this as an in-PR-scope FR-5/NFR-4 gap: the generic marker failure remains non-fatal and can allow apparent residue success without `pipeline.closedOut`. The residue marker call and catch behavior did not change after the prior synthesis SHA, which already demoted this finding under convergence, so it remains advisory for this cycle.\n\n## Clean Sub-roles\n- security\n\n## Convergence Note\nCycle 8 can block only on lines changed after `cd0c267053f41d6fa8e10ae3347ae21a1162b91a`. The cycle diff at the manifest HEAD touches only `src/lib/pan-dir/record.ts` and `tests/unit/lib/lifecycle/residue.test.ts`. The changed legacy-path call introduces the surviving performance blocker. The changed test mock fixes the prior hang, while the still-failing assertions were unchanged and explicitly identified previously; all workflow and disposition findings are also unchanged or outside the PR diff. One blocker is below the proportionality threshold of 54 for 18 PR commits. The workspace branch advanced after this review run was generated, so every scope calculation above was explicitly pinned to manifest HEAD `2171cd161b9eb4461351b57620a1ec9497ceaec9`.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/.pan/review/agent-pan-3396-review-2171cd16/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3396 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 3,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-08-01T22:40:56Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3396 (attempt 2/3):\n\nFailed check: lint\n\nVerification FAILED at lint (130339ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(71956 chars elided)…\neHint\":null},{\"flags\":\"--force\",\"description\":\"Clear paused and pending-operator-decision gates and start anyway\",\"required\":false,\"valueHint\":null},{\"flags\":\"--fresh\",\"description\":\"Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill\",\"required\":false,\"valueHint\":null},{\"flags\":\"--host\",\"description\":\"Bypass workspace docker stack-health gate and spawn on the host\",\"required\":false,\"valueHint\":null},{\"flags\":\"--yes\",\"description\":\"Confirm --host in non-interactive contexts\",\"required\":false,\"valueHint\":null},{\"flags\":\"--off-book\",\"description\":\"Allow one work-agent dispatch outside the active order book and log the override\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Lifecycle\"},\n   {\"id\":\"pan-strike\",\"path\":[\"strike\"],\"display\":\"/pan strike\",\"description\":\"Spawn strike agent(s) — implement and push a strike branch for Deacon to land throug\n...(truncated)\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3396 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
     }
   ],
   "scopeDrift": {
@@ -314,19 +326,19 @@
     "recordedAt": "2026-08-01T22:26:16.391Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:35:12.454Z",
+  "updated": "2026-08-01T22:40:56.539Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T22:27:25.587Z",
-    "updatedAt": "2026-08-01T22:33:16.096Z",
+    "updatedAt": "2026-08-01T22:40:55.143Z",
     "reviewNotes": "Verification failed at lint",
-    "verificationNotes": "Verification FAILED at lint (157423ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(71956 chars elided)…\neHint\":null},{\"flags\":\"--force\",\"description\":\"Clear paused and pending-operator-decision gates and start anyway\",\"required\":false,\"valueHint\":null},{\"flags\":\"--fresh\",\"description\":\"Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill\",\"required\":false,\"valueHint\":null},{\"flags\":\"--host\",\"description\":\"Bypass workspace docker stack-health gate and spawn on the host\",\"required\":false,\"valueHint\":null},{\"flags\":\"--yes\",\"description\":\"Confirm --host in non-interactive contexts\",\"required\":false,\"valueHint\":null},{\"flags\":\"--off-book\",\"description\":\"Allow one work-agent dispatch outside the active order book and log the override\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Lifecycle\"},\n   {\"id\":\"pan-strike\",\"path\":[\"strike\"],\"display\":\"/pan strike\",\"description\":\"Spawn strike agent(s) — implement and push a strike branch for Deacon to land throug\n...(truncated)",
+    "verificationNotes": "Verification FAILED at lint (130339ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(71956 chars elided)…\neHint\":null},{\"flags\":\"--force\",\"description\":\"Clear paused and pending-operator-decision gates and start anyway\",\"required\":false,\"valueHint\":null},{\"flags\":\"--fresh\",\"description\":\"Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill\",\"required\":false,\"valueHint\":null},{\"flags\":\"--host\",\"description\":\"Bypass workspace docker stack-health gate and spawn on the host\",\"required\":false,\"valueHint\":null},{\"flags\":\"--yes\",\"description\":\"Confirm --host in non-interactive contexts\",\"required\":false,\"valueHint\":null},{\"flags\":\"--off-book\",\"description\":\"Allow one work-agent dispatch outside the active order book and log the override\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Lifecycle\"},\n   {\"id\":\"pan-strike\",\"path\":[\"strike\"],\"display\":\"/pan strike\",\"description\":\"Spawn strike agent(s) — implement and push a strike branch for Deacon to land throug\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "482f8a7dfebc4144f988e1f59d04d0e3a8f3beb6",
     "reviewRequestedAt": "2026-08-01T22:27:25.587Z",
@@ -438,10 +450,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2670,
-            "output": 133766,
-            "cacheRead": 63845089,
-            "cacheWrite": 2606130
+            "input": 2703,
+            "output": 134470,
+            "cacheRead": 64705498,
+            "cacheWrite": 2609407
           }
         }
       },
@@ -459,15 +471,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2670,
-          "output": 133766,
-          "cacheRead": 63845089,
-          "cacheWrite": 2606130
+          "input": 2703,
+          "output": 134470,
+          "cacheRead": 64705498,
+          "cacheWrite": 2609407
         }
       },
       "costAtCloseOut": {
-        "usd": 258.8127833,
-        "pricingAsOf": "2026-08-01T22:33:26.956Z"
+        "usd": 258.9064743,
+        "pricingAsOf": "2026-08-01T22:40:55.187Z"
       }
     },
     "merges": [
@@ -476,7 +488,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
