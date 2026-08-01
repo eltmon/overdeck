@@ -74,6 +74,7 @@ CREATE TABLE `conversations` (
 	`name` text NOT NULL,
 	`cwd` text NOT NULL,
 	`issue_id` text,
+	`project_key` text,
 	`harness` text,
 	`model` text,
 	`effort` text,

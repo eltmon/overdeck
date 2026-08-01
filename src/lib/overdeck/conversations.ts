@@ -37,6 +37,7 @@ const conversationsTable = sqliteTable('conversations', {
   name:                text('name').notNull(),
   cwd:                 text('cwd').notNull(),
   issueId:             text('issue_id'),
+  projectKey:          text('project_key'),
   harness:             text('harness'),
   model:               text('model'),
   effort:              text('effort'),
@@ -123,6 +124,7 @@ export const Conversation = Schema.Struct({
   name:                ConversationName,
   cwd:                 Schema.String,
   issueId:             Schema.NullOr(Schema.String),
+  projectKey:          Schema.NullOr(Schema.String),
   harness:             Schema.NullOr(Harness),
   model:               Schema.NullOr(Schema.String),
   effort:              Schema.NullOr(Schema.String),
@@ -209,6 +211,7 @@ function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
     name:                row.name,
     cwd:                 row.cwd,
     issueId:             row.issueId ?? null,
+    projectKey:          row.projectKey ?? null,
     harness:             row.harness ?? null,
     model:               row.model ?? null,
     effort:              row.effort ?? null,
@@ -388,7 +391,7 @@ export const TranscriptsWriterLive = Layer.succeed(
 export class ConversationWriter extends Context.Service<ConversationWriter, {
   readonly create: (opts: {
     name: ConversationName; cwd: string; model?: string; effort?: string;
-    harness?: Harness; issueId?: string; title?: string;
+    harness?: Harness; issueId?: string; projectKey?: string; title?: string;
   }) => Effect.Effect<Conversation>;
   readonly archive:       (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | AlreadyArchived>;
   readonly unarchive:     (name: ConversationName) => Effect.Effect<Conversation, ConversationNotFound | NotArchived>;
@@ -418,7 +421,7 @@ export const ConversationWriterLive = Layer.effect(
 
     const create = (opts: {
       name: ConversationName; cwd: string; model?: string; effort?: string;
-      harness?: Harness; issueId?: string; title?: string;
+      harness?: Harness; issueId?: string; projectKey?: string; title?: string;
     }): Effect.Effect<Conversation> =>
       Effect.gen(function* () {
         const id = randomUUID() as unknown as ConversationId;
@@ -429,6 +432,7 @@ export const ConversationWriterLive = Layer.effect(
             name:        opts.name,
             cwd:         opts.cwd,
             issueId:     opts.issueId ?? null,
+            projectKey:  opts.projectKey ?? null,
             harness:     opts.harness ?? null,
             model:       opts.model ?? null,
             effort:      opts.effort ?? null,
@@ -440,7 +444,8 @@ export const ConversationWriterLive = Layer.effect(
         yield* bus.emit({ type: 'conversation.created', payload: { name: opts.name } });
         return decodeConversation({
           id, name: opts.name, cwd: opts.cwd,
-          issueId: opts.issueId ?? null, harness: opts.harness ?? null,
+          issueId: opts.issueId ?? null, projectKey: opts.projectKey ?? null,
+          harness: opts.harness ?? null,
           model: opts.model ?? null, effort: opts.effort ?? null,
           title: opts.title ?? null, titleSource: opts.title ? 'manual' : null,
           createdAt: ts, archivedAt: null,
