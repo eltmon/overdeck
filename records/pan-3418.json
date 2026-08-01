@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T15:39:14.429Z",
+  "updated": "2026-08-01T15:39:36.265Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 4,
-    "claims": {},
+    "sequence": 5,
+    "claims": {
+      "widen-backfill-predicate": {
+        "writerId": "agent-pan-3418",
+        "agentId": "agent-pan-3418",
+        "pid": 3786148,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T15:39:36.265Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3418",
@@ -99,6 +107,7 @@
     "db-writes-null-for-empty.db-writes-null-for-empty.ac1": "completed",
     "db-writes-null-for-empty.db-writes-null-for-empty.ac2": "completed",
     "db-writes-null-for-empty.db-writes-null-for-empty.ac3": "completed",
-    "db-writes-null-for-empty.db-writes-null-for-empty.ac4": "completed"
+    "db-writes-null-for-empty.db-writes-null-for-empty.ac4": "completed",
+    "widen-backfill-predicate": "running"
   }
 }
