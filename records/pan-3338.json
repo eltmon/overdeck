@@ -90,10 +90,10 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T21:52:34.849Z",
+  "updated": "2026-08-01T21:52:49.949Z",
   "pipeline": {
     "issueId": "PAN-3338",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
@@ -101,8 +101,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-01T21:52:34.813Z",
-    "reviewNotes": "Prior liveness and atomicity blockers are fixed; one deferred-correction hardening advisory remains",
+    "updatedAt": "2026-08-01T21:52:48.337Z",
+    "reviewNotes": "Verification infrastructure error: Verification worker 566942 exceeded 3900000ms after CPU admission",
     "uatNotes": "UAT required: the issue and its acceptance criteria are explicitly about what simple-mode dashboard cards render ('Planning' vs 'The plan is ready' / Start work button) — observable dashboard behavior per the test role's trigger. Built and ran the dashboard from this workspace in the sanctioned isolated workspace-container path (`pan workspace rebuild PAN-3338` -> https://feature-pan-3338.overdeck.localhost / https://api-feature-pan-3338.overdeck.localhost), never touching the host-level production dashboard (test.md's host-process boundary; PAN-2322 also refuses a workspace checkout from ever becoming the primary host dashboard). Confirmed via curl that /api/health reports buildCommit 38e80a9a31904e56a409ef2fa565cc85e599be78 (this branch's HEAD, matching the reviewed commit) and mode 'peer'. Drove the frontend with a local Playwright (chromium) script (Claude-in-Chrome extension was not connected in this session): the app boots cleanly, renders the full shell (Home/Flywheel/Order Book, Simple/Advanced toggle, 'Nothing needs you right now'), and the console shows no errors beyond an expected PostHog-not-configured warning (dev/peer environment has no analytics token). However the workspace container's runtime database starts empty by design — `/api/issues` and `/api/agents` both return `[]`, and the UI itself shows 'No workspaces' / 'No projects'. Per docs/WORKSPACE-CONTAINERS.md and the single-deacon-invariant, the container runs with OVERDECK_DISABLE_DEACON=1 as a 'development-time read/UI peer only — not a second orchestrator', so there is no way to spawn or finalize a real plan agent inside it and reconstruct the exact scenario the acceptance criteria describe (a plan agent whose plan is finalized, whose tmux session stays alive, and whose ephemeral idle signal has been cleared). Constructing that state would require either a live orchestrated agent lifecycle the isolated container structurally cannot provide, or fabricating backend/DB state directly, which is both out of the test role's boundaries and not a genuine browser flow. Unmet criteria: all three of the issue's acceptance bullets ('renders as ready-to-start in simple mode regardless of how long ago it finished', 'agent genuinely mid-planning... still renders as working', 'agents table status and read model status agree for a stopped-but-session-alive agent') remain unproven via an actual interactive browser session in this run, even though the identical pure derivation functions the UI calls (derivePipelineState, deriveSimpleIssue/bucketSimpleHome) are exhaustively locked by the characterization tests listed in the automated-gate notes.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
@@ -216,7 +216,7 @@
       },
       "costAtCloseOut": {
         "usd": 105.675173,
-        "pricingAsOf": "2026-08-01T21:52:34.840Z"
+        "pricingAsOf": "2026-08-01T21:52:48.696Z"
       }
     },
     "merges": [
