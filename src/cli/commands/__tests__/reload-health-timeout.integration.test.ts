@@ -93,7 +93,10 @@ beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {});
   vi.spyOn(console, 'log').mockImplementation(() => {});
   vi.spyOn(console, 'warn').mockImplementation(() => {});
-  mocks.acquireRestartLock.mockReturnValue(Effect.succeed({ release: vi.fn(async () => undefined) }));
+  mocks.acquireRestartLock.mockReturnValue(Effect.succeed({
+    refresh: vi.fn(async () => undefined),
+    release: vi.fn(async () => undefined),
+  }));
   mocks.readRestartLockHolder.mockReturnValue(Effect.succeed(null));
   mocks.writeRestartStatus.mockReturnValue(Effect.succeed(undefined));
   mocks.refuseNonPrimaryDashboardCwd.mockReturnValue(false);

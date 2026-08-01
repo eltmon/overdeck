@@ -30,7 +30,7 @@ import {
 } from '../../dashboard/server/identity.js';
 
 import { acquireRestartLock, readRestartLockHolder, type RestartLockHandle } from '../../lib/restart-lock.js';
-import { writeRestartStatus } from '../../lib/restart-status.js';
+import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { applyBootGateEnv, formatBootGateState, resolveBootGates, type BootGateOptions } from '../../lib/boot-gates.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import { readActiveDashboardBundleSync, type ActiveDashboardBundle } from '../../lib/deploy/active-dashboard-bundle.js';
@@ -378,16 +378,22 @@ function spawnDashboardSystemdUnit(
   }
 }
 
-async function recordRestartStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
+async function recordRestartStatus(
+  startedAt: number,
+  success: boolean,
+  error?: string,
+  phase: RestartPhase = success ? 'healthy' : 'failed',
+): Promise<void> {
   await Effect.runPromise(writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan restart',
     success,
+    phase,
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
     pid: process.pid,
-    initiator: process.env.OVERDECK_AGENT_ID,
+    initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
   }));
 }
@@ -475,6 +481,12 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
   }
 
   try {
+    if (scope === 'dashboard' || scope === 'full') {
+      await restartLock?.refresh();
+      // Persist the initiator and destructive phase before any SIGTERM. A
+      // failed write aborts here, while the existing dashboard is still alive.
+      await recordRestartStatus(startedAt, false, undefined, 'stopping');
+    }
     switch (scope) {
       case 'dashboard': {
         if (await shouldRunManualSupervisorCycle()) {
@@ -520,6 +532,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
       }
       case 'full': {
         await runFullRestart(config, { healthTimeoutMs, bootGateOptions: options });
+        await recordRestartStatus(startedAt, true);
         break;
       }
     }
@@ -527,7 +540,7 @@ export async function restartCommand(options: RestartOptions): Promise<void> {
     const message = err instanceof StageError
       ? `[${err.failure.stage}] ${err.failure.reason}`
       : (err as Error)?.message || String(err);
-    if (scope === 'dashboard') {
+    if (scope === 'dashboard' || scope === 'full') {
       await recordRestartStatus(startedAt, false, message);
     }
     if (err instanceof StageError) {

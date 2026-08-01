@@ -1,4 +1,4 @@
-import { mkdir, open, readFile, unlink } from 'node:fs/promises';
+import { mkdir, open, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { Data, Effect } from 'effect';
 import { getOverdeckHome } from './paths.js';
@@ -10,10 +10,12 @@ export type RestartLockHolder = {
 };
 
 export type RestartLockHandle = {
+  refresh(): Promise<void>;
   release(): Promise<void>;
 };
 
 const STALE_LOCK_MS = 5 * 60 * 1000;
+const LOCK_HEARTBEAT_MS = Math.floor(STALE_LOCK_MS / 3);
 
 function restartLockPath(): string {
   return join(getOverdeckHome(), 'restart.lock');
@@ -76,6 +78,41 @@ function matchesHolder(actual: RestartLockHolder | null, expected: RestartLockHo
   return actual?.pid === expected.pid && actual.ts === expected.ts && actual.caller === expected.caller;
 }
 
+function createOwnedLockHandle(path: string, initialHolder: RestartLockHolder): RestartLockHandle {
+  let holder = initialHolder;
+  let released = false;
+
+  const refresh = async (): Promise<void> => {
+    if (released || !matchesHolder(await readHolderFromPath(path), holder)) return;
+    const next = { ...holder, ts: Date.now() };
+    const tmp = `${path}.${process.pid}.${next.ts}.tmp`;
+    await writeFile(tmp, `${JSON.stringify(next)}\n`, { encoding: 'utf8', mode: 0o600 });
+    if (!matchesHolder(await readHolderFromPath(path), holder)) {
+      await unlinkIfExists(tmp);
+      return;
+    }
+    await rename(tmp, path);
+    holder = next;
+  };
+
+  const heartbeat = setInterval(() => {
+    void refresh().catch(() => undefined);
+  }, LOCK_HEARTBEAT_MS);
+  heartbeat.unref?.();
+
+  return {
+    refresh,
+    async release() {
+      if (released) return;
+      released = true;
+      clearInterval(heartbeat);
+      if (matchesHolder(await readHolderFromPath(path), holder)) {
+        await unlinkIfExists(path);
+      }
+    },
+  };
+}
+
 async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | null> {
   const breakerPath = `${path}.break`;
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -84,6 +121,7 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
       await writeLockFile(breakerPath, holder);
       let released = false;
       return {
+        async refresh() {},
         async release() {
           if (released) return;
           released = true;
@@ -103,7 +141,7 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
 }async function readRestartLockHolderPromise(): Promise<RestartLockHolder | null> {
   const path = restartLockPath();
   const observed = await readHolderFromPath(path);
-  if (!observed || isProcessAlive(observed.pid)) return observed;
+  if (!observed || !isStale(observed, Date.now())) return observed;
 
   const breaker = await acquireStaleBreaker(path);
   if (!breaker) return observed;
@@ -123,16 +161,7 @@ async function acquireStaleBreaker(path: string): Promise<RestartLockHandle | nu
     const holder = { pid: process.pid, ts: Date.now(), caller };
     try {
       await writeLockFile(path, holder);
-      let released = false;
-      return {
-        async release() {
-          if (released) return;
-          released = true;
-          if (matchesHolder(await readHolderFromPath(path), holder)) {
-            await unlinkIfExists(path);
-          }
-        },
-      };
+      return createOwnedLockHandle(path, holder);
     } catch (error) {
       if (!isErrnoException(error) || error.code !== 'EEXIST') throw error;
       const breaker = await acquireStaleBreaker(path);

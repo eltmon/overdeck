@@ -17,13 +17,36 @@ REASON="${5:-post-merge}"
 
 LOG_FILE="/tmp/overdeck-deploy.log"
 LOCK_FILE="/tmp/overdeck-deploy.lock"
-HEALTH_URL="http://localhost:3011/api/health"
-HEALTH_TIMEOUT=30
 RESTART_MARKER="$HOME/.overdeck/dashboard-restarting.json"
 
 log() {
   echo "[$(date '+%Y-%m-%d %H:%M:%S')] [post-merge-deploy] $*" | tee -a "$LOG_FILE"
 }
+
+# A detached child still belongs to the dashboard's systemd cgroup. The old
+# flow killed its parent dashboard below, systemd reaped this script with the
+# rest of the cgroup, and no successor reached the start step (PAN-3386).
+# Re-exec in an independent retrying unit before doing any destructive work.
+if [[ "${OVERDECK_POST_MERGE_DEPLOY_SUPERVISED:-}" != "1" ]]; then
+  if [[ "$(uname -s)" != "Linux" ]] || ! command -v systemd-run >/dev/null 2>&1; then
+    log "ERROR: post-merge deploy requires systemd supervision; old dashboard left running."
+    exit 1
+  fi
+  UNIT="overdeck-post-merge-deploy-$(date +%s%N)"
+  log "Handing deploy to independent systemd unit: $UNIT"
+  exec systemd-run \
+    --user --unit "$UNIT" --collect --quiet \
+    --property=Restart=on-failure \
+    --property=RestartSec=10s \
+    --property=StartLimitIntervalSec=0 \
+    "--property=StandardOutput=append:$LOG_FILE" \
+    "--property=StandardError=append:$LOG_FILE" \
+    "--property=WorkingDirectory=$REPO_ROOT" \
+    --setenv OVERDECK_POST_MERGE_DEPLOY_SUPERVISED=1 \
+    --setenv OVERDECK_RESTART_INITIATOR=merge-step0 \
+    --setenv "OVERDECK_ISSUE_ID=$ISSUE_ID" \
+    "$0" "$@"
+fi
 
 # --- Lock: only one deploy runs at a time ---
 exec 9>"$LOCK_FILE"
@@ -131,57 +154,28 @@ mv "$REPO_ROOT/dist" "$REPO_ROOT/dist.old.$$" 2>/dev/null || true
 mv "$REPO_ROOT/dist.incoming" "$REPO_ROOT/dist"
 rm -rf "$REPO_ROOT/dist.old.$$" >> "$LOG_FILE" 2>&1 || true
 
-# --- Step 5: Kill old server ---
-log "Stopping old server processes..."
-for port in 3010 3011 3012; do
-  fuser -k "${port}/tcp" >> "$LOG_FILE" 2>&1 || true
-done
-
-# Also kill any orphaned dashboard processes — host-side only (PAN-1763).
-# Workspace/UAT stack `server` containers run the same `node dist/dashboard/server.js`
-# cmdline and ARE visible to host pkill (containers share the host kernel); a bare
-# pattern kill SIGTERMed every stack's server container on every deploy, flipping
-# stacks unhealthy and tripping the spawn gate. Skip PIDs in container cgroups.
-for pid in $(pgrep -f "node.*dist/dashboard/server" 2>/dev/null || true); do
-  if grep -qE 'docker|containerd|libpod' "/proc/$pid/cgroup" 2>/dev/null; then
-    continue # in-container workspace/UAT server — not ours to kill
-  fi
-  kill "$pid" >> "$LOG_FILE" 2>&1 || true
-done
-pkill -f "bun.*src/dashboard/server/main" >> "$LOG_FILE" 2>&1 || true
-pkill -f "vite.*301" >> "$LOG_FILE" 2>&1 || true
-
-sleep 2
-
-# Verify ports are clear
-if lsof -i :3010,:3011,:3012 > /dev/null 2>&1; then
-  log "Ports still in use, force killing..."
-  lsof -ti :3010,:3011,:3012 | xargs -r kill -9 >> "$LOG_FILE" 2>&1 || true
-  sleep 1
+# --- Step 5: Restart through the shared lifecycle door ---
+# pan restart owns the restart lock, writes the initiator + stopping phase before
+# SIGTERM, starts the replacement in its own systemd unit, and verifies health.
+# The outer systemd unit retries this entire script on failure, so a post-kill
+# failure cannot abandon the machine with no successor.
+log "Restarting dashboard through pan restart..."
+NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
+GIT_COMMON_DIR="$(git -C "$REPO_ROOT" rev-parse --path-format=absolute --git-common-dir)"
+PRIMARY_REPO_ROOT="$(dirname "$GIT_COMMON_DIR")"
+log "Restart command cwd: $PRIMARY_REPO_ROOT"
+if ! ( cd "$PRIMARY_REPO_ROOT" && OVERDECK_SKIP_SUPERVISOR_CYCLE=1 \
+  "$NODE" "$REPO_ROOT/dist/cli/index.js" restart --dashboard --resume \
+  --health-timeout 120000 ) >> "$LOG_FILE" 2>&1; then
+  log "ERROR: Shared dashboard restart failed; systemd will retry the deploy."
+  exit 1
 fi
 
-# --- Step 6: Start new server ---
-log "Starting new server..."
-NODE=/home/eltmon/.config/nvm/versions/node/v22.22.0/bin/node
-setsid "$NODE" dist/dashboard/server.js >> "$LOG_FILE" 2>&1 &
-
-# --- Step 7: Health check ---
-log "Waiting for server health check (${HEALTH_TIMEOUT}s timeout)..."
-for i in $(seq 1 "$HEALTH_TIMEOUT"); do
-  if curl -s --max-time 2 "$HEALTH_URL" > /dev/null 2>&1; then
-    log "Health check passed after ${i}s."
-    # NOTE: The new server reads the restart marker and pending file on boot,
-    # emits lifecycle_started, processes the lifecycle (including post-merge cleanup),
-    # emits lifecycle_completed, and then deletes the files itself. Do NOT delete
-    # the restart marker here: the health endpoint can respond before startup code
-    # reaches processPendingLifecycle(), and deleting it here races away the only
-    # signal that should populate the Activity Feed.
-    log "Restart marker left for new server to process. Pending lifecycle will emit lifecycle_complete."
-    log "Post-merge deploy complete for issue=$ISSUE_ID built_sha=$BUILT_SHA."
-    exit 0
-  fi
-  sleep 1
-done
-
-log "ERROR: Health check timed out after ${HEALTH_TIMEOUT}s. Check $LOG_FILE."
-exit 1
+# NOTE: The new server reads the restart marker and pending file on boot,
+# emits lifecycle_started, processes the lifecycle (including post-merge cleanup),
+# emits lifecycle_completed, and then deletes the files itself. Do NOT delete
+# the restart marker here: the health endpoint can respond before startup code
+# reaches processPendingLifecycle(), and deleting it here races away the only
+# signal that should populate the Activity Feed.
+log "Restart marker left for new server to process. Pending lifecycle will emit lifecycle_complete."
+log "Post-merge deploy complete for issue=$ISSUE_ID built_sha=$BUILT_SHA."

@@ -29,7 +29,7 @@ import {
   StageError,
   type DashboardRestartResult,
 } from '../../lib/platform-lifecycle.js';
-import { writeRestartStatus } from '../../lib/restart-status.js';
+import { writeRestartStatus, type RestartPhase } from '../../lib/restart-status.js';
 import { agentRestartBlockReason } from '../../lib/deploy/agent-restart-gate.js';
 import {
   refuseNonPrimaryDashboardCwd,
@@ -72,16 +72,22 @@ async function resolvePrimaryRepoRoot(cwd: string): Promise<string> {
   return workspaceMatch?.[1] ?? repoRoot;
 }
 
-async function recordReloadStatus(startedAt: number, success: boolean, error?: string): Promise<void> {
+async function recordReloadStatus(
+  startedAt: number,
+  success: boolean,
+  error?: string,
+  phase: RestartPhase = success ? 'healthy' : 'failed',
+): Promise<void> {
   await Effect.runPromise(writeRestartStatus({
     ts: new Date().toISOString(),
     trigger: 'pan reload',
     success,
+    phase,
     error,
     durationMs: Date.now() - startedAt,
     attempts: 1,
     pid: process.pid,
-    initiator: process.env.OVERDECK_AGENT_ID,
+    initiator: process.env.OVERDECK_RESTART_INITIATOR ?? process.env.OVERDECK_AGENT_ID,
     issueId: process.env.OVERDECK_ISSUE_ID,
   }));
 }
@@ -231,6 +237,10 @@ export async function reloadCommand(options: ReloadOptions): Promise<void> {
 
     let restartResult: DashboardRestartResult;
     try {
+      await lock.refresh();
+      // This durable entry must land before restartDashboard sends SIGTERM. If
+      // persistence fails, abort while the old dashboard is still running.
+      await recordReloadStatus(startedAt, false, undefined, 'stopping');
       restartResult = await Effect.runPromise(restartDashboard(config, () => spawnDashboardDetached(config, {
         deacon: options.deacon,
         serverPath: deployment?.serverPath,

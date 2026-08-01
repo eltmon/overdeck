@@ -162,8 +162,7 @@ export function buildSystemdReloadArgs(
     '--collect', '--quiet',
     '--property=Restart=on-failure',
     '--property=RestartSec=10s',
-    '--property=StartLimitBurst=2',
-    '--property=StartLimitIntervalSec=300s',
+    '--property=StartLimitIntervalSec=0',
     `--property=StandardOutput=append:${logPath}`,
     `--property=StandardError=append:${logPath}`,
     `--property=WorkingDirectory=${request.cwd}`,
@@ -236,9 +235,8 @@ async function spawnDetachedReload(request: ReloadRequest, now: number): Promise
       } catch (error) {
         systemdFailure = error instanceof Error ? error.message : String(error);
       }
-      await log.appendFile(
-        `[auto-deploy] WARNING: ${systemdFailure}; falling back to an unsupervised detached reload.\n`,
-        'utf8',
+      throw new Error(
+        `Automatic deploy requires an independent systemd unit before it can stop the dashboard: ${systemdFailure}`,
       );
     }
 
