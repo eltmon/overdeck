@@ -170,7 +170,9 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "packages/contracts/src/composer-commands.generated.ts"
+      "packages/contracts/src/composer-commands.generated.ts",
+      "scripts/lint-state-writes.sh",
+      "tests/unit/scripts/lint-state-writes.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -189,17 +191,19 @@
       "docs/WORKSPACE-CONTAINERS.md",
       "packages/contracts/src/composer-commands.generated.ts",
       "roles/test.md",
+      "scripts/lint-state-writes.sh",
       "src/cli/commands/admin/index.ts",
       "src/cli/commands/admin/seed-uat-fixtures.ts",
       "src/lib/uat-fixtures/fixture-data.ts",
       "src/lib/uat-fixtures/seed.ts",
       "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
-      "tests/unit/lib/uat-fixtures/seed.test.ts"
+      "tests/unit/lib/uat-fixtures/seed.test.ts",
+      "tests/unit/scripts/lint-state-writes.test.ts"
     ],
-    "recordedAt": "2026-08-01T13:04:50.271Z"
+    "recordedAt": "2026-08-01T13:59:42.560Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T13:59:33.103Z",
+  "updated": "2026-08-01T13:59:42.562Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
