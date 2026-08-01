@@ -855,3 +855,8 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **MIN-931 fresh session verified working** ($2.97/+46−79 frozen → $5.23/+448−143). Wedge recovery real, not cosmetic.
 - **PAN-3422 re-struck** with the compaction-boundary lead (verify activity delta, not just keystroke acceptance; re-deliver once if the turn never starts). This class has cost 5 manual interventions today — highest-frequency operational failure of the run.
 - MIN-932 deep in Lane A work ($18.10, +1535/−157). Leak strike round 2 still at +42/−92 (small diff, high thought — heap analysis).
+
+## RUN-79 tick 42 (2026-08-01 ~21:55Z) — red-main fix pushed (#3452), watch armed
+
+- strike-3448's fix committed (`695dbbf5b2 avoid forbidden bd-ready fixture literal`; forbidden literal count in its workspace: 0) → pushed + **PR #3452**. Its local gate run failed on the usual load flake — irrelevant, red main outranks it and CI is the gate. Background watch armed on the test lane; merging on green, then verifying main re-greens and landing #3449 (PAN-3446) behind it.
+- Fleet 32 sessions (convoys + campaign + 4 strikes). Campaign untouched by the red-main event — MIN-932 still working Lane A.
