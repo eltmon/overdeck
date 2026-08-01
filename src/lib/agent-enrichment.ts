@@ -650,12 +650,16 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     ? await Effect.runPromise(detectAwaitingInputForAgent(agentId, { isPlanning }))
     : null
 
-  const fallbackDetection: AwaitingInputDetection | null = runtimeState?.resolution === 'needs_input'
-    ? {
-        reason: 'other',
-        prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
-      }
-    : null
+  // Resolution is a stop-hook verdict and can outlive the stop that produced it.
+  // Once tool activity resumes, the current activity is stronger evidence: do
+  // not keep projecting the old needs_input verdict as an actionable decision.
+  const fallbackDetection: AwaitingInputDetection | null =
+    runtimeState?.resolution === 'needs_input' && runtimeState.state !== 'active'
+      ? {
+          reason: 'other',
+          prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
+        }
+      : null
 
   // An interactive session does not finish — it yields the turn. The Stop hook
   // reports that as `activity: idle`, which until now carried no operator
