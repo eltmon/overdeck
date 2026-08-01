@@ -85,6 +85,7 @@ pan-test-config
 pan-tldr
 pan-tts
 pan-unpause
+pan-unstick
 pan-untroubled
 pan-up
 pan-wipe
