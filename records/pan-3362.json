@@ -62,7 +62,8 @@
   ],
   "scopeDrift": {
     "outsideDeclaredScope": [
-      "packages/contracts/src/composer-commands.generated.ts"
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/lib/cloister/transcript-retention.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -83,15 +84,16 @@
       "roles/test.md",
       "src/cli/commands/admin/index.ts",
       "src/cli/commands/admin/seed-uat-fixtures.ts",
+      "src/lib/cloister/transcript-retention.ts",
       "src/lib/uat-fixtures/fixture-data.ts",
       "src/lib/uat-fixtures/seed.ts",
       "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
       "tests/unit/lib/uat-fixtures/seed.test.ts"
     ],
-    "recordedAt": "2026-08-01T11:32:46.338Z"
+    "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:28:08.448Z",
+  "updated": "2026-08-01T12:28:15.327Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
