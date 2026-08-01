@@ -563,17 +563,6 @@ export async function completePlanningForIssue(options: {
     // caller mid-fetch and they would never see their own success response.
     // Keep this name in scope; we schedule the kill at the very end.
 
-    // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
-    await (async () => {
-      try {
-        const planningState = getAgentStateSync(sessionName);
-        if (planningState) {
-          saveAgentStateSync({ ...planningState, status: 'stopped', stoppedAt: new Date().toISOString() });
-          console.log(`[complete-planning] Marked ${sessionName} as stopped`);
-        }
-      } catch { /* Non-fatal — agent status is cosmetic */ }
-    })();
-
     // Determine project path
     const githubCheck = isGitHubIssue(id);
     const projectPath = resolveIssueProjectPathSync(id);
@@ -759,6 +748,31 @@ export async function completePlanningForIssue(options: {
     } else {
       newState = 'Skipped (already in progress)';
     }
+
+    // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead
+    // of "Watch Planning". Runs only AFTER the PRD gate and spec promotion
+    // succeeded — a rejected finalize leaves the agent running (PAN-3338).
+    // saveAgentStateSync writes the DB + state.json but emits no event, so the
+    // read model must be told explicitly or it keeps the spawn-time 'running'
+    // forever. hasLiveTmuxSession must be honest: skipKill leaves the session
+    // alive, and the reducer's PAN-2633 gate keeps the pending-input payload
+    // only when it is true.
+    await (async () => {
+      try {
+        const planningState = getAgentStateSync(sessionName);
+        if (planningState) {
+          const previousStatus = planningState.status;
+          saveAgentStateSync({ ...planningState, status: 'stopped', stoppedAt: new Date().toISOString() });
+          const hasLiveTmuxSession = await Effect.runPromise(sessionExists(sessionName));
+          await Effect.runPromise(eventStore.append({
+            type: 'agent.status_changed',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: sessionName, status: 'stopped', previousStatus, hasLiveTmuxSession },
+          }));
+          console.log(`[complete-planning] Marked ${sessionName} as stopped`);
+        }
+      } catch { /* Non-fatal — agent status is cosmetic */ }
+    })();
 
     await Effect.runPromise(eventStore.append({
       type: 'planning.sync',
