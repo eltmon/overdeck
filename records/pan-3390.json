@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T09:24:51.256Z",
-  "updated": "2026-08-01T10:02:48.158Z",
+  "updated": "2026-08-01T10:03:59.389Z",
   "pipeline": {
     "issueId": "PAN-3390",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T10:02:48.136Z",
+    "updatedAt": "2026-08-01T10:03:59.381Z",
     "strikeReadyHead": "4abc3c85599fbfc9eae61f39a27f09695bc441d5",
     "strikeReadyAt": "2026-08-01T10:02:48.135Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
   },
@@ -22,24 +22,24 @@
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 482478,
-            "output": 55243,
-            "cacheRead": 21255168,
+            "input": 484278,
+            "output": 55377,
+            "cacheRead": 21579776,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 482478,
-          "output": 55243,
-          "cacheRead": 21255168,
+          "input": 484278,
+          "output": 55377,
+          "cacheRead": 21579776,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 14.697264,
-        "pricingAsOf": "2026-08-01T10:02:48.151Z"
+        "usd": 14.872588,
+        "pricingAsOf": "2026-08-01T10:03:59.385Z"
       }
     },
     "merges": [],
