@@ -9409,3 +9409,16 @@ I refused every `--accept-*` override — 25 close-outs, zero overrides — and 
 6. Drive **PAN-3358**, checking the UI-configurability requirement is in the plan.
 
 Everything else is either operator-gated (PAN-3313) or deliberately held (PAN-3356, PAN-3305).
+
+## RUN-75 tick 29 (2026-08-01 02:34Z) — steady state; PAN-3358 is large but sound
+
+- Infra: hook 445/guard=1, leak **0**, 28.7 GB, load 2.4. gen-a still the fresh CLI (21:27) — checked, not assumed.
+- Sweep: **no new close-out debt**. panopticon-cli holds only PAN-3305 (blocked), PAN-3356 (held — ACs unverified), PAN-3358 (in flight), PAN-3366 (struck). MIN-908 + 13 zombie PRs out of merge scope; TIN-1 backlog.
+- **`strike-pan-3366`** (tracker precedence) healthy: ctx 32%, $2.33, +74/-11, still writing, not pushed.
+- **PAN-3358 flagged then cleared.** Its agent showed **$152.76, +7374/-1185, 25 commits, ctx 88%** — which on a "propagate version strings" issue reads like runaway scope. Checked the file breakdown before saying so, and it is coherent: `version-ship.ts` (382) + `version-ship-deps.ts` (530) + `ship-record.ts` (250) for the step, `projects.ts` (+356/-67) for the `version_sync` config, **`ProjectSettingsDisclosure.tsx` (+305) for the operator-required UI configurability**, `dod-gate-ship.test.ts` (206) for the DoD row, ~1,440 lines of tests, and a `no-loss-matrix.ts` entry. Roughly half the diff is tests.
+- **LESSON: cost and diff size are not scope signals on their own.** $152 and +7,374 lines looked alarming; the file list showed a proportionate implementation of config + ship step + DoD row + UI, with the no-loss matrix updated. **Read what changed before judging how much changed** — the same discipline as reading a pane instead of a cost delta.
+- Watch item: PAN-3358 is at **ctx 88%** with 25 unpushed commits on a clean tree. If it compacts badly the work is committed and safe, but it should push soon.
+
+### Handover status
+
+Handover to the incoming Fable 5 orchestrator is **prepared and durable** (appended above, pushed as `992b762bcb`). `roles.flywheel.model` is now `claude-fable-5`; config backed up at `~/.overdeck/config.yaml.bak-run75-handover`. **The switch takes effect on the next spawn** — `pan flywheel start` refuses while this session is alive (singleton invariant, working correctly). Continuing to tick until the operator ends this session rather than letting the loop go dark.
