@@ -321,19 +321,18 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T21:14:47.979Z",
+  "updated": "2026-08-01T21:15:42.089Z",
   "pipeline": {
     "issueId": "PAN-3367",
-    "reviewStatus": "skipped",
+    "reviewStatus": "pending",
     "testStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:12:25.965Z",
-    "updatedAt": "2026-08-01T21:14:45.521Z",
-    "reviewNotes": "Review mode: none — AI review skipped by configuration; verification gate still enforced",
+    "updatedAt": "2026-08-01T21:15:42.034Z",
     "testNotes": "Diff is 100% docs-only (git diff main...HEAD --stat: 89 files, all under docs/audits/pan-3367/**, 3588 insertions, 0 deletions, 0 source/test/config files touched). npm run typecheck: exit 0 (root tsc, hooks, evals, dashboard-types guard 58 known/0 new, frontend-types guard 0 known/0 new). npm run lint: exit 0, all 20 sub-checks green (eslint, effect, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular 77 baselined/0 new, ratchet-audit, quarantine-audit 12 entries). npm test full run: 74 of 1379 files / 77 of 13065 tests failed, exit code reported as pass-with-failures by vitest summary (1302 passed files, 12931 passed tests, 50 skipped); every single failure is 'Hook timed out in 5000ms' (66) or 'Test timed out in 5000ms' (10) inside beforeEach/setupOverdeckTestDb() SQLite fixture setup, not an assertion failure. Root-caused live: system load average 24.3-37.8 on a 24-core box with 33-35 concurrent Overdeck agent tmux sessions during the run. Re-ran an 8-file representative sample of the failed files (spanning cli/conversations, lib/conversations, lib/overdeck, dashboard, memory, workspaces clusters) with --no-file-parallelism in isolation: 8/8 files passed, 61/61 tests passed. This PR touches zero source or test files, so the timeouts are not a regression from this change; they reproduce the same CPU-storm-induced flakiness pattern already documented and root-caused on this branch's prior test run (25/1379 failures at lower load), now worse (74/1379) because current load is higher. Typecheck, lint, and test all pass on re-verification with no functional failures attributable to this diff. UAT not required: PAN-3367 is a read-only docs audit producing markdown reports under docs/audits/pan-3367/** with zero dashboard/UI/application behavior changes; the xBRIEF's 8 items (snapshot-evidence, audit-batch-a..f, synthesis-report) carry no browser/UAT verify_commands or acceptance criteria, and the draft PRD's mentions of 'browser UAT' refer to the historical audited issues' own environment-blocked verdicts, not a requirement on this deliverable.",
     "inspectNotes": "Blocking AC2 finding resolved and independently verified. reproduce-worklist.mjs now captures resetAt (first pending/pending after the negative verdict) at lines 28-38 and emits it into candidates.json; both worklist tables gained a 'Reset at' column. Verified by recomputing negAt/resetAt/passAt for all 29 non-compacted worklist rows directly from the committed events-<issue>.json.gz dumps with an independent script: 30/30 rows present, 29/29 recomputed with ZERO mismatches, PAN-1525 correctly marked _(compacted)_ in both the reset and pass columns. Spot-checked the two tightest deltas (PAN-3049 19ms, PAN-3151 27ms neg-to-reset) — both are genuine consecutive event rows, not backfill artifacts. Secondary finding also fixed: notes now truncate at a word boundary with an explicit …[truncated] marker and the preamble points at commit-counts.json negNotes for full text. AC1 (script committed, node:sqlite readOnly:true, 61 candidates = 61 raw event dumps), AC2 (all 25 mandatory issues, every required field incl. reset timestamp), AC3 (30 = 25 mandatory + 5 extras with variance-from-29 explanation), AC4 (5 zero-commit extras gap-sorted, under cap 10, no overflow) and NFR-2 all pass — the backfill read committed dumps rather than re-querying the further-compacted DB, so no state plane was written.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3399",
@@ -552,7 +551,7 @@
       },
       "costAtCloseOut": {
         "usd": 247.872246,
-        "pricingAsOf": "2026-08-01T21:14:47.973Z"
+        "pricingAsOf": "2026-08-01T21:15:42.081Z"
       }
     },
     "merges": [
