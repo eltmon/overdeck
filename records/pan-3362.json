@@ -126,10 +126,10 @@
     "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:40:16.699Z",
+  "updated": "2026-08-01T12:44:32.560Z",
   "pipeline": {
     "issueId": "PAN-3362",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -137,11 +137,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T12:29:41.661Z",
-    "updatedAt": "2026-08-01T12:39:44.552Z",
+    "updatedAt": "2026-08-01T12:44:32.259Z",
     "reviewNotes": "Unrelated Deacon transcript-retention behavior violates the explicit PAN-3362 scope constraint",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
-    "reviewedAtCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
     "lastVerifiedCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
     "reviewSpawnedAt": "2026-08-01T12:36:01.269Z",
     "scopeDrift": {
@@ -182,9 +181,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3542224,
-            "output": 61438,
-            "cacheRead": 16062464,
+            "input": 3557385,
+            "output": 65002,
+            "cacheRead": 16795136,
             "cacheWrite": 0
           }
         },
@@ -222,30 +221,30 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 736,
-            "output": 175296,
-            "cacheRead": 128002201,
-            "cacheWrite": 2726980
+            "input": 768,
+            "output": 183549,
+            "cacheRead": 136781041,
+            "cacheWrite": 3290658
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 6051559,
-          "output": 147036,
-          "cacheRead": 32634880,
+          "input": 6066720,
+          "output": 150600,
+          "cacheRead": 33367552,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 736,
-          "output": 175296,
-          "cacheRead": 128002201,
-          "cacheWrite": 2726980
+          "input": 768,
+          "output": 183549,
+          "cacheRead": 136781041,
+          "cacheWrite": 3290658
         }
       },
       "costAtCloseOut": {
-        "usd": 85.158651,
-        "pricingAsOf": "2026-08-01T12:39:44.560Z"
+        "usd": 88.95527,
+        "pricingAsOf": "2026-08-01T12:44:32.323Z"
       }
     },
     "merges": [
@@ -254,7 +253,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3362",
