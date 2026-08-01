@@ -866,3 +866,8 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **Operator promoted uat/pan-sable-0801 carrying PAN-3367** (the 29-issue code-level audit — the run's costliest item at ~$236). Close-out blocked at the deploy row: live build predates the merge. Tried a reload; **the deploy gate refused with an explicit reason — "post-merge lifecycle is pending", queued 21:54:57Z, fires automatically; do not retry or --force."** Respected it; close-out retries next tick. (This is PAN-3383's observability fix EARNING ITS KEEP: the gate stated its blocking reason instead of failing silently — exactly what that issue added.)
 - Full read-door sweep re-derived: 17 PAN + 20 MIN + TIN-1 in pipeline. **Read-door robustness note:** papers-please and lexerra returned EMPTY on the first pass (curl/jq under load) and only yielded their typed `unavailable` objects on retry — an empty response is NOT a bare array and must never be read as "no pipeline"; retried both rather than assuming.
 - Clean UAT batch EMPTY (candidate null) — nothing review+test passed. Red main (PAN-3448) still active; #3452 watch running.
+
+## RUN-79 tick 44 (2026-08-01 ~22:10Z) — 🟢 RED MAIN FIX MERGED (#3452 → 286847320e)
+
+- **PAN-3448 landed** and handed off — forbidden `bd ready` fixture literals removed, beads-removal guard untouched. Main re-green watch armed on the merge commit. Red-main duration: reported by strike-3446 at ~21:30Z → fixed and merged ~22:08Z (~38 min, and the report came from an agent refusing to fix-forward — the sensor pattern again).
+- #3449 (PAN-3446 reviewRunId recovery) test lane running; merges on green now that main's blocker is gone.
