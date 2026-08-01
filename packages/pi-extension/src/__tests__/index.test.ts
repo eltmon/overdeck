@@ -33,7 +33,7 @@ const now = () => fixedTime
 
 // Track fetch calls and control responses per test.
 let fetchCalls: { url: string; body: unknown; headers: Record<string, string> }[] = []
-let fetchResponse: { status: number } = { status: 200 }
+let fetchResponse: { status: number; body?: Record<string, unknown> } = { status: 200 }
 
 beforeEach(() => {
   fetchCalls = []
@@ -49,7 +49,11 @@ beforeEach(() => {
       const url = _url
       const body = init?.body ? JSON.parse(init.body as string) : undefined
       fetchCalls.push({ url, body, headers: init?.headers as Record<string, string> })
-      return { status: fetchResponse.status } as Response
+      return {
+        status: fetchResponse.status,
+        ok: fetchResponse.status >= 200 && fetchResponse.status < 300,
+        json: async () => fetchResponse.body ?? {},
+      } as Response
     }),
   )
 })
@@ -484,7 +488,7 @@ describe('handleTurnEnd', () => {
 
   it('PAN-1134: POSTs activity idle and a turn cost event', async () => {
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636' },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', role: 'conversation' },
       {},
     )
     expect(fetchCalls.length).toBe(2)
@@ -496,28 +500,42 @@ describe('handleTurnEnd', () => {
     expect(fetchCalls[1]!.body).toMatchObject({ kind: 'cost-event', issueId: 'PAN-636', tool: 'turn_end' })
   })
 
-  it('posts work-complete when all issue beads are closed', async () => {
-    const workspace = join(h.home, 'workspace')
-    mkdirSync(join(workspace, '.beads'), { recursive: true })
-    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+  it('posts work-complete when the dashboard plan checklist is complete', async () => {
+    fetchResponse.body = { success: true, complete: true, incomplete: [] }
 
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636' },
       {},
     )
 
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/plan-checklist')
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
     expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
   })
 
-  it('routes work turn-end completion from launcher session type env', async () => {
-    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
-    const workspace = join(h.home, 'workspace')
-    mkdirSync(join(workspace, '.beads'), { recursive: true })
-    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+  it('does not post evidence-clean completion when the dashboard plan checklist is incomplete', async () => {
+    fetchResponse.body = {
+      success: true,
+      complete: false,
+      incomplete: ['    - item-one First item (pending)'],
+    }
 
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', workspace },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636' },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/plan-checklist')
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(false)
+  })
+
+  it('routes work turn-end completion from launcher session type env', async () => {
+    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
+    fetchResponse.body = { success: true, complete: true, incomplete: [] }
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636' },
       {},
     )
 
