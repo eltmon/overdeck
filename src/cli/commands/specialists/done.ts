@@ -31,6 +31,8 @@ interface DoneOptions {
   /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
   reviewers?: string;
   notes?: string;
+  uatStatus?: 'passed' | 'failed';
+  uatNotes?: string;
 }
 
 export async function doneCommand(
@@ -59,6 +61,11 @@ export async function doneCommand(
   if (!validStatuses.includes(options.status)) {
     console.error(chalk.red(`Invalid status: ${options.status}`));
     console.error(chalk.dim(`Valid options for ${specialist}: ${validStatuses.join(', ')}`));
+    return exitCli(1);
+  }
+
+  if (options.uatStatus && (specialist !== 'test' || !['passed', 'failed'].includes(options.uatStatus))) {
+    console.error(chalk.red('--uat-status applies only to test verdicts and must be passed or failed'));
     return exitCli(1);
   }
 
@@ -179,6 +186,8 @@ export async function doneCommand(
     case 'test':
       update.testStatus = options.status as ReviewStatus['testStatus'];
       if (options.notes) update.testNotes = options.notes;
+      if (options.uatStatus) update.uatStatus = options.uatStatus;
+      if (options.uatNotes) update.uatNotes = options.uatNotes;
       if (options.status === 'passed') {
         console.log(chalk.green(`✓ Tests ${options.status} for ${normalizedIssueId}`));
         // readyForMerge is set only by the ship role after rebase/verify/push (PAN-1048).

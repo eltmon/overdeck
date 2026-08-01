@@ -1441,12 +1441,14 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     }
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { reviewStatus, testStatus, mergeStatus, reviewNotes, testNotes, verificationStatus, readyForMerge } = body as {
+    const { reviewStatus, testStatus, uatStatus, mergeStatus, reviewNotes, testNotes, uatNotes, verificationStatus, readyForMerge } = body as {
       reviewStatus?: string;
       testStatus?: string;
+      uatStatus?: string;
       mergeStatus?: string;
       reviewNotes?: string;
       testNotes?: string;
+      uatNotes?: string;
       verificationStatus?: string;
       readyForMerge?: boolean;
     };
@@ -1470,9 +1472,11 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
     }
     if (reviewStatus) update.reviewStatus = reviewStatus as any;
     if (testStatus) update.testStatus = testStatus as any;
+    if (uatStatus) update.uatStatus = uatStatus as any;
     if (mergeStatus) update.mergeStatus = mergeStatus as any;
     if (reviewNotes) update.reviewNotes = reviewNotes;
     if (testNotes) update.testNotes = testNotes;
+    if (uatNotes) update.uatNotes = uatNotes;
     if (verificationStatus) update.verificationStatus = verificationStatus as any;
     if (readyForMerge !== undefined) update.readyForMerge = readyForMerge;
 
@@ -1592,10 +1596,10 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
       }
 
       if (testStatus === 'passed') {
-        // Tests passing makes the issue operator-mergeable; triggerMerge still runs the post-rebase gate.
-        setReviewStatus(issueId, { readyForMerge: true });
-        console.log(`[review-status] ${issueId} marked ready for merge after test=passed`);
-        emitActivityEntrySync({ source: 'ship', level: 'success', issueId, message: `${issueId} is ready. Open Awaiting Merge and click MERGE when you are ready to land it.`, link: '/awaiting-merge', desktop: true });
+        if (status.readyForMerge) {
+          console.log(`[review-status] ${issueId} marked ready for merge after all gates passed`);
+          emitActivityEntrySync({ source: 'ship', level: 'success', issueId, message: `${issueId} is ready. Open Awaiting Merge and click MERGE when you are ready to land it.`, link: '/awaiting-merge', desktop: true });
+        } else console.log(`[review-status] ${issueId} automated tests passed, but another gate remains unresolved (uat=${status.uatStatus ?? 'not-required'})`);
 
         // Post overdeck/tests=success so the CI test job self-skips on this
         // commit. Mirrors what verification-runner does at the pre-review gate.
@@ -1621,22 +1625,18 @@ const postWorkspaceReviewStatusRoute = HttpRouter.add(
           timestamp: new Date().toISOString(),
           payload: { issueId, passed: true },
         })));
-        // Notify the whole-issue work agent when one exists. This MUST be an
-        // Effect-level catch: a try/catch around `yield*` does not intercept a
-        // failed Effect — the failure propagated and 500'd the entire verdict
-        // POST after readyForMerge was only partially applied. Swarm issues
-        // have no `agent-<issue>` at all, so this path failed on every
-        // swarm test-pass (observed live on PAN-1791).
-        const notifyAgentId = `agent-${issueId.toLowerCase()}`;
-        yield* Effect.tryPromise(() => messageAgent(
-          notifyAgentId,
-          `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete. Tell the operator to open Overdeck's Awaiting Merge page and click MERGE when ready. You may stop working on this issue.`
-        )).pipe(
-          Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
-          Effect.catch((err) => Effect.sync(() => console.log(
-            `[review-status] Could not notify work agent for ${issueId} (may not be running): ${err instanceof Error ? err.message : String(err)}`
-          ))),
-        );
+        if (status.readyForMerge) {
+          const notifyAgentId = `agent-${issueId.toLowerCase()}`;
+          yield* Effect.tryPromise(() => messageAgent(
+            notifyAgentId,
+            `ALL CHECKS PASSED for ${issueId}. Review: passed. Tests: passed. Your work is complete. Tell the operator to open Overdeck's Awaiting Merge page and click MERGE when ready. You may stop working on this issue.`
+          )).pipe(
+            Effect.tap(() => Effect.sync(() => console.log(`[review-status] Notified ${notifyAgentId} that all checks passed`))),
+            Effect.catch((err) => Effect.sync(() => console.log(
+              `[review-status] Could not notify work agent for ${issueId} (may not be running): ${err instanceof Error ? err.message : String(err)}`
+            ))),
+          );
+        }
       }
     }
 

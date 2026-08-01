@@ -43,6 +43,8 @@ describe('test role dispatch', () => {
     expect(prompt).toContain('Do not spawn or wake a separate UAT agent');
     expect(prompt).toContain('/api/review/PAN-503/status');
     expect(prompt).toContain('"testStatus":"passed"');
+    expect(prompt).toContain('"uatStatus":"failed"');
+    expect(prompt).toContain('A required UAT that cannot run or leaves any criterion unproven is uatStatus "failed"');
     expect(prompt).not.toContain('readyForMerge');
     expect(prompt).toContain('Do NOT spawn, wake, or delegate to test-agent or uat-agent specialists');
   });
@@ -64,6 +66,7 @@ describe('test role dispatch', () => {
     // deacon failsafe (checkCompletedButUnsignaledTests) reads back.
     expect(prompt).toContain('.pan/test/result.json');
     expect(prompt).toContain('{"status":"passed","notes":');
+    expect(prompt).toContain('"uatStatus":"passed","uatNotes":');
 
     // It must come BEFORE the curl POST so the verdict survives an interrupted POST.
     const artifactIdx = prompt.indexOf('.pan/test/result.json');

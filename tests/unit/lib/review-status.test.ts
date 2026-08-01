@@ -118,6 +118,40 @@ describe('review status', () => {
     expect(capturePipelineStageForIssueMock).toHaveBeenCalledWith('PAN-2200', 'review_passed');
   });
 
+  it('keeps a required UAT failure latched across a review retry and no-code test skip', () => {
+    const head = rehydrateHeadAnchor('def456def456def456def456def456def456def4');
+    setReviewStatusSync('PAN-93365', {
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
+      verificationStatus: 'passed',
+      reviewedAtCommit: head,
+      lastVerifiedCommit: head,
+    });
+
+    // pan done starts a fresh review/test cycle but must not erase the UAT verdict.
+    setReviewStatusSync('PAN-93365', {
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      verificationStatus: 'pending',
+      readyForMerge: false,
+    });
+    setReviewStatusSync('PAN-93365', {
+      reviewStatus: 'passed',
+      verificationStatus: 'passed',
+      readyForMerge: true,
+    });
+
+    expect(getReviewStatusSync('PAN-93365')).toMatchObject({
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      verificationStatus: 'passed',
+      readyForMerge: false,
+    });
+  });
+
   // PAN-3339: verification is dispatched only from inside the review pipeline, which
   // never runs again once the issue merges. A `pending` verdict carried past the merge
   // has no owner and blocks DoD row 3 forever, so the merge write settles it here with

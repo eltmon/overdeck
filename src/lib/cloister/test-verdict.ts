@@ -25,6 +25,8 @@ import type { XBriefDocument } from '../xbrief/types.js';
 export interface TestVerdictArtifact {
   status: 'passed' | 'failed';
   notes?: string;
+  uatStatus?: 'passed' | 'failed';
+  uatNotes?: string;
 }
 
 /** Workspace-relative path to the test verdict artifact. */
@@ -70,6 +72,12 @@ export function readTestVerdictArtifact(
       return {
         status: parsed.status,
         notes: typeof parsed.notes === 'string' ? parsed.notes : undefined,
+        ...(
+          parsed.uatStatus === 'passed' || parsed.uatStatus === 'failed'
+            ? { uatStatus: parsed.uatStatus }
+            : {}
+        ),
+        ...(typeof parsed.uatNotes === 'string' ? { uatNotes: parsed.uatNotes } : {}),
       };
     }
   } catch {
@@ -78,12 +86,14 @@ export function readTestVerdictArtifact(
   return null;
 }
 
+type RecoveredTestVerdict = TestVerdictArtifact;
+
 export type UnsignaledTestDecision =
   | { action: 'wait' }
   | { action: 'none' }
   | { action: 'escalate' }
-  | { action: 'auto-complete'; status: 'passed' | 'failed'; notes?: string }
-  | { action: 'nudge-verdict'; status: 'passed' | 'failed'; notes?: string }
+  | ({ action: 'auto-complete' } & RecoveredTestVerdict)
+  | ({ action: 'nudge-verdict' } & RecoveredTestVerdict)
   | { action: 'nudge-write' };
 
 /**
@@ -112,7 +122,7 @@ export function decideUnsignaledTestAction(input: {
   // nothing to recover here — checkPendingTestDispatch / the orphan sweep own
   // re-dispatch, and the strand-surfacing path owns visibility.
   if (!sessionLive) {
-    if (artifact) return { action: 'auto-complete', status: artifact.status, notes: artifact.notes };
+    if (artifact) return { action: 'auto-complete', ...artifact };
     return { action: 'none' };
   }
 
@@ -124,8 +134,8 @@ export function decideUnsignaledTestAction(input: {
   if (artifact) {
     // Already nudged once and still no signal → the agent is unresponsive;
     // complete from the artifact so the pipeline isn't blocked.
-    if (alreadyNudged) return { action: 'auto-complete', status: artifact.status, notes: artifact.notes };
-    return { action: 'nudge-verdict', status: artifact.status, notes: artifact.notes };
+    if (alreadyNudged) return { action: 'auto-complete', ...artifact };
+    return { action: 'nudge-verdict', ...artifact };
   }
 
   // No artifact: never guess. Nudge once to write+POST; if the agent is still

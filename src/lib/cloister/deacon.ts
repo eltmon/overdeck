@@ -1447,7 +1447,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
           const fallbackNote = `Test auto-completed by deacon: ${decision.status} (verdict artifact present, agent ${sessionLive ? 'alive but unresponsive after nudge' : 'dead'})`;
           setReviewStatusSync(issueId, {
             testStatus: decision.status,
-            testNotes: decision.notes || fallbackNote,
+            testNotes: decision.notes || fallbackNote, ...(decision.uatStatus ? { uatStatus: decision.uatStatus, uatNotes: decision.uatNotes || decision.notes } : {}),
           });
           const msg = `Auto-completed test for ${issueId}: ${decision.status} (${sessionLive ? 'alive but unresponsive after nudge' : 'dead agent'}, verdict artifact)`;
           actions.push(msg);
@@ -1459,7 +1459,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
             decision.status === 'failed'
               ? ` --notes "${(decision.notes || 'See .pan/test/result.json').replace(/"/g, "'").slice(0, 120)}"`
               : '';
-          const cmd = `pan admin specialists done test ${issueId} --status ${decision.status}${noteArg}`;
+          const cmd = `pan admin specialists done test ${issueId} --status ${decision.status}${noteArg}${decision.uatStatus ? ` --uat-status ${decision.uatStatus}${decision.uatNotes ? ` --uat-notes "${decision.uatNotes.replace(/"/g, "'").slice(0, 120)}"` : ''}` : ''}`;
           const nudge = `Your test verdict (${decision.status}) is already written to .pan/test/result.json. Your ONLY remaining task is to execute this Bash command immediately — do not analyze, do not summarize, do not ask questions, just run it:\n\n${cmd}\n\nRun this command NOW. Do not write any other response before executing it.`;
           try {
             const { messageAgent } = await import('../agents.js');
@@ -1474,7 +1474,7 @@ export async function checkCompletedButUnsignaledTests(): Promise<string[]> {
           break;
         }
         case 'nudge-write': {
-          const nudge = `Your test run for ${issueId} looks finished but no verdict was recorded. Decide the verdict from the gates/UAT you ran, then do BOTH of these now: (1) write the workspace file .pan/test/result.json as {"status":"passed"|"failed","notes":"<evidence>"}, and (2) run: pan admin specialists done test ${issueId} --status passed|failed. Do this immediately — do not summarize or ask questions, just write the file and run the command.`;
+          const nudge = `Your test run for ${issueId} looks finished but no verdict was recorded. Decide the automated-gate verdict and, when UAT was required, its separate verdict. Then do BOTH now: (1) write .pan/test/result.json as {"status":"passed"|"failed","notes":"<gate evidence>","uatStatus":"passed"|"failed","uatNotes":"<UAT evidence>"} (omit UAT fields only when UAT was not required), and (2) run: pan admin specialists done test ${issueId} --status passed|failed [--uat-status passed|failed]. Do this immediately — do not summarize or ask questions, just write the file and run the command.`;
           try {
             const { messageAgent } = await import('../agents.js');
             await messageAgent(testSession, nudge);

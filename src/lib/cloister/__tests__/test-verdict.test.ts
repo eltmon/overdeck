@@ -66,6 +66,21 @@ describe('test-verdict artifact (PAN-1681)', () => {
       expect(readTestVerdictArtifact(ws)).toEqual({ status: 'failed', notes: '3 tests failing' });
     });
 
+    it('preserves a separate required-UAT failure alongside passed automated gates', () => {
+      writeArtifact({
+        status: 'passed',
+        notes: 'typecheck, lint, and tests passed',
+        uatStatus: 'failed',
+        uatNotes: 'workspace has no tracker-backed issue data',
+      });
+      expect(readTestVerdictArtifact(ws)).toEqual({
+        status: 'passed',
+        notes: 'typecheck, lint, and tests passed',
+        uatStatus: 'failed',
+        uatNotes: 'workspace has no tracker-backed issue data',
+      });
+    });
+
     it('returns null on malformed JSON', () => {
       writeArtifact('{ not json');
       expect(readTestVerdictArtifact(ws)).toBeNull();
@@ -113,6 +128,21 @@ describe('test-verdict artifact (PAN-1681)', () => {
         .toEqual({ action: 'auto-complete', status: 'passed', notes: 'ok' });
       expect(decideUnsignaledTestAction({ sessionLive: false, idle: false, alreadyNudged: false, artifact: failed }))
         .toEqual({ action: 'auto-complete', status: 'failed', notes: 'boom' });
+    });
+
+    it('carries the UAT latch through artifact recovery', () => {
+      const uatBlocked = {
+        status: 'passed' as const,
+        notes: 'automated gates passed',
+        uatStatus: 'failed' as const,
+        uatNotes: 'required browser flow could not run',
+      };
+      expect(decideUnsignaledTestAction({
+        sessionLive: false,
+        idle: false,
+        alreadyNudged: false,
+        artifact: uatBlocked,
+      })).toEqual({ action: 'auto-complete', ...uatBlocked });
     });
 
     it('dead session + no artifact → none (never guesses pass/fail)', () => {

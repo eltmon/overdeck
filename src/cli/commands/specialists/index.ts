@@ -61,6 +61,8 @@ export function registerSpecialistsCommands(program: Command): void {
     .requiredOption('--status <status>', 'Result status: passed, failed, or review-only blocked')
     .option('--item <itemId>', 'xBRIEF item ID (required for inspect verdicts)')
     .option('--notes <notes>', 'Optional notes about the result')
+    .option('--uat-status <status>', 'Test only: required browser UAT result (passed or failed)')
+    .option('--uat-notes <notes>', 'Test only: browser UAT evidence or blocking condition')
     .option('--run-id <runId>', 'Review cycle ID used to deduplicate review feedback')
     .option('--reviewers <verdicts>', 'PAN-1862 (review only): per-reviewer verdicts, e.g. "security=passed,correctness=blocked"')
     .action(doneAndExitCommand);

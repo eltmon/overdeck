@@ -41,6 +41,8 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'flywheel_substrate_bugs', column: 'affected_criteria' },
     { table: 'review_status', column: 'release_status' },
     { table: 'review_status', column: 'release_notes' },
+    { table: 'review_status', column: 'uat_status' },
+    { table: 'review_status', column: 'uat_notes' },
     { table: 'review_status', column: 'inspect_owner_session' },
     { table: 'review_status', column: 'strike_ready_head' },
     { table: 'review_status', column: 'strike_ready_at' },
@@ -158,6 +160,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   runSchemaTopUp(db, "UPDATE `discovered_sessions` SET `harness` = 'claude-code' WHERE `harness` IS NULL");
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_status` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `release_notes` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_status` text');
+  runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `uat_notes` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `inspect_owner_session` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_head` text');
   runSchemaTopUp(db, 'ALTER TABLE `review_status` ADD COLUMN `strike_ready_at` integer');

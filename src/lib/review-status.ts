@@ -291,8 +291,8 @@ export function setReviewStatusSync(
   //
   // Explicit caller intent still wins (the merge flow sets readyForMerge=false when a
   // merge starts; mergeStatus then leaves pending/queued so the derive agrees).
-  // PAN-905: GitHub-native blockers always override readyForMerge to false.
-  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0;
+  // PAN-905/PAN-3365: merge blockers and failed required UAT override explicit readiness.
+  const hasBlockers = (merged.blockerReasons?.length ?? 0) > 0 || merged.uatStatus === 'failed';
   const readyForMerge = hasBlockers
     ? false
     : (update.readyForMerge !== undefined
@@ -461,7 +461,7 @@ export function setReviewStatusSync(
       eventType: `mergeStatus.${update.mergeStatus}`,
     });
   }
-  if (update.readyForMerge === true && !status.readyForMerge) {
+  if (updated.readyForMerge && !status.readyForMerge) {
     emitActivityEntrySync({ source: 'cloister', level: 'success', message: `${issueId} — ready for merge`, issueId });
     emitActivityTtsSync({
       utterance: `${issueId} ready for merge`,

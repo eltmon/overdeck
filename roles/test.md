@@ -70,10 +70,11 @@ Never start, stop, kill, or restart the host-level Overdeck dashboard, superviso
 5. When UAT is required, start or connect to the running app using the project instructions and drive the browser with Playwright MCP tools.
 6. Walk the golden path and named edge cases from the acceptance criteria.
 7. Capture screenshots, console messages, network failures, and the exact unmet acceptance criterion for any UAT failure.
-8. Emit exactly one final test sentinel:
+8. Record automated gates and browser UAT as separate verdicts. `testStatus` covers only configured test-suite commands; when UAT is required, record `uatStatus` independently. A UAT that cannot run or leaves any criterion unproven is `uatStatus: failed` even when `testStatus: passed`; this latch survives review retries until a later UAT proves the criterion.
+9. Emit exactly one final test sentinel:
    - `TESTS PASSED` when the configured test suite passes and required UAT passes or is not required.
    - `TESTS FAILED` when any test-suite command fails, the app cannot start, Playwright cannot verify required behavior, or an acceptance criterion remains unproven.
-9. For Pi sessions, end your final response with exactly one structured Overdeck sentinel line:
+10. For Pi sessions, end your final response with exactly one structured Overdeck sentinel line:
    - `OVERDECK_SPECIALIST_RESULT: test-agent passed`
    - `OVERDECK_SPECIALIST_RESULT: test-agent failed`
 
