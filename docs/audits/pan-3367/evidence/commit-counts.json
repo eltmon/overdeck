@@ -21,7 +21,7 @@
     "passAt": "2026-07-25T23:22:15.348Z",
     "minutes": 48,
     "negState": "blocked/pending",
-    "negNotes": "Review dispatch skipped — already running: agent-pan-2467-review",
+    "negNotes": "Review dispatch skipped \u2014 already running: agent-pan-2467-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3080",
     "commitMethod": "pr-commits",
     "commitCount": 1,
@@ -538,7 +538,7 @@
     "passAt": "2026-07-31T21:31:46.047Z",
     "minutes": 46,
     "negState": "blocked/pending",
-    "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition — `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
+    "negNotes": "[correctness] Review-stuck recovery invokes the wrong state transition \u2014 `src/dashboard/frontend/src/components/issue-view/NeedsYouSlot.tsx:46`",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3360",
     "commitMethod": "pr-commits",
     "commitCount": 1,
@@ -561,7 +561,7 @@
     "minutes": 16,
     "negState": "blocked/pending",
     "negNotes": null,
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now/-/merge_requests/86",
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 0,
     "prTotalCommits": 1,
@@ -576,23 +576,12 @@
     "passAt": "2026-07-26T06:41:35.735Z",
     "minutes": 43,
     "negState": "passed/failed",
-    "negNotes": "Review bypassed: verification passed but review infrastructure repeatedly failed.",
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now/-/merge_requests/77",
+    "negNotes": null,
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 2,
     "prTotalCommits": 11,
-    "inRangeDetail": [
-      {
-        "authoredDate": "2026-07-26T02:19:50.000-04:00",
-        "committedDate": "2026-07-26T02:19:50.000-04:00",
-        "headline": "Merge origin/main into feature/min-879"
-      },
-      {
-        "authoredDate": "2026-07-26T02:16:07.000-04:00",
-        "committedDate": "2026-07-26T02:16:07.000-04:00",
-        "headline": "fix: reset analytics identity on logout (MIN-879)"
-      }
-    ],
+    "inRangeDetail": [],
     "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
     "resetAt": "2026-07-26T06:20:38.473Z"
   },
@@ -604,22 +593,11 @@
     "minutes": 44,
     "negState": "failed/pending",
     "negNotes": null,
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now/-/merge_requests/89",
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 2,
     "prTotalCommits": 15,
-    "inRangeDetail": [
-      {
-        "authoredDate": "2026-07-25T22:28:18.000-04:00",
-        "committedDate": "2026-07-25T22:28:18.000-04:00",
-        "headline": "fix: preserve clear flags through task adapter"
-      },
-      {
-        "authoredDate": "2026-07-25T22:13:06.000-04:00",
-        "committedDate": "2026-07-25T22:13:06.000-04:00",
-        "headline": "fix: address when-first review findings"
-      }
-    ],
+    "inRangeDetail": [],
     "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
     "resetAt": "2026-07-26T01:55:12.065Z"
   },
@@ -630,8 +608,8 @@
     "passAt": "2026-07-25T13:08:06.763Z",
     "minutes": 16,
     "negState": "blocked/pending",
-    "negNotes": "Vite defines server.watch twice, so the later property overwrites the new .pnpm-store exclusion and the ENOSPC mitigation never takes effect.",
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now-backend/-/merge_requests/68",
+    "negNotes": null,
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 0,
     "prTotalCommits": 9,
@@ -646,28 +624,12 @@
     "passAt": "2026-07-25T13:30:24.102Z",
     "minutes": 43,
     "negState": "blocked/pending",
-    "negNotes": "Agent re-review request (1/25): Fixed review issues",
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now/-/merge_requests/88",
+    "negNotes": null,
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 3,
     "prTotalCommits": 14,
-    "inRangeDetail": [
-      {
-        "authoredDate": "2026-07-25T08:59:26.000-04:00",
-        "committedDate": "2026-07-25T08:59:26.000-04:00",
-        "headline": "Merge remote-tracking branch 'origin/main' into feature/min-902"
-      },
-      {
-        "authoredDate": "2026-07-25T08:51:58.000-04:00",
-        "committedDate": "2026-07-25T08:52:59.000-04:00",
-        "headline": "fix(dev): merge .pnpm-store ignore into the existing server.watch block"
-      },
-      {
-        "authoredDate": "2026-07-25T08:47:34.000-04:00",
-        "committedDate": "2026-07-25T08:49:51.000-04:00",
-        "headline": "fix(dev): keep .pnpm-store out of Vite watcher and eslint traversal"
-      }
-    ],
+    "inRangeDetail": [],
     "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
     "resetAt": "2026-07-25T12:50:55.030Z"
   },
@@ -700,18 +662,12 @@
     "passAt": "2026-07-25T13:44:34.987Z",
     "minutes": 51,
     "negState": "blocked/pending",
-    "negNotes": "Agent re-review request (1/25): Fixed review issues",
-    "prUrl": "https://gitlab.com/eltmon/mind-your-now/-/merge_requests/87",
+    "negNotes": null,
+    "prUrl": null,
     "commitMethod": "mr-commits",
     "commitCount": 1,
     "prTotalCommits": 9,
-    "inRangeDetail": [
-      {
-        "authoredDate": "2026-07-25T09:04:49.000-04:00",
-        "committedDate": "2026-07-25T09:04:49.000-04:00",
-        "headline": "Merge remote-tracking branch 'origin/main' into feature/min-891"
-      }
-    ],
+    "inRangeDetail": [],
     "branchExists": "n/a (non-overdeck repo; commit count derived from MR, not branch log)",
     "resetAt": "2026-07-25T13:04:47.715Z"
   },
@@ -993,7 +949,7 @@
       {
         "authoredDate": "2026-07-27T11:58:53Z",
         "committedDate": "2026-07-27T11:58:53Z",
-        "headline": "fix(cloister): stop dropping non-GitHub projects and unrecorded confl…"
+        "headline": "fix(cloister): stop dropping non-GitHub projects and unrecorded confl\u2026"
       },
       {
         "authoredDate": "2026-07-27T12:18:40Z",
@@ -1003,7 +959,7 @@
       {
         "authoredDate": "2026-07-27T12:26:29Z",
         "committedDate": "2026-07-27T12:26:29Z",
-        "headline": "fix(db): repeat the v61 top-ups in the v61->v62 migration path (PAN-3…"
+        "headline": "fix(db): repeat the v61 top-ups in the v61->v62 migration path (PAN-3\u2026"
       },
       {
         "authoredDate": "2026-07-27T12:26:39Z",
@@ -1035,27 +991,27 @@
       {
         "authoredDate": "2026-07-27T12:01:32Z",
         "committedDate": "2026-07-27T12:01:32Z",
-        "headline": "test: add regression test for review_cycle_history clear on unstick (…"
+        "headline": "test: add regression test for review_cycle_history clear on unstick (\u2026"
       },
       {
         "authoredDate": "2026-07-27T12:07:38Z",
         "committedDate": "2026-07-27T12:08:06Z",
-        "headline": "test: seed cycle history in review_cycle_history clear regression tes…"
+        "headline": "test: seed cycle history in review_cycle_history clear regression tes\u2026"
       },
       {
         "authoredDate": "2026-07-27T12:22:16Z",
         "committedDate": "2026-07-27T12:22:16Z",
-        "headline": "fix: validate JSON storage format in review_cycle_history regression …"
+        "headline": "fix: validate JSON storage format in review_cycle_history regression \u2026"
       },
       {
         "authoredDate": "2026-07-27T12:27:57Z",
         "committedDate": "2026-07-27T12:27:57Z",
-        "headline": "fix: remove double-serialization from reviewCycleHistory regression t…"
+        "headline": "fix: remove double-serialization from reviewCycleHistory regression t\u2026"
       },
       {
         "authoredDate": "2026-07-27T12:30:00Z",
         "committedDate": "2026-07-27T12:30:00Z",
-        "headline": "fix: pass array directly to setReviewStatusSync in regression test (P…"
+        "headline": "fix: pass array directly to setReviewStatusSync in regression test (P\u2026"
       }
     ],
     "branchExists": true,
@@ -1077,7 +1033,7 @@
       {
         "authoredDate": "2026-07-28T06:42:03Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "feat: preserve verificationStatus in close-out journal write (PAN-302…"
+        "headline": "feat: preserve verificationStatus in close-out journal write (PAN-302\u2026"
       },
       {
         "authoredDate": "2026-07-28T06:45:04Z",
@@ -1087,27 +1043,27 @@
       {
         "authoredDate": "2026-07-28T06:47:05Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "feat: add journal fallback to row 5 (post-merge) mergeStatus read (PA…"
+        "headline": "feat: add journal fallback to row 5 (post-merge) mergeStatus read (PA\u2026"
       },
       {
         "authoredDate": "2026-07-28T06:56:55Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "feat: add idempotent short-circuit for re-close workflows (PAN-3025 W…"
+        "headline": "feat: add idempotent short-circuit for re-close workflows (PAN-3025 W\u2026"
       },
       {
         "authoredDate": "2026-07-28T06:59:30Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "docs: record verdict durability and idempotent re-close in DEFINITION…"
+        "headline": "docs: record verdict durability and idempotent re-close in DEFINITION\u2026"
       },
       {
         "authoredDate": "2026-07-28T07:12:07Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "fix: update records test to expect preserved verificationStatus (PAN-…"
+        "headline": "fix: update records test to expect preserved verificationStatus (PAN-\u2026"
       },
       {
         "authoredDate": "2026-07-28T07:42:04Z",
         "committedDate": "2026-07-28T08:50:10Z",
-        "headline": "fix: update close-out-terminal test to expect preserved verificationS…"
+        "headline": "fix: update close-out-terminal test to expect preserved verificationS\u2026"
       },
       {
         "authoredDate": "2026-07-28T08:49:51Z",
@@ -1117,17 +1073,17 @@
       {
         "authoredDate": "2026-07-28T09:08:52Z",
         "committedDate": "2026-07-28T09:08:52Z",
-        "headline": "fix: replace vacuous test mocks with production-path verifications (P…"
+        "headline": "fix: replace vacuous test mocks with production-path verifications (P\u2026"
       },
       {
         "authoredDate": "2026-07-28T09:14:50Z",
         "committedDate": "2026-07-28T09:14:50Z",
-        "headline": "fix: correct Effect return types and dependency mocking in row-5 and …"
+        "headline": "fix: correct Effect return types and dependency mocking in row-5 and \u2026"
       },
       {
         "authoredDate": "2026-07-28T09:22:57Z",
         "committedDate": "2026-07-28T09:22:57Z",
-        "headline": "fix: add missing canonical-state mock and strengthen workflow asserti…"
+        "headline": "fix: add missing canonical-state mock and strengthen workflow asserti\u2026"
       }
     ],
     "branchExists": true,
@@ -1171,7 +1127,7 @@
       {
         "authoredDate": "2026-07-28T11:46:38Z",
         "committedDate": "2026-07-28T11:46:38Z",
-        "headline": "fix(db): create event_idempotency in overdeck.db, and bound the sweep…"
+        "headline": "fix(db): create event_idempotency in overdeck.db, and bound the sweep\u2026"
       },
       {
         "authoredDate": "2026-07-28T12:02:37Z",

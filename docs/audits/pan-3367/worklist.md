@@ -7,14 +7,46 @@ payloads for every PAN candidate are dumped verbatim to `evidence/events-<issue>
 — some issues generate hundreds to thousands of `review.status_changed` events from what looks
 like review-thrash loops, producing multi-MB raw JSON per issue; `gunzip -k` to inspect). **Raw
 event dumps for the 8 MIN candidates were generated locally but are not committed to this public
-repository** — `eltmon/overdeck` is public while the source repositories those payloads describe
-(`mind-your-now`, `mind-your-now-backend`) are private, and the raw payloads embed private source
-paths, review commentary, and implementation detail. Every MIN report in this audit is written to
-avoid quoting that private content; see the confidentiality note at the top of each `min-*.md`
-report. The full candidate list (61 issues, full available window) is at
-`evidence/candidates.json`; the commit-count computation output (including in-window commit
-detail — commit *message headlines* only, which are low-sensitivity identifiers, not diff
-content) is at `evidence/commit-counts.json`.
+repository, and their notes/URLs/commit-headline detail are stripped from the committed metadata
+files too** — `eltmon/overdeck` is public while the source repositories those payloads describe
+(private Mind Your Now repositories) are private, and both the raw payloads and the per-row
+notes/merge-request-URL/commit-headline fields can embed private source paths, review commentary,
+and implementation detail. Every MIN report in this audit is written to avoid quoting that private
+content; see the confidentiality note at the top of each `min-*.md` report and the "Confidentiality-
+safe evidence contract" section below. The full candidate list (61 issues, full available window)
+is at `evidence/candidates.json`; the commit-count computation output is at
+`evidence/commit-counts.json` — for the 8 MIN rows, `negNotes`, `prUrl`, and `inRangeDetail` are
+`null`/empty by design, not by omission.
+
+## Confidentiality-safe evidence contract (added in review cycle 3, 2026-08-01)
+
+The approved xBRIEF (FR-1, `snapshot-evidence.ac1`, `audit-batch-e.ac1-ac2`) requires a committed
+raw event snapshot for every worklist candidate and quoted failing-criterion/failure-reason text
+for the cross-tracker (MIN) batch. This audit's own security findings (review cycles 1-3)
+established that literal compliance — publishing raw MIN payloads or quoting private Linear/GitLab
+text verbatim — discloses private Mind Your Now material from a public repository, which is a worse
+outcome than an incomplete deliverable. **This audit adopts a confidentiality-safe substitute for
+the 8 MIN/non-public candidates, in deliberate deviation from the literal text of FR-1 and
+`audit-batch-e.ac1-ac2`:**
+
+- No raw event payload is committed for a non-public-prefix issue (`evidenceDumped: false` in
+  `candidates.json`).
+- No merge/pull-request URL, commit SHA, commit message, file path, line number, or endpoint name
+  from a private repository is committed anywhere in this report set.
+- No verbatim quotation of private Linear issue text or private review/commit commentary is
+  committed; MIN reports state paraphrased scope and verdict only.
+- Every MIN verdict still rests on the same standard as every PAN verdict — the auditor reading the
+  actual merged diff directly, not trusting a secondhand summary — but the *evidence trail* proving
+  that reading happened is not reproducible from this public repository alone. It is independently
+  reproducible only by someone with access to the private Mind Your Now repositories, re-running
+  this audit's method against the same merge requests (locatable via the MIN issue IDs already named
+  in each report).
+
+This substitute has not been run through a formal xBRIEF replanning/amendment cycle — that
+requires operator action this audit cannot take on its own authority (see the operator escalation
+recorded in this issue's conversation). Until amended, the literal text of FR-1 and
+`audit-batch-e.ac1-ac2` remains unsatisfied for the 8 MIN/non-public candidates; this section
+records that as a known, deliberate, safety-driven deviation rather than an oversight.
 
 **`candidates.json` reproducibility note:** the generator emits `resetAt` for every candidate on a
 fresh run. 59 of the 61 committed rows carry `resetAt`, backfilled from the committed
@@ -164,10 +196,10 @@ truncated at a word boundary with `…[truncated]`; the full text is in
 | PAN-3216 | 2026-07-28T06:40:30.326Z<br>`failed/pending` | Verification error: Verification worker 1874133 exited before writing a result | 2026-07-28T07:07:50.045Z | 2026-07-28T07:25:42.825Z | 45 min | 0 (pr-commits) | yes | [3219](https://github.com/eltmon/overdeck/pull/3219) |
 | PAN-3230 | 2026-07-28T19:07:34.616Z<br>`blocked/pending` | _(empty)_ | 2026-07-28T19:11:38.189Z | 2026-07-28T20:05:45.836Z | 58 min | 2 (pr-commits) | yes | [3239](https://github.com/eltmon/overdeck/pull/3239) |
 | PAN-3356 | 2026-07-31T20:45:43.264Z<br>`blocked/pending` | [correctness] Review-stuck recovery invokes the wrong state transition — …[truncated] | 2026-07-31T21:15:00.405Z | 2026-07-31T21:31:46.047Z | 46 min | 1 (pr-commits) | yes | [3360](https://github.com/eltmon/overdeck/pull/3360) |
-| MIN-858 | 2026-07-25T12:51:37.111Z<br>`blocked/pending` | _(empty)_ | 2026-07-25T12:57:45.130Z | 2026-07-25T13:07:47.534Z | 16 min | 0 (mr-commits) | n/a (non-overdeck repo; commit count derived from MR, not branch log) | [86](https://gitlab.com/eltmon/mind-your-now/-/merge_requests/86) |
-| MIN-879 | 2026-07-26T05:58:18.535Z<br>`passed/failed` | Review bypassed: verification passed but review infrastructure repeatedly failed. | 2026-07-26T06:20:38.473Z | 2026-07-26T06:41:35.735Z | 43 min | 2 (mr-commits) | n/a (non-overdeck repo; commit count derived from MR, not branch log) | [77](https://gitlab.com/eltmon/mind-your-now/-/merge_requests/77) |
-| MIN-896 | 2026-07-26T01:54:56.569Z<br>`failed/pending` | _(empty)_ | 2026-07-26T01:55:12.065Z | 2026-07-26T02:38:31.158Z | 44 min | 2 (mr-commits) | n/a (non-overdeck repo; commit count derived from MR, not branch log) | [89](https://gitlab.com/eltmon/mind-your-now/-/merge_requests/89) |
-| MIN-901 | 2026-07-25T12:52:13.226Z<br>`blocked/pending` | Vite defines server.watch twice, so the later property overwrites the new .pnpm-store exclusion and the ENOSPC …[truncated] | 2026-07-25T12:54:03.350Z | 2026-07-25T13:08:06.763Z | 16 min | 0 (mr-commits) | n/a (non-overdeck repo; commit count derived from MR, not branch log) | [68](https://gitlab.com/eltmon/mind-your-now-backend/-/merge_requests/68) |
+| MIN-858 | 2026-07-25T12:51:37.111Z<br>`blocked/pending` | _(redacted — private repo, see min-858.md)_ | 2026-07-25T12:57:45.130Z | 2026-07-25T13:07:47.534Z | 16 min | 0 (mr-commits) | n/a (private repo) | _(redacted — private repo)_ |
+| MIN-879 | 2026-07-26T05:58:18.535Z<br>`passed/failed` | _(redacted — private repo, see min-879.md)_ | 2026-07-26T06:20:38.473Z | 2026-07-26T06:41:35.735Z | 43 min | 2 (mr-commits) | n/a (private repo) | _(redacted — private repo)_ |
+| MIN-896 | 2026-07-26T01:54:56.569Z<br>`failed/pending` | _(redacted — private repo, see min-896.md)_ | 2026-07-26T01:55:12.065Z | 2026-07-26T02:38:31.158Z | 44 min | 2 (mr-commits) | n/a (private repo) | _(redacted — private repo)_ |
+| MIN-901 | 2026-07-25T12:52:13.226Z<br>`blocked/pending` | _(redacted — private repo, see min-901.md)_ | 2026-07-25T12:54:03.350Z | 2026-07-25T13:08:06.763Z | 16 min | 0 (mr-commits) | n/a (private repo) | _(redacted — private repo)_ |
 
 ## Derived zero-commit extras (5, capped at 10 — no overflow)
 
@@ -202,13 +234,12 @@ this is the evidence downstream batches should read before accepting or overridi
 ## PRD evidence-source correction
 
 The PRD (evidence source 7) states MYN's frontend lives on GitHub at `~/Projects/myn` and only
-the backend is on GitLab. Verified while resolving MIN prUrls: **this is incorrect.**
-`~/Projects/myn` is a polyrepo wrapper directory with no `.git` of its own;
-`~/Projects/myn/frontend` and `~/Projects/myn/api` are separate git checkouts, and **both are
-GitLab-hosted** — `frontend` → `git@gitlab.com:eltmon/mind-your-now.git`, `api` →
-`git@gitlab.com:eltmon/mind-your-now-backend.git`. `~/Projects/myn-cli` (a different, unrelated
-checkout) is on GitHub (`github.com/mindyournow/myn-cli`) but its `prUrl`s did not appear in any
-of the MIN records checked here. All 4 mandatory MIN issues' `pipeline.prUrl` in this audit
-resolved to `gitlab.com/eltmon/mind-your-now(-backend)` merge requests, fetched successfully via
-`glab api`. `audit-batch-e` should use `~/Projects/myn/frontend` and `~/Projects/myn/api` (GitLab,
-`glab`) for MIN diffs, not `gh`/GitHub as the PRD's source list implies.
+the backend is on GitLab. Verified while resolving MIN evidence sources: **this is incorrect.**
+`~/Projects/myn` is a polyrepo wrapper directory with no `.git` of its own; its `frontend` and
+`api` subdirectories are separate git checkouts, and **both are GitLab-hosted**, not split
+GitHub/GitLab as the PRD assumed (a private-repo detail — specific remote URLs are withheld here
+per the confidentiality findings from the PAN-3367 review; see the confidentiality note in each
+`min-*.md` report). A third, unrelated local checkout referenced by the PRD is GitHub-hosted, but
+none of the 4 mandatory MIN issues' merge requests resolved there. `audit-batch-e` should use the
+local `myn/frontend` and `myn/api` checkouts (GitLab, `glab`) for MIN diffs, not `gh`/GitHub as the
+PRD's source list implies.

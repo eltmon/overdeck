@@ -44,19 +44,28 @@ for (const [id, evs] of byIssue) {
         continue;
       }
       if (seq[j].state === 'passed/passed' && sawPending) {
+        const isPublic = isPublicIssue(id);
+        // Non-public issues get a minimal, content-free stub: no notes, no
+        // per-issue raw dump. Notes/reviewNotes/testNotes can themselves
+        // embed private source paths, diff snippets, and endpoint names —
+        // stripping them here (not just skipping the raw dump below) is
+        // required, not optional; a prior version of this script recorded
+        // notes for every issue regardless of visibility.
         hit = { issueId: id, negState: seq[i].state, negAt: new Date(seq[i].t).toISOString(),
                 resetAt: new Date(resetAtT).toISOString(),
                 passAt: new Date(seq[j].t).toISOString(), minutes: Math.round((seq[j].t - seq[i].t) / 60e3),
-                negNotes: JSON.parse(seq[i].raw.payload).status.reviewNotes ?? JSON.parse(seq[i].raw.payload).status.testNotes ?? null };
+                negNotes: isPublic
+                  ? (JSON.parse(seq[i].raw.payload).status.reviewNotes ?? JSON.parse(seq[i].raw.payload).status.testNotes ?? null)
+                  : null,
+                evidenceDumped: isPublic };
         break;
       }
     }
   }
   if (!hit) continue;
-  hit.evidenceDumped = isPublicIssue(id);
   candidates.push(hit);
   if (!isPublicIssue(id)) {
-    console.error(`${id}: SKIPPED raw payload dump — not a public-repo issue prefix (confidentiality allowlist)`);
+    console.error(`${id}: SKIPPED raw payload dump and notes — not a public-repo issue prefix (confidentiality allowlist)`);
     continue;
   }
   // Dump the issue's full raw event series verbatim — this is the forensic evidence.

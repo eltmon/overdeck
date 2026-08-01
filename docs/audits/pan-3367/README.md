@@ -55,8 +55,8 @@ to launder in the first place.
 | [PAN-3230](https://github.com/eltmon/overdeck/issues/3230) | genuine-finding | satisfied | [pan-3230.md](pan-3230.md) | none |
 | [PAN-3356](https://github.com/eltmon/overdeck/issues/3356) | genuine-finding | satisfied (finding); cockpit ACs cannot determine | [pan-3356.md](pan-3356.md) | none (PAN-3362 gates re-verification) |
 | [PAN-1525](https://github.com/eltmon/overdeck/issues/1525) | genuine-finding (mechanical, lower confidence) | satisfied | [pan-1525.md](pan-1525.md) | none |
-| [MIN-879](https://linear.app/mind-your-now/issue/MIN-879) | genuine-finding | satisfied | [min-879.md](min-879.md) | none |
-| [MIN-896](https://linear.app/mind-your-now/issue/MIN-896) | genuine-finding | satisfied | [min-896.md](min-896.md) | none |
+| MIN-879 | genuine-finding | satisfied | [min-879.md](min-879.md) | none |
+| MIN-896 | genuine-finding | satisfied | [min-896.md](min-896.md) | none |
 | [PAN-3076](https://github.com/eltmon/overdeck/issues/3076) | genuine-finding (extra) | satisfied | [extras/pan-3076.md](extras/pan-3076.md) | none |
 | [PAN-3128](https://github.com/eltmon/overdeck/issues/3128) | genuine-finding (extra) | satisfied | [extras/pan-3128.md](extras/pan-3128.md) | none |
 | [PAN-3093](https://github.com/eltmon/overdeck/issues/3093) | genuine-finding (extra) | satisfied | [extras/pan-3093.md](extras/pan-3093.md) | none |
@@ -68,8 +68,8 @@ to launder in the first place.
 | [PAN-3114](https://github.com/eltmon/overdeck/issues/3114) | environment-blocked | satisfied | [pan-3114.md](pan-3114.md) | none |
 | [PAN-3147](https://github.com/eltmon/overdeck/issues/3147) | environment-blocked | satisfied | [pan-3147.md](pan-3147.md) | none |
 | [PAN-3216](https://github.com/eltmon/overdeck/issues/3216) | environment-blocked | satisfied | [pan-3216.md](pan-3216.md) | none |
-| [MIN-858](https://linear.app/mind-your-now/issue/MIN-858) | environment-blocked (false positive) | satisfied | [min-858.md](min-858.md) | none |
-| [MIN-901](https://linear.app/mind-your-now/issue/MIN-901) | environment-blocked (false positive) | satisfied | [min-901.md](min-901.md) | none |
+| MIN-858 | environment-blocked (false positive) | satisfied | [min-858.md](min-858.md) | none |
+| MIN-901 | environment-blocked (false positive) | satisfied | [min-901.md](min-901.md) | none |
 
 ## Classification breakdown
 
@@ -80,11 +80,12 @@ to launder in the first place.
   defect. One (PAN-3356) covers only its narrowly-traced finding, not the issue's full scope (see headline
   answer 2).
 - **environment-blocked: 8 of 30.** No finding was ever recorded, or the recorded finding was a confirmed
-  false positive unrelated to the diff's actual changed files (MIN-858, MIN-901 — the identical "Vite
-  defines server.watch twice" note attached to two unrelated MRs in two different repos, neither of which
-  touches `vite.config.*`). The remaining 6 (PAN-3052, PAN-3083, PAN-3109, PAN-3114, PAN-3147, PAN-3216)
-  are pure infra/dispatch retries — tmux launch failures, a database lock, a verification-worker crash —
-  with the pipeline's own notes in several cases explicitly stating no code finding was made
+  false positive unrelated to the diff's actual changed files (MIN-858, MIN-901 — the identical finding
+  text attached to two unrelated merge requests in two different private repositories, neither of which
+  touches the file the finding concerns; see the confidentiality note in each report for why the specific
+  finding text isn't reproduced here). The remaining 6 (PAN-3052, PAN-3083, PAN-3109, PAN-3114, PAN-3147,
+  PAN-3216) are pure infra/dispatch retries — tmux launch failures, a database lock, a verification-worker
+  crash — with the pipeline's own notes in several cases explicitly stating no code finding was made
   (PAN-3114: "no code findings were emitted").
 - **unknown: 0.**
 
