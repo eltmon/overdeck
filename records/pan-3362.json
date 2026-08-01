@@ -86,7 +86,7 @@
     "recordedAt": "2026-08-01T11:32:46.338Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:57:39.324Z",
+  "updated": "2026-08-01T11:57:44.703Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "blocked",
@@ -97,7 +97,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T11:33:25.155Z",
-    "updatedAt": "2026-08-01T11:57:38.688Z",
+    "updatedAt": "2026-08-01T11:57:44.692Z",
     "reviewNotes": "public `--force` permits the explicitly forbidden host-seeding path",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
@@ -180,10 +180,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 600,
-            "output": 145679,
-            "cacheRead": 93098543,
-            "cacheWrite": 1709356
+            "input": 604,
+            "output": 146225,
+            "cacheRead": 94077794,
+            "cacheWrite": 1709918
           }
         }
       },
@@ -195,15 +195,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 600,
-          "output": 145679,
-          "cacheRead": 93098543,
-          "cacheWrite": 1709356
+          "input": 604,
+          "output": 146225,
+          "cacheRead": 94077794,
+          "cacheWrite": 1709918
         }
       },
       "costAtCloseOut": {
-        "usd": 51.210884,
-        "pricingAsOf": "2026-08-01T11:57:38.721Z"
+        "usd": 51.413607,
+        "pricingAsOf": "2026-08-01T11:57:44.698Z"
       }
     },
     "merges": [
