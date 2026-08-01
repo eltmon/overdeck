@@ -886,6 +886,24 @@ export function markRecordPipelineClosedOutSync(
   queueIssueRecordCommit(project, issueId, recordPath);
 }
 
+/** PAN-3396: mark residue disposition closed-out without asserting merge landing. */
+export function markRecordPipelineResidueClosedOutSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  const now = new Date().toISOString();
+  // Residue never claims mergeStatus (which is unknowable for recordless work);
+  // closedOut marks the record terminal, readyForMerge false prevents re-drive.
+  record.pipeline.closedOut = true;
+  record.pipeline.closedOutAt = now;
+  record.pipeline.readyForMerge = false;
+  // mergeStatus deliberately left undefined — residue disposition never claims a merge
+  record.pipeline.updatedAt = now;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
 /** Persist the completed Definition-of-Done gate through the issue record write door. */
 export function writeCloseOutDodGateSync(
   project: ProjectConfig,
