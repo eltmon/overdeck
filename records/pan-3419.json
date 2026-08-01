@@ -12,11 +12,95 @@
       "timestamp": "2026-08-01T15:35:20.741Z",
       "reason": "start",
       "agentModel": "gpt-5.6-sol"
+    },
+    {
+      "timestamp": "2026-08-01T18:22:01.203Z",
+      "reason": "end",
+      "note": "Anomalies first: local maxWorkers=4 npm test runs hit unrelated 5-second timeout flakes under sustained machine contention; every failing file passed in isolation, and the full repository suite passed under the repository's CI=1 maxWorkers=2 configuration (13,021 root tests and 63 frontend tests). The first pan sync used the frozen live deployment generation, so I reran sync through this workspace's CLI and verified --project in Claude, Pi, and Codex rendered contexts. The handoff skill update landed with the CLI item because CLI/skill parity requires the same commit. Final lint exposed a stale generated composer-command manifest, and final tests exposed that project_key was missing from the fresh-db migration and canonical Effect conversation schema; both root causes were fixed, tested, committed, and pushed. ForkModal had two additional real hosts beyond the planned file list, and both were updated. Live conversation 1827 was reassigned through setConversationProjectKey without restarting the dashboard; visible regrouping waits for deployment. All xBRIEF items are complete, typecheck and lint pass, the full CI-configured test suite passes, and feature/pan-3419 is clean and fully pushed."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "docs/overdeck-remodel/overdeck-schema.ts",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "tests/unit/lib/overdeck/conversations.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx"
+    ],
+    "declaredScope": [
+      "features/conversations.mdx",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/__tests__/handoff.test.ts",
+      "src/cli/commands/fork-client.ts",
+      "src/cli/commands/fork.ts",
+      "src/cli/commands/handoff.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+      "src/dashboard/server/routes/__tests__/palette.test.ts",
+      "src/dashboard/server/routes/palette.ts",
+      "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
+      "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/projects.ts",
+      "sync-sources/rules/handoff-isolate-cwd.md",
+      "sync-sources/skills/pan-handoff/SKILL.md",
+      "tests/unit/cli/fork-client.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/overdeck-remodel/overdeck-schema.ts",
+      "drizzle/overdeck/0000_overdeck_init.sql",
+      "features/conversations.mdx",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/__tests__/handoff.test.ts",
+      "src/cli/commands/fork-client.ts",
+      "src/cli/commands/fork.ts",
+      "src/cli/commands/handoff.ts",
+      "src/cli/index.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+      "src/dashboard/frontend/src/components/Stage/index.tsx",
+      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/dashboard/server/routes/__tests__/palette.test.ts",
+      "src/dashboard/server/routes/palette.ts",
+      "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
+      "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
+      "src/lib/overdeck/conversation-forks.ts",
+      "src/lib/overdeck/conversation-runtime.ts",
+      "src/lib/overdeck/conversations.ts",
+      "src/lib/overdeck/infra.ts",
+      "src/lib/projects.ts",
+      "sync-sources/rules/handoff-isolate-cwd.md",
+      "sync-sources/skills/pan-handoff/SKILL.md",
+      "tests/unit/cli/fork-client.test.ts",
+      "tests/unit/lib/overdeck/conversations.test.ts",
+      "tests/unit/lib/overdeck/title-sources.test.ts"
+    ],
+    "recordedAt": "2026-08-01T18:21:54.888Z"
+  },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T18:21:57.746Z",
+  "updated": "2026-08-01T18:22:01.239Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -26,8 +110,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T18:21:57.744Z",
+    "updatedAt": "2026-08-01T18:22:01.200Z",
     "inspectNotes": "All 5 ACs verified against tree at c2817141. AC-1: idempotent ALTER at infra.ts:279 inside ensureWorkspaceTablesSync, called from runOverdeckMigrationSync (infra.ts:204) which getOverdeckDatabaseSync runs on every open; runSchemaTopUp swallows duplicate-column so re-open is safe; text column with no default = nullable. AC-2: createConversation INSERT carries project_key (conversations.ts:1231/1249) from handleConversationCreate's canonicalProjectKey; every LegacyConversation read goes through the single LEGACY_CONVERSATION_SELECT which now selects c.project_key, and rowToLegacyConversation maps it to projectKey. AC-3: setConversationProjectKey (conversations.ts:1365) updates via the conversations write door, matching the setConversationHarness pattern, and passes null through. AC-4: getProjectSync is exact-key lookup so a yaml key returns itself and a display name maps to its key via listProjectsSync; unknown input yields 'Unknown project: <input>'. AC-5: resolveProjectKeyForCwd (projects.ts:555) normalizes with resolve(), guards prefix with a trailing slash so sibling dirs cannot false-match, keeps the longest projectPath, returns null outside all registered paths. NFR-1: existing rows get NULL, no read path changes behavior. Non-blocking: handleConversationCreate resolves the key twice (resolveRegisteredProjectKey then resolveProjectCwd re-resolves), and resolveProjectCwd's !projectConfig branch is now unreachable after a successful key resolution.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewRequestedAt": "2026-08-01T18:21:57.744Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -107,35 +192,36 @@
         "tests/unit/lib/overdeck/title-sources.test.ts"
       ],
       "recordedAt": "2026-08-01T18:21:54.888Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3435"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 657974,
-            "output": 35431,
-            "cacheRead": 14488576,
+            "input": 2789541,
+            "output": 143706,
+            "cacheRead": 98136064,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 657974,
-          "output": 35431,
-          "cacheRead": 14488576,
+          "input": 2789541,
+          "output": 143706,
+          "cacheRead": 98136064,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 11.597088,
-        "pricingAsOf": "2026-08-01T15:52:50.159Z"
+        "usd": 67.326917,
+        "pricingAsOf": "2026-08-01T18:22:01.229Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3435"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -315,84 +401,5 @@
     "docs-project-flag.docs-project-flag.ac1": "completed",
     "docs-project-flag.docs-project-flag.ac2": "completed",
     "docs-project-flag.docs-project-flag.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "docs/overdeck-remodel/overdeck-schema.ts",
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "packages/contracts/src/composer-commands.generated.ts",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-      "tests/unit/lib/overdeck/conversations.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx"
-    ],
-    "declaredScope": [
-      "features/conversations.mdx",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/__tests__/handoff.test.ts",
-      "src/cli/commands/fork-client.ts",
-      "src/cli/commands/fork.ts",
-      "src/cli/commands/handoff.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-      "src/dashboard/server/routes/__tests__/palette.test.ts",
-      "src/dashboard/server/routes/palette.ts",
-      "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-      "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-      "src/lib/overdeck/conversation-forks.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/projects.ts",
-      "sync-sources/rules/handoff-isolate-cwd.md",
-      "sync-sources/skills/pan-handoff/SKILL.md",
-      "tests/unit/cli/fork-client.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/overdeck-remodel/overdeck-schema.ts",
-      "drizzle/overdeck/0000_overdeck_init.sql",
-      "features/conversations.mdx",
-      "packages/contracts/src/composer-commands.generated.ts",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/__tests__/handoff.test.ts",
-      "src/cli/commands/fork-client.ts",
-      "src/cli/commands/fork.ts",
-      "src/cli/commands/handoff.ts",
-      "src/cli/index.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-      "src/dashboard/frontend/src/components/Stage/index.tsx",
-      "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-      "src/dashboard/server/routes/__tests__/palette.test.ts",
-      "src/dashboard/server/routes/palette.ts",
-      "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-      "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-      "src/lib/overdeck/conversation-forks.ts",
-      "src/lib/overdeck/conversation-runtime.ts",
-      "src/lib/overdeck/conversations.ts",
-      "src/lib/overdeck/infra.ts",
-      "src/lib/projects.ts",
-      "sync-sources/rules/handoff-isolate-cwd.md",
-      "sync-sources/skills/pan-handoff/SKILL.md",
-      "tests/unit/cli/fork-client.test.ts",
-      "tests/unit/lib/overdeck/conversations.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
-    ],
-    "recordedAt": "2026-08-01T18:21:54.888Z"
   }
 }
