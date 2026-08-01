@@ -2019,7 +2019,7 @@ function boot() {
   expectedShelf = Math.max(1, (SNAP.paused || []).length);
   for (const iss of SNAP.issues) spawnOrb(iss);
   for (const p of (SNAP.paused || [])) {
-    const o = spawnOrb({ id: p.id, project: p.project, role: p.role, stage: 'WORK', heat: .15, yieldReason: p.yieldReason, model: p.model, harness: p.harness }, { state: 'shelf' });
+    const o = spawnOrb({ id: p.id, project: p.project, role: p.role, stage: 'WORK', heat: .15, title: p.title, yieldReason: p.yieldReason, model: p.model, harness: p.harness }, { state: 'shelf' });
     o.x = o.tx; o.y = L.shelfY;
   }
   for (const f of (SNAP.failed || [])) {
