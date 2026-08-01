@@ -1,0 +1,418 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:58:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3396: bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline and offers no disposition path for recordless pre-record-era rows",
+    "updated": "2026-08-01T15:48:28.351Z"
+  },
+  "plan": {
+    "id": "pan-3396",
+    "title": "bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline and offers no disposition path for recordless pre-record-era rows",
+    "status": "proposed",
+    "uid": "8ebc9f4d-b06e-4f82-b9f1-2ec63816d682",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:58:00.000Z",
+    "updated": "2026-08-01T15:48:28.351Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3396",
+        "label": "PAN-3396",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "membership",
+      "lifecycle",
+      "close-out",
+      "bug"
+    ],
+    "narratives": {
+      "Problem": "The membership resolver classifies a tracker-closed issue with a still-open convention PR as zombie_pr/inPipeline without consulting the durable close-out record, so already-closed-out issues (e.g. MIN-882) resurrect into the operator-visible exception queue. Separately, pre-record-era closed issues with stale PRs (MIN-172/572/576/596/620/622/632) can never leave the bucket: pan close fails the DoD gate with 'no review status or journal record found' and no disposition door exists.",
+      "Proposal": "Add a durable L7-record lens (hasTerminalCloseOut = record.pipeline.closedOut === true, read via the record door) to IssueLensSignals; a tracker-closed issue with an open PR AND a terminal close-out record classifies clean_terminal with the leftover PR named as residue in the reason. Add `pan close --residue <reason>` (operator-conversation-only, tracker-closed pre-verified via isTrackerIssueClosed) which closes stale convention PRs/MRs with an honest no-merge-claim comment, writes an all-skip residue DoD gate audit carrying the verified evidence, and marks the per-issue record terminal WITHOUT asserting mergeStatus: 'merged'. Full design decisions D1-D10 and before/after snippets are in the PRD at .pan/drafts/PAN-3396.md.",
+      "NonGoals": "- Granting the flywheel or any non-conv-* caller the --residue door (separate policy decision)\n- Changing population-2 behavior (genuine close-out lag keeps classifying zombie_pr and drains through standard close-out)\n- Closing or reconciling the specific 11 MIN rows observed in RUN-79 (operator action with the shipped door, not code)\n- Retroactively closing MIN-882's leftover PR from the resolver (the resolver classifies; it never mutates forge state)\n- GitHub-app PR-close path in the residue module (default deps use the gh/glab CLI precedent)\n- Any frontend/dashboard change (bucket vocabulary and DTO unchanged)"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Disposition door is `pan close --residue <reason>`, operator-conversation-only (conv-*) like --abandon",
+        "rationale": "The issue names this exact flag shape as its example and no alternative is documented; bypassing the DoD gate's evidence is a judgment call, so it takes the same trust tier as --abandon rather than being granted to the flywheel in this issue."
+      },
+      {
+        "summary": "--residue closes stale convention PRs/MRs itself with an honest comment instead of refusing while they exist",
+        "rationale": "A disposition door that refuses on the exact condition it exists to clear would be useless for the recordless population; a PR close is reversible (reopen) and the comment explicitly does not claim a merge, avoiding the anti-lie guards in close-issue.ts."
+      },
+      {
+        "summary": "Tracker-closed pre-verification uses isTrackerIssueClosed() rather than --abandon's GitHub-only canonical read",
+        "rationale": "The affected population (MIN-*) is Linear-tracked with GitLab MRs; isTrackerIssueClosed is the existing tracker-agnostic door the DoD gate already uses."
+      },
+      {
+        "summary": "No new PipelineBucket — clean_terminal plus an audit reason carries the reclassified state",
+        "rationale": "A sixth bucket would churn @overdeck/contracts, frontend grouping, and consumer filters for zero behavioral gain; the issue's fix direction explicitly says classify clean_terminal (audit-only)."
+      },
+      {
+        "summary": "The terminal-close-out lens reads only the durable record (pipeline.closedOut), not live review status",
+        "rationale": "Membership is durable-only by invariant (L5 never decides membership); by ceremony step 8 the tracker issue is already closed, so a mid-ceremony-aborted runtime plane never justifies resurrecting the issue into the pipeline."
+      }
+    ],
+    "metadata": {
+      "sizeJustification": "18 files / 8 subsystems is one inseparable bug fix, not bundled scope: the resolver lens (src/lib) and the gather that feeds it are two halves of the zombie_pr reclassification and must land together; the --residue disposition door (src/cli + src/lib/lifecycle) is the issue's second named fix direction and shares the DoD-gate/record-door types the first half touches; tests/ and scripts/file-size-allowlist.txt are mandatory companions of those code changes (quality gates), and docs/ + sync-sources/ are the mandated documentation work item that must ship in the same commits (SKILLS-CONVENTION, dod-doc-drift). No item is independently shippable as a sibling issue without leaving the tree contradictory.",
+      "canonicalFilename": "2026-08-01-PAN-3396-bug-membership-zombie-pr-bucket-resurrects-closed-out-issues-as-inpipeline-and-offers-no-disposition-path-for-recordless-pre-record-era-rows.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "items": [
+      {
+        "id": "resolver-terminal-closeout-lens",
+        "title": "Add hasTerminalCloseOut lens to the membership resolver (zombie_pr → clean_terminal when closed out)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:58:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3396",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership.ts",
+            "src/lib/__tests__/pipeline-membership.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/pipeline-membership.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "pipeline-membership.test.ts passes including the three new lens cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-1. Add `hasTerminalCloseOut: boolean` to IssueLensSignals in src/lib/pipeline-membership.ts (doc comment names it L7-record, durable record door only). Update the module-header lens list. In the closed-issue branch (lines 127-137), when hasOpenPr && hasTerminalCloseOut, return clean_terminal with reason 'issue closed out (durable close-out record) — the still-open PR is residue; close it on the forge'; otherwise keep the existing zombie_pr result unchanged. Tests: existing fixtures gain hasTerminalCloseOut: false; add cases (a) closed+openPR+closedOut → clean_terminal/inPipeline false with residue reason, (b) closed+openPR without record → zombie_pr (pins FR-2), (c) closed+openPR+closedOut+phaseLabel → clean_terminal with labelDrift stale_present. Resolver stays pure (NFR-1)."
+        },
+        "items": [
+          {
+            "id": "resolver-terminal-closeout-lens.ac1",
+            "title": "Given closed issue + open PR + hasTerminalCloseOut true, resolvePipelineMembership returns bucket clean_terminal and inPipeline false with a reason naming the residue PR",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-terminal-closeout-lens.ac2",
+            "title": "Given closed issue + open PR + hasTerminalCloseOut false, resolvePipelineMembership returns bucket zombie_pr and inPipeline true (FR-2 unchanged)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "resolver-terminal-closeout-lens.ac3",
+            "title": "Given closed+openPR+closedOut with phaseLabel set, the result preserves labelDrift stale_present",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "gather-closeout-signal",
+        "title": "Populate hasTerminalCloseOut in gatherProjectLensSignals via the record door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:58:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3396",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/pipeline-membership-gather.ts",
+            "tests/unit/lib/pipeline-membership-gather.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pipeline-membership-gather.test.ts",
+            "bash scripts/lint-pipeline-membership.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "gather tests pass including record-probe scoping and end-to-end reclassification",
+            "lint-pipeline-membership passes",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-2. Add required dep `hasTerminalCloseOutRecord(project, issueId): Promise<boolean>` to PipelineMembershipGatherDeps (required so existing fixtures fail typecheck until they declare lens behavior). Default impl reads readIssueRecord(project, issueId)?.pipeline.closedOut === true, catching errors to false (fail toward zombie_pr visibility). In gatherProjectLensSignals, after candidate states are final (after the GitHub unknown-state block, before the merged-head fan-out), probe only candidates that are tracker-closed AND have an open PR, collecting a closedOutRecordIssues set; add `hasTerminalCloseOut: closedOutRecordIssues.has(id)` to the assembled signals. Tests: extend the deps() fixture with the new dep; closed+open-PR candidate with dep true → signal true and end-to-end clean_terminal via resolvePipelineMembership; dep false → zombie_pr; assert the dep is never called for open issues or closed issues without open PRs."
+        },
+        "items": [
+          {
+            "id": "gather-closeout-signal.ac1",
+            "title": "The gather records hasTerminalCloseOutRecord probe calls only for tracker-closed candidates with an open PR — the probe mock records zero calls for open issues and for closed issues without open PRs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-closeout-signal.ac2",
+            "title": "A closed+open-PR candidate whose record probe returns true produces hasTerminalCloseOut: true and classifies clean_terminal end-to-end; a false probe produces zombie_pr",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "gather-closeout-signal.ac3",
+            "title": "Default dep returns false when the record read throws, and scripts/lint-pipeline-membership.sh passes (no DB/review-status import added)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "residue-flag-and-gate",
+        "title": "Add pan close --residue flag, eligibility validator, and buildResidueDodGate",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:58:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3396",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/dod.ts",
+            "src/lib/lifecycle/types.ts",
+            "src/cli/commands/close.ts",
+            "tests/unit/lib/lifecycle/dod.test.ts",
+            "tests/cli/commands/close-residue-flag.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "dod.test.ts passes with residue gate builder cases",
+            "close-residue-flag.test.ts passes the validator matrix",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-3. dod.ts: widen DodGateResult.disposition to { reason, by, kind?: 'abandon' | 'residue' }; set kind 'abandon' in buildAbandonedDodGate; add buildResidueDodGate(reason, by, evidence) returning all-9-rows skip with 'gate not evaluated — residue disposition recorded by <by>: <reason>. Verified: <evidence joined>' per row, passed true, disposition kind 'residue'. types.ts: add residueDisposition?: { reason: string; by: string } to CloseOutOptions. close.ts: register --residue <reason>; extract exported pure checkResidueFlagEligibility({ residueReason, abandonRequested, dodAcceptedRows, agentId }) returning an error string or null (empty reason / +abandon / +accept-* / non-conv-* agent), called after the abandon validation; when residue active, refuse unless await isTrackerIssueClosed(issueId) (tracker-agnostic, import from ../../lib/cloister/issue-closed.js), then pass residueDisposition into closeOut opts with by = OVERDECK_AGENT_ID || userInfo().username. Tests: builder shape cases in dod.test.ts; new tests/cli/commands/close-residue-flag.test.ts covers the full validator matrix."
+        },
+        "items": [
+          {
+            "id": "residue-flag-and-gate.ac1",
+            "title": "buildResidueDodGate returns all 9 rows skip with the evidence in each observed string, passed true, and disposition.kind 'residue'; buildAbandonedDodGate now carries kind 'abandon'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-flag-and-gate.ac2",
+            "title": "checkResidueFlagEligibility rejects empty reason, --abandon combination, --accept-* combination, and non-conv-* agent ids, and returns null for an eligible conv-* caller",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-flag-and-gate.ac3",
+            "title": "pan close --help lists --residue, and the command refuses residue when isTrackerIssueClosed returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "residue-ceremony",
+        "title": "Thread residue through closeOut: stale-PR/MR close step, ceremony skips, no-merge-claim terminal marker",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:58:00.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3396",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/lifecycle/residue.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "src/lib/pan-dir/record.ts",
+            "tests/unit/lib/lifecycle/residue.test.ts",
+            "tests/unit/lib/pan-dir/record-close-out.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts",
+            "bash scripts/lint-file-size.sh",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "residue.test.ts passes the fake-runner forge matrix",
+            "record-close-out.test.ts passes the no-merge-claim marker case",
+            "lint-file-size passes with updated allowlist rows",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-4. New module src/lib/lifecycle/residue.ts: closeResidueConventionPrs(ctx, deps) enumerates open PRs/MRs on feature/<id> and strike/<id> across the project's required repos (GitHub gh pr list/close, GitLab glab mr close+note, injectable runners per the gitlab-merge-requests.ts:26-51 precedent), closes each with the honest residue comment (no merge claim), and returns { step, evidence }; any close failure → stepFailed (ceremony aborts before the terminal marker); zero open artifacts → stepSkipped with evidence. record.ts: add markRecordPipelineResidueClosedOutSync — identical to markRecordPipelineClosedOutSync except it never touches mergeStatus (NFR-2). workflows.ts closeOut: when opts.residueDisposition is set, run the residue PR-close step before gate evaluation (abort on failure), build the gate via buildResidueDodGate with the collected evidence, skip closeIssue with stepSkipped naming the tracker pre-verification, and mark terminal via the residue marker. Update scripts/file-size-allowlist.txt rows for workflows.ts and record.ts to their new counts with # PAN-3396 (NFR-4). Tests: residue.test.ts fake-runner matrix (GitHub-only, GitLab-only, mixed, close failure → stepFailed, none open → stepSkipped); record-close-out.test.ts gains the residue marker case (closedOut/closedOutAt set, readyForMerge false, mergeStatus left undefined on a fresh ensured record)."
+        },
+        "items": [
+          {
+            "id": "residue-ceremony.ac1",
+            "title": "closeResidueConventionPrs closes open feature/strike PRs and MRs on both forges with the honest residue comment via injectable runners, and returns evidence strings naming each closed artifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-ceremony.ac2",
+            "title": "A PR/MR close failure produces stepFailed and the ceremony returns without writing the terminal marker; zero open artifacts produces stepSkipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-ceremony.ac3",
+            "title": "markRecordPipelineResidueClosedOutSync creates the record when missing and writes closedOut/closedOutAt with readyForMerge false while leaving pipeline.mergeStatus undefined",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "residue-ceremony.ac4",
+            "title": "scripts/file-size-allowlist.txt rows for src/lib/lifecycle/workflows.ts and src/lib/pan-dir/record.ts match their new line counts with a # PAN-3396 comment, and bash scripts/lint-file-size.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-membership-residue",
+        "title": "Document the L7-record lens, zombie_pr reclassification rule, and --residue disposition",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:58:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3396",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PIPELINE-MEMBERSHIP.md",
+            "docs/DEFINITION-OF-DONE.md",
+            "sync-sources/skills/pan-close/SKILL.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/lifecycle/dod-doc-drift.test.ts",
+            "bash scripts/lint-skills.sh"
+          ],
+          "expected_outputs": [
+            "dod-doc-drift test passes",
+            "lint-skills passes with the documented --residue flag"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "PRD WI-5. docs/PIPELINE-MEMBERSHIP.md: add the terminal close-out record as a 7th durable lens in the numbered list (consulted only for tracker-closed issues with an open PR); update the zombie_pr bucket row with the closed-out-record exception and the clean_terminal row with the residue case. docs/DEFINITION-OF-DONE.md: add a Rules-of-the-table bullet for the residue disposition (purpose, tracker-agnostic verification, honest PR-close comment, all-skip gate with evidence, no merge claim, operator-conversation-only); do not change the table itself (dod-doc-drift pins it to DOD_ROWS). sync-sources/skills/pan-close/SKILL.md: add a --residue <reason> section after the --accept-* block (when to use, guards, what it does to open PRs) in the same commit per docs/SKILLS-CONVENTION.md."
+        },
+        "items": [
+          {
+            "id": "docs-membership-residue.ac1",
+            "title": "docs/PIPELINE-MEMBERSHIP.md contains a seventh durable-lens entry and a zombie_pr bucket rule that returns clean_terminal when a terminal close-out record exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-membership-residue.ac2",
+            "title": "docs/DEFINITION-OF-DONE.md contains a residue-disposition rules bullet and tests/unit/lib/lifecycle/dod-doc-drift.test.ts still passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-membership-residue.ac3",
+            "title": "sync-sources/skills/pan-close/SKILL.md documents --residue with its guards and PR-close behavior, and bash scripts/lint-skills.sh passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "resolver-terminal-closeout-lens",
+        "to": "gather-closeout-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "residue-flag-and-gate",
+        "to": "residue-ceremony",
+        "type": "blocks"
+      },
+      {
+        "from": "gather-closeout-signal",
+        "to": "docs-membership-residue",
+        "type": "blocks"
+      },
+      {
+        "from": "residue-ceremony",
+        "to": "docs-membership-residue",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
