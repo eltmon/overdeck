@@ -46,7 +46,7 @@ const resume = vi.hoisted(() => ({
 vi.mock('../../agents/resume.js', () => ({
   resumeAgent: resume.resumeAgent,
 }));
-vi.mock('../orphan-proposed-reconciler.js', () => ({
+vi.mock('../work-agent-start.js', () => ({
   spawnWorkAgentThroughAgentsEndpoint: spawn.workAgent,
 }));
 

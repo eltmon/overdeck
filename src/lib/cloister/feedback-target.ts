@@ -189,7 +189,7 @@ async function startAgentForFeedback(
   }
 
   console.warn(`[feedback-target] Starting ${agentId} for ${issueId} feedback through the canonical work-agent start path`);
-  const { spawnWorkAgentThroughAgentsEndpoint } = await import('./orphan-proposed-reconciler.js');
+  const { spawnWorkAgentThroughAgentsEndpoint } = await import('./work-agent-start.js');
   const result = await spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, false, 'resume-agent');
   if (!result.spawned) {
     console.warn(
