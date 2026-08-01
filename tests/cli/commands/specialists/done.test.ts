@@ -204,6 +204,24 @@ describe('specialists done command', () => {
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
+  it('records required UAT separately from passed automated gates', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('test', 'pan-1059', {
+      status: 'passed',
+      notes: 'typecheck, lint, and tests passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      testStatus: 'passed',
+      testNotes: 'typecheck, lint, and tests passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
+    });
+  });
+
   it('PAN-2524: persists the verdict before a hanging feedback delivery times out', async () => {
     vi.useFakeTimers();
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);

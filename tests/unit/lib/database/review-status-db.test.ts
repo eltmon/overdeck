@@ -69,6 +69,21 @@ describe('upsertReviewStatus', () => {
     expect(row.ready_for_merge).toBe(1);
   });
 
+  it('round-trips the browser UAT verdict independently from automated tests', () => {
+    upsertReviewStatusSync(makeStatus({
+      issueId: 'PAN-UAT-1',
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
+    }));
+
+    expect(getReviewStatusFromDbSync('PAN-UAT-1')).toMatchObject({
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      uatNotes: 'workspace has no tracker-backed issue data',
+    });
+  });
+
   // PAN-1691: per-issue auto-merge routing key is a tri-state (undefined/true/false).
   it('round-trips autoMerge: undefined → NULL → undefined', () => {
     upsertReviewStatusSync(makeStatus({ issueId: 'PAN-AM-1' }));

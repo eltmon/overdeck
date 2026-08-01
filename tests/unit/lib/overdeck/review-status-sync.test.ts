@@ -50,6 +50,27 @@ describe('overdeck review status sync', () => {
     }));
   });
 
+  it('round-trips the required browser UAT latch independently from automated tests', () => {
+    upsertReviewStatusSync({
+      issueId: 'PAN-UAT-LATCH',
+      reviewStatus: 'passed',
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    const raw = odb.raw().prepare(
+      'SELECT test_status, uat_status FROM review_status WHERE issue_id = ?',
+    ).get('PAN-UAT-LATCH') as { test_status: string; uat_status: string };
+    expect(raw).toEqual({ test_status: 'passed', uat_status: 'failed' });
+    expect(getReviewStatusFromDbSync('PAN-UAT-LATCH')).toEqual(expect.objectContaining({
+      testStatus: 'passed',
+      uatStatus: 'failed',
+      readyForMerge: false,
+    }));
+  });
+
   it('round-trips the active inspection owner session', () => {
     upsertReviewStatusSync({
       issueId: 'PAN-INSPECT-OWNER',

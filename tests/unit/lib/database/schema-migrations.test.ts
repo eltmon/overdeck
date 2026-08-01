@@ -84,7 +84,7 @@ describe('schema migrations', () => {
 
   it('v61 -> v62: a database already stamped exactly v61 still receives the late v61 top-ups (started_by, affected_criteria) alongside conflicts_since', () => {
     // A v61 database that has never run the no-version-bump top-up (this build's
-    // SCHEMA_VERSION is 63, so `currentVersion === SCHEMA_VERSION` no longer
+    // SCHEMA_VERSION is 64, so `currentVersion === SCHEMA_VERSION` no longer
     // matches 61, and `currentVersion < 61` doesn't match either) — regression
     // for the migration-composition gap where such a database could stamp
     // user_version = 63 while missing started_by and affected_criteria.
@@ -106,7 +106,7 @@ describe('schema migrations', () => {
 
   it('v62 -> v63: repair path adds review_cycle_history to a database that skipped this build release', () => {
     // Regression: a user with v62 (pre-PR) who skips to v63+ needs to get review_cycle_history.
-    // When they run v63+ code, their database is at v62 < SCHEMA_VERSION (63), so the migration
+    // When they run v63+ code, their database is at v62 < SCHEMA_VERSION (64), so the migration
     // ladder runs. Since v61→v62 (this PR) added those columns via repair and migration,
     // they get added. This test verifies the v61→v62 migration block (which runs for v62 < 63)
     // adds both columns.
@@ -116,7 +116,7 @@ describe('schema migrations', () => {
     // v62 database from before this PR was shipped — missing review_cycle_history
     db.pragma('user_version = 62');
 
-    // Process through migrations. With SCHEMA_VERSION = 63 and currentVersion = 62,
+    // Process through migrations. With SCHEMA_VERSION = 64 and currentVersion = 62,
     // the v61→v62 migration block runs and adds the missing columns.
     expect(() => runMigrations(db)).not.toThrow();
 
@@ -138,7 +138,7 @@ describe('schema migrations', () => {
     // Start at v61 (simulates user before this PR)
     db.pragma('user_version = 61');
 
-    // When runMigrations processes a v61 database with SCHEMA_VERSION=63,
+    // When runMigrations processes a v61 database with SCHEMA_VERSION=64,
     // the currentVersion < 62 block runs, adding the columns
     expect(() => runMigrations(db)).not.toThrow();
 
@@ -160,7 +160,7 @@ describe('schema migrations', () => {
     // Simulate a v62 database before this PR, missing review_cycle_history and conflicts_since
     db.pragma('user_version = 62');
 
-    // Run migrations with SCHEMA_VERSION = 63. The v62→v63 block runs because currentVersion < 63,
+    // Run migrations with SCHEMA_VERSION = 64. The v62→v63 block runs because currentVersion < 63,
     // and it adds the missing columns as a safety measure for databases that skipped this release.
     expect(() => runMigrations(db)).not.toThrow();
 
@@ -169,6 +169,19 @@ describe('schema migrations', () => {
     expect(columnNames).toContain('review_cycle_history');
     expect(columnNames).toContain('conflicts_since');
     // Database should advance from v62 to v63
+    expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
+  });
+
+  it('v63 -> v64: persists separate browser UAT verdict columns', () => {
+    db.exec('CREATE TABLE flywheel_substrate_bugs (issue_id TEXT PRIMARY KEY, affected_criteria TEXT)');
+    db.exec('CREATE TABLE agents (id TEXT PRIMARY KEY, started_by TEXT)');
+    db.exec('CREATE TABLE review_status (issue_id TEXT PRIMARY KEY)');
+    db.pragma('user_version = 63');
+
+    expect(() => runMigrations(db)).not.toThrow();
+
+    const columns = db.prepare('PRAGMA table_info(review_status)').all() as Array<{ name: string }>;
+    expect(columns.map((column) => column.name)).toEqual(expect.arrayContaining(['uat_status', 'uat_notes']));
     expect(db.pragma('user_version', { simple: true })).toBe(SCHEMA_VERSION);
   });
 
