@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T13:20:46.402Z",
-  "updated": "2026-08-01T14:15:51.218Z",
+  "updated": "2026-08-01T14:15:53.820Z",
   "pipeline": {
     "issueId": "PAN-3406",
     "reviewStatus": "pending",
@@ -25,26 +25,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T14:15:40.941Z",
-    "reviewRequestedAt": "2026-08-01T14:15:40.941Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "docs/ORDER-BOOKS.md",
-        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-        "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
-      ],
-      "actualChangedFiles": [
-        "docs/ORDER-BOOKS.md",
-        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-        "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
-      ],
-      "recordedAt": "2026-08-01T14:15:39.735Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3412"
+    "updatedAt": "2026-08-01T13:32:36.390Z"
   },
   "closeOut": {
     "usage": {
@@ -137,22 +118,5 @@
     "order-books-doc-title-join": "completed",
     "order-books-doc-title-join.order-books-doc-title-join.ac1": "completed",
     "order-books-doc-title-join.order-books-doc-title-join.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/ORDER-BOOKS.md",
-      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-      "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
-      "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
-    ],
-    "actualChangedFiles": [
-      "docs/ORDER-BOOKS.md",
-      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-      "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
-      "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
-    ],
-    "recordedAt": "2026-08-01T14:15:39.735Z"
   }
 }
