@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T11:07:51.023Z",
+  "updated": "2026-08-01T11:09:58.390Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,16 +78,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "synthesis-report": {
-        "writerId": "agent-pan-3367",
-        "agentId": "agent-pan-3367",
-        "pid": 2404420,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T11:07:51.023Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -165,6 +157,17 @@
         "outcome": "completed",
         "reason": "Audited the 5 derived zero-commit extras (PAN-3076/3128/3093/3049/3229) — all satisfied. Completes the worklist: 30/30 issues audited, zero not-satisfied verdicts, zero follow-ups filed. Discovered the converse of H9 (branch rebase can deflate a window's commit count to a false zero, not just inflate it) via PAN-3128/3093; H12 (transient pass) recurred for PAN-3049/3229. Corrected several hand-estimated timestamps by re-verifying against raw event data before commit.",
         "releasedAt": "2026-08-01T11:07:42.750Z"
+      },
+      {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 2404420,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T11:07:51.023Z",
+        "itemId": "synthesis-report",
+        "outcome": "completed",
+        "reason": "Wrote README.md synthesizing all 30 per-issue reports into a verdict table and three headline answers (0 not-satisfied, 1 partial cannot-determine gated on PAN-3362, 30-vs-29 variance already explained). Posted the summary comment on PAN-3367: https://github.com/eltmon/overdeck/issues/3367#issuecomment-5151163639. Committed the comment text at pan-3367-comment.md.",
+        "releasedAt": "2026-08-01T11:09:58.390Z"
       }
     ],
     "statusReasons": {
@@ -195,6 +198,10 @@
       "audit-batch-f": {
         "reason": "Audited the 5 derived zero-commit extras (PAN-3076/3128/3093/3049/3229) — all satisfied. Completes the worklist: 30/30 issues audited, zero not-satisfied verdicts, zero follow-ups filed. Discovered the converse of H9 (branch rebase can deflate a window's commit count to a false zero, not just inflate it) via PAN-3128/3093; H12 (transient pass) recurred for PAN-3049/3229. Corrected several hand-estimated timestamps by re-verifying against raw event data before commit.",
         "updatedAt": "2026-08-01T11:07:42.750Z"
+      },
+      "synthesis-report": {
+        "reason": "Wrote README.md synthesizing all 30 per-issue reports into a verdict table and three headline answers (0 not-satisfied, 1 partial cannot-determine gated on PAN-3362, 30-vs-29 variance already explained). Posted the summary comment on PAN-3367: https://github.com/eltmon/overdeck/issues/3367#issuecomment-5151163639. Committed the comment text at pan-3367-comment.md.",
+        "updatedAt": "2026-08-01T11:09:58.390Z"
       }
     }
   },
@@ -229,6 +236,9 @@
     "audit-batch-f.audit-batch-f.ac1": "completed",
     "audit-batch-f.audit-batch-f.ac2": "completed",
     "audit-batch-f.audit-batch-f.ac3": "completed",
-    "synthesis-report": "running"
+    "synthesis-report": "completed",
+    "synthesis-report.synthesis-report.ac1": "completed",
+    "synthesis-report.synthesis-report.ac2": "completed",
+    "synthesis-report.synthesis-report.ac3": "completed"
   }
 }
