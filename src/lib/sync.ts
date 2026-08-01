@@ -533,6 +533,16 @@ export function executeSyncSync(options: SyncOptions = {}): SyncResult {
     }
   }
 
+  const sourceSet = new Set([
+    ...allFiles.map((file) => file.relativePath),
+    ...collectSourceFilesSync(CACHE_RULES_DIR, 'rules/').map((file) => file.relativePath),
+  ]);
+  const pruneResult = pruneStaleManifestEntriesSync(targetBase, manifest, sourceSet, {
+    prefixes: ['skills/', 'agents/', 'rules/'],
+  });
+  result.pruned.push(...pruneResult.pruned);
+  result.keptModified.push(...pruneResult.keptModified);
+
   // Write updated manifest
   writeManifestSync(manifestPath, manifest);
 
