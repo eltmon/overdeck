@@ -9422,3 +9422,29 @@ Everything else is either operator-gated (PAN-3313) or deliberately held (PAN-33
 ### Handover status
 
 Handover to the incoming Fable 5 orchestrator is **prepared and durable** (appended above, pushed as `992b762bcb`). `roles.flywheel.model` is now `claude-fable-5`; config backed up at `~/.overdeck/config.yaml.bak-run75-handover`. **The switch takes effect on the next spawn** — `pan flywheel start` refuses while this session is alive (singleton invariant, working correctly). Continuing to tick until the operator ends this session rather than letting the loop go dark.
+
+---
+
+# INTERIM — Fable 5 acting-flywheel (operator conversation, not a `pan flywheel start` run)
+
+## Interim tick 1 (2026-08-01 ~03:00Z) — handover picked up; PAN-3358 convoy wedge root-caused; two strikes dispatched
+
+Operator directed this conversation (Fable 5) to act as the flywheel. Old `flywheel-orchestrator` session killed per its own recommendation (durable at `5f71966c14`).
+
+- **Infra verified:** the "hook 445/guard=1" artifact is `~/.overdeck/bin/work-agent-stop-hook` — 445 lines, guard present, byte-identical to main's `sync-sources/hooks/work-agent-stop-hook`. (First check hit the wrong file: `pre-tool-hook` is 35 lines and always was. The handover metric never named its file — now recorded.) Leak ~0, 175 GB free, load ~3.9, dashboard healthy on **gen-a** (built 01:27Z, buildCommit `5194158a8e`).
+- **PAN-3358 review wedge root-caused (new defect class → PAN-3368):** correctness sub-reviewer died 00:35Z (`orphaned: tmux session missing (reconcile)`, ~4s after its 00:30 resume) with no `correctness.md`. The deadline warm-respawn (02:26Z) and `pan review restart` (02:43Z) both resume ONLY the synthesis parent — no child liveness check, no re-dispatch. `pan review restart --role correctness` fails with "per-reviewer restart route retired" while the CLI still advertises the flag. Unwedged via `pan review abort` + `pan review request` (verification → fresh convoy, 25 auto-requeues remaining). Filed **PAN-3368**, dispatched **strike-pan-3368**.
+- **strike-pan-3365 dispatched** (verdict-laundering guard — handover move #3). Investigating at dispatch time.
+- **strike-pan-3366** finished: full gates passed at `2513075c1b`, PR **#3369** open, CI running. I own its merge; landing when green.
+- **planning-pan-3367 started** (`pan plan --auto`) — the 29-issue audit gets a real plan, not 29 shallow reviews. First attempt failed "database is locked / dashboard is not responding" — dashboard was healthy; the lock was transient and the error message misdiagnoses it. Retry succeeded. (Watch for recurrence before filing.)
+- **PAN-3356 is IN the live build** — its UAT batch merge `5194158a8e` IS the live buildCommit. Operator will UAT it live personally after the next `pan reload`; **pause directive**: once PAN-3366 lands and a fresh reload is verified healthy, hold ticking so the operator can test undisturbed.
+- Second `dist/dashboard/server.js` (pid 937207) verified as a Docker workspace-container peer (cwd `/workspaces/overdeck`), not an orphaned duel.
+- Held unchanged: PAN-3356 close-out (ACs → operator UAT), PAN-3305, PAN-3313 (operator-gated), lexerra scope (operator's POC call). No `--accept-*` overrides.
+
+## Interim tick 2 (2026-08-01 ~03:15Z) — PAN-3366 landed; reload false-abort outage caught, root-caused, filed+struck (PAN-3370); PAUSED for operator UAT of PAN-3356
+
+- **PAN-3366 merged** (PR #3369, squash, all checks green incl. 14m34s test lane) and handed off to verifying-on-main via `pan done --strike`. Its record-write hit a lock held by this conversation and fell back to the workspace `pipeline-verdict.json` (PAN-2583 sweep will pick it up — verify at close-out).
+- **NEW OUTAGE + defect (PAN-3370, struck):** first `pan reload` built gen-b from `645e344255b4`, killed the live server, then aborted on a FALSE `PID 378934 (cmd: unknown) survived SIGKILL` — the pid was dead, `/proc` gone; the checker treats unreadable-cmdline as alive. Abort landed in the worst ordering: old server dead, new never started → **dashboard fully down** until manual `pan restart` (~3 min). That restart came up on stale gen-a; a reload retry then succeeded cleanly. Live = **`645e344255b4`** (pid 3144743), contains PAN-3356 + PAN-3366. **LESSON: a reload that reports failure may have already killed the server — check `:3011` immediately, not eventually.**
+- Old gen-a dist was missing `dist/fts-worker.js` (merge-agent memory-reset marker failed, non-fatal) — watch whether the fresh build still lacks it before filing.
+- Docker residue noted: container pid 2423895 runs `server.js` with a DELETED cwd (`/workspaces/overdeck (deleted)`) — a workspace container outliving its directory; reaper should own this, verify later.
+- Fleet at pause: strike-pan-3365 ($15.01, +291/−65), strike-pan-3368 ($5.02, +176/−75), strike-pan-3370 (just spawned), planning-pan-3367 (k3, +241 notes). PAN-3358: verification → fresh review convoy cycle in flight server-side (25 auto-requeues).
+- **PAUSED per operator directive:** PAN-3356 merged + deployed + fresh restart verified → operator UATs the issue-cockpit redesign live. No ticks, no reloads, no restarts until the operator finishes. Heartbeat stopped deliberately.
