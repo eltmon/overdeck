@@ -2,7 +2,7 @@
   "issueId": "PAN-3418",
   "schemaVersion": 2,
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T14:59:52.821Z",
+  "updated": "2026-08-01T14:59:54.693Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3418: Empty-string conversation model is stored, never backfilled, and blanks the harness+model chips (conv 1794 silently ran Opus 5)",
       "timestamp": "2026-08-01T14:59:52.821Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
