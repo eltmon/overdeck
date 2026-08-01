@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-01T22:35:30.735Z",
+  "updated": "2026-08-01T22:41:59.278Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "cache-prune": {
-        "writerId": "agent-pan-3450",
-        "agentId": "agent-pan-3450",
-        "pid": 3863930,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:35:30.734Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3450",
@@ -92,12 +84,27 @@
         "outcome": "completed",
         "reason": "Added manifest-driven stale entry pruning with modified-file preservation, result reporting fields, and seven regression tests; targeted tests and typecheck pass.",
         "releasedAt": "2026-08-01T22:29:03.260Z"
+      },
+      {
+        "writerId": "agent-pan-3450",
+        "agentId": "agent-pan-3450",
+        "pid": 3863930,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:35:30.734Z",
+        "itemId": "cache-prune",
+        "outcome": "completed",
+        "reason": "Pruned stale cache manifest entries, preserved/reclassified modified and user files, skipped empty skill trees, and added cache regression coverage.",
+        "releasedAt": "2026-08-01T22:41:59.278Z"
       }
     ],
     "statusReasons": {
       "prune-helper": {
         "reason": "Added manifest-driven stale entry pruning with modified-file preservation, result reporting fields, and seven regression tests; targeted tests and typecheck pass.",
         "updatedAt": "2026-08-01T22:29:03.260Z"
+      },
+      "cache-prune": {
+        "reason": "Pruned stale cache manifest entries, preserved/reclassified modified and user files, skipped empty skill trees, and added cache regression coverage.",
+        "updatedAt": "2026-08-01T22:41:59.278Z"
       }
     }
   },
@@ -108,6 +115,10 @@
     "prune-helper.prune-helper.ac3": "completed",
     "prune-helper.prune-helper.ac4": "completed",
     "prune-helper.prune-helper.ac5": "completed",
-    "cache-prune": "running"
+    "cache-prune": "completed",
+    "cache-prune.cache-prune.ac1": "completed",
+    "cache-prune.cache-prune.ac2": "completed",
+    "cache-prune.cache-prune.ac3": "completed",
+    "cache-prune.cache-prune.ac4": "completed"
   }
 }
