@@ -113,6 +113,7 @@ vi.mock('../../../lib/tmux.js', async () => {
   killSession: effectMock(undefined),
   listPaneValues: vi.fn(() => []),
   listPaneValues: effectMock([]),
+  listPaneValuesSync: vi.fn(() => []),
   listSessionNames: effectMock([]),
   sessionExists: vi.fn(() => false),
   sessionExistsSync: vi.fn(() => false),
@@ -558,6 +559,67 @@ describe('monitorReviewConvoySignals', () => {
     expect(actions).toEqual([]);
   });
 
+  it('retries a warm-resumed reviewer whose active mirror never advances (PAN-3375)', async () => {
+    const fs = await import('fs');
+    const agents = await import('../../../lib/agents.js');
+    const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+    vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+    vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+    vi.mocked(agents.getAgentStateSync)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: '2026-05-13T00:00:00.000Z',
+        lastResumeAt: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+      } as any)
+      .mockReturnValueOnce({
+        id: 'agent-pan-879-review-security',
+        issueId: 'PAN-879',
+        workspace: '/workspace',
+        role: 'review',
+        model: 'model',
+        harness: 'claude-code',
+        status: 'running',
+        startedAt: new Date().toISOString(),
+        reviewSubRole: 'security',
+        reviewRunId: 'agent-pan-879-review-abcdef12',
+        reviewOutputPath: outputPath,
+        reviewSynthesisAgentId: 'agent-pan-879-review',
+      } as any);
+    mockSessionExistsAsync.mockImplementation((name: string) =>
+      Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+    );
+    mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+    mockGetAgentRuntimeState.mockReturnValue({
+      state: 'active',
+      lastActivity: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+    } as any);
+
+    const actions = await monitorReviewConvoySignals();
+
+    expect(mockMessageAgent).not.toHaveBeenCalled();
+    expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-879-review-security');
+    expect(mockSpawnReviewSubRole).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-879',
+      subRole: 'security',
+      runId: 'agent-pan-879-review-abcdef12',
+      outputPath,
+    }));
+    expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+      reviewRetryAttempt: 1,
+    }));
+    expect(actions).toEqual([]);
+  });
+
   it('signals REVIEWER_FAILED when an idle reviewer has already been retried (PAN-1806)', async () => {
     const fs = await import('fs');
     const agents = await import('../../../lib/agents.js');
@@ -698,6 +760,73 @@ describe('monitorReviewConvoySignals', () => {
     expect(mockMessageAgent).not.toHaveBeenCalled();
     expect(mockSpawnReviewSubRole).toHaveBeenCalled();
     expect(actions).toEqual([]);
+  });
+
+  it('retries one reviewer when its deadline elapses before signaling timeout (PAN-3375)', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-13T00:30:00.000Z'));
+    try {
+      const fs = await import('fs');
+      const agents = await import('../../../lib/agents.js');
+      const outputPath = '/tmp/test-agents/agent-pan-879-review-security/review-security.md';
+      vi.mocked(fs.readdirSync).mockReturnValue(['agent-pan-879-review-security'] as any);
+      vi.mocked(fs.existsSync).mockImplementation((path: any) => String(path) === '/tmp/test-agents');
+      vi.mocked(agents.getAgentStateSync)
+        .mockReturnValueOnce({
+          id: 'agent-pan-879-review-security',
+          issueId: 'PAN-879',
+          workspace: '/workspace',
+          role: 'review',
+          model: 'model',
+          harness: 'claude-code',
+          status: 'running',
+          startedAt: '2026-05-13T00:00:00.000Z',
+          reviewSubRole: 'security',
+          reviewRunId: 'agent-pan-879-review-abcdef12',
+          reviewOutputPath: outputPath,
+          reviewSynthesisAgentId: 'agent-pan-879-review',
+          reviewDeadlineAt: '2026-05-13T00:28:00.000Z',
+        } as any)
+        .mockReturnValueOnce({
+          id: 'agent-pan-879-review-security',
+          issueId: 'PAN-879',
+          workspace: '/workspace',
+          role: 'review',
+          model: 'model',
+          harness: 'claude-code',
+          status: 'running',
+          startedAt: new Date().toISOString(),
+          reviewSubRole: 'security',
+          reviewRunId: 'agent-pan-879-review-abcdef12',
+          reviewOutputPath: outputPath,
+          reviewSynthesisAgentId: 'agent-pan-879-review',
+        } as any);
+      mockSessionExistsAsync.mockImplementation((name: string) =>
+        Effect.succeed(['agent-pan-879-review', 'agent-pan-879-review-security'].includes(name)) as any,
+      );
+      mockIsPaneDead.mockReturnValue(Effect.succeed(false) as any);
+      mockGetAgentRuntimeState.mockReturnValue({
+        state: 'active',
+        lastActivity: '2026-05-13T00:29:59.000Z',
+      } as any);
+
+      const actions = await monitorReviewConvoySignals();
+
+      expect(mockMessageAgent).not.toHaveBeenCalled();
+      expect(mockKillSessionAsync).toHaveBeenCalledWith('agent-pan-879-review-security');
+      expect(mockSpawnReviewSubRole).toHaveBeenCalledWith(expect.objectContaining({
+        issueId: 'PAN-879',
+        subRole: 'security',
+        runId: 'agent-pan-879-review-abcdef12',
+        outputPath,
+      }));
+      expect(mockSaveAgentState).toHaveBeenCalledWith(expect.objectContaining({
+        reviewRetryAttempt: 1,
+      }));
+      expect(actions).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('does not treat a fresh active reviewer as idle (PAN-1806)', async () => {
