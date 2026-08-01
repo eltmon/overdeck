@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T11:32:39.615Z",
+  "updated": "2026-08-01T11:32:46.339Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -162,5 +162,35 @@
     "docs.docs.ac1": "completed",
     "docs.docs.ac2": "completed",
     "docs.docs.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "packages/contracts/src/composer-commands.generated.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/SKILLS-CONVENTION.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "roles/test.md",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/commands/admin/seed-uat-fixtures.ts",
+      "src/lib/uat-fixtures/fixture-data.ts",
+      "src/lib/uat-fixtures/seed.ts",
+      "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
+      "tests/unit/lib/uat-fixtures/seed.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/SKILLS-CONVENTION.md",
+      "docs/WORKSPACE-CONTAINERS.md",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "roles/test.md",
+      "src/cli/commands/admin/index.ts",
+      "src/cli/commands/admin/seed-uat-fixtures.ts",
+      "src/lib/uat-fixtures/fixture-data.ts",
+      "src/lib/uat-fixtures/seed.ts",
+      "tests/unit/lib/uat-fixtures/fixture-data.test.ts",
+      "tests/unit/lib/uat-fixtures/seed.test.ts"
+    ],
+    "recordedAt": "2026-08-01T11:32:46.338Z"
   }
 }
