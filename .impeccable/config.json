@@ -14,6 +14,12 @@
         "value": "geist mono",
         "createdAt": "2026-08-01T15:25:30.270Z",
         "reason": "Geist Mono is mandated by PAN-3410 PRD D-1 (user-authored, user-confirmed); it is the subject of the mockup, not a stylistic default"
+      },
+      {
+        "rule": "overused-font",
+        "value": "space grotesk",
+        "createdAt": "2026-08-01T16:40:00.000Z",
+        "reason": "Space Grotesk is the god-view surface's existing production theme font (src/dashboard/frontend/src/components/GodView/theme.css, PAN-341); the operator explicitly directed keeping the god view's current styles, so mockups for that surface must match it"
       }
     ]
   }
