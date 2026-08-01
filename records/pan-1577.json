@@ -2,7 +2,7 @@
   "issueId": "PAN-1577",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-01T16:18:54.677Z",
+  "updated": "2026-08-01T16:20:01.924Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -49,7 +49,7 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
+    "sequence": 12,
     "claims": {
       "move-mutation": {
         "writerId": "agent-pan-1577",
@@ -57,6 +57,13 @@
         "pid": 3875244,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-01T16:18:54.677Z"
+      },
+      "cli-skill": {
+        "writerId": "agent-pan-1577",
+        "agentId": "agent-pan-1577",
+        "pid": 3965617,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:20:01.924Z"
       }
     },
     "statusReasons": {
@@ -83,6 +90,10 @@
       "move-mutation": {
         "reason": "start",
         "updatedAt": "2026-08-01T16:18:54.677Z"
+      },
+      "cli-skill": {
+        "reason": "already implemented, claiming to record",
+        "updatedAt": "2026-08-01T16:20:01.924Z"
       }
     },
     "claimHistory": [
@@ -166,6 +177,7 @@
     "cli-move.cli-move.ac2": "completed",
     "cli-move.cli-move.ac3": "completed",
     "cli-move.cli-move.ac4": "completed",
-    "move-mutation": "running"
+    "move-mutation": "running",
+    "cli-skill": "running"
   }
 }
