@@ -2,7 +2,7 @@
   "issueId": "PAN-3410",
   "schemaVersion": 2,
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-01T15:21:00.501Z",
+  "updated": "2026-08-01T15:21:04.787Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3410: design(dashboard): style guide v2 — Geist type system, display scale, chips, soft cards, page-not-modal doctrine",
       "timestamp": "2026-08-01T15:21:00.500Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
