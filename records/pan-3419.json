@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-01T16:44:03.089Z",
+  "updated": "2026-08-01T16:54:47.572Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -71,16 +71,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "docs-project-flag": {
-        "writerId": "agent-pan-3419",
-        "agentId": "agent-pan-3419",
-        "pid": 1767175,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T16:44:03.089Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3419",
@@ -158,6 +150,17 @@
         "outcome": "completed",
         "reason": "Used setConversationProjectKey against the canonical ~/.overdeck runtime DB and verified 20260801-2fc7 now reads projectKey mind-your-now; it will regroup under MYN after deployment",
         "releasedAt": "2026-08-01T16:43:46.602Z"
+      },
+      {
+        "writerId": "agent-pan-3419",
+        "agentId": "agent-pan-3419",
+        "pid": 1767175,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T16:44:03.089Z",
+        "itemId": "docs-project-flag",
+        "outcome": "completed",
+        "reason": "Documented the Continue modal Project selector, CLI --project inheritance and override behavior, and isolated-cwd association guidance. The pan-handoff skill update shipped with the CLI item to satisfy same-commit CLI/skill parity. lint-skills passed, pan sync rendered the rule from this workspace, and all three harness contexts contain --project.",
+        "releasedAt": "2026-08-01T16:54:47.572Z"
       }
     ],
     "statusReasons": {
@@ -188,6 +191,10 @@
       "cleanup-conv-1827": {
         "reason": "Used setConversationProjectKey against the canonical ~/.overdeck runtime DB and verified 20260801-2fc7 now reads projectKey mind-your-now; it will regroup under MYN after deployment",
         "updatedAt": "2026-08-01T16:43:46.602Z"
+      },
+      "docs-project-flag": {
+        "reason": "Documented the Continue modal Project selector, CLI --project inheritance and override behavior, and isolated-cwd association guidance. The pan-handoff skill update shipped with the CLI item to satisfy same-commit CLI/skill parity. lint-skills passed, pan sync rendered the rule from this workspace, and all three harness contexts contain --project.",
+        "updatedAt": "2026-08-01T16:54:47.572Z"
       }
     }
   },
@@ -223,6 +230,9 @@
     "cleanup-conv-1827": "completed",
     "cleanup-conv-1827.cleanup-conv-1827.ac1": "completed",
     "cleanup-conv-1827.cleanup-conv-1827.ac2": "completed",
-    "docs-project-flag": "running"
+    "docs-project-flag": "completed",
+    "docs-project-flag.docs-project-flag.ac1": "completed",
+    "docs-project-flag.docs-project-flag.ac2": "completed",
+    "docs-project-flag.docs-project-flag.ac3": "completed"
   }
 }
