@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-01T22:26:59.586Z",
+  "updated": "2026-08-01T22:27:01.668Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -102,6 +102,13 @@
         "agentId": "agent-pan-3447-slot-1",
         "branch": "feature/pan-3447-slot-1",
         "assignedAt": "2026-08-01T22:26:40.647Z"
+      },
+      {
+        "slotIndex": 2,
+        "itemId": "confluence-model",
+        "agentId": "agent-pan-3447-slot-2",
+        "branch": "feature/pan-3447-slot-2",
+        "assignedAt": "2026-08-01T22:27:01.667Z"
       }
     ]
   }
