@@ -17,6 +17,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T20:38Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-08-01T20:38:13.123Z"
+    },
+    {
+      "timestamp": "2026-08-01T20:47:06.207Z",
+      "reason": "end",
+      "note": "All blocking review issues fixed and all work complete"
     }
   ],
   "feedback": [
@@ -74,7 +79,7 @@
     "recordedAt": "2026-08-01T20:47:00.998Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T20:47:01.920Z",
+  "updated": "2026-08-01T20:47:06.207Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
