@@ -866,3 +866,22 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **Operator promoted uat/pan-sable-0801 carrying PAN-3367** (the 29-issue code-level audit — the run's costliest item at ~$236). Close-out blocked at the deploy row: live build predates the merge. Tried a reload; **the deploy gate refused with an explicit reason — "post-merge lifecycle is pending", queued 21:54:57Z, fires automatically; do not retry or --force."** Respected it; close-out retries next tick. (This is PAN-3383's observability fix EARNING ITS KEEP: the gate stated its blocking reason instead of failing silently — exactly what that issue added.)
 - Full read-door sweep re-derived: 17 PAN + 20 MIN + TIN-1 in pipeline. **Read-door robustness note:** papers-please and lexerra returned EMPTY on the first pass (curl/jq under load) and only yielded their typed `unavailable` objects on retry — an empty response is NOT a bare array and must never be read as "no pipeline"; retried both rather than assuming.
 - Clean UAT batch EMPTY (candidate null) — nothing review+test passed. Red main (PAN-3448) still active; #3452 watch running.
+
+## RUN-79 tick 44 (2026-08-01 ~22:10Z) — 🟢 RED MAIN FIX MERGED (#3452 → 286847320e)
+
+- **PAN-3448 landed** and handed off — forbidden `bd ready` fixture literals removed, beads-removal guard untouched. Main re-green watch armed on the merge commit. Red-main duration: reported by strike-3446 at ~21:30Z → fixed and merged ~22:08Z (~38 min, and the report came from an agent refusing to fix-forward — the sensor pattern again).
+- #3449 (PAN-3446 reviewRunId recovery) test lane running; merges on green now that main's blocker is gone.
+
+## RUN-79 tick 45 (2026-08-01 ~22:20Z) — PAN-3367 CLOSED OUT (27 total); operator deploy request satisfied by the same reload
+
+- **PAN-3367 closed out** — the deploy gate cleared itself exactly as it announced (no --force, no override). 27 issues landed+closed this run.
+- **Operator asked for a deploy of the file-path-chips fix (0dea908ff0) mid-tick; already satisfied** — my reload had built `27703fb4d7`, verified via `git merge-base --is-ancestor` to contain it; live pid 2553912 healthy. Recorded because it validates the reload-as-deploy path: one atomic swap served both the close-out gate and an operator request without disrupting 29 in-flight agents.
+- Main CI running on two heads (27703fb4d7, 9a6c51bec4) — re-green watch still armed; #3449 (reviewRunId) test lane running behind it.
+- Fleet all producing: strike-3431 $9.25 (leak, deep analysis), strike-3422 $8.47 +319/−3 (compaction fix taking shape), MIN-932 $34.50 +2171/−301 (Lane A heavy), MIN-931 $14.53 +1026/−241 (rework strong after the wedge recovery). Server 1510MB at 1h22m BEFORE the reload — much flatter than the earlier 3GB/hr, consistent with load-dependence; measure again at comparable load before concluding.
+
+## RUN-79 tick 46 (2026-08-01 ~22:30Z) — 🟢 MAIN RE-GREEN CONFIRMED; leak load-scaling quantified
+
+- **Main green on `da01905b4d`** — PAN-3448's fix verified end to end. Red-main episode closed (~38 min from strike report to green).
+- **PAN-3431 leak: load-dependence QUANTIFIED and it is super-linear** — ~18MB/min at ~20 sessions, ~107MB/min at ~31, **~300MB/min at 42 sessions** (2458MB in 8 min). Growth tracks concurrent session COUNT, not uptime. Appended with a sharpened heap-diff recipe: snapshot, spawn 10 sessions, snapshot, diff retained objects keyed by session/agent id — suspects are per-session watchers/listeners/transcript buffers/terminal-registry entries never released on detach. This turns a vague "leak" into a targeted hunt.
+- strike-3422's compaction fix (+319/−3) pushed to its PR branch; its local suite failed on the load flake (expected at 42 sessions). #3449 (reviewRunId) test lane still running.
+- MIN-931 rework strong ($16.60, editing planning.py). MIN-932 $38.09 +2250 — ctx 0%/out 0 right after a 1h11m thought block; cost still climbing so it is post-compaction, not wedged. Verify next tick.
