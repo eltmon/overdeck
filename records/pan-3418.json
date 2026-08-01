@@ -22,9 +22,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-01T16:40:27.647Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T16:52Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-01T16:52:23.098Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-01T16:52:23Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3418\n\n# Review Synthesis — PAN-3418 — 2026-08-01T16:51:49Z\n\n## Verdict: CHANGES REQUESTED — active conversation composers are re-seeded to the global model\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/context.json\n- Branch: feature/pan-3418\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418\n- HEAD reviewed: d6db3c77b436875078d9ab3c63d01b981fa1fd1b\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`\nThe new post-load re-seed calls `onChange` whenever `liveConversation` is false, but `liveConversation` defaults to false and the active-conversation caller in `src/dashboard/frontend/src/components/chat/ComposerFooter.tsx:673-680` does not pass it. The picker is disabled for a running conversation, but the async effect does not check `disabled`, so opening a live conversation whose actual model differs from the stored/configured default replaces the local model selection after model discovery. That makes the UI report and derive capabilities from the wrong model and violates the explicit requirement that a running conversation must not be auto-switched. The changed line is inside the PR diff, and the single blocker is proportionate to the PR's seven commits.\n\nFix by passing the running-conversation state through the production caller and adding integration coverage that uses the real `ModelPicker` to prove a live conversation's model remains unchanged after the available-model request resolves. The existing direct picker test supplies `liveConversation` explicitly, while `ComposerFooter.test.tsx` mocks `ModelPicker`, so neither test exercises the broken integration path.\n\n## Non-blocking Findings\n\n### [requirements] FR-6 live-host repair verification remains outstanding — whole-feature scope\nThe code and regression tests establish the empty-string repair path, but the five existing host rows can only be verified after deployment. This is a close-out checkpoint rather than an in-PR blocker.\n\n## Scope Note\nFR-6 is classified as `whole_feature_scope`; it is intentionally non-blocking before deployment and must be recorded during post-deploy close-out. The requirements review otherwise found complete in-PR coverage, but its NonGoal 4 conclusion considered the picker guard in isolation; the correctness review found that the production caller does not activate that guard.\n\n## Clean Sub-roles\n- Security found no vulnerabilities or advisories.\n- Performance found no regressions or advisories.\n- Requirements found no missing or partial in-PR-scope requirement, aside from the production integration contradiction captured by the correctness blocker above.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3418 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -53,7 +66,7 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:52:22.479Z",
+  "updated": "2026-08-01T16:52:24.722Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "blocked",
@@ -63,9 +76,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z",
-    "updatedAt": "2026-08-01T16:52:22.428Z",
+    "updatedAt": "2026-08-01T16:52:23.260Z",
     "reviewNotes": "Active conversation composers are re-seeded to the global model because the production caller does not pass liveConversation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
+    "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
     "reviewSpawnedAt": "2026-08-01T16:45:58.719Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -93,24 +107,6 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-01T16:33:34.861Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      }
     }
   },
   "closeOut": {
@@ -175,7 +171,7 @@
       },
       "costAtCloseOut": {
         "usd": 53.10345,
-        "pricingAsOf": "2026-08-01T16:52:22.458Z"
+        "pricingAsOf": "2026-08-01T16:52:24.714Z"
       }
     },
     "merges": [
