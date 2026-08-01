@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 import { Effect } from 'effect';
 
-import { saveAgentState, type AgentState } from '../agents.js';
+import { saveAgentState, type AgentState } from '../agents/agent-state.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 
 function isNotFound(error: unknown): boolean {

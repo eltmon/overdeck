@@ -108,6 +108,10 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
 
+vi.mock('../../../src/lib/agents/agent-state.js', () => ({
+  saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+}));
+
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: mockLoadConfigSync,

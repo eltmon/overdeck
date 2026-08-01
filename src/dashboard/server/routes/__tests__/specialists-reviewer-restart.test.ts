@@ -15,8 +15,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../lib/agents.js', () => ({
   getAgentStateSync: mocks.getAgentStateSync,
-  saveAgentState: (state: unknown) => Effect.promise(() => mocks.saveAgentState(state)),
   saveAgentRuntimeState: vi.fn(),
+}));
+
+vi.mock('../../../../lib/agents/agent-state.js', () => ({
+  saveAgentState: (state: unknown) => Effect.promise(() => mocks.saveAgentState(state)),
 }));
 
 vi.mock('../../../../lib/tmux.js', () => ({
