@@ -181,7 +181,7 @@
     "recordedAt": "2026-08-01T21:32:02.810Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:38:05.621Z",
+  "updated": "2026-08-01T21:38:12.498Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "blocked",
@@ -190,9 +190,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:38:03.361Z",
+    "updatedAt": "2026-08-01T21:38:09.924Z",
     "reviewNotes": "Residue audit evidence is unreachable, configured repositories can be omitted, and the batch lens bypasses the record read door",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
+    "reviewedAtCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7",
     "reviewRequestedAt": "2026-08-01T21:32:03.917Z",
     "reviewSpawnedAt": "2026-08-01T21:29:28.719Z",
     "scopeDrift": {
@@ -240,24 +241,14 @@
       ],
       "recordedAt": "2026-08-01T21:32:02.810Z"
     },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "96047e2831b60d8da38e5b5aeadc4dac95d6bbe7"
+    "reviewCycleHistory": [
+      {
+        "cycle": 1,
+        "runId": "agent-pan-3396-review-97c4ca39",
+        "blockingCount": 4,
+        "recordedAt": "2026-08-01T21:38:03.739Z"
       }
-    }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -341,7 +332,7 @@
       },
       "costAtCloseOut": {
         "usd": 136.1788093,
-        "pricingAsOf": "2026-08-01T21:38:03.398Z"
+        "pricingAsOf": "2026-08-01T21:38:09.931Z"
       }
     },
     "merges": [
