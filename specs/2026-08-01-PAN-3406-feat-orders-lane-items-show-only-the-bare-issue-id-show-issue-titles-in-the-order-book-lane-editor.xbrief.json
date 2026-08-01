@@ -1,0 +1,195 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T13:25:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3406: feat(orders): lane items show only the bare issue ID — show issue titles in the order-book lane editor",
+    "updated": "2026-08-01T13:32:20.152Z"
+  },
+  "plan": {
+    "id": "pan-3406",
+    "title": "feat(orders): lane items show only the bare issue ID — show issue titles in the order-book lane editor",
+    "status": "proposed",
+    "uid": "d0e4b928-d018-4c94-abea-d93ee8f30fc1",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T13:25:00.000Z",
+    "updated": "2026-08-01T13:32:20.152Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3406",
+        "label": "PAN-3406",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "orders",
+      "order-book",
+      "dashboard",
+      "frontend",
+      "lane-editor"
+    ],
+    "narratives": {
+      "Problem": "The order-book lane editor renders each item as `A1 · book PAN-3295 · [no PRD] released` — the bare issue ID only. With 8+ items per lane the operator cannot tell what any item is without opening the tracker, defeating the point of curating a book. LaneItem.tsx:76 renders `{item.issue}` as the row label and nothing else; OrderBookItem carries no title; titles live only in the dashboard issues read model (useDashboardStore(selectIssues), src/dashboard/frontend/src/lib/store.ts:604).",
+      "Proposal": "Resolve titles at render time from the issues read model — never persist them. LaneEditor gains an optional `issues?: Issue[]` prop (mirroring AddIssuesRail.tsx:42-44: `const storeIssues = useDashboardStore(selectIssues) as Issue[]; const availableIssues = issues ?? storeIssues;`) and builds a useMemo Map keyed by identifier.toUpperCase() → title, passing `title={titles.get(item.issue.toUpperCase())}` to each LaneItem. LaneItem gains an optional `title?: string` prop: when present it renders the title in the existing flex-1 slot (`min-w-0 flex-1 truncate text-muted-foreground`, HTML `title` attribute for the full-string tooltip); when absent it renders today's exact empty spacer, so unknown issues degrade to byte-identical ID-only rows. Test coverage extends src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx (issues passed via the new prop, no store mock) with a known-issue title case and an unknown-issue fallback case. Docs: one sentence in docs/ORDER-BOOKS.md stating the render-time join and the no-persistence rule.",
+      "NonGoals": "- No `title` field on OrderBookItem, no API/schema change, no persistence of titles anywhere in the order-book store.\n- No titles in other order-book surfaces (BookStrip, ProgressPanel, LifecycleStrip) — this issue covers lane editor rows only.\n- No fetching of titles for issues absent from the read model (no tracker lookups, no new endpoints).\n- No redesign of the row layout, chips, or state tones."
+    },
+    "autoDecisions": [
+      {
+        "summary": "LaneEditor subscribes to the store and passes `title` down; LaneItem stays presentational with an optional prop.",
+        "rationale": "One store subscription per editor instead of one per row, and it mirrors the established AddIssuesRail pattern (issues prop override + store default), keeping component tests free of store mocking. The issue body mandated the render-time join but left placement open."
+      },
+      {
+        "summary": "Fallback for unknown issues is today's exact DOM (empty flex spacer), not an 'unknown' label.",
+        "rationale": "Issue AC2 requires degrading to today's ID-only rendering; reusing the existing spacer element makes the fallback a visual no-op rather than new UI."
+      },
+      {
+        "summary": "Test lives in the existing LaneEditor.test.tsx with issues passed via prop, rather than a new LaneItem.test.tsx with store seeding.",
+        "rationale": "The join happens in LaneEditor, so testing through it covers resolution + rendering end-to-end; every sibling test in this directory uses the props-only, no-store-mock pattern."
+      },
+      {
+        "summary": "Docs work item is a one-sentence update to docs/ORDER-BOOKS.md rather than a new doc page.",
+        "rationale": "ORDER-BOOKS.md is the canonical order-book doc; the change is one rendering behavior, and the doc currently says nothing about lane-row composition, so a sentence near the UI paragraph (line ~131) closes the gap without inventing a new surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "lane-item-titles",
+        "title": "Render issue titles in lane editor rows via render-time read-model join",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T13:25:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3406",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+            "src/dashboard/frontend/src/components/orders/LaneItem.tsx",
+            "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend test -- src/components/orders/__tests__/LaneEditor.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "LaneEditor.test.tsx exits 0 with the new title-rendering and ID-only-fallback cases passing alongside the existing four cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In LaneEditor.tsx: add an optional `issues?: Issue[]` prop (import type Issue from '../../types'); add `const storeIssues = useDashboardStore(selectIssues) as Issue[];` and `const availableIssues = issues ?? storeIssues;` (mirror AddIssuesRail.tsx:42-44, including its imports of useDashboardStore/selectIssues from '../../lib/store'); add a useMemo `titles` Map keyed by `issue.identifier.toUpperCase()` with value `issue.title`; pass `title={titles.get(item.issue.toUpperCase())}` on each <LaneItem>. In LaneItem.tsx: add optional `title?: string` to LaneItemProps; replace the unconditional spacer at line 77 (`<span className=\"min-w-0 flex-1\" aria-hidden=\"true\" />`) with a conditional — when `title` is set render `<span className=\"min-w-0 flex-1 truncate text-muted-foreground\" title={title}>{title}</span>`, otherwise render the existing spacer unchanged. Do NOT change OrderBookItem, any /api/orders payload, or any other order-book component. In __tests__/LaneEditor.test.tsx: add an Issue fixture helper (shape per AddIssuesRail.test.tsx:12-24) and a new test that renders <LaneEditor book={book} issues={[...]} onBookChange={vi.fn()} /> where the issues list covers PAN-1 with a title (and a mixed-case identifier variant if practical) but not PAN-2; assert the PAN-1 row renders the title text, that the title element's `title` attribute carries the full string, and that the PAN-2 row still renders bare `PAN-2` with no title text. Keep all four existing tests passing."
+        },
+        "items": [
+          {
+            "id": "lane-item-titles.ac1",
+            "title": "Given an item whose issue exists in the read model, when LaneEditor renders, the row renders the issue title (truncated, muted) beside the mono ID, and the title element carries a `title` attribute with the full issue title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-item-titles.ac2",
+            "title": "Given an item whose issue is absent from the read model, the row falls back to today's ID-only rendering — bare ID, empty title slot, no crash and no blank row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-item-titles.ac3",
+            "title": "Title lookup is case-insensitive: a book item whose `issue` case differs from the read-model identifier still resolves and renders the title",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-item-titles.ac4",
+            "title": "The diff contains no OrderBookItem schema change and no POST/PATCH body carrying a title — titles are resolved at render time only (verified by reading the diff)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "lane-item-titles.ac5",
+            "title": "src/dashboard/frontend/src/components/orders/__tests__/LaneEditor.test.tsx contains a case asserting a known issue renders its title and a case asserting an unknown issue renders ID-only, and `npm --prefix src/dashboard/frontend test -- src/components/orders/__tests__/LaneEditor.test.tsx` exits 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "order-books-doc-title-join",
+        "title": "Document the lane editor's render-time title join in docs/ORDER-BOOKS.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T13:25:00.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3406",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/ORDER-BOOKS.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n \"render\" docs/ORDER-BOOKS.md"
+          ],
+          "expected_outputs": [
+            "docs/ORDER-BOOKS.md contains a sentence stating the lane editor renders each item's issue title resolved at render time from the dashboard issues read model and that titles are not persisted in the book"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add one sentence to docs/ORDER-BOOKS.md near the UI paragraph (the `/orders` Progress view paragraph at approximately line 131) stating: the lane editor renders each item's issue title next to its ID, resolved at render time from the dashboard issues read model, falling back to the bare ID when the issue is not in the read model; titles are never persisted into the stored book. No other doc changes."
+        },
+        "items": [
+          {
+            "id": "order-books-doc-title-join.ac1",
+            "title": "docs/ORDER-BOOKS.md contains a sentence describing how lane editor rows render the issue title resolved at render time from the dashboard issues read model, with ID-only fallback for unknown issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "order-books-doc-title-join.ac2",
+            "title": "docs/ORDER-BOOKS.md contains an explicit rule that the stored order book persists no titles (render-time join only)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3406-feat-orders-lane-items-show-only-the-bare-issue-id-show-issue-titles-in-the-order-book-lane-editor.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
