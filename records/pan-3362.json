@@ -131,19 +131,20 @@
     "recordedAt": "2026-08-01T12:28:15.326Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T12:53:46.660Z",
+  "updated": "2026-08-01T13:00:26.791Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T12:29:41.661Z",
-    "updatedAt": "2026-08-01T12:46:49.216Z",
+    "updatedAt": "2026-08-01T13:00:26.692Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed cycle-2 review findings: removed the out-of-scope transcript-retention.ts fix (reverted — it's already tracked and being fixed independently as PAN-3404, PR #3405) so this branch's diff returns to its actual scope, and made seedUatFixturesLocal fail loud when emitActivityEntryOnce returns an outcome other than appended/duplicate instead of silently reporting a failed persist as success.",
+    "verificationNotes": "Verification FAILED at test (549540ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362\n\n ❯ |root| src/lib/cloister/__tests__/transcript-retention.test.ts (7 tests | 1 failed) 43ms\n     × deletes only jsonl older than N days for ended agents 17ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-rnIraK/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep\n…(881 chars elided)…\nject/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn \n...(truncated)",
     "inspectNotes": "All 4 ACs verified; 5/5 tests pass. AC1 issue shape, AC2 5 agent rows (work+4 named review sub-roles), AC3 doc parses via readPlanSync with 3 items x 2 acceptance_criterion sub-items and tracker-free ProjectConfig, AC4 leak sweep over all 7 builder outputs. Non-blocking notes for seed-writer: FIXTURE_PR_HEAD_SHA is 39 chars and non-hex, FIXTURE_XBRIEF_PLAN_UID is not a valid UUID, FIXTURE_PROJECT_PATH hardcodes /home/node instead of resolved OVERDECK_HOME.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3402",
     "lastVerifiedCommit": "08d65e43dabd25b4b021e18074775d2a2553d22d",
@@ -226,10 +227,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 782,
-            "output": 184750,
-            "cacheRead": 140944557,
-            "cacheWrite": 3293395
+            "input": 788,
+            "output": 186073,
+            "cacheRead": 142734802,
+            "cacheWrite": 3297190
           }
         }
       },
@@ -241,15 +242,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 782,
-          "output": 184750,
-          "cacheRead": 140944557,
-          "cacheWrite": 3293395
+          "input": 788,
+          "output": 186073,
+          "cacheRead": 142734802,
+          "cacheWrite": 3297190
         }
       },
       "costAtCloseOut": {
-        "usd": 89.806854,
-        "pricingAsOf": "2026-08-01T12:46:52.666Z"
+        "usd": 90.187633,
+        "pricingAsOf": "2026-08-01T13:00:26.731Z"
       }
     },
     "merges": [
