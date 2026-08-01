@@ -373,7 +373,7 @@
     "recordedAt": "2026-07-31T21:49:32.535Z"
   },
   "created": "2026-07-31T15:11:50.149Z",
-  "updated": "2026-08-01T01:58:27.259Z",
+  "updated": "2026-08-01T01:58:29.695Z",
   "pipeline": {
     "issueId": "PAN-3357",
     "reviewStatus": "passed",
@@ -385,7 +385,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T21:53:04.434Z",
-    "updatedAt": "2026-08-01T01:28:12.115Z",
+    "updatedAt": "2026-08-01T01:58:29.684Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3357-review",
     "testNotes": "npm run typecheck: PASSED (tsc root+hooks+evals, dashboard-types guard, frontend-types guard all green). npm run lint: FAILED at lint:circular (scripts/lint-circular-deps.sh) — new circular dependency introduced by this branch's new file src/lib/agents/removal.ts (added in commit 73e23449f6, part of route-deletion-sites WI-2): src/dashboard/server/read-model.ts > .../issue-service-singleton.ts > .../issue-data-service.ts > src/lib/review-status.ts > src/lib/cloister/review-agent.ts > src/lib/agents/removal.ts > src/lib/overdeck/agent-state-sync.ts > src/lib/agents.ts > src/lib/agents/spawn.ts > src/lib/cloister/merge-agent.ts > .../issue-lifecycle.ts > .../domain-services.ts. Confirmed via `git show main:src/lib/agents/removal.ts` (does not exist on main) and `git diff <merge-base>..HEAD --stat` (removal.ts and state-dir-removal.ts are new on this branch). Guard explicitly requires the cycle be removed, not baselined. No UI/dashboard changes in this xBRIEF (deletion door, retention config, CI guard script, migration CLI, docs only) so browser UAT was not required and was not run. npm test was started but did not complete within the verification window (280s timeout, non-conclusive) — not needed to reach a verdict since the lint gate already fails deterministically.",
     "inspectNotes": "All 4 ACs met: recursive door preserves every **/*.jsonl in place, deletes non-jsonl residue, prunes empty subdirs, rmdir ENOTEMPTY/EEXIST -> removedDir:false, ENOENT -> idempotent no-op. Async fs/promises only (NFR-1), own 62-line module outside deacon.ts/agent-state.ts (NFR-3). FR-3 call-site routing + CI guard belong to later beads.",
@@ -495,7 +495,9 @@
         "tests/unit/lib/overdeck/agents-removal.test.ts"
       ],
       "recordedAt": "2026-07-31T21:40:59.710Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-01T01:58:29.684Z"
   },
   "closeOut": {
     "usage": {
@@ -579,7 +581,80 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3359"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-01T01:58:29.694Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 3463238aceda5c7113bc48b60fc12712db7b9a9e",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3359 MERGED at 2026-08-01T01:27:20Z",
+          "status": "pass",
+          "mergedAt": "2026-08-01T01:27:20Z",
+          "mergeCommit": "bfbe66a77fd02edb6b749eaabefa694b69f0ec2b"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on bfbe66a77fd02edb6b749eaabefa694b69f0ec2b",
+          "status": "pass"
+        },
+        {
+          "id": "deploy",
+          "num": 7,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 5194158a contains merge bfbe66a7",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 8,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Cleaned 9 agent state directories (8 transcript files preserved); No strike branch strike/pan-3357 found; Pruned 554 checkpoint ref(s) for agent-pan-3357, planning-pan-3357, strike-pan-3357; No specialist registry entries for PAN-3357"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
