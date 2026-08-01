@@ -518,3 +518,11 @@ Heartbeat stopped at operator direction; no monitors or background watches remai
 - **MIN-929 fresh-restarted**: alive-but-inert 56 min at review-rework with unprocessed feedback, no pending operator decision (`pan answer` clean) → `pan start --fresh` per PAN-3150 door. Watch: if the delivered-feedback-never-processed class recurs, file it (PAN-3257 covers only the crash-resume PTY variant).
 - Membership sweep: 4 typed blind spots (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable) surfaced as investigate suggestions. MIN zombie_pr ×11 audit-only. MIN-864 still stalled (pending/pending record, GitLab-blind PR lens) — investigate next tick.
 - Held: PAN-3356 (ACs), PAN-3305, PAN-3362 + PAN-3367 awaiting release, lexerra scope, PAN-3313.
+
+## RUN-79 tick 2 (2026-08-01 ~09:50Z) — PAN-3386 CLOSED OUT (fix live); MIN-864 unstuck after a week; state compaction pushed
+
+- **PAN-3386 closed out** (main CI green on merge `6d0bdf5e`, deploy patrol shipped it — successor pid 1923951 came up in ~10s while I watched as backstop; 8-row DoD, no overrides). The supervised-deploy fix is LIVE, so future post-merge deploys can no longer kill-without-successor.
+- **FLYWHEEL-STATE compaction pushed** (`e68d47c54d` after pull-merge). Tick-1 push had been blocked by ANOTHER session's dirty primary worktree tripping the file-size pre-push guard (settings.ts 1138>1134, model-capabilities.ts 1532>1463) — that session updated the allowlist and is mid-flight on a model-catalog/CLIProxy change set + a lint-file-size `--at` fix for exactly this dirty-tree-blocks-push defect. Left their work untouched.
+- **MIN-864 unstuck after ~1 week**: polyrepo workspace (6 sub-repos on feature/min-864), verification passed 07-25, open GitLab MR, but NO registry agent state and review record pending/pending — pipeline lost track. `pan review request MIN-864` accepted (verification → convoy). Watch: if the convoy wedges on the wrapper shape, that's live evidence for the wrapper-blind stamp/compare sites (PAN-2948 follow-up).
+- Strike baselines for delta checks: pan-1889 $4.59 +296/−21 · pan-3389 $3.84 +37/−13 · pan-3390 $4.21 +60/−6 · MIN-929 fresh session $3.54 +6/−11 (progressing).
+- Main CI green ×2. Load normal.
