@@ -1,0 +1,23 @@
+{
+  "issueId": "PAN-3422",
+  "schemaVersion": 2,
+  "created": "2026-08-01T15:30:57.389Z",
+  "updated": "2026-08-01T15:30:57.389Z",
+  "pipeline": {
+    "issueId": "PAN-3422",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-01T15:30:57.389Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "harness": "claude-code",
+  "model": "gpt-5.6-sol"
+}
