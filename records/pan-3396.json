@@ -352,6 +352,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T23:48Z] test-agent → FAILED — seq 2",
       "timestamp": "2026-08-01T23:48:00.939Z"
+    },
+    {
+      "timestamp": "2026-08-01T23:50:04.689Z",
+      "reason": "end",
+      "note": "Test fix verified — residue tests passing"
     }
   ],
   "feedback": [
@@ -412,7 +417,7 @@
     "recordedAt": "2026-08-01T23:49:58.057Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:50:03.607Z",
+  "updated": "2026-08-01T23:50:04.690Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
