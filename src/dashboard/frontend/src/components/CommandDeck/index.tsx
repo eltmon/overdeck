@@ -466,13 +466,27 @@ export function CommandDeck({
     if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
     const pathToKeys = new Map<string, string[]>();
+    const keyToKeys = new Map<string, string[]>();
     for (const rp of registeredProjects) {
-      if (!rp.path) continue;
       const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
-      pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
+      if (rp.path) pathToKeys.set(rp.path.replace(/\/+$/, ''), keys);
+      keyToKeys.set(rp.key, keys);
     }
 
+    // Prefer the explicit projectKey override (PAN-1577); fall back to
+    // cwd→project-path inference only when it's null.
     for (const conv of conversations) {
+      if (conv.projectKey) {
+        const projectKeys = keyToKeys.get(conv.projectKey);
+        if (projectKeys) {
+          for (const projectKey of projectKeys) {
+            if (!map[projectKey]) map[projectKey] = [];
+            map[projectKey].push(conv);
+          }
+          excludeSet.add(conv.id);
+        }
+        continue;
+      }
       if (!conv.cwd) continue;
       const cwd = conv.cwd.replace(/\/+$/, '');
       for (const [projectPath, projectKeys] of pathToKeys) {
@@ -496,12 +510,19 @@ export function CommandDeck({
   // PAN-2005: same idea for the issue cockpit deep-link (/command-deck/<proj>/<issue>).
   const appliedCockpit = useRef<string | null>(null);
 
-  // Resolve the registered project (by name) that owns a conversation's cwd,
-  // or null when the conversation is unscoped — cwd not under any registered
-  // project (e.g. created without a projectKey, so cwd defaults to ~/Projects).
+  // Resolve the registered project (by name) that owns a conversation, or null
+  // when the conversation is unscoped. Prefers the explicit `projectKey`
+  // override (PAN-1577) when set; falls back to cwd→project-path inference
+  // only when it's null (e.g. created without a projectKey, so cwd defaults to
+  // ~/Projects).
   const resolveConversationProjectName = useCallback(
     (conv: Conversation | null | undefined): string | null => {
-      if (!conv?.cwd) return null;
+      if (!conv) return null;
+      if (conv.projectKey) {
+        const matched = registeredProjects.find((rp) => rp.key === conv.projectKey);
+        return matched ? (matched.name ?? matched.key) : null;
+      }
+      if (!conv.cwd) return null;
       const cwd = conv.cwd;
       const matched = registeredProjects.find(
         (rp) => !!rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')),

@@ -90,6 +90,8 @@ export interface Conversation {
   needsTerminal?: boolean;
   /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
   workspaceId?: string | null;
+  /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
+  projectKey?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────

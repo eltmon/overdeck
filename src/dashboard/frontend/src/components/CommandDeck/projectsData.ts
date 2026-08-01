@@ -19,12 +19,17 @@ export interface RegisteredProjectLite {
   path: string;
 }
 
-/** True when a conversation's cwd is not under any registered project (or has no
- * cwd) — i.e. it belongs in the No-project bucket. */
+/** True when a conversation doesn't resolve to any registered project — i.e. it
+ * belongs in the No-project bucket. Prefers the explicit `projectKey` override
+ * (PAN-1577) when set; falls back to cwd→project-path inference only when it's
+ * null. */
 export function isUnscopedConversation(
-  conv: { cwd?: string | null },
+  conv: { cwd?: string | null; projectKey?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
 ): boolean {
+  if (conv.projectKey) {
+    return !registeredProjects.some((rp) => rp.key === conv.projectKey);
+  }
   const cwd = conv.cwd;
   if (!cwd) return true;
   return !registeredProjects.some((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
