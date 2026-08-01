@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T10:41:25.295Z",
+  "updated": "2026-08-01T10:45:11.580Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -78,16 +78,8 @@
   "harness": "claude-code",
   "model": "claude-sonnet-5",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "audit-batch-b": {
-        "writerId": "agent-pan-3367",
-        "agentId": "agent-pan-3367",
-        "pid": 1519728,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:41:25.295Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3367",
@@ -110,6 +102,17 @@
         "outcome": "completed",
         "reason": "Audited PAN-3216/3230/3206/3192/3356 — all 5 verdicts satisfied, no follow-ups filed. Every flagged review finding has a genuine, file-scoped fix commit confirmed present on main and (where recorded) an explicit reviewer resolution note naming the same defect. Discovered H11: the worklist's negNotes cell can be stale for multi-round episodes (collapse-dedup keeps only the first note per state run) — confirmed for 3/5 issues here by reading the full events-<issue>.json.gz dumps instead. PAN-3356's report separates the audited finding (satisfied) from the broader cockpit ACs (still cannot-determine, PAN-3362 open).",
         "releasedAt": "2026-08-01T10:41:15.635Z"
+      },
+      {
+        "writerId": "agent-pan-3367",
+        "agentId": "agent-pan-3367",
+        "pid": 1519728,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:41:25.295Z",
+        "itemId": "audit-batch-b",
+        "outcome": "completed",
+        "reason": "Audited PAN-2467/2876/3037/3052/3083 — all 5 verdicts satisfied, no follow-ups filed. PAN-2467/2876/3037 each had a genuine review finding (H11 stale-note pattern again) with a precisely matching fix commit confirmed via diff. PAN-3052/3083 are pure infra-retry cases — full event history shows no finding was ever recorded, diff approved from first successful review pass.",
+        "releasedAt": "2026-08-01T10:45:11.580Z"
       }
     ],
     "statusReasons": {
@@ -120,6 +123,10 @@
       "audit-batch-a": {
         "reason": "Audited PAN-3216/3230/3206/3192/3356 — all 5 verdicts satisfied, no follow-ups filed. Every flagged review finding has a genuine, file-scoped fix commit confirmed present on main and (where recorded) an explicit reviewer resolution note naming the same defect. Discovered H11: the worklist's negNotes cell can be stale for multi-round episodes (collapse-dedup keeps only the first note per state run) — confirmed for 3/5 issues here by reading the full events-<issue>.json.gz dumps instead. PAN-3356's report separates the audited finding (satisfied) from the broader cockpit ACs (still cannot-determine, PAN-3362 open).",
         "updatedAt": "2026-08-01T10:41:15.635Z"
+      },
+      "audit-batch-b": {
+        "reason": "Audited PAN-2467/2876/3037/3052/3083 — all 5 verdicts satisfied, no follow-ups filed. PAN-2467/2876/3037 each had a genuine review finding (H11 stale-note pattern again) with a precisely matching fix commit confirmed via diff. PAN-3052/3083 are pure infra-retry cases — full event history shows no finding was ever recorded, diff approved from first successful review pass.",
+        "updatedAt": "2026-08-01T10:45:11.580Z"
       }
     }
   },
@@ -134,6 +141,9 @@
     "audit-batch-a.audit-batch-a.ac2": "completed",
     "audit-batch-a.audit-batch-a.ac3": "completed",
     "audit-batch-a.audit-batch-a.ac4": "completed",
-    "audit-batch-b": "running"
+    "audit-batch-b": "completed",
+    "audit-batch-b.audit-batch-b.ac1": "completed",
+    "audit-batch-b.audit-batch-b.ac2": "completed",
+    "audit-batch-b.audit-batch-b.ac3": "completed"
   }
 }
