@@ -17,6 +17,11 @@
       "timestamp": "2026-08-01T16:33:42.222Z",
       "reason": "end",
       "note": "Anomalies: post-deploy row healing is intentionally deferred to verify-on-main/close-out because it cannot execute before this branch merges and deploys. The xBRIEF parent was cancelled, but pan task cancel did not cascade cancellation to its nested acceptance criteria, so pan done required --force despite a clean, fully pushed worktree. The full npm test run hit 58 unrelated 5-second timeout failures under concurrent strike-suite CPU saturation; changed-area tests, typecheck, and lint passed. Deviation: frontend tests used the frontend package Vitest command because the root xBRIEF command excludes frontend tests. Delivered request normalization, NULL write-door storage, widened backfill, independent harness rendering, and picker reseeding."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-01T16:40:27.647Z"
     }
   ],
   "feedback": [],
@@ -48,7 +53,7 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:35:54.810Z",
+  "updated": "2026-08-01T16:40:27.647Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
