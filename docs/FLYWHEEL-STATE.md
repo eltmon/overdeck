@@ -755,3 +755,7 @@ Pressure climbed to 2.2GB avail / PSI full 41.9 (severe stalling): THREE concurr
 - Memory recovered (8.4GB avail; campaign host builds finished). Campaign: MIN-930 $1.71 +533/−40 (P0 advancing), MIN-931 $3.18 +575/−51. MIN-839 rework respawned + progressing (+161).
 - **strike-3422 → PR #3430** (paused agent's committed fix pushed directly — no local re-grind). CORRECTED root cause: the PTY supervisor path didn't VERIFY Enter submission (commits: verify supervisor Enter submission + confirmation-budget test) — not the tmux menu detector I hypothesized. The composer-wedge class gets its structural fix once landed+deployed.
 - Main CI in progress (PAN-3416 close-out queued). PAN-3420 planned, awaiting operator release.
+
+## RUN-79 interstitial (~17:30Z) — THIRD memory crisis: server leak CONFIRMED (2nd balloon) → restart #2 + PAN-3431 struck
+
+PSI avg10 hit 94 (thrashing) at 1.9GB avail: server ballooned AGAIN (743MB→2.4GB on the same 85b623885d build) + two concurrent campaign Java builds. Restart #2 freed to 14GB (a build finished simultaneously). **Two balloons in 75 min = real leak under sustained load, not churn — diagnosis upgraded.** Filed **PAN-3431** (heap-profile bisect directive; suspects #3414 activity-polling banner / #3421 reconcile / #3400 patrol retirement; NOT #3425/#3430 which postdate the build) + struck. Until fixed: server RSS Monitor (>3GB) is the tripwire; expect ~hourly restarts under fleet load. NOTE for next deploy: it will include #3425+#3430 — attribution of any new balloon must account for the changed surface.
