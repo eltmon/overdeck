@@ -90,17 +90,17 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T21:24:27.304Z",
+  "updated": "2026-08-01T21:24:37.871Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-01T21:24:27.138Z",
+    "updatedAt": "2026-08-01T21:24:37.851Z",
     "reviewNotes": "Prior liveness and atomicity blockers are fixed; one deferred-correction hardening advisory remains",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
@@ -136,24 +136,6 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "38e80a9a31904e56a409ef2fa565cc85e599be78"
-      }
     }
   },
   "closeOut": {
@@ -161,9 +143,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3793329,
-            "output": 98071,
-            "cacheRead": 25546240,
+            "input": 3795719,
+            "output": 98317,
+            "cacheRead": 25889280,
             "cacheWrite": 0
           }
         },
@@ -210,9 +192,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 9346870,
-          "output": 239150,
-          "cacheRead": 67269120,
+          "input": 9349260,
+          "output": 239396,
+          "cacheRead": 67612160,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -223,8 +205,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 101.73173299999999,
-        "pricingAsOf": "2026-08-01T21:24:27.268Z"
+        "usd": 101.922583,
+        "pricingAsOf": "2026-08-01T21:24:37.858Z"
       }
     },
     "merges": [
