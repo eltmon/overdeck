@@ -15,15 +15,17 @@ evidence-gathering method and NonGoals.**
    already correct and the negative state was infra noise). **No case in this worklist matches the
    "pass replaced a defect with nothing" pattern the mechanism in [PAN-3365](https://github.com/eltmon/overdeck/issues/3365)
    made possible.**
-2. **How many ACs remain unverifiable ("cannot determine")? One — a scoped, partial case, not a whole
-   verdict.** [PAN-3356](https://github.com/eltmon/overdeck/issues/3356)'s specific audited finding (a
+2. **How many ACs remain unverifiable ("cannot determine")? Three, all within one issue,
+   [PAN-3356](https://github.com/eltmon/overdeck/issues/3356).** PAN-3356's *specific audited finding* (a
    Needs-You stuck-gate recovery bug) is **satisfied** — a fix commit and regression test confirm it. But
-   PAN-3356 is the large issue-cockpit redesign, and its *broader* cockpit-level acceptance criteria (the
-   six-tab IA, the Needs-You slot, the crew spine, taken as a whole) were never exercised end-to-end,
-   because [PAN-3362](https://github.com/eltmon/overdeck/issues/3362) — "No way to seed tracker-backed
-   issue fixtures in workspace containers" — is still **open** and blocks the browser UAT that would
-   verify them. PAN-3356 is deliberately not closed out pending PAN-3362, per the PAN-3367 issue body.
-   **Re-verification gate: PAN-3362.**
+   PAN-3356 is the large issue-cockpit redesign, and 3 of its broader cockpit-level acceptance criteria —
+   (1) the six-tab information architecture, (2) the Needs-You slot's correct prioritization across all
+   redesign states, and (3) the crew spine — were never exercised end-to-end, because
+   [PAN-3362](https://github.com/eltmon/overdeck/issues/3362) — "No way to seed tracker-backed issue
+   fixtures in workspace containers" — is still **open** and blocks the browser UAT that would verify
+   them. See [pan-3356.md](pan-3356.md)'s "Broader-scope caveat" for the full enumeration. PAN-3356 is
+   deliberately not closed out pending PAN-3362, per the PAN-3367 issue body. **Re-verification gate:
+   PAN-3362.**
 3. **Variance versus the expected ~29: worklist totals 30 (+1), fully explained.** 25 mandatory issues
    (24 with surviving event evidence + PAN-1525, whose evidence is compacted) plus 5 derived zero-commit
    extras (well under the cap of 10, no overflow). The flywheel's exact dedup to 29 could not be

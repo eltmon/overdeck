@@ -3,12 +3,29 @@
 Derived by running [`evidence/reproduce-worklist.mjs`](evidence/reproduce-worklist.mjs) against
 `~/.overdeck/overdeck.db` (Node 22, `node:sqlite`, read-only) on 2026-08-01, followed by a
 commit-count pass against each candidate's PR/MR (see "Commit-count method" below). Raw event
-payloads for every candidate are dumped verbatim to `evidence/events-<issue>.json.gz` (gzipped —
-four MIN issues generate 1,000-3,200+ `review.status_changed` events each from what looks like
-review-thrash loops, producing 10-20MB of raw JSON per issue; gzip brings the full evidence set
-from 115MB to 1.7MB with no loss of fidelity, `gunzip -k` to inspect); the full candidate list (61
-issues, full available window) is at `evidence/candidates.json`; the commit-count computation
-output (including in-window commit detail) is at `evidence/commit-counts.json`.
+payloads for every PAN candidate are dumped verbatim to `evidence/events-<issue>.json.gz` (gzipped
+— some issues generate hundreds to thousands of `review.status_changed` events from what looks
+like review-thrash loops, producing multi-MB raw JSON per issue; `gunzip -k` to inspect). **Raw
+event dumps for the 8 MIN candidates were generated locally but are not committed to this public
+repository** — `eltmon/overdeck` is public while the source repositories those payloads describe
+(`mind-your-now`, `mind-your-now-backend`) are private, and the raw payloads embed private source
+paths, review commentary, and implementation detail. Every MIN report in this audit is written to
+avoid quoting that private content; see the confidentiality note at the top of each `min-*.md`
+report. The full candidate list (61 issues, full available window) is at
+`evidence/candidates.json`; the commit-count computation output (including in-window commit
+detail — commit *message headlines* only, which are low-sensitivity identifiers, not diff
+content) is at `evidence/commit-counts.json`.
+
+**`candidates.json` reproducibility note:** the generator emits `resetAt` for every candidate on a
+fresh run. 59 of the 61 committed rows carry `resetAt`, backfilled from the committed
+`events-<issue>.json.gz` dumps where the live DB had compacted further (see the "Reset at" column
+note under "Mandatory worklist" below). The 2 exceptions are `MIN-911` and `MIN-928` — both
+non-mandatory, non-worklist candidates (not among the 25 named issues or the 5 derived extras)
+whose raw event dumps were deleted for the confidentiality reasons above before this backfill ran.
+Their rows are intentionally incomplete rather than silently wrong; re-deriving `resetAt` for them
+would require either re-fetching from the (further-compacted) live DB or re-generating and
+re-deleting a private-repo evidence dump, neither of which is worth doing for two candidates this
+audit never covers.
 
 ## Final count and variance from 29
 
