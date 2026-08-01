@@ -33,7 +33,7 @@ pan review mode <id> <quick|full>                  # Set this issue's review mod
 pan review reset <id> [--session]                  # Reset review/test/merge cycles (human override)
 pan review resync <id>                             # Re-emit canonical status to heal dashboard drift
 pan review abort <id>                              # Kill all running reviewers, leave worker idle
-pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch a fresh review pipeline
+pan review restart <id> [--model <m>] [--role <r>] # Resume review and re-dispatch reviewers missing a report
 ```
 
 ## What each subcommand does
@@ -62,9 +62,9 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 - **`abort <id>`** — Kills any currently running reviewer sessions but
   leaves the work agent alone. Use when reviewers are stuck or running
   against the wrong commit and you want to halt without resetting state.
-- **`restart <id>`** — `abort` + dispatch a fresh review pipeline in one
-  command. Use when reviewers crashed or produced unusable output and you
-  want a clean re-run. Optional flags:
+- **`restart <id>`** — Restarts the review parent, preserves completed reports,
+  and re-dispatches reviewer lanes that have no report. Use when a reviewer
+  crashed and the synthesis parent is waiting on that missing lane. Optional flags:
   - `--model <model>` — override the model for every reviewer in this run
     (e.g. `gpt-5.4`, `claude-sonnet-4-6`). Useful when the default model has
     misbehaved and you want to retry with a different one.
@@ -85,7 +85,7 @@ pan review restart <id> [--model <m>] [--role <r>] # Kill reviewers and dispatch
 | Issue passed but is missing from Awaiting Merge or actions are wrongly gated | `pan review resync <id>` |
 | Same as above plus reviewer Claude sessions are bad | `pan review reset <id> --session` |
 | Reviewer is hung, just kill it | `pan review abort <id>` |
-| Reviewer crashed, want a fresh convoy with a different model | `pan review restart <id> --model gpt-5.4` |
+| Reviewer crashed, resume the convoy with a different model | `pan review restart <id> --model gpt-5.4` |
 | Only the security reviewer is broken | `pan review restart <id> --role security` |
 
 ## Merging is NOT here

@@ -379,6 +379,17 @@ describe('resolveBareNumericIdSync rollout (PAN-1173)', () => {
     expect(fetch).toHaveBeenCalledWith('http://dashboard.test/api/specialists/overdeck/PAN-9999/review/restart', expect.any(Object));
   });
 
+  it('routes pan review restart --role to the per-reviewer recovery endpoint', async () => {
+    const { reviewRestartCommand } = await import('../review-restart.js');
+
+    await reviewRestartCommand('9999', { role: 'correctness' });
+
+    expect(fetch).toHaveBeenCalledWith(
+      'http://dashboard.test/api/specialists/overdeck/PAN-9999/reviewer/correctness/restart',
+      expect.any(Object),
+    );
+  });
+
   it('does not fail pan review restart when an accepted response is not JSON', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
