@@ -563,3 +563,26 @@ Operator: "ALL issues in MYN and overdeck pipelines should be progressing" — t
 - **MIN-839 work agent auto-started** post-finalize (06:58 local) — the planning→start gap did not recur here.
 - MIN-929 awaiting test dispatch (review APPROVED). MIN-864 conflict resolution slowed ($6.99, +38/−102, nudge visible) — one more tick before intervening.
 - pan-3362 $18.76 +809 · pan-3367 $29.49 +1432 (audit docs) · min-874 $24.30 +2364 (Java tests) — all delta-verified working. 21 agents active.
+
+## RUN-79 tick 7 (2026-08-01 ~11:20Z) — PAN-3392 landed (train); PAN-3389 + PAN-3305 closed out; MIN-864 second freeze → fresh
+
+- **PAN-3392 landed** (#3398 train-merged; handed off). Resurrection now logs its null-state path and falls back to the canonical start door — the MIN-864 wedge class is structurally covered once deployed.
+- **PAN-3389 + PAN-3305 closed out** (live build e7911e9c contains both merges; 8-row DoD each, no overrides). Run scoreboard: 5 PAN issues landed+closed (3386, 3389, 3390, 3305, + 3392 at verify), 7 MIN close-outs drained, 6 substrate issues filed (3389, 3390, 3392, 3393, 3396, 3397).
+- **MIN-864 froze again** (cost byte-identical $6.9884 across 2 ticks, stuck-nudge unprocessed in pane) — no pending decision → second `pan start --fresh`. WATCH CLASS (3 specimens today incl. MIN-929 pre-fresh): MYN gpt-5.6 work agents go inert with delivered-but-unprocessed nudges. Next occurrence: capture full pane + supervisor log to pin delivery-vs-harness before filing.
+- strike-3393 verify long but moving ($14.55, 1h7m). strike-1889 slow-moving ($14.00) — if no readiness by next tick, read its full transcript tail. pan-3362 at "clean tree, running full suite before signaling" — pan done imminent. pan-3367 brewing 39m on audit batch (long-thought watch). min-874 $40.27 +2969 (heavy but proportionate Java test work). min-839 working.
+- MIN-929 still awaiting test dispatch (0 test sessions) — governor/slot check next tick if still absent.
+
+## RUN-79 interstitial (~11:25Z) — strike-3393 landing decision: CI arbitrates, not the loaded host
+
+strike-pan-3393 reported: fix committed, typecheck/lint green, but 3 full local suite runs failed on random 5s setupOverdeckTestDb hook timeouts under host load 10-25 (every failed file passes alone); correctly refused to fix-forward the orthogonal infra flake or signal ready. **Owner decision: pushed its branch + opened PR #3400 myself — the PR's CI on GitHub runners is the authoritative gate; local verification is currently unusable under saturation load.** Appended the specimen to PAN-3344 (CPU-blind governor) including the no-headroom 5s hook timeout. Land #3400 on green + pan done --strike.
+
+## RUN-79 interstitial (~11:32Z) — MIN-864 review wedge: DB-lock became durable BLOCKED; fresh cycle dispatched; PAN-3401 filed
+
+Reviewer reported: correctness lane's transient database-lock failure durably signaled blocked on its runId; the lane then completed CLEAN but signal-once forbids in-place correction — 3 passed + 1 clean-but-uncorrectable. Recovery: `pan review abort MIN-864` + `pan review request` (fresh cycle, verification → convoy). Filed **PAN-3401**: verdicts must encode judgment, never infra outcomes — blocked-polarity sibling of PAN-2746, with the signal-once trap documented (same-run supersede for infra-blocked signals). Dispatch strike when a slot frees; fleet currently saturated.
+
+## RUN-79 tick 8 (2026-08-01 ~11:40Z) — strike-1889 landed via CI path (#3403); MIN-929 verdict-signal loss found + re-driven
+
+- **strike-1889 diagnosed**: fix committed (`63af28265b`), clean tree — but the agent is poll-looping a silent background task ("Task Output → (No output)" ×6) around the same load-flaked local suite. Same landing decision as 3393: pushed + **PR #3403**, CI arbitrates. (Two strikes in one day burned hours on unusable local verification — PAN-3344 is compounding; consider raising its priority.)
+- **MIN-929: review verdict announced but never recorded.** Parent printed "Review passed after cycle-3 convergence gate" + synthesis written ~1.5h ago, yet no test dispatch, no ready flip, health monitor still nudging the idle work agent — the signal step silently failed (synthesis-present variant of REVIEWER_READY-never-landed). `pan review restart MIN-929` resumed the parent (per-lane idempotency re-runs nothing). VERIFY next tick: verdict recorded + test dispatched; if the signal fails twice, file the specimen with pane+transcript evidence.
+- #3400 (PAN-3393) test lane pending. PAN-3392 close-out still deploy-gated (live e7911e9c predates its merge).
+- Fresh MIN-864 session working ($0.70, new review convoy live since 07:32). pan-3362 $32.93 post-compaction continuing. pan-3367 $68.51 audit (COST WATCH — biggest spender of the run). min-874 $58.32 out 3.4k. min-839 $17.34 +782/−67.
