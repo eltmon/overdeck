@@ -1,0 +1,756 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:34:49.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3420: Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+    "updated": "2026-08-01T15:41:20.830Z"
+  },
+  "plan": {
+    "id": "pan-3420",
+    "title": "Dashboard + pan show render a completed, closed-out issue as never-started (post-close-out history wipe)",
+    "status": "proposed",
+    "uid": "ec1a5964-c2a7-4093-87ac-daad120804a0",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:34:49.000Z",
+    "updated": "2026-08-01T15:41:20.830Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3420",
+        "label": "PAN-3420",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "dashboard",
+      "cli",
+      "state-planes",
+      "close-out",
+      "read-door",
+      "history"
+    ],
+    "narratives": {
+      "Problem": "A completed, merged, closed-out issue renders as never-started on the dashboard detail page and in pan show, because six read paths (review-status payload, specialist strip, drawer tasks badge, conversations tab, activity rail, pan show CV) read live runtime state that close-out deliberately wipes. The durable history exists in records/<issue>.json on overdeck-state but nothing reads it, and two history fields (verdict timeline, reviewerVerdicts) are not reliably journaled before runtime state is cleared.",
+      "Proposal": "Add a close-out snapshot that journals the final verdict timeline into the record before runtime clearing; add one durable read door src/lib/issue-history/resolver.ts (resolveIssueHistorySync + deriveCvFromHistory) that sources terminal-issue history from the permanent plane only; rewire the six surfaces to fall back to it only when the live read is empty AND the record is closedOut; cover with a no-loss regression test across resolver, routes, CLI, and frontend derivations.",
+      "NonGoals": "- Not reverting or weakening the closed-out journal nulling in review-status-read.ts (runtime cache hygiene stays)\n- Not promoting the event store or status_history SQLite tables to durable planes\n- Not changing what close-out tears down (workspace, Docker, branches, agent dirs, tmux sessions all still cleaned)\n- Not backfilling pre-PAN-3420 records with synthetic history arrays (resolver degrades gracefully)\n- No visual/UX redesign of the issue detail page — data-source fixes only\n- Not changing live read-path behavior for in-flight issues in any way"
+    },
+    "autoDecisions": [
+      {
+        "summary": "Durable fallback rather than reverting the journal nulling in review-status-read.ts:21-28",
+        "rationale": "The nulling is deliberate runtime-cache hygiene; the defect is that history surfaces have no durable read, not that the cache is cleared."
+      },
+      {
+        "summary": "Snapshot verdict history into the record at close-out (write-side) instead of reconstructing from the event store",
+        "rationale": "The event store and status_history tables are rebuildable caches; the record on overdeck-state is the permanent plane."
+      },
+      {
+        "summary": "One new resolver module as the single read door; routes/CLI/frontend rewire to it",
+        "rationale": "Six independent record-readers would recreate the drift the two-door tenet exists to prevent."
+      },
+      {
+        "summary": "No backfill for already-closed issues",
+        "rationale": "The resolver derives what it can from existing record fields (sessionHistory, claimHistory, usage.byStage, dodGate); history stays [] for pre-fix records."
+      },
+      {
+        "summary": "Single issue, not sibling split",
+        "rationale": "Projected surface is exactly 25 files / 5 subsystems (at, not over, the finalize lint limits), and every surface shares the one resolver, so splitting would force cross-issue contract coupling."
+      },
+      {
+        "summary": "Tasks API needs no change",
+        "rationale": "PAN-2401's readWorkspacePlanSync already overlays record statusOverrides (src/lib/xbrief/io.ts:358-369); the 0/0 badge symptom is the frontend reading the never-set issue.tasks field."
+      }
+    ],
+    "items": [
+      {
+        "id": "be-history-snapshot",
+        "title": "Journal verdict timeline + reviewerVerdicts into the record before close-out clears runtime state",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "be-issue-history-resolver",
+            "test-no-loss-regression"
+          ],
+          "files_scope": [
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/lifecycle/workflows.ts",
+            "tests/unit/lib/pan-dir/record-history-snapshot.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/pan-dir/record-history-snapshot.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "record-history-snapshot.test.ts passes all cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-8",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Add `history?: StatusHistoryEntry[]` to PanIssuePipelineRecord (src/lib/pan-dir/record.ts:162-207) and type reviewerVerdicts properly instead of `unknown`. In closeOut (src/lib/lifecycle/workflows.ts:168-331), BEFORE clearReviewStatusStep (~line 1017), snapshot the final getReviewStatusSync(issueId) fields — history, reviewerVerdicts, reviewCycleHistory, uatStatus/uatNotes, verificationStatus/verificationNotes, testStatus/testNotes, reviewStatus/reviewNotes, reviewSpawnedAt — into the record pipeline block via the record write door (updateIssueRecord). Add a unit test proving the convoy-completion record write via buildIssueRecord (src/lib/pan-dir/records.ts:144) persists reviewerVerdicts (MIN-929's record lacks them — close that gap), and one proving the close-out snapshot lands before the runtime clear. Additive only: nothing is cleared earlier and no existing field is rewritten after closedOutAt. See PRD work item 1."
+        },
+        "items": [
+          {
+            "id": "be-history-snapshot.ac1",
+            "title": "PanIssuePipelineRecord persists a history?: StatusHistoryEntry[] field and a typed reviewerVerdicts map",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-history-snapshot.ac2",
+            "title": "A simulated close-out persists history, reviewerVerdicts, and uat/verification verdicts into records/<issue>.json before the runtime review_status row is cleared",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-history-snapshot.ac3",
+            "title": "The convoy-completion record write persists reviewerVerdicts into records/<issue>.json (unit-tested via buildIssueRecord)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "be-issue-history-resolver",
+        "title": "New durable read door: src/lib/issue-history/resolver.ts (resolveIssueHistorySync + deriveCvFromHistory)",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "api-review-status-durable",
+            "api-activity-durable",
+            "cli-show-durable"
+          ],
+          "files_scope": [
+            "src/lib/issue-history/types.ts",
+            "src/lib/issue-history/resolver.ts",
+            "tests/unit/lib/issue-history/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/issue-history/resolver.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "resolver.test.ts passes every derivation-rule case including pre-fix-record fallbacks",
+            "typecheck completes without errors"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "FR-7",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/issue-history/types.ts with the IssueHistory DTO exactly as specified in the PRD (IssueHistoryPhase, IssueHistorySpecialist, IssueHistorySession, IssueHistoryActivityEntry, IssueHistory) and src/lib/issue-history/resolver.ts exporting resolveIssueHistorySync(issueId): IssueHistory | null and deriveCvFromHistory(history). The resolver reads ONLY the permanent plane: the record door (readIssueRecordSync, src/lib/pan-dir/record.ts:481), findSpecByIssue (src/lib/pan-dir/specs.ts:213) + record statusOverrides via applyStatusOverrides (src/lib/xbrief/io.ts), and retained agent dirs under ~/.overdeck/agents/. It must never read SQLite, tmux, or the tracker. Implement the derivation rules verbatim from the PRD: phases (plan from first planning sessionHistory entry else record.created; work from first start entry; review from reviewSpawnedAt ?? reviewRequestedAt; test from last history test entry; ship from last history merge entry else closedOutAt when merged; done = closedOutAt), specialists (reviewerVerdicts map; fallback to closeOut.usage.byStage review.* keys with verdict passed when reviewStatus is passed), tasks (spec items + statusOverrides overlay, total/completed counts), sessions (dir-name scan, role from prefix, first *.jsonl as transcriptPath), activity (sessionHistory mapped), merges (closeOut.merges). deriveCvFromHistory: totals from claimHistory, successRate over completed/failed outcomes, avgDuration from claimedAt→releasedAt minutes, recentWork from last 3 claims. Unit tests cover every rule and both pre-fix fallbacks (no history array, no reviewerVerdicts). See PRD work item 2 + DTO + derivation rules."
+        },
+        "items": [
+          {
+            "id": "be-issue-history-resolver.ac1",
+            "title": "resolveIssueHistorySync returns closedOut, verdicts, phases, specialists, tasks, sessions, activity, and merges derived only from the record door, findSpecByIssue, and retained agent dirs",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-issue-history-resolver.ac2",
+            "title": "Phase derivation produces plan/work/review/test/ship/done timestamps exactly per the PRD derivation rules",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-issue-history-resolver.ac3",
+            "title": "Specialist derivation falls back to closeOut.usage.byStage roles with verdict passed when reviewerVerdicts is absent and reviewStatus is passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-issue-history-resolver.ac4",
+            "title": "deriveCvFromHistory returns totals, successRate, avgDuration, and recentWork computed from tasks.claimHistory",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "be-issue-history-resolver.ac5",
+            "title": "The resolver unit suite passes with no SQLite, tmux, or tracker fixtures, preserving the permanent-plane-only constraint",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-review-status-durable",
+        "title": "GET /api/review/:issueId/status falls back to durable verdicts for closed-out issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/workspaces.ts",
+            "src/dashboard/server/routes/__tests__/review-status-closed-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/review-status-closed-out.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route test passes both the closed-out synthesis branch and the unchanged never-started default branch",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-6",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the GET /api/review/:issueId/status route (src/dashboard/server/routes/workspaces.ts:1363-1428), after `const status = getReviewStatusSync(issueId)` (line 1375): when status is null, call resolveIssueHistorySync(issueId); if it returns closedOut, return the synthesized payload per the PRD snippet (journaled review/test/merge/uat/verification verdicts + notes, prUrl/prNumber, reviewedAtCommit/lastVerifiedCommit, reviewRequestedAt/reviewSpawnedAt, readyForMerge: false, updatedAt: closedOutAt, history, reviewerVerdicts rebuilt from specialists, plus the additive fields phases and closedOut: true). Skip the merge-queue and tmux enrichment in that branch. When the resolver returns null or non-closedOut, the existing default path runs unchanged. Route test with a mocked resolver covers: closed-out → verdicts/history/phases/closedOut present; never-started → existing all-pending default preserved; in-flight → live path byte-identical. See PRD work item 3 + route snippet."
+        },
+        "items": [
+          {
+            "id": "api-review-status-durable.ac1",
+            "title": "For a closed-out issue the route returns journaled review/test/merge/uat/verification verdicts plus history, reviewerVerdicts, phases, and closedOut: true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-review-status-durable.ac2",
+            "title": "For a never-started issue the route preserves the existing all-pending default response",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-review-status-durable.ac3",
+            "title": "For an in-flight issue the route preserves the pre-change live-path response byte-for-byte",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "api-activity-durable",
+        "title": "GET /api/command-deck/activity/:issueId merges durable sessions + activity for closed-out issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/command-deck.ts",
+            "src/dashboard/server/routes/__tests__/command-deck-activity-closed-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/__tests__/command-deck-activity-closed-out.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "route test passes: closed-out fixture gains retained sessions with transcriptPath and durable activity entries",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In the activity route (src/dashboard/server/routes/command-deck.ts:187-208, fetchActivityDataWithContext), after the existing live assembly: when resolveIssueHistorySync(issueId)?.closedOut, append resolver sessions (role, agentId, transcriptPath) for any agent ids not already present in the response's session list, and append resolver activity entries (timestamp, kind, summary) to the activity list. Live entries win on id conflict; the merge is additive and changes nothing when the live data is present or the issue is not closed-out. Route test: closed-out fixture gains retained sessions + activity entries; an in-flight fixture is untouched. See PRD work item 4."
+        },
+        "items": [
+          {
+            "id": "api-activity-durable.ac1",
+            "title": "For a closed-out issue the activity response returns durable retained sessions (with transcriptPath) and sessionHistory-derived activity entries merged under live entries",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "api-activity-durable.ac2",
+            "title": "For an in-flight issue the activity response preserves the pre-change live-only payload",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-show-durable",
+        "title": "pan show falls back to record-derived work history + verdict line for closed-out issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/show.ts",
+            "tests/unit/cli/show-closed-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/cli/show-closed-out.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "show-closed-out.test.ts passes: real counts + verdict line for closed-out fixture, '(no work history)' only when no claims",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/show.ts, after `const cvData = readAgentCVSync(agentId)` (line 82): when cvData is null, derive it via deriveCvFromHistory(resolveIssueHistorySync(issueId)) so the existing CV line (lines 151-164) and recent-entries block (lines 166-184) render real data; the derivation returns null for non-closed-out/no-record issues, preserving '(no work history)' only when there are no claims. Also: when getReviewStatusSync returns null but the resolver reports closedOut, print one durable verdict line after the pipeline section — `pipeline review passed · test passed · merged · closed out <relative date>` (verdicts joined with ' · ', nulls skipped, using the existing relativeTime helper). Unit test covers: closed-out with claims → real totals/success/avg + verdict line; no-record issue → unchanged output; in-flight → unchanged. See PRD work item 5."
+        },
+        "items": [
+          {
+            "id": "cli-show-durable.ac1",
+            "title": "pan show on a closed-out issue with claim history prints real totals, success rate, and avg duration derived from the record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-show-durable.ac2",
+            "title": "pan show prints the durable verdict line (review/test/merge/closed-out date) when the live review status is null and the record is closedOut",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-show-durable.ac3",
+            "title": "pan show falls back to '(no work history)' only when the record has no claim history, and never for a merged issue with claims",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-drawer-durable",
+        "title": "Drawer tasks badge, phase rail dates, and activity rail consume durable sources",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/useDrawerData.ts",
+            "src/dashboard/frontend/src/components/drawer/IssueDrawer.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
+            "src/dashboard/frontend/src/components/drawer/__tests__/useDrawerData-closed-out.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/drawer/__tests__/useDrawerData-closed-out.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "frontend test passes: badge counts from tasks query, phase dates from payload phases, activity rail durable fallback",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-3",
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Three data-source fixes in the drawer. (1) Tasks badge: IssueDrawer.tsx:11-15 taskBadge currently derives 0/0 from the never-set issue.tasks via useDrawerData.ts:235-251,422 — add (or reuse the TasksPanel's) a React Query hook in queries.ts next to useReviewStatusQuery that fetches GET /api/issues/:id/tasks, and compute the badge as completed/total from that response (fall back to the current derivation only while loading). (2) Phase rail: useDrawerData.ts:307-333 phaseTimeline — when the review-status payload carries the additive phases array (api-review-status-durable), map plan→planned, work→implemented, review→reviewed, ship→shipping, done→merged through the existing formatWhen; live fields keep priority for non-closed-out payloads. (3) Activity rail: useDrawerData.ts:397-416 — when the store's recentActivity/detailedActivity are empty for a closed-out issue, fall back to the activity API's durable entries (kind + summary + timestamp). No visual changes. See PRD work item 6."
+        },
+        "items": [
+          {
+            "id": "fe-drawer-durable.ac1",
+            "title": "The drawer tasks badge renders counts from the /api/issues/:id/tasks query (e.g. tasks 17/17) instead of the never-set issue.tasks field",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-drawer-durable.ac2",
+            "title": "phaseTimeline renders the payload's phases so WORK/REVIEW/TEST/SHIP show real dates for a closed-out issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-drawer-durable.ac3",
+            "title": "The activity rail falls back to durable activity entries when the store's activity arrays are empty for a closed-out issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-specialists-durable",
+        "title": "Specialist chips render journaled verdicts for closed-out issues, never the convoy-slot copy",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/issue-detail/deriveSpecialists.ts",
+            "src/dashboard/frontend/src/components/issue-detail/deriveSpecialists.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/issue-detail/deriveSpecialists.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deriveSpecialists tests pass: closed-out chips show done/passed verdicts and never the queued copy",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Extend deriveSpecialistChips (src/dashboard/frontend/src/components/issue-detail/deriveSpecialists.ts:78-127) with closedOut + reviewerVerdicts inputs from the review-status payload (ReviewStatusData in queries.ts gains the additive fields). When no live session or reviewSubStatus exists for a role AND closedOut is true, emit {status: 'done', verdict, lastLine: verdict === 'blocked' ? 'blocked at close-out' : 'passed', hasConversation: whether a retained transcript exists}. The queued fallback with 'starts when the convoy slot frees' (lines 70/119) must never be emitted when closedOut. Tests cover: closed-out with verdicts → done chips; closed-out pre-fix record (verdicts derived from usage) → done chips; in-flight without sessions → existing queued copy unchanged. See PRD work item 7."
+        },
+        "items": [
+          {
+            "id": "fe-specialists-durable.ac1",
+            "title": "For a closed-out issue each specialist chip renders a done/passed (or blocked) verdict from reviewerVerdicts when no live session exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-specialists-durable.ac2",
+            "title": "The 'starts when the convoy slot frees' copy never renders for a closed-out issue but still renders for an in-flight queued convoy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fe-conversations-durable",
+        "title": "Conversations tab lists retained sessions with transcript access for closed-out issues",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/drawer/DrawerAgentSession.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/IssueDetail.tsx",
+            "src/dashboard/frontend/src/components/issue-detail/__tests__/conversations-closed-out.test.tsx"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/frontend/src/components/issue-detail/__tests__/conversations-closed-out.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "test passes: closed-out issue renders retained plan/work/review session rows with transcript links",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "The conversations tab (DrawerAgentSession.tsx, mounted via IssueDetail.tsx:304-316) synthesizes from store agentsById, which read-model prunes for closed issues — hence 'Nothing here yet'. When the store has no live agent for the issue, consume the activity API response (which after api-activity-durable includes retained sessions with transcriptPath) and render a read-only retained-session list: one row per session with role + agent id + a link/button that opens the retained transcript through the existing conversation/JSONL viewer path. Show 'Nothing here yet — no agent has started on this issue' only when the retained list is also empty. No layout redesign. See PRD work item 8."
+        },
+        "items": [
+          {
+            "id": "fe-conversations-durable.ac1",
+            "title": "The conversations tab renders the retained plan/work/review session list (role + agent id + transcript link) for a closed-out issue",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fe-conversations-durable.ac2",
+            "title": "The tab shows the 'Nothing here yet' copy only when no live agent AND no retained sessions exist",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-no-loss-regression",
+        "title": "No-loss regression: fixture close-out asserts every surface returns full lifecycle history",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "tests/unit/lib/issue-history/closed-out-regression.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/issue-history/closed-out-regression.test.ts",
+            "npm test"
+          ],
+          "expected_outputs": [
+            "regression suite passes end-to-end across resolver, status route, tasks overlay, and pan show fallback",
+            "full npm test run shows no new failures"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Issue acceptance #3. Build a fixture closed-out record shaped like pan-3406.json / min-929.json (pipeline verdicts passed/merged, closedOut + closedOutAt, sessionHistory with planning/start/end entries, tasks.claimHistory with completed claims, statusOverrides all completed, closeOut.usage.byStage with review.* keys, closeOut.merges, closeOut.dodGate.rows) plus a fixture spec with items, wired through the same test seams the earlier items' tests use (record-dir override / resolver mocks as established). Assert: (1) resolver returns non-empty phases for every phase that ran, ≥1 specialist, tasks.total ≥ 1 with completed ≥ 1, non-empty history when journaled, ≥1 session with a transcript path; (2) the status-route synthesis returns reviewStatus 'passed' for the fixture; (3) the tasks overlay yields completed counts; (4) pan show's fallback prints real history; (5) an in-flight fixture leaves every one of those paths untouched (fallback inert). See PRD work item 9 + acceptance criteria."
+        },
+        "items": [
+          {
+            "id": "test-no-loss-regression.ac1",
+            "title": "The resolver produces non-empty phases, specialists, tasks, history, and sessions from the fixture closed-out record",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-no-loss-regression.ac2",
+            "title": "The suite passes while asserting the status route returns reviewStatus 'passed' and pan show prints real history for the closed-out fixture",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-no-loss-regression.ac3",
+            "title": "An in-flight fixture preserves every read path byte-identical — the fallback stays inert",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-history-door",
+        "title": "Document the issue-history read door in AGENT-STATE-PLANES.md and ISSUE-VIEW.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:34:49.000Z",
+        "metadata": {
+          "difficulty": "trivial",
+          "kind": "docs",
+          "issueLabel": "pan-3420",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/AGENT-STATE-PLANES.md",
+            "docs/ISSUE-VIEW.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "lint passes with the updated docs"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Update docs/AGENT-STATE-PLANES.md with an 'Issue history read door' section: the resolver module (src/lib/issue-history/resolver.ts), the close-out snapshot fields on PanIssuePipelineRecord, and the rule that history surfaces fall back to the resolver only when the live read is empty AND record.pipeline.closedOut === true. Update docs/ISSUE-VIEW.md to name the durable source each issue-view section consumes for terminal issues (status payload phases/verdicts, tasks query, activity API durable entries, reviewerVerdicts chips). See PRD work item 10."
+        },
+        "items": [
+          {
+            "id": "docs-history-door.ac1",
+            "title": "docs/AGENT-STATE-PLANES.md contains an 'Issue history read door' section naming resolveIssueHistorySync, the close-out snapshot, and the closedOut-only fallback rule",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-history-door.ac2",
+            "title": "docs/ISSUE-VIEW.md shows the durable source each issue-view section consumes for terminal issues",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "be-history-snapshot",
+        "to": "be-issue-history-resolver",
+        "type": "blocks"
+      },
+      {
+        "from": "be-issue-history-resolver",
+        "to": "api-review-status-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "be-issue-history-resolver",
+        "to": "api-activity-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "be-issue-history-resolver",
+        "to": "cli-show-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "api-review-status-durable",
+        "to": "fe-drawer-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "api-review-status-durable",
+        "to": "fe-specialists-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "api-activity-durable",
+        "to": "fe-conversations-durable",
+        "type": "blocks"
+      },
+      {
+        "from": "api-activity-durable",
+        "to": "fe-drawer-durable",
+        "type": "informs"
+      },
+      {
+        "from": "cli-show-durable",
+        "to": "test-no-loss-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "api-review-status-durable",
+        "to": "test-no-loss-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-drawer-durable",
+        "to": "test-no-loss-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-specialists-durable",
+        "to": "test-no-loss-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "fe-conversations-durable",
+        "to": "test-no-loss-regression",
+        "type": "blocks"
+      },
+      {
+        "from": "test-no-loss-regression",
+        "to": "docs-history-door",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-01-PAN-3420-dashboard-pan-show-render-a-completed-closed-out-issue-as-never-started-post-close-out-history-wipe.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
