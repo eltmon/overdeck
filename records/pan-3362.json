@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T10:36:12.590Z",
+  "updated": "2026-08-01T10:53:42.569Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "seed-writer": {
-        "writerId": "agent-pan-3362",
-        "agentId": "agent-pan-3362",
-        "pid": 1256362,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T10:36:12.590Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3362",
@@ -91,12 +83,27 @@
         "outcome": "completed",
         "reason": "Added pure fixture builders in src/lib/uat-fixtures/fixture-data.ts (project config, normalized issue, agent rows, review status, activity entries, xBRIEF doc, continue.json) plus unit tests in tests/unit/lib/uat-fixtures/fixture-data.test.ts covering the item's 4 ACs",
         "releasedAt": "2026-08-01T10:34:26.672Z"
+      },
+      {
+        "writerId": "agent-pan-3362",
+        "agentId": "agent-pan-3362",
+        "pid": 1256362,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T10:36:12.590Z",
+        "itemId": "seed-writer",
+        "outcome": "completed",
+        "reason": "Implemented seedUatFixturesLocal in src/lib/uat-fixtures/seed.ts writing through canonical doors; deviated from PRD by using src/lib/overdeck/review-status-sync.ts instead of the legacy src/lib/database/review-status-db.ts (blocked by the overdeck-boundary lint gate). requiresInspection=false for this item, so proceeding to next.",
+        "releasedAt": "2026-08-01T10:53:42.569Z"
       }
     ],
     "statusReasons": {
       "fixture-data": {
         "reason": "Added pure fixture builders in src/lib/uat-fixtures/fixture-data.ts (project config, normalized issue, agent rows, review status, activity entries, xBRIEF doc, continue.json) plus unit tests in tests/unit/lib/uat-fixtures/fixture-data.test.ts covering the item's 4 ACs",
         "updatedAt": "2026-08-01T10:34:26.672Z"
+      },
+      "seed-writer": {
+        "reason": "Implemented seedUatFixturesLocal in src/lib/uat-fixtures/seed.ts writing through canonical doors; deviated from PRD by using src/lib/overdeck/review-status-sync.ts instead of the legacy src/lib/database/review-status-db.ts (blocked by the overdeck-boundary lint gate). requiresInspection=false for this item, so proceeding to next.",
+        "updatedAt": "2026-08-01T10:53:42.569Z"
       }
     }
   },
@@ -106,6 +113,10 @@
     "fixture-data.fixture-data.ac2": "completed",
     "fixture-data.fixture-data.ac3": "completed",
     "fixture-data.fixture-data.ac4": "completed",
-    "seed-writer": "running"
+    "seed-writer": "completed",
+    "seed-writer.seed-writer.ac1": "completed",
+    "seed-writer.seed-writer.ac2": "completed",
+    "seed-writer.seed-writer.ac3": "completed",
+    "seed-writer.seed-writer.ac4": "completed"
   }
 }
