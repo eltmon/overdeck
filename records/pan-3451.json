@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T22:32:54.035Z",
+  "updated": "2026-08-01T22:33:15.141Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "hooks-doc-checklist-door": {
+        "writerId": "agent-pan-3451",
+        "agentId": "agent-pan-3451",
+        "pid": 3756629,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:33:15.140Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3451",
@@ -119,6 +127,7 @@
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac1": "completed",
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac2": "completed",
     "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac3": "completed",
-    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac4": "completed"
+    "ohmypi-extension-checklist-door.ohmypi-extension-checklist-door.ac4": "completed",
+    "hooks-doc-checklist-door": "running"
   }
 }
