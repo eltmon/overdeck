@@ -237,7 +237,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T12:34:25.021Z",
+  "updated": "2026-08-01T12:40:44.430Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -486,7 +486,7 @@
     }
   ],
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "tasks": {
     "sequence": 16,
     "claims": {},
