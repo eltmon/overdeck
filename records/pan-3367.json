@@ -321,7 +321,7 @@
     "recordedAt": "2026-08-01T11:11:24.220Z"
   },
   "created": "2026-08-01T02:43:33.946Z",
-  "updated": "2026-08-01T14:45:56.288Z",
+  "updated": "2026-08-01T14:45:59.365Z",
   "pipeline": {
     "issueId": "PAN-3367",
     "reviewStatus": "pending",
@@ -568,6 +568,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-01T03:13:07.572Z"
+    },
+    {
+      "issue": "PAN-3367",
+      "recoveryPath": "verdict-fallback-contention",
+      "obligationGeneration": "2026-08-01T14:27:40.123Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-01T14:45:59.363Z"
     }
   ],
   "harness": "claude-code",
