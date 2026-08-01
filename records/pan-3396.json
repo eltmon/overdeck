@@ -296,16 +296,16 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:25:32.574Z",
+  "updated": "2026-08-01T22:25:36.633Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T22:25:32.152Z",
+    "updatedAt": "2026-08-01T22:25:33.489Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed cycle-7 blocking findings - test mock callback invocation and batch-reader state-home resolution",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -446,7 +446,7 @@
       },
       "costAtCloseOut": {
         "usd": 251.4913963,
-        "pricingAsOf": "2026-08-01T22:25:32.253Z"
+        "pricingAsOf": "2026-08-01T22:25:36.414Z"
       }
     },
     "merges": [
