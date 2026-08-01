@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:44:02.331Z",
+  "updated": "2026-08-01T20:44:15.445Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -133,5 +133,36 @@
     "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac1": "completed",
     "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac2": "completed",
     "simple-mode-finished-plan-regressions.simple-mode-finished-plan-regressions.ac3": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts"
+    ],
+    "declaredScope": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+      "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+      "src/dashboard/server/routes/__tests__/complete-planning.test.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts",
+      "src/lib/agent-enrichment.ts",
+      "src/lib/overdeck/planning-promotion.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/AGENT-STATE-PLANES.md",
+      "src/dashboard/frontend/src/lib/__tests__/issue-pipeline-state.test.ts",
+      "src/dashboard/frontend/src/lib/__tests__/simple-derive.test.ts",
+      "src/dashboard/frontend/src/lib/issuePipelineState.ts",
+      "src/dashboard/server/services/__tests__/agent-enrichment-service.test.ts",
+      "src/dashboard/server/services/agent-enrichment-service.ts",
+      "src/lib/agent-enrichment.ts",
+      "src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts",
+      "src/lib/overdeck/planning-promotion.ts"
+    ],
+    "recordedAt": "2026-08-01T20:44:15.443Z"
   }
 }
