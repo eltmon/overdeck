@@ -88,18 +88,18 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:58:42.622Z",
+  "updated": "2026-08-01T23:58:44.783Z",
   "pipeline": {
     "issueId": "PAN-3451",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-01T23:58:42.541Z",
-    "reviewNotes": "All four reviewers passed; asynchronous checklist path fixes the prior event-loop blocker",
+    "updatedAt": "2026-08-01T23:58:43.964Z",
+    "reviewNotes": "Review dispatch skipped — already running: agent-pan-3451-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "f0e238ac045590f2454520637aa79daed3d47791",
     "lastVerifiedCommit": "f0e238ac045590f2454520637aa79daed3d47791",
@@ -213,7 +213,7 @@
       },
       "costAtCloseOut": {
         "usd": 85.429156,
-        "pricingAsOf": "2026-08-01T23:58:42.594Z"
+        "pricingAsOf": "2026-08-01T23:58:44.048Z"
       }
     },
     "merges": [
