@@ -53,19 +53,19 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:45:58.851Z",
+  "updated": "2026-08-01T16:52:22.479Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z",
-    "updatedAt": "2026-08-01T16:45:58.720Z",
+    "updatedAt": "2026-08-01T16:52:22.428Z",
+    "reviewNotes": "Active conversation composers are re-seeded to the global model because the production caller does not pass liveConversation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewRequestedAt": "2026-08-01T16:35:49.792Z",
     "reviewSpawnedAt": "2026-08-01T16:45:58.719Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -93,11 +93,69 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-01T16:33:34.861Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 280138,
+            "output": 10457,
+            "cacheRead": 2928640,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 657877,
+            "output": 24110,
+            "cacheRead": 3881984,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 603860,
+            "output": 10337,
+            "cacheRead": 1806848,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 621021,
+            "output": 18146,
+            "cacheRead": 801792,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 572691,
+            "output": 5442,
+            "cacheRead": 892928,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 1298049,
@@ -109,15 +167,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1298049,
-          "output": 82961,
-          "cacheRead": 46471168,
+          "input": 4033636,
+          "output": 151453,
+          "cacheRead": 56783360,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 32.214659,
-        "pricingAsOf": "2026-08-01T16:45:58.772Z"
+        "usd": 53.10345,
+        "pricingAsOf": "2026-08-01T16:52:22.458Z"
       }
     },
     "merges": [
