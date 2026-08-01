@@ -13,6 +13,9 @@
  * emitActivityEntryDurable) plus a direct file write for the xBRIEF plan.
  */
 
+import { join } from 'node:path';
+
+import { getOverdeckHome } from '../paths.js';
 import type { ProjectConfig } from '../projects.js';
 import type { AgentState, Role } from '../agents/agent-state.js';
 import type { ReviewStatus } from '../review-status.js';
@@ -30,8 +33,15 @@ export const FIXTURE_ISSUE_ID = 'FIX-1';
 export const FIXTURE_ISSUE_NUMBER = 1;
 /** Fake "owner/repo" the fixture issue claims to live in — does not exist. */
 export const FIXTURE_SOURCE_REPO = 'uat-fixtures/repo';
-/** Container-local, container-writable path for the fixture project. */
-export const FIXTURE_PROJECT_PATH = '/home/node/.overdeck/uat-fixtures/repo';
+/**
+ * Container-local, container-writable path for the fixture project — derived
+ * from the current OVERDECK_HOME (not hardcoded) so it always matches where
+ * seed.ts actually writes the plan/continue files, even under an overridden
+ * container-local home (review finding, PAN-3362 cycle 3).
+ */
+export function fixtureProjectPath(): string {
+  return join(getOverdeckHome(), FIXTURE_PROJECT_KEY, 'repo');
+}
 /** Cached-issue id, matching the `github-${owner}-${repo}-${number}` shape. */
 export const FIXTURE_ISSUE_CACHE_ID = 'github-uat-fixtures-repo-1';
 /** Cached-project id, matching the `github-${owner}-${repo}` shape. */
@@ -118,14 +128,14 @@ export function fixtureNormalizedIssue(now: string = new Date().toISOString()): 
 export function fixtureProjectConfig(): ProjectConfig {
   return {
     name: FIXTURE_PROJECT_KEY,
-    path: FIXTURE_PROJECT_PATH,
+    path: fixtureProjectPath(),
     issue_prefix: FIXTURE_ISSUE_PREFIX,
   };
 }
 
 /** Builds the work agent row plus the four review-convoy sub-role rows. */
 export function fixtureAgentStates(now: string = new Date().toISOString()): AgentState[] {
-  const workspace = `${FIXTURE_PROJECT_PATH}/workspaces/feature-fix-1`;
+  const workspace = join(fixtureProjectPath(), 'workspaces', 'feature-fix-1');
   const workRole: Role = 'work';
   const reviewRole: Role = 'review';
 

@@ -25,6 +25,7 @@ import {
   fixtureContinueJson,
   fixtureNormalizedIssue,
   fixtureProjectConfig,
+  fixtureProjectPath,
   fixtureReviewStatus,
   fixtureXBriefDoc,
 } from './fixture-data.js';
@@ -95,21 +96,22 @@ export async function seedUatFixturesLocal(): Promise<SeedReport> {
     }
   }
 
-  const workspaceOverdeckDir = join(
-    home, FIXTURE_PROJECT_KEY, 'repo', 'workspaces', 'feature-fix-1', '.overdeck',
-  );
+  // fixtureProjectPath() re-derives from the current OVERDECK_HOME rather
+  // than reusing the `home` local, so this always agrees with the path
+  // registerProjectSync() just wrote via fixtureProjectConfig() (review
+  // finding, PAN-3362 cycle 3).
+  const workspaceOverdeckDir = join(fixtureProjectPath(), 'workspaces', 'feature-fix-1', '.overdeck');
   await mkdir(workspaceOverdeckDir, { recursive: true });
   const planPath = join(workspaceOverdeckDir, 'spec.vbrief.json');
   await writeFile(planPath, serializeXBriefDocument(fixtureXBriefDoc()));
 
   // Fixture-only file, not real Overdeck-managed continue state — the FIX-1
   // fixture workspace deliberately mimics a real workspace's .overdeck/ shape
-  // so findPlan()'s workspace-continue fallback can read it (WI-2). Built
-  // without the literal filename token on this line so scripts/lint-state-writes.sh's
-  // repo-wide ad-hoc-continue-write guard (PAN-1919) doesn't mistake a synthetic
-  // fixture for a real, ungated write to .overdeck/continue.json.
-  const fixtureContinueFileName = ['continue', 'json'].join('.');
-  const fixtureContinueFilePath = join(workspaceOverdeckDir, fixtureContinueFileName);
+  // so findPlan()'s workspace-continue fallback can read it (WI-2). This
+  // exact write is a declared, narrow exception in scripts/lint-state-writes.sh's
+  // CONTINUE_FIXTURE_EXCEPTIONS (PAN-1919 ad-hoc-continue-write guard), not an
+  // evasion of it — the guard still fails any other new continue.json write.
+  const fixtureContinueFilePath = join(workspaceOverdeckDir, 'continue.json');
   const fixtureContinueBody = JSON.stringify(fixtureContinueJson(), null, 2);
   await writeFile(fixtureContinueFilePath, fixtureContinueBody);
 
