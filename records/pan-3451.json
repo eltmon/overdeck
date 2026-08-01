@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T22:25:41.062Z",
+  "updated": "2026-08-01T22:29:52.349Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "pi-extension-checklist-door": {
-        "writerId": "agent-pan-3451",
-        "agentId": "agent-pan-3451",
-        "pid": 3268600,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-01T22:25:41.062Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3451",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Added authenticated agent plan-checklist endpoint, route registration, and complete/incomplete/auth/422 regression coverage",
         "releasedAt": "2026-08-01T22:25:20.268Z"
+      },
+      {
+        "writerId": "agent-pan-3451",
+        "agentId": "agent-pan-3451",
+        "pid": 3268600,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T22:25:41.062Z",
+        "itemId": "pi-extension-checklist-door",
+        "outcome": "completed",
+        "reason": "Pi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
+        "releasedAt": "2026-08-01T22:29:52.349Z"
       }
     ],
     "statusReasons": {
       "add-plan-checklist-endpoint": {
         "reason": "Added authenticated agent plan-checklist endpoint, route registration, and complete/incomplete/auth/422 regression coverage",
         "updatedAt": "2026-08-01T22:25:20.268Z"
+      },
+      "pi-extension-checklist-door": {
+        "reason": "Pi completion evidence now queries the authenticated plan-checklist endpoint and no longer reads beads or legacy workspace plans",
+        "updatedAt": "2026-08-01T22:29:52.349Z"
       }
     }
   },
@@ -89,6 +96,9 @@
     "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac2": "completed",
     "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac3": "completed",
     "add-plan-checklist-endpoint.add-plan-checklist-endpoint.ac4": "completed",
-    "pi-extension-checklist-door": "running"
+    "pi-extension-checklist-door": "completed",
+    "pi-extension-checklist-door.pi-extension-checklist-door.ac1": "completed",
+    "pi-extension-checklist-door.pi-extension-checklist-door.ac2": "completed",
+    "pi-extension-checklist-door.pi-extension-checklist-door.ac3": "completed"
   }
 }
