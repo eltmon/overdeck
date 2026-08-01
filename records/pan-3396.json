@@ -261,16 +261,16 @@
     "recordedAt": "2026-08-01T21:59:25.816Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:59:55.492Z",
+  "updated": "2026-08-01T21:59:58.358Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T21:59:35.744Z",
+    "updatedAt": "2026-08-01T21:59:36.791Z",
     "reviewNotes": "Residue tests fail during module collection and the membership batch repeats synchronous state-home resolution per issue",
     "verificationNotes": "Verification FAILED at lint (444780ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(1768 chars elided)…\n34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m27.10 kB\u001b[22m \u001b[2m│ gzip: 7.19 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 33.16 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m780ms\u001b[39m\n\n> @overdeck/core@0.48.0 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34m\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -413,7 +413,7 @@
       },
       "costAtCloseOut": {
         "usd": 203.3217613,
-        "pricingAsOf": "2026-08-01T21:59:55.103Z"
+        "pricingAsOf": "2026-08-01T21:59:58.348Z"
       }
     },
     "merges": [
