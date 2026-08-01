@@ -668,3 +668,11 @@ strike-3408 reported the load-flake pattern (34 unrelated setup timeouts, load ~
 ## RUN-79 interstitial (~14:35Z) — strike-3407 landed via CI path (#3415); 5th load-flake casualty
 
 strike-3407 (cockpit terminal reveal + size-ratchet compliance) committed, gates green except the load-flaked full suite (9 failures default / 4 with CI workers, all pass in isolation) — pushed + PR #3415 per standing decision. #3414 test lane still running. PAN-3344 tax count today: 5 strikes.
+
+## RUN-79 tick 20 (2026-08-01 ~14:40Z) — PAN-3408 landed; PAN-3401 closed out; MIN-864 organic APPROVED (limbo exit)
+
+- **PAN-3408 landed** (#3414 squash `b384f431ea`, handed off) — phantom waiting-banner retires on demonstrated activity. **PAN-3401 closed out** (14th landed+closed this run).
+- **MIN-864: organic APPROVED** on the first cycle under the PAN-3401 guard (verdict commit-anchored fe@e1669c15 api@b6455904) — 8-day limbo exit; test phase next, merge operator-gated (MYN hold; check CURRENT UAT policy at merge time). Operator confirmed the yield display confusion was just after-state (reviewers finished in ~10 min and exited).
+- Operator flagged a possible real-subscription UAT attempt: verified FALSE — agent-min-874 is testing the BYO-AI card's "connect not available yet" unavailable-state with a test token, not a live OAuth. Nothing to stop.
+- **Watch item fired**: PAN-2583 fallback line reappeared on PAN-3408's pan done (journal write lock contention CLI-vs-server). Cross-process fallback is the designed rescue (PAN-2952 covered same-process); operations completed on retry. Recording occurrences — file only if it becomes chronic or the sweep misses a verdict.
+- #3415 (terminal fix) mid-CI. PAN-3362 in test phase (agent-pan-3362-test spawned 10:31). PAN-3367 test session spawned 10:15.
