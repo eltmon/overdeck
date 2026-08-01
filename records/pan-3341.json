@@ -59,7 +59,7 @@
     "recordedAt": "2026-07-30T23:08:52.027Z"
   },
   "created": "2026-07-30T21:02:51.612Z",
-  "updated": "2026-07-31T23:36:28.247Z",
+  "updated": "2026-08-01T00:37:16.686Z",
   "pipeline": {
     "issueId": "PAN-3341",
     "reviewStatus": "passed",
@@ -71,7 +71,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-30T23:31:39.966Z",
-    "updatedAt": "2026-07-31T23:36:28.229Z",
+    "updatedAt": "2026-08-01T00:37:16.668Z",
     "reviewNotes": "All four reviewers passed with no blocking or advisory findings.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: membership bucket checks precede readyForMerge/trackerState in deriveStateLabel (resource-discovery.ts:212-215), post_merge_limbo returns 'Merged — Needs Close-Out', clean_terminal+L3_issueOpen===false returns Closed/Done by tmux, undefined membership falls through to artifact heuristics. Membership comes from the existing readPipelineMembershipSnapshotsForProjects snapshot — no new gather work (NFR-1). Verified locally: vitest resource-discovery.test.ts 33/33 pass incl. 6 new cases; npm run typecheck clean (dashboard/frontend ratchets: none new).",
@@ -190,7 +190,7 @@
       },
       "costAtCloseOut": {
         "usd": 44.736689,
-        "pricingAsOf": "2026-07-31T23:36:28.242Z"
+        "pricingAsOf": "2026-08-01T00:37:16.675Z"
       }
     },
     "merges": [
