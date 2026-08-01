@@ -1,0 +1,662 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-01T15:25:39Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3419: pan handoff has no --project: an isolated --cwd lands every successor outside all registered projects (conv 1827)",
+    "updated": "2026-08-01T15:34:07.447Z"
+  },
+  "plan": {
+    "id": "pan-3419",
+    "title": "pan handoff has no --project: an isolated --cwd lands every successor outside all registered projects (conv 1827)",
+    "status": "proposed",
+    "uid": "930fc3f3-0cfa-4149-ae0f-548adfddface",
+    "author": "agent:k3[1m]",
+    "sequence": 2,
+    "created": "2026-08-01T15:25:39Z",
+    "updated": "2026-08-01T15:34:07.447Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3419",
+        "label": "PAN-3419",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/1577",
+        "label": "PAN-1577 (shares the project_key column this plan creates)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "conversations",
+      "handoff",
+      "projects",
+      "cli",
+      "dashboard"
+    ],
+    "metadata": {
+      "sizeJustification": "One mechanism (the project_key column) threaded through exactly the surfaces the issue's acceptance criteria name: the conversations door, the shared fork route, both CLI verbs that reach it, the three grouping surfaces the ACs require (deck, sidebar, palette), the modal the ACs require, the mandated data cleanup, and the mandated docs. The file count is driven by the repo's own door separation (one-to-five-line edits per file), not by scope creep; the items are vertically interlocked (WI-2..8 are meaningless without WI-1's column) and cannot ship independently as sibling issues without each being unreviewable alone. No item can be dropped without leaving a named AC unmet (palette routing is a grouping surface under the 'grouping honours the explicit association first' AC).",
+      "canonicalFilename": "2026-08-01-PAN-3419-pan-handoff-has-no-project-an-isolated-cwd-lands-every-successor-outside-all-registered-projects-conv-1827.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "pan handoff has no way to declare the successor conversation's project. Grouping is pure cwd containment, and the universal isolated---cwd rule guarantees an isolated handoff cwd is outside every registered project path, so every correctly-isolated handoff lands in the No-project bucket by construction (live repro: conv 1827 doing MYN work from /home/eltmon/Projects/hoff-agent-surface).",
+      "Proposal": "Add one explicit association primitive — a nullable project_key column (projects.yaml key) on the conversations row, written only through the conversations door — and thread it through: (1) schema top-up + door support + setConversationProjectKey writer (the same primitive PAN-1577's move UX will reuse); (2) the summary-fork route accepts an optional projectKey (yaml key or display name, 400 on unknown) and otherwise stores the SOURCE conversation's effective project on the successor, never re-deriving from the successor's cwd; (3) pan handoff and pan fork gain --project; (4) all grouping surfaces (projectsData helper, CommandDeck partition + resolveConversationProjectName, palette routing) resolve explicit-first and fall back to cwd containment; (5) the Fork/Handoff modal gains a Project select defaulted to 'Same as source'; (6) POST /api/conversations stores the key it already validates; (7) conv 1827 is reassigned to mind-your-now through the write door. Full detail in the PRD draft (.pan/drafts/PAN-3419.md).",
+      "NonGoals": "- No move-conversation UX (endpoint, pan conv move, drag-and-drop, menu action, UI clearing) — PAN-1577, which reuses this column and writer.\n- No 'No project' option in the modal select (deliberate un-scoping is a move/clear operation).\n- No fork-blob (ForkRequest) project field — the row carries the association; recovery re-runs against the existing row.\n- No backfill beyond conv 1827 — existing rows keep NULL and cwd-derived grouping.\n- No change to workspace_id or workspace-keyed memory attribution.\n- No change to frontend cwd-containment match order (no longest-prefix rework); only the explicit-first step is added."
+    },
+    "autoDecisions": [
+      {
+        "summary": "One mechanism shared with PAN-1577: nullable project_key TEXT column on conversations (yaml key) + setConversationProjectKey writer in the door.",
+        "rationale": "PAN-1577 (open) already leans toward an explicit projectKey override column so JSONL is never relocated; the issue demands one mechanism, and a plain nullable column is the smallest primitive satisfying both. Reusing workspace_id was rejected: it is cwd-derived state, changing it would silently reroute workspace-keyed memory, and grouping would need a workspace→project join the frontend cannot do."
+      },
+      {
+        "summary": "Store the yaml key; accept key-or-name on input via new resolveRegisteredProjectKey, which does NOT require the project path to exist.",
+        "rationale": "The issue asks to match POST /api/conversations' acceptance rule (resolveProjectCwd accepts key or display name). Path existence is a cwd-usability requirement, not an association requirement — the successor's cwd is independent of the project path. Unknown input still fails loudly."
+      },
+      {
+        "summary": "No fork-blob (ForkRequest) project field.",
+        "rationale": "The blob exists so recoverStuckForks can re-run the pipeline for an already-created row; the association is persisted on the row at createConversation time, before the pipeline starts, so recovery never consults the blob for it. Adding it would be dead weight (simplicity-first)."
+      },
+      {
+        "summary": "pan fork gains --project too, and inheritance applies to all fork modes server-side.",
+        "rationale": "Same route, same defect class: an isolated-cwd pan fork misfiles identically. The CLI delta is one .option line plus pass-through; the server inheritance lives in the shared handler."
+      },
+      {
+        "summary": "POST /api/conversations stores project_key when projectKey is given.",
+        "rationale": "It already validates and cwd-resolves the value; storing it makes the association explicit from birth instead of relying on containment forever. Same mechanism, one extra argument."
+      },
+      {
+        "summary": "Modal default 'Same as source' sends no projectKey; no explicit 'No project' option.",
+        "rationale": "Omission already means inherit server-side, so the default needs no wire value. Deliberate un-scoping is a clear/move operation that belongs to PAN-1577's UX, not this issue."
+      },
+      {
+        "summary": "Stale/unknown stored project_key values fall back to cwd containment at grouping time.",
+        "rationale": "A stored key whose project was later unregistered must not strand the conversation in a phantom group; cwd containment is the existing, understood fallback (NFR-1 preserved)."
+      },
+      {
+        "summary": "Conv 1827 cleanup runs pre-merge through a bun -e door invocation from the workspace.",
+        "rationale": "Opening overdeck.db via getOverdeckDatabaseSync applies the WI-1 top-up idempotently, and the old server's explicit-column INSERTs ignore the extra nullable column, so the write is safe against the live DB. It satisfies 'through the write door' without building PAN-1577's move endpoint early."
+      }
+    ],
+    "items": [
+      {
+        "id": "store-project-key",
+        "title": "Add project_key column, door support, and project resolver helpers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3419",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "fork-route-project",
+            "cli-project-flag",
+            "grouping-explicit-first",
+            "fork-modal-project",
+            "palette-explicit",
+            "cleanup-conv-1827"
+          ],
+          "files_scope": [
+            "src/lib/overdeck/infra.ts",
+            "src/lib/overdeck/conversations.ts",
+            "src/lib/projects.ts",
+            "src/lib/overdeck/conversation-runtime.ts",
+            "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-project-key.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-project-key.test.ts passes (column top-up, create/read round-trip, writer set/clear, both resolvers)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-5",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Foundation for the whole issue — exact edits are specified in PRD WI-1 (.pan/drafts/PAN-3419.md). (a) infra.ts: add runSchemaTopUp(db, 'ALTER TABLE `conversations` ADD COLUMN `project_key` text') after the workspace_id top-up (line 277). (b) conversations.ts: add project_key to LegacyConversationRow, LEGACY_CONVERSATION_SELECT, LegacyConversation (projectKey), rowToLegacyConversation; createConversation accepts projectKey?: string | null and inserts it (never derived at write time); add exported setConversationProjectKey(name, projectKey | null) writer. This file is over the 1000-line ratchet — add a scripts/file-size-allowlist.txt row '<new-count> src/lib/overdeck/conversations.ts # PAN-3419'. (c) projects.ts: add resolveProjectKeyForCwd(cwd) — longest-prefix containment over listProjectsSync paths, returns yaml key or null (exact snippet in PRD). (d) conversation-runtime.ts: add resolveRegisteredProjectKey(input) — key-or-display-name match returning the canonical yaml key, 'Unknown project: <input>' error otherwise, NO path-existence requirement (exact snippet in PRD); in handleConversationCreate, when projectKey is present, validate via resolveRegisteredProjectKey (400 on error) before the existing resolveProjectCwd check, and pass projectKey: keyResult.key into createConversation. (e) New test file src/lib/overdeck/__tests__/conversation-project-key.test.ts following the OVERDECK_HOME-fixture pattern of conversation-project-cwd.test.ts (set process.env.OVERDECK_HOME to a tmp dir before the first dynamic import; projects.yaml fixture with a key≠name project and nested paths)."
+        },
+        "items": [
+          {
+            "id": "store-project-key.ac1",
+            "title": "Given any existing overdeck.db, when getOverdeckDatabaseSync opens it, then PRAGMA table_info(conversations) contains a nullable project_key column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-project-key.ac2",
+            "title": "Given a POST /api/conversations with projectKey, createConversation persists the canonical yaml key into project_key and conversation reads return it as projectKey",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-project-key.ac3",
+            "title": "setConversationProjectKey updates the row's project_key through the write door and accepts null to clear it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-project-key.ac4",
+            "title": "resolveRegisteredProjectKey resolves a projects.yaml key or display name to the canonical yaml key and returns an 'Unknown project' error for unknown input",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "store-project-key.ac5",
+            "title": "Given nested registered project paths, resolveProjectKeyForCwd returns the longest-prefix matching project's yaml key, or null when the cwd is under no registered project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-route-project",
+        "title": "Summary-fork route accepts projectKey and inherits the source conversation's project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversation-forks.ts",
+            "src/lib/overdeck/__tests__/conversation-fork-project.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "conversation-fork-project.test.ts passes (inherit, explicit-wins, name-resolves, unknown-errors, none-when-source-unscoped)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "In handleConversationSummaryFork (src/lib/overdeck/conversation-forks.ts:652): parse body['projectKey'] as a trimmed string beside the issueId parsing (lines 691-698); compute the association via a new exported pure function resolveForkProjectKey(requested, source) (exact snippet in PRD WI-2) — explicit request validated to canonical key wins, else inherit source.projectKey ?? resolveProjectKeyForCwd(source.cwd), else no association; return 400 with the error when validation fails; pass projectKey into createConversation (line 770). The successor's own cwd is never consulted. New test file conversation-fork-project.test.ts (same OVERDECK_HOME fixture pattern) covering the six cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "fork-route-project.ac1",
+            "title": "Given a source conversation with an effective project and a successor cwd outside every registered project, when the fork body omits projectKey, then the successor row stores the source's project key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-project.ac2",
+            "title": "Given a valid explicit projectKey (yaml key or display name), it wins over source inheritance and the successor stores the canonical yaml key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-project.ac3",
+            "title": "Given an unknown projectKey, the route rejects with HTTP 400 naming the unknown project and creates no conversation row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-route-project.ac4",
+            "title": "Given a source with no explicit key and a cwd under no registered project, resolveForkProjectKey returns no projectKey so grouping falls back to cwd containment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cli-project-flag",
+        "title": "Add --project to pan handoff and pan fork, forwarded through fork-client",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/index.ts",
+            "src/cli/commands/handoff.ts",
+            "src/cli/commands/fork.ts",
+            "src/cli/commands/fork-client.ts",
+            "src/cli/commands/__tests__/handoff.test.ts",
+            "tests/unit/cli/fork-client.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts",
+            "pan handoff --help",
+            "pan fork --help"
+          ],
+          "expected_outputs": [
+            "handoff.test.ts and fork-client.test.ts pass (projectKey forwarded in body)",
+            "both --help outputs contain --project"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "src/cli/index.ts: add .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\\'s project') to both the handoff command (after --cwd, line 434) and the fork command (after --cwd). handoff.ts: HandoffOptions gains project?: string; pass projectKey: options.project into forkConversationViaServer; on success print '  Project: <key>' (gray) when newConv.projectKey is set. fork.ts: ForkOptions gains project?: string; pass projectKey: options.project. fork-client.ts: ForkViaServerOptions gains projectKey?: string; forward it into the POST body beside the issueId line; ForkResultConv gains projectKey?: string | null. Tests: extend src/cli/commands/__tests__/handoff.test.ts (assert forkConversationViaServer receives projectKey) and tests/unit/cli/fork-client.test.ts (mirror the existing forwards-issueId body test)."
+        },
+        "items": [
+          {
+            "id": "cli-project-flag.ac1",
+            "title": "pan handoff --project <key> sends projectKey in the summary-fork POST body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-flag.ac2",
+            "title": "pan fork --project <key> sends projectKey in the summary-fork POST body identically",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-flag.ac3",
+            "title": "Given the server rejects an unknown project, the CLI prints the server's 'Unknown project' message and exits non-zero without creating a conversation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cli-project-flag.ac4",
+            "title": "pan handoff --help and pan fork --help output contains --project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "grouping-explicit-first",
+        "title": "Frontend grouping resolves the explicit project association before cwd containment",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/projectsData.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "projectsData.test.ts passes (explicit-wins, name-match, cwd-fallback, unknown-explicit-fallback, unscoped)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "projectsData.ts: add exported resolveConversationProject(conv, registeredProjects) (exact snippet in PRD WI-4) — explicit projectKey match on rp.key then rp.name first, then cwd containment — and reimplement isUnscopedConversation as its null check. ConversationList.tsx: Conversation interface gains projectKey?: string | null beside workspaceId. CommandDeck/index.tsx: rework the projectConversations partition (lines 463-491) to resolve each conversation through resolveConversationProject (preserving the dual key+name map entries) and make resolveConversationProjectName (lines 502-512) delegate to it. index.tsx is over the file-size ratchet; the rework should net-remove lines — add a file-size-allowlist row '# PAN-3419' only if it grows. Tests: extend projectsData.test.ts with the five cases in the PRD."
+        },
+        "items": [
+          {
+            "id": "grouping-explicit-first.ac1",
+            "title": "Given a conversation with projectKey set to a registered project's yaml key and a cwd outside every registered project, resolveConversationProject returns that project and isUnscopedConversation returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouping-explicit-first.ac2",
+            "title": "Given projectKey is absent, grouping falls back to cwd containment so existing rows keep their current bucket",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouping-explicit-first.ac3",
+            "title": "Given projectKey matches no registered project key or name, grouping falls back to cwd containment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "grouping-explicit-first.ac4",
+            "title": "The CommandDeck projectConversations partition and resolveConversationProjectName both resolve through resolveConversationProject, so an explicitly-associated conversation renders under its project and selecting it routes to that project's deck",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "fork-modal-project",
+        "title": "Fork/Handoff modal offers a Project select defaulted to the source conversation's project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/CommandDeck/__tests__/ForkModal.test.tsx",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "ForkModal.test.tsx passes (select renders with source default, choice sends projectKey, default omits it)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "ForkModal.tsx: add a Project <select> (markup pattern from NewWorkspaceModal.tsx:362-391) listing registered projects fetched with the same react-query key/fetcher Sidebar.tsx:236-245 uses for /api/registered-projects (deduped). Options: default '' labeled 'Same as source (<name from resolveConversationProject(conversation, projects)>, or No project)', then one option per project (value=yaml key). Visible for all three fork intents. Pass the selection as a new trailing projectKey?: string argument to onConfirm (positional style matches the existing signature). useConversationMutations.ts summaryForkConversation: opts gain projectKey?: string; add projectKey: opts.projectKey to the POST body (undefined is dropped by JSON.stringify, so the default path sends nothing and the server inherits). Thread the new argument through the onConfirm lambdas in ConversationList.tsx:333-344 and ConversationPanel.tsx:1075-1085. Tests: extend ForkModal.test.tsx per the PRD."
+        },
+        "items": [
+          {
+            "id": "fork-modal-project.ac1",
+            "title": "The Fork/Handoff modal renders a Project select listing every registered project for all three fork intents",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-modal-project.ac2",
+            "title": "The Project select defaults to 'Same as source (<source project name>)' and confirming with the default sends no projectKey in the summary-fork body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "fork-modal-project.ac3",
+            "title": "Choosing a project sends that project's yaml key as projectKey in the POST /api/conversations/:name/summary-fork body",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "palette-explicit",
+        "title": "Command-palette conversation routing honors the explicit project association",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/palette.ts",
+            "src/dashboard/server/routes/__tests__/palette.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/dashboard/server/routes/__tests__/palette.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "palette.test.ts passes (explicit-key routing, cwd-enc fallback)",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "palette.ts: registeredProjectDirs entries gain yamlKey: p.key alongside the existing key: p.config.name ?? p.key (deck identifier). Extend the routeableConversationName cache into a conversation-row cache (it already calls getConversationByClaudeSessionId at lines 210-221). In toPaletteConversationHit, when the row's projectKey matches a dir's yamlKey (or key), emit that dir's deck identifier as projectKey; otherwise keep the cwd-encoded resolveConversationProjectKey result. Tests: extend palette.test.ts — row with project_key routes to that project's deck identifier despite a foreign projectId; NULL project_key keeps the cwd-enc derivation."
+        },
+        "items": [
+          {
+            "id": "palette-explicit.ac1",
+            "title": "Given a conversation row with project_key set, palette conversation hits route to that project's deck identifier (name ?? key) even when the session's JSONL dir is outside every registered project",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "palette-explicit.ac2",
+            "title": "Given project_key is null, palette routing falls back to the cwd-encoded projectId derivation",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "cleanup-conv-1827",
+        "title": "Reassign conv 1827 (20260801-2fc7) to the mind-your-now project through the write door",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "infra",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/conversations.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "OVERDECK_HOME=\"$HOME/.overdeck\" bun -e \"import { getConversationByName } from './src/lib/overdeck/conversations.js'; console.log(getConversationByName('20260801-2fc7')?.projectKey);\""
+          ],
+          "expected_outputs": [
+            "the read-back prints mind-your-now"
+          ],
+          "readiness": "sequential",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Runtime data operation — modifies no source files (files_scope names the door module whose writer it invokes). Must run AFTER store-project-key lands in this workspace (sequential). From the workspace root run exactly: OVERDECK_HOME=\"$HOME/.overdeck\" bun -e \"import { setConversationProjectKey, getConversationByName } from './src/lib/overdeck/conversations.js'; setConversationProjectKey('20260801-2fc7', 'mind-your-now'); console.log('projectKey =', getConversationByName('20260801-2fc7')?.projectKey);\" — opening the DB applies the item-1 top-up first, so the column exists even while the live dashboard runs the old build (its explicit-column INSERTs are unaffected). The OVERDECK_HOME prefix is mandatory: polluted shell envs have written throwaway DBs before (hazard H2). Do NOT restart the dashboard to make the regrouping visible — the flywheel is the deployer; note in the completion message that conv 1827 regroups under MYN once the merged build deploys."
+        },
+        "items": [
+          {
+            "id": "cleanup-conv-1827.ac1",
+            "title": "The live conversations row for name 20260801-2fc7 stores project_key = 'mind-your-now', written via setConversationProjectKey (no raw SQL)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "cleanup-conv-1827.ac2",
+            "title": "getConversationByName('20260801-2fc7') returns projectKey 'mind-your-now' after the write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-project-flag",
+        "title": "Document --project in the pan-handoff skill, conversations docs page, and isolated-cwd rule",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-01T15:25:39Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3419",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "sync-sources/skills/pan-handoff/SKILL.md",
+            "features/conversations.mdx",
+            "sync-sources/rules/handoff-isolate-cwd.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "bash scripts/lint-skills.sh",
+            "pan sync"
+          ],
+          "expected_outputs": [
+            "lint-skills.sh exits 0",
+            "pan sync renders the updated isolated-cwd rule into ~/.claude/CLAUDE.md (grep for --project in the managed region)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "sync-sources/skills/pan-handoff/SKILL.md: add a --project usage line and a short 'Project association' section beside 'Issue association' (line 71) — the successor inherits the source conversation's project by default; --project overrides; the explicit association means an isolated --cwd no longer files the successor under No project. features/conversations.mdx: in the handoff/Continue-dialog section (lines 83-170) document the modal's Project picker (default 'Same as source') and the CLI --project flag with the inherit default. sync-sources/rules/handoff-isolate-cwd.md: add --project <key> to the pan handoff example with one terse sentence (inheritance makes it automatic from a project-scoped source). Run pan sync after the rule edit. lint-skills.sh must pass."
+        },
+        "items": [
+          {
+            "id": "docs-project-flag.ac1",
+            "title": "sync-sources/skills/pan-handoff/SKILL.md shows a --project usage line and states the default (inherit the source conversation's project)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-project-flag.ac2",
+            "title": "features/conversations.mdx contains the Fork/Handoff modal's Project picker and the --project flag with the inherit-from-source default",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-project-flag.ac3",
+            "title": "sync-sources/rules/handoff-isolate-cwd.md contains --project in its pan handoff guidance and pan sync renders it into the harness context files",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "store-project-key",
+        "to": "fork-route-project",
+        "type": "blocks"
+      },
+      {
+        "from": "store-project-key",
+        "to": "grouping-explicit-first",
+        "type": "blocks"
+      },
+      {
+        "from": "store-project-key",
+        "to": "palette-explicit",
+        "type": "blocks"
+      },
+      {
+        "from": "store-project-key",
+        "to": "cleanup-conv-1827",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-route-project",
+        "to": "cli-project-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-route-project",
+        "to": "fork-modal-project",
+        "type": "blocks"
+      },
+      {
+        "from": "grouping-explicit-first",
+        "to": "fork-modal-project",
+        "type": "blocks"
+      },
+      {
+        "from": "cli-project-flag",
+        "to": "docs-project-flag",
+        "type": "blocks"
+      },
+      {
+        "from": "fork-modal-project",
+        "to": "docs-project-flag",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
