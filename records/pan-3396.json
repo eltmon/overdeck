@@ -171,7 +171,7 @@
     "recordedAt": "2026-08-01T21:32:02.810Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T21:43:09.161Z",
+  "updated": "2026-08-01T21:43:20.823Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "reviewing",
@@ -330,7 +330,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
