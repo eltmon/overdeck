@@ -65,7 +65,7 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T21:03:38.010Z",
+  "updated": "2026-08-01T21:03:49.701Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "blocked",
@@ -75,9 +75,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-01T21:03:36.780Z",
+    "updatedAt": "2026-08-01T21:03:49.677Z",
     "reviewNotes": "Finalize can publish stale session liveness and succeed without the required status event",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3444",
+    "reviewedAtCommit": "6130a234d93dbc7092d180648083c7e963874469",
     "reviewSpawnedAt": "2026-08-01T20:58:54.776Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -109,24 +110,6 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "6130a234d93dbc7092d180648083c7e963874469"
-      }
     }
   },
   "closeOut": {
@@ -197,7 +180,7 @@
       },
       "costAtCloseOut": {
         "usd": 71.48795799999999,
-        "pricingAsOf": "2026-08-01T21:03:36.840Z"
+        "pricingAsOf": "2026-08-01T21:03:49.686Z"
       }
     },
     "merges": [
