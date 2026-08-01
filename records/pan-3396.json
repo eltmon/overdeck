@@ -314,18 +314,18 @@
     "recordedAt": "2026-08-01T22:26:16.391Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T22:33:00.103Z",
+  "updated": "2026-08-01T22:33:08.331Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T22:27:25.587Z",
-    "updatedAt": "2026-08-01T22:32:59.947Z",
-    "reviewNotes": "Legacy membership batch path still performs synchronous project and workspace resolution for every unmigrated candidate",
+    "updatedAt": "2026-08-01T22:33:06.410Z",
+    "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Verification FAILED at lint (157423ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:agent-dir-removal\n> bash scripts/guard-agent-dir-removal.sh\n\n✓ agent-dir-removal guard passed (all agent state cleanup uses removeAgentStateDir)\n\n> @overdeck/core@0.48.0 prelint:ski\n…(71956 chars elided)…\neHint\":null},{\"flags\":\"--force\",\"description\":\"Clear paused and pending-operator-decision gates and start anyway\",\"required\":false,\"valueHint\":null},{\"flags\":\"--fresh\",\"description\":\"Drop the saved Claude session (non-destructive) and start a new one — replaces a live session too, so it recovers an inert agent without a separate pan kill\",\"required\":false,\"valueHint\":null},{\"flags\":\"--host\",\"description\":\"Bypass workspace docker stack-health gate and spawn on the host\",\"required\":false,\"valueHint\":null},{\"flags\":\"--yes\",\"description\":\"Confirm --host in non-interactive contexts\",\"required\":false,\"valueHint\":null},{\"flags\":\"--off-book\",\"description\":\"Allow one work-agent dispatch outside the active order book and log the override\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"Lifecycle\"},\n   {\"id\":\"pan-strike\",\"path\":[\"strike\"],\"display\":\"/pan strike\",\"description\":\"Spawn strike agent(s) — implement and push a strike branch for Deacon to land throug\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "482f8a7dfebc4144f988e1f59d04d0e3a8f3beb6",
@@ -438,10 +438,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 2648,
-            "output": 131799,
-            "cacheRead": 63338677,
-            "cacheWrite": 2602649
+            "input": 2660,
+            "output": 133490,
+            "cacheRead": 63589873,
+            "cacheWrite": 2603920
           }
         }
       },
@@ -459,15 +459,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 2648,
-          "output": 131799,
-          "cacheRead": 63338677,
-          "cacheWrite": 2602649
+          "input": 2660,
+          "output": 133490,
+          "cacheRead": 63589873,
+          "cacheWrite": 2603920
         }
       },
       "costAtCloseOut": {
-        "usd": 258.7479333,
-        "pricingAsOf": "2026-08-01T22:33:00.030Z"
+        "usd": 258.7831093,
+        "pricingAsOf": "2026-08-01T22:33:06.813Z"
       }
     },
     "merges": [
