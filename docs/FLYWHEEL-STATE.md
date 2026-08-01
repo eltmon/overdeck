@@ -860,3 +860,9 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 
 - strike-3448's fix committed (`695dbbf5b2 avoid forbidden bd-ready fixture literal`; forbidden literal count in its workspace: 0) → pushed + **PR #3452**. Its local gate run failed on the usual load flake — irrelevant, red main outranks it and CI is the gate. Background watch armed on the test lane; merging on green, then verifying main re-greens and landing #3449 (PAN-3446) behind it.
 - Fleet 32 sessions (convoys + campaign + 4 strikes). Campaign untouched by the red-main event — MIN-932 still working Lane A.
+
+## RUN-79 tick 43 (2026-08-01 ~21:58Z) — PAN-3367 promoted; close-out deploy-gated (gate respected, no --force)
+
+- **Operator promoted uat/pan-sable-0801 carrying PAN-3367** (the 29-issue code-level audit — the run's costliest item at ~$236). Close-out blocked at the deploy row: live build predates the merge. Tried a reload; **the deploy gate refused with an explicit reason — "post-merge lifecycle is pending", queued 21:54:57Z, fires automatically; do not retry or --force."** Respected it; close-out retries next tick. (This is PAN-3383's observability fix EARNING ITS KEEP: the gate stated its blocking reason instead of failing silently — exactly what that issue added.)
+- Full read-door sweep re-derived: 17 PAN + 20 MIN + TIN-1 in pipeline. **Read-door robustness note:** papers-please and lexerra returned EMPTY on the first pass (curl/jq under load) and only yielded their typed `unavailable` objects on retry — an empty response is NOT a bare array and must never be read as "no pipeline"; retried both rather than assuming.
+- Clean UAT batch EMPTY (candidate null) — nothing review+test passed. Red main (PAN-3448) still active; #3452 watch running.
