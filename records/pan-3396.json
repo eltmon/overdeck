@@ -347,9 +347,22 @@
       "timestamp": "2026-08-01T23:46:23.173Z",
       "reason": "end",
       "note": "Fixed residue test assertions to match implementation contract"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-01T23:48Z] test-agent → FAILED — seq 2",
+      "timestamp": "2026-08-01T23:48:00.939Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-01T23:48:00Z",
+      "markdownBody": "# Test failure\n\nWorkspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD cd39c67b31 (matches reviewed commit). `npm run typecheck` PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). `npm run lint` PASSED clean on a clean-memory run (exit 0, all 18 lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands) — one earlier attempt OOM'd during the build:cli prelint step under heap pressure (swap was 8.0Gi/8.0Gi full from concurrent agent load) and was a transient resource crash, not a code defect; the rerun after memory freed passed with exit 0. `npm test` FAILED: `npx vitest run tests/unit/lib/lifecycle/residue.test.ts` has 3 real, deterministic assertion failures (reproduced twice, once inside the full suite run and once in isolation) — `returns stepSkipped when no open PRs/MRs found` (expected skipped=true, got false), `fails on any repository operation errors while preserving partial progress` (expected result.details defined, got undefined), and `fails when coordinate extraction fails for required repositories` (expected success/skipped=true, got false). residue.test.ts is explicitly in this PR's own declared files_scope (residue-ceremony xBRIEF item) and is new code added by this branch, not a pre-existing failure. This matches a finding review already flagged (non-blocking there only under its cycle-convergence policy: 'Residue test assertions contradict the helper contract — tests/unit/lib/lifecycle/residue.test.ts:39'), but the test gate evaluates actual pass/fail independent of review's convergence rules. All other PAN-3396-scoped test files pass: `npx vitest run tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts` → 6 files passed, 149 passed / 1 skipped. The full `npm test` run also showed 40 failures across 38 unrelated files (src/lib/workspaces/*, workspace-manager, cli/commands/conversations/*) all failing identically at `beforeEach` with `setupOverdeckTestDb()` hook-timeout (5000ms) — none touch PAN-3396 files_scope; this is consistent with resource contention on a machine running many concurrent agents, not attributable to this branch. This backend/CLI-only change (membership resolver lens + `pan close --residue`) has no dashboard/frontend surface (explicit NonGoal: 'Any frontend/dashboard change'); acceptance criteria are entirely vitest/lint commands with no UI wording, so browser UAT is not required and was not attempted.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3396`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts"
@@ -399,18 +412,18 @@
     "recordedAt": "2026-08-01T23:46:16.725Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-01T23:47:57.856Z",
+  "updated": "2026-08-01T23:48:02.195Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:46:46.628Z",
-    "updatedAt": "2026-08-01T23:47:57.212Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-08-01T23:47:57.246Z",
+    "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (1224874ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/overdeck/bootstrap.test.ts (4 tests | 1 failed) 16839ms\n     × AC2: snapshot sequence advances when EventBus emits — no direct store polling 12097ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 17353ms\n     × emits, reads, and streams events through EventBusLive 12100ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 2 failed) 27916ms\n     × ignores extra tables and columns and succeeds in query-only mode 11922ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 11138ms (retry x1)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 8882ms\n     × searches observations with issue, tag, workspace, and sibling filters 5705ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 2 failed) 28396ms\n     × replays gap-fill events from the events transport 12216ms (retry x1)\n     × fails replay with SnapshotRequired when the requested offset predates retained events 11259ms (retry x1)\n\n Test Files  145 passed (145)\n      Tests  1755 passed (1755)\n   Start at  19:38:48\n   Duration  53.66s (transform 10.11s, setup 22.84s, import 80.32s, tests 43.91s, environment 41.82s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-gFWoCX/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn \n…(1816 chars elided)…\nting workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XU4XBn/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewRequestedAt": "2026-08-01T23:46:46.628Z",
@@ -568,7 +581,7 @@
       },
       "costAtCloseOut": {
         "usd": 311.6359323,
-        "pricingAsOf": "2026-08-01T23:47:57.542Z"
+        "pricingAsOf": "2026-08-01T23:48:01.371Z"
       }
     },
     "merges": [
