@@ -2669,7 +2669,7 @@ export async function runPatrol(): Promise<PatrolResult> {
   const reconciledJournalActions = await reconcileInFlightJournals();
   actions.push(...reconciledJournalActions);
   for (const a of reconciledJournalActions) addLog('action', a, state.patrolCycle);
-
+  for (const a of (await import('./feedback-stuck-retirement.js')).retireResolvedFeedbackDeliveryStuckFlags()) { actions.push(a); addLog('action', a, state.patrolCycle); }
   // Process any pending post-merge lifecycle that wasn't consumed on startup (PAN-626).
   // In dev mode, the deploy script may fail to restart cleanly, leaving the pending file.
   try {
