@@ -48,7 +48,7 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-01T16:35:50.881Z",
+  "updated": "2026-08-01T16:35:54.810Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -57,7 +57,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T16:35:29.339Z",
+    "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z",
+    "updatedAt": "2026-08-01T16:35:50.784Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewRequestedAt": "2026-08-01T16:35:49.792Z",
     "scopeDrift": {
@@ -86,8 +87,7 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-01T16:33:34.861Z"
-    },
-    "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -111,7 +111,7 @@
       },
       "costAtCloseOut": {
         "usd": 32.214659,
-        "pricingAsOf": "2026-08-01T16:35:30.071Z"
+        "pricingAsOf": "2026-08-01T16:35:54.793Z"
       }
     },
     "merges": [
