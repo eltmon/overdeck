@@ -16,7 +16,8 @@ import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync } from '../../../../lib/review-status.js';
 import { getAgentCommandSync } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
-import { saveAgentRuntimeState } from '../../../../lib/agents.js';
+import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
+import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { execAsync, readJsonBody, validateSpecialistAgentName } from './shared.js';
@@ -555,17 +556,10 @@ const postProjectSpecialistResetSessionRoute = HttpRouter.add(
 );
 
 // ─── Route: POST /api/specialists/:project/:issueId/review/restart ───────────
-// Kills all reviewer tmux sessions + coordinator, wipes the review agent
-// state directories (PAN-1985), then dispatches a fresh review through the
-// role primitive. The new review starts with a fresh `state.json` and a new
-// session id because the old dirs are gone.
-//
-// Convoy view vs Quick Review view is purely a presentation concern (the
-// menu label is "Restart All" vs "Restart"); the route behavior is the
-// same for both. Wipe+respawn is the deliberate override path for harness/
-// model switches — the NORMAL review flow continues the same session
-// across re-dispatches (PAN-1862), and this endpoint is the escape hatch
-// that pays the re-research cost.
+// Stops the review parent and convoy sessions, then resumes the parent through
+// the role primitive. Saved sessions and completed reports stay intact; same-run
+// recovery re-dispatches only reviewer lanes that have not produced a report.
+// A model or harness change still takes the existing fresh-spawn path.
 
 const postProjectReviewRestartRoute = HttpRouter.add(
   'POST',
@@ -647,30 +641,64 @@ const postProjectReviewRestartRoute = HttpRouter.add(
 
 // ─── Route: POST /api/specialists/:project/:issueId/reviewer/:role/restart ───
 //
-// PAN-1048 review feedback 005 (C5): the per-reviewer restart endpoint is
-// retired. The role primitive launches the four code-review-* sub-agents in a
-// single review-role run via the Agent tool — there is no longer a per-axis
-// tmux session to restart, no `pan-review-agent` shell to relaunch, and no
-// per-reviewer prompt file to feed back in. Returning 410 with a pointer to
-// the supported restart surface keeps any frontend cache/intent that still
-// hits this URL from silently re-establishing the legacy machinery.
+// PAN-3368: convoy reviewers are independent role sessions again. Restarting one
+// lane preserves completed sibling reports and gives operators the surgical recovery
+// that the CLI's long-advertised --role flag promises.
 
 const postProjectReviewerRoleRestartRoute = HttpRouter.add(
   'POST',
   '/api/specialists/:project/:issueId/reviewer/:role/restart',
   httpHandler(Effect.gen(function* () {
     const params = yield* HttpRouter.params;
+    const issueId = (params['issueId'] as string).toUpperCase();
+    const role = params['role'] as string;
+    if (!(REVIEW_SUB_ROLES as readonly string[]).includes(role)) {
+      return jsonResponse(
+        { error: `Invalid reviewer role: ${role}`, allowed: REVIEW_SUB_ROLES },
+        { status: 400 },
+      );
+    }
+
+    const parentId = `agent-${issueId.toLowerCase()}-review`;
+    const reviewerId = `${parentId}-${role}`;
+    const parent = getAgentStateSync(parentId);
+    if (!parent?.reviewRunId || !parent.workspace) {
+      return jsonResponse(
+        { error: `Active review run not found for ${issueId}` },
+        { status: 409 },
+      );
+    }
+
+    const body = yield* readJsonBody;
+    const { model } = body as { model?: string };
+    const reviewer = getAgentStateSync(reviewerId);
+    yield* Effect.promise(() => Effect.runPromise(killSession(reviewerId)).catch(() => undefined));
+
+    const { spawnReviewSubRoleForIssue } = yield* Effect.promise(
+      () => import('../../../../lib/cloister/review-agent.js'),
+    );
+    const result = yield* spawnReviewSubRoleForIssue({
+      issueId,
+      workspace: parent.workspace,
+      subRole: role as ReviewSubRole,
+      runId: parent.reviewRunId,
+      ...(reviewer?.reviewRunId === parent.reviewRunId && reviewer.reviewOutputPath
+        ? { outputPath: reviewer.reviewOutputPath }
+        : {}),
+      contextManifestPath: parent.reviewContextManifestPath,
+      synthesisAgentId: parentId,
+      ...(model ? { model } : {}),
+      allowHost: parent.hostOverride ?? false,
+    });
+
     return jsonResponse(
       {
-        error: 'per-reviewer restart route retired',
-        hint: 'The review role launches all four code-review-* sub-agents in a single run via the Agent tool. To re-run a review, POST /api/review/:issueId/trigger (full review restart through spawnReviewRoleForIssue), which dispatches role: review and re-fans-out the convoy.',
-        retiredFor: {
-          project: params['project'],
-          issueId: params['issueId'],
-          role: params['role'],
-        },
+        success: result.success,
+        message: result.message,
+        error: result.error,
+        restarted: role,
       },
-      { status: 410 },
+      result.success ? undefined : { status: 500 },
     );
   })),
 );

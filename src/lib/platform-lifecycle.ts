@@ -120,6 +120,15 @@ export class StageError extends Error {
 }
 
 class EaddrinuseSpawnError extends StageError {}
+class DashboardPortsReleasedError extends StageError {}
+
+type PidSurvivorProbe = (pid: number) => Promise<string | null>;
+
+type DashboardStopOptions = {
+  graceTimeoutMs?: number;
+  portOwnerProbe?: (port: number) => Promise<number[]>;
+  pidSurvivorProbe?: PidSurvivorProbe;
+};
 
 export function readPlatformConfigSync(): PlatformConfig {
   const defaults: PlatformConfig = {
@@ -232,7 +241,10 @@ function isPidAlive(pid: number): boolean {
     process.kill(pid, 0);
     return true;
   } catch (error) {
-    return (error as NodeJS.ErrnoException).code !== 'ESRCH';
+    // EPERM proves that the pid exists but belongs to another user. Any other
+    // probe failure is not positive liveness evidence and must not block the
+    // replacement dashboard from starting.
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
   }
 }
 
@@ -256,6 +268,22 @@ async function describePid(pid: number): Promise<string> {
     return stdout.trim().replace(/\s+/g, ' ') || 'unknown';
   } catch {
     return 'unknown';
+  }
+}
+
+async function describeSurvivingPid(pid: number): Promise<string | null> {
+  try {
+    const { stdout } = await execAsync(`ps -p ${pid} -o pid=,stat=,cmd=`);
+    const description = stdout.trim().replace(/\s+/g, ' ');
+    if (!description) return null;
+
+    const state = description.split(' ')[1] ?? '';
+    if (state.startsWith('Z') || state.startsWith('X')) return null;
+    return isPidAlive(pid) ? description : null;
+  } catch {
+    // The process disappeared between the kill(0) sample and ps. That race used
+    // to become the fatal "cmd: unknown survived SIGKILL" false positive.
+    return null;
   }
 }
 
@@ -323,14 +351,12 @@ function createEaddrinuseProbe(
 
 async function stopDashboardPromise(
   config: PlatformConfig,
-  opts: {
-    graceTimeoutMs?: number;
-    portOwnerProbe?: (port: number) => Promise<number[]>;
-  } = {},
+  opts: DashboardStopOptions = {},
 ): Promise<void> {
   const graceMs = opts.graceTimeoutMs ?? 5000;
   const ports = [config.dashboardPort, config.dashboardApiPort];
   const portOwnerProbe = opts.portOwnerProbe ?? pidsOnPort;
+  const pidSurvivorProbe = opts.pidSurvivorProbe ?? describeSurvivingPid;
 
   // 0. If an interactive `pan dev` session owns these ports, route the stop to
   //    the supervisor itself rather than port-killing its children. The dev
@@ -369,20 +395,24 @@ async function stopDashboardPromise(
   if (stubbornPids.size > 0) killPidsSync([...stubbornPids], 'SIGKILL');
 
   const finalFreed = await Promise.all(ports.map((p) => waitForPortFree(p, 2000, portOwnerProbe)));
-  const failures: string[] = [];
+  const survivorFailures: string[] = [];
   for (const pid of allPids) {
-    if (isPidAlive(pid)) {
-      failures.push(`PID ${pid} (cmd: ${await describePid(pid)}) survived SIGKILL`);
+    const description = await pidSurvivorProbe(pid);
+    if (description !== null) {
+      survivorFailures.push(`PID ${pid} (cmd: ${description}) survived SIGKILL`);
     }
   }
+  const portFailures: string[] = [];
   for (const [index, port] of ports.entries()) {
     if (finalFreed[index]) continue;
     for (const pid of await portOwnerProbe(port)) {
-      failures.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
+      portFailures.push(`port ${port} still held by PID ${pid} (cmd: ${await describePid(pid)})`);
     }
   }
+  const failures = [...survivorFailures, ...portFailures];
   if (failures.length > 0) {
-    throw new StageError({
+    const Failure = portFailures.length === 0 ? DashboardPortsReleasedError : StageError;
+    throw new Failure({
       stage: 'dashboard',
       reason: failures.join('; '),
     });
@@ -533,9 +563,18 @@ async function restartDashboardPromise(
     eaddrinuseLogPath?: string;
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
+    pidSurvivorProbe?: PidSurvivorProbe;
   } = {},
 ): Promise<DashboardRestartResult> {
-  await Effect.runPromise(stopDashboard(config));
+  try {
+    await stopDashboardPromise(config, {
+      portOwnerProbe: opts.portOwnerProbe,
+      pidSurvivorProbe: opts.pidSurvivorProbe,
+    });
+  } catch (error) {
+    if (!(error instanceof DashboardPortsReleasedError)) throw error;
+    console.warn(`[dashboard] ${error.failure.reason}; ports are free, continuing restart`);
+  }
   const logPath = opts.eaddrinuseLogPath ?? DASHBOARD_LOG_FILE;
   const logOffset = await fileSizeOrZero(logPath);
   const handle = await startDashboardFn();
@@ -649,10 +688,7 @@ const stageErrorOf = (op: string) => (cause: unknown): StageError => {
 /** Effect variant of {@link stopDashboard}. */
 export const stopDashboard = (
   config: PlatformConfig,
-  opts: {
-    graceTimeoutMs?: number;
-    portOwnerProbe?: (port: number) => Promise<number[]>;
-  } = {},
+  opts: DashboardStopOptions = {},
 ): Effect.Effect<void, StageError> =>
   Effect.tryPromise({ try: () => stopDashboardPromise(config, opts), catch: stageErrorOf('stopDashboard') });
 
@@ -697,6 +733,7 @@ export const restartDashboard = (
     eaddrinuseLogPath?: string;
     portOwnerProbe?: (port: number) => Promise<number[]>;
     pidDescriptor?: (pid: number) => Promise<string>;
+    pidSurvivorProbe?: PidSurvivorProbe;
   } = {},
 ): Effect.Effect<DashboardRestartResult, StageError> =>
   Effect.tryPromise({
