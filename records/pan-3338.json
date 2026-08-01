@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T20:30:10.794Z",
+  "updated": "2026-08-01T20:30:19.322Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "simple-mode-finished-plan-regressions": {
+        "writerId": "agent-pan-3338",
+        "agentId": "agent-pan-3338",
+        "pid": 3870332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-01T20:30:19.322Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3338",
@@ -113,6 +121,7 @@
     "pipeline-state-accepts-planned-canonical": "completed",
     "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac1": "completed",
     "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac2": "completed",
-    "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac3": "completed"
+    "pipeline-state-accepts-planned-canonical.pipeline-state-accepts-planned-canonical.ac3": "completed",
+    "simple-mode-finished-plan-regressions": "running"
   }
 }
