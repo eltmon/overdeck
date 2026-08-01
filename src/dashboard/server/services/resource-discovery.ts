@@ -210,7 +210,7 @@ function deriveStateLabel(
 ): string {
   const trackerState = issue.trackerState ?? '';
   if (membership?.bucket === 'post_merge_limbo') return 'Merged — Needs Close-Out';
-  if (membership?.bucket === 'clean_terminal' && membership.lenses.L3_issueOpen === false) {
+  if (membership?.lenses.L3_issueOpen === false) {
     return hasTmux ? 'Closed' : 'Done';
   }
   if (issue.readyForMerge) return 'In Review';
