@@ -22,6 +22,11 @@
       "reason": "feedback",
       "note": "[2026-08-01T23:18Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-01T23:18:11.351Z"
+    },
+    {
+      "timestamp": "2026-08-01T23:26:02.666Z",
+      "reason": "end",
+      "note": "Review finding fixed: checklist HTTP requests now resolve plans and status overlays through the asynchronous workspace-plan door. The synchronous helper remains for CLI callers, both paths share a pure evaluator, and regression tests prove the Promise helper never invokes the synchronous reader. Typecheck, lint, and 17 focused tests passed."
     }
   ],
   "feedback": [
@@ -66,7 +71,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-01T23:25:57.882Z",
+  "updated": "2026-08-01T23:26:02.728Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "pending",
@@ -75,10 +80,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T23:25:57.880Z",
+    "updatedAt": "2026-08-01T23:26:02.659Z",
     "reviewNotes": "Checklist route performs synchronous plan and record reads on the dashboard event loop",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3458",
     "reviewedAtCommit": "23c9bb23203555981d7dafc9cca1db1ff3e88346",
+    "reviewRequestedAt": "2026-08-01T23:25:57.880Z",
     "reviewSpawnedAt": "2026-08-01T23:13:02.766Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -111,17 +117,16 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:25:56.881Z"
-    },
-    "reviewRequestedAt": "2026-08-01T23:25:57.880Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 383561,
-            "output": 19617,
-            "cacheRead": 5038592,
+            "input": 387149,
+            "output": 19869,
+            "cacheRead": 5318144,
             "cacheWrite": 0
           }
         },
@@ -159,24 +164,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 927991,
-            "output": 63812,
-            "cacheRead": 34569216,
+            "input": 982889,
+            "output": 73674,
+            "cacheRead": 42083840,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 4653088,
-          "output": 164136,
-          "cacheRead": 55170560,
+          "input": 4711574,
+          "output": 174250,
+          "cacheRead": 62964736,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 55.7748,
-        "pricingAsOf": "2026-08-01T23:18:17.562Z"
+        "usd": 60.267738,
+        "pricingAsOf": "2026-08-01T23:26:02.718Z"
       }
     },
     "merges": [
