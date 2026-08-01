@@ -319,15 +319,7 @@
       "timestamp": "2026-08-01T00:08:12.354Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-01T00:08:12Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3358\n\n# Review Synthesis — PAN-3358 — 2026-08-01T00:13:00Z\n\n## Verdict: CHANGES REQUESTED — every projects-config mutation fails on supported platforms without util-linux `flock`\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/context.json\n- Branch: feature/pan-3358\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358\n- HEAD reviewed: 1cd3e7c441162d5006b60791a609a80e9309cf8d\n- Cycle number: 8\n- Prior cycle SHA: 0ad9598e6081572f0410400dc4d0a2dee1c8f047\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings after gates |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Every projects-config mutation fails on supported platforms without util-linux `flock` — `src/lib/projects-config-write.ts:52`\nBoth synchronous and asynchronous lock acquisition unconditionally spawn the external `flock` command. That utility is provided by util-linux and is not a stock executable on supported macOS or Windows installations; there is no platform implementation, bundled helper, prerequisite gate, or fallback. On those systems, Version ship settings and existing project rename/register/remove, auto-merge, swarm, and merge-train mutations fail before reading or writing `projects.yaml`. Implement a cross-platform lock primitive that ships with Overdeck, or explicit mechanically safe platform backends with mutual-exclusion and crash-release tests. This blocker is promotable in cycle 8 because the unconditional external `flock` dependency was introduced after the prior synthesis as the stale-lock race fix.\n\n## Non-blocking Findings\n\n### [correctness] Whitespace-only commit messages pass validation but make Git reject every changed ship — `src/lib/projects.ts:282`\nShared validation accepts a `commit_message` containing only whitespace, while `git commit -m` rejects it after valid version changes have been prepared. Require a present message to have non-empty trimmed content and add route and runner coverage. This remains advisory under the reviewer’s severity classification.\n\n## Clean Sub-roles\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3358/.pan/review/agent-pan-3358-review-1cd3e7c4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3358 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       ".husky/commit-msg",
@@ -413,10 +405,10 @@
     "recordedAt": "2026-07-31T20:12:30.347Z"
   },
   "created": "2026-07-31T15:29:27.446Z",
-  "updated": "2026-08-01T00:12:36.805Z",
+  "updated": "2026-08-01T00:12:40.238Z",
   "pipeline": {
     "issueId": "PAN-3358",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -424,8 +416,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-07-31T20:13:10.439Z",
-    "updatedAt": "2026-08-01T00:12:36.760Z",
-    "reviewNotes": "Projects-config locking unconditionally requires util-linux flock, breaking supported macOS and Windows mutations",
+    "updatedAt": "2026-08-01T00:12:39.775Z",
+    "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
     "inspectNotes": "Lossless write door verified: replayed the writer logic read-only over the live 401-line ~/.overdeck/projects.yaml (all 12 projects, with and without a final newline) plus 20 edge fixtures — 3/4-space indentation, no-trailing-newline last project, trailing doc comment, inline comment on the last field, dangling comment inside the project block, blank lines at EOF, CRLF, trailing spaces, document marker with unrelated top-level keys, merge-key aliases, and replacing/clearing an existing block including a flow-style value — every case reparses clean, reads the block back under the right project with no phantom top-level key, leaves unrelated projects and sibling fields untouched, and round-trips byte-identical on clear; flow-style, alias, and empty project values now throw without writing. AC2/3/4 satisfied by the route payload tests: GET returns config null / declared block plus newest matching lastOutcome, PUT 400s with the validation error list and never calls the writer, valid PUT persists through the door with loadProjectsConfigSync reading it back, unknown key 404s naming the known project keys. Both routes registered in projectsRouteLayer and auth-guarded.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3361",
     "reviewedAtCommit": "1cd3e7c441162d5006b60791a609a80e9309cf8d",
@@ -592,7 +584,7 @@
       },
       "costAtCloseOut": {
         "usd": 880.055832,
-        "pricingAsOf": "2026-08-01T00:12:36.797Z"
+        "pricingAsOf": "2026-08-01T00:12:39.793Z"
       }
     },
     "merges": [
