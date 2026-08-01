@@ -726,3 +726,9 @@ Monitor fired at 5.9GB avail (PSI 0.58, no stalling; bounced to ~7GB). Growth = 
 ## RUN-79 interstitial (~16:10Z) — memory emergency handled: server restart at 2.7GB/8MBps; verdict = allocation churn, not proven leak
 
 Escalation chain: Monitor 5.9GB → 3.5GB avail with PSI 12.77 (real stalling). Growth driver = dashboard server 1.9→2.7GB at ~8MB/s on build `85b623885d`. **Restarted the server** (pan restart, healthy, ~60s outage). Fresh process: 743→1914MB then GC DROPPED it to 1318MB — heavy allocation churn with high watermark, NOT proven monotonic leak (old process killed before it could plateau). Two Monitors now armed: system memory (<6GB/PSI>5) + server RSS (>3GB + :3011 liveness). Dispatch freeze holds until stable. If server RSS alerts >3GB again → treat as real leak, bisect today's merges (#3414 activity-derivation, #3421 reconcile-adoption prime suspects). Other pressure: restic (transient), host-side mvn build (transient), pan-1577 tsc churn (2 specimens — file on 3rd).
+
+## RUN-79 tick 25 (2026-08-01 ~16:25Z) — strike-3416 via CI (#3425); verification green on 3362/3367/864; memory stable
+
+- **strike-3416 landed via CI path** (PR #3425 — shared specialist session tree builder; 7th load-flake preemption). strike-3422 root cause confirmed, implementing (+249/−47 in pty-supervisor area).
+- Verification gates green on PAN-3362/PAN-3367/MIN-864; review/test specialist verdicts still converging server-side — ready set empty, UAT candidate null (correct, not a wedge). MIN-839 rework crunching ($19.95, slow delta — recheck). MIN-874 hardening OAuth state (50m task, $18.40 fresh session).
+- Memory stable post-restart (no Monitor events ~15 min): server churns to ~1.9GB then GC reclaims. Dispatch freeze still on for NEW strikes (3417/3397/3396 queued) until an hour of stability.
