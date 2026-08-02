@@ -39,7 +39,7 @@ echo "[$(date -Iseconds)] stop-hook: resolved AGENT_ID=$AGENT_ID — proceeding"
   >> "$LOG_DIR/hooks.log" 2>/dev/null || true
 
 TS=$(date -Iseconds)
-BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"hookName\":\"Stop\",\"timestamp\":\"$TS\"}"
 pan_emit_event "$AGENT_ID" "$BODY"
 
 # ── API error detection (all agent types) ────────────────────────────────

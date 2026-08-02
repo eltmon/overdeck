@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptFlagFor, DOD_ROWS } from '../../../../src/lib/lifecycle/dod.js';
+import { acceptFlagFor, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS } from '../../../../src/lib/lifecycle/dod.js';
 
 describe('DOD_ROWS', () => {
   it('defines the nine uniquely identified rows in order', () => {
@@ -43,5 +43,32 @@ describe('DOD_ROWS', () => {
       '--accept-ship',
       '--accept-deploy',
     ]);
+  });
+});
+
+describe('buildAbandonedDodGate', () => {
+  it('returns all-skip gate with abandon disposition and kind field', () => {
+    const result = buildAbandonedDodGate('no landing evidence', 'conv-x');
+    expect(result.passed).toBe(true);
+    expect(result.rows.every(row => row.status === 'skip')).toBe(true);
+    expect(result.disposition).toEqual({
+      reason: 'no landing evidence',
+      by: 'conv-x',
+      kind: 'abandon',
+    });
+  });
+});
+
+describe('buildResidueDodGate', () => {
+  it('returns all-skip gate with residue disposition, kind field, and evidence in observed', () => {
+    const result = buildResidueDodGate('pre-record-era stale PR', 'conv-y', ['MIN-572: closed out on 2026-07-23', 'Closed PR #42 with honest comment']);
+    expect(result.passed).toBe(true);
+    expect(result.rows.every(row => row.status === 'skip')).toBe(true);
+    expect(result.rows[0]?.observed).toContain('Verified: MIN-572: closed out on 2026-07-23; Closed PR #42 with honest comment');
+    expect(result.disposition).toEqual({
+      reason: 'pre-record-era stale PR',
+      by: 'conv-y',
+      kind: 'residue',
+    });
   });
 });

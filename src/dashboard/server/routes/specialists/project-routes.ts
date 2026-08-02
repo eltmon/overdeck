@@ -18,6 +18,7 @@ import { getAgentCommandSync } from '../../../../lib/settings.js';
 import { killSession } from '../../../../lib/tmux.js';
 import { getAgentStateSync, saveAgentRuntimeState } from '../../../../lib/agents.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from '../../../../lib/cloister/review-monitor.js';
+import { resolveReviewParentRunState } from '../../../../lib/cloister/review-run-recovery.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { httpHandler } from '../http-handler.js';
 import { execAsync, readJsonBody, validateSpecialistAgentName } from './shared.js';
@@ -661,7 +662,10 @@ const postProjectReviewerRoleRestartRoute = HttpRouter.add(
 
     const parentId = `agent-${issueId.toLowerCase()}-review`;
     const reviewerId = `${parentId}-${role}`;
-    const parent = getAgentStateSync(parentId);
+    const parentState = getAgentStateSync(parentId);
+    const parent = parentState
+      ? yield* Effect.promise(() => resolveReviewParentRunState(parentState))
+      : null;
     if (!parent?.reviewRunId || !parent.workspace) {
       return jsonResponse(
         { error: `Active review run not found for ${issueId}` },

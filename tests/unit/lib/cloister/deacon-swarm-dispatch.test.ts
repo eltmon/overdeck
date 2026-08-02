@@ -385,6 +385,23 @@ describe('registered slot capacity (PAN-2214 cap-reached-at-zero-live-slots regr
     expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, limits)).toBe(true);
   });
 
+  it('does not charge terminal slot agents against live capacity', () => {
+    const alive = [
+      agentRow('agent-pan-1791-slot-1', true),
+      agentRow('agent-pan-1791-slot-2', true),
+      agentRow('agent-pan-1791-slot-3', true),
+    ];
+
+    const live = countRunningSwarmSlotsForIssue(
+      'PAN-1791',
+      alive,
+      agent => agent.id === 'agent-pan-1791-slot-2',
+    );
+
+    expect(live).toBe(2);
+    expect(registeredSlotCapacityAvailable('PAN-1791', 0, live, limits)).toBe(true);
+  });
+
   it('K tmux-alive slots against reservedSwarmSlots=K exhausts capacity; K-1 leaves room', () => {
     const alive = [
       agentRow('agent-pan-1791-slot-1', true),

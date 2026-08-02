@@ -5,9 +5,11 @@ import type { Agent } from '../../types';
 
 interface SidebarProps {
   agents: Agent[];
+  onIssueHover?: (issueId: string) => void;
+  onIssueSelect?: (issueId: string) => void;
 }
 
-export function GodViewSidebar({ agents }: SidebarProps) {
+export function GodViewSidebar({ agents, onIssueHover, onIssueSelect }: SidebarProps) {
   return (
     <div
       className="gv-glass flex flex-col gap-3 p-3 overflow-hidden shrink-0"
@@ -15,7 +17,7 @@ export function GodViewSidebar({ agents }: SidebarProps) {
     >
       {/* Activity Feed */}
       <div className="flex flex-col gap-2 flex-1 min-h-0 overflow-hidden">
-        <ActivityFeed />
+        <ActivityFeed onIssueHover={onIssueHover} onIssueSelect={onIssueSelect} />
       </div>
 
       <div className="w-full h-px" style={{ backgroundColor: 'var(--gv-border)' }} />

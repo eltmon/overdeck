@@ -31,7 +31,7 @@ fi
 
 TS=$(date -Iseconds)
 
-pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+pan_emit_event "$AGENT_ID" "{\"kind\":\"activity\",\"activity\":\"idle\",\"hookName\":\"SessionStart\",\"timestamp\":\"$TS\"}"
 
 # PAN-1594: write the ready.json readiness signal that waitForReadySignal()
 # consumes. Claude-side counterpart to the Pi extension's handleSessionStart

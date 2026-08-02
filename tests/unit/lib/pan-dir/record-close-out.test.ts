@@ -7,6 +7,7 @@ import {
   readIssueRecordSync,
   writeIssueRecordSync,
   markRecordPipelineClosedOutSync,
+  markRecordPipelineResidueClosedOutSync,
   type PanIssueRecord,
 } from '../../../../src/lib/pan-dir/record.js';
 
@@ -99,5 +100,38 @@ describe('markRecordPipelineClosedOutSync preserves verificationStatus (PAN-3025
     markRecordPipelineClosedOutSync(project, 'PAN-3025');
 
     expect(mockQueueAutoCommit).toHaveBeenCalled();
+  });
+});
+
+describe('markRecordPipelineResidueClosedOutSync (PAN-3396)', () => {
+  it('creates terminal record without mergeStatus (residue disposition)', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'pan-record-residue-'));
+    dirs.push(ws);
+    const project = getProjectConfigFromWorkspacePath(ws);
+    const record = baseRecord('PAN-3396');
+
+    writeIssueRecordSync(project, 'PAN-3396', record);
+    markRecordPipelineResidueClosedOutSync(project, 'PAN-3396');
+
+    const after = readIssueRecordSync(project, 'PAN-3396');
+    expect(after?.pipeline.closedOut).toBe(true);
+    expect(after?.pipeline.closedOutAt).toBeDefined();
+    expect(after?.pipeline.readyForMerge).toBe(false);
+    expect(after?.pipeline.mergeStatus).toBeUndefined();
+  });
+
+  it('deletes existing mergeStatus when marking residue (non-blocking finding fix)', () => {
+    const ws = mkdtempSync(join(tmpdir(), 'pan-record-residue-delete-'));
+    dirs.push(ws);
+    const project = getProjectConfigFromWorkspacePath(ws);
+    const record = baseRecord('PAN-3396');
+    record.pipeline.mergeStatus = 'merged';
+
+    writeIssueRecordSync(project, 'PAN-3396', record);
+    markRecordPipelineResidueClosedOutSync(project, 'PAN-3396');
+
+    const after = readIssueRecordSync(project, 'PAN-3396');
+    expect(after?.pipeline.closedOut).toBe(true);
+    expect(after?.pipeline.mergeStatus).toBeUndefined();
   });
 });

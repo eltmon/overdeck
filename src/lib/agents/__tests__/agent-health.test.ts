@@ -216,6 +216,83 @@ describe('classifyAgentHealth', () => {
     });
   });
 
+  it('renders inactivity messages naming the agent and humanizing durations', () => {
+    // <60 minute case: 20 minutes (warning threshold)
+    const underHour = classifyAgentHealth(input({
+      agentId: 'agent-test-20min',
+      persisted: {
+        status: 'available',
+        value: {
+          role: 'work',
+          status: 'running',
+          startedAt: '2026-07-16T10:00:00.000Z',
+          lastActivity: '2026-07-16T11:40:00.000Z',
+          kickoffDelivered: true,
+        },
+      },
+      runtime: {
+        state: 'active',
+        lastActivity: '2026-07-16T11:40:00.000Z',
+      },
+      liveSessions: new Set(['agent-test-20min']),
+      nowMs: NOW, // 2026-07-16T12:00:00.000Z
+    }));
+    expect(underHour.reasons[0]).toMatchObject({
+      code: 'agent.runtime.inactive.warning',
+      message: 'agent-test-20min has produced no activity for 20 min.',
+    });
+
+    // <48 hour case: 47 hours renders as 'N h' format
+    const hoursInactive = classifyAgentHealth(input({
+      agentId: 'agent-test-47hrs',
+      persisted: {
+        status: 'available',
+        value: {
+          role: 'work',
+          status: 'running',
+          startedAt: '2026-07-13T00:00:00.000Z',
+          lastActivity: '2026-07-14T13:00:00.000Z',
+          kickoffDelivered: true,
+        },
+      },
+      runtime: {
+        state: 'active',
+        lastActivity: '2026-07-14T13:00:00.000Z',
+      },
+      liveSessions: new Set(['agent-test-47hrs']),
+      nowMs: NOW, // 2026-07-16T12:00:00.000Z
+    }));
+    expect(hoursInactive.reasons[0]).toMatchObject({
+      code: 'agent.runtime.inactive.stalled',
+      message: 'agent-test-47hrs has produced no activity for 47 h.',
+    });
+
+    // >=48 hour case: 72+ hours renders as 'N d' format
+    const multiDays = classifyAgentHealth(input({
+      agentId: 'agent-test-3d',
+      persisted: {
+        status: 'available',
+        value: {
+          role: 'work',
+          status: 'running',
+          startedAt: '2026-07-13T10:00:00.000Z',
+          lastActivity: '2026-07-13T10:00:00.000Z',
+          kickoffDelivered: true,
+        },
+      },
+      runtime: {
+        state: 'active',
+        lastActivity: '2026-07-13T10:00:00.000Z',
+      },
+      liveSessions: new Set(['agent-test-3d']),
+      nowMs: NOW, // 2026-07-16T12:00:00.000Z = 72 hours later
+    }));
+    expect(multiDays.reasons[0]).toMatchObject({
+      code: 'agent.runtime.inactive.stalled',
+      message: 'agent-test-3d has produced no activity for 3 d.',
+    });
+  });
+
   it('preserves zero context and real failure counters in the projection', () => {
     const snapshot = classifyAgentHealth(input({
       observations: {

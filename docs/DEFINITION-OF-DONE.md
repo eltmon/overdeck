@@ -52,6 +52,7 @@ Rows 1–3 read live status first and fall back to the per-issue record's `pipel
   so deleting an unmerged branch or finding only fresh pointers remains a miss. A strike-landed
   issue passes through the strike branch's own merge evidence; unmerged commits on the superseded
   feature branch remain in the observed string instead of causing a miss.
+- **Residue disposition handles tracker-closed pre-record-era issues** (PAN-3396). When `pan close --residue` is used, the DoD gate is skipped and every row reports skip with the verified disposition evidence. The command closes stale convention PRs/MRs with an honest "no merge claim" comment, verifies the tracker issue is closed (tracker-agnostic via `isTrackerIssueClosed`), and marks the issue terminal without asserting `mergeStatus` (which is unknowable for recordless work). Residue is operator-conversation-only and mutually exclusive with `--abandon` and `--accept-*` flags.
 - **The verification verdict is the row; `lastVerifiedCommit` is not required** (PAN-3067). The
   runner writes that anchor best-effort — it snapshots HEAD inside a `try/catch` for the
   test-skip drift check, and a policy `skipped` verdict never has one — so its absence proves
