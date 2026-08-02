@@ -31,6 +31,7 @@ import { getAgentStateSync } from '../agents.js';
 import { messageAgent } from '../agents/messaging.js';
 import { stopAgent } from '../agents.js';
 import {
+  IDLE_EXEMPT_ROLES,
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
   type ParkedOrbit,
@@ -379,8 +380,13 @@ async function sweepRow(
 
     case 'idle-running': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      const lastActivity = typeof row.details?.idleMinutes === 'number' ? row.details.idleMinutes : 0;
+      // Belt-and-suspenders: never nudge/stop an orchestrator or conversation
+      // (their activity lives outside the stamp this orbit reads — the
+      // first-night flywheel kill). The resolver exempts them; this guards
+      // against any row that still slips through.
       const agentState = getAgentStateSync(agentId);
+      if (IDLE_EXEMPT_ROLES.has(String(agentState?.role ?? ''))) return false;
+      const lastActivity = typeof row.details?.idleMinutes === 'number' ? row.details.idleMinutes : 0;
       const currentActivity = agentState?.lastActivity ?? null;
       // Step 2: previously nudged, grace elapsed, and the agent never moved → stop it.
       if (state?.nudgedActivityAt && currentActivity && state.nudgedActivityAt === currentActivity
