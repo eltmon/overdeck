@@ -145,7 +145,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:53:32.125Z",
+  "updated": "2026-08-02T20:54:39.355Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -168,7 +168,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd",
-    "reviewRequestedAt": "2026-08-02T20:39:43.419Z",
+    "reviewRequestedAt": "2026-08-02T20:54:38.257Z",
     "reviewSpawnedAt": "2026-08-02T20:42:29.170Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -208,7 +208,8 @@
         "src/lib/cloister/stall-sweeper.ts"
       ],
       "recordedAt": "2026-08-02T20:39:42.438Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-02T20:54:38.257Z"
   },
   "closeOut": {
     "usage": {
