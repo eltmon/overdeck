@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:12:53.482Z",
+  "updated": "2026-08-02T03:22:14.203Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "no-loss-and-component-tests": {
-        "writerId": "agent-pan-3423",
-        "agentId": "agent-pan-3423",
-        "pid": 3545892,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:12:53.482Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3423",
@@ -141,6 +133,16 @@
         "outcome": "completed",
         "reason": "Top consumers upgraded: kind badges for each type (container/agent/specialist), proportional memory bars, LEAKED tag with amber highlight, header updated to '⚠ N leaked' or 'No leaks'. Tests pass.",
         "releasedAt": "2026-08-02T03:12:41.988Z"
+      },
+      {
+        "writerId": "agent-pan-3423",
+        "agentId": "agent-pan-3423",
+        "pid": 3545892,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:12:53.482Z",
+        "itemId": "no-loss-and-component-tests",
+        "outcome": "completed",
+        "releasedAt": "2026-08-02T03:22:14.201Z"
       }
     ],
     "statusReasons": {
@@ -198,6 +200,9 @@
     "top-consumers-upgrade.top-consumers-upgrade.ac1": "completed",
     "top-consumers-upgrade.top-consumers-upgrade.ac2": "completed",
     "top-consumers-upgrade.top-consumers-upgrade.ac3": "completed",
-    "no-loss-and-component-tests": "running"
+    "no-loss-and-component-tests": "completed",
+    "no-loss-and-component-tests.no-loss-and-component-tests.ac1": "completed",
+    "no-loss-and-component-tests.no-loss-and-component-tests.ac2": "completed",
+    "no-loss-and-component-tests.no-loss-and-component-tests.ac3": "completed"
   }
 }
