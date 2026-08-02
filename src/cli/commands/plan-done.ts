@@ -14,6 +14,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
+import { formatQualityIssues } from '../../lib/xbrief/quality-lint.js';
 import { promotePlanning, readAutoSpawnOnFinalize } from './plan-finalize.js';
 
 export async function planDoneCommand(id: string, options: { prd?: boolean } = {}): Promise<void> {
@@ -28,6 +29,9 @@ export async function planDoneCommand(id: string, options: { prd?: boolean } = {
 
   if (!result.success) {
     spinner.fail(chalk.red(`Failed: ${result.error || 'Unknown error'}`));
+    for (const line of formatQualityIssues(result.qualityIssues)) {
+      console.error(chalk.red('  ' + line));
+    }
     return exitCli(1);
   }
 

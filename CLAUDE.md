@@ -383,6 +383,8 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
 marker so the no-loss gate proves that no existing surface disappeared.
 
+**God View:** `/god-view` centers the Confluence production canvas from [PAN-3447](https://github.com/eltmon/overdeck/issues/3447); its deliberate style-guide exemption and live-data contract are documented in `docs/GOD-VIEW.md`.
+
 **Session lifecycle rules:**
 - On WebSocket close, do NOT kill the PTY — the tmux session survives independently.
 - Do NOT pre-resize tmux windows. Let the PTY spawn handle sizing via client dimensions.

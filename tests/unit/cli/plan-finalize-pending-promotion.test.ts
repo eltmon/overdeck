@@ -15,12 +15,24 @@ import {
   writePendingPromotionMarker,
   type PendingPromotionMarker,
 } from '../../../src/cli/commands/plan-finalize.js';
+import { planDoneCommand } from '../../../src/cli/commands/plan-done.js';
 import { reconcilePendingPromotions } from '../../../src/lib/cloister/pending-promotion-reconciler.js';
 import { PENDING_PROMOTION_FILENAME } from '../../../src/lib/pan-dir/types.js';
 
 vi.mock('../../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: vi.fn(),
   emitActivityTtsSync: vi.fn(),
+}));
+
+const oraMocks = vi.hoisted(() => ({
+  fail: vi.fn(),
+  succeed: vi.fn(),
+}));
+
+vi.mock('ora', () => ({
+  default: vi.fn(() => ({
+    start: () => oraMocks,
+  })),
 }));
 
 const FIXED_NOW = '2026-07-28T18:00:00.000Z';
@@ -90,6 +102,8 @@ beforeEach(() => {
   vi.setSystemTime(new Date(FIXED_NOW));
   vi.spyOn(console, 'log').mockImplementation(() => undefined);
   vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  oraMocks.fail.mockClear();
+  oraMocks.succeed.mockClear();
 });
 
 afterEach(() => {
@@ -218,6 +232,66 @@ describe('plan finalize pending-promotion marker', () => {
     expect(output).toContain('Promotion deferred');
     expect(output).toContain('the deacon will complete promotion automatically');
     expect(output).toContain('Manual fallback: pan plan done PAN-3229.');
+  });
+
+  it('prints server quality issues from both finalize and done failure paths', async () => {
+    const qualityIssues = [{
+      itemId: 'marker',
+      rule: 'ac-missing',
+      message: 'Item marker has no acceptance criteria',
+      severity: 'error',
+    }];
+    const response = () => new Response(JSON.stringify({
+      error: 'xBRIEF quality lint failed',
+      qualityIssues,
+    }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    const { root, workspacePath } = createWorkspace();
+    process.env.OVERDECK_HOME = root;
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(async () => response()));
+    mockProcessExit();
+
+    const finalizeResult = await planFinalizeCommand({
+      workspace: workspacePath,
+      prd: false,
+      qualityLint: false,
+    }).catch(error => error as Error);
+
+    expect(finalizeResult.message).toBe('EXIT:1');
+    expect([
+      ...vi.mocked(console.log).mock.calls,
+      ...vi.mocked(console.error).mock.calls,
+    ].map(args => String(args[0])).join('\n')).toContain('ac-missing: Item marker has no acceptance criteria');
+
+    vi.mocked(console.log).mockClear();
+    vi.mocked(console.error).mockClear();
+
+    const doneResult = await planDoneCommand('PAN-3229', { prd: false }).catch(error => error as Error);
+
+    expect(doneResult.message).toBe('EXIT:1');
+    expect(oraMocks.fail).toHaveBeenCalledWith(expect.stringContaining('xBRIEF quality lint failed'));
+    expect(vi.mocked(console.error).mock.calls.map(args => String(args[0])).join('\n'))
+      .toContain('ac-missing: Item marker has no acceptance criteria');
+  });
+
+  it('names the evaluator defect when a quality failure response has no issues', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      error: 'xBRIEF quality lint failed',
+      qualityIssues: [],
+    }), {
+      status: 422,
+      headers: { 'Content-Type': 'application/json' },
+    })));
+    mockProcessExit();
+
+    const result = await planDoneCommand('PAN-3229', { prd: false }).catch(error => error as Error);
+
+    expect(result.message).toBe('EXIT:1');
+    expect(vi.mocked(console.error).mock.calls.map(args => String(args[0])).join('\n'))
+      .toContain('quality-issues-missing: The complete-planning endpoint rejected the plan without returning any quality issues');
   });
 
   it('does not write a marker when promotion succeeds or is explicitly skipped', async () => {

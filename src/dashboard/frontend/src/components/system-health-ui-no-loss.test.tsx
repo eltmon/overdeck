@@ -214,14 +214,27 @@ describe('system health UI no-loss audit', () => {
     };
   });
 
-  it('keeps every header metric and diagnostic visible by name', () => {
+  it('keeps every header metric and diagnostic visible by name in redesigned layout', () => {
     renderPill();
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
+
+    // Summary line (new header box)
+    expect(within(dialog).getByText(/All clear.*spawn headroom.*relay running.*0 stalled/)).toBeInTheDocument();
+
+    // Chip row (new top status row, replaces old 8-tile status grid)
+    expect(within(dialog).getByText('Admitted work agents')).toBeInTheDocument();
+    expect(within(dialog).getByText('2')).toBeInTheDocument();
+    expect(within(dialog).getByText('Containers')).toBeInTheDocument();
+    expect(within(dialog).getByText('Webhook relay')).toBeInTheDocument();
+    expect(within(dialog).getByText('Running')).toBeInTheDocument();
+
+    // Vitals tiles (4x2 grid with meter bars, replaces old 8-tile grid)
     expect(within(dialog).getByText('CPU')).toBeInTheDocument();
     expect(within(dialog).getByText('12.5%')).toBeInTheDocument();
     expect(within(dialog).getByText('Load/core 0.20')).toBeInTheDocument();
+    expect(within(dialog).getByText('Memory')).toBeInTheDocument();
     expect(within(dialog).getByText('23 GB / 64 GB')).toBeInTheDocument();
     expect(within(dialog).getByText('Avail 41 GB')).toBeInTheDocument();
     expect(within(dialog).getByText('Overdeck')).toBeInTheDocument();
@@ -230,11 +243,6 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('Swap')).toBeInTheDocument();
     expect(within(dialog).getByText('50.0%')).toBeInTheDocument();
     expect(within(dialog).getByText('Overcommit 125.0%')).toBeInTheDocument();
-    expect(within(dialog).getByText('Admitted work agents')).toBeInTheDocument();
-    expect(within(dialog).getByText('2')).toBeInTheDocument();
-    expect(within(dialog).getByText('Containers')).toBeInTheDocument();
-    expect(within(dialog).getByText('Webhook relay')).toBeInTheDocument();
-    expect(within(dialog).getByText('Running')).toBeInTheDocument();
   });
 
   it('retains agent kill, specialist kill, and container remove actions', async () => {
@@ -269,6 +277,44 @@ describe('system health UI no-loss audit', () => {
     await waitFor(() => {
       expect(mockRefreshDashboardState).toHaveBeenCalled();
     });
+  });
+
+  it('groups top consumers by kind badge and displays proportional memory bars', () => {
+    hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
+    // Top consumers section with kind badges
+    expect(within(dialog).getByText(/Work|Specialist|Container/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/agent-pan-1|specialist-review-agent|container-1/)).toBeInTheDocument();
+  });
+
+  it('displays attention section with severity dots and grouped agent rows when critical', () => {
+    hookState.current = {
+      data: {
+        ...createSnapshot('critical'),
+        agents: [{
+          id: 'agent-stalled',
+          issueId: 'PAN-1',
+          status: 'stalled',
+          reasons: [{
+            code: 'agent.runtime.inactive.stalled',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'agent-stalled has produced no activity for 35 min.',
+          }],
+        }],
+      },
+      isLoading: false,
+      error: null,
+    };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
+    // Attention section should exist with agent activity issue
+    expect(within(dialog).getByText(/agent-stalled|activity stalled/)).toBeInTheDocument();
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {

@@ -238,9 +238,23 @@ export const AgentActivityChangedEvent = Schema.Struct({
     agentId: AgentId,
     activity: Activity,
     currentTool: Schema.optional(Schema.String),
+    hookName: Schema.optional(Schema.String),
   }),
 })
 export type AgentActivityChangedEvent = typeof AgentActivityChangedEvent.Type
+
+/** A registered harness hook fired without implying an agent activity transition. */
+export const AgentHookFiredEvent = Schema.Struct({
+  type: Schema.Literal("agent.hook_fired"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    hookName: Schema.String,
+    tool: Schema.optional(Schema.String),
+  }),
+})
+export type AgentHookFiredEvent = typeof AgentHookFiredEvent.Type
 
 export const AgentThinkingStartedEvent = Schema.Struct({
   type: Schema.Literal("agent.thinking_started"),
@@ -1253,6 +1267,7 @@ export const DomainEvent = Schema.Union([
   AgentOutputReceivedEvent,
   // PAN-800 runtime events
   AgentActivityChangedEvent,
+  AgentHookFiredEvent,
   AgentThinkingStartedEvent,
   AgentThinkingStoppedEvent,
   AgentWaitingStartedEvent,

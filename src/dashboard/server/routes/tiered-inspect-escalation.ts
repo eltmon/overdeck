@@ -58,7 +58,7 @@ export function handleTieredInspectFailureEscalation(
   const overrides = readOverrides(workspacePath);
   const decision = decide({
     kind: 'supervisor-blocked',
-    taskId,
+    itemId: taskId,
     sha: getReviewStatusSync(issueId)?.reviewedAtCommit ?? 'unknown',
     attemptsAtCurrentTier: tiered.escalation.retries_at_tier,
   }, item, tiered.escalation, overrides);
