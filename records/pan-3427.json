@@ -26,42 +26,56 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:36:56.620Z",
+  "updated": "2026-08-02T17:38:26.997Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:36:40.404Z",
-    "inspectNotes": "Inspecting item routes-project-param"
+    "updatedAt": "2026-08-02T17:38:26.820Z",
+    "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd."
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 197,
+            "output": 324,
+            "cacheRead": 64,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 202,
-            "output": 46349,
-            "cacheRead": 11318582,
-            "cacheWrite": 545967
+            "input": 220,
+            "output": 53257,
+            "cacheRead": 13429012,
+            "cacheWrite": 561566
           }
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 197,
+          "output": 324,
+          "cacheRead": 64,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
-          "input": 202,
-          "output": 46349,
-          "cacheRead": 11318582,
-          "cacheWrite": 545967
+          "input": 220,
+          "output": 53257,
+          "cacheRead": 13429012,
+          "cacheWrite": 561566
         }
       },
       "costAtCloseOut": {
-        "usd": 4.092533,
-        "pricingAsOf": "2026-08-02T17:36:40.412Z"
+        "usd": 4.6245574,
+        "pricingAsOf": "2026-08-02T17:38:26.901Z"
       }
     },
     "merges": [],
