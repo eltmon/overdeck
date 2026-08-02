@@ -21,7 +21,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync, listProjectsSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
 import { projectKey as resolveCanonicalProjectKey } from '../../../lib/project-key.js';
 import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -63,6 +63,7 @@ interface JsonBodyResult {
 interface OrdersStateRoot {
   stateRoot: string;
   project?: string;
+  projectConfig?: ProjectConfig;
 }
 
 function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): OrdersStateRoot {
@@ -70,11 +71,19 @@ function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): Ord
   if (projectKey !== undefined) {
     const project = getProjectSync(projectKey);
     if (!project) throw new Error(`Unknown project: ${projectKey}`);
-    return { stateRoot: resolveStateReadHomeSync(project, projectKey).root, project: projectKey };
+    return {
+      stateRoot: resolveStateReadHomeSync(project, projectKey).root,
+      project: projectKey,
+      projectConfig: project,
+    };
   }
   const project = findProjectByPathSync(process.cwd());
   if (!project) throw new Error(`No configured project contains ${process.cwd()}`);
-  return { stateRoot: resolveStateReadHomeSync(project).root, project: resolveCanonicalProjectKey(project) };
+  return {
+    stateRoot: resolveStateReadHomeSync(project).root,
+    project: resolveCanonicalProjectKey(project),
+    projectConfig: project,
+  };
 }
 
 function errorResult(error: unknown): RouteResult {
@@ -285,9 +294,9 @@ function previewBrief(book: OrderBook): string {
   return `${lines.join('\n')}\n`;
 }
 
-async function defaultStartOrderBook(book: OrderBook): Promise<StartOrderBookResult> {
+async function defaultStartOrderBook(book: OrderBook, project: ProjectConfig): Promise<StartOrderBookResult> {
   const { startFlywheelRun } = await import('../../../cli/commands/flywheel.js');
-  return startFlywheelRun({ cwd: process.cwd(), orders: book.id });
+  return startFlywheelRun({ cwd: resolveProjectPath(project), orders: book.id });
 }
 
 export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {
@@ -459,9 +468,9 @@ export async function postOrderStartPayload(
   projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => {
-    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
-    const book = requireBook(stateRoot, bookId);
-    const validation = validateBookForStart(stateRoot, book, {
+    const resolved = resolveOrdersStateRoot(deps, projectKey);
+    const book = requireBook(resolved.stateRoot, bookId);
+    const validation = validateBookForStart(resolved.stateRoot, book, {
       issueLookup: deps.issueLookup,
       hasPrd: deps.hasPrd,
     });
@@ -473,7 +482,13 @@ export async function postOrderStartPayload(
         warnings: validation.warns,
       };
     }
-    const result = await (deps.startOrderBook ?? defaultStartOrderBook)(book);
+    let result: StartOrderBookResult;
+    if (deps.startOrderBook) {
+      result = await deps.startOrderBook(book);
+    } else {
+      if (!resolved.projectConfig) throw new Error(`No configured project contains ${process.cwd()}`);
+      result = await defaultStartOrderBook(book, resolved.projectConfig);
+    }
     return { ok: true, runId: result.runId, warnings: validation.warns };
   }).then((result) => {
     if (

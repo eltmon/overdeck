@@ -15,11 +15,13 @@ const {
   mockFindProjectByPathSync,
   mockListProjectsSync,
   mockResolveStateReadHomeSync,
+  mockStartFlywheelRun,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
   mockListProjectsSync: vi.fn(),
   mockResolveStateReadHomeSync: vi.fn(),
+  mockStartFlywheelRun: vi.fn(),
 }));
 
 vi.mock('../../../../lib/projects.js', async (importOriginal) => {
@@ -31,6 +33,10 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
     listProjectsSync: mockListProjectsSync,
   };
 });
+
+vi.mock('../../../../cli/commands/flywheel.js', () => ({
+  startFlywheelRun: mockStartFlywheelRun,
+}));
 
 vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../../lib/state-read-home.js')>();
@@ -145,6 +151,7 @@ beforeEach(() => {
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
   mockListProjectsSync.mockReset().mockReturnValue([]);
   mockResolveStateReadHomeSync.mockReset();
+  mockStartFlywheelRun.mockReset();
 });
 
 afterEach(() => {
@@ -460,5 +467,50 @@ describe('/api/orders routes', () => {
     await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere?project=other-project'))
       .resolves.toMatchObject({ status: 404, body: { error: 'Order book not found: 2026-07-18-nowhere' } });
     expect(mockListProjectsSync).not.toHaveBeenCalled();
+  });
+
+  it('starts the Flywheel with cwd set to the non-default project\'s resolved path', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-OTHER' });
+
+    const states = new Map<string, OrderIssueState>([['PAN-20', { issue: 'PAN-20', open: true, parked: false }]]);
+    const layer = makeOrdersRouteLayer({ issueLookup: issueLookup(states) });
+    await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
+      id: '2026-07-18-cross-start',
+      name: 'Cross start',
+    }));
+    await requestOrdersRoute(layer, '/api/orders/2026-07-18-cross-start/items?project=other-project', mutation('POST', {
+      items: [{ issue: 'PAN-20', lane: 'A' }],
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-cross-start/start?project=other-project', mutation('POST')))
+      .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-OTHER', warnings: [] } });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: '2026-07-18-cross-start' });
+  });
+
+  it('keeps starting from the server cwd when the book is in the default project', async () => {
+    const defaultRoot = gitFixture();
+    const defaultProject = { path: process.cwd() } as ProjectConfig;
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockListProjectsSync.mockReturnValue([{ key: 'default-project', config: defaultProject }]);
+    mockResolveStateReadHomeSync.mockReturnValue({ root: defaultRoot, migrated: true });
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-DEFAULT' });
+
+    const states = new Map<string, OrderIssueState>([['PAN-21', { issue: 'PAN-21', open: true, parked: false }]]);
+    const layer = makeOrdersRouteLayer({ issueLookup: issueLookup(states) });
+    await requestOrdersRoute(layer, '/api/orders', mutation('POST', {
+      id: '2026-07-18-default-start',
+      name: 'Default start',
+    }));
+    await requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/items', mutation('POST', {
+      items: [{ issue: 'PAN-21', lane: 'A' }],
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-default-start/start', mutation('POST')))
+      .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-DEFAULT', warnings: [] } });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: process.cwd(), orders: '2026-07-18-default-start' });
   });
 });
