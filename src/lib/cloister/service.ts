@@ -2,8 +2,12 @@
 import type { HealthState } from '../runtimes/types.js';
 import type { CloisterConfig } from './config.js';
 import type { AgentHealth } from './health.js';
-import type { DomainEvent } from '@overdeck/contracts';
 import { loadCloisterConfigSync } from './config.js';
+import {
+  getCloisterEventStore,
+  setCloisterEventStoreProvider,
+  type CloisterEventStore,
+} from './event-store-provider.js';
 // PAN-378: initializeEnabledSpecialists removed — per-project ephemeral specialists
 // are spawned on-demand, no global initialization needed.
 import { getGlobalRegistry, getRuntimeForAgent } from '../runtimes/index.js';
@@ -75,27 +79,7 @@ async function cleanupLegacySpecialistsDirectory(): Promise<void> {
   await rm(LEGACY_SPECIALISTS_DIR, { recursive: true, force: true });
 }
 
-interface CloisterEventStore {
-  append(event: Omit<DomainEvent, 'sequence'>): number;
-  subscribe?: (fn: (event: CloisterDomainEventLike) => void) => () => void;
-}
-
-let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
-
-export function setCloisterEventStoreProvider(provider: (() => CloisterEventStore) | null): void {
-  cloisterEventStoreProvider = provider;
-}
-
-/**
- * Read door for the process-local cloister event store (set by deacon-main in
- * the deacon-child process). Cloister modules that emit domain events outside
- * the service host (e.g. the stall sweeper) append through this — never to the
- * DB directly. Returns null when no provider is wired (CLI/test contexts):
- * callers must treat emission as best-effort.
- */
-export function getCloisterEventStore(): CloisterEventStore | null {
-  return cloisterEventStoreProvider?.() ?? null;
-}
+export { getCloisterEventStore, setCloisterEventStoreProvider };
 
 /**
  * Write Cloister running state to file for cross-process visibility
@@ -531,7 +515,7 @@ export class CloisterService {
     if (this.domainEventUnsubscribe) return;
 
     try {
-      const injected = cloisterEventStoreProvider?.();
+      const injected = getCloisterEventStore();
       if (injected) {
         this.eventStore = injected;
         if (injected.subscribe) {
