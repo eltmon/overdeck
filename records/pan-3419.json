@@ -334,7 +334,7 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T18:33:47.373Z",
+  "updated": "2026-08-02T18:35:36.429Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -344,7 +344,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T18:33:40.911Z",
+    "updatedAt": "2026-08-02T18:35:36.177Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -470,9 +470,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19800545,
-            "output": 159273,
-            "cacheRead": 47553536,
+            "input": 19813637,
+            "output": 162573,
+            "cacheRead": 48278528,
             "cacheWrite": 0
           }
         },
@@ -510,10 +510,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 454,
-            "output": 90477,
-            "cacheRead": 37928799,
-            "cacheWrite": 1033598
+            "input": 478,
+            "output": 93046,
+            "cacheRead": 39456943,
+            "cacheWrite": 1045754
           }
         },
         "work": {
@@ -533,21 +533,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 41170269,
-          "output": 662145,
-          "cacheRead": 247157760,
+          "input": 41183361,
+          "output": 665445,
+          "cacheRead": 247882752,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 454,
-          "output": 90477,
-          "cacheRead": 37928799,
-          "cacheWrite": 1033598
+          "input": 478,
+          "output": 93046,
+          "cacheRead": 39456943,
+          "cacheWrite": 1045754
         }
       },
       "costAtCloseOut": {
-        "usd": 360.3773853,
-        "pricingAsOf": "2026-08-02T18:33:45.910Z"
+        "usd": 361.2660973,
+        "pricingAsOf": "2026-08-02T18:35:36.300Z"
       }
     },
     "merges": [
