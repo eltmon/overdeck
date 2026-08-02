@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ConfluenceOrb } from '../useConfluenceData';
+import type { ConfluenceData, ConfluenceOrb } from '../useConfluenceData';
 import { GodViewConfluence } from '../GodViewConfluence';
 
 vi.mock('../RiverCanvas', () => ({
@@ -22,21 +22,21 @@ vi.mock('../useConfluenceChoreography', () => ({
   useConfluenceChoreography: vi.fn(),
 }));
 
-vi.mock('../useConfluenceData', async (importOriginal) => {
-  const original = await importOriginal<typeof import('../useConfluenceData')>();
-  return {
-    ...original,
-    useConfluenceData: () => ({
-      orbs: [],
-      hookStream: { entries: [], eventsPerMin: 0 },
-      meta: { conversations: 0, mergeQ: 0, roleCounts: {} },
-    }),
-  };
-});
-
 vi.mock('../../Sidebar', () => ({
   GodViewSidebar: () => <aside aria-label="Stubbed sidebar" />,
 }));
+
+const data = {
+  orbs: [],
+  hookStream: { entries: [], eventsPerMin: 0 },
+  meta: { conversations: 0, mergeQ: 0, roleCounts: {} },
+} as unknown as ConfluenceData;
+
+function renderConfluence() {
+  return render(
+    <GodViewConfluence data={data} helpOpen={false} onHelpChange={vi.fn()} />,
+  );
+}
 
 describe('Confluence issue drawer link', () => {
   beforeEach(() => {
@@ -47,7 +47,7 @@ describe('Confluence issue drawer link', () => {
   it('navigates a picked orb to the real issue drawer route', () => {
     const pushState = vi.spyOn(window.history, 'pushState');
     const dispatchEvent = vi.spyOn(window, 'dispatchEvent');
-    render(<GodViewConfluence />);
+    renderConfluence();
 
     fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
 
@@ -57,7 +57,7 @@ describe('Confluence issue drawer link', () => {
 
   it('does not navigate when canvas picking misses', () => {
     const pushState = vi.spyOn(window.history, 'pushState');
-    render(<GodViewConfluence />);
+    renderConfluence();
 
     fireEvent.click(screen.getByRole('button', { name: 'Canvas miss' }));
 
@@ -66,7 +66,7 @@ describe('Confluence issue drawer link', () => {
   });
 
   it('contains no preview issue rail', () => {
-    render(<GodViewConfluence />);
+    renderConfluence();
     expect(document.querySelector('.confluence-issue-rail')).toBeNull();
   });
 });

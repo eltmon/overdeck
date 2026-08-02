@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { HOOK_INVENTORY } from '@overdeck/contracts';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
@@ -6,7 +6,7 @@ import { GodViewSidebar } from '../Sidebar';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverEffectsApi } from './RiverCanvas';
 import { useConfluenceChoreography } from './useConfluenceChoreography';
-import { useConfluenceData, type ConfluenceOrb } from './useConfluenceData';
+import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
 interface HoverState {
@@ -22,13 +22,17 @@ export function navigateToConfluenceIssue(issueId: string): void {
   window.dispatchEvent(new PopStateEvent('popstate'));
 }
 
-export function GodViewConfluence() {
-  const rootRef = useRef<HTMLDivElement>(null);
+interface GodViewConfluenceProps {
+  data: ConfluenceData;
+  helpOpen: boolean;
+  onHelpChange: (open: boolean) => void;
+}
+
+export function GodViewConfluence({ data, helpOpen, onHelpChange }: GodViewConfluenceProps) {
   const effectsRef = useRef<RiverEffectsApi>(null);
-  const { orbs, hookStream, meta } = useConfluenceData();
+  const { orbs, hookStream, meta } = data;
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const [hover, setHover] = useState<HoverState | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
 
   const hookCounts = useMemo(() => {
@@ -37,25 +41,8 @@ export function GodViewConfluence() {
     return counts;
   }, [hookStream.entries]);
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'f' && !event.metaKey && !event.ctrlKey && !event.altKey) {
-        event.preventDefault();
-        if (document.fullscreenElement) void document.exitFullscreen();
-        else void rootRef.current?.requestFullscreen();
-      } else if (event.key === 'h' || event.key === '?') {
-        event.preventDefault();
-        setHelpOpen((open) => !open);
-      } else if (event.key === 'Escape') {
-        setHelpOpen(false);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
-
   return (
-    <div ref={rootRef} className="confluence-root">
+    <div className="confluence-root">
       <div className="confluence-main">
         <aside className="confluence-hookbus gv-glass" aria-label="Hook bus">
           <h3>HOOK BUS <em>· harness</em></h3>
@@ -115,7 +102,7 @@ export function GodViewConfluence() {
       {helpOpen && (
         <div className="confluence-help" role="dialog" aria-modal="true" aria-label="Confluence field guide">
           <div>
-            <header><strong>CONFLUENCE FIELD GUIDE</strong><button type="button" onClick={() => setHelpOpen(false)}>×</button></header>
+            <header><strong>CONFLUENCE FIELD GUIDE</strong><button type="button" onClick={() => onHelpChange(false)}>×</button></header>
             <p>The river moves issues from PLAN through MERGE. Heat and motion follow live hook traffic; frost means an agent has gone quiet.</p>
             <p>Amber shelf orbs are deliberately paused. Pink wrecks are failed merges. Review satellites show the four specialist verdicts and synthesis parent.</p>
           </div>

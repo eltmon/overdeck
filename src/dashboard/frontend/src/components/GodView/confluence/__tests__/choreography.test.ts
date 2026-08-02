@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { RiverEffectsApi } from '../RiverCanvas';
 import {
@@ -146,15 +144,19 @@ describe('Confluence choreography dispatch table', () => {
       .toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-11' });
   });
 
-  it('contains no wall-clock choreography timers or simulator schedule fields', () => {
-    const root = process.cwd();
-    const frontend = root.endsWith('/src/dashboard/frontend')
-      ? root
-      : resolve(root, 'src/dashboard/frontend');
-    const source = readFileSync(
-      resolve(frontend, 'src/components/GodView/confluence/useConfluenceChoreography.ts'),
-      'utf8',
-    );
-    expect(source).not.toMatch(/setTimeout|setInterval|nextTransition|nextTide|nextThaw/);
+  it('plans and runs a frame without scheduling wall-clock choreography timers', () => {
+    vi.useFakeTimers();
+    try {
+      const commands = planConfluenceChoreography({
+        previous: new Map([['PAN-1', orb('PAN-1')]]),
+        current: new Map([['PAN-1', orb('PAN-1', { stage: 'REVIEW' })]]),
+        hookEvents: [hook('PAN-1')],
+        random: () => 1,
+      });
+      runConfluenceCommands(commands, effects());
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

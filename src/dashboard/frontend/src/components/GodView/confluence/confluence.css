@@ -1,3 +1,45 @@
+.confluence-topbar {
+  position: relative;
+  z-index: 20;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 12px 0;
+  padding: 7px 10px;
+  overflow-x: auto;
+  border-color: rgba(0, 212, 255, .2);
+  scrollbar-width: none;
+}
+
+.confluence-topbar::-webkit-scrollbar { display: none; }
+.confluence-brand { display: flex; flex: 0 0 auto; align-items: center; gap: 6px; color: var(--gv-blue); font: 700 11px var(--gv-font-display); letter-spacing: .14em; text-transform: uppercase; }
+.confluence-brand svg { width: 17px; height: 17px; animation: gv-logo-glow 3s ease-in-out infinite; }
+.confluence-clock { flex: 0 0 auto; color: var(--gv-blue); font-size: 12px; }
+.confluence-stat { display: flex; flex: 0 0 auto; flex-direction: column; gap: 1px; white-space: nowrap; }
+.confluence-stat em { color: var(--gv-text-dim); font: 7px var(--gv-font-mono); font-style: normal; letter-spacing: .1em; }
+.confluence-stat b { color: var(--gv-text-primary); font: 700 10px var(--gv-font-mono); }
+.confluence-event-pop { width: 3px; height: 3px; margin-left: -8px; border-radius: 50%; background: var(--gv-green); opacity: 0; }
+.confluence-event-pop.pop { animation: confluence-event-pop .22s ease-out; }
+.confluence-ecg-stat { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; }
+.confluence-ecg { width: 130px; height: 30px; border: 1px solid rgba(57, 255, 20, .12); border-radius: 4px; background: rgba(4, 10, 8, .55); }
+.confluence-meters { display: flex; flex: 0 0 auto; gap: 5px; }
+.confluence-meter { display: flex; width: 48px; flex-direction: column; gap: 2px; }
+.confluence-meter i { height: 3px; overflow: hidden; border-radius: 2px; background: rgba(255, 255, 255, .08); }
+.confluence-meter i b { display: block; height: 100%; background: var(--gv-blue); box-shadow: 0 0 5px var(--gv-blue); }
+.confluence-meter em { color: var(--gv-text-secondary); font: 7px var(--gv-font-mono); font-style: normal; white-space: nowrap; }
+.confluence-active { flex: 0 0 auto; padding: 4px 8px; border: 1px solid var(--gv-border); border-radius: 999px; color: var(--gv-text-secondary); font: 700 9px var(--gv-font-mono); }
+.confluence-active.on { border-color: rgba(57, 255, 20, .3); color: var(--gv-green); background: rgba(57, 255, 20, .08); }
+.confluence-topbar-button { flex: 0 0 auto; height: 27px; padding: 0 8px; border: 1px solid var(--gv-border); border-radius: 7px; color: var(--gv-text-secondary); background: rgba(255, 255, 255, .02); font: 8px var(--gv-font-mono); cursor: pointer; }
+.confluence-topbar-button:hover { border-color: rgba(0, 212, 255, .35); color: var(--gv-blue); }
+.confluence-topbar-button.icon { display: grid; width: 28px; padding: 0; place-items: center; }
+.confluence-topbar-button.icon svg { width: 13px; height: 13px; }
+
+@keyframes confluence-event-pop {
+  0% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(57, 255, 20, .8); }
+  100% { opacity: 0; transform: scale(2.8); box-shadow: 0 0 0 7px rgba(57, 255, 20, 0); }
+}
+
 .confluence-root {
   position: relative;
   z-index: 10;
