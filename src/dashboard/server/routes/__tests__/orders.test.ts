@@ -7,7 +7,31 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { _resetInternalTokenCacheForTests, INTERNAL_TOKEN_HEADER } from '../../../../lib/internal-token.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../../lib/orders/types.js';
+import type { ProjectConfig } from '../../../../lib/projects.js';
 import { makeOrdersRouteLayer } from '../orders.js';
+
+const { mockGetProjectSync, mockFindProjectByPathSync, mockResolveStateReadHomeSync } = vi.hoisted(() => ({
+  mockGetProjectSync: vi.fn(),
+  mockFindProjectByPathSync: vi.fn(),
+  mockResolveStateReadHomeSync: vi.fn(),
+}));
+
+vi.mock('../../../../lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/projects.js')>();
+  return {
+    ...actual,
+    getProjectSync: mockGetProjectSync,
+    findProjectByPathSync: mockFindProjectByPathSync,
+  };
+});
+
+vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../../lib/state-read-home.js')>();
+  return {
+    ...actual,
+    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
+  };
+});
 
 interface RouteResult {
   status: number;
@@ -110,6 +134,9 @@ function writeSequence(root: string): void {
 beforeEach(() => {
   process.env['OVERDECK_INTERNAL_TOKEN'] = 'orders-route-test-token';
   _resetInternalTokenCacheForTests();
+  mockGetProjectSync.mockReset().mockReturnValue(null);
+  mockFindProjectByPathSync.mockReset().mockReturnValue(null);
+  mockResolveStateReadHomeSync.mockReset();
 });
 
 afterEach(() => {
@@ -309,5 +336,56 @@ describe('/api/orders routes', () => {
       .resolves.toEqual({ status: 200, body: { ok: true, runId: 'RUN-88', warnings: [] } });
     expect(startOrderBook).toHaveBeenCalledOnce();
     expect(startOrderBook).toHaveBeenCalledWith(expect.objectContaining({ id: '2026-07-18-clean' }));
+  });
+
+  it('resolves ?project=<key> through the projects registry and stamps the envelope', async () => {
+    const rootA = gitFixture();
+    const rootB = gitFixture();
+    const projectA = { path: '/fake/project-a' } as ProjectConfig;
+    const projectB = { path: '/fake/project-b' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => {
+      if (key === 'project-a') return projectA;
+      if (key === 'project-b') return projectB;
+      return null;
+    });
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === projectA ? rootA : rootB,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-a', mutation('POST', {
+      id: '2026-07-18-book-a',
+      name: 'Book A',
+    }))).resolves.toMatchObject({ status: 200, body: { id: '2026-07-18-book-a' } });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-b', mutation('POST', {
+      id: '2026-07-18-book-b',
+      name: 'Book B',
+    }))).resolves.toMatchObject({ status: 200, body: { id: '2026-07-18-book-b' } });
+
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-a')).resolves.toMatchObject({
+      status: 200,
+      body: { project: 'project-a', books: [{ id: '2026-07-18-book-a' }] },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=project-b')).resolves.toMatchObject({
+      status: 200,
+      body: { project: 'project-b', books: [{ id: '2026-07-18-book-b' }] },
+    });
+  });
+
+  it('rejects an unknown ?project= key with 400 across GET and mutation routes', async () => {
+    mockGetProjectSync.mockReturnValue(null);
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+
+    await expect(requestOrdersRoute(layer, '/api/orders?project=ghost-project')).resolves.toMatchObject({
+      status: 400,
+      body: { error: expect.stringContaining('Unknown project: ghost-project') },
+    });
+    await expect(requestOrdersRoute(layer, '/api/orders?project=ghost-project', mutation('POST', {
+      name: 'Should not be created',
+    }))).resolves.toMatchObject({
+      status: 400,
+      body: { error: expect.stringContaining('Unknown project: ghost-project') },
+    });
   });
 });

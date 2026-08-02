@@ -21,7 +21,8 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
-import { findProjectByPathSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, getProjectSync } from '../../../lib/projects.js';
+import { projectKey as resolveCanonicalProjectKey } from '../../../lib/project-key.js';
 import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
@@ -47,6 +48,7 @@ export interface OrdersRouteDeps {
 
 interface OrdersReadSnapshot {
   stateRoot: string;
+  project?: string;
   books: OrderBook[];
   issueState: ReadonlyMap<string, OrderIssueState>;
   issueLookup: OrderIssueLookup;
@@ -58,11 +60,21 @@ interface JsonBodyResult {
   body: Record<string, unknown>;
 }
 
-function stateRootFor(deps: OrdersRouteDeps): string {
-  if (deps.stateRoot) return deps.stateRoot();
+interface OrdersStateRoot {
+  stateRoot: string;
+  project?: string;
+}
+
+function resolveOrdersStateRoot(deps: OrdersRouteDeps, projectKey?: string): OrdersStateRoot {
+  if (deps.stateRoot) return { stateRoot: deps.stateRoot() };
+  if (projectKey !== undefined) {
+    const project = getProjectSync(projectKey);
+    if (!project) throw new Error(`Unknown project: ${projectKey}`);
+    return { stateRoot: resolveStateReadHomeSync(project, projectKey).root, project: projectKey };
+  }
   const project = findProjectByPathSync(process.cwd());
   if (!project) throw new Error(`No configured project contains ${process.cwd()}`);
-  return resolveStateReadHomeSync(project).root;
+  return { stateRoot: resolveStateReadHomeSync(project).root, project: resolveCanonicalProjectKey(project) };
 }
 
 function errorResult(error: unknown): RouteResult {
@@ -71,7 +83,7 @@ function errorResult(error: unknown): RouteResult {
   if (/already (exists|belongs|running|active)|multiple non-complete/i.test(message)) {
     return { status: 409, body: { error: message } };
   }
-  if (/invalid|required|must be|cannot be empty|positive integer|server-controlled|may only transition/i.test(message)) {
+  if (/invalid|required|must be|cannot be empty|positive integer|server-controlled|may only transition|unknown project/i.test(message)) {
     return { status: 400, body: { error: message } };
   }
   return { status: 500, body: { error: message } };
@@ -175,8 +187,8 @@ function nextBookId(stateRoot: string, name: string, now: Date): string {
   return `${base}-${suffix}`;
 }
 
-function buildOrdersReadSnapshot(deps: OrdersRouteDeps): OrdersReadSnapshot {
-  const stateRoot = stateRootFor(deps);
+function buildOrdersReadSnapshot(deps: OrdersRouteDeps, projectKey?: string): OrdersReadSnapshot {
+  const { stateRoot, project } = resolveOrdersStateRoot(deps, projectKey);
   const books = listBooks(stateRoot);
   const issueIds = [...new Set(books.flatMap((book) => book.items.flatMap((item) => [item.issue, ...item.prereqs])))];
   const issueState = (deps.issueLookup ?? liveOrderIssueLookup)(issueIds);
@@ -186,6 +198,7 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps): OrdersReadSnapshot {
   }));
   return {
     stateRoot,
+    project,
     books,
     issueState,
     issueLookup,
@@ -193,8 +206,8 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps): OrdersReadSnapshot {
   };
 }
 
-function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot) {
-  const stateRoot = snapshot?.stateRoot ?? stateRootFor(deps);
+function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot, projectKey?: string) {
+  const stateRoot = snapshot?.stateRoot ?? resolveOrdersStateRoot(deps, projectKey).stateRoot;
   const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
   const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
@@ -275,36 +288,53 @@ async function defaultStartOrderBook(book: OrderBook): Promise<StartOrderBookRes
   return startFlywheelRun({ cwd: process.cwd(), orders: book.id });
 }
 
-export async function getOrdersPayload(deps: OrdersRouteDeps = {}): Promise<RouteResult> {
+export async function getOrdersPayload(deps: OrdersRouteDeps = {}, projectKey?: string): Promise<RouteResult> {
   return routeResult(async () => {
-    const snapshot = buildOrdersReadSnapshot(deps);
-    return { books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot)) };
+    const snapshot = buildOrdersReadSnapshot(deps, projectKey);
+    return {
+      ...(snapshot.project !== undefined ? { project: snapshot.project } : {}),
+      books: snapshot.books.map((book) => enrichedBook(book, deps, snapshot)),
+    };
   });
 }
 
-export async function postOrderPayload(body: Record<string, unknown>, deps: OrdersRouteDeps = {}): Promise<RouteResult> {
+export async function postOrderPayload(
+  body: Record<string, unknown>,
+  deps: OrdersRouteDeps = {},
+  projectKey?: string,
+): Promise<RouteResult> {
   return routeResult(async () => {
-    const stateRoot = stateRootFor(deps);
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const name = requireString(body['name'], 'name');
     const id = body['id'] === undefined
       ? nextBookId(stateRoot, name, (deps.now ?? (() => new Date()))())
       : requireString(body['id'], 'id');
     const settings = body['settings'] === undefined ? undefined : settingsPatch(body['settings']);
-    return enrichedBook(await createBook(stateRoot, { id, name, settings }), deps);
+    return enrichedBook(await createBook(stateRoot, { id, name, settings }), deps, undefined, projectKey);
   });
 }
 
-export async function getOrderPayload(bookId: string, deps: OrdersRouteDeps = {}): Promise<RouteResult> {
-  return routeResult(async () => enrichedBook(requireBook(stateRootFor(deps), bookId), deps));
+export async function getOrderPayload(
+  bookId: string,
+  deps: OrdersRouteDeps = {},
+  projectKey?: string,
+): Promise<RouteResult> {
+  return routeResult(async () => enrichedBook(
+    requireBook(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId),
+    deps,
+    undefined,
+    projectKey,
+  ));
 }
 
 export async function patchOrderPayload(
   bookId: string,
   body: Record<string, unknown>,
   deps: OrdersRouteDeps = {},
+  projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => {
-    const stateRoot = stateRootFor(deps);
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const patch = body['settings'] === undefined ? undefined : settingsPatch(body['settings']);
     if (patch?.posture !== undefined) {
       patch.postureSetAt = (deps.now ?? (() => new Date()))().toISOString();
@@ -331,7 +361,7 @@ export async function patchOrderPayload(
       changed = true;
     }
     if (!changed) throw new Error('name, settings, or status is required');
-    return enrichedBook(requireBook(stateRoot, bookId), deps);
+    return enrichedBook(requireBook(stateRoot, bookId), deps, undefined, projectKey);
   });
 }
 
@@ -339,14 +369,15 @@ export async function postOrderItemsPayload(
   bookId: string,
   body: Record<string, unknown>,
   deps: OrdersRouteDeps = {},
+  projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => {
-    const stateRoot = stateRootFor(deps);
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const book = requireBook(stateRoot, bookId);
     const input = body['items'] ?? body['item'];
     if (input === undefined) throw new Error('items is required');
     const actor = (deps.actor ?? (() => 'dashboard'))();
-    return enrichedBook(await addItems(stateRoot, bookId, parseItems(book, input), actor), deps);
+    return enrichedBook(await addItems(stateRoot, bookId, parseItems(book, input), actor), deps, undefined, projectKey);
   });
 }
 
@@ -354,10 +385,13 @@ export async function deleteOrderItemPayload(
   bookId: string,
   issueId: string,
   deps: OrdersRouteDeps = {},
+  projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => enrichedBook(
-    await removeItem(stateRootFor(deps), bookId, issueId),
+    await removeItem(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId, issueId),
     deps,
+    undefined,
+    projectKey,
   ));
 }
 
@@ -366,9 +400,10 @@ export async function patchOrderItemPayload(
   issueId: string,
   body: Record<string, unknown>,
   deps: OrdersRouteDeps = {},
+  projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => {
-    const stateRoot = stateRootFor(deps);
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const existing = requireBook(stateRoot, bookId).items.find(
       (item) => item.issue.toUpperCase() === issueId.toUpperCase(),
     );
@@ -394,22 +429,27 @@ export async function patchOrderItemPayload(
       changed = true;
     }
     if (!changed) throw new Error('lane, order, prereqs, reVerify, or planAtPickup is required');
-    return enrichedBook(requireBook(stateRoot, bookId), deps);
+    return enrichedBook(requireBook(stateRoot, bookId), deps, undefined, projectKey);
   });
 }
 
 export async function getBacklogCandidatesPayload(
   limit: number,
   deps: OrdersRouteDeps = {},
+  projectKey?: string,
 ): Promise<RouteResult> {
   return routeResult(async () => ({
-    candidates: backlogCandidates(stateRootFor(deps), Math.max(1, Math.min(100, limit))),
+    candidates: backlogCandidates(resolveOrdersStateRoot(deps, projectKey).stateRoot, Math.max(1, Math.min(100, limit))),
   }));
 }
 
-export async function postOrderStartPayload(bookId: string, deps: OrdersRouteDeps = {}): Promise<RouteResult> {
+export async function postOrderStartPayload(
+  bookId: string,
+  deps: OrdersRouteDeps = {},
+  projectKey?: string,
+): Promise<RouteResult> {
   return routeResult(async () => {
-    const stateRoot = stateRootFor(deps);
+    const { stateRoot } = resolveOrdersStateRoot(deps, projectKey);
     const book = requireBook(stateRoot, bookId);
     const validation = validateBookForStart(stateRoot, book, {
       issueLookup: deps.issueLookup,
@@ -439,9 +479,13 @@ export async function postOrderStartPayload(bookId: string, deps: OrdersRouteDep
   });
 }
 
-export async function getPreviewBriefPayload(bookId: string, deps: OrdersRouteDeps = {}): Promise<RouteResult> {
+export async function getPreviewBriefPayload(
+  bookId: string,
+  deps: OrdersRouteDeps = {},
+  projectKey?: string,
+): Promise<RouteResult> {
   return routeResult(async () => {
-    const book = requireBook(stateRootFor(deps), bookId);
+    const book = requireBook(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId);
     return { bookId: book.id, brief: previewBrief(book) };
   });
 }
@@ -465,6 +509,11 @@ function mutationAuth(request: HttpServerRequest.HttpServerRequest) {
   return rejectUnsafeDashboardMutationRequest(request);
 }
 
+function projectParam(request: HttpServerRequest.HttpServerRequest): string | undefined {
+  const url = HttpServerRequest.toURL(request);
+  return url._tag === 'Some' ? (url.value.searchParams.get('project') ?? undefined) : undefined;
+}
+
 export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
   const getBacklogCandidatesRoute = HttpRouter.add(
     'GET',
@@ -477,7 +526,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
       if (!Number.isInteger(limit) || limit < 1) {
         return jsonResponse({ error: 'limit must be a positive integer' }, { status: 400 });
       }
-      return resultResponse(yield* Effect.promise(() => getBacklogCandidatesPayload(limit, deps)));
+      return resultResponse(yield* Effect.promise(() => getBacklogCandidatesPayload(limit, deps, projectParam(request))));
     })),
   );
 
@@ -485,7 +534,8 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
     'GET',
     '/api/orders',
     httpHandler(Effect.gen(function* () {
-      return resultResponse(yield* Effect.promise(() => getOrdersPayload(deps)));
+      const request = yield* HttpServerRequest.HttpServerRequest;
+      return resultResponse(yield* Effect.promise(() => getOrdersPayload(deps, projectParam(request))));
     })),
   );
 
@@ -498,7 +548,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
       if (authError) return authError;
       const parsed = yield* readJsonBody;
       if (!parsed.ok) return jsonResponse({ error: 'Request body must be a JSON object' }, { status: 400 });
-      return resultResponse(yield* Effect.promise(() => postOrderPayload(parsed.body, deps)));
+      return resultResponse(yield* Effect.promise(() => postOrderPayload(parsed.body, deps, projectParam(request))));
     })),
   );
 
@@ -506,8 +556,9 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
     'GET',
     '/api/orders/:id',
     httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
       const id = (yield* HttpRouter.params)['id'] ?? '';
-      return resultResponse(yield* Effect.promise(() => getOrderPayload(id, deps)));
+      return resultResponse(yield* Effect.promise(() => getOrderPayload(id, deps, projectParam(request))));
     })),
   );
 
@@ -521,7 +572,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
       const parsed = yield* readJsonBody;
       if (!parsed.ok) return jsonResponse({ error: 'Request body must be a JSON object' }, { status: 400 });
       const id = (yield* HttpRouter.params)['id'] ?? '';
-      return resultResponse(yield* Effect.promise(() => patchOrderPayload(id, parsed.body, deps)));
+      return resultResponse(yield* Effect.promise(() => patchOrderPayload(id, parsed.body, deps, projectParam(request))));
     })),
   );
 
@@ -535,7 +586,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
       const parsed = yield* readJsonBody;
       if (!parsed.ok) return jsonResponse({ error: 'Request body must be a JSON object' }, { status: 400 });
       const id = (yield* HttpRouter.params)['id'] ?? '';
-      return resultResponse(yield* Effect.promise(() => postOrderItemsPayload(id, parsed.body, deps)));
+      return resultResponse(yield* Effect.promise(() => postOrderItemsPayload(id, parsed.body, deps, projectParam(request))));
     })),
   );
 
@@ -551,6 +602,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
         params['id'] ?? '',
         params['issue'] ?? '',
         deps,
+        projectParam(request),
       )));
     })),
   );
@@ -570,6 +622,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
         params['issue'] ?? '',
         parsed.body,
         deps,
+        projectParam(request),
       )));
     })),
   );
@@ -582,7 +635,7 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
       const authError = mutationAuth(request);
       if (authError) return authError;
       const id = (yield* HttpRouter.params)['id'] ?? '';
-      return resultResponse(yield* Effect.promise(() => postOrderStartPayload(id, deps)));
+      return resultResponse(yield* Effect.promise(() => postOrderStartPayload(id, deps, projectParam(request))));
     })),
   );
 
@@ -590,8 +643,9 @@ export function makeOrdersRouteLayer(deps: OrdersRouteDeps = {}) {
     'GET',
     '/api/orders/:id/preview-brief',
     httpHandler(Effect.gen(function* () {
+      const request = yield* HttpServerRequest.HttpServerRequest;
       const id = (yield* HttpRouter.params)['id'] ?? '';
-      return resultResponse(yield* Effect.promise(() => getPreviewBriefPayload(id, deps)));
+      return resultResponse(yield* Effect.promise(() => getPreviewBriefPayload(id, deps, projectParam(request))));
     })),
   );
 
