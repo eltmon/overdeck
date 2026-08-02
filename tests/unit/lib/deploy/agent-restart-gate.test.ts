@@ -75,7 +75,10 @@ describe('agentRestartBlockReason', () => {
       escalated: false,
     });
     expect(result).toContain('queued since 2026-07-26T12:00:00.000Z (0s ago)');
-    expect(result).toContain('fires automatically as soon as the window clears');
+    expect(result).toContain('deploy patrol retries automatically');
+    expect(result).toContain('merge debounce has elapsed');
+    expect(result).toContain('CI is green for the exact origin/main tip');
+    expect(result).toContain('safety window clears');
     expect(result).toContain('do not retry or use --force');
   });
 

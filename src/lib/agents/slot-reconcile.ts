@@ -38,6 +38,7 @@ export interface ReconciledSlotItem {
   status: ReconciledSlotItemStatus;
   branch?: string;
   agentId?: string;
+  mergedVia?: 'completed-status' | 'branch-ancestry';
 }
 
 export interface SlotReconcileResult {
@@ -82,6 +83,7 @@ export async function reconcileSlotState(
   const slotEligibleItemIds = new Set(analyzeSwarmReadiness(doc, { hotspots }).items
     .filter(item => item.slotEligible)
     .map(item => item.id));
+  const itemStatuses = new Map(doc.plan.items.map(item => [item.id, item.status]));
   const slotItems = resolveSlotItemOwnership(slotEligibleItemIds, assignments, agents);
 
   const result: SlotReconcileResult = {
@@ -97,12 +99,15 @@ export async function reconcileSlotState(
   for (const slotItem of slotItems) {
     const branch = branchesBySlot.get(slotItem.slotIndex);
     const agent = agentsBySlot.get(slotItem.slotIndex);
-    const merged = options.statusOverrides?.[slotItem.itemId] === 'completed' || branch?.merged === true;
+    const completed = options.statusOverrides?.[slotItem.itemId] === 'completed'
+      || itemStatuses.get(slotItem.itemId) === 'completed';
+    const merged = completed || branch?.merged === true;
     const entry: ReconciledSlotItem = {
       ...slotItem,
       status: merged ? 'merged' : agent || branch ? 'in_flight' : 'pending',
       branch: branch?.branch,
       agentId: agent?.agentId,
+      ...(merged ? { mergedVia: completed ? 'completed-status' : 'branch-ancestry' } : {}),
     };
 
     if (entry.status === 'merged') result.merged.push(entry);

@@ -131,6 +131,7 @@
             "group": "Reference",
             "pages": [
               "reference/architecture",
+              "reference/god-view",
               "reference/state-model",
               "reference/harness-landscape",
               "reference/posthog-agents",

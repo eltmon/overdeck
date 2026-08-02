@@ -397,6 +397,34 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('No active pressure signals.')).toBeInTheDocument();
   });
 
+  it('displays attention severity and the singleton agent row when critical', () => {
+    hookState.current = {
+      data: {
+        ...createSnapshot('critical'),
+        agents: [{
+          id: 'agent-stalled',
+          issueId: 'PAN-1',
+          status: 'stalled',
+          reasons: [{
+            code: 'agent.runtime.inactive.stalled',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'agent-stalled has produced no activity for 35 min.',
+          }],
+        }],
+      },
+      isLoading: false,
+      error: null,
+    };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
+    expect(within(dialog).getAllByLabelText('critical attention').length).toBeGreaterThan(0);
+    expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
+    expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
+  });
+
   it('emits one critical transition event and makes leaked-first focus reversible', () => {
     const rendered = renderPill();
     hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };

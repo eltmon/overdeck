@@ -4,20 +4,21 @@ import { useGodViewStore } from '../../hooks/useGodViewSocket';
 
 interface GaugeProps {
   label: string;
-  value: number; // 0-100
+  value: number | null; // 0-100
   color: string;
   size?: number;
 }
 
-function Gauge({ label, value, color, size = 80 }: GaugeProps) {
+function Gauge({ label, value, color, size = 62 }: GaugeProps) {
   const cx = size / 2;
   const cy = size / 2;
   const outerRadius = cx - 4;
-  const innerRadius = outerRadius - 10;
+  const innerRadius = outerRadius - 8;
 
   const startAngle = -Math.PI * 0.75;
   const endAngle = Math.PI * 0.75;
-  const valueAngle = startAngle + (value / 100) * (endAngle - startAngle);
+  const bounded = value == null ? 0 : Math.max(0, Math.min(100, value));
+  const valueAngle = startAngle + (bounded / 100) * (endAngle - startAngle);
 
   return (
     <div className="flex flex-col items-center gap-0.5">
@@ -49,7 +50,7 @@ function Gauge({ label, value, color, size = 80 }: GaugeProps) {
             fill={color}
             fontFamily="var(--gv-font-mono)"
           >
-            {Math.round(value)}%
+            {value == null ? '—' : `${Math.round(value)}%`}
           </text>
         </Group>
       </svg>
@@ -71,14 +72,6 @@ function formatBytes(bytes: number): string {
 export function InfraGauges() {
   const systemHealth = useGodViewStore((s) => s.systemHealth);
 
-  if (!systemHealth) {
-    return (
-      <div className="text-[10px] text-center py-2" style={{ color: 'var(--gv-text-dim)' }}>
-        Loading system stats...
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-2">
       <h3
@@ -87,16 +80,17 @@ export function InfraGauges() {
       >
         System
       </h3>
-      <div className="flex justify-around gap-2">
-        <Gauge label="CPU" value={systemHealth.cpu} color="var(--gv-blue)" />
-        <Gauge label="MEM" value={systemHealth.memPercent} color="var(--gv-purple)" />
+      <div className="flex justify-around gap-1">
+        <Gauge label="CPU" value={systemHealth?.cpu ?? null} color="var(--gv-blue)" />
+        <Gauge label="MEM" value={systemHealth?.memPercent ?? null} color="var(--gv-purple)" />
+        <Gauge label="SWAP" value={systemHealth?.summary.swapUsedPercent ?? null} color="var(--gv-amber)" />
       </div>
       <div className="flex justify-between px-1">
         <span className="text-[10px]" style={{ color: 'var(--gv-text-dim)' }}>
-          Used: {formatBytes(systemHealth.memUsed)}
+          Used: {systemHealth ? formatBytes(systemHealth.memUsed) : '—'}
         </span>
         <span className="text-[10px]" style={{ color: 'var(--gv-text-dim)' }}>
-          Total: {formatBytes(systemHealth.memTotal)}
+          Total: {systemHealth ? formatBytes(systemHealth.memTotal) : '—'}
         </span>
       </div>
     </div>

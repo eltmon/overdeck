@@ -234,6 +234,15 @@ describe('SystemHealthPill', () => {
     }
   });
 
+  it('keeps virtual commitment visible as a historical diagnostic', () => {
+    setSnapshot('healthy');
+    renderPill();
+
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    expect(screen.getByText('Overcommit 33.3%')).toBeInTheDocument();
+  });
+
   it('selects the primary label by structured reason code, not message text', () => {
     const snapshot = createSnapshot('critical');
     snapshot.host.reasons = [{

@@ -421,9 +421,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">CPU</div>
               <div className="mt-1 font-semibold text-foreground">{data.host.metrics.cpuPercent == null ? 'Unavailable' : `${data.host.metrics.cpuPercent.toFixed(1)}%`}</div>
-              {data.host.metrics.loadPerCore1m != null && (
-                <div className="mt-1 text-muted-foreground">Load/core {data.host.metrics.loadPerCore1m.toFixed(2)}</div>
-              )}
+              <div className="mt-1 text-muted-foreground">
+                Load/core {data.host.metrics.loadPerCore1m == null ? 'Unavailable' : data.host.metrics.loadPerCore1m.toFixed(2)}
+              </div>
               {data.host.metrics.cpuPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -436,9 +436,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Memory</div>
               <div className="mt-1 font-semibold text-foreground">{data.host.metrics.usedMemoryBytes == null || data.host.metrics.totalMemoryBytes == null ? 'Unavailable' : `${formatBytes(data.host.metrics.usedMemoryBytes)} / ${formatBytes(data.host.metrics.totalMemoryBytes)}`}</div>
-              {data.host.metrics.availableMemoryBytes != null && (
-                <div className="mt-1 text-muted-foreground">Avail {formatBytes(data.host.metrics.availableMemoryBytes)}</div>
-              )}
+              <div className="mt-1 text-muted-foreground">
+                Avail {data.host.metrics.availableMemoryBytes == null ? 'Unavailable' : formatBytes(data.host.metrics.availableMemoryBytes)}
+              </div>
               {data.host.metrics.memoryUsedPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -464,9 +464,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Swap <span className="text-[11px]">historical · not live pressure</span></div>
               <div className="mt-1 font-semibold text-foreground">{data.host.metrics.swapUsedPercent == null ? 'Unavailable' : `${data.host.metrics.swapUsedPercent.toFixed(1)}%`}</div>
-              {data.host.metrics.virtualCommitmentPercent != null && (
-                <div className="mt-1 text-muted-foreground">Overcommit {data.host.metrics.virtualCommitmentPercent.toFixed(1)}%</div>
-              )}
               {data.host.metrics.swapUsedPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -475,6 +472,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                   />
                 </div>
               )}
+              <div className="mt-1 text-muted-foreground">
+                Overcommit {data.host.metrics.virtualCommitmentPercent == null ? 'Unavailable' : `${data.host.metrics.virtualCommitmentPercent.toFixed(1)}%`}
+              </div>
             </div>
           </div>
 

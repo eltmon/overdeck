@@ -58,18 +58,23 @@ describe('notification-hook classification', () => {
       HOME: fakeHome,
     })
 
-  it('does NOT emit for the idle-timeout heartbeat "Claude is waiting for your input"', async () => {
+  it('records the idle-timeout hook without classifying it as a user question', async () => {
     // Claude Code fires this for any agent idle >60s — after a completed turn,
     // between items, or when work is done. Classifying it as user_question
     // painted every long-idle agent as a blocking "Question for you" decision
     // with no question content (seen on PAN-3253).
     await run('Claude is waiting for your input')
-    expect(existsSync(eventLog)).toBe(false)
+    const log = readFileSync(eventLog, 'utf-8')
+    expect(log).toContain('"kind":"hook_fired"')
+    expect(log).toContain('"hookName":"Notification"')
+    expect(log).not.toContain('"kind": "waiting_start"')
   })
 
   it('idle-heartbeat exclusion is case-insensitive and exact', async () => {
     await run('CLAUDE IS WAITING FOR YOUR INPUT')
-    expect(existsSync(eventLog)).toBe(false)
+    const log = readFileSync(eventLog, 'utf-8')
+    expect(log).toContain('"kind":"hook_fired"')
+    expect(log).not.toContain('"kind": "waiting_start"')
   })
 
   it('still emits user_question for a message that carries actual question text', async () => {
@@ -85,8 +90,10 @@ describe('notification-hook classification', () => {
     expect(log).toContain('"reason": "tool_permission"')
   })
 
-  it('emits nothing for an unclassified message', async () => {
+  it('records an unclassified Notification firing without changing waiting state', async () => {
     await run('Task completed successfully')
-    expect(existsSync(eventLog)).toBe(false)
+    const log = readFileSync(eventLog, 'utf-8')
+    expect(log).toContain('"kind":"hook_fired"')
+    expect(log).not.toContain('"kind": "waiting_start"')
   })
 })

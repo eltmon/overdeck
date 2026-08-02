@@ -165,7 +165,7 @@ describe('conversation search watcher', () => {
     expect(fakeWatcher.close).toHaveBeenCalledTimes(1);
   });
 
-  it('uses one native watcher per directory instead of one per transcript file', async () => {
+  it('uses one native recursive subscription per root instead of one watcher per path', async () => {
     const root = mkdtempSync(join(tmpdir(), 'overdeck-conversation-watch-'));
     const nested = join(root, 'session', 'subagents');
     mkdirSync(nested, { recursive: true });
@@ -177,9 +177,9 @@ describe('conversation search watcher', () => {
     const watcher = new ConversationDirectoryWatcher([root]);
     try {
       await watcher.ready;
-      expect(watcher.watchedDirectoryCount).toBe(3);
+      expect(watcher.activeSubscriptionCount).toBe(1);
       await watcher.close();
-      expect(watcher.watchedDirectoryCount).toBe(0);
+      expect(watcher.activeSubscriptionCount).toBe(0);
     } finally {
       await watcher.close();
       rmSync(root, { recursive: true, force: true });

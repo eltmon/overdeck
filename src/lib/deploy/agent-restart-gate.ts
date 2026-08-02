@@ -35,5 +35,5 @@ export async function agentRestartBlockReason(
     blockedBy: [],
   });
 
-  return `Restart refused. The active deployment gate says: "${assessment.reason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago); it fires automatically as soon as the window clears — do not retry or use --force, which would interrupt the operation the gate is protecting.`;
+  return `Restart refused. The active deployment gate says: "${assessment.reason}" This deploy has been queued since ${queued.requestedAt} (${formatQueueAge(queued.requestedAt)} ago). The deploy patrol retries automatically after the merge debounce has elapsed, CI is green for the exact origin/main tip, and the safety window clears — do not retry or use --force, which would interrupt the operation the gate is protecting.`;
 }
