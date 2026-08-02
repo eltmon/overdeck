@@ -5,6 +5,7 @@ import {
   type PendingPaneChoice,
   type SessionPaneChoiceResult,
 } from '../../lib/session-pane-choice.js'
+import { sessionExistsSync } from '../../lib/tmux.js'
 
 export interface AnswerCommandDeps {
   captureSessionPaneChoice?: (sessionName: string) => Promise<PendingPaneChoice | null>
@@ -22,6 +23,9 @@ export function normalizeAnswerSessionId(id: string): string {
   if (/^(?:agent|planning|strike|review|test|ship|inspect|conv)-/.test(normalized)) {
     return normalized
   }
+  // Named singleton sessions (flywheel-orchestrator, sequencer-runner, …)
+  // carry no role prefix — use the exact name when a session exists for it.
+  if (sessionExistsSync(normalized)) return normalized
   return `agent-${normalized}`
 }
 
