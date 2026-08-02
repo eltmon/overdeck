@@ -19,8 +19,9 @@ import { toast } from 'sonner';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { useKillAgent } from '../hooks/useKillAgent';
-import { buildAttentionItems, summaryLine } from '../lib/system-health-attention';
+import { buildAttentionItems, contextNotes, summaryLine } from '../lib/system-health-attention';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { useDashboardStore } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 
 const POPOVER_ID = 'system-health-popover';
@@ -260,6 +261,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   const copy = data ? healthCopy(data, reasons) : 'Health unavailable · Retry';
   const attentionItems = useMemo(() => data ? buildAttentionItems(data) : [], [data]);
   const summary = useMemo(() => data ? summaryLine(data, attentionItems) : '', [data, attentionItems]);
+  const notes = useMemo(() => data ? contextNotes(data) : [], [data]);
 
   useEffect(() => {
     if (!data) return;
@@ -424,11 +426,54 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </div>
           </div>
 
-          {reasons.length > 0 && (
-            <div className="mb-3 space-y-1 rounded-lg border border-border p-2 text-xs">
-              {reasons.map((reason, index) => (
-                <div key={`${reason.code}-${index}`} className="text-muted-foreground">• {reason.message}</div>
-              ))}
+          {attentionItems.length > 0 ? (
+            <div className="mb-3">
+              <div className="space-y-1 rounded-lg border border-border p-2">
+                {attentionItems.map((item) => (
+                  <div key={`${item.code}-${item.agents.join(',')}`} className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`inline-block h-2 w-2 rounded-full ${item.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`}></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-foreground">
+                          {item.title}
+                          {item.agents.length > 1 && <span className="ml-1 text-muted-foreground">×{item.agents.length}</span>}
+                        </div>
+                        <div className="text-muted-foreground">{item.sub}</div>
+                      </div>
+                    </div>
+                    {item.agentId && (
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            useDashboardStore.getState().openIssue(item.agentId!.replace(/^agent-/, 'PAN-').split('-').slice(0, -1).join('-'));
+                            closePopover();
+                          }}
+                          className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          Open
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {notes.length > 0 && (
+                <details className="mt-2 cursor-pointer text-xs">
+                  <summary className="text-muted-foreground hover:text-foreground">
+                    {notes.length} context note{notes.length !== 1 ? 's' : ''} — background, not pressure signals
+                  </summary>
+                  <div className="mt-2 space-y-1 rounded-lg border border-border p-2">
+                    {notes.map((note, idx) => (
+                      <div key={`${note.code}-${idx}`} className="text-muted-foreground">• {note.message}</div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+          ) : (
+            <div className="mb-3 rounded-lg border border-border p-2 text-xs text-foreground">
+              {summary}
             </div>
           )}
 
