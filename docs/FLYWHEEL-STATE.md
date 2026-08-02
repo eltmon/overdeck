@@ -1163,3 +1163,56 @@ Also noted: memory-governor runway is now PSI-evidenced (operator-approved), so 
 
 - #3494 (PAN-3431 round 3) still in CI (lint + test lanes). Nothing to merge; no ready set. MIN-934 working, MIN-933 in review — campaign holds at 4 of 5 with Lane B complete.
 - Status emitted this tick (rule holding). Surfaced the load-control order-book recommendation into `openQuestions` so it reaches the operator through the snapshot rather than only through chat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline file than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness rather than a real regression.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same collateral pattern as the red-main window earlier: check whether the failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak trajectory noted for the eventual verification: 2428MB @12m24s with 30 sessions on the CURRENT (pre-round-3) build — consistent with the attach-cost characterization, and the reference point round 3 must beat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same discipline as the red-main collateral sweep: establish whether a failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak reference for eventual verification: **2428MB @12m24s with 30 sessions** on the current (pre-round-3) build — consistent with the attach-cost characterization and the number round 3 must beat.
+
+### RUN-79 tick 83 — 2026-08-02T19:30Z — RED MAIN on three gates; uat/pan-crow-0802 swept
+
+**Promote sweep (uat/pan-crow-0802 → main 7ac5339817d).** Fresh read-door sweep across all 12
+registered projects. Four typed blind spots unchanged (papers-please, puzzdom: tracker_unconfigured;
+lexerra, krux: forge_unavailable/404) — never reconstructed from tracker/agent/tmux state.
+PAN-3338 closed out clean: 8/8 DoD rows, zero overrides.
+
+**RED MAIN — five consecutive commits, three independent gates.** Found by reading #3494's CI
+rather than trusting the "resync fixed it" story from tick 82:
+
+1. `src/cli/commands/parked.ts:100` calls `project.projectPath`; `getProjectSync` returns the
+   `ProjectConfig` at `src/lib/projects.ts:307`, whose field is `path`. (A second unrelated
+   `ProjectConfig` exists at `src/lib/workspace-config.ts:245` — importing that to silence the
+   error would be the wrong fix.) → PAN-3503, struck.
+2. Composer manifest never regenerated for `pan parked` / `pan parked ack`. → same strike.
+3. Unbaselined cycle `deacon.ts > stall-sweeper.ts > service.ts`, introduced by my own PAN-3485
+   stall-sweeper landing. Fails `lint:circular` on main itself, so it blocks the verification gate
+   for every branch that syncs main. → PAN-3501, struck.
+
+**Lesson — a red PR is not evidence about the PR.** Tick 82 diagnosed #3494 as a frontend-types
+baseline desync and resynced it. The resync was correct but insufficient: the branch inherited
+main's breakage. #3494's build/lint/test failures are RED-MAIN collateral, not the streaming
+change. This is the second time this run I nearly re-drove a strike over its base's breakage.
+**Check the base's CI before attributing a branch failure to the branch.**
+
+**Leak reference point updated.** Pre-reload server: 2540MB @78min with 28 sessions, against the
+prior 2428MB @12min with 30 sessions — about +1.7MB/min of steady drip. The ongoing drip is
+largely solved; the residual is the one-time per-attach cost. Post-reload the fresh server sat at
+1326MB at 53s uptime with the same 28 sessions, which is that front-loaded cost, visible in
+isolation. Memory system-wide is healthy (31GB available, PSI ~0) — the 10s `/api/health`
+responses before the reload were event-loop blocking, not memory pressure.
+
+**Deploy.** `pan reload` reported a health-check failure at 30s but had actually succeeded — the
+server was still booting. Verified after: `buildCommit` 7ac5339817d, matching main. The 30s
+health timeout is too tight for a boot that attaches 28 sessions.
+
+**PAN-3426.** Nine uncommitted files in the workspace fix all four PR #3495 CI failures; the test
+role verified them locally and correctly refused to commit (outside its boundary). Resumed the
+work agent — it had already picked up the same work on its own.
+

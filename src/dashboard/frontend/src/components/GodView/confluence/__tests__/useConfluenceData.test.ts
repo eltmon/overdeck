@@ -440,3 +440,43 @@ describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
     expect(result.current.find((candidate) => candidate.id === 'PAN-78')).toBeUndefined();
   });
 });
+
+describe('event-driven liveness (operator directive: event-based, not polling)', () => {
+  it('an agent with a stale snapshot stamp but fresh runtime events is NOT stale', async () => {
+    const staleSnap = new Date(NOW.getTime() - 3 * 60 * 60_000).toISOString();
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-5': agent({ id: 'agent-pan-5', issueId: 'PAN-5', lastActivity: staleSnap }),
+      },
+      agentRuntimeById: {
+        // A tool beat 40 seconds ago — the event stream says WORKING.
+        'agent-pan-5': { activity: 'working', lastActivity: new Date(NOW.getTime() - 40_000).toISOString(), updatedAtSequence: 99 } as never,
+      },
+      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Live work', labels: [], state: 'open' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const orb = result.current.find((candidate) => candidate.id === 'PAN-5');
+    expect(orb?.state).toBe('active');
+    expect(orb?.idleMin).toBeLessThan(1);
+  });
+
+  it('an agent with fresh snapshot stamps but NO runtime events goes stale on evidence', async () => {
+    const freshSnap = new Date(NOW.getTime() - 45 * 60_000).toISOString();
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-6': agent({ id: 'agent-pan-6', issueId: 'PAN-6', lastActivity: freshSnap }),
+      },
+      agentRuntimeById: {},
+      issuesRaw: [{ id: 'PAN-6', identifier: 'PAN-6', title: 'Quiet', labels: [], state: 'open' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const orb = result.current.find((candidate) => candidate.id === 'PAN-6');
+    expect(orb?.state).toBe('stale');
+  });
+});

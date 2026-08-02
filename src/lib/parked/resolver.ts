@@ -149,6 +149,17 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
 /** Idle threshold for the idle-running orbit: below this a live idle agent is warm, not parked. */
 export const IDLE_RUNNING_THRESHOLD_MS = 6 * 60 * 60_000;
 
+/**
+ * Roles the idle-running orbit must NEVER touch: orchestrators and
+ * conversations. Their real activity lives in the conversation/runtime plane,
+ * not the agents-table lastActivity this orbit reads — the sweeper's first
+ * night proved the trap when its idle nudge→stop killed the FLYWHEEL (its
+ * agents-table stamp was a day stale while it ticked normally), halting all
+ * new dispatch for 90 minutes. A "stopped orchestrator" is not a freed slot;
+ * it is the pipeline going silent.
+ */
+export const IDLE_EXEMPT_ROLES: ReadonlySet<string> = new Set(['flywheel', 'sequencer', 'conversation', 'knowledge']);
+
 /** Per-issue gathered signals — the classifier's entire input. Gathered through read doors, never stores. */
 export interface ParkedSignals {
   issueId: string;
@@ -349,6 +360,10 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
   //    no other orbit already explains the stall (orbit of last resort).
   if (!closed && rows.length === 0) {
     for (const agent of s.liveAgents) {
+      // Orchestrators and conversations are exempt (IDLE_EXEMPT_ROLES): their
+      // activity does not live in the stamp this orbit reads, and stopping one
+      // silences the pipeline instead of freeing a slot.
+      if (IDLE_EXEMPT_ROLES.has(String(agent.role ?? ''))) continue;
       const lastMs = Date.parse(agent.lastActivity ?? agent.startedAt ?? '');
       if (!Number.isFinite(lastMs)) continue;
       const idleMs = s.now - lastMs;

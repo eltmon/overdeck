@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AgentSnapshot, DomainEvent, ReviewStatusSnapshot } from '@overdeck/contracts';
+import type { AgentRuntimeSnapshot, AgentSnapshot, DomainEvent, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useGodViewStore } from '../../../hooks/useGodViewSocket';
 import {
   subscribeDashboardDomainEvents,
@@ -184,10 +184,26 @@ function issueProject(issueId: string): string {
   return prefix === 'pan' ? 'overdeck' : prefix || 'overdeck';
 }
 
-function latestActivity(agents: readonly AgentSnapshot[]): string | null {
+/**
+ * Event-driven liveness (PAN-3490 follow-up, operator-directed): the orb's
+ * "is it working" stamp must come from the EVENT STREAM, not the polled
+ * snapshot. AgentSnapshot.lastActivity only moves on the enrichment poller's
+ * cadence (polling), so orbs read idle while agents work and running while
+ * they sit. agentRuntimeById.lastActivity is stamped by every real domain
+ * event — tool beats (agent.activity_changed), thinking/waiting transitions,
+ * messages — so it is current within a beat. Take the fresher of the two.
+ */
+function effectiveStamp(agent: AgentSnapshot, runtime: AgentRuntimeSnapshot | undefined): string | null {
+  const snap = agent.lastActivity ?? agent.startedAt ?? null;
+  const rt = runtime?.lastActivity ?? null;
+  if (rt && (!snap || rt > snap)) return rt;
+  return snap;
+}
+
+function latestActivity(agents: readonly AgentSnapshot[], runtimeById: Readonly<Record<string, AgentRuntimeSnapshot>>): string | null {
   let latest: string | null = null;
   for (const agent of agents) {
-    const candidate = agent.lastActivity ?? agent.startedAt;
+    const candidate = effectiveStamp(agent, runtimeById[agent.id]);
     if (candidate && (!latest || candidate > latest)) latest = candidate;
   }
   return latest;
@@ -195,6 +211,15 @@ function latestActivity(agents: readonly AgentSnapshot[]): string | null {
 
 function activeStatus(status: AgentSnapshot['status']): boolean {
   return status === 'running' || status === 'starting';
+}
+
+/** "Active" means PRODUCING, not registered: activity inside this window. */
+const ACTIVE_RECENT_WINDOW_MS = 15 * 60_000;
+
+function recentlyActive(agent: AgentSnapshot, runtime: AgentRuntimeSnapshot | undefined, now: number): boolean {
+  if (!activeStatus(agent.status)) return false;
+  const stamp = Date.parse(effectiveStamp(agent, runtime) ?? '');
+  return Number.isFinite(stamp) && now - stamp < ACTIVE_RECENT_WINDOW_MS;
 }
 
 /** Agent statuses that mean the agent is (or could imminently be) working the issue.
@@ -573,6 +598,7 @@ export function useConfluenceOrbs(
   microStatesByAgentId: Readonly<Record<string, ConfluenceMicroState>> = EMPTY_MICRO_STATES,
 ): readonly ConfluenceOrb[] {
   const agentsById = useDashboardStore((state) => state.agentsById);
+  const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const parked = useParked();
@@ -615,7 +641,7 @@ export function useConfluenceOrbs(
       liveIds.add(id);
       const stage = orbStage(issueAgents, issue, review);
       const primary = primaryAgent(issueAgents, stage);
-      const lastActivity = latestActivity(issueAgents);
+      const lastActivity = latestActivity(issueAgents, agentRuntimeById);
       const lastActivityMs = lastActivity ? Date.parse(lastActivity) : Number.NaN;
       const idleMin = Number.isFinite(lastActivityMs) ? Math.max(0, (now - lastActivityMs) / 60_000) : 0;
       const yieldedByScheduler = issueAgents.some((agent) =>
@@ -703,7 +729,7 @@ export function useConfluenceOrbs(
     return next
       .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth, parked]);
+  }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth, parked, agentRuntimeById]);
 }
 
 type CostSummaryResponse = { today?: { totalTokens?: number } };
@@ -747,6 +773,7 @@ export function useConfluenceMeta(
   hookStream: ConfluenceHookStream,
 ): ConfluenceMeta {
   const agentsById = useDashboardStore((state) => state.agentsById);
+  const agentRuntimeById = useDashboardStore((state) => state.agentRuntimeById);
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
   const recentActivity = useDashboardStore((state) => state.recentActivity);
   const system = useGodViewStore((state) => state.systemHealth);
@@ -800,7 +827,11 @@ export function useConfluenceMeta(
       oldestIdle: orbs.reduce((oldest, orb) => Math.max(oldest, orb.idleMin), 0),
       beads: null,
       system,
-      active: Object.values(agentsById).filter((agent) => activeStatus(agent.status)).length,
+      // The operator's definition: an agent counts as active only while it is
+      // actually producing (activity in the last 15 minutes, event-driven via
+      // agentRuntimeById) — a 'running' registry row that has sat idle for
+      // hours is not live work.
+      active: Object.values(agentsById).filter((agent) => recentlyActive(agent, agentRuntimeById[agent.id], now.getTime())).length,
       total: Object.keys(agentsById).length,
       roleCounts,
       parkedTotal: parked?.summary.total ?? null,
@@ -809,7 +840,7 @@ export function useConfluenceMeta(
         ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
         : null,
     };
-  }, [agentsById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked, velocity]);
+  }, [agentsById, agentRuntimeById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked, velocity]);
 }
 
 export function useConfluenceData(): ConfluenceData {
