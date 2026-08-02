@@ -171,8 +171,12 @@ function activeStatus(status: AgentSnapshot['status']): boolean {
 
 /** Agent statuses that mean the agent is (or could imminently be) working the issue.
  * Registry rows for long-dead agents of closed-out issues must NOT put an orb on
- * the river — that residue is what once flooded the doldrums with 90+ closed issues. */
-const LIVE_AGENT_STATUSES = new Set<string>(['running', 'starting', 'healthy', 'warning', 'stuck', 'stalled']);
+ * the river — that residue is what once flooded the doldrums with 90+ closed issues.
+ * running/starting always count; degraded/paused statuses count only when the
+ * issue is known-open, so ancient stuck/paused rows of untracked or closed issues
+ * (e.g. LEX-1) cannot resurrect an orb. */
+const ALWAYS_LIVE_STATUSES = new Set<string>(['running', 'starting']);
+const CONDITIONAL_LIVE_STATUSES = new Set<string>(['healthy', 'warning', 'stuck', 'stalled']);
 const ACTIVE_MERGE_STATUSES = new Set<string>(['pending', 'queued', 'merging', 'verifying']);
 /** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
  * so a large stale population never becomes an unreadable label wall. */
@@ -491,8 +495,10 @@ export function useConfluenceOrbs(
       // Membership: an orb exists only for issues the pipeline is actually
       // touching — a live/paused agent or an in-flight merge. Closed-out issues
       // never render, no matter what agent residue remains in the registry.
+      const knownOpenIssue = issue !== undefined && !closedIssueState(issue);
       const hasLiveAgent = issueAgents.some((agent) =>
-        LIVE_AGENT_STATUSES.has(String(agent.status)) || agent.paused === true);
+        ALWAYS_LIVE_STATUSES.has(String(agent.status))
+        || ((CONDITIONAL_LIVE_STATUSES.has(String(agent.status)) || agent.paused === true) && knownOpenIssue));
       const mergeActive = ACTIVE_MERGE_STATUSES.has(String(review?.mergeStatus ?? issue?.mergeStatus ?? ''));
       if (!hasLiveAgent && !mergeActive) continue;
       if (closedIssueState(issue)) continue;
