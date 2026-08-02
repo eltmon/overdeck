@@ -65,7 +65,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:39:04.652Z",
+  "updated": "2026-08-02T19:39:08.610Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -75,8 +75,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:39:01.483Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-08-02T19:39:07.942Z",
+    "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
       "sha": "d28b8893d9eba336166570587a15114995062a16",
@@ -177,7 +177,7 @@
       },
       "costAtCloseOut": {
         "usd": 49.999083,
-        "pricingAsOf": "2026-08-02T19:39:04.637Z"
+        "pricingAsOf": "2026-08-02T19:39:08.157Z"
       }
     },
     "merges": [
