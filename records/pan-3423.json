@@ -97,7 +97,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:51:49.376Z",
+  "updated": "2026-08-02T19:51:55.760Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "blocked",
@@ -107,7 +107,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:51:48.620Z",
+    "updatedAt": "2026-08-02T19:51:55.729Z",
     "reviewNotes": "Correctness reviewer failed before producing a report, so correctness remains unverified.",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
@@ -119,25 +119,8 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewSpawnedAt": "2026-08-02T19:40:48.192Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
-      }
-    }
+    "reviewedAtCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85",
+    "reviewSpawnedAt": "2026-08-02T19:40:48.192Z"
   },
   "closeOut": {
     "usage": {
@@ -198,9 +181,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 488004,
-            "output": 20889,
-            "cacheRead": 8012800,
+            "input": 496494,
+            "output": 21221,
+            "cacheRead": 8273920,
             "cacheWrite": 0
           }
         }
@@ -213,9 +196,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6080753,
-          "output": 281438,
-          "cacheRead": 55970816,
+          "input": 6089243,
+          "output": 281770,
+          "cacheRead": 56231936,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -226,8 +209,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 70.7842753,
-        "pricingAsOf": "2026-08-02T19:51:48.720Z"
+        "usd": 70.9672453,
+        "pricingAsOf": "2026-08-02T19:51:55.747Z"
       }
     },
     "merges": [
