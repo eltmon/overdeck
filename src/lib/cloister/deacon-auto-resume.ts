@@ -14,7 +14,7 @@ import {
 } from './boot-reconciliation.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
-import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
+import { listAllAgentsSync as listAllAgents, RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -645,6 +645,12 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
+  // PAN-3479: tombstoned rows keep their session_id for transcript linkage —
+  // the phase, not a nulled session, is what makes them non-resumable.
+  if (state.phase === RETAINED_TRANSCRIPTS_PHASE) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — retired (transcripts retained)`);
+    return null;
+  }
 
   if (isTerminalSwarmSlotAgent(state)) {
     if (await Effect.runPromise(sessionExists(agentId))) {
@@ -886,6 +892,8 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();
   const candidates = listAllAgents()
     .filter((agent) => agent.status === 'stopped' && agent.role === 'work')
+    // PAN-3479: retired rows exist only for transcript linkage — never resume.
+    .filter((agent) => agent.phase !== RETAINED_TRANSCRIPTS_PHASE)
     .filter((agent) => !bootReconciliationHoldSet.has(agent.id))
     .map((agent) => agent.id);
 
