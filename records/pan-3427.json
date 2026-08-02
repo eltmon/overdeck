@@ -62,6 +62,11 @@
       "timestamp": "2026-08-02T19:30:25.295Z",
       "reason": "end",
       "note": "Anomalies first: this session restarted from a crash multiple times (transcript\nresumed, task-door claims reset to pending each time — verified against git log\nand pan task show rather than trusting the stale workspace .overdeck/spec.vbrief.json\ncopy, which never reflected live status). Two pre-existing bugs were found and\nfiled separately (not fixed here, out of scope):\n- https://github.com/eltmon/overdeck/issues/3497 — this workspace's own UAT\n  devcontainer crash-loops because ~/.overdeck is correctly not mounted into it\n  (single-deacon-invariant), but the CLIProxy watchdog has no peer-dashboard\n  guard and keeps trying to spawn a binary that will never exist there.\n- https://github.com/eltmon/overdeck/issues/3504 — main is currently\n  typecheck-red: src/cli/commands/parked.ts references a nonexistent\n  ProjectConfig.projectPath field (should be .path), landed directly on main\n  in an unrelated commit. Every file this issue touched still typechecks clean\n  in isolation; this is the only error anywhere in the repo.\nA `npm test` full-suite run showed 65 failed test files, all in unrelated\nconversations/ and workspaces/ suites, all failing on the identical\nsetupOverdeckTestDb() beforeEach hook timing out at 5000ms; re-running two of\nthose files in isolation passed cleanly (19/19), confirming resource-contention\nflake under full-suite load, not a regression from this work. The first `pan\ndone` rebase (onto origin/main) succeeded cleanly with no conflicts, but the\nsubsequent push was killed by a timeout signal before completing; verified the\nremote hadn't moved, then re-pushed the same rebased history successfully.\n\nSummary: PAN-3427 made order books reachable across every registered project,\nnot just the dashboard server's own cwd project, across all four surfaces:\n\n- Dashboard routes (src/dashboard/server/routes/orders.ts): every /api/orders*\n  route accepts ?project=<key>, resolved through the projects registry\n  (getProjectSync + resolveStateReadHomeSync); an unknown key is a 400, not a\n  404; GET /api/orders/:id falls back to scanning other registered projects in\n  registry order when the book isn't in the default root; POST .../start\n  launches the Flywheel in the book's own project root via resolveProjectPath\n  instead of the server's cwd.\n- CLI (src/cli/commands/orders.ts): every `pan orders` verb takes --project\n  <key>; added `pan orders queue <id>` to move a draft to ready through the\n  write door.\n- Flywheel continuation (src/cli/commands/flywheel-complete.ts): when the\n  completing project's own queue is empty, continuation scans every tracked\n  project's ready queue in registry order and starts the first hit in its own\n  project root with no carried-over brief.\n- Dashboard frontend (OrderBookPage.tsx + rails + OrderBookModule.tsx): a\n  project picker in the page header, deep-linkable via ?project=<key>,\n  threaded through every fetch the page makes.\n- Docs: docs/ORDER-BOOKS.md and configuration/order-books.mdx updated to cover\n  all of the above.\n\nAll 9 xBRIEF items landed as separate commits, each pushed before being marked\ndone. Every item's own scoped verify_commands (typecheck + its test file(s) +\nlint-skills where applicable) passed; full `npm run lint` is green with no new\nerrors."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T19:34:23.441Z"
     }
   ],
   "feedback": [],
@@ -121,7 +126,7 @@
     "recordedAt": "2026-08-02T19:30:17.905Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:33:34.481Z",
+  "updated": "2026-08-02T19:34:23.443Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
