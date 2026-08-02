@@ -945,3 +945,9 @@ Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 ac
 - #3444 (PAN-3338) and #3402 (PAN-3362) are now BOTH green but not yet in the ready set — their review/test verdicts haven't flipped; pipeline-owned, not mine to merge.
 - **MIN-931 handed off** (stopped 23:31Z after completion; review + test sessions live) — Lane B tail MIN-934 waits for it to reach terminal, correctly. MIN-932 at **$102.33 (+4943/−897)** — the run's biggest single spender, still producing.
 - strike-3462 (deferred deploys) +75/−30, strike-3431 (leak) $15.09 still hunting.
+
+## RUN-79 tick 54 (2026-08-02 ~03:25Z) — auto-merge waiting correctly (not a PAN-3462 repeat); state push landed
+
+- **PAN-3450's auto-merge has NOT fired and that is CORRECT** — scheduled for 03:10Z but PR #3461's `test` lane is still IN_PROGRESS; the queue is waiting on checks, exactly as designed, and `/auto-merge/problems` is empty. **Deliberately did NOT treat this as another "scheduled thing never fires" defect** — checked the mechanism's actual blocking input before concluding, which is the correction I owed after the PAN-3462 sequence (where I first over-trusted a promise, then risked over-generalizing the distrust).
+- Tick-53 state commit reached origin (rode along when the other session pushed — no bypass). Two fresh unpushed commits from them now sit ahead; same PAN-3062 pattern, harmless as long as I keep committing only my allowlisted path and never force.
+- strike-3462 + strike-3431 still working; campaign MIN-932 in flight; MIN-931 in review/test; #3444/#3402 green but verdicts not yet flipped to ready.
