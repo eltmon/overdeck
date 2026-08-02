@@ -413,7 +413,7 @@
     "recordedAt": "2026-08-02T20:24:43.474Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T20:43:30.454Z",
+  "updated": "2026-08-02T20:44:19.386Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -425,14 +425,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T20:25:12.668Z",
-    "updatedAt": "2026-08-02T20:43:25.282Z",
-    "testNotes": "Verified at HEAD f9b6b73140249e17eebcc32a911d2be43ad0edad (branch fully current with origin/main; merge-base(HEAD, origin/main) == origin/main). Note: two small fix-forward commits (62a795df7d4, f9b6b731402) landed on this branch mid-session, pushed by the still-active work agent reacting to the prior test cycle's lint failure (regenerated composer-command manifest; extracted a Cloister event-store provider to break a new circular dependency) -- ran all gates against this current HEAD, not the stale reviewedAtCommit 5c151a89e75. install: PASS (bun install --frozen-lockfile). typecheck: PASS (root tsc, hooks, evals, dashboard-types ratchet 57 known/0 new, frontend-types ratchet 0/0). lint: PASS, exit 0, including lint:slash-commands (the composer-command manifest drift that failed the prior cycle is now regenerated and matches the CLI registry), lint:file-size, lint:circular-deps (77 baselined cycles, no new), lint:ratchet-audit, lint:quarantine-audit. build: PASS. server-bundle (npm run build:dashboard:server:bundle): PASS. test gate: frontend `OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main` (the actual configured command) PASSED in full -- 155 files, 1823 tests, 61s. Root `--changed origin/main` was attempted via the actual configured command but is impractically slow (>8min, no results before timeout) because the shared packages/contracts graph pulls in most of the repository's integration-style test suite -- same finding as the prior test cycle. Substituted the xBRIEF's own named regression tests as scoped verification: src/lib/overdeck/__tests__/conversation-project-key.test.ts, conversation-fork-project.test.ts, src/cli/commands/__tests__/handoff.test.ts, tests/unit/cli/fork-client.test.ts, src/dashboard/server/routes/__tests__/palette.test.ts -> 5 files, 28 tests passed. Additionally ran regression tests for the two non-PAN-3419 commits' own touched files (tests/lib/cloister/service.test.ts, src/lib/cloister/__tests__/stall-sweeper.test.ts) -> 1 passed/1 skipped file, 17 passed/14 skipped tests, 0 failed.",
-    "uatNotes": "UAT required: fork-modal-project.ac1-3 and grouping-explicit-first.ac1-4 are explicit dashboard UI acceptance criteria (Fork/Handoff modal Project select; CommandDeck grouping/routing). Built/ran the workspace's own isolated Docker stack (overdeck-feature-pan-3419-server-1/frontend-1/dev-1), restarted server+frontend to pick up current HEAD -- verified via GET /api/health: buildCommit=f9b6b73140249e17eebcc32a911d2be43ad0edad (matches HEAD), buildDirty=false, buildBranch=feature/pan-3419. Playwright MCP connected this session (prior UAT attempts failed here). The fresh isolated peer container had zero registered projects/conversations, so seeded throwaway test fixtures entirely inside the container's own runtime state (never touched the git-tracked repo or host state): two projects (uat-alpha, uat-beta) in the container-local $OVERDECK_HOME/projects.yaml, and two conversation rows via the app's own sanctioned write door (createConversation/setConversationProjectKey/setConversationClaudeSessionId in src/lib/overdeck/conversations.ts, no raw SQL) -- one with explicit projectKey=uat-alpha and cwd=/tmp/uat-isolated-cwd (outside every registered project), one with no projectKey and cwd=/tmp/uat-beta. CommandDeck grouping: navigated to /command-deck/uat-alpha -- the explicit-projectKey conversation (cwd outside all projects) rendered under the uat-alpha deck (Conversations: 1), proving grouping-explicit-first.ac1 and ac4 (explicit association wins over cwd containment; partition+routing resolve through it). Navigated to /command-deck/uat-beta -- the no-projectKey conversation correctly fell back to cwd-derived grouping and rendered under the uat-beta deck, proving ac2. Fork/Handoff modal: opened 'Continue in a new conversation' (the unified dialog covering Fresh summary / Agent handoff / Exact copy) from the uat-alpha conversation's menu -- Project combobox rendered with options 'Same as source (uat-alpha)' [default, selected], 'uat-alpha', 'uat-beta', proving fork-modal-project.ac1 and ac2. Selected uat-beta and clicked Continue; captured the outbound POST /api/conversations/uat-test-source/summary-fork request body via Playwright network inspection: {\"projectKey\":\"uat-beta\", ...}, proving ac3 (chosen project's yaml key sent in the body). The call itself 400'd with 'No session file found for conversation uat-test-source' -- expected and unrelated to PAN-3419: the synthetic conversation has a fabricated claudeSessionId with no matching JSONL transcript on disk (a limitation of the throwaway UAT fixture, not a product defect); the server-side fork-route-project behavior for a real transcript is independently covered by the passing conversation-fork-project.test.ts unit test. grouping-explicit-first.ac3 (unknown projectKey falls back to cwd) was not separately exercised live but is covered by the passing projectsData.test.ts unit test. All UI-observable acceptance criteria (fork-modal-project.ac1/ac2/ac3, grouping-explicit-first.ac1/ac2/ac4) directly proven true against the workspace's own running build.",
+    "updatedAt": "2026-08-02T20:44:15.063Z",
     "blockerReasons": [
       {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 5ac6214 (2 paths): src/lib/cloister/event-store-provider.ts, src/lib/cloister/service.ts",
-        "detectedAt": "2026-08-02T20:43:16.991Z"
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-02T20:44:15.063Z"
       }
     ],
     "conflictsSince": {
@@ -445,107 +443,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "5c151a89e751d37e91d834f25dc9e9ed9c639b3f",
-    "reviewRequestedAt": "2026-08-02T20:25:12.668Z",
-    "reviewSpawnedAt": "2026-08-02T19:44:31.379Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "docs/overdeck-remodel/overdeck-schema.ts",
-        "docs/review/PAN-3419-conversation-1827-project-association.md",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "src/cli/commands/parked.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "src/lib/cloister/event-store-provider.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/cloister/stall-sweeper.ts",
-        "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
-        "src/lib/projects-config-lock.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts",
-        "tests/unit/lib/overdeck/title-sources.test.ts",
-        "tests/unit/lib/projects-version-sync.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx"
-      ],
-      "declaredScope": [
-        "features/conversations.mdx",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/fork.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-        "src/dashboard/server/routes/__tests__/palette.test.ts",
-        "src/dashboard/server/routes/palette.ts",
-        "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/projects.ts",
-        "sync-sources/rules/handoff-isolate-cwd.md",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/unit/cli/fork-client.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/overdeck-remodel/overdeck-schema.ts",
-        "docs/review/PAN-3419-conversation-1827-project-association.md",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "features/conversations.mdx",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/fork.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/commands/parked.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "src/dashboard/server/routes/__tests__/palette.test.ts",
-        "src/dashboard/server/routes/palette.ts",
-        "src/lib/cloister/event-store-provider.ts",
-        "src/lib/cloister/service.ts",
-        "src/lib/cloister/stall-sweeper.ts",
-        "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/projects-config-lock.ts",
-        "src/lib/projects.ts",
-        "sync-sources/rules/handoff-isolate-cwd.md",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/unit/cli/fork-client.test.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts",
-        "tests/unit/lib/overdeck/title-sources.test.ts",
-        "tests/unit/lib/projects-version-sync.test.ts"
-      ],
-      "recordedAt": "2026-08-02T20:24:43.474Z"
-    }
+    "reviewSpawnedAt": "2026-08-02T19:44:31.379Z"
   },
   "closeOut": {
     "usage": {
@@ -608,9 +506,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7065706,
-            "output": 308985,
-            "cacheRead": 201149952,
+            "input": 7074992,
+            "output": 310847,
+            "cacheRead": 202461696,
             "cacheWrite": 0
           }
         }
@@ -623,9 +521,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 50665277,
-          "output": 764422,
-          "cacheRead": 299845632,
+          "input": 50674563,
+          "output": 766284,
+          "cacheRead": 301157376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -636,8 +534,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 451.0461603,
-        "pricingAsOf": "2026-08-02T20:43:25.305Z"
+        "usd": 451.8043223,
+        "pricingAsOf": "2026-08-02T20:44:15.121Z"
       }
     },
     "merges": [
