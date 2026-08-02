@@ -83,9 +83,28 @@ describe('reconcileSlotState', () => {
         status: 'merged',
         branch: 'feature/pan-1762-slot-1',
         agentId: undefined,
+        mergedVia: 'completed-status',
       },
     ]);
     expect(result.pending).toEqual([]);
+  });
+
+  it('uses the merged plan view to prove completion when status overrides were already applied', async () => {
+    const plan = makeDoc(['a']);
+    plan.plan.items[0].status = 'completed';
+
+    const result = await reconcileSlotState('PAN-1762', '/workspace', plan, {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'running', slotItemId: 'a' }],
+      ),
+    });
+
+    expect(result.merged[0]).toMatchObject({
+      itemId: 'a',
+      status: 'merged',
+      mergedVia: 'completed-status',
+    });
   });
 
   it('returns a clean initial state when no durable slot ownership exists', async () => {
