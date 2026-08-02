@@ -9,7 +9,7 @@
 import './theme.css';
 
 import { GodViewTopBar } from './TopBar';
-import { GodViewSidebar } from './Sidebar';
+import { GodViewConfluence } from './confluence/GodViewConfluence';
 import { useGodViewSocket } from '../../hooks/useGodViewSocket';
 import { useDashboardStore, selectAgents } from '../../lib/store';
 import type { Agent } from '../../types';
@@ -23,13 +23,7 @@ export function GodViewPage() {
     <div className="god-view flex flex-col h-full">
       <GodViewTopBar agents={agents} />
 
-      <div className="flex flex-1 gap-3 px-3 pb-3 pt-2 min-h-0 overflow-hidden">
-        <div className="flex flex-1 min-w-0 min-h-0 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-sm text-white/50">
-          Agent scan moved to the Agents fleet view.
-        </div>
-
-        <GodViewSidebar agents={agents} />
-      </div>
+      <GodViewConfluence />
     </div>
   );
 }
