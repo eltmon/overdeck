@@ -145,25 +145,18 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:53:28.491Z",
+  "updated": "2026-08-02T20:53:32.125Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:53:27.284Z",
-    "reviewNotes": "Agent re-review request (1/25): Resolved the 5ac6214 main conflicts while preserving issue-routed parked acknowledgements and main's documented event-store door. Build, dashboard-server build, typecheck, circular/slash guards, and 27 focused tests pass.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 5ac6214 (3 paths): src/cli/commands/parked.ts, src/lib/cloister/event-store-provider.ts, src/lib/cloister/service.ts",
-        "detectedAt": "2026-08-02T20:43:16.991Z"
-      }
-    ],
+    "updatedAt": "2026-08-02T20:53:28.221Z",
+    "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
     "conflictsSince": {
       "sha": "5ac62149c3326712f3d279938881aa8941165992",
       "detectedAt": "2026-08-02T20:43:16.991Z",
@@ -305,7 +298,7 @@
       },
       "costAtCloseOut": {
         "usd": 144.5388633,
-        "pricingAsOf": "2026-08-02T20:53:27.508Z"
+        "pricingAsOf": "2026-08-02T20:53:32.022Z"
       }
     },
     "merges": [
