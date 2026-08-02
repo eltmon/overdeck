@@ -140,11 +140,16 @@
   pointer-events: none;
 }
 
-.confluence-tooltip strong { color: var(--gv-blue); font: 700 14px var(--gv-font-mono); }
-.confluence-tooltip > span { color: var(--gv-text-secondary); font-size: 11px; }
-.confluence-tooltip > div { display: flex; gap: 5px; flex-wrap: wrap; }
-.confluence-tooltip > div b,
+.confluence-tooltip > strong { color: var(--gv-blue); font: 700 14px var(--gv-font-mono); }
+.confluence-tooltip-title { color: var(--gv-text-secondary); font-size: 11px; }
+.confluence-tooltip-chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 3px 0; }
+.confluence-tooltip-chips b,
 .confluence-rail-chips span { padding: 2px 7px; border: 1px solid rgba(0, 212, 255, .35); border-radius: 999px; color: var(--gv-text-primary); font: 9px var(--gv-font-mono); }
+.confluence-tooltip-row,
+.confluence-tooltip-convoy { display: flex; justify-content: space-between; gap: 12px; color: var(--gv-text-secondary); font: 10px var(--gv-font-mono); }
+.confluence-tooltip-row b,
+.confluence-tooltip-convoy b { max-width: 175px; overflow: hidden; color: var(--gv-text-primary); font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+.confluence-tooltip-convoy { margin-top: 2px; padding-top: 5px; border-top: 1px solid var(--gv-border); }
 .confluence-tooltip small { margin-top: 4px; color: var(--gv-text-dim); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 
 .confluence-issue-rail {

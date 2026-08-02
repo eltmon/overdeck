@@ -6,6 +6,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { createAurora, type AuroraController } from './aurora';
+import { resolveHoverOrb } from './OrbTooltip';
 import {
   PROJECT_RING,
   ROLE_COLORS,
@@ -101,7 +102,7 @@ export interface RiverCanvasProps {
   conversations?: number | null;
   mergeQueue?: number;
   sequencer?: boolean;
-  onHover?: (orb: ConfluenceOrb | null, point: { x: number; y: number } | null) => void;
+  onHover?: (orb: ConfluenceOrb | null, point: { x: number; y: number; canvasWidth: number } | null) => void;
   onSelect?: (orb: ConfluenceOrb | null) => void;
 }
 
@@ -111,6 +112,7 @@ interface Engine {
   resize(): void;
   dispose(): void;
   pick(x: number, y: number): RenderOrb | null;
+  setPointer(x: number, y: number, inside: boolean): void;
 }
 
 function mixColor(first: string, second: string, amount: number): string {
@@ -190,6 +192,8 @@ function createEngine(
   let simT = 0;
   let frameId = 0;
   let disposed = false;
+  let hoverOrb: RenderOrb | null = null;
+  const pointer = { x: 0, y: 0, inside: false };
 
   const list = () => [...renderOrbs.values()];
   const anchorAll = () => {
@@ -538,10 +542,23 @@ function createEngine(
     drawGateFlashes(); drawConvoys(); drawOrbs(); drawParticles(); drawPulses(); drawTickers(); drawTide(); drawStageHeaders(); drawConstellation(); drawSequencer();
   };
 
+  const updateHover = () => {
+    const next = resolveHoverOrb(
+      list(),
+      hoverOrb,
+      pointer.x,
+      pointer.y,
+      pointer.inside,
+    );
+    if (next === hoverOrb) return;
+    hoverOrb = next;
+    props.onHover?.(next, next ? { x: next.x, y: next.y, canvasWidth: width } : null);
+  };
+
   const frame = (now: number) => {
     if (disposed) return;
     const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now; simT += dt;
-    advance(dt); draw(); frameId = window.requestAnimationFrame(frame);
+    advance(dt); updateHover(); draw(); frameId = window.requestAnimationFrame(frame);
   };
 
   resize(); reconcile(initial); frameId = window.requestAnimationFrame(frame);
@@ -550,6 +567,7 @@ function createEngine(
     update: reconcile,
     resize,
     pick(x, y) { return pickOrb(list(), x, y); },
+    setPointer(x, y, inside) { pointer.x = x; pointer.y = y; pointer.inside = inside; if (!inside && hoverOrb) { hoverOrb = null; props.onHover?.(null, null); } },
     dispose() { disposed = true; window.cancelAnimationFrame(frameId); aurora.dispose(); renderOrbs.clear(); particles.length = 0; pulses.length = 0; tickers.length = 0; },
   };
 }
@@ -596,10 +614,9 @@ export const RiverCanvas = forwardRef<RiverEffectsApi, RiverCanvasProps>(functio
         aria-label="Confluence pipeline river"
         onMouseMove={(event) => {
           const cursor = point(event);
-          const orb = engineRef.current?.pick(cursor.x, cursor.y) ?? null;
-          props.onHover?.(orb, orb ? cursor : null);
+          engineRef.current?.setPointer(cursor.x, cursor.y, true);
         }}
-        onMouseLeave={() => props.onHover?.(null, null)}
+        onMouseLeave={() => engineRef.current?.setPointer(0, 0, false)}
         onClick={(event) => {
           const cursor = point(event);
           props.onSelect?.(engineRef.current?.pick(cursor.x, cursor.y) ?? null);

@@ -3,6 +3,7 @@ import { HOOK_INVENTORY } from '@overdeck/contracts';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
+import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverEffectsApi } from './RiverCanvas';
 import { useConfluenceChoreography } from './useConfluenceChoreography';
 import { useConfluenceData, type ConfluenceOrb } from './useConfluenceData';
@@ -12,6 +13,7 @@ interface HoverState {
   orb: ConfluenceOrb;
   x: number;
   y: number;
+  canvasWidth: number;
 }
 
 export function GodViewConfluence() {
@@ -82,12 +84,12 @@ export function GodViewConfluence() {
           />
 
           {hover && (
-            <div className="confluence-tooltip" style={{ left: hover.x + 16, top: hover.y + 16 }} role="tooltip">
-              <strong>{hover.orb.id}</strong>
-              <span>{hover.orb.title}</span>
-              <div><b>{hover.orb.stage}</b><b>{hover.orb.role}</b><b>{hover.orb.model ?? 'model —'}</b></div>
-              <small>Click to open the issue rail</small>
-            </div>
+            <OrbTooltip
+              orb={hover.orb}
+              anchor={hover}
+              hookRate={hookStream.entries.filter((entry) => entry.issueId === hover.orb.id).length}
+              eventsFired={hookStream.entries.filter((entry) => entry.issueId === hover.orb.id).length}
+            />
           )}
 
           <aside className={`confluence-issue-rail ${selected ? 'open' : ''}`} aria-hidden={!selected}>
