@@ -97,6 +97,16 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T19:58:06.262Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:58Z] verification-gate → FAILED — seq 2",
+      "timestamp": "2026-08-02T19:58:57.447Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T19:58:57.699Z"
     }
   ],
   "feedback": [
@@ -106,6 +116,13 @@
       "outcome": "changes-requested",
       "timestamp": "2026-08-02T19:50:56Z",
       "markdownBody": "# Review CHANGES REQUESTED for PAN-3427\n\n# Review Synthesis — PAN-3427 — 2026-08-02T19:50:05Z\n\n## Verdict: CHANGES REQUESTED — `pan orders start --project` drops the selected project before launch\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/context.json\n- Branch: feature/pan-3427\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427\n- HEAD reviewed: a340937d0157b5084e2bbfa47f670f119adb427e\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness, requirements] `pan orders start --project` starts from the caller's project — `src/cli/commands/orders.ts:113`\nThe new `--project` option is used only by `stateRootFor()` during the preliminary `requireBook` check. `runOrdersStart()` then calls `defaultStartOrderBook(bookId)`, which invokes `startFlywheelRun({ orders: bookId })` without the selected project's cwd. From another project, the command can validate project B's book and then fail against project A's state root, or start a same-ID book in project A. This is inside the PR diff and directly violates FR-5/NFR-1. Retain the resolved project through launch, pass its primary path as `cwd`, and cover the real cross-project start wiring with a regression test.\n\n### [correctness] Project switching can pair stale books with the new mutation scope — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:62`\n`loadBooks()` applies every response without cancellation or a captured-scope generation check, while `selectProject()` leaves the previous `books` array visible. Overlapping project A and B requests can resolve out of order, leaving A's books rendered while `projectKey` is B; subsequent detail reads and mutations then target B using A's displayed book ID. The affected loading and selection code is inside the PR diff. Clear or hide prior books when switching, ignore or abort superseded list/detail requests, and add a deferred-response regression test that resolves the old project last.\n\n### [performance] Cross-project detail lookup performs an unbounded synchronous filesystem scan in the dashboard request path — `src/dashboard/server/routes/orders.ts:340`\nOn an unscoped `GET /api/orders/:id` miss, the changed route loops over every registered project and synchronously resolves migration state and reads each candidate book. Because the Node dashboard shares one event loop for HTTP and WebSocket work, slow or numerous state roots can stall the whole dashboard. The loop is inside the PR diff. Move the fallback behind an asynchronous orders read-door helper using async state-home/book reads, while scanning sequentially to preserve registry-order first-match behavior.\n\n## Non-blocking Findings\n\n### [security] Cross-project order-book metadata remains unauthenticated — `src/dashboard/server/routes/orders.ts:558`\nThe new selector expands existing unauthenticated order-book GET access from the cwd project to every registered project. A reachable network caller can enumerate campaign names, issue IDs, prerequisites, run IDs, posture attribution, validation state, and brief-overlay paths. The reviewer classified this as advisory because it exposes operational metadata rather than credentials. Authenticate the project-scoped GET routes or explicitly define and test a redacted public projection.\n\n### [performance] Ready-queue scanning reads every historical book file — `src/lib/orders/resolver.ts:103`\n`firstReadyBookInQueue()` reads `index.json` and then opens each book until it finds a ready status, even though the index already contains status. Cross-project completion multiplies that work across all projects. Select the first ready index entry and read only its book, while preserving explicit behavior for an index that references a missing file.\n\n### [requirements] Untraced `pan parked` companion fix — `src/cli/commands/parked.ts:97`\nThe branch changes recovery-trip acknowledgement from the nonexistent `project.projectPath` field to `project.path`. The correction is small and valid, but it is outside PAN-3427's traced requirements; document it as an intentional companion fix or move it to its own change.\n\n## Clean Sub-roles\nNone; security reported one advisory, correctness reported two blockers, performance reported one blocker and one advisory, and requirements reported one blocker plus one advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3427 -m \"Fixed review issues\"`"
+    },
+    {
+      "seq": 2,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T19:58:57Z",
+      "markdownBody": "VERIFICATION STUCK for PAN-3427 (attempt 3/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (27032ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3427 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
     }
   ],
   "scopeDrift": {
@@ -166,7 +183,7 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:58:06.321Z",
+  "updated": "2026-08-02T19:58:57.699Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "blocked",
