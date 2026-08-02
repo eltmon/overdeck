@@ -56,7 +56,7 @@ import { resumeQueuedMerges } from './services/merge-queue-service.js';
 import { mkdir } from 'node:fs/promises';
 import { getOverdeckHome } from '../../lib/paths.js';
 import { ensureManagedTmuxContextOnce } from '../../lib/tmux.js';
-import { startCliproxyWatchdog } from './routes/cliproxy.js';
+import { shouldStartCliproxyWatchdog, startCliproxyWatchdog } from './routes/cliproxy.js';
 import { startResourcesSnapshotService } from './routes/resources/snapshot.js';
 import { cleanupOrphanedConversationAttachments } from './services/conversation-attachments.js';
 import { closeMemoryFtsDatabases } from '../../lib/memory/fts-db.js';
@@ -619,9 +619,14 @@ void (async () => {
   });
 })().catch(err => console.warn('[memory-poller] lifecycle subscription failed:', err?.message ?? err));
 
-// Start CLIProxy watchdog — auto-restarts the sidecar if it crashes
-startCliproxyWatchdog();
-console.log('[overdeck] CLIProxy watchdog started (30s interval)');
+// The host dashboard owns the CLIProxy sidecar. Peer dashboards run without
+// ~/.overdeck mounted and must not try to install or restart host-side services.
+if (shouldStartCliproxyWatchdog()) {
+  startCliproxyWatchdog();
+  console.log('[overdeck] CLIProxy watchdog started (30s interval)');
+} else {
+  console.log('[overdeck] CLIProxy watchdog skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');
+}
 
 if (isPeerDashboard) {
   console.log('[overdeck] smee-client webhook relay skipped — peer dashboard (OVERDECK_DISABLE_DEACON=1)');

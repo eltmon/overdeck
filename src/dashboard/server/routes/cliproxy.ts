@@ -36,6 +36,12 @@ async function refreshStatus(): Promise<void> {
 
 const INSTALL_RETRY_COOLDOWN_MS = 5 * 60_000;
 
+export function shouldStartCliproxyWatchdog(
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  return env.OVERDECK_DISABLE_DEACON !== '1';
+}
+
 /** Start a background interval that checks CLIProxy health every 30s and
  *  auto-restarts it if it went down. */
 export function startCliproxyWatchdog(): void {
