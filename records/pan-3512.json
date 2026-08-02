@@ -12,11 +12,16 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-02T23:09:41.821Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-02T23:17:25.964Z"
     }
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:09:41.821Z",
+  "updated": "2026-08-02T23:17:25.965Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
