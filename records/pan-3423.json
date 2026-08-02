@@ -10,19 +10,46 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+      "src/dashboard/frontend/src/lib/system-health-attention.ts",
+      "src/lib/agents/__tests__/agent-health.test.ts",
+      "src/lib/agents/health.ts"
+    ],
+    "declaredScope": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+      "src/dashboard/frontend/src/lib/system-health-attention.ts",
+      "src/lib/agents/__tests__/agent-health.test.ts",
+      "src/lib/agents/health.ts"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
+    ],
+    "recordedAt": "2026-08-02T03:23:12.679Z"
+  },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:23:15.961Z",
+  "updated": "2026-08-02T03:23:18.808Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T03:23:15.954Z",
+    "updatedAt": "2026-08-02T03:23:18.703Z",
     "inspectNotes": "All 4 ACs met in src/dashboard/frontend/src/lib/system-health-attention.ts. AC1: info reasons filtered at all four reason sources (host/admission/services/agents, lines 92-131) and contextNotes covers exactly those same four sources (lines 15-22) — verified against SystemHealthSnapshot in packages/contracts/src/system-health.ts:253-278, which has no fifth reason-bearing field. AC2: agent-domain codes with >1 entry produce one row with agents=[both ids], agentId omitted, sub='2x agents: a, b' truncating at slice(0,2) + '+N more'. AC3: mapPresentationSeverity forces agent.runtime.inactive.stalled to critical and the comparator sorts critical first, then stalled before idle. AC4: healthy snapshot yields [] and summaryLine returns 'All clear - <N> GiB spawn headroom - relay running - 0 stalled agents'. NFR-2 satisfied: pure module, no React import. NON-BLOCKING (outside these ACs, for the component bead or review convoy): (1) reasonLabel line 78-82 returns the literal 'Retry' as the row TITLE for system.health_snapshot.unavailable (severity critical per src/dashboard/server/routes/misc/health.ts:57) and agent.persisted_state.unavailable (severity warning per src/lib/agents/health.ts:171) — both survive the info filter, so a real outage renders a row titled 'Retry'. In SystemHealthPill.tsx:114-117 that string was a suffix of 'Health unavailable - Retry', not a title. (2) Non-agent codes are grouped by code but rendered from entries[0] only, so two services emitting the same code would silently drop all but the first. (3) Grouped rows take severity from entries[0], so a mixed-severity group under one code under-reports. (4) FR-8 names memory percent in the summary line; only the all-clear variant carries headroom and neither non-healthy variant carries memory percent.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewRequestedAt": "2026-08-02T03:23:15.954Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -49,35 +76,36 @@
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
       ],
       "recordedAt": "2026-08-02T03:23:12.679Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3466"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 453,
-            "output": 27071,
-            "cacheRead": 10578946,
-            "cacheWrite": 226261
+            "input": 1023,
+            "output": 54363,
+            "cacheRead": 26357559,
+            "cacheWrite": 567543
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 453,
-          "output": 27071,
-          "cacheRead": 10578946,
-          "cacheWrite": 226261
+          "input": 1023,
+          "output": 54363,
+          "cacheRead": 26357559,
+          "cacheWrite": 567543
         }
       },
       "costAtCloseOut": {
-        "usd": 1.476532,
-        "pricingAsOf": "2026-08-02T02:59:32.674Z"
+        "usd": 3.618029,
+        "pricingAsOf": "2026-08-02T03:23:18.764Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3466"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -245,31 +273,5 @@
     "docs-resource-governor": "completed",
     "docs-resource-governor.docs-resource-governor.ac1": "completed",
     "docs-resource-governor.docs-resource-governor.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "docs/RESOURCE-GOVERNOR.md",
-      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
-      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
-      "src/dashboard/frontend/src/lib/system-health-attention.ts",
-      "src/lib/agents/__tests__/agent-health.test.ts",
-      "src/lib/agents/health.ts"
-    ],
-    "declaredScope": [
-      "docs/RESOURCE-GOVERNOR.md",
-      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
-      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
-      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
-      "src/dashboard/frontend/src/lib/system-health-attention.ts",
-      "src/lib/agents/__tests__/agent-health.test.ts",
-      "src/lib/agents/health.ts"
-    ],
-    "actualChangedFiles": [
-      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
-      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
-    ],
-    "recordedAt": "2026-08-02T03:23:12.679Z"
   }
 }
