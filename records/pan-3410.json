@@ -622,6 +622,21 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T22:54:20.545Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T22:55:07.805Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T22:55:07.833Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T22:55:07.872Z"
     }
   ],
   "feedback": [],
@@ -725,7 +740,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T22:54:20.584Z",
+  "updated": "2026-08-02T22:55:07.873Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "reviewing",
