@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-02T01:39:55.053Z",
+  "updated": "2026-08-02T01:40:06.707Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "pending",
@@ -211,5 +211,47 @@
     "docs-sync-prune": "completed",
     "docs-sync-prune.docs-sync-prune.ac1": "completed",
     "docs-sync-prune.docs-sync-prune.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/workspace-create.ts",
+      "tests/cli/commands/sync-mirror.test.ts",
+      "tests/lib/cost-parsers/jsonl-parser.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "cli/core-commands.mdx",
+      "features/skills.mdx",
+      "src/cli/commands/sync.ts",
+      "src/lib/harness-skill-sync.ts",
+      "src/lib/manifest.ts",
+      "src/lib/skills-merge.ts",
+      "src/lib/sync.ts",
+      "sync-sources/skills/pan-sync/SKILL.md",
+      "tests/unit/lib/manifest-prune.test.ts",
+      "tests/unit/lib/skills-merge.test.ts",
+      "tests/unit/lib/sync-prune-cache.test.ts",
+      "tests/unit/lib/sync-prune-target.test.ts"
+    ],
+    "actualChangedFiles": [
+      "cli/core-commands.mdx",
+      "features/skills.mdx",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/sync.ts",
+      "src/cli/commands/workspace-create.ts",
+      "src/lib/harness-skill-sync.ts",
+      "src/lib/manifest.ts",
+      "src/lib/skills-merge.ts",
+      "src/lib/sync.ts",
+      "sync-sources/skills/pan-sync/SKILL.md",
+      "tests/cli/commands/sync-mirror.test.ts",
+      "tests/lib/cost-parsers/jsonl-parser.test.ts",
+      "tests/unit/lib/manifest-prune.test.ts",
+      "tests/unit/lib/skills-merge.test.ts",
+      "tests/unit/lib/sync-prune-cache.test.ts",
+      "tests/unit/lib/sync-prune-target.test.ts"
+    ],
+    "recordedAt": "2026-08-02T01:40:06.706Z"
   }
 }
