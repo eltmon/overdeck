@@ -208,7 +208,7 @@
     "recordedAt": "2026-08-01T13:59:42.560Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-01T19:09:33.333Z",
+  "updated": "2026-08-02T17:03:20.682Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "passed",
@@ -350,16 +350,7 @@
   },
   "harness": "claude-code",
   "model": "k3[1m]",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3362",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T07:36:32.192Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
     "claims": {},
