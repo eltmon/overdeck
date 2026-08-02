@@ -532,6 +532,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T16:21Z] review-agent → FAILED — seq 4",
       "timestamp": "2026-08-02T16:21:51.997Z"
+    },
+    {
+      "timestamp": "2026-08-02T16:25:05.429Z",
+      "reason": "end",
+      "note": "Synced main (184 commits), no conflicts to resolve"
     }
   ],
   "feedback": [
@@ -565,7 +570,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T16:25:02.066Z",
+  "updated": "2026-08-02T16:25:05.477Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -574,7 +579,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T16:25:02.061Z",
+    "updatedAt": "2026-08-02T16:25:05.424Z",
     "reviewNotes": "all four current-cycle convoy reviewers failed to start",
     "conflictsSince": {
       "sha": "c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae",
@@ -586,8 +591,8 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "328720ae65861cf1fda59fe0e2d0bf32cf061cf1",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
-    "reviewSpawnedAt": "2026-08-01T20:22:39.126Z",
-    "reviewRequestedAt": "2026-08-02T16:25:02.061Z"
+    "reviewRequestedAt": "2026-08-02T16:25:02.061Z",
+    "reviewSpawnedAt": "2026-08-01T20:22:39.126Z"
   },
   "closeOut": {
     "usage": {
@@ -642,10 +647,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2010,
-            "output": 383674,
-            "cacheRead": 437239166,
-            "cacheWrite": 22457055
+            "input": 2030,
+            "output": 392515,
+            "cacheRead": 441986069,
+            "cacheWrite": 22477322
           }
         }
       },
@@ -663,15 +668,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2010,
-          "output": 383674,
-          "cacheRead": 437239166,
-          "cacheWrite": 22457055
+          "input": 2030,
+          "output": 392515,
+          "cacheRead": 441986069,
+          "cacheWrite": 22477322
         }
       },
       "costAtCloseOut": {
-        "usd": 241.937927,
-        "pricingAsOf": "2026-08-02T16:22:28.025Z"
+        "usd": 243.026427,
+        "pricingAsOf": "2026-08-02T16:25:05.465Z"
       }
     },
     "merges": [
