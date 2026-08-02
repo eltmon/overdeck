@@ -372,11 +372,11 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T19:29:53.747Z",
+  "updated": "2026-08-02T19:36:13.375Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -384,9 +384,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
-    "updatedAt": "2026-08-02T19:29:53.676Z",
-    "reviewNotes": "Approved; cycle delta is clean and the unchanged Windows separator finding remains non-promotable under the cycle-7 convergence gate",
-    "testNotes": "typecheck PASSED (root tsc, hooks, evals, dashboard-types ratchet 57 known/0 new, frontend-types ratchet 0/0). PAN-3419 regression tests PASSED: npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-project-key.test.ts src/lib/overdeck/__tests__/conversation-fork-project.test.ts src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts src/dashboard/server/routes/__tests__/palette.test.ts -> 5 files, 28 tests passed; frontend npx vitest run src/components/CommandDeck/projectsData.test.ts src/components/CommandDeck/__tests__/ForkModal.test.tsx -> 2 files, 13 tests passed. npm run lint FAILS at the lint:slash-commands step: packages/contracts/src/composer-commands.generated.ts is missing the pan-parked/pan-parked-ack entries scripts/lint-slash-commands.sh expects, exit 1 ('composer-command manifest has drifted from the CLI registry'). Verified pre-existing on origin/main and unrelated to this PR's diff: merge-base(HEAD, origin/main) == origin/main HEAD (branch fully current), and origin/main's own committed manifest also has zero pan-parked matches -- drift stems from unrelated commits 5ba22313a2d/dafc96071f5 (PAN-3486) that never regenerated the manifest. Did not run generate:slash-commands or edit code/config per test-role boundaries. testStatus failed because a required configured gate (lint) is currently red.",
+    "updatedAt": "2026-08-02T19:36:13.273Z",
     "uatNotes": "UAT required (Fork/Handoff modal Project select + CommandDeck grouping are explicit dashboard-UI acceptance criteria). Built/ran the workspace's own isolated Docker stack; workspace API confirms buildCommit=4ebc214d617b9799a398780d76665c2a7c157420 (matches HEAD) buildDirty=false, after working around an orthogonal pre-existing bug (unrelated to this PR): src/lib/cliproxy.ts's watchdog crashes any peer-dashboard container lacking a cliproxy binary via an unhandled child-process 'error' event -- worked around with an ephemeral container-runtime pid-file stub, no code/config edited. Could not exercise the browser: Playwright MCP (configured for this role) never connected in this session, and the claude-in-chrome fallback reports the extension is not connected. No Fork/Handoff modal or CommandDeck grouping acceptance criterion was proven end-to-end. Recommend retrying UAT in a session with a reachable browser tool; separately consider filing the cliproxy watchdog crash, since it will block every future workspace-container UAT until fixed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -409,7 +407,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewedAtCommit": "4ebc214d617b9799a398780d76665c2a7c157420",
     "reviewSpawnedAt": "2026-08-02T18:39:35.862Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -566,9 +563,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 6890573,
-            "output": 286782,
-            "cacheRead": 176002048,
+            "input": 6942732,
+            "output": 292020,
+            "cacheRead": 180172288,
             "cacheWrite": 0
           }
         }
@@ -581,9 +578,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 45704752,
-          "output": 707672,
-          "cacheRead": 265702912,
+          "input": 45756911,
+          "output": 712910,
+          "cacheRead": 269873152,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -594,8 +591,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 398.3777023,
-        "pricingAsOf": "2026-08-02T19:29:53.722Z"
+        "usd": 400.8807573,
+        "pricingAsOf": "2026-08-02T19:36:13.363Z"
       }
     },
     "merges": [
