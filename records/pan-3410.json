@@ -635,7 +635,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T20:27:54.042Z",
+  "updated": "2026-08-02T20:28:05.743Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
@@ -647,7 +647,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T20:27:53.781Z",
+    "updatedAt": "2026-08-02T20:27:54.080Z",
     "reviewNotes": "Cycle-5 fixes resolve the documentation and nested-scope blockers; remaining settings and font-sweep risks are previously reviewed advisories",
     "testNotes": "typecheck: PASS (npm run typecheck, incl. dashboard/frontend type ratchets). lint: FAIL at lint:circular — 'new circular dependencies found: src/lib/cloister/deacon.ts > src/lib/cloister/stall-sweeper.ts > src/lib/cloister/service.ts'. Verified this is NOT a PAN-3410 regression: these three files have zero diff between HEAD (27a14570e), the merge-base with origin/main (d28b8893d), and origin/main's tip itself (all identical, confirmed via git diff). scripts/circular-deps-baseline.txt (also unmodified by this branch) does not contain this cycle, so it is a pre-existing, currently-unbaselined red-main defect introduced by unrelated PAN-3487 stall-sweeper work already on main, inherited via this branch's merge of origin/main. Confirmed main's own CI (run 30763459403 on d28b8893d) is independently red (lint + test jobs failing) for a different reason (lint:slash-commands drift, which this branch already fixed in commit 2d21006b1). Cannot fix per boundaries (no code/config edits permitted). test: full `npm test` reported 70 failed / 13088 passed / 50 skipped, ALL 70 failures are 'Hook timed out in 5000ms' inside setupOverdeckTestDb() beforeEach hooks, in files entirely outside PAN-3410's scope (conversations/embeddings, costs, memory search-scopes, cli conversations commands). Reproduced the same timeouts re-running 3 of those files in isolation; machine was at load average 42 on 24 cores with swap 100% full (uptime/free confirmed) from ~30 concurrently running agents on this host — matches the documented resource-contention flake pattern, not a code regression. All PAN-3410-scoped test files pass cleanly in isolation: tests/unit/dashboard/fonts-local.test.ts, src/lib/__tests__/config-yaml-ui-theme.test.ts, src/lib/__tests__/settings-api.test.ts, tests/lib/settings-api.test.ts (4 files, root vitest, all pass) plus src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts, src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx, src/dashboard/frontend/src/recovery.test.ts (frontend vitest, 24/24 pass), and tests/e2e/styleguide-conformance.spec.ts (6/6 pass). Top-level status is 'failed' per the configured lint gate's literal result, though the failure is demonstrably pre-existing and outside this diff's scope — flagging for operator/pipeline judgment on whether to treat as a red-main blocker rather than a PAN-3410 defect.",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
@@ -777,10 +777,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 268,
-            "output": 48793,
-            "cacheRead": 35773122,
-            "cacheWrite": 348404
+            "input": 270,
+            "output": 49245,
+            "cacheRead": 36121526,
+            "cacheWrite": 349936
           }
         },
         "work": {
@@ -806,15 +806,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2312,
-          "output": 516195,
-          "cacheRead": 431242743,
-          "cacheWrite": 29656661
+          "input": 2314,
+          "output": 516647,
+          "cacheRead": 431591147,
+          "cacheWrite": 29658193
         }
       },
       "costAtCloseOut": {
-        "usd": 354.2320703,
-        "pricingAsOf": "2026-08-02T20:27:53.975Z"
+        "usd": 354.3101053,
+        "pricingAsOf": "2026-08-02T20:28:05.553Z"
       }
     },
     "merges": [
