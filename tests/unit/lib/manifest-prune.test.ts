@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, relative } from 'path';
 import {
   hashFileSync,
   pruneStaleManifestEntriesSync,
@@ -55,6 +55,19 @@ describe('pruneStaleManifestEntriesSync', () => {
 
   it('drops a stale manifest entry when its target file is already missing', () => {
     const targetBase = createTargetBase();
+    const manifest = createManifest({
+      'skills/missing/SKILL.md': entry('sha256:missing'),
+    });
+
+    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+
+    expect(result).toEqual({ pruned: ['skills/missing/SKILL.md'], keptModified: [] });
+    expect(manifest.installed).toEqual({});
+  });
+
+  it('drops stale entries when targetBase is already missing', () => {
+    const targetBase = createTargetBase();
+    rmSync(targetBase, { recursive: true });
     const manifest = createManifest({
       'skills/missing/SKILL.md': entry('sha256:missing'),
     });
@@ -119,6 +132,83 @@ describe('pruneStaleManifestEntriesSync', () => {
     expect(existsSync(skillFile)).toBe(false);
     expect(existsSync(ruleFile)).toBe(true);
     expect(manifest.installed).toHaveProperty('rules/removed.md');
+  });
+
+  it('rejects traversal paths without reading or deleting outside targetBase', () => {
+    const targetBase = createTargetBase();
+    const outsideDir = createTargetBase();
+    const outsideFile = write(outsideDir, 'outside.txt', 'outside\n');
+    const traversalPath = `skills/../${relative(targetBase, outsideFile)}`;
+    const manifest = createManifest({
+      [traversalPath]: entry(hashFileSync(outsideFile)),
+    });
+
+    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set(), {
+      prefixes: ['skills/'],
+    });
+
+    expect(result).toEqual({ pruned: [], keptModified: [traversalPath] });
+    expect(readFileSync(outsideFile, 'utf-8')).toBe('outside\n');
+    expect(manifest.installed).toEqual({});
+  });
+
+  it('rejects absolute manifest paths without touching their targets', () => {
+    const targetBase = createTargetBase();
+    const outsideDir = createTargetBase();
+    const outsideFile = write(outsideDir, 'absolute.txt', 'outside\n');
+    const manifest = createManifest({
+      [outsideFile]: entry(hashFileSync(outsideFile)),
+    });
+
+    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set(), {
+      prefixes: ['skills/', 'agents/', 'rules/'],
+    });
+
+    expect(result).toEqual({ pruned: [], keptModified: [outsideFile] });
+    expect(readFileSync(outsideFile, 'utf-8')).toBe('outside\n');
+    expect(manifest.installed).toEqual({});
+  });
+
+  it('rejects symlinked ancestors that redirect outside targetBase', () => {
+    const targetBase = createTargetBase();
+    const outsideDir = createTargetBase();
+    const outsideFile = write(outsideDir, 'SKILL.md', 'outside\n');
+    const linkedParent = join(targetBase, 'skills', 'linked');
+    mkdirSync(join(targetBase, 'skills'), { recursive: true });
+    symlinkSync(outsideDir, linkedParent, 'dir');
+    const manifest = createManifest({
+      'skills/linked/SKILL.md': entry(hashFileSync(outsideFile)),
+    });
+
+    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+
+    expect(result).toEqual({ pruned: [], keptModified: ['skills/linked/SKILL.md'] });
+    expect(readFileSync(outsideFile, 'utf-8')).toBe('outside\n');
+    expect(lstatSync(linkedParent).isSymbolicLink()).toBe(true);
+    expect(manifest.installed).toEqual({});
+  });
+
+  it('preserves stale targets whose filesystem type changed', () => {
+    const targetBase = createTargetBase();
+    const directoryPath = join(targetBase, 'rules', 'directory.md');
+    const danglingLink = join(targetBase, 'skills', 'dangling', 'SKILL.md');
+    mkdirSync(directoryPath, { recursive: true });
+    mkdirSync(join(danglingLink, '..'), { recursive: true });
+    symlinkSync(join(targetBase, 'missing-target'), danglingLink);
+    const manifest = createManifest({
+      'rules/directory.md': entry('sha256:directory'),
+      'skills/dangling/SKILL.md': entry('sha256:link'),
+    });
+
+    const result = pruneStaleManifestEntriesSync(targetBase, manifest, new Set());
+
+    expect(result).toEqual({
+      pruned: [],
+      keptModified: ['rules/directory.md', 'skills/dangling/SKILL.md'],
+    });
+    expect(lstatSync(directoryPath).isDirectory()).toBe(true);
+    expect(lstatSync(danglingLink).isSymbolicLink()).toBe(true);
+    expect(manifest.installed).toEqual({});
   });
 
   it('removes empty ancestor directories but never removes targetBase', () => {
