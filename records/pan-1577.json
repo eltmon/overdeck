@@ -641,7 +641,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:35:53.219Z",
+  "updated": "2026-08-02T17:35:55.407Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -650,7 +650,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:35:50.588Z",
+    "updatedAt": "2026-08-02T17:35:52.698Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (27984ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m386.77 kB\u001b[22m \u001b[2m│ gzip: 62.47 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 386.77 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5467ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m354.98 kB\u001b[22m \u001b[2m│ gzip: 60.13 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m580.91 kB\u001b[22m \u001b[2m│ gzip: 92.83 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.64 kB\u001b[22m \u001b[2m│ gzip:  5.85 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m817.91 kB\u001b[22m \u001b[2m│ gzip: 79.95 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5938ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/cli/commands/parked.ts(100,45): error TS2339: Property 'projectPath' does not exist on type 'ProjectConfig'.\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (79%)\n  - rolldown-plugin-dts:fake-js (16%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "conflictsSince": {
@@ -762,7 +762,7 @@
       },
       "costAtCloseOut": {
         "usd": 306.40509529999997,
-        "pricingAsOf": "2026-08-02T17:35:50.650Z"
+        "pricingAsOf": "2026-08-02T17:35:55.389Z"
       }
     },
     "merges": [
