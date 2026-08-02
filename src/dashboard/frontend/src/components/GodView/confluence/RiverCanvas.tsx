@@ -83,7 +83,7 @@ interface GateFlash { x: number; t: number }
 interface Tide { active: boolean; x: number; targetId: string | null; beneficiaryId: string | null; t: number }
 
 export interface RiverEffectsApi {
-  emitSparks(issueId: string, color?: string): void;
+  emitSparks(issueId: string, color?: string, agentId?: string, heatBump?: number): void;
   emitRing(issueId: string, color?: string): void;
   emitTicker(text: string, color?: string): void;
   playTide(targetId?: string, beneficiaryId?: string): void;
@@ -175,6 +175,7 @@ function createEngine(
 
   const aurora: AuroraController = createAurora(glCanvas);
   const renderOrbs = new Map<string, RenderOrb>();
+  const retiredIds = new Set<string>();
   const particles: Particle[] = [];
   const pulses: Pulse[] = [];
   const tickers: Ticker[] = [];
@@ -189,7 +190,6 @@ function createEngine(
   let simT = 0;
   let frameId = 0;
   let disposed = false;
-  let lastHookSequence = new Set<string>();
 
   const list = () => [...renderOrbs.values()];
   const anchorAll = () => {
@@ -295,7 +295,7 @@ function createEngine(
   };
 
   const api: RiverEffectsApi = {
-    emitSparks(issueId, color = '#00d4ff') { const orb = orbAt(issueId); if (orb) burst(orb.x, orb.y, color, 26, 90, 1.4, 2.6); },
+    emitSparks(issueId, color = '#00d4ff', agentId, heatBump = 0) { const orb = orbAt(issueId); if (orb) { orb.heat = Math.min(1, orb.heat + heatBump); orb.flashT = simT + 0.8; const satellite = orb.convoy?.find((member) => member.agentId === agentId); if (satellite) satellite.flash = 1; burst(orb.x, orb.y, color, 26, 90, 1.4, 2.6); } },
     emitRing(issueId, color = '#00d4ff') { const orb = orbAt(issueId); if (orb) ring(orb.x, orb.y, color, 70, 2.5); },
     emitTicker(text, color = '#00d4ff') { ticker(text, color); },
     playTide(targetId, beneficiaryId) {
@@ -303,7 +303,7 @@ function createEngine(
       tide.targetId = targetId ?? list().find((orb) => orb.state === 'active' && orb.stage === 'WORK')?.id ?? null;
       tide.beneficiaryId = beneficiaryId ?? list().find((orb) => orb.state === 'shelf')?.id ?? null;
     },
-    playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
+    playMerge(issueId) { const orb = orbAt(issueId); if (orb) { retiredIds.add(issueId); startMerge(orb); } },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
     pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
     spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, true); },
@@ -315,7 +315,7 @@ function createEngine(
     const live = new Set(next.orbs.map((orb) => orb.id));
     for (const source of next.orbs) {
       const current = orbAt(source.id);
-      if (!current) { spawnOrb(source); continue; }
+      if (!current) { if (!retiredIds.has(source.id)) spawnOrb(source); continue; }
       const previousStage = current.stage;
       const previousSpend = current.spend;
       const existingSatellites = new Map(current.convoy?.map((satellite) => [satellite.role, satellite]) ?? []);
@@ -326,11 +326,8 @@ function createEngine(
         compactT: Math.max(current.compactT, source.compactT),
         fading: null,
       });
-      if (source.stage !== previousStage) {
-        flashGate(source.stage);
-        ring(current.x, current.y, STAGE_COLORS[source.stage], 70, 2.5);
-        burst(current.x, current.y, STAGE_COLORS[source.stage], 26, 90, 1.4, 2.6);
-        if (source.stage === 'MERGE') current.mergeDwell = 1.5 + Math.random() * 2;
+      if (source.stage !== previousStage && source.stage === 'MERGE') {
+        current.mergeDwell = 1.5 + Math.random() * 2;
       }
       if (source.spend > previousSpend) dollar(current);
     }
@@ -339,21 +336,8 @@ function createEngine(
       if (orb.stage === 'MERGE') startMerge(orb);
       else orb.fading = 1;
     }
+    for (const issueId of retiredIds) if (!live.has(issueId)) retiredIds.delete(issueId);
     anchorAll();
-
-    const seen = new Set<string>();
-    for (const entry of next.hookStream.entries.slice(-500)) {
-      const key = `${entry.ts}:${entry.agentId}:${entry.hookName}:${entry.tool}`;
-      seen.add(key);
-      if (lastHookSequence.has(key)) continue;
-      const orb = entry.issueId ? orbAt(entry.issueId) : undefined;
-      if (!orb) continue;
-      orb.heat = Math.min(1, orb.heat + 0.13);
-      orb.flashT = simT + 0.8;
-      const satellite = orb.convoy?.find((member) => member.agentId === entry.agentId);
-      if (satellite) satellite.flash = 1;
-    }
-    lastHookSequence = seen;
     aurora.setEnergy(next.hookStream.energy);
   };
 

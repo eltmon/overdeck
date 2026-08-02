@@ -43,6 +43,7 @@ export interface ConfluenceOrb {
   state: OrbState;
   convoy: readonly ConfluenceConvoyMember[] | null;
   yieldReason: string | null;
+  yieldedByScheduler: boolean;
   warn: string | null;
   broken: boolean;
   model: string | null;
@@ -55,6 +56,7 @@ export interface ConfluenceOrb {
   thinkUntil: number;
   compactT: number;
   spend: number;
+  mergeStatus: string | null;
 }
 
 export interface HookStreamEntry {
@@ -484,6 +486,7 @@ export function useConfluenceOrbs(
         }, now),
         convoy: convoyMembers(issueAgents),
         yieldReason: issueAgents.find((agent) => agent.pausedReason)?.pausedReason ?? null,
+        yieldedByScheduler,
         warn: primary.status === 'error' || primary.troubled ? (primary.lastFailureReason ?? primary.status) : null,
         broken,
         model: primary.model ?? null,
@@ -496,6 +499,7 @@ export function useConfluenceOrbs(
         thinkUntil: micro.thinkUntil,
         compactT: micro.compactT,
         spend: micro.spend,
+        mergeStatus: typeof mergeStatus === 'string' ? mergeStatus : null,
       };
       const signature = orbSignature(orb);
       const previous = cache.current.get(id);

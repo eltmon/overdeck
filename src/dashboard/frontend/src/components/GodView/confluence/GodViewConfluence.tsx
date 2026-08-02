@@ -4,6 +4,7 @@ import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
 import { RiverCanvas, type RiverEffectsApi } from './RiverCanvas';
+import { useConfluenceChoreography } from './useConfluenceChoreography';
 import { useConfluenceData, type ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
@@ -22,6 +23,8 @@ export function GodViewConfluence() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
   const selected = useMemo(() => orbs.find((orb) => orb.id === selectedId) ?? null, [orbs, selectedId]);
+  useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
+
   const hookCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const entry of hookStream.entries) counts.set(entry.hookName, (counts.get(entry.hookName) ?? 0) + 1);
