@@ -417,16 +417,16 @@
     "recordedAt": "2026-08-01T23:49:58.057Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T00:35:15.939Z",
+  "updated": "2026-08-02T00:35:22.402Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
     "testStatus": "passed",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T00:34:53.228Z",
+    "updatedAt": "2026-08-02T00:35:16.337Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD 48b5fba3656807360826f012d5f95ff9d190b8f6 (matches reviewedAtCommit, tree clean). npm run typecheck PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). npm run lint PASSED clean, exit 0 (all lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands, lint:ratchet-audit). The prior blocking failure (residue.test.ts: 3 assertion failures) is RESOLVED by the latest commit 48b5fba365 'fix(tests): align residue test assertions with implementation contract'. Re-ran all 7 PAN-3396-scoped test files fresh: npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts -> 7 files passed, 152 passed / 1 skipped, 0 failed. Full npm test run: 72 files / 122 tests failed, but every failure is a setupOverdeckTestDb() beforeEach hook timeout (5000ms) or an unrelated schema-audit.test.ts test timeout, spread across SQLite/workspace/conversations/memory/costs test infrastructure -- none touch this issue's declared files_scope (all of which passed above). Re-ran 3 of the failing files in isolation and they still timed out identically. uptime showed load average 24.69/31.03/31.68 on a 24-core box with swap 8.0Gi/8.0Gi (100%) full, confirming severe resource contention from concurrently running agents (32 running per the workspace briefing) rather than a code defect. This backend/CLI-only change (membership resolver lens + pan close --residue) has no dashboard/frontend surface: PRD NonGoals explicitly state 'Any frontend/dashboard change: bucket vocabulary is unchanged and the DTO already carries bucket/reasons-adjacent state' (drafts/pan-3396.md:247), and all acceptance criteria are vitest/lint commands with no UI wording -- browser UAT is not required and was not attempted.",
     "verificationNotes": "Verification FAILED at test (924113ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396\n\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 1 failed) 18307ms\n     × warns for each missing artifact at startup without repairing the schema 10343ms (retry x1)\n\n Test Files  145 passed (145)\n      Tests  1755 passed (1755)\n   Start at  20:27:26\n   Duration  37.07s (transform 5.27s, setup 16.20s, import 53.65s, tests 32.43s, environment 28.48s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-TE39KC/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Works\n…(920 chars elided)…\nture-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SGAurI/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n...(truncated)",
@@ -552,10 +552,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 3136,
-            "output": 151062,
-            "cacheRead": 73027447,
-            "cacheWrite": 3759309
+            "input": 3162,
+            "output": 151622,
+            "cacheRead": 73521180,
+            "cacheWrite": 3768055
           }
         }
       },
@@ -579,15 +579,15 @@
           "cacheWrite": 424933
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 3136,
-          "output": 151062,
-          "cacheRead": 73027447,
-          "cacheWrite": 3759309
+          "input": 3162,
+          "output": 151622,
+          "cacheRead": 73521180,
+          "cacheWrite": 3768055
         }
       },
       "costAtCloseOut": {
-        "usd": 313.7454653,
-        "pricingAsOf": "2026-08-02T00:34:53.249Z"
+        "usd": 313.80859730000003,
+        "pricingAsOf": "2026-08-02T00:35:22.391Z"
       }
     },
     "merges": [
