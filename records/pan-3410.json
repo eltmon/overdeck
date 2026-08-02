@@ -668,23 +668,23 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T20:36:15.810Z",
+  "updated": "2026-08-02T20:36:18.365Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "blocked",
+    "reviewStatus": "passed",
     "testStatus": "failed",
     "uatStatus": "passed",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T20:36:15.049Z",
+    "updatedAt": "2026-08-02T20:36:15.223Z",
     "reviewNotes": "[requirements] The settings write path still does not satisfy the stated no-loss guarantee — xBRIEF `settings-api-ui-theme` / FR-7",
     "testNotes": "typecheck: PASS (npm run typecheck, incl. dashboard/frontend type ratchets). lint: FAIL at lint:circular — 'new circular dependencies found: src/lib/cloister/deacon.ts > src/lib/cloister/stall-sweeper.ts > src/lib/cloister/service.ts'. Verified this is NOT a PAN-3410 regression: these three files have zero diff between HEAD (27a14570e), the merge-base with origin/main (d28b8893d), and origin/main's tip itself (all identical, confirmed via git diff). scripts/circular-deps-baseline.txt (also unmodified by this branch) does not contain this cycle, so it is a pre-existing, currently-unbaselined red-main defect introduced by unrelated PAN-3487 stall-sweeper work already on main, inherited via this branch's merge of origin/main. Confirmed main's own CI (run 30763459403 on d28b8893d) is independently red (lint + test jobs failing) for a different reason (lint:slash-commands drift, which this branch already fixed in commit 2d21006b1). Cannot fix per boundaries (no code/config edits permitted). test: full `npm test` reported 70 failed / 13088 passed / 50 skipped, ALL 70 failures are 'Hook timed out in 5000ms' inside setupOverdeckTestDb() beforeEach hooks, in files entirely outside PAN-3410's scope (conversations/embeddings, costs, memory search-scopes, cli conversations commands). Reproduced the same timeouts re-running 3 of those files in isolation; machine was at load average 42 on 24 cores with swap 100% full (uptime/free confirmed) from ~30 concurrently running agents on this host — matches the documented resource-contention flake pattern, not a code regression. All PAN-3410-scoped test files pass cleanly in isolation: tests/unit/dashboard/fonts-local.test.ts, src/lib/__tests__/config-yaml-ui-theme.test.ts, src/lib/__tests__/settings-api.test.ts, tests/lib/settings-api.test.ts (4 files, root vitest, all pass) plus src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts, src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx, src/dashboard/frontend/src/recovery.test.ts (frontend vitest, 24/24 pass), and tests/e2e/styleguide-conformance.spec.ts (6/6 pass). Top-level status is 'failed' per the configured lint gate's literal result, though the failure is demonstrably pre-existing and outside this diff's scope — flagging for operator/pipeline judgment on whether to treat as a red-main blocker rather than a PAN-3410 defect.",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
-    "verificationNotes": "Verification FAILED at lint (208385ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(62620 chars elided)…\n0.74 kB\u001b[22m \u001b[2m│ gzip:   2.36 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcodex-app-server-host.d.ts\u001b[22m\u001b[39m                     \u001b[2m  3.16 kB\u001b[22m \u001b[2m│ gzip:   1.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  2.51 kB\u001b[22m \u001b[2m│ gzip:   1.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mverification-worker.d.ts\u001b[22m\u001b[39m                       \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 498 files, total: 17.13 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m6273ms\u001b[39m\n\n> @overdeck/core@0.48\n...(truncated)",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
     "reviewedAtCommit": "27a14570e72c8d856b0e8307d210572afd0f4a0b",
@@ -787,28 +787,6 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T18:36:54.913Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-27a14570/security.md",
-        "atCommit": "27a14570e72c8d856b0e8307d210572afd0f4a0b"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-27a14570/correctness.md",
-        "atCommit": "27a14570e72c8d856b0e8307d210572afd0f4a0b"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-27a14570/performance.md",
-        "atCommit": "27a14570e72c8d856b0e8307d210572afd0f4a0b"
-      },
-      "requirements": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-27a14570/requirements.md",
-        "atCommit": "27a14570e72c8d856b0e8307d210572afd0f4a0b"
-      }
     }
   },
   "closeOut": {
@@ -869,7 +847,7 @@
       },
       "costAtCloseOut": {
         "usd": 356.1184833,
-        "pricingAsOf": "2026-08-02T20:36:15.074Z"
+        "pricingAsOf": "2026-08-02T20:36:18.353Z"
       }
     },
     "merges": [
