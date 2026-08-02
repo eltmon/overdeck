@@ -267,6 +267,92 @@ describe('system-health-attention', () => {
       });
     });
 
+    it('carries the matching specialist kill consumer for a singleton specialist', () => {
+      const snapshot = createSnapshot('healthy', {
+        agents: [{
+          id: 'specialist-review-agent',
+          issueId: 'PAN-1',
+          kind: 'specialist',
+          status: 'stalled',
+          reasons: [{
+            code: 'agent.runtime.inactive.stalled',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'specialist-review-agent has produced no activity for 35 min.',
+          }],
+        }],
+        topConsumers: [{
+          id: 'specialist-review-agent',
+          label: 'specialist-review-agent',
+          type: 'specialist',
+          memoryBytes: GIB,
+          memoryGb: 1,
+          currentIssue: 'PAN-1',
+          killTarget: {
+            kind: 'specialist',
+            projectKey: 'overdeck',
+            issueId: 'PAN-1',
+            specialistType: 'review-agent',
+          },
+        }],
+      });
+
+      const items = buildAttentionItems(snapshot);
+      expect(items).toHaveLength(1);
+      expect(items[0]?.killConsumer?.killTarget).toEqual({
+        kind: 'specialist',
+        projectKey: 'overdeck',
+        issueId: 'PAN-1',
+        specialistType: 'review-agent',
+      });
+    });
+
+    it('carries each matching specialist kill consumer in a grouped row', () => {
+      const specialist = (id: string, issueId: string) => ({
+        id,
+        issueId,
+        kind: 'specialist' as const,
+        status: 'stalled' as const,
+        reasons: [{
+          code: 'agent.runtime.inactive.stalled',
+          domain: 'agent' as const,
+          severity: 'warning' as const,
+          message: `${id} has produced no activity for 35 min.`,
+        }],
+      });
+      const consumer = (id: string, issueId: string, specialistType: string) => ({
+        id,
+        label: id,
+        type: 'specialist' as const,
+        memoryBytes: GIB,
+        memoryGb: 1,
+        currentIssue: issueId,
+        killTarget: {
+          kind: 'specialist' as const,
+          projectKey: 'overdeck',
+          issueId,
+          specialistType,
+        },
+      });
+      const snapshot = createSnapshot('healthy', {
+        agents: [
+          specialist('specialist-review-agent', 'PAN-1'),
+          specialist('specialist-test-agent', 'PAN-2'),
+        ],
+        topConsumers: [
+          consumer('specialist-review-agent', 'PAN-1', 'review-agent'),
+          consumer('specialist-test-agent', 'PAN-2', 'test-agent'),
+        ],
+      });
+
+      const items = buildAttentionItems(snapshot);
+      expect(items).toHaveLength(1);
+      expect(items[0]?.targets.map(target => target.killConsumer?.killTarget)).toEqual([
+        expect.objectContaining({ kind: 'specialist', specialistType: 'review-agent' }),
+        expect.objectContaining({ kind: 'specialist', specialistType: 'test-agent' }),
+      ]);
+    });
+
     it('returns stalled items before idle items in the sort order', () => {
       const snapshot = createSnapshot('healthy', {
         agents: [

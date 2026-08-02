@@ -96,10 +96,11 @@ function formatBytes(bytes: number): string {
 export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionItem[] {
   const agentConsumers = new Map<string, SystemHealthConsumer>();
   for (const consumer of snapshot.topConsumers) {
+    if (consumer.type === 'container') continue;
     const agentId = consumer.killTarget?.kind === 'agent'
-      ? consumer.killTarget.agentId
-      : undefined;
-    if (agentId) agentConsumers.set(agentId, consumer);
+      ? consumer.killTarget.agentId ?? consumer.id
+      : consumer.id;
+    agentConsumers.set(agentId, consumer);
   }
 
   const allReasons: Array<{
