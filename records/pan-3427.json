@@ -31,7 +31,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:56:27.534Z",
+  "updated": "2026-08-02T18:00:31.194Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -90,16 +90,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "routes-book-scan": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 234113,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:56:27.534Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -144,6 +136,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T17:53:46.060Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 234113,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:56:27.534Z",
+        "itemId": "routes-book-scan",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T18:00:25.931Z"
       }
     ],
     "statusReasons": {
@@ -157,7 +160,7 @@
       },
       "routes-book-scan": {
         "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T17:53:46.060Z"
+        "updatedAt": "2026-08-02T18:00:25.931Z"
       }
     }
   },
@@ -172,6 +175,6 @@
     "cli-project-option.cli-project-option.ac2": "completed",
     "cli-project-option.cli-project-option.ac3": "completed",
     "cli-project-option.cli-project-option.ac4": "completed",
-    "routes-book-scan": "running"
+    "routes-book-scan": "pending"
   }
 }
