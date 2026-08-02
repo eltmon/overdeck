@@ -8,6 +8,7 @@ import {
   createBook,
   moveItem,
   removeItem,
+  setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
 import { findProjectByPathSync, getProjectSync } from '../../lib/projects.js';
@@ -207,6 +208,13 @@ export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {
   return (deps.startOrderBook ?? defaultStartOrderBook)(bookId);
 }
 
+export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
+  const stateRoot = stateRootFor(deps);
+  const book = requireBook(stateRoot, bookId);
+  if (book.status !== 'draft') throw new Error(`Order book ${bookId} must be draft before it can be queued`);
+  return setStatus(stateRoot, bookId, 'ready');
+}
+
 async function commandAction(action: () => Promise<void>): Promise<void> {
   try {
     await action();
@@ -271,6 +279,14 @@ export function createOrdersCommand(): Command {
     .option('--project <key>', 'Resolve the order book in another registered project')
     .action((id: string, issue: string, options: OrdersMoveOptions) => commandAction(async () => {
       console.log(formatBook(await runOrdersMove(id, issue, options, { projectKey: options.project })));
+    }));
+
+  orders
+    .command('queue <id>')
+    .description('Mark a draft order book ready for dispatch')
+    .option('--project <key>', 'Resolve the order book in another registered project')
+    .action((id: string, options: { project?: string }) => commandAction(async () => {
+      console.log(formatBook(await runOrdersQueue(id, { projectKey: options.project })));
     }));
 
   orders
