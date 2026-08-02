@@ -107,6 +107,11 @@
       "timestamp": "2026-08-02T18:12:11.792Z",
       "reason": "end",
       "note": "Fix lint verification"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-02T18:13:17.551Z"
     }
   ],
   "feedback": [],
@@ -152,7 +157,7 @@
     "recordedAt": "2026-08-02T18:12:05.186Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:12:39.316Z",
+  "updated": "2026-08-02T18:13:17.551Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
