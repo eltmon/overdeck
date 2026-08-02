@@ -59,7 +59,8 @@ describe('tiered crews mapping', () => {
     const imported = importCrews(liveConfig);
     expect(crewLabel(imported.crews[0])).toBe('Kimi K2.7 Code');
     expect(crewLabel(imported.crews[1])).toBe('4-model mix');
-    expect(blendedCost(imported.crews[1])).toBeCloseTo(6.525);
+    // gpt-5.6-terra repriced $8.75 → $7/1M in PAN-3388 (272K billing-tier pin).
+    expect(blendedCost(imported.crews[1])).toBeCloseTo(6);
     expect(blendedCost({ id: 'unknown', model: 'missing', harness: 'ohmypi' })).toBeNull();
   });
 
