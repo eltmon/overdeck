@@ -80,6 +80,24 @@ describe('deacon-swarm merged slot GC', () => {
     expect(fakeDeps.clearSlotAssignment).not.toHaveBeenCalled();
   });
 
+  it('immediately reaps a live slot when completed item status proves the merge', async () => {
+    const fakeDeps = {
+      ...deps(['agent-pan-2203-slot-1']),
+      stopSlotAgent: vi.fn(async () => undefined),
+    };
+
+    const actions = await gcMergedSlots('PAN-2203', '/repo/workspaces/feature-pan-2203', [
+      slot({ mergedVia: 'completed-status' }),
+    ], fakeDeps);
+
+    expect(actions).toEqual([
+      '[swarm] gc reaped merged agent agent-pan-2203-slot-1',
+      '[swarm] gc slot 1 (item wi-1) for PAN-2203',
+    ]);
+    expect(fakeDeps.stopSlotAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
+    expect(fakeDeps.clearSlotAssignment).toHaveBeenCalled();
+  });
+
   it('reaps a merged live slot after the idle threshold and frees its occupancy', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-10T12:00:00.000Z'));
