@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T02:56:16.350Z",
+  "updated": "2026-08-02T17:03:45.587Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -36,16 +36,7 @@
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3427",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T22:49:53.671Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 2,
     "claims": {},
