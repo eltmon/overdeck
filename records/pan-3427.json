@@ -61,7 +61,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:30:02.276Z",
+  "updated": "2026-08-02T19:30:17.906Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -360,5 +360,60 @@
     "docs-order-books": "completed",
     "docs-order-books.docs-order-books.ac1": "completed",
     "docs-order-books.docs-order-books.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
+      "src/dashboard/frontend/src/components/orders/projectScope.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/orders/orders-writer.test.ts"
+    ],
+    "declaredScope": [
+      "configuration/order-books.mdx",
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/flywheel-complete.ts",
+      "src/cli/commands/orders.ts",
+      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
+      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+      "src/dashboard/server/routes/__tests__/orders.test.ts",
+      "src/dashboard/server/routes/orders.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/writer.ts",
+      "sync-sources/skills/pan-orders/SKILL.md",
+      "tests/unit/cli/flywheel-complete.test.ts",
+      "tests/unit/cli/orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts",
+      "tests/unit/lib/orders/orders-writer.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/order-books.mdx",
+      "docs/ORDER-BOOKS.md",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/cli/commands/flywheel-complete.ts",
+      "src/cli/commands/orders.ts",
+      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
+      "src/dashboard/frontend/src/components/orders/projectScope.ts",
+      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+      "src/dashboard/server/routes/__tests__/orders.test.ts",
+      "src/dashboard/server/routes/orders.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/writer.ts",
+      "sync-sources/skills/pan-orders/SKILL.md",
+      "tests/unit/cli/flywheel-complete.test.ts",
+      "tests/unit/cli/orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts"
+    ],
+    "recordedAt": "2026-08-02T19:30:17.905Z"
   }
 }
