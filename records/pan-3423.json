@@ -22,9 +22,22 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-02T03:44:51.616Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:38Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-02T19:38:24.760Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T19:38:24Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3423` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3423`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -52,7 +65,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:37:40.245Z",
+  "updated": "2026-08-02T19:38:24.760Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
