@@ -132,7 +132,11 @@ export function GodViewConfluence({
           <div className="confluence-hint"><b>h / ?</b> field guide · <b>hover</b> orb · <b>click</b> issue drawer · <b>f</b> fullscreen</div>
         </section>
 
-        <GodViewSidebar agents={agents} />
+        <GodViewSidebar
+          agents={agents}
+          onIssueHover={(issueId) => effectsRef.current?.emitRing(issueId, '#ffffff')}
+          onIssueSelect={navigateToConfluenceIssue}
+        />
       </div>
 
       <footer className="confluence-bottom">
