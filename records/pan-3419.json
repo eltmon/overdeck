@@ -397,7 +397,7 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T19:54:11.013Z",
+  "updated": "2026-08-02T19:54:24.061Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
@@ -408,7 +408,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
     "updatedAt": "2026-08-02T19:54:07.522Z",
     "blockerReasons": [
       {
