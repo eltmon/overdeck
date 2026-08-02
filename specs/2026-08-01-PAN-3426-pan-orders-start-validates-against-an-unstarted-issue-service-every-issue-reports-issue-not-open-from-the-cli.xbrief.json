@@ -4,17 +4,17 @@
     "created": "2026-08-01T22:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3426: pan orders start validates against an unstarted issue service — every issue reports issue-not-open from the CLI",
-    "updated": "2026-08-02T02:51:06.960Z"
+    "updated": "2026-08-02T22:43:28.934Z"
   },
   "plan": {
     "id": "pan-3426",
     "title": "pan orders start validates against an unstarted issue service — every issue reports issue-not-open from the CLI",
-    "status": "running",
+    "status": "completed",
     "uid": "797c5809-876a-4280-82f9-8604acda281f",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T22:40:00.000Z",
-    "updated": "2026-08-02T02:51:06.960Z",
+    "updated": "2026-08-02T22:43:28.934Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3426",
@@ -310,5 +310,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
