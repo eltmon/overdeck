@@ -154,6 +154,11 @@ beforeEach(() => {
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
   mockListProjectsSync.mockReset().mockReturnValue([]);
   mockResolveStateReadHomeSync.mockReset();
+  // Delegates to whatever the sync mock is configured to return, so tests only
+  // need to configure one mock regardless of which resolution path they exercise.
+  mockResolveStateReadHomeAsync.mockReset().mockImplementation(
+    async (project: ProjectConfig, key?: string) => mockResolveStateReadHomeSync(project, key),
+  );
   mockStartFlywheelRun.mockReset();
 });
 
