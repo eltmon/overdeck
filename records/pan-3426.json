@@ -144,10 +144,10 @@
       "src/lib/orders/validate.ts",
       "tests/unit/lib/orders/orders-resolver.test.ts"
     ],
-    "recordedAt": "2026-08-02T17:53:32.102Z"
+    "recordedAt": "2026-08-02T18:12:05.186Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:11:45.470Z",
+  "updated": "2026-08-02T18:12:05.187Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
