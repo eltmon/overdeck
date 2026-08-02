@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-02T13:49:10.987Z",
-  "updated": "2026-08-02T14:23:22.263Z",
+  "updated": "2026-08-02T14:23:24.511Z",
   "pipeline": {
     "issueId": "PAN-3482",
     "reviewStatus": "passed",
     "testStatus": "skipped",
     "verificationStatus": "skipped",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T14:23:22.186Z",
+    "updatedAt": "2026-08-02T14:23:22.483Z",
     "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
     "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)"
   },
@@ -39,7 +39,7 @@
       },
       "costAtCloseOut": {
         "usd": 8.801246,
-        "pricingAsOf": "2026-08-02T14:23:22.194Z"
+        "pricingAsOf": "2026-08-02T14:23:24.502Z"
       }
     },
     "merges": [],
