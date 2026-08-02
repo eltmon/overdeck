@@ -408,6 +408,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                   />
                 </div>
               )}
+              <div className="mt-1 text-muted-foreground">
+                Overcommit {data.host.metrics.virtualCommitmentPercent == null ? 'Unavailable' : `${data.host.metrics.virtualCommitmentPercent.toFixed(1)}%`}
+              </div>
             </div>
           </div>
 
