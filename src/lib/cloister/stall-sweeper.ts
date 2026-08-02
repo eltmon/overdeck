@@ -26,7 +26,7 @@
  */
 import { Effect } from 'effect';
 
-import { emitActivityEntrySync } from '../activity-logger.js';
+import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
 import { getAgentStateSync } from '../agents.js';
 import { messageAgent } from '../agents/messaging.js';
 import { stopAgent } from '../agents.js';
@@ -82,7 +82,7 @@ export interface StallSweeperDeps {
   dispatchReview?: (issueId: string) => Promise<void>;
   clearStuck?: (issueId: string) => void;
   resetMergeForEvaluation?: (issueId: string) => void;
-  emitActivity?: (entry: { level: string; issueId?: string; message: string }) => void;
+  emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
 
@@ -105,9 +105,11 @@ function defaultEmitEvent(type: string, payload: Record<string, unknown>): void 
   }
 }
 
-function defaultEmitActivity(entry: { level: string; issueId?: string; message: string }): void {
+function defaultEmitActivity(entry: { level: ActivityLevel; issueId?: string; message: string }): void {
+  // Source is cloister — the sweeper is cloister machinery; the 🧹 message
+  // prefix carries the sweeper identity in the feed.
   emitActivityEntrySync({
-    source: 'sweeper',
+    source: 'cloister',
     level: entry.level,
     ...(entry.issueId ? { issueId: entry.issueId } : {}),
     message: entry.message,
@@ -156,8 +158,13 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   const stop = deps.stopAgent ?? (async (agentId: string) => { await Effect.runPromise(stopAgent(agentId)); });
   const message = deps.messageAgent ?? ((agentId: string, text: string) => messageAgent(agentId, text, 'stall-sweeper'));
   const writeFeedback = deps.writeFeedback ?? (async (issueId: string, stage: string, summary: string, markdownBody: string) => {
-    await Effect.runPromise(writeFeedbackFile({ issueId, specialist: stage, outcome: 'failed', summary, markdownBody }).pipe(
-      Effect.catch((error) => { console.warn(`[sweeper] feedback write failed for ${issueId}:`, error.message); return Effect.succeed({ success: false }); }),
+    // The feedback writer's specialist union is the pipeline role set — map the
+    // sweeper's stage names onto it (rework/conflict notes are review-agent work).
+    const specialist = stage === 'uat' ? 'uat-agent' as const
+      : stage === 'merge' ? 'merge-agent' as const
+        : 'review-agent' as const;
+    await Effect.runPromise(writeFeedbackFile({ issueId, specialist, outcome: 'failed', summary, markdownBody }).pipe(
+      Effect.catch((error: { message?: string }) => { console.warn(`[sweeper] feedback write failed for ${issueId}:`, error?.message ?? error); return Effect.succeed({ success: false }); }),
     ));
   });
   const dispatchReview = deps.dispatchReview ?? ((issueId: string) => dispatchReviewHostSide(issueId));
@@ -239,7 +246,7 @@ interface SweepActions {
   dispatchReview: (issueId: string) => Promise<void>;
   clearStuck: (issueId: string) => void;
   resetMerge: (issueId: string) => void;
-  emitActivity: (entry: { level: string; issueId?: string; message: string }) => void;
+  emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
 }
 
@@ -354,7 +361,7 @@ async function sweepRow(
       const currentActivity = agentState?.lastActivity ?? null;
       // Step 2: previously nudged, grace elapsed, and the agent never moved → stop it.
       if (state?.nudgedActivityAt && currentActivity && state.nudgedActivityAt === currentActivity
-        && now - Date.parse(state.lastNudgedAt ?? 0) >= IDLE_NUDGE_GRACE_MS) {
+        && now - (state.lastNudgedAt ? Date.parse(state.lastNudgedAt) : 0) >= IDLE_NUDGE_GRACE_MS) {
         await actions.stop(agentId);
         actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'stopped-idle', agentId });
         act(`sweeper stopped ${agentId} — no progress ${Math.round(lastActivity / 60)}h after a nudge; the slot is freed for live work`);
