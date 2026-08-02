@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:22:09.517Z",
+  "updated": "2026-08-02T08:22:27.174Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,7 +135,7 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 36,
+    "sequence": 37,
     "claims": {
       "help-fullscreen": {
         "writerId": "deacon-swarm",
@@ -143,6 +143,13 @@
         "pid": 2330131,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-02T08:18:27.647Z"
+      },
+      "issue-rail-link": {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 2870554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T08:22:27.174Z"
       }
     },
     "claimHistory": [
@@ -407,7 +414,8 @@
     "orb-tooltip": "completed",
     "orb-tooltip.orb-tooltip.ac1": "completed",
     "orb-tooltip.orb-tooltip.ac2": "completed",
-    "orb-tooltip.orb-tooltip.ac3": "completed"
+    "orb-tooltip.orb-tooltip.ac3": "completed",
+    "issue-rail-link": "running"
   },
   "swarm": {
     "slotAssignments": [
