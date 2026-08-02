@@ -202,7 +202,7 @@
     "recordedAt": "2026-08-02T18:15:29.053Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:21:15.976Z",
+  "updated": "2026-08-02T18:21:39.355Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -211,7 +211,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T18:18:52.253Z",
     "updatedAt": "2026-08-02T18:20:43.424Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "npm run typecheck: PASS (root, hooks, evals, dashboard ratchet 55/55, frontend ratchet 0/0). npm run lint: FAIL at lint:slash-commands — packages/contracts/src/composer-commands.generated.ts is missing pan-parked and pan-parked-ack entries present in the live CLI registry (src/cli/commands/parked.ts). Verified via git log/git show that this drift is pre-existing on origin/main (commits 5ba22313a2d, dafc96071f5 added the commands; cc801b13e2d was the last manifest regen, predating them) and is NOT introduced by PAN-3426, whose only touch to parked.ts is an unrelated one-line typecheck fix (project.projectPath -> project.path). npx vitest run tests/unit/lib/orders/orders-validate.test.ts: FAIL — 2/14 tests fail ('blocks an empty book', 'moves only a plan-at-pickup missing-PRD finding to warnings'). Root cause: validateBookForStart() in src/lib/orders/validate.ts calls orderIssueStoreStatus() unconditionally before checking options.issueLookup, so the new store-unavailable block fires even when a test supplies its own issueLookup — contradicting the plan's own autoDecisions[3] ('the store probe applies only when the default lookup is in use') and violating xBRIEF item store-unavailable-finding.ac3 ('existing orders-validate.test.ts suite passes unchanged'). This is a real regression in PAN-3426's declared scope, not environmental. tests/unit/lib/orders/orders-resolver.test.ts and tests/unit/cli/flywheel-orders.test.ts pass (12/12 combined). Verdict: automated gates FAILED on both lint and test.",
