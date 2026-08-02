@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:21:30.138Z",
+  "updated": "2026-08-02T09:26:46.961Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 46,
-    "claims": {
-      "bottom-strip": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 1454485,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T09:21:30.138Z"
-      }
-    },
+    "sequence": 47,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -386,6 +378,17 @@
         "outcome": "completed",
         "reason": "Hook bus now renders the contracts inventory, counts wired events with per-row 420 ms hot timers, preserves dark fiber, and avoids frame-loop DOM updates; focused and Confluence tests plus typecheck pass",
         "releasedAt": "2026-08-02T09:21:19.090Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1454485,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:21:30.138Z",
+        "itemId": "bottom-strip",
+        "outcome": "completed",
+        "reason": "Bottom strip now draws the real 60-second wired-hook telemetry trace with burst formulas, per-channel rates, aggregate current/peak labels, and live role counts; focused, Confluence, lint, and typecheck gates pass",
+        "releasedAt": "2026-08-02T09:26:46.961Z"
       }
     ],
     "statusReasons": {
@@ -443,8 +446,8 @@
         "updatedAt": "2026-08-02T09:21:19.090Z"
       },
       "bottom-strip": {
-        "reason": "Implement the real-event hook telemetry trace and role-count strip",
-        "updatedAt": "2026-08-02T09:21:30.138Z"
+        "reason": "Bottom strip now draws the real 60-second wired-hook telemetry trace with burst formulas, per-channel rates, aggregate current/peak labels, and live role counts; focused, Confluence, lint, and typecheck gates pass",
+        "updatedAt": "2026-08-02T09:26:46.961Z"
       }
     }
   },
@@ -504,7 +507,11 @@
     "hook-bus.hook-bus.ac2": "completed",
     "hook-bus.hook-bus.ac3": "completed",
     "hook-bus.hook-bus.ac4": "completed",
-    "bottom-strip": "running"
+    "bottom-strip": "completed",
+    "bottom-strip.bottom-strip.ac1": "completed",
+    "bottom-strip.bottom-strip.ac2": "completed",
+    "bottom-strip.bottom-strip.ac3": "completed",
+    "bottom-strip.bottom-strip.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
