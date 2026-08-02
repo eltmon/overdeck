@@ -1139,3 +1139,22 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **strike-3431 round 3 committed and landed to CI**: `c4764c6f12b stream cost event log reads` + `ffc6d61387a preserve cost reader pagination` → **PR #3494**. The diagnosis and the fix line up: loading the FULL cost event log per read is precisely a large allocation on a path every session attach touches — exactly the "one-time per-attach cost never released" shape that criterion 3's ramp sample revealed. Measurement drove the fix rather than guesswork.
 - Wrote the verification protocol INTO the PR body (same-uptime or ≥20min slope; never 180s windows) so whoever validates it does not repeat the GC-phase error that twice reported the opposite of the truth on this issue.
 - Emitted a status snapshot this tick, per the rule added after the stale-snapshot false idle escalation.
+
+## RUN-79 tick 80 (2026-08-02 ~17:15Z) — 26 acknowledged parked issues evaluated; dispositions recorded
+
+Operator batch-acknowledged 26 needs-you parked issues (acknowledged trips re-fire if left undecided). **Full disposition:**
+
+**18 of 26 need NO parked decision — they are already in-pipeline and moving**: PAN-1577, PAN-3338, PAN-3362, PAN-3410, PAN-3411, PAN-3418, PAN-3419, PAN-3420, PAN-3423, PAN-3426, PAN-3427, PAN-3450, MIN-839, MIN-923, MIN-924, MIN-933, MIN-934, TIN-1. Their trips were stale-state artifacts, not real decisions owed.
+
+**8 genuinely parked, evaluated against evidence THIS RUN produced:**
+- **PAN-1824 (CI flake: fake timers / @slow) — PRIORITIZE.** The run's single biggest tax: 9 strikes lost local verification; one measured a 21→39→65 timeout gradient on unchanged code. Evidence posted.
+- **PAN-1711 (event-loop stalls under load) — PRIORITIZE.** Spawned three filings this run (PAN-3492 retry amplification, PAN-3429 governor won't shed, PAN-3431 RSS). Evidence posted.
+- **PAN-1767 (merged-but-not-closed-out count) — PRIORITIZE.** The operator asked "why haven't these closed out?" three times this run; this issue answers it in `pan status`. Evidence posted.
+- **PAN-1416 (workspace dashboards must not claim canonical)** — still-valid invariant; today's "orphan server" report was exactly this hazard (verified benign container peer). Keep open, no book.
+- **PAN-1776 (hot-updatable delivery)** — relevant: PAN-3422's 5-specimen composer wedge needed a deploy to fix. Keep, medium.
+- **PAN-1868 (cost-bleed circuit breaker)** — relevant: $236/$200/$124 single-issue spends this run; progress-aware breaking differs from the warn-only cost policy. Keep, medium.
+- **PAN-1164 (live diff summaries), PAN-1951 (warm inspector session)** — no pain observed this run. Keep parked, low.
+
+**Recommendation to operator:** PAN-1824 + PAN-1711 + PAN-3344 + PAN-3429 + PAN-3492 are five faces of ONE problem — nothing admission-controls heavy work on this host. They belong in a single order book, not five separate strikes.
+
+Also noted: memory-governor runway is now PSI-evidenced (operator-approved), so admission deferrals from idle swap are over — that removes the false-pressure deferrals seen earlier in the run.
