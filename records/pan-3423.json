@@ -145,18 +145,18 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:49:12.068Z",
+  "updated": "2026-08-02T20:53:28.491Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:49:12.007Z",
-    "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
+    "updatedAt": "2026-08-02T20:53:27.284Z",
+    "reviewNotes": "Agent re-review request (1/25): Resolved the 5ac6214 main conflicts while preserving issue-routed parked acknowledgements and main's documented event-store door. Build, dashboard-server build, typecheck, circular/slash guards, and 27 focused tests pass.",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -276,9 +276,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 829155,
-            "output": 65715,
-            "cacheRead": 50483200,
+            "input": 846982,
+            "output": 68017,
+            "cacheRead": 53500416,
             "cacheWrite": 0
           }
         }
@@ -291,9 +291,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12864058,
-          "output": 433728,
-          "cacheRead": 123175936,
+          "input": 12881885,
+          "output": 436030,
+          "cacheRead": 126193152,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -304,8 +304,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 142.8720603,
-        "pricingAsOf": "2026-08-02T20:49:12.056Z"
+        "usd": 144.5388633,
+        "pricingAsOf": "2026-08-02T20:53:27.508Z"
       }
     },
     "merges": [
