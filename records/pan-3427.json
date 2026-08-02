@@ -208,17 +208,17 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:03:44.410Z",
+  "updated": "2026-08-02T21:03:49.119Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T21:03:44.407Z",
+    "updatedAt": "2026-08-02T21:03:49.063Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -228,8 +228,8 @@
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
-    "reviewSpawnedAt": "2026-08-02T19:43:14.268Z",
     "reviewRequestedAt": "2026-08-02T21:03:44.407Z",
+    "reviewSpawnedAt": "2026-08-02T19:43:14.268Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -341,10 +341,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5736,
-            "output": 198059,
-            "cacheRead": 145261309,
-            "cacheWrite": 7871980
+            "input": 5760,
+            "output": 201693,
+            "cacheRead": 152442006,
+            "cacheWrite": 7881099
           }
         }
       },
@@ -362,15 +362,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5736,
-          "output": 198059,
-          "cacheRead": 145261309,
-          "cacheWrite": 7871980
+          "input": 5760,
+          "output": 201693,
+          "cacheRead": 152442006,
+          "cacheWrite": 7881099
         }
       },
       "costAtCloseOut": {
-        "usd": 96.7513521,
-        "pricingAsOf": "2026-08-02T20:57:15.173Z"
+        "usd": 98.2466771,
+        "pricingAsOf": "2026-08-02T21:03:49.101Z"
       }
     },
     "merges": [
