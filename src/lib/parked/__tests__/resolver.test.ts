@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   classifyParked,
   IDLE_RUNNING_THRESHOLD_MS,
+  PARKED_ORBITS,
   summarizeParked,
   type ParkedSignals,
 } from '../resolver.js';
@@ -196,5 +197,33 @@ describe('summarizeParked', () => {
     expect(summary.byOrbit).toEqual({ 'operator-gate': 1, 'zombie-session': 1, 'stuck-flag': 1 });
     expect(summary.primaryByIssue['PAN-1']).toBe('zombie-session');
     expect(summary.primaryByIssue['PAN-2']).toBe('stuck-flag');
+  });
+});
+
+describe('guard-exit inventory (PAN-3488)', () => {
+  it('every orbit in the taxonomy has a fixture producing non-empty park + release copy', () => {
+    // One fixture per orbit — the taxonomy is ten entries and each must
+    // classify with both sentences populated. A new orbit added to
+    // PARKED_ORBITS without a classifier branch (or without copy) fails here.
+    const fixtures: Record<string, ParkedSignals> = {
+      'stuck-flag': signals({ reviewStatus: baseStatus({ stuck: true, stuckReason: 'verification_stuck' }) }),
+      'needs-you': signals({ openRecoveryTrips: [{ recoveryPath: 'dead-end-rebuild' }] }),
+      'deacon-ignored': signals({ reviewStatus: baseStatus({ deaconIgnored: true, deaconIgnoredReason: 'freeze' }) }),
+      'operator-gate': signals({ agents: [baseAgent({ paused: true })] }),
+      'uat-failed': signals({ reviewStatus: baseStatus({ reviewStatus: 'passed', testStatus: 'passed', uatStatus: 'failed' }) }),
+      'merge-failed': signals({ reviewStatus: baseStatus({ mergeStatus: 'failed' }) }),
+      conflicts: signals({ reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 60_000).toISOString(), paths: [] } }) }),
+      'zombie-session': signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: [{ ...baseAgent({}), tmuxActive: true }] }),
+      'idle-running': signals({ reviewStatus: baseStatus({}), liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }] }),
+      'circuit-breaker': signals({ reviewStatus: baseStatus({ autoRequeueCount: 30 }) }),
+    };
+    expect(Object.keys(fixtures).sort()).toEqual([...PARKED_ORBITS].sort());
+    for (const orbit of PARKED_ORBITS) {
+      const rows = classifyParked(fixtures[orbit]);
+      const row = rows.find((candidate) => candidate.orbit === orbit);
+      expect(row, `orbit ${orbit} must classify`).toBeDefined();
+      expect(row!.parkReason.length, `orbit ${orbit} must say WHY it is parked`).toBeGreaterThan(0);
+      expect(row!.unparkCondition.length, `orbit ${orbit} must document its exit`).toBeGreaterThan(0);
+    }
   });
 });

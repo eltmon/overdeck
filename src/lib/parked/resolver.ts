@@ -92,7 +92,9 @@ export interface ParkedRow {
   details?: Record<string, unknown>;
 }
 
-/** A human sentence per stuck_reason — the stuck flag carries the machine code, the resolver owns the copy. */
+/** A human sentence per stuck_reason — the stuck flag carries the machine code, the resolver owns the copy.
+ * GUARD-EXIT INVARIANT (PAN-3488): every stuck_reason written anywhere in src/ MUST have an entry
+ * here — scripts/guard-park-exits.sh fails the lint on an undocumented flavor. */
 const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   feedback_delivery_needs_you: {
     park: 'review/test feedback could not be delivered — the work agent is not running and nothing resumed it',
@@ -109,6 +111,38 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   'dead-end-rebuild': {
     park: 'dead-end recovery exhausted 25 requeues',
     unpark: 'operator decision — decompose or pan unstick after the root cause is fixed',
+  },
+  main_diverged: {
+    park: 'the PR branch diverged from main and cannot merge cleanly',
+    unpark: 'sync-main and resolve conflicts, then re-drive (sweeper treats this as the conflicts orbit)',
+  },
+  model_divergence: {
+    park: 'the agent hit a model/API divergence error and was parked for investigation',
+    unpark: 'investigate the model error (pane + transcript), then pan unstick and resume',
+  },
+  usage_limit: {
+    park: 'the agent hit a provider usage limit and stopped mid-flight',
+    unpark: 'wait for the provider window to reset, then pan unstick and resume',
+  },
+  context_overflow: {
+    park: 'the agent overflowed its context window and cannot continue in this session',
+    unpark: 'pan unstick after compaction/fork — resume with a fresh session',
+  },
+  review_convoy_unrecoverable: {
+    park: 'the review convoy died and could not be recovered in place',
+    unpark: 're-dispatch a fresh review convoy (sweeper does this after cooldown)',
+  },
+  test_signal_strand: {
+    park: 'a test verdict was written but never delivered to the pipeline',
+    unpark: 're-drive the stranded verdict to a resumed work agent',
+  },
+  'review-not-converging': {
+    park: 'review cycles stopped converging (stall or reversal across ≥3 cycles) — rework is suppressed',
+    unpark: 'decompose into sibling issues, or pan unstick to clear the gate and attempt rework',
+  },
+  state_derived_verification_hold: {
+    park: 'verification is held by a derived-state rule (the recorded state forbids advancing)',
+    unpark: 'fix the underlying state mismatch, then pan unstick to release the hold',
   },
 };
 
