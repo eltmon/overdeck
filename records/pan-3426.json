@@ -242,17 +242,19 @@
     "recordedAt": "2026-08-02T18:21:43.270Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T21:30:00.331Z",
+  "updated": "2026-08-02T21:30:06.498Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
     "testStatus": "failed",
-    "verificationStatus": "pending",
-    "mergeStatus": "pending",
+    "verificationStatus": "skipped",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:22:23.831Z",
+    "updatedAt": "2026-08-02T21:30:06.431Z",
     "testNotes": "PR #3495 (head 99fc16816eb) red on CI: 3 test failures + 1 lint failure. Uncommitted local diff (not from this test session) fixes all 4 (verified: 24/24 tests pass, typecheck clean) but this role cannot commit it. npm run lint STILL fails end-to-end even with that diff, at lint:circular: pre-existing deacon.ts>stall-sweeper.ts>service.ts cycle on main itself, unrelated to PAN-3426, already filed as github.com/eltmon/overdeck/issues/3501 (pipeline-wide blocker, strike agent recommended). Needs a work agent to commit/push the local fix and a strike on #3501.",
+    "verificationNotes": "Merge already landed; verify-on-main owns post-merge validation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -301,9 +303,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 94265,
-            "output": 59716,
-            "cacheRead": 27062,
+            "input": 209273,
+            "output": 114347,
+            "cacheRead": 48042,
             "cacheWrite": 0
           }
         },
@@ -349,10 +351,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 140,
-            "output": 37705,
-            "cacheRead": 12869993,
-            "cacheWrite": 464935
+            "input": 154,
+            "output": 42293,
+            "cacheRead": 14730978,
+            "cacheWrite": 474898
           }
         },
         "work": {
@@ -363,31 +365,31 @@
             "cacheWrite": 2846164
           },
           "openai/gpt-5.6-sol": {
-            "input": 1759615,
-            "output": 39538,
-            "cacheRead": 9026048,
+            "input": 5439785,
+            "output": 137128,
+            "cacheRead": 78614528,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 94265,
-          "output": 59716,
-          "cacheRead": 27062,
+          "input": 209273,
+          "output": 114347,
+          "cacheRead": 48042,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 10801542,
-          "output": 257957,
-          "cacheRead": 63822336,
+          "input": 14481712,
+          "output": 355547,
+          "cacheRead": 133410816,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 140,
-          "output": 37705,
-          "cacheRead": 12869993,
-          "cacheWrite": 464935
+          "input": 154,
+          "output": 42293,
+          "cacheRead": 14730978,
+          "cacheWrite": 474898
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1345,
@@ -397,8 +399,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 104.7246542,
-        "pricingAsOf": "2026-08-02T19:22:24.211Z"
+        "usd": 161.6807182,
+        "pricingAsOf": "2026-08-02T21:30:06.476Z"
       }
     },
     "merges": [
