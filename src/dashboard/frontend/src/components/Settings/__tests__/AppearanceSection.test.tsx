@@ -40,10 +40,7 @@ describe('AppearanceSection', () => {
     document.documentElement.dataset.theme = 'broadsheet';
     useDesignLanguage.setState({ designLanguage: 'broadsheet' });
     fetchControl = installStrictFetchMock(({ method, url }) => {
-      if (method === 'GET' && url === '/api/settings') {
-        return Response.json({ ui: { theme: useDesignLanguage.getState().designLanguage } });
-      }
-      if (method === 'PUT' && url === '/api/settings') {
+      if (method === 'PUT' && url === '/api/settings/design-language') {
         return Response.json({ success: true });
       }
       return undefined;
@@ -87,7 +84,7 @@ describe('AppearanceSection', () => {
     const putCall = fetchControl.fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT');
     expect(putCall).toBeDefined();
     const body = JSON.parse(String((putCall?.[1] as RequestInit).body));
-    expect(body.ui).toEqual({ theme: 'broadsheet' });
+    expect(body).toEqual({ theme: 'broadsheet' });
 
     // Simulated reload: a fresh read of the persisted mirror reflects the new choice.
     expect(localStorage.getItem('overdeck.ui.designLanguage')).toBe('broadsheet');

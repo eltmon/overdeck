@@ -41,6 +41,18 @@ function xtermTheme(isDark: boolean): ITheme {
   };
 }
 
+// xterm renders glyphs into its own canvas (WebGL) or DOM cells it styles
+// itself — it needs a concrete font-family string at Terminal construction
+// time and cannot consume a CSS custom property directly. Reading the
+// resolved --font-mono value here (PAN-3410 NFR-3) keeps this in sync with
+// the active Ledger/Broadsheet theme instead of hardcoding one theme's value;
+// the literal fallback only applies if the token isn't defined yet.
+function resolveMonoFontFamily(): string {
+  const fallback = "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace";
+  const resolved = getComputedStyle(document.documentElement).getPropertyValue('--font-mono').trim();
+  return resolved || fallback;
+}
+
 // Debounce utility to prevent resize spam
 function debounce<T extends (...args: unknown[]) => void>(fn: T, ms: number): (...args: Parameters<T>) => void {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -447,7 +459,7 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
         cursorStyle: 'bar',
         cursorInactiveStyle: 'none',
         fontSize: 14,
-        fontFamily: "'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace",
+        fontFamily: resolveMonoFontFamily(),
         cols: 120,
         rows: 29,  // Match typical fitted size to avoid row mismatch with tmux status bar
         scrollback: 0,  // tmux is the source of truth for history; local scrollback duplicates content

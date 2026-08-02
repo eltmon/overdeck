@@ -27,6 +27,7 @@ import {
   type ConversationSearchConfig,
   type RoleEffort,
   type ProviderConfig,
+  type DesignLanguage,
   ROLE_EFFORTS,
 } from './config-yaml.js';
 import { ModelId } from './settings.js';
@@ -1445,6 +1446,26 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
 }
 
 /**
+ * Single-field `ui.theme` (Overdeck Theme — Ledger/Broadsheet) write.
+ *
+ * The frontend's `useDesignLanguage` hook calls this directly instead of
+ * fetching the whole settings document and PUTting it back with only the
+ * theme changed: that GET-then-PUT round trip leaves a client-round-trip-sized
+ * window in which a concurrent settings save (another tab, or the top-level
+ * Settings form) commits, then gets silently overwritten by this save's now-stale
+ * snapshot of every other field. Reading `loadSettingsApi()` fresh and saving
+ * immediately, in one server-side call with no network round trip in between,
+ * removes that window (PAN-3410 review finding — no-loss guarantee, FR-7).
+ */
+async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
+  const current = loadSettingsApi();
+  await Effect.runPromise(saveSettingsApi({
+    ...current,
+    ui: { ...current.ui, theme },
+  }));
+}
+
+/**
  * Get OpenRouter favorites from config
  */
 export function getOpenRouterFavorites(): string[] {
@@ -1532,6 +1553,20 @@ export const saveOpenRouterFavorites = (
     catch: (cause) =>
       new SettingsApiError({
         operation: 'saveOpenRouterFavorites',
+        message: cause instanceof Error ? cause.message : String(cause),
+        cause,
+      }),
+  });
+
+/** Effect variant of `saveDesignLanguage` — single-field `ui.theme` write. */
+export const saveDesignLanguage = (
+  theme: DesignLanguage,
+): Effect.Effect<void, SettingsApiError> =>
+  Effect.tryPromise({
+    try: () => saveDesignLanguagePromise(theme),
+    catch: (cause) =>
+      new SettingsApiError({
+        operation: 'saveDesignLanguage',
         message: cause instanceof Error ? cause.message : String(cause),
         cause,
       }),

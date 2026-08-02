@@ -32,18 +32,17 @@ interface DesignLanguageState {
 export const useDesignLanguage = create<DesignLanguageState>((set) => ({
   designLanguage: getStoredDesignLanguage(),
 
-  // PUT /api/settings replaces the whole settings document (no server-side
-  // partial merge), so — same as SettingsPage.tsx's saveSettings — read the
-  // latest settings first and PUT them back with only ui.theme changed.
+  // PUT /api/settings/design-language writes only `ui.theme`, read fresh and
+  // saved server-side in one request — unlike a GET-then-PUT /api/settings
+  // round trip, there is no client-held stale snapshot of every other field
+  // that a concurrent settings save (another tab, or the top-level Settings
+  // form) could be clobbered by (PAN-3410 review finding — no-loss guarantee,
+  // FR-7).
   setDesignLanguage: async (designLanguage: DesignLanguage) => {
-    const getRes = await fetch('/api/settings');
-    if (!getRes.ok) throw new Error(`Failed to fetch settings (HTTP ${getRes.status})`);
-    const current = await getRes.json() as { ui?: { theme?: DesignLanguage } };
-
-    const putRes = await fetch('/api/settings', {
+    const putRes = await fetch('/api/settings/design-language', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...current, ui: { ...current.ui, theme: designLanguage } }),
+      body: JSON.stringify({ theme: designLanguage }),
     });
     if (!putRes.ok) throw new Error(`Failed to save ui.theme (HTTP ${putRes.status})`);
 

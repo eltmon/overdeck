@@ -35,7 +35,16 @@
       #pan-boot {
         position: fixed; inset: 0;
         display: flex; align-items: center; justify-content: center; gap: 10px;
-        font-family: 'DM Sans', system-ui, sans-serif; font-size: 14px;
+        /* Deliberate theme-invariant exception (PAN-3410 NFR-3): this inline
+           <style> paints before index.css's --font-sans token loads (that CSS
+           is imported by the main.tsx module script at the bottom of <body>,
+           which hasn't executed yet at first paint) and before localStorage's
+           theme mirror can be read here without duplicating that read. The
+           var() fallback keeps today's literal if the token isn't resolved
+           yet; either way #pan-boot is replaced by #root the instant React
+           mounts (see the PAN-1580 note above), so it never needs to reflect
+           the Ledger/Broadsheet distinction. */
+        font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif); font-size: 14px;
         color: #6b7280; background: inherit;
       }
       html.dark #pan-boot { color: #8b93a1; }

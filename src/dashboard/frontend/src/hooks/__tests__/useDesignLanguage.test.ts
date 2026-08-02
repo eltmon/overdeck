@@ -54,10 +54,7 @@ describe('useDesignLanguage', () => {
   describe('setDesignLanguage', () => {
     it('flips document.documentElement.dataset.theme immediately on success and persists the mirror', async () => {
       fetchControl = installStrictFetchMock(({ method, url }) => {
-        if (method === 'GET' && url === '/api/settings') {
-          return Response.json({ ui: { theme: 'broadsheet' } });
-        }
-        if (method === 'PUT' && url === '/api/settings') {
+        if (method === 'PUT' && url === '/api/settings/design-language') {
           return Response.json({ success: true });
         }
         return undefined;
@@ -74,12 +71,9 @@ describe('useDesignLanguage', () => {
       expect(result.current.designLanguage).toBe('ledger');
     });
 
-    it('PUTs the full settings payload with only ui.theme changed (server does not partial-merge)', async () => {
+    it('PUTs only { theme } to /api/settings/design-language — no GET, no full-document round trip (PAN-3410 no-loss guarantee, FR-7)', async () => {
       fetchControl = installStrictFetchMock(({ method, url }) => {
-        if (method === 'GET' && url === '/api/settings') {
-          return Response.json({ ui: { theme: 'broadsheet' }, workhorses: { mid: 'claude-sonnet-4-6' } });
-        }
-        if (method === 'PUT' && url === '/api/settings') {
+        if (method === 'PUT' && url === '/api/settings/design-language') {
           return Response.json({ success: true });
         }
         return undefined;
@@ -90,18 +84,19 @@ describe('useDesignLanguage', () => {
         await result.current.setDesignLanguage('ledger');
       });
 
+      // No GET at all — a concurrent settings save (another tab, or the
+      // top-level Settings form) has nothing to clobber, since this call
+      // never holds a stale snapshot of any other field.
+      expect(fetchControl.fetchMock.mock.calls.some(([, init]) => (init as RequestInit | undefined)?.method === 'GET')).toBe(false);
+
       const putCall = fetchControl.fetchMock.mock.calls.find(([, init]) => (init as RequestInit)?.method === 'PUT');
       const body = JSON.parse(String((putCall?.[1] as RequestInit).body));
-      expect(body.workhorses).toEqual({ mid: 'claude-sonnet-4-6' });
-      expect(body.ui).toEqual({ theme: 'ledger' });
+      expect(body).toEqual({ theme: 'ledger' });
     });
 
     it('throws and leaves state unchanged when the PUT fails', async () => {
       fetchControl = installStrictFetchMock(({ method, url }) => {
-        if (method === 'GET' && url === '/api/settings') {
-          return Response.json({ ui: { theme: 'broadsheet' } });
-        }
-        if (method === 'PUT' && url === '/api/settings') {
+        if (method === 'PUT' && url === '/api/settings/design-language') {
           return new Response(JSON.stringify({ error: 'ui.theme must be ledger or broadsheet' }), { status: 400 });
         }
         return undefined;

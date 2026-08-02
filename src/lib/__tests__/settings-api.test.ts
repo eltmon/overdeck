@@ -740,6 +740,26 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('open_in_editor_command: cursor {path}');
     expect(written).toContain('theme: broadsheet');
   });
+
+  it('saveDesignLanguage preserves a settings field changed by a concurrent save instead of overwriting it with a stale snapshot (no-loss regression, PAN-3410 FR-7)', async () => {
+    // Models the exact race the review finding described: a concurrent
+    // settings save (another tab, or the top-level Settings form) commits
+    // workhorses.mid = 'gpt-5.5' to config.yaml. saveDesignLanguage must not
+    // hold a stale pre-concurrent-save snapshot of that field — it reads
+    // `loadSettingsApi()` fresh, in the same call, with no client round trip
+    // in between where staleness could creep in.
+    mockLoadConfig.mockReturnValue(baseConfig({
+      workhorses: { mid: 'gpt-5.5' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+    }));
+    const { saveDesignLanguage } = await import('../settings-api.js');
+
+    await Effect.runPromise(saveDesignLanguage('ledger'));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('mid: gpt-5.5');
+    expect(written).toContain('theme: ledger');
+  });
 });
 
 describe('validateSettingsApi', () => {
