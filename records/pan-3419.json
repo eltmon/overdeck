@@ -243,19 +243,20 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T14:43:43.105Z",
+  "updated": "2026-08-02T14:53:12.551Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T14:00:25.902Z",
-    "updatedAt": "2026-08-02T14:43:43.085Z",
+    "updatedAt": "2026-08-02T14:53:12.257Z",
     "reviewNotes": "Review passed applied by deacon sweep from on-disk synthesis.md",
+    "testNotes": "Ran from workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419 on branch feature/pan-3419 (HEAD fdaf4f0e435, matches reviewedAtCommit). npm run typecheck: passed (root tsc, hooks, evals, dashboard-types guard 57 known/0 new, frontend-types guard 0 known/0 new). npm run lint: passed (eslint src/ clean, plus effect-pinning, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit, circular-deps 77 baselined/0 new, ratchet-audit, quarantine-audit all green). Configured test gate (project's own changed-file-scoped command, PAN-666 design — vitest run --changed origin/<mergeBase>) run for both workspaces against origin/main@cf2538207cb3ae32730ae6c589e50f098aa4305f: root suite 981 files / 9253 tests passed, 3 files / 44 tests skipped, 0 failed; frontend suite 154 files / 1803 tests passed, 0 failed. Anomaly (does not affect this verdict): mid-session, two files outside PAN-3419's diff (src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx) acquired uncommitted edits I did not make; workspace was verified clean at session start and HEAD still matches the reviewed commit. Could not identify the source despite checking tmux (-L overdeck), host process cwd/open-fd scans, and the two running workspace containers' internal process lists. Left uncommitted and untouched (out of scope for a read-only test role); flagging for operator awareness. These files are outside the changed-file scope so they do not affect the configured test gate result above; an unscoped full-suite run separately showed 4 failures confined to exactly these 2 files before the edits appeared, and both passed cleanly in isolation, consistent with either the known contention-flake pattern or the later edit — either way, irrelevant to the configured gate.",
     "verificationNotes": "Verification FAILED at test (764194ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (6 tests | 3 failed) 354ms\n     × keeps every header metric and diagnostic visible by name in redesigned layout 53ms\n     × groups top consumers by kind badge and displays proportional memory bars 24ms\n     × displays attention section with severity dots and grouped agent rows when critical 20ms\n\n Test Files  1 failed | 152 passed (153)\n      Tests  3 failed | 1793 passed (1796)\n   Start at  10:25:15\n   Duration  41.98s (transform 6.77s, setup 18.82s, import 59.69s, tests 37.48s, environment 32.04s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-cFSbIN/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Wor\n…(899 chars elided)…\nG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qk2NHG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qk2NHG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] comp\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b",
@@ -393,10 +394,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 116,
-            "output": 24014,
-            "cacheRead": 11809578,
-            "cacheWrite": 254727
+            "input": 196,
+            "output": 56306,
+            "cacheRead": 23292593,
+            "cacheWrite": 333179
           }
         },
         "work": {
@@ -416,15 +417,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 116,
-          "output": 24014,
-          "cacheRead": 11809578,
-          "cacheWrite": 254727
+          "input": 196,
+          "output": 56306,
+          "cacheRead": 23292593,
+          "cacheWrite": 333179
         }
       },
       "costAtCloseOut": {
-        "usd": 276.208178,
-        "pricingAsOf": "2026-08-02T14:43:43.097Z"
+        "usd": 279.023994,
+        "pricingAsOf": "2026-08-02T14:53:12.454Z"
       }
     },
     "merges": [
