@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:02:38.886Z",
+  "updated": "2026-08-02T03:14:31.521Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -47,16 +47,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "theme-token-scope": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 2530918,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:02:38.885Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -68,12 +60,27 @@
         "outcome": "completed",
         "reason": "Self-hosted Geist, Geist Mono, DM Sans, and Space Grotesk variable woff2 (174KB total) with per-family OFL licenses under public/fonts/; added @font-face rules to index.css, removed the four Google Fonts <link> tags from index.html, updated recovery.test.ts's cross-origin example off Google Fonts, and added tests/unit/dashboard/fonts-local.test.ts covering all four ACs.",
         "releasedAt": "2026-08-02T03:02:15.378Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 2530918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:02:38.885Z",
+        "itemId": "theme-token-scope",
+        "outcome": "completed",
+        "reason": "Added --font-sans/--font-display/--font-mono CSS variables (:root=Ledger values, [data-theme=broadsheet] overrides to Geist/Geist Mono Variable); repointed tailwind.config.js fontFamily + hardcoded body font-family to the variables; added .display-xl/.display-lg/.eyebrow component classes ported from the style-guide-v2 mockup, with Ledger-safe fallback via @apply text-xl|text-lg|text-xs font-medium so the fallback is byte-identical to Tailwind's own scale. Had to add a tailwind safelist entry for the three new classes since they aren't consumed by any .tsx file yet and Tailwind's content-based purge was silently dropping display-xl/display-lg from the build (eyebrow survived only by accidental substring match on unrelated 'eyebrow' prop names elsewhere). Verified compiled CSS directly (Tailwind CLI + full vite build) rather than trusting typecheck alone. Pre-existing unrelated test failure noted: src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts (blendedCost assertion, last touched in old PAN-2684/PAN-2829 commits, untouched by this change).",
+        "releasedAt": "2026-08-02T03:14:31.521Z"
       }
     ],
     "statusReasons": {
       "self-host-fonts": {
         "reason": "Self-hosted Geist, Geist Mono, DM Sans, and Space Grotesk variable woff2 (174KB total) with per-family OFL licenses under public/fonts/; added @font-face rules to index.css, removed the four Google Fonts <link> tags from index.html, updated recovery.test.ts's cross-origin example off Google Fonts, and added tests/unit/dashboard/fonts-local.test.ts covering all four ACs.",
         "updatedAt": "2026-08-02T03:02:15.378Z"
+      },
+      "theme-token-scope": {
+        "reason": "Added --font-sans/--font-display/--font-mono CSS variables (:root=Ledger values, [data-theme=broadsheet] overrides to Geist/Geist Mono Variable); repointed tailwind.config.js fontFamily + hardcoded body font-family to the variables; added .display-xl/.display-lg/.eyebrow component classes ported from the style-guide-v2 mockup, with Ledger-safe fallback via @apply text-xl|text-lg|text-xs font-medium so the fallback is byte-identical to Tailwind's own scale. Had to add a tailwind safelist entry for the three new classes since they aren't consumed by any .tsx file yet and Tailwind's content-based purge was silently dropping display-xl/display-lg from the build (eyebrow survived only by accidental substring match on unrelated 'eyebrow' prop names elsewhere). Verified compiled CSS directly (Tailwind CLI + full vite build) rather than trusting typecheck alone. Pre-existing unrelated test failure noted: src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts (blendedCost assertion, last touched in old PAN-2684/PAN-2829 commits, untouched by this change).",
+        "updatedAt": "2026-08-02T03:14:31.521Z"
       }
     }
   },
@@ -83,6 +90,10 @@
     "self-host-fonts.self-host-fonts.ac2": "completed",
     "self-host-fonts.self-host-fonts.ac3": "completed",
     "self-host-fonts.self-host-fonts.ac4": "completed",
-    "theme-token-scope": "running"
+    "theme-token-scope": "completed",
+    "theme-token-scope.theme-token-scope.ac1": "completed",
+    "theme-token-scope.theme-token-scope.ac2": "completed",
+    "theme-token-scope.theme-token-scope.ac3": "completed",
+    "theme-token-scope.theme-token-scope.ac4": "completed"
   }
 }
