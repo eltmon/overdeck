@@ -127,6 +127,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T20:44Z] review-agent → FAILED — seq 3",
       "timestamp": "2026-08-02T20:44:55.537Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T20:53:23.812Z"
     }
   ],
   "feedback": [
@@ -203,7 +208,7 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T20:49:04.320Z",
+  "updated": "2026-08-02T20:53:23.813Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "failed",
