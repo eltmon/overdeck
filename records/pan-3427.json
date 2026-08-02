@@ -137,6 +137,11 @@
       "timestamp": "2026-08-02T21:03:50.122Z",
       "reason": "end",
       "note": "Fixed all 3 blocking review findings from cycle 1:\n\n1. [correctness, requirements] pan orders start --project was dropping the\n   selected project before launch — defaultStartOrderBook/runOrdersStart in\n   src/cli/commands/orders.ts now thread the resolved ProjectConfig through to\n   startFlywheelRun's cwd, mirroring the dashboard route's earlier fix.\n   Regression test added in tests/unit/cli/orders.test.ts (verified the real\n   defaultStartOrderBook path, not the injected mock).\n\n2. [correctness] Project switching in OrderBookPage.tsx could pair a stale\n   project-A list response with the newly-selected project-B scope. Added a\n   generation-counter guard in loadBooks() so a late-resolving response from a\n   superseded project switch is ignored, and selectProject() now clears books\n   immediately. Regression test in OrderBookPage.test.tsx uses controlled\n   deferred promises to resolve project B before project A; verified the test\n   fails without the fix (reverted and reapplied to confirm) and passes with it.\n\n3. [performance] The cross-project GET /api/orders/:id scan-on-miss fallback\n   in src/dashboard/server/routes/orders.ts was doing a synchronous fs read\n   per candidate project, which can stall the dashboard's shared event loop.\n   Added resolveStateReadHomeAsync to src/lib/state-read-home.ts and switched\n   the scan loop to it + getBookAsync, scanning sequentially (not in parallel)\n   to preserve registry-order first-match behavior.\n\nAlso synced main (a merge, not a rebase, since a PR exists): resolved the one\nconflict in packages/contracts/src/composer-commands.generated.ts by\nrebuilding the CLI and regenerating the manifest fresh rather than hand-\nmerging generated content, so it reflects both main's independent parked.ts\nfix and this branch's new orders commands/flags. Confirmed via\nscripts/lint-slash-commands.sh that the regenerated manifest matches the CLI\nregistry.\n\nVerified: full npm run typecheck (root, hooks, evals, dashboard, frontend\nguards) is clean. All directly-touched test suites pass:\ntests/unit/cli/orders.test.ts (10/10), src/dashboard/server/routes/__tests__/orders.test.ts\n(11/11), OrderBookPage.test.tsx (10/10)."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T21:04:57.583Z"
     }
   ],
   "feedback": [],
@@ -198,7 +203,7 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:04:29.465Z",
+  "updated": "2026-08-02T21:04:57.890Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -363,7 +368,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
