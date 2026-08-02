@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T04:16:14.048Z",
+  "updated": "2026-08-02T04:16:28.346Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "broadsheet-mechanical-migration": {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 3090922,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T04:16:28.346Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -251,6 +259,7 @@
     "user-docs-appearance.user-docs-appearance.ac1": "completed",
     "user-docs-appearance.user-docs-appearance.ac2": "completed",
     "user-docs-appearance.user-docs-appearance.ac3": "completed",
-    "user-docs-appearance.user-docs-appearance.ac4": "completed"
+    "user-docs-appearance.user-docs-appearance.ac4": "completed",
+    "broadsheet-mechanical-migration": "running"
   }
 }
