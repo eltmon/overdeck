@@ -145,7 +145,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:43:33.252Z",
+  "updated": "2026-08-02T20:49:12.068Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "reviewing",
@@ -155,7 +155,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:43:33.198Z",
+    "updatedAt": "2026-08-02T20:49:12.007Z",
     "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
     "blockerReasons": [
       {
@@ -230,9 +230,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6358824,
-            "output": 167782,
-            "cacheRead": 44404224,
+            "input": 6735074,
+            "output": 185245,
+            "cacheRead": 49354752,
             "cacheWrite": 0
           }
         },
@@ -276,9 +276,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 766925,
-            "output": 54090,
-            "cacheRead": 38502400,
+            "input": 829155,
+            "output": 65715,
+            "cacheRead": 50483200,
             "cacheWrite": 0
           }
         }
@@ -291,9 +291,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12425578,
-          "output": 404640,
-          "cacheRead": 106244608,
+          "input": 12864058,
+          "output": 433728,
+          "cacheRead": 123175936,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -304,8 +304,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 131.3413563,
-        "pricingAsOf": "2026-08-02T20:43:33.210Z"
+        "usd": 142.8720603,
+        "pricingAsOf": "2026-08-02T20:49:12.056Z"
       }
     },
     "merges": [
