@@ -8,7 +8,7 @@ import { HookBus } from './HookBus';
 import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
-import { useConfluenceChoreography } from './useConfluenceChoreography';
+import { useConfluenceChoreography, useSweepChoreography } from './useConfluenceChoreography';
 import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
 
@@ -65,6 +65,7 @@ export function GodViewConfluence({
   const [railId, setRailId] = useState<string | null>(null);
   const railOrb = railId ? orbs.find((orb) => orb.id === railId) ?? null : null;
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
+  useSweepChoreography(effectsRef);
 
   useEffect(() => {
     window.__orbs = orbs;
@@ -126,6 +127,7 @@ export function GodViewConfluence({
             selectedId={railId ?? selectedId}
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
+            parkedTotal={meta.parkedTotal}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}
             onSelect={(orb) => setRailId(orb ? orb.id : null)}
           />

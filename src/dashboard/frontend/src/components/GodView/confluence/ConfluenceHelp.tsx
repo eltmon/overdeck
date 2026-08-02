@@ -86,6 +86,10 @@ export function ConfluenceHelp({ eventsPerMin, onClose }: ConfluenceHelpProps) {
             <p>An orb that stops emitting events <b>frosts over in place</b> — colors desaturate to ice, a frost crown grows, snow falls. Fully frozen orbs <b>sink into the ❄ DOLDRUMS</b> with idle-age labels (10h … 24d). Any activity thaws an orb in a burst of steam and floats it back to WORK.</p>
           </div>
           <div className="h-card">
+            <h4 style={{ color: '#bfe3ff' }}>The Stall Sweeper</h4>
+            <p>Parked issues (stuck flags, failed merges, gates, zombies) settle in the Doldrums with <b>orbit-tinted frost</b> — amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle — and an orbit tag under the id. When the parked population changes, an <b>ice-blue lantern beam sweeps the Doldrums</b>, glinting every orb the scan touched. A swept orb <b>thaws back up into the river</b>; an orb only a human can release fires a slow-rising <b>⚑ signal flare</b>. The 🧹 PARKED top-bar stat is the true census.</p>
+          </div>
+          <div className="h-card">
             <h4 style={{ color: 'var(--gv-text-primary)' }}>Merge Portal &amp; Wrecks</h4>
             <p>The white slit at the right edge is <b>main</b>. An issue reaching MERGE dwells briefly in the queue, then accelerates through the portal as a comet — the burst is the merge landing. <b>✗ blinking pink hulls are merge-failed wrecks</b> awaiting a human tow.</p>
           </div>

@@ -51,7 +51,7 @@ vi.mock('../../Sidebar', () => ({
   ),
 }));
 
-vi.mock('../useConfluenceChoreography', () => ({ useConfluenceChoreography: vi.fn() }));
+vi.mock('../useConfluenceChoreography', () => ({ useConfluenceChoreography: vi.fn(), useSweepChoreography: vi.fn() }));
 
 vi.mock('../RiverCanvas', async () => {
   const React = await import('react');
@@ -64,6 +64,8 @@ vi.mock('../RiverCanvas', async () => {
         playTide: vi.fn(),
         playMerge: vi.fn(),
         playThaw: vi.fn(),
+        playSweep: vi.fn(),
+        playFlare: vi.fn(),
         pulseSun: vi.fn(),
         spawnFromSun: vi.fn(),
         gateFlash: vi.fn(),

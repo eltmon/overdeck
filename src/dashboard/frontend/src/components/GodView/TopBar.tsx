@@ -128,6 +128,7 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
       <Stat label="MERGES" value={meta.mergesToday} />
       <Stat label="TOKENS" value={meta.tokensToday == null ? '—' : fmtTokens(meta.tokensToday)} />
       <Stat label="❄ STALE" value={meta.staleTotal} />
+      <Stat label="🧹 PARKED" value={meta.parkedTotal ?? '—'} />
       <Stat label="OLDEST" value={meta.total === 0 ? '—' : fmtAge(meta.oldestIdle)} />
       <span className={`confluence-active ${meta.active > 0 ? 'on' : ''}`}>{meta.active} active</span>
       <button

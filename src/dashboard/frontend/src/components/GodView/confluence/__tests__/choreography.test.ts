@@ -42,6 +42,9 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
     compactT: 0,
     spend: 0,
     mergeStatus: null,
+    parkedOrbit: null,
+    parkedMin: null,
+    orbitReason: null,
     ...overrides,
   };
 }
@@ -67,6 +70,8 @@ function effects(): RiverEffectsApi {
     playTide: vi.fn(),
     playMerge: vi.fn(),
     playThaw: vi.fn(),
+    playSweep: vi.fn(),
+    playFlare: vi.fn(),
     pulseSun: vi.fn(),
     spawnFromSun: vi.fn(),
     gateFlash: vi.fn(),
@@ -235,5 +240,65 @@ describe('Confluence choreography dispatch table', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+// ─── Sweep choreography (PAN-3490) ───────────────────────────────────────────
+
+import { planSweepCommands } from '../useConfluenceChoreography';
+import type { DomainEvent } from '@overdeck/contracts';
+
+let sweepSequence = 1000;
+function sweepEvent(type: string, payload: Record<string, unknown>): DomainEvent {
+  sweepSequence += 1;
+  return { type, sequence: sweepSequence, timestamp: '2026-08-02T13:00:00.000Z', payload } as unknown as DomainEvent;
+}
+
+describe('planSweepCommands', () => {
+  it('sweep.scan raises the lantern beam once per batch plus a census ticker', () => {
+    const commands = planSweepCommands([
+      sweepEvent('sweep.scan', { issueCount: 12, rowCount: 14, rows: [] }),
+      sweepEvent('sweep.scan', { issueCount: 12, rowCount: 14, rows: [] }),
+    ]);
+    expect(commands.filter((command) => command.type === 'sweep-tide')).toHaveLength(1);
+    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('12 parked'))).toBe(true);
+  });
+
+  it('sweep.unparked thaws the orb and leaves a freed ticker', () => {
+    const commands = planSweepCommands([
+      sweepEvent('sweep.unparked', { issueId: 'PAN-3418', orbit: 'stuck-flag', action: 'stuck-redrive' }),
+    ]);
+    expect(commands).toContainEqual({ type: 'thaw', issueId: 'PAN-3418' });
+    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('PAN-3418 swept free'))).toBe(true);
+  });
+
+  it('sweep.escalated fires a signal flare; sweep.action leaves only a ticker', () => {
+    const commands = planSweepCommands([
+      sweepEvent('sweep.escalated', { issueId: 'MIN-924', orbit: 'operator-gate', reason: 'paused' }),
+      sweepEvent('sweep.action', { issueId: 'PAN-2833', orbit: 'merge-failed', action: 'merge-reevaluate' }),
+    ]);
+    expect(commands).toContainEqual({ type: 'flare', issueId: 'MIN-924' });
+    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('needs operator'))).toBe(true);
+    expect(commands.some((command) => command.type === 'ticker' && command.text.includes('merge-reevaluate'))).toBe(true);
+    expect(commands.filter((command) => command.type === 'thaw')).toHaveLength(0);
+  });
+
+  it('runs sweep commands through the effects dispatch table', () => {
+    const api = effects();
+    runConfluenceCommands(planSweepCommands([
+      sweepEvent('sweep.scan', { issueCount: 3, rowCount: 3, rows: [] }),
+      sweepEvent('sweep.unparked', { issueId: 'PAN-1', orbit: 'merge-failed', action: 'merge-reevaluate' }),
+      sweepEvent('sweep.escalated', { issueId: 'PAN-2', orbit: 'operator-gate', reason: 'paused' }),
+    ]), api);
+    expect(api.playSweep).toHaveBeenCalledOnce();
+    expect(api.playThaw).toHaveBeenCalledWith('PAN-1');
+    expect(api.playFlare).toHaveBeenCalledWith('PAN-2');
+  });
+
+  it('ignores non-sweep events entirely', () => {
+    const commands = planSweepCommands([
+      sweepEvent('agent.activity_changed', { agentId: 'agent-pan-1' }),
+    ]);
+    expect(commands).toHaveLength(0);
   });
 });

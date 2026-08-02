@@ -21,6 +21,7 @@ vi.mock('../RiverCanvas', () => ({
 
 vi.mock('../useConfluenceChoreography', () => ({
   useConfluenceChoreography: vi.fn(),
+  useSweepChoreography: vi.fn(),
 }));
 
 vi.mock('../../Sidebar', () => ({

@@ -42,9 +42,22 @@ function queryClient(): QueryClient {
   return new QueryClient({ defaultOptions: { queries: { retry: false } } });
 }
 
+const PARKED_EMPTY = { rows: [], summary: { total: 0, byOrbit: {}, primaryByIssue: {} } };
+let parkedPayload = PARKED_EMPTY;
+
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(NOW);
+  parkedPayload = PARKED_EMPTY;
+  // The test-setup fetch guard fails unexpected requests; answer /api/parked
+  // with the controllable fixture and keep everything else forbidden.
+  globalThis.fetch = vi.fn(async (input) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (url.includes('/api/parked')) {
+      return new Response(JSON.stringify(parkedPayload), { status: 200 });
+    }
+    throw new Error(`Unexpected network request: ${url}`);
+  }) as unknown as typeof fetch;
   useDashboardStore.setState({
     sequence: 0,
     agentsById: {},
@@ -344,5 +357,86 @@ describe('useConfluenceData metadata fallback', () => {
     expect(result.current.meta.tokensToday).toBeNull();
     expect(result.current.meta.costPerMin).toBeNull();
     expect(result.current.meta.conversations).toBe(0);
+  });
+});
+
+describe('useConfluenceOrbs — parked cast (PAN-3490)', () => {
+  it('synthesizes a Doldrums orb for a parked issue with no live agent', async () => {
+    parkedPayload = {
+      rows: [{
+        issueId: 'PAN-77',
+        orbit: 'stuck-flag',
+        parkedAt: new Date(NOW.getTime() - 16 * 60 * 60_000).toISOString(),
+        parkReason: 'stuck flag set (feedback_delivery_needs_you)',
+        unparkCondition: 'resume the work agent',
+        lastActionAt: null,
+        actionCount: 0,
+      }],
+      summary: { total: 1, byOrbit: { 'stuck-flag': 1 }, primaryByIssue: { 'PAN-77': 'stuck-flag' } },
+    };
+    useDashboardStore.setState({
+      issuesRaw: [{ id: 'PAN-77', identifier: 'PAN-77', title: 'Stuck thing', labels: [], state: 'open' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const orb = result.current.find((candidate) => candidate.id === 'PAN-77');
+    expect(orb).toBeDefined();
+    expect(orb?.state).toBe('stale');
+    expect(orb?.parkedOrbit).toBe('stuck-flag');
+    expect(orb?.orbitReason).toContain('feedback_delivery_needs_you');
+    expect(orb?.parkedMin).toBe(16 * 60);
+    expect(orb?.title).toBe('Stuck thing');
+  });
+
+  it('a live orb on a parked issue carries the orbit without leaving the river', async () => {
+    parkedPayload = {
+      rows: [{
+        issueId: 'PAN-3',
+        orbit: 'conflicts',
+        parkedAt: new Date(NOW.getTime() - 4 * 60 * 60_000).toISOString(),
+        parkReason: 'branch invalidated',
+        unparkCondition: 'resolve conflicts',
+        lastActionAt: null,
+        actionCount: 0,
+      }],
+      summary: { total: 1, byOrbit: { conflicts: 1 }, primaryByIssue: { 'PAN-3': 'conflicts' } },
+    };
+    useDashboardStore.setState({
+      agentsById: { 'agent-pan-3': agent({ id: 'agent-pan-3', issueId: 'PAN-3' }) },
+      issuesRaw: [{ id: 'PAN-3', identifier: 'PAN-3', title: 'Conflicted', labels: [], state: 'open' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    const orb = result.current.find((candidate) => candidate.id === 'PAN-3');
+    expect(orb?.state).toBe('active');
+    expect(orb?.parkedOrbit).toBe('conflicts');
+    expect(orb?.parkedMin).toBe(240);
+  });
+
+  it('closed parked issues never render (residue is not cast)', async () => {
+    parkedPayload = {
+      rows: [{
+        issueId: 'PAN-78',
+        orbit: 'stuck-flag',
+        parkedAt: new Date(NOW.getTime() - 60_000).toISOString(),
+        parkReason: 'stuck',
+        unparkCondition: 'unstick',
+        lastActionAt: null,
+        actionCount: 0,
+      }],
+      summary: { total: 1, byOrbit: { 'stuck-flag': 1 }, primaryByIssue: { 'PAN-78': 'stuck-flag' } },
+    };
+    useDashboardStore.setState({
+      issuesRaw: [{ id: 'PAN-78', identifier: 'PAN-78', title: 'Done thing', labels: [], state: 'closed' }],
+    });
+    const client = queryClient();
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+
+    expect(result.current.find((candidate) => candidate.id === 'PAN-78')).toBeUndefined();
   });
 });

@@ -12,11 +12,15 @@ import {
   ROLE_COLORS,
   STAGES,
   STAGE_COLORS,
+  SWEEP_BEAM_COLOR,
+  SWEEP_FLARE_COLOR,
   advanceFrostAccrual,
   clamp,
   fmtAge,
   hexA,
   modelGlyph,
+  parkedOrbitColor,
+  parkedOrbitTag,
   pickOrb,
   positionOrb,
   type LayoutRect,
@@ -82,6 +86,16 @@ interface Pulse { x: number; y: number; r: number; maxR: number; color: string; 
 interface Ticker { text: string; color: string; x: number; y: number; life: number; maxLife: number }
 interface GateFlash { x: number; t: number }
 interface Tide { active: boolean; x: number; targetId: string | null; beneficiaryId: string | null; t: number }
+/** The sweeper's lantern beam (PAN-3490): an ice-blue light that travels the
+ * Doldrums band on a real population change, glinting each frozen orb it
+ * passes. Distinct from the governor tide (amber, river+shelf) in color,
+ * altitude, and meaning. */
+interface SweepBeam { active: boolean; x: number; t: number }
+/** A signal flare fired by a parked orb on sweep.escalated — rises slowly,
+ * pulses, and fades after a few seconds. */
+interface Flare { issueId: string; x: number; y: number; t: number }
+const FLARE_LIFETIME = 8;
+const FLARE_LIMIT = 8;
 
 export interface RiverEffectsApi {
   emitSparks(issueId: string, color?: string, agentId?: string, heatBump?: number): void;
@@ -90,6 +104,8 @@ export interface RiverEffectsApi {
   playTide(targetId?: string, beneficiaryId?: string): void;
   playMerge(issueId: string): void;
   playThaw(issueId: string): void;
+  playSweep(): void;
+  playFlare(issueId: string): void;
   pulseSun(): void;
   spawnFromSun(issueId: string): void;
   gateFlash(stage: Stage | number): void;
@@ -106,6 +122,8 @@ export interface RiverCanvasProps {
   conversations?: number | null;
   mergeQueue?: number;
   sequencer?: boolean;
+  /** True parked census for the Doldrums label (null while /api/parked is unanswered). */
+  parkedTotal?: number | null;
   onHover?: (orb: ConfluenceOrb | null, point: { x: number; y: number; canvasWidth: number } | null) => void;
   onSelect?: (orb: ConfluenceOrb | null) => void;
 }
@@ -215,6 +233,8 @@ function createEngine(
   const tickers: Ticker[] = [];
   const gateFlashes: GateFlash[] = [];
   const tide: Tide = { active: false, x: 0, targetId: null, beneficiaryId: null, t: 0 };
+  const sweepBeam: SweepBeam = { active: false, x: 0, t: 0 };
+  const flares: Flare[] = [];
   let props = initial;
   let width = 0;
   let height = 0;
@@ -344,6 +364,19 @@ function createEngine(
     },
     playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
+    playSweep() {
+      sweepBeam.active = true;
+      sweepBeam.x = layout.padX - 30;
+      sweepBeam.t = 0;
+    },
+    playFlare(issueId) {
+      const orb = orbAt(issueId);
+      if (!orb) return;
+      if (flares.length >= FLARE_LIMIT) flares.shift();
+      flares.push({ issueId, x: orb.x, y: orb.y - orb.radius - 6, t: 0 });
+      burst(orb.x, orb.y - orb.radius, SWEEP_FLARE_COLOR, 18, 60, 1.4, 2, Math.PI * 0.9, -Math.PI / 2);
+      ring(orb.x, orb.y, SWEEP_FLARE_COLOR, 66, 2);
+    },
     pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
     spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, true); },
     gateFlash: flashGate,
@@ -458,7 +491,11 @@ function createEngine(
     frost.addColorStop(0, 'rgba(120,170,255,0.02)'); frost.addColorStop(1, 'rgba(120,170,255,0.08)'); fx.fillStyle = frost;
     fx.fillRect(layout.padX, layout.doldrumsY - layout.doldrumsH / 2, width - layout.padX * 2, layout.doldrumsH);
     fx.strokeStyle = 'rgba(159,199,255,0.2)'; fx.beginPath(); fx.moveTo(layout.padX, layout.doldrumsY - layout.doldrumsH / 2); fx.lineTo(width - layout.padX, layout.doldrumsY - layout.doldrumsH / 2); fx.stroke();
-    fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stale, no hook activity · ${list().filter((orb) => orb.state === 'stale').length} frozen`, width - layout.padX - 8, layout.doldrumsY - layout.doldrumsH / 2 + 11); fx.textAlign = 'left';
+    const staleShown = list().filter((orb) => orb.state === 'stale').length;
+    const census = props.parkedTotal != null
+      ? `${props.parkedTotal} parked · showing ${staleShown}`
+      : `${staleShown} frozen`;
+    fx.fillStyle = 'rgba(159,199,255,0.55)'; fx.fillText(`❄ DOLDRUMS — stalled, nothing autonomous will advance · ${census}`, width - layout.padX - 8, layout.doldrumsY - layout.doldrumsH / 2 + 11); fx.textAlign = 'left';
     if (Math.random() < 0.12) frostMotes(layout.padX + Math.random() * (width - layout.padX * 2), layout.doldrumsY - 20, 1);
   };
 
@@ -521,8 +558,14 @@ function createEngine(
       const baseRole = roleColor(orb.role); const color = orb.frost > 0.02 ? mixColor(baseRole, ICE, orb.frost * 0.8) : baseRole;
       const compact = orb.compactT > 0 ? 1 - orb.compactT * 0.35 : 1; const radius = orb.radius * (0.85 + orb.heat * 0.45) * (orb.merging ? 1.2 : 1) * compact;
       if (orb.state === 'stale') {
-        const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 1.6); glow.addColorStop(0, 'rgba(120,150,200,.5)'); glow.addColorStop(1, 'rgba(120,150,200,0)'); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.6, 0, 7); fx.fill();
-        fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.7, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(191,227,255,.75)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.85, 0, 7); fx.stroke(); drawFrostCrown(orb, radius * 0.9, 1); drawLabel(orb, `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`, 'rgba(159,199,255,.85)'); fx.globalAlpha = 1; continue;
+        // Orbit-tinted frost (PAN-3490): a parked orb's ring, glow, and label
+        // carry its orbit's color so the Doldrums reads WHY things are parked.
+        const tint = parkedOrbitColor(orb.parkedOrbit);
+        const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 1.6); glow.addColorStop(0, hexA(tint, 0.4)); glow.addColorStop(1, hexA(tint, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.6, 0, 7); fx.fill();
+        fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.7, 0, 7); fx.fill(); fx.strokeStyle = hexA(tint, 0.75); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.85, 0, 7); fx.stroke(); drawFrostCrown(orb, radius * 0.9, 1);
+        const orbitTag = parkedOrbitTag(orb.parkedOrbit);
+        drawLabel(orb, orbitTag ? `❄ ${orb.id} · ${orbitTag} ${fmtAge(orb.staleMin)}` : `❄ ${orb.id} · ${fmtAge(orb.staleMin)} idle`, hexA(tint, 0.85));
+        fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'failed') {
         const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
@@ -555,6 +598,50 @@ function createEngine(
   const drawPulses = () => { for (const pulse of pulses) { fx.globalAlpha = Math.max(0, pulse.alpha); fx.strokeStyle = pulse.color; fx.lineWidth = pulse.width; fx.beginPath(); fx.arc(pulse.x, pulse.y, pulse.r, 0, 7); fx.stroke(); } fx.globalAlpha = 1; };
   const drawTickers = () => { fx.font = '500 10px "JetBrains Mono"'; for (const item of tickers) { const alpha = item.life < 1 ? item.life : Math.max(0, 1 - (item.life - (item.maxLife - 2)) / 2); fx.globalAlpha = alpha * 0.55; fx.fillStyle = item.color; fx.fillText(item.text, item.x, item.y); } fx.globalAlpha = 1; };
   const drawTide = () => { if (!tide.active) return; const glow = fx.createLinearGradient(tide.x - 60, 0, tide.x + 6, 0); glow.addColorStop(0, 'rgba(255,184,0,0)'); glow.addColorStop(0.85, 'rgba(255,184,0,.22)'); glow.addColorStop(1, 'rgba(255,184,0,.55)'); fx.fillStyle = glow; fx.fillRect(tide.x - 60, layout.riverTop - 30, 66, layout.riverBottom - layout.riverTop + layout.shelfH + 40); fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.9)'; fx.fillText('GOVERNOR', tide.x - 52, layout.riverTop - 36); };
+  const drawSweepBeam = () => {
+    if (!sweepBeam.active) return;
+    const top = layout.doldrumsY - layout.doldrumsH / 2 - 8;
+    const height = layout.doldrumsH + 26;
+    const glow = fx.createLinearGradient(sweepBeam.x - 52, 0, sweepBeam.x + 8, 0);
+    glow.addColorStop(0, hexA(SWEEP_BEAM_COLOR, 0));
+    glow.addColorStop(0.8, hexA(SWEEP_BEAM_COLOR, 0.2));
+    glow.addColorStop(1, hexA(SWEEP_BEAM_COLOR, 0.5));
+    fx.fillStyle = glow;
+    fx.fillRect(sweepBeam.x - 52, top, 60, height);
+    fx.fillStyle = hexA(SWEEP_BEAM_COLOR, 0.85);
+    fx.fillRect(sweepBeam.x + 7, top, 1.5, height);
+    fx.font = '600 8.5px "JetBrains Mono"';
+    fx.fillStyle = hexA(SWEEP_BEAM_COLOR, 0.9);
+    fx.fillText('🧹 SWEEP', sweepBeam.x - 48, top - 4);
+  };
+  const drawFlares = () => {
+    for (const flare of flares) {
+      const fade = clamp(1 - flare.t / FLARE_LIFETIME, 0, 1);
+      const pulse = 0.55 + 0.45 * Math.sin(simT * 7);
+      const glow = fx.createRadialGradient(flare.x, flare.y, 0, flare.x, flare.y, 14 + pulse * 6);
+      glow.addColorStop(0, hexA(SWEEP_FLARE_COLOR, 0.75 * fade * pulse));
+      glow.addColorStop(1, hexA(SWEEP_FLARE_COLOR, 0));
+      fx.fillStyle = glow;
+      fx.beginPath();
+      fx.arc(flare.x, flare.y, 14 + pulse * 6, 0, 7);
+      fx.fill();
+      fx.fillStyle = hexA('#fff3c8', fade);
+      fx.beginPath();
+      fx.arc(flare.x, flare.y, 2.2, 0, 7);
+      fx.fill();
+      fx.strokeStyle = hexA(SWEEP_FLARE_COLOR, 0.5 * fade);
+      fx.lineWidth = 1;
+      fx.beginPath();
+      fx.moveTo(flare.x, flare.y + 4);
+      fx.lineTo(flare.x, flare.y + 16);
+      fx.stroke();
+      if (flare.t < FLARE_LIFETIME * 0.6) {
+        fx.font = '600 8px "JetBrains Mono"';
+        fx.fillStyle = hexA(SWEEP_FLARE_COLOR, fade * 0.85);
+        fx.fillText('⚑', flare.x + 8, flare.y + 2);
+      }
+    }
+  };
   const drawConstellation = () => { const count = props.conversations ?? 0; if (!count) return; const start = (width - (count * 14 + 150)) / 2; fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(0,212,255,.5)'; fx.fillText(`◈ ${count} CONVERSATIONS`, start, 33); for (let index = 0; index < count; index++) { const x = start + 130 + index * 14 + Math.sin(index * 3.7) * 3; const y = 30 + Math.sin(simT * 1.3 + index * 1.7) * 4; const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(simT * 2 + index)); fx.fillStyle = `rgba(0,212,255,${0.2 + twinkle * 0.55})`; fx.beginPath(); fx.arc(x, y, 2 + twinkle * 1.2, 0, 7); fx.fill(); } };
   const drawSequencer = () => { if (props.sequencer === false) return; const x = layout.sunX + 118; const y = layout.sunY - 2; const pulse = 0.5 + 0.5 * Math.sin(simT * 1.1 + 2); fx.save(); fx.translate(x, y); fx.rotate(simT * 0.7); fx.strokeStyle = `rgba(255,119,0,${0.3 + pulse * 0.3})`; fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke(); fx.rotate(-simT * 1.3); fx.strokeStyle = `rgba(255,119,0,${0.16 + pulse * 0.18})`; fx.setLineDash([2, 7]); fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke(); fx.restore(); fx.setLineDash([]); fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill(); fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)'; fx.fillText('SEQUENCER', x - 28, y + 28); };
 
@@ -582,6 +669,28 @@ function createEngine(
     for (let index = tickers.length - 1; index >= 0; index--) { const item = tickers[index]!; item.life += dt; item.x += dt * 34; if (item.life > item.maxLife) tickers.splice(index, 1); }
     for (let index = gateFlashes.length - 1; index >= 0; index--) { gateFlashes[index]!.t += dt; if (gateFlashes[index]!.t > 0.8) gateFlashes.splice(index, 1); }
     if (tide.active) { tide.t += dt; tide.x = layout.padX - 40 + tide.t / 1.6 * (width - layout.padX * 2 + 80); for (const orb of list()) { if (Math.abs(orb.x - tide.x) >= 30) continue; if (orb.id === tide.targetId && orb.state === 'active') { orb.state = 'shelf'; orb.yieldReason ||= 'yield: freeing a slot'; burst(orb.x, orb.y, '#ffb800', 20, 70, 1.2, 2.2); ring(orb.x, orb.y, '#ffb800', 60, 2); } if (orb.id === tide.beneficiaryId && orb.state === 'shelf') thaw(orb); } if (tide.x > width - layout.padX + 40) tide.active = false; }
+    // Sweeper beam: crosses the Doldrums in ~1.8s; every frozen orb the light
+    // touches glints — the scan visibly TOUCHES each parked issue it scanned.
+    if (sweepBeam.active) {
+      sweepBeam.t += dt;
+      sweepBeam.x = layout.padX - 30 + (sweepBeam.t / 1.8) * (width - layout.padX * 2 + 60);
+      for (const orb of list()) {
+        if (orb.state !== 'stale') continue;
+        if (Math.abs(orb.x - sweepBeam.x) < 26) orb.flashT = Math.max(orb.flashT, simT + 0.45);
+      }
+      if (Math.random() < dt * 30 && particles.length < PARTICLE_LIMIT) {
+        particles.push({ x: sweepBeam.x + (Math.random() - 0.5) * 10, y: layout.doldrumsY + (Math.random() - 0.5) * layout.doldrumsH, vx: -14 - Math.random() * 10, vy: (Math.random() - 0.5) * 6, life: 0, maxLife: 0.7 + Math.random() * 0.5, color: SWEEP_BEAM_COLOR, size: 1 + Math.random(), kind: 'spark' });
+      }
+      if (sweepBeam.x > width - layout.padX + 40) sweepBeam.active = false;
+    }
+    // Signal flares rise, pulse, and burn out.
+    for (let index = flares.length - 1; index >= 0; index--) {
+      const flare = flares[index]!;
+      flare.t += dt;
+      flare.y -= dt * 22;
+      flare.x += Math.sin(flare.t * 2.2) * dt * 6;
+      if (flare.t > FLARE_LIFETIME) flares.splice(index, 1);
+    }
   };
 
   const draw = () => {
@@ -590,7 +699,7 @@ function createEngine(
     for (const orb of list()) { if (orb.state === 'stale' || orb.state === 'shelf') continue; const color = roleColor(orb.role); const glow = trail.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, 5 + orb.heat * 8); glow.addColorStop(0, hexA(color, 0.5 * (0.25 + orb.heat))); glow.addColorStop(1, hexA(color, 0)); trail.fillStyle = glow; trail.beginPath(); trail.arc(orb.x, orb.y, 5 + orb.heat * 8, 0, 7); trail.fill(); }
     drawRiver(); drawZones(); drawPortal(); drawSun();
     fx.globalCompositeOperation = 'lighter'; fx.drawImage(trailCanvas, 0, 0, width, height); fx.globalCompositeOperation = 'source-over';
-    drawGateFlashes(); drawConvoys(); drawOrbs(); drawParticles(); drawPulses(); drawTickers(); drawTide(); drawStageHeaders(); drawConstellation(); drawSequencer();
+    drawGateFlashes(); drawConvoys(); drawOrbs(); drawParticles(); drawPulses(); drawTickers(); drawTide(); drawSweepBeam(); drawFlares(); drawStageHeaders(); drawConstellation(); drawSequencer();
   };
 
   const updateHover = () => {
@@ -636,6 +745,8 @@ export const RiverCanvas = forwardRef<RiverCanvasHandle, RiverCanvasProps>(funct
     playTide: (...args) => engineRef.current?.api.playTide(...args),
     playMerge: (...args) => engineRef.current?.api.playMerge(...args),
     playThaw: (...args) => engineRef.current?.api.playThaw(...args),
+    playSweep: () => engineRef.current?.api.playSweep(),
+    playFlare: (...args) => engineRef.current?.api.playFlare(...args),
     pulseSun: () => engineRef.current?.api.pulseSun(),
     spawnFromSun: (...args) => engineRef.current?.api.spawnFromSun(...args),
     gateFlash: (...args) => engineRef.current?.api.gateFlash(...args),

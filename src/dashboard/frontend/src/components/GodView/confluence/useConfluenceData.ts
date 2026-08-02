@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AgentSnapshot, DomainEvent, ReviewStatusSnapshot } from '@overdeck/contracts';
 import { useGodViewStore } from '../../../hooks/useGodViewSocket';
 import {
@@ -57,6 +57,29 @@ export interface ConfluenceOrb {
   compactT: number;
   spend: number;
   mergeStatus: string | null;
+  /** PAN-3490: the issue's primary parked orbit (most severe), null when not parked. */
+  parkedOrbit: string | null;
+  /** Minutes since the park began (parkedAt age), null when not parked. */
+  parkedMin: number | null;
+  /** Operator sentence — why the issue is parked (tooltip/rail copy). */
+  orbitReason: string | null;
+}
+
+/** The /api/parked row shape (PAN-3486) — the God View's parked cast source. */
+export interface ParkedRowView {
+  issueId: string;
+  orbit: string;
+  parkedAt: string;
+  parkReason: string;
+  unparkCondition: string;
+  lastActionAt: string | null;
+  actionCount: number;
+  details?: Record<string, unknown>;
+}
+
+export interface ParkedResponse {
+  rows: ParkedRowView[];
+  summary: { total: number; byOrbit: Record<string, number>; primaryByIssue: Record<string, string> };
 }
 
 export interface HookStreamEntry {
@@ -114,6 +137,9 @@ export interface ConfluenceMeta {
   active: number;
   total: number;
   roleCounts: Readonly<Record<string, number>>;
+  /** PAN-3490: parked population size + orbit histogram (null while /api/parked has never answered). */
+  parkedTotal: number | null;
+  parkedByOrbit: Readonly<Record<string, number>> | null;
 }
 
 export interface ConfluenceData {
@@ -262,7 +288,7 @@ function aggregateMicroState(
 
 function orbSignature(orb: ConfluenceOrb): string {
   return JSON.stringify(orb, (key, value) =>
-    key === 'staleMin' || key === 'idleMin' ? undefined : value,
+    key === 'staleMin' || key === 'idleMin' || key === 'parkedMin' ? undefined : value,
   );
 }
 
@@ -461,12 +487,93 @@ export function useHookStream(): ConfluenceHookStream {
   return stream;
 }
 
+async function fetchParked(): Promise<ParkedResponse> {
+  const response = await fetch('/api/parked');
+  if (!response.ok) throw new Error('Failed to fetch parked population');
+  return response.json() as Promise<ParkedResponse>;
+}
+
+/**
+ * The parked population for the God View cast (PAN-3490). Fetched once on
+ * mount; refreshed ONLY by real sweep.* domain events (the sweeper emits
+ * sweep.scan on population change, sweep.unparked on release). No polling
+ * interval — the honesty contract forbids fabricated motion, and a timer
+ * refetch would animate nothing that didn't happen.
+ */
+export function useParked(): ParkedResponse | null {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    const unsubscribe = subscribeDashboardDomainEvents((events) => {
+      if (events.some((event) => event.type.startsWith('sweep.'))) {
+        void queryClient.invalidateQueries({ queryKey: ['parked-population'] });
+      }
+    });
+    return unsubscribe;
+  }, [queryClient]);
+  const { data } = useQuery({
+    queryKey: ['parked-population'],
+    queryFn: fetchParked,
+    staleTime: Number.POSITIVE_INFINITY,
+    refetchInterval: false,
+    retry: 1,
+  });
+  return data ?? null;
+}
+
+/** Index parked rows by issue, keeping the row for the issue's PRIMARY (most severe) orbit. */
+function parkedPrimaryByIssue(parked: ParkedResponse | null): Map<string, ParkedRowView> {
+  const map = new Map<string, ParkedRowView>();
+  if (!parked) return map;
+  for (const [issueId, orbit] of Object.entries(parked.summary.primaryByIssue)) {
+    const row = parked.rows.find((candidate) => candidate.issueId === issueId && candidate.orbit === orbit)
+      ?? parked.rows.find((candidate) => candidate.issueId === issueId);
+    if (row) map.set(issueId, row);
+  }
+  return map;
+}
+
+/** A parked issue with no live agent gets a synthesized Doldrums orb — the graveyard is real cast. */
+function parkedOnlyOrb(row: ParkedRowView, issue: IssueRecord | undefined, now: number): ConfluenceOrb {
+  const parkedMs = Math.max(0, now - Date.parse(row.parkedAt));
+  const parkedMin = Math.floor(parkedMs / 60_000);
+  return {
+    id: row.issueId,
+    project: issueProject(row.issueId),
+    role: 'work',
+    stage: 'WORK',
+    title: issue?.title ?? row.issueId,
+    heat: 0.04,
+    staleMin: parkedMin,
+    state: 'stale',
+    convoy: null,
+    yieldReason: null,
+    yieldedByScheduler: false,
+    warn: null,
+    broken: false,
+    model: null,
+    harness: null,
+    labels: issue?.labels ?? [],
+    glyph: null,
+    lastActivity: null,
+    idleMin: parkedMin,
+    waitUntil: 0,
+    thinkUntil: 0,
+    compactT: 0,
+    spend: 0,
+    mergeStatus: null,
+    parkedOrbit: row.orbit,
+    parkedMin,
+    orbitReason: row.parkReason,
+  };
+}
+
 export function useConfluenceOrbs(
   microStatesByAgentId: Readonly<Record<string, ConfluenceMicroState>> = EMPTY_MICRO_STATES,
 ): readonly ConfluenceOrb[] {
   const agentsById = useDashboardStore((state) => state.agentsById);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
   const reviewStatusByIssueId = useDashboardStore((state) => state.reviewStatusByIssueId);
+  const parked = useParked();
   const agents = useMemo(() => Object.values(agentsById), [agentsById]);
   const issueIds = useMemo(
     () => Array.from(new Set(agents.map((agent) => agent.issueId).filter(Boolean))).sort(),
@@ -479,6 +586,7 @@ export function useConfluenceOrbs(
   return useMemo(() => {
     const issues = issuesRaw as IssueRecord[];
     const issuesById = new Map(issues.map((issue) => [issueKey(issue), issue]));
+    const parkedByIssue = parkedPrimaryByIssue(parked);
     const agentsByIssue = new Map<string, AgentSnapshot[]>();
     for (const agent of agents) {
       const list = agentsByIssue.get(agent.issueId) ?? [];
@@ -516,6 +624,8 @@ export function useConfluenceOrbs(
       const micro = aggregateMicroState(issueAgents, microStatesByAgentId);
       const broken = workspaceHealth[id.toUpperCase()]?.stackHealth?.healthy === false
         || (issue?.stackHealth as { healthy?: boolean } | undefined)?.healthy === false;
+      const parkedRow = parkedByIssue.get(id.toUpperCase()) ?? null;
+      const parkedMin = parkedRow ? Math.max(0, Math.floor((now - Date.parse(parkedRow.parkedAt)) / 60_000)) : null;
       const orb: ConfluenceOrb = {
         id,
         project: issueProject(id),
@@ -546,6 +656,9 @@ export function useConfluenceOrbs(
         compactT: micro.compactT,
         spend: micro.spend,
         mergeStatus: typeof mergeStatus === 'string' ? mergeStatus : null,
+        parkedOrbit: parkedRow?.orbit ?? null,
+        parkedMin,
+        orbitReason: parkedRow?.parkReason ?? null,
       };
       const signature = orbSignature(orb);
       const previous = cache.current.get(id);
@@ -559,14 +672,36 @@ export function useConfluenceOrbs(
     for (const id of cache.current.keys()) {
       if (!liveIds.has(id)) cache.current.delete(id);
     }
+    // Parked-but-invisible cast: an issue can be parked with NO live agent and
+    // no active merge (a stuck flag on a dead work agent, an exhausted merge).
+    // Those never passed membership above — synthesize their Doldrums orbs so
+    // the whole parked population is real cast, not just the live-agent slice.
+    for (const [issueId, row] of parkedByIssue) {
+      if (liveIds.has(issueId)) continue;
+      const issue = issuesById.get(issueId);
+      if (closedIssueState(issue)) continue;
+      const orb = parkedOnlyOrb(row, issue, now);
+      const signature = orbSignature(orb);
+      const previous = cache.current.get(issueId);
+      if (previous?.signature === signature) {
+        next.push(previous.orb);
+      } else {
+        cache.current.set(issueId, { signature, orb });
+        next.push(orb);
+      }
+      liveIds.add(issueId);
+    }
+    // Doldrums emissaries: the OLDEST stale orbs represent the population
+    // (a graveyard reads oldest-first), capped so a large census never
+    // becomes a label wall. The Doldrums label counts the true total.
     const staleOrbs = next.filter((orb) => orb.state === 'stale')
-      .sort((a, b) => a.staleMin - b.staleMin)
+      .sort((a, b) => b.staleMin - a.staleMin)
       .slice(0, STALE_ORB_LIMIT);
     const keepStale = new Set(staleOrbs.map((orb) => orb.id));
     return next
       .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
       .sort((a, b) => a.id.localeCompare(b.id));
-  }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth]);
+  }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth, parked]);
 }
 
 type CostSummaryResponse = { today?: { totalTokens?: number } };
@@ -614,6 +749,7 @@ export function useConfluenceMeta(
     staleTime: 10_000,
     refetchInterval: 10_000,
   });
+  const parked = useParked();
 
   return useMemo(() => {
     const now = new Date();
@@ -647,8 +783,10 @@ export function useConfluenceMeta(
       active: Object.values(agentsById).filter((agent) => activeStatus(agent.status)).length,
       total: Object.keys(agentsById).length,
       roleCounts,
+      parkedTotal: parked?.summary.total ?? null,
+      parkedByOrbit: parked?.summary.byOrbit ?? null,
     };
-  }, [agentsById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system]);
+  }, [agentsById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked]);
 }
 
 export function useConfluenceData(): ConfluenceData {

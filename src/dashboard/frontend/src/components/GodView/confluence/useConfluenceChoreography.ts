@@ -1,5 +1,7 @@
 import { useEffect, useRef, type MutableRefObject } from 'react';
-import { HOOKS, STAGE_COLORS, type HookFamilyKey, type Stage } from './model';
+import type { DomainEvent } from '@overdeck/contracts';
+import { subscribeDashboardDomainEvents } from '../../../lib/store';
+import { HOOKS, STAGE_COLORS, SWEEP_BEAM_COLOR, SWEEP_FLARE_COLOR, type HookFamilyKey, type Stage } from './model';
 import type { RiverEffectsApi } from './RiverCanvas';
 import type { ConfluenceOrb, HookStreamEntry } from './useConfluenceData';
 
@@ -16,8 +18,41 @@ export type ChoreographyCommand =
   | { type: 'merge'; issueId: string }
   | { type: 'tide'; targetId: string; beneficiaryId?: string }
   | { type: 'thaw'; issueId: string }
+  | { type: 'sweep-tide' }
+  | { type: 'flare'; issueId: string }
   | { type: 'sun' }
   | { type: 'spawn'; issueId: string };
+
+/**
+ * Sweep event → visual command mapping (PAN-3490). Pure and fixture-tested.
+ * sweep.scan (population changed) raises the lantern beam across the Doldrums;
+ * sweep.unparked thaws that issue's orb back into the river; sweep.escalated
+ * fires a signal flare off the orb. sweep.action alone (nudge, merge reset)
+ * leaves a ticker trace but no orb motion — the orb moves when the row
+ * actually resolves (sweep.unparked / the next scan's cast).
+ */
+export function planSweepCommands(events: readonly DomainEvent[]): ChoreographyCommand[] {
+  const commands: ChoreographyCommand[] = [];
+  let tideQueued = false;
+  for (const event of events) {
+    if (event.type === 'sweep.scan') {
+      if (!tideQueued) {
+        commands.push({ type: 'sweep-tide' });
+        commands.push({ type: 'ticker', text: `🧹 sweeper scan · ${event.payload.issueCount} parked`, color: SWEEP_BEAM_COLOR });
+        tideQueued = true;
+      }
+    } else if (event.type === 'sweep.unparked') {
+      commands.push({ type: 'thaw', issueId: event.payload.issueId });
+      commands.push({ type: 'ticker', text: `🧹 ${event.payload.issueId} swept free`, color: SWEEP_BEAM_COLOR });
+    } else if (event.type === 'sweep.escalated') {
+      commands.push({ type: 'flare', issueId: event.payload.issueId });
+      commands.push({ type: 'ticker', text: `⚑ ${event.payload.issueId} needs operator`, color: SWEEP_FLARE_COLOR });
+    } else if (event.type === 'sweep.action') {
+      commands.push({ type: 'ticker', text: `🧹 ${event.payload.issueId} · ${event.payload.action}`, color: SWEEP_BEAM_COLOR });
+    }
+  }
+  return commands;
+}
 
 interface ChoreographyFrame {
   previous: ReadonlyMap<string, ConfluenceOrb>;
@@ -129,6 +164,12 @@ export function runConfluenceCommands(commands: readonly ChoreographyCommand[], 
       case 'tide':
         effects.playTide(command.targetId, command.beneficiaryId);
         break;
+      case 'sweep-tide':
+        effects.playSweep();
+        break;
+      case 'flare':
+        effects.playFlare(command.issueId);
+        break;
       case 'thaw':
         effects.playThaw(command.issueId);
         break;
@@ -176,4 +217,38 @@ export function useConfluenceChoreography(
     previousRef.current = current;
     seenEventsRef.current = nextSeen;
   }, [effectsRef, entries, orbs]);
+}
+
+/**
+ * Sweep choreography (PAN-3490). Subscribes to the raw domain-event stream for
+ * sweep.* events and plays the sweeper's visuals — the lantern beam on
+ * population change, thaws on release, flares on escalation. The first batch
+ * seen after mount sets a sequence baseline WITHOUT playing: replays of
+ * already-applied history (bootstrap/reconnect) must never re-animate ancient
+ * sweeps — motion stays real.
+ */
+export function useSweepChoreography(
+  effectsRef: MutableRefObject<RiverEffectsApi | null>,
+): void {
+  const baselineRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeDashboardDomainEvents((allEvents) => {
+      // system.heartbeat carries no sequence — sequence is the replay guard.
+      const events = allEvents.filter((event): event is Exclude<DomainEvent, { type: 'system.heartbeat' }> => 'sequence' in event);
+      if (events.length === 0) return;
+      const maxSequence = events.reduce((max, event) => Math.max(max, event.sequence), 0);
+      if (baselineRef.current === null) {
+        baselineRef.current = maxSequence;
+        return;
+      }
+      const sweepEvents = events.filter((event) =>
+        event.type.startsWith('sweep.') && event.sequence > (baselineRef.current ?? 0));
+      if (maxSequence > (baselineRef.current ?? 0)) baselineRef.current = maxSequence;
+      if (sweepEvents.length === 0) return;
+      const effects = effectsRef.current;
+      if (effects) runConfluenceCommands(planSweepCommands(sweepEvents), effects);
+    });
+    return unsubscribe;
+  }, [effectsRef]);
 }
