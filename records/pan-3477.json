@@ -3,141 +3,47 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-02T05:10:54.170Z",
-  "updated": "2026-08-02T13:55:14.264Z",
+  "updated": "2026-08-02T14:51:25.937Z",
   "pipeline": {
     "issueId": "PAN-3477",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "skipped",
+    "verificationStatus": "skipped",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T13:55:14.245Z",
-    "testNotes": "Skipped: issue is already merged",
-    "lastVerifiedCommit": "5cd9fd395558387ced019cbeace3ebbad58aafd4",
-    "strikeLandingState": "landed",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": [
-      {
-        "timestamp": "2026-08-02T07:26:37.049Z",
-        "strikeHead": "5cd9fd395558387ced019cbeace3ebbad58aafd4",
-        "mainHead": "bbad16a553ae100ca34e0e9dab808491be533b64",
-        "outcome": "transport-failed",
-        "detail": "Strike merge request failed: fetch failed"
-      }
-    ],
     "closedOut": true,
-    "closedOutAt": "2026-08-02T13:55:14.245Z"
+    "closedOutAt": "2026-08-02T13:55:14.245Z",
+    "updatedAt": "2026-08-02T14:51:25.892Z",
+    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
+    "verificationNotes": "Strike path: quality gates run by the strike agent before landing; the verification stage is bypassed by design (PAN-3067)"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1106189,
-            "output": 90932,
-            "cacheRead": 52352512,
+            "input": 1348540,
+            "output": 98060,
+            "cacheRead": 53659648,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1106189,
-          "output": 90932,
-          "cacheRead": 52352512,
+          "input": 1348540,
+          "output": 98060,
+          "cacheRead": 53659648,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.435161,
-        "pricingAsOf": "2026-08-02T12:54:17.919Z"
+        "usd": 36.514324,
+        "pricingAsOf": "2026-08-02T14:51:25.914Z"
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790",
-    "dodGate": {
-      "evaluatedAt": "2026-08-02T13:55:14.264Z",
-      "rows": [
-        {
-          "id": "review",
-          "num": 1,
-          "title": "Review passed",
-          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
-          "observed": "reviewStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "tests",
-          "num": 2,
-          "title": "Tests passed",
-          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "testStatus: passed",
-          "status": "pass"
-        },
-        {
-          "id": "verification",
-          "num": 3,
-          "title": "Verification green on the branch",
-          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
-          "observed": "verificationStatus: passed at 5cd9fd395558387ced019cbeace3ebbad58aafd4",
-          "status": "pass"
-        },
-        {
-          "id": "merged",
-          "num": 4,
-          "title": "Merged to main",
-          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
-          "observed": "Merge specialist confirmed merge completed; PR #3480 MERGED at 2026-08-02T07:44:21Z",
-          "status": "pass",
-          "mergedAt": "2026-08-02T07:44:21Z",
-          "mergeCommit": "a64fa21a934f16bf4a47af779918f0a645355a10"
-        },
-        {
-          "id": "post-merge",
-          "num": 5,
-          "title": "Post-merge lifecycle ran",
-          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
-          "observed": "canonical state: verifying_on_main; no running work/planning agents",
-          "status": "pass"
-        },
-        {
-          "id": "main-verify",
-          "num": 6,
-          "title": "Verified on main",
-          "expected": "merged commit verified on main",
-          "observed": "9 check-runs concluded successfully on a64fa21a934f16bf4a47af779918f0a645355a10",
-          "status": "pass"
-        },
-        {
-          "id": "ship",
-          "num": 7,
-          "title": "Version strings propagated",
-          "expected": "every declared version_sync.expect path reports the batch version",
-          "observed": "project declares no version_sync; ship step not applicable",
-          "status": "skip"
-        },
-        {
-          "id": "deploy",
-          "num": 8,
-          "title": "Deployed",
-          "expected": "live server build includes the merged commit",
-          "observed": "build commit 55fbe7a5 contains merge a64fa21a",
-          "status": "pass"
-        },
-        {
-          "id": "teardown",
-          "num": 9,
-          "title": "Close-out teardown verified",
-          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
-          "overridable": false,
-          "status": "pass",
-          "observed": "Killed 1 tmux session(s); No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; No orphaned processes found; Removed workspace directory after worktree removal failed; Removed git worktree; Cleaned 7 agent state directories (1 transcript files preserved); Preserved local branch strike/pan-3477 — not merged to main; Preserved remote branch strike/pan-3477 — not merged to main; Pruned 89 checkpoint ref(s) for agent-pan-3477, planning-pan-3477, strike-pan-3477; No specialist registry entries for PAN-3477"
-        }
-      ],
-      "accepted": []
-    }
+    "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
