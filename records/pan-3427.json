@@ -56,7 +56,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:55:22.507Z",
+  "updated": "2026-08-02T19:04:26.676Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -115,16 +115,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 25,
-    "claims": {
-      "frontend-project-picker": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 3742355,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:55:22.507Z"
-      }
-    },
+    "sequence": 26,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -258,6 +250,17 @@
         "outcome": "completed",
         "reason": "Cross-project continuation implemented in e17ef47e07e6; typecheck green, flywheel-complete tests 8/8 pass covering all four ACs.",
         "releasedAt": "2026-08-02T18:48:06.534Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 3742355,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:55:22.507Z",
+        "itemId": "frontend-project-picker",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T19:04:26.566Z"
       }
     ],
     "statusReasons": {
@@ -289,6 +292,10 @@
       "flywheel-cross-project-continuation": {
         "reason": "Cross-project continuation implemented in e17ef47e07e6; typecheck green, flywheel-complete tests 8/8 pass covering all four ACs.",
         "updatedAt": "2026-08-02T18:48:06.534Z"
+      },
+      "frontend-project-picker": {
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "updatedAt": "2026-08-02T19:04:26.566Z"
       }
     }
   },
@@ -324,6 +331,6 @@
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac2": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac3": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac4": "completed",
-    "frontend-project-picker": "running"
+    "frontend-project-picker": "pending"
   }
 }
