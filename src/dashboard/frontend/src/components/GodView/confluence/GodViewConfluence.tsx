@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
+import { BottomStrip } from './BottomStrip';
 import { ConfluenceHelp } from './ConfluenceHelp';
 import { HookBus } from './HookBus';
 import { OrbTooltip } from './OrbTooltip';
@@ -118,14 +119,7 @@ export function GodViewConfluence({
         />
       </div>
 
-      <footer className="confluence-bottom">
-        <div className="confluence-trace gv-glass">
-          <span>HOOK TELEMETRY · <b>{hookStream.eventsPerMin} events / last 60 s</b></span>
-        </div>
-        <div className="confluence-roles gv-glass">
-          {Object.entries(meta.roleCounts).map(([role, count]) => <span key={role}><i data-role={role} />{role}<b>{count}</b></span>)}
-        </div>
-      </footer>
+      <BottomStrip entries={hookStream.entries} roleCounts={meta.roleCounts} />
 
       {helpOpen && (
         <ConfluenceHelp
