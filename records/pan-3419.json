@@ -372,7 +372,7 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T19:36:13.375Z",
+  "updated": "2026-08-02T19:36:20.791Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -384,7 +384,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
-    "updatedAt": "2026-08-02T19:36:13.273Z",
+    "updatedAt": "2026-08-02T19:36:20.653Z",
     "uatNotes": "UAT required (Fork/Handoff modal Project select + CommandDeck grouping are explicit dashboard-UI acceptance criteria). Built/ran the workspace's own isolated Docker stack; workspace API confirms buildCommit=4ebc214d617b9799a398780d76665c2a7c157420 (matches HEAD) buildDirty=false, after working around an orthogonal pre-existing bug (unrelated to this PR): src/lib/cliproxy.ts's watchdog crashes any peer-dashboard container lacking a cliproxy binary via an unhandled child-process 'error' event -- worked around with an ephemeral container-runtime pid-file stub, no code/config edited. Could not exercise the browser: Playwright MCP (configured for this role) never connected in this session, and the claude-in-chrome fallback reports the extension is not connected. No Fork/Handoff modal or CommandDeck grouping acceptance criterion was proven end-to-end. Recommend retrying UAT in a session with a reachable browser tool; separately consider filing the cliproxy watchdog crash, since it will block every future workspace-container UAT until fixed.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -592,7 +592,7 @@
       },
       "costAtCloseOut": {
         "usd": 400.8807573,
-        "pricingAsOf": "2026-08-02T19:36:13.363Z"
+        "pricingAsOf": "2026-08-02T19:36:20.776Z"
       }
     },
     "merges": [
