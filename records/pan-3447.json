@@ -302,7 +302,7 @@
     "recordedAt": "2026-08-02T10:30:36.339Z"
   },
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T13:19:06.062Z",
+  "updated": "2026-08-02T13:19:08.026Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "passed",
@@ -310,11 +310,11 @@
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "merged",
-    "mergeStep": "post-merge-cleanup",
+    "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T10:32:41.836Z",
-    "updatedAt": "2026-08-02T13:19:05.998Z",
+    "updatedAt": "2026-08-02T13:19:06.126Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "testNotes": "Skipped: no code changed since pre-review verification gate",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
@@ -499,7 +499,7 @@
       },
       "costAtCloseOut": {
         "usd": 394.941166,
-        "pricingAsOf": "2026-08-02T13:19:06.013Z"
+        "pricingAsOf": "2026-08-02T13:19:08.017Z"
       }
     },
     "merges": [
@@ -508,7 +508,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3447",
