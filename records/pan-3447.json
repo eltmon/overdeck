@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:27:00.556Z",
+  "updated": "2026-08-02T09:33:32.254Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 48,
-    "claims": {
-      "smoke-test": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 1577223,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T09:27:00.556Z"
-      }
-    },
+    "sequence": 49,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -397,6 +389,17 @@
         "outcome": "completed",
         "reason": "Bottom strip now draws the real 60-second wired-hook telemetry trace with burst formulas, per-channel rates, aggregate current/peak labels, and live role counts; focused, Confluence, lint, and typecheck gates pass",
         "releasedAt": "2026-08-02T09:26:46.961Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1577223,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:27:00.556Z",
+        "itemId": "smoke-test",
+        "outcome": "completed",
+        "reason": "Canvas smoke coverage now proves null-WebGL fallback, trail compositing, PLAN/MERGE headers, and pointer tooltip picking; isolated Chromium verification passed and exposed/fixed the trace height overlap",
+        "releasedAt": "2026-08-02T09:33:32.253Z"
       }
     ],
     "statusReasons": {
@@ -458,8 +461,8 @@
         "updatedAt": "2026-08-02T09:26:46.961Z"
       },
       "smoke-test": {
-        "reason": "Add full Confluence canvas fallback smoke coverage and isolated browser verification",
-        "updatedAt": "2026-08-02T09:27:00.556Z"
+        "reason": "Canvas smoke coverage now proves null-WebGL fallback, trail compositing, PLAN/MERGE headers, and pointer tooltip picking; isolated Chromium verification passed and exposed/fixed the trace height overlap",
+        "updatedAt": "2026-08-02T09:33:32.253Z"
       }
     }
   },
@@ -524,7 +527,10 @@
     "bottom-strip.bottom-strip.ac2": "completed",
     "bottom-strip.bottom-strip.ac3": "completed",
     "bottom-strip.bottom-strip.ac4": "completed",
-    "smoke-test": "running"
+    "smoke-test": "completed",
+    "smoke-test.smoke-test.ac1": "completed",
+    "smoke-test.smoke-test.ac2": "completed",
+    "smoke-test.smoke-test.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
