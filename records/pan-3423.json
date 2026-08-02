@@ -210,7 +210,7 @@
     "recordedAt": "2026-08-02T21:19:44.181Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T22:02:53.559Z",
+  "updated": "2026-08-02T22:06:16.093Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
@@ -221,7 +221,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T21:20:50.385Z",
     "updatedAt": "2026-08-02T22:02:53.398Z",
     "reviewNotes": "All four reviewers passed; prior correctness, accessibility, labeling, duplicate-consumer, and documentation gaps are resolved.",
     "testNotes": "Automated gates FAILED: typecheck passed; lint FAILED at lint:file-size on src/dashboard/server/routes/workspaces/merge-ops.ts (1913 vs 1912 lines) -- file untouched by this PR, root-caused to branch staleness vs origin/main (ratchet compares against live origin/main tip; branch is 2 commits behind, including a fix that shrank that file), needs main-sync/rebase which is out of test-role scope. PAN-3423 scoped tests all pass: 3 files/32 tests (system-health-attention, SystemHealthPill, no-loss). Full frontend suite: 306 files/2986 tests passed. Full root npm test: 60 files/83 tests failed, all identical 'Hook timed out in 5000ms' on setupOverdeckTestDb() under host load ~30 from concurrent agents, none in this PR's scope; in-scope agent-health.test.ts verified in isolation: 12/12 passed. See .pan/test/result.json for full evidence.",
