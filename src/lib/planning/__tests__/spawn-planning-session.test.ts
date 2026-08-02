@@ -23,6 +23,14 @@ describe('buildPlanningPrompt', () => {
     expect(prompt).not.toContain('Child Stories');
   });
 
+  it('defines readiness as static parallel safety instead of the initial DAG frontier', async () => {
+    const prompt = await buildPlanningPrompt(baseIssue, '/tmp/workspace');
+
+    expect(prompt).toContain('never derive it from zero in-degree or the initial frontier');
+    expect(prompt).toContain('incoming `blocks` edges should still be `ready`');
+    expect(prompt).toContain('the DAG controls when it dispatches');
+  });
+
   it('renders child stories section for Rally Features', async () => {
     const featureIssue: PlanningIssue = {
       ...baseIssue,
