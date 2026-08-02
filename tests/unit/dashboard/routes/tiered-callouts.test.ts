@@ -56,7 +56,7 @@ describe('handleTieredCallout', () => {
     expect(d.deliverSupervisorReview).toHaveBeenCalledWith(expect.objectContaining({
       issueId: 'PAN-2222',
       sha: 'abcdef1234567890',
-      taskId: 'task-1',
+      itemId: 'task-1',
       item: ITEM,
       workspacePath: '/tmp/workspace',
     }));
