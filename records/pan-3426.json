@@ -172,6 +172,11 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-02T18:44:15.471Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-02T18:51:22.757Z"
     }
   ],
   "feedback": [],
@@ -217,7 +222,7 @@
     "recordedAt": "2026-08-02T18:21:43.270Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:45:48.372Z",
+  "updated": "2026-08-02T18:51:22.758Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "failed",
