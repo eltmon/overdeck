@@ -143,40 +143,13 @@
 .confluence-tooltip > strong { color: var(--gv-blue); font: 700 14px var(--gv-font-mono); }
 .confluence-tooltip-title { color: var(--gv-text-secondary); font-size: 11px; }
 .confluence-tooltip-chips { display: flex; gap: 5px; flex-wrap: wrap; margin: 3px 0; }
-.confluence-tooltip-chips b,
-.confluence-rail-chips span { padding: 2px 7px; border: 1px solid rgba(0, 212, 255, .35); border-radius: 999px; color: var(--gv-text-primary); font: 9px var(--gv-font-mono); }
+.confluence-tooltip-chips b { padding: 2px 7px; border: 1px solid rgba(0, 212, 255, .35); border-radius: 999px; color: var(--gv-text-primary); font: 9px var(--gv-font-mono); }
 .confluence-tooltip-row,
 .confluence-tooltip-convoy { display: flex; justify-content: space-between; gap: 12px; color: var(--gv-text-secondary); font: 10px var(--gv-font-mono); }
 .confluence-tooltip-row b,
 .confluence-tooltip-convoy b { max-width: 175px; overflow: hidden; color: var(--gv-text-primary); font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .confluence-tooltip-convoy { margin-top: 2px; padding-top: 5px; border-top: 1px solid var(--gv-border); }
 .confluence-tooltip small { margin-top: 4px; color: var(--gv-text-dim); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
-
-.confluence-issue-rail {
-  position: absolute;
-  z-index: 30;
-  top: 0;
-  bottom: 0;
-  left: 0;
-  width: min(390px, 88%);
-  padding: 16px;
-  border-right: 1px solid rgba(0, 212, 255, .2);
-  background: rgba(11, 15, 27, .94);
-  transform: translateX(-102%);
-  transition: transform .35s cubic-bezier(.22, 1, .36, 1);
-}
-
-.confluence-issue-rail.open { transform: translateX(0); }
-.confluence-issue-rail header { display: flex; align-items: center; }
-.confluence-issue-rail header strong { color: var(--gv-blue); font: 700 16px var(--gv-font-mono); }
-.confluence-issue-rail button,
-.confluence-help button { margin-left: auto; width: 28px; height: 28px; border: 1px solid var(--gv-border); border-radius: 8px; color: var(--gv-text-secondary); background: transparent; cursor: pointer; }
-.confluence-issue-rail p { margin-top: 10px; color: var(--gv-text-secondary); font-size: 11px; line-height: 1.4; }
-.confluence-rail-chips { display: flex; gap: 5px; margin-top: 10px; }
-.confluence-issue-rail dl { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 14px; }
-.confluence-issue-rail dl > div { padding: 8px; border: 1px solid var(--gv-border); border-radius: 8px; }
-.confluence-issue-rail dt { color: var(--gv-text-dim); font-size: 9px; text-transform: uppercase; }
-.confluence-issue-rail dd { margin-top: 3px; color: var(--gv-text-primary); font: 11px var(--gv-font-mono); }
 
 .confluence-bottom {
   position: relative;
@@ -214,6 +187,7 @@
 
 .confluence-help > div { width: min(680px, 92%); padding: 22px 26px; border: 1px solid rgba(0, 212, 255, .28); border-radius: 18px; background: rgba(13, 18, 32, .96); box-shadow: 0 20px 80px rgba(0, 0, 0, .7); }
 .confluence-help header { display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--gv-border); }
+.confluence-help button { margin-left: auto; width: 28px; height: 28px; border: 1px solid var(--gv-border); border-radius: 8px; color: var(--gv-text-secondary); background: transparent; cursor: pointer; }
 .confluence-help strong { color: var(--gv-blue); letter-spacing: .1em; }
 .confluence-help p { margin-top: 12px; color: var(--gv-text-secondary); font-size: 11px; line-height: 1.55; }
 

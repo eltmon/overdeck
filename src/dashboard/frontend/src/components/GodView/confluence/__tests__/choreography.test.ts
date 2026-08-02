@@ -147,7 +147,14 @@ describe('Confluence choreography dispatch table', () => {
   });
 
   it('contains no wall-clock choreography timers or simulator schedule fields', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts'), 'utf8');
+    const root = process.cwd();
+    const frontend = root.endsWith('/src/dashboard/frontend')
+      ? root
+      : resolve(root, 'src/dashboard/frontend');
+    const source = readFileSync(
+      resolve(frontend, 'src/components/GodView/confluence/useConfluenceChoreography.ts'),
+      'utf8',
+    );
     expect(source).not.toMatch(/setTimeout|setInterval|nextTransition|nextTide|nextThaw/);
   });
 });

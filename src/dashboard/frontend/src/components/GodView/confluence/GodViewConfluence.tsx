@@ -16,15 +16,19 @@ interface HoverState {
   canvasWidth: number;
 }
 
+export function navigateToConfluenceIssue(issueId: string): void {
+  const path = `/issues/${encodeURIComponent(issueId)}`;
+  if (window.location.pathname !== path) window.history.pushState({}, '', path);
+  window.dispatchEvent(new PopStateEvent('popstate'));
+}
+
 export function GodViewConfluence() {
   const rootRef = useRef<HTMLDivElement>(null);
   const effectsRef = useRef<RiverEffectsApi>(null);
   const { orbs, hookStream, meta } = useConfluenceData();
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const [hover, setHover] = useState<HoverState | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
-  const selected = useMemo(() => orbs.find((orb) => orb.id === selectedId) ?? null, [orbs, selectedId]);
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
 
   const hookCounts = useMemo(() => {
@@ -44,7 +48,6 @@ export function GodViewConfluence() {
         setHelpOpen((open) => !open);
       } else if (event.key === 'Escape') {
         setHelpOpen(false);
-        setSelectedId(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -76,11 +79,12 @@ export function GodViewConfluence() {
             ref={effectsRef}
             orbs={orbs}
             hookStream={hookStream}
-            selectedId={selectedId}
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}
-            onSelect={(orb) => setSelectedId(orb?.id ?? null)}
+            onSelect={(orb) => {
+              if (orb) navigateToConfluenceIssue(orb.id);
+            }}
           />
 
           {hover && (
@@ -91,17 +95,6 @@ export function GodViewConfluence() {
               eventsFired={hookStream.entries.filter((entry) => entry.issueId === hover.orb.id).length}
             />
           )}
-
-          <aside className={`confluence-issue-rail ${selected ? 'open' : ''}`} aria-hidden={!selected}>
-            {selected && (
-              <>
-                <header><strong>{selected.id}</strong><button type="button" onClick={() => setSelectedId(null)} aria-label="Close issue rail">×</button></header>
-                <p>{selected.title}</p>
-                <div className="confluence-rail-chips"><span>{selected.stage}</span><span>{selected.role}</span><span>{selected.state}</span></div>
-                <dl><div><dt>Model</dt><dd>{selected.model ?? '—'}</dd></div><div><dt>Spend</dt><dd>${selected.spend.toFixed(2)}</dd></div></dl>
-              </>
-            )}
-          </aside>
 
           <div className="confluence-tag">PIPELINE FLOW · <b>PLAN → WORK → REVIEW → TEST → VERIFY → MERGE</b> · frost = stale · shelf = yielded</div>
           <div className="confluence-hint"><b>h / ?</b> field guide · <b>hover</b> orb · <b>click</b> issue rail · <b>f</b> fullscreen</div>
