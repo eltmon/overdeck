@@ -90,6 +90,8 @@ describe('strikeCommand', () => {
     expect(prompt).toContain('/tmp/feature-pan-1234-strike');
     expect(prompt).not.toMatch(/merge fast-forward/);
     expect(prompt).not.toMatch(/push\s+origin\s+main/);
+    expect(prompt).not.toContain('git rebase origin/main');
+    expect(prompt).toContain('pan sync-main PAN-1234');
     expect(prompt).toContain('git push origin strike/pan-1234');
     expect(prompt).toContain('pan strike-ready PAN-1234');
     expect(prompt).not.toContain('pan tell flywheel-orchestrator');
