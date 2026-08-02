@@ -247,7 +247,7 @@
     "recordedAt": "2026-08-02T10:30:36.339Z"
   },
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T11:27:03.587Z",
+  "updated": "2026-08-02T11:27:09.413Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "reviewing",
@@ -258,7 +258,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T10:32:41.836Z",
-    "updatedAt": "2026-08-02T11:27:01.606Z",
+    "updatedAt": "2026-08-02T11:27:09.239Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "Verified against mockup design/style-guide/mockups/god-view-confluence.html. AC1: draw() order matches the mockup 1:1 (trail -> drawRiver, drawZones, drawPortal, drawSun, trail composite, gateFlashes, convoys, orbs, particles, pulses, tickers, tide, stageHeaders, constellation, sequencer = mockup:1168-1186), and drawRiver's internal order matches mockup:1228-1280 (flow band -> 2-pass stage-gradient ribbon -> 3 cyan sine layers -> scrolling chevrons -> separators + gate chevrons); six STAGES columns with headers present. AC2: role core + glyph + project ring + heat glow all drawn; satellites use circular orbits (the PRD's deliberate reconciliation (b), drafts/pan-3447.md:120), S/C/P/R/Sigma letters, and the arrival spiral decays at exactly 36 px/s to base orbit as specified at drafts/pan-3447.md:99; shelf/doldrums/wreck/sun/sequencer/constellation branches all present. AC3: waiting = rotating dashed amber ring while warn = static dashed amber ring, exactly the FR-21 distinction (drafts/pan-3447.md:134); thinking white inner arc, compaction contraction + orange ring, broken red flicker + error sparks + tag, cost dollar() particles fired on spend delta captured before Object.assign. AC4: all nine effects methods are thin wrappers over the engine api; every particle push site (burst/frostMotes/snow/dollar) is guarded by PARTICLE_LIMIT 1600 with no unguarded path, and dpr = Math.min(devicePixelRatio, 2). AC5: the 'Agent scan moved' placeholder is gone and GodViewConfluence mounts; ResizeObserver -> resize() recomputes layout and calls anchorAll() so every orb is re-anchored. Imports verified present: pickOrb/advanceFrostAccrual/positionOrb (model.ts:222,268,166), createAurora (aurora.ts:77), HOOK_INVENTORY (packages/contracts/src/hook-inventory.ts:14). MINOR FIDELITY NOTE (non-blocking): the separator gate chevrons at RiverCanvas.tsx:409-414 omit the mockup's explicit fx.lineWidth = 1.5, so they inherit 0.9 from the last sine layer and render thinner than the reference.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3481",
@@ -441,7 +441,7 @@
       },
       "costAtCloseOut": {
         "usd": 384.555942,
-        "pricingAsOf": "2026-08-02T11:27:02.407Z"
+        "pricingAsOf": "2026-08-02T11:27:09.317Z"
       }
     },
     "merges": [
