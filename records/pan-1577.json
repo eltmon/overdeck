@@ -627,11 +627,16 @@
       "reason": "feedback",
       "note": "[2026-08-02T17:18Z] review-agent → FAILED — seq 14",
       "timestamp": "2026-08-02T17:18:34.249Z"
+    },
+    {
+      "timestamp": "2026-08-02T17:29:01.018Z",
+      "reason": "end",
+      "note": "Fixed slash-commands drift and baselined pre-existing stall-sweeper circular dependency"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:29:00.173Z",
+  "updated": "2026-08-02T17:29:01.019Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
