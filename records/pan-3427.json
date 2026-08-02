@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:16:15.958Z",
+  "updated": "2026-08-02T17:16:46.618Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -48,8 +48,16 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "routes-project-param": {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 2469918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:16:46.618Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -71,6 +79,6 @@
     }
   },
   "statusOverrides": {
-    "routes-project-param": "pending"
+    "routes-project-param": "running"
   }
 }
