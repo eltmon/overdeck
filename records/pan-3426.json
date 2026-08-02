@@ -20,17 +20,51 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/orders.ts",
+      "src/lib/orders/types.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/cli/commands/flywheel-orders.ts",
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/services/issue-service-singleton.ts",
+      "src/lib/orders/resolver.ts",
+      "tests/unit/cli/flywheel-orders.test.ts",
+      "tests/unit/lib/orders/orders-validate.test.ts"
+    ],
+    "declaredScope": [
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/flywheel-orders.ts",
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/services/issue-service-singleton.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/validate.ts",
+      "tests/unit/cli/flywheel-orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts",
+      "tests/unit/lib/orders/orders-validate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/orders.ts",
+      "src/lib/orders/types.ts",
+      "src/lib/orders/validate.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts"
+    ],
+    "recordedAt": "2026-08-02T17:30:49.499Z"
+  },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:53.258Z",
+  "updated": "2026-08-02T17:30:55.473Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:30:53.256Z",
+    "updatedAt": "2026-08-02T17:30:55.113Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
     "reviewRequestedAt": "2026-08-02T17:30:53.256Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -64,19 +98,50 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T17:30:49.499Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3495"
+    }
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {},
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 7762,
+            "output": 2737,
+            "cacheRead": 64,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 619,
+            "output": 20993,
+            "cacheRead": 12446478,
+            "cacheWrite": 489862
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 7762,
+          "output": 2737,
+          "cacheRead": 64,
+          "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 619,
+          "output": 20993,
+          "cacheRead": 12446478,
+          "cacheWrite": 489862
+        }
+      },
       "costAtCloseOut": {
-        "usd": 0,
-        "pricingAsOf": "2026-08-02T02:50:59.299Z"
+        "usd": 1.9840164,
+        "pricingAsOf": "2026-08-02T17:30:55.140Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3495"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -177,38 +242,5 @@
     "docs-order-books-cli-start": "completed",
     "docs-order-books-cli-start.docs-order-books-cli-start.ac1": "completed",
     "docs-order-books-cli-start.docs-order-books-cli-start.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "src/cli/commands/orders.ts",
-      "src/lib/orders/types.ts"
-    ],
-    "declaredScopeUntouched": [
-      "src/cli/commands/flywheel-orders.ts",
-      "src/cli/commands/flywheel.ts",
-      "src/dashboard/server/services/issue-service-singleton.ts",
-      "src/lib/orders/resolver.ts",
-      "tests/unit/cli/flywheel-orders.test.ts",
-      "tests/unit/lib/orders/orders-validate.test.ts"
-    ],
-    "declaredScope": [
-      "docs/ORDER-BOOKS.md",
-      "src/cli/commands/flywheel-orders.ts",
-      "src/cli/commands/flywheel.ts",
-      "src/dashboard/server/services/issue-service-singleton.ts",
-      "src/lib/orders/resolver.ts",
-      "src/lib/orders/validate.ts",
-      "tests/unit/cli/flywheel-orders.test.ts",
-      "tests/unit/lib/orders/orders-resolver.test.ts",
-      "tests/unit/lib/orders/orders-validate.test.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/ORDER-BOOKS.md",
-      "src/cli/commands/orders.ts",
-      "src/lib/orders/types.ts",
-      "src/lib/orders/validate.ts",
-      "tests/unit/lib/orders/orders-resolver.test.ts"
-    ],
-    "recordedAt": "2026-08-02T17:30:49.499Z"
   }
 }
