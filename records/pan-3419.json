@@ -238,18 +238,18 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T14:28:10.360Z",
+  "updated": "2026-08-02T14:28:16.537Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T14:00:25.902Z",
-    "updatedAt": "2026-08-02T14:28:09.323Z",
+    "updatedAt": "2026-08-02T14:28:16.526Z",
     "reviewNotes": "All four reviewers passed; cycle-4 merge delta is clean and all 14 manifest claims remain satisfied.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
@@ -341,24 +341,6 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-02T13:58:11.859Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b"
-      }
     }
   },
   "closeOut": {
@@ -366,9 +348,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 18751808,
-            "output": 128779,
-            "cacheRead": 38577664,
+            "input": 18799590,
+            "output": 131015,
+            "cacheRead": 39187968,
             "cacheWrite": 0
           }
         },
@@ -415,15 +397,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 31064622,
-          "output": 451483,
-          "cacheRead": 194784768,
+          "input": 31112404,
+          "output": 453719,
+          "cacheRead": 195395072,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 266.259984,
-        "pricingAsOf": "2026-08-02T14:28:09.400Z"
+        "usd": 266.871126,
+        "pricingAsOf": "2026-08-02T14:28:16.531Z"
       }
     },
     "merges": [
@@ -432,7 +414,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3419",
