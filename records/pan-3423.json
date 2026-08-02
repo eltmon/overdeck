@@ -128,7 +128,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:39:48.771Z",
+  "updated": "2026-08-02T20:39:51.759Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -138,9 +138,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:39:48.724Z",
+    "updatedAt": "2026-08-02T20:39:49.049Z",
     "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
-    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
       "sha": "d28b8893d9eba336166570587a15114995062a16",
       "detectedAt": "2026-08-02T19:29:34.891Z",
@@ -281,7 +280,7 @@
       },
       "costAtCloseOut": {
         "usd": 114.3142773,
-        "pricingAsOf": "2026-08-02T20:39:48.764Z"
+        "pricingAsOf": "2026-08-02T20:39:51.752Z"
       }
     },
     "merges": [
