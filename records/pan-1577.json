@@ -636,7 +636,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:29:05.118Z",
+  "updated": "2026-08-02T17:29:13.955Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
@@ -722,10 +722,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2130,
-            "output": 422017,
-            "cacheRead": 467656484,
-            "cacheWrite": 23574170
+            "input": 2132,
+            "output": 422202,
+            "cacheRead": 468225510,
+            "cacheWrite": 23575908
           }
         }
       },
@@ -749,15 +749,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2130,
-          "output": 422017,
-          "cacheRead": 467656484,
-          "cacheWrite": 23574170
+          "input": 2132,
+          "output": 422202,
+          "cacheRead": 468225510,
+          "cacheWrite": 23575908
         }
       },
       "costAtCloseOut": {
-        "usd": 298.4347363,
-        "pricingAsOf": "2026-08-02T17:29:05.024Z"
+        "usd": 298.5547403,
+        "pricingAsOf": "2026-08-02T17:29:06.603Z"
       }
     },
     "merges": [
@@ -948,5 +948,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
