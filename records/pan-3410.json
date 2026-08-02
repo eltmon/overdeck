@@ -89,7 +89,8 @@
       "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
       "src/dashboard/frontend/src/components/Stage/stage.module.css",
       "src/dashboard/frontend/src/components/chat/ContextWindowMeter.module.css",
-      "src/dashboard/frontend/src/components/styles/decisions.module.css"
+      "src/dashboard/frontend/src/components/styles/decisions.module.css",
+      "tests/lib/settings-api.test.ts"
     ],
     "declaredScopeUntouched": [],
     "declaredScope": [
@@ -168,12 +169,13 @@
       "src/lib/settings-api.ts",
       "sync-sources/dev-skills/pan-style-guide/SKILL.md",
       "tests/e2e/styleguide-conformance.spec.ts",
+      "tests/lib/settings-api.test.ts",
       "tests/unit/dashboard/fonts-local.test.ts"
     ],
-    "recordedAt": "2026-08-02T04:56:38.778Z"
+    "recordedAt": "2026-08-02T07:11:01.048Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T07:10:57.739Z",
+  "updated": "2026-08-02T07:11:01.050Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "reviewing",
