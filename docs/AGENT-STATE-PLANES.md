@@ -256,6 +256,26 @@ rule in `scripts/lint-state-writes.sh` enforces the boundary around
 table row that is stopped with no live tmux session overrides a newer
 running/starting event projection; a live tmux session still wins.
 
+### Stopped but session-alive (PAN-3338)
+
+`status` in the agents table is the durable record — written at finalize or
+stop, never inferred from process liveness. `hasLiveTmuxSession` is the
+liveness signal, sourced from the tmux oracle below. The read model must agree
+with the durable record; the single resolver for whether a stopped-but-alive
+agent gets rewritten back to `running` is `shouldResurrectStoppedAgent()` in
+`src/dashboard/server/services/agent-enrichment-service.ts`.
+
+Interactive roles — `plan` agents and `conv-*` conversation sessions — are
+exempt. For them, sitting stopped with a live tmux session is the deliberate
+post-completion steady state: a planning session that finalized with
+`skipKill` stays alive so the operator can inspect it, and a conversation sits
+idle at a live prompt between turns. `shouldResurrectStoppedAgent()` never
+rewrites these back to `running`; the shared predicate is
+`isInteractiveRoleAgent()` in `src/lib/agent-enrichment.ts`. Every other role
+(work, review, test, ship) keeps the PAN-1419 crash-recovery reconcile
+unchanged: a stopped-but-tmux-alive agent there is a transitional state
+following a crash or restart, and the poller rewrites it to `running`.
+
 ## Liveness oracle — tmux
 
 A session on the `overdeck` tmux socket is the physical liveness authority.

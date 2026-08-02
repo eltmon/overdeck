@@ -14,7 +14,7 @@
 
 import { Effect } from 'effect'
 import { listRunningAgents, type AgentState } from '../../../lib/agents.js'
-import { computeAgentEnrichment, getAgentJsonlMtime, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
+import { computeAgentEnrichment, getAgentJsonlMtime, isInteractiveRoleAgent, type AgentEnrichment, type PendingInputsScan } from '../../../lib/agent-enrichment.js'
 import { getReviewStatusSync } from '../../../lib/review-status.js'
 import { withConcurrencyLimit } from '../../../lib/concurrency.js'
 import { getRuntimeCensus, type RuntimeCensus } from '../../../lib/runtime-census.js'
@@ -109,6 +109,22 @@ export function shouldSkipEnrichmentCycle(census: Pick<RuntimeCensus, 'tmuxAvail
   return !census.tmuxAvailable
 }
 
+/**
+ * PAN-3338 — should the poller rewrite this stopped agent to 'running' on tmux
+ * liveness alone? For interactive roles the durable stopped status is the
+ * deliberate post-completion state, so it must stand; other roles keep the
+ * PAN-1419 crash-recovery reconcile.
+ */
+export function shouldResurrectStoppedAgent(
+  agentId: string,
+  role: string | undefined,
+  status: string,
+  tmuxActive: boolean,
+): boolean {
+  if (!tmuxActive || status !== 'stopped') return false
+  return !isInteractiveRoleAgent(agentId, role)
+}
+
 export function hasReapablePendingInput(enrichment: AgentEnrichment): boolean {
   return (
     enrichment.pendingInputCount > 0 ||
@@ -193,7 +209,7 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
                 workspace: agent.workspace || undefined,
                 runtime: undefined,
                 model: agent.model || undefined,
-                status: toAgentStatus(agent.tmuxActive && agent.status === 'stopped' ? 'running' : agent.status),
+                status: toAgentStatus(shouldResurrectStoppedAgent(agentId, agent.role, agent.status, agent.tmuxActive) ? 'running' : agent.status),
                 startedAt: agent.startedAt || undefined,
                 lastActivity: agent.lastActivity || undefined,
                 branch: agent.branch || undefined,
@@ -220,7 +236,10 @@ async function pollOnce(state: EnrichmentServiceState): Promise<void> {
 
       // Reconcile stale status: if tmux is active but state.json says stopped,
       // emit a status_changed event so the read model corrects to 'running'.
-      if (agent.tmuxActive && agent.status === 'stopped' && !state.reconciledAgentIds.has(agentId)) {
+      // Interactive roles (plan, conv-*) are exempt — for them, stopped-but-
+      // session-alive is the deliberate post-completion steady state (skipKill
+      // finalize, idle conversations), not staleness (PAN-3338).
+      if (shouldResurrectStoppedAgent(agentId, agent.role, agent.status, agent.tmuxActive) && !state.reconciledAgentIds.has(agentId)) {
         state.reconciledAgentIds.add(agentId)
         try {
           const statusEvent: Omit<AgentStatusChangedEvent, 'sequence'> = {
