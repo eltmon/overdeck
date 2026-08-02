@@ -169,6 +169,25 @@ describe('syncMainIntoWorkspace polyrepo support', () => {
     ]);
   });
 
+  it('merge-syncs main into a strike branch without rebasing or changing branches', async () => {
+    const repo = createTestRepo(root, 'overdeck');
+    git(repo.workspace, 'branch', '-m', 'strike/pan-3440');
+    writeFileSync(join(repo.workspace, 'strike.txt'), 'strike work\n');
+    git(repo.workspace, 'add', 'strike.txt');
+    git(repo.workspace, 'commit', '-q', '-m', 'strike work');
+    advanceMain(repo, 'upstream');
+    repoRootsMock.mockReturnValue([
+      { repoKey: 'overdeck', dir: repo.workspace, sourceBranch: 'strike/pan-3440', targetBranch: 'main', isPolyrepo: false },
+    ]);
+
+    const result = await syncMainIntoWorkspace(repo.workspace, 'PAN-3440');
+
+    expect(result).toMatchObject({ success: true, commitCount: 2, changedFiles: ['value.txt'] });
+    expect(git(repo.workspace, 'branch', '--show-current')).toBe('strike/pan-3440');
+    expect(git(repo.workspace, 'show', '-s', '--format=%P', 'HEAD').split(' ')).toHaveLength(2);
+    expect(readFileSync(join(repo.workspace, 'strike.txt'), 'utf8')).toBe('strike work\n');
+  });
+
   it('returns the active cancellation and skips unattempted repos', async () => {
     const api = createTestRepo(root, 'api');
     const fe = createTestRepo(root, 'fe');

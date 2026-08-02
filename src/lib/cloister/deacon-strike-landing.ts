@@ -121,7 +121,7 @@ async function handleFailure(issueId: string, head: string, detail: string, proj
   try { mainHead = await deps.getMainHead(projectPath); } catch (error) { detail += `; main HEAD unavailable: ${error instanceof Error ? error.message : String(error)}`; }
   const attempts = [...(status.strikeLandingAttempts ?? []), { timestamp: deps.now(), strikeHead: head, mainHead, outcome: 'failed', detail }];
   const recoveryCount = (status.strikeRecoveryCount ?? 0) + 1;
-  const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nFetch origin, rebase strike/${issueId.toLowerCase()} onto current origin/main, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
+  const recoveryMessage = `Strike landing failed for ${issueId} at ${head}.\n\nCurrent main: ${mainHead}\nFailure: ${detail}\n\nRun pan sync-main ${issueId}, resolve every conflict, rerun the configured gates, push only strike/${issueId.toLowerCase()}, then run pan strike-ready ${issueId}. A fresh pushed HEAD is required before another landing attempt.`;
   if (!NON_ACTIONABLE.test(detail) && recoveryCount < 3) {
     try {
       const outcome = await deps.deliverRecovery(`strike-${issueId.toLowerCase()}`, recoveryMessage);

@@ -10,6 +10,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { readLatestSynthesisVerdict } from './synthesis-verdict.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -569,6 +570,31 @@ async function reconcileReviewStatusOrphan(
       return actions;
     }
     if (!hasPassedReview) {
+      // RACE GUARD (PAN-1577 loop, 2026-08-02): consult the synthesis artifact
+      // of record before declaring this review dead. A just-finished convoy's
+      // synthesis.md lands on disk before the history entry syncs into the
+      // row; resetting here wiped APPROVED verdicts five times in one evening.
+      const artifact = readLatestSynthesisVerdict(issueId);
+      if (artifact?.verdict === 'passed') {
+        const artifactUpdate: Record<string, unknown> = {
+          reviewStatus: 'passed',
+          reviewNotes: artifact.notes,
+          reviewRetryCount: 0,
+          recoveryStartedAt: undefined,
+          ...(artifact.headSha ? { reviewedAtCommit: artifact.headSha } : {}),
+        };
+        if (status.stuckReason === 'review_infrastructure_failure') {
+          artifactUpdate['stuck'] = false;
+          artifactUpdate['stuckReason'] = undefined;
+          artifactUpdate['stuckAt'] = undefined;
+          artifactUpdate['stuckDetails'] = undefined;
+        }
+        setReviewStatusSync(issueId, artifactUpdate);
+        actions.push(
+          `Restored orphaned review verdict for ${issueId} from the synthesis artifact (race guard — history sync had not landed)`,
+        );
+        return actions;
+      }
       const nextRetry = (status.reviewRetryCount ?? 0) + 1;
       const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
       setReviewStatusSync(issueId, {

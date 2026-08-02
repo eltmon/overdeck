@@ -157,7 +157,6 @@ export async function handleTieredCallout(
       issueId: callout.issueId,
       item,
       sha: callout.sha,
-      taskId: callout.taskId,
     };
   }
 

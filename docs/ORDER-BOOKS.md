@@ -70,10 +70,13 @@ draft → ready → running → drained → complete → next ready book
 
 ## Validation before start
 
+Before validation, the shared Flywheel order-start resolver used by both `pan orders start <id>` and `pan flywheel start --orders <id>` calls `ensureOrderIssueStore()`. It initializes the shared issue service with `skipPolling: true`, loading the existing issue cache without making tracker API calls or starting a polling loop. The cache is not refreshed during the start operation.
+
 `validateBookForStart()` returns separate `blocks` and `warns` arrays. Start refuses a book with any block and names every finding.
 
 Validation blocks when:
 
+- the order issue store is unavailable or empty;
 - an item is closed or cannot be resolved as open;
 - an issue belongs to another non-complete book;
 - a prerequisite cannot be resolved;
@@ -82,7 +85,7 @@ Validation blocks when:
 
 A Lane B item with `planAtPickup: true` converts the missing-PRD finding to a warning. Warnings remain visible but do not disable **Queue book** or **Start run**.
 
-The dashboard route `POST /api/orders/:id/start` and the CLI start path use the same validator and Flywheel start function.
+The dashboard route `POST /api/orders/:id/start` and both CLI start commands use the same asynchronous order-start resolver, issue-store prime, validator, and Flywheel start function. If the shared issue service did not start or its cache contains no issues, validation emits one `issue-store-unavailable` block and omits the misleading per-issue `issue-not-open` and `unresolved-prerequisite` findings. Run `pan up` once to populate the shared issue cache, then retry the start command.
 
 ## Dispatch enforcement
 

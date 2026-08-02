@@ -1,8 +1,16 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ensureOrderIssueStore } from '../../../../src/lib/orders/resolver.js';
 import { createOrderPrdLookup, validateBookForStart } from '../../../../src/lib/orders/validate.js';
+import { getSharedIssueService } from '../../../../src/dashboard/server/services/issue-service-singleton.js';
+
+vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
+  getSharedIssueService: vi.fn(),
+  startSharedIssueService: vi.fn(),
+  isSharedIssueServiceStarted: vi.fn(),
+}));
 
 const roots: string[] = [];
 const at = '2026-07-17T12:00:00.000Z';
@@ -65,6 +73,75 @@ describe('order book start validation', () => {
     expect(validateBookForStart(root, book([]), { issueLookup: () => new Map() }).blocks).toEqual([
       expect.objectContaining({ code: 'empty-book' }),
     ]);
+  });
+
+  it('reports one unavailable-store block, suppresses store-dependent noise, and retains other checks', () => {
+    const root = fixtureRoot();
+    writeOtherBook(root, book([item('PAN-1', 'A')], '2026-07-17-other'));
+    const value = book([
+      item('PAN-1', 'A', ['PAN-2', 'PAN-404']),
+      item('PAN-2', 'B', ['PAN-1']),
+    ]);
+
+    const result = validateBookForStart(root, value, {
+      storeStatus: () => ({ started: false, issueCount: 2 }),
+      hasPrd: () => false,
+    });
+    const codes = result.blocks.map((finding) => finding.code);
+
+    expect(codes.filter((code) => code === 'issue-store-unavailable')).toHaveLength(1);
+    expect(codes).not.toContain('issue-not-open');
+    expect(codes).not.toContain('unresolved-prerequisite');
+    expect(codes).toEqual(expect.arrayContaining([
+      'duplicate-membership',
+      'prerequisite-cycle',
+      'missing-prd',
+    ]));
+  });
+
+  it('treats a started but empty store as unavailable', () => {
+    const root = fixtureRoot();
+    const result = validateBookForStart(root, book([item('PAN-1', 'A')]), {
+      storeStatus: () => ({ started: true, issueCount: 0 }),
+      hasPrd: () => true,
+    });
+
+    expect(result.blocks).toEqual([
+      expect.objectContaining({ code: 'issue-store-unavailable', issue: '2026-07-17-campaign' }),
+    ]);
+  });
+
+  it('reports genuinely missing issues when the default lookup has a populated store', async () => {
+    const root = fixtureRoot();
+    await ensureOrderIssueStore();
+    vi.mocked(getSharedIssueService).mockReturnValue({
+      getIssues: vi.fn(() => []),
+    } as never);
+
+    const result = validateBookForStart(root, book([item('PAN-1', 'A', ['PAN-404'])]), {
+      storeStatus: () => ({ started: true, issueCount: 10 }),
+      hasPrd: () => true,
+    });
+
+    expect(result.blocks.map((finding) => finding.code)).toEqual([
+      'issue-not-open',
+      'unresolved-prerequisite',
+    ]);
+  });
+
+  it('does not probe store status when an issue lookup is injected', () => {
+    const root = fixtureRoot();
+    const storeStatus = vi.fn(() => ({ started: false, issueCount: 0 }));
+    const issueLookup = () => new Map([
+      ['PAN-1', { issue: 'PAN-1', open: true, parked: false }],
+    ]);
+
+    expect(validateBookForStart(root, book([item('PAN-1', 'A')]), {
+      issueLookup,
+      storeStatus,
+      hasPrd: () => true,
+    }).blocks).toEqual([]);
+    expect(storeStatus).not.toHaveBeenCalled();
   });
 
   it('reports closed issues, cross-book duplicates, unresolved prerequisites, cycles, and missing Lane B PRDs', () => {

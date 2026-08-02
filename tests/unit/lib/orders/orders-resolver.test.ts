@@ -9,6 +9,11 @@ import {
   ensureOrderIssueStore,
   orderIssueStoreStatus,
 } from '../../../../src/lib/orders/resolver.js';
+import {
+  getSharedIssueService,
+  isSharedIssueServiceStarted,
+  startSharedIssueService,
+} from '../../../../src/dashboard/server/services/issue-service-singleton.js';
 
 vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),
@@ -116,5 +121,34 @@ describe('orders resolver', () => {
     const progress = computeBookProgress(value, lookup(true));
     expect(progress.drained).toBe(true);
     expect(progress.landed).toBe(1);
+  });
+
+  describe('ensureOrderIssueStore', () => {
+    it('starts the shared issue service without polling', async () => {
+      await ensureOrderIssueStore();
+
+      expect(startSharedIssueService).toHaveBeenCalledWith({ skipPolling: true });
+    });
+  });
+
+  describe('orderIssueStoreStatus', () => {
+    it('reports the shared service start state and issue count', async () => {
+      await ensureOrderIssueStore();
+      vi.mocked(isSharedIssueServiceStarted).mockReturnValue(true);
+      vi.mocked(getSharedIssueService).mockReturnValue({
+        getIssues: vi.fn(() => [{ identifier: 'PAN-1' }, { identifier: 'PAN-2' }]),
+      } as never);
+
+      expect(orderIssueStoreStatus()).toEqual({ started: true, issueCount: 2 });
+    });
+
+    it('falls back to unavailable when the shared service throws', async () => {
+      await ensureOrderIssueStore();
+      vi.mocked(isSharedIssueServiceStarted).mockImplementation(() => {
+        throw new Error('service unavailable');
+      });
+
+      expect(orderIssueStoreStatus()).toEqual({ started: false, issueCount: 0 });
+    });
   });
 });

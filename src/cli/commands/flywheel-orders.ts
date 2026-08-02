@@ -3,7 +3,7 @@ import type { OrderBook } from '@overdeck/contracts';
 
 import { abortSpawnedFlywheel } from '../../lib/cloister/flywheel.js';
 import { requireFlywheelBrief } from '../../lib/flywheel-start.js';
-import { getBook } from '../../lib/orders/resolver.js';
+import { ensureOrderIssueStore, getBook } from '../../lib/orders/resolver.js';
 import { validateBookForStart } from '../../lib/orders/validate.js';
 import { setStatus as setOrderBookStatus } from '../../lib/orders/writer.js';
 import { findProjectByPathSync } from '../../lib/projects.js';
@@ -12,6 +12,7 @@ import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 export interface FlywheelOrderStartDeps {
   orderStateRoot?: (cwd: string) => string;
   getOrderBook?: typeof getBook;
+  prepareIssueStore?: () => Promise<unknown>;
   validateOrderBook?: typeof validateBookForStart;
   setOrderStatus?: typeof setOrderBookStatus;
   requireBrief?: typeof requireFlywheelBrief;
@@ -37,17 +38,18 @@ function validationError(bookId: string, findings: readonly { code: string; issu
   ].join('\n'));
 }
 
-export function resolveFlywheelOrderStart(
+export async function resolveFlywheelOrderStart(
   cwd: string,
   bookId: string,
   deps: FlywheelOrderStartDeps = {},
-): FlywheelOrderStartContext {
+): Promise<FlywheelOrderStartContext> {
   const stateRoot = (deps.orderStateRoot ?? orderStateRootFor)(cwd);
   const book = (deps.getOrderBook ?? getBook)(stateRoot, bookId);
   if (!book) throw new Error(`Order book not found: ${bookId}`);
   if (book.status !== 'ready') {
     throw new Error(`Order book ${book.id} must be ready before start (current status: ${book.status})`);
   }
+  await (deps.prepareIssueStore ?? ensureOrderIssueStore)();
   const validation = (deps.validateOrderBook ?? validateBookForStart)(stateRoot, book);
   if (validation.blocks.length > 0) throw validationError(book.id, validation.blocks);
   return { stateRoot, book };
