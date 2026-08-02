@@ -286,8 +286,9 @@ export function appendCostEventSync(event: CostEvent): void {
  */
 export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
   const events: CostEvent[] = [];
-  const offset = options.offset || 0;
-  const limit = options.limit || undefined;
+  const offset = options.offset ?? 0;
+  const limit = options.limit;
+  const canPageWhileScanning = offset >= 0 && (limit === undefined || limit > 0);
   let matched = 0;
 
   scanEventLinesSync({
@@ -307,17 +308,22 @@ export function readEventsSync(options: ReadEventsOptions = {}): CostEvent[] {
       if (options.startDate && event.ts < options.startDate) return;
       if (options.endDate && event.ts > options.endDate) return;
 
-      if (matched < offset) {
+      if (canPageWhileScanning && matched < offset) {
         matched += 1;
         return;
       }
       events.push(event);
       matched += 1;
-      if (limit !== undefined && events.length >= limit) return false;
+      if (canPageWhileScanning && limit !== undefined && events.length >= limit) return false;
     },
   });
 
-  return events;
+  if (canPageWhileScanning) return events;
+
+  let paged = events;
+  if (options.offset) paged = paged.slice(options.offset);
+  if (options.limit) paged = paged.slice(0, options.limit);
+  return paged;
 }
 
 /**

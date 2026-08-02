@@ -65,6 +65,8 @@ describe('bounded event readers', () => {
       { issueId: 'PAN-1', input: 2000 },
     ]);
     expect(tailEventsSync(2).map((event) => event.issueId)).toEqual(['PAN-2', 'PAN-1']);
+    expect(readEventsSync({ offset: -1 }).map((event) => event.input)).toEqual([2000]);
+    expect(readEventsSync({ limit: -1 }).map((event) => event.issueId)).toEqual(['PAN-1', 'PAN-2']);
   });
 
   it('tracks line and byte cursors across appended events', () => {
