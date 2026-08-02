@@ -222,20 +222,20 @@
     "recordedAt": "2026-08-02T22:06:29.456Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T22:32:36.675Z",
+  "updated": "2026-08-02T22:32:38.799Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T22:32:27.744Z",
+    "updatedAt": "2026-08-02T22:32:29.786Z",
     "reviewNotes": "All four reviewers passed; prior correctness, accessibility, labeling, duplicate-consumer, and documentation gaps are resolved.",
-    "testNotes": "Automated gates on feature/pan-3423 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend guards all clean). npm run lint FAILED at lint:file-size: 'src/dashboard/server/routes/workspaces/merge-ops.ts is 1913 lines (allowed 1912)'. Root-caused: this file is untouched by PAN-3423 (git diff origin/main...HEAD --stat -- merge-ops.ts is empty; last touched by branch at fdcbcad2647, PAN-3328/#3348). origin/main advanced 2 commits past this branch's last main-merge (merge-base 5ac62149c3), including #3509 which shrank merge-ops.ts; the ratchet script compares against the live origin/main tip, so this branch's untouched copy now reads as 'grown' relative to a newer main it hasn't synced. This is branch staleness, not a defect introduced by this PR, but the configured lint gate genuinely fails as run and a main-sync/rebase is outside the test role's boundaries (no edit/commit/merge). Scoped PAN-3423 tests all pass: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention -> 3 files / 32 tests passed. Full frontend suite (src/dashboard/frontend) -> 306 files / 2986 tests passed. Full root-level `npm test` completed: 60 files / 83 tests failed, ALL with the identical signature 'Error: Hook timed out in 5000ms' inside beforeEach(() => odb = setupOverdeckTestDb()) -- a DB-fixture-setup timeout under heavy host contention (load average ~30 from ~17 concurrent Overdeck agents/workspaces on this machine at the time), not an assertion or logic failure, and none of the 60 failing files are in this PR's declared scope (tests/unit/lib/workspaces/*, src/cli/commands/conversations/__tests__/*, etc.). The in-scope file src/lib/agents/__tests__/agent-health.test.ts (FR-3, this PR's server-side change) was verified separately in isolation: 1 file / 12 tests PASSED in 152ms. Top-level status is failed on the lint gate alone, per the configured automated gates (typecheck, lint, test); the lint failure is unrelated to this PR's diff but blocks merge as configured.",
+    "testNotes": "Automated gates FAILED: typecheck passed; lint FAILED at lint:file-size on src/dashboard/server/routes/workspaces/merge-ops.ts (1913 vs 1912 lines) -- file untouched by this PR, root-caused to branch staleness vs origin/main (2 commits behind, including a fix that shrank that file; ratchet compares against live origin/main tip), needs main-sync/rebase out of test-role scope. PAN-3423 scoped tests: 3 files/32 tests passed. Full frontend suite: 306 files/2986 tests passed. Full root npm test: 60 files/83 tests failed, all identical 'Hook timed out in 5000ms' on setupOverdeckTestDb() under host load ~30 from concurrent agents, none in this PR's scope; in-scope agent-health.test.ts verified in isolation: 12/12 passed. See .pan/test/result.json for full evidence.",
     "uatNotes": "UAT executed: built workspace dashboard (npm run build:dashboard), ran it isolated on PORT=3423 with OVERDECK_DISABLE_DEACON=1 (never touched the shared host dashboard on 3011), drove it with an isolated Playwright session. Opened the live SystemHealthPill popover (real Warning-state data) and confirmed: state-badge header + relative updated time; bordered summary line; chip row replacing the old tile grid; all 4 vitals tiles rendering real threshold-colored meter bars incl. swap 'historical - not live pressure' label; grouped xN attention row collapsed with no inline Kill/Open (closed-by-default disclosure only); singleton rows with working Open/Kill wiring (verified via source + aria-labels, not clicked, to avoid killing another agent's live session on this shared host); closed-by-default context-notes disclosure; top-consumers kind badges + proportional bars + 'No leaks' header; Escape closes the popover. LEAKED-tag, healthy all-clear variant, and exact FR-3 message text were not re-observed live (system stayed in Warning state) but are covered by passing unit/component tests. Full evidence and screenshot description in .pan/test/result.json. Cleaned up the port-3423 process and scratch files afterward.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
@@ -375,7 +375,7 @@
       },
       "costAtCloseOut": {
         "usd": 215.1144013,
-        "pricingAsOf": "2026-08-02T22:32:33.637Z"
+        "pricingAsOf": "2026-08-02T22:32:38.793Z"
       }
     },
     "merges": [
