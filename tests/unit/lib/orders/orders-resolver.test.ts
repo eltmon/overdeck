@@ -1,12 +1,20 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   backlogCandidates,
   computeBookProgress,
   membership,
+  ensureOrderIssueStore,
+  orderIssueStoreStatus,
 } from '../../../../src/lib/orders/resolver.js';
+
+vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
+  getSharedIssueService: vi.fn(),
+  startSharedIssueService: vi.fn(),
+  isSharedIssueServiceStarted: vi.fn(),
+}));
 
 const roots: string[] = [];
 const at = '2026-07-17T12:00:00.000Z';

@@ -43,6 +43,7 @@ export const getAgentHealthHistoryRoute = HttpRouter.add(
 //
 // Body shape (discriminated by `kind`):
 //   {kind: "activity",          activity, tool?}
+//   {kind: "hook_fired",        hookName, tool?}
 //   {kind: "thinking_start",    lastToolAt}
 //   {kind: "thinking_stop",     resolvedBy}
 //   {kind: "waiting_start",     reason, message?}
