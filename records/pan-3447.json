@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T06:47:15.703Z",
+  "updated": "2026-08-02T06:57:13.950Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,8 +135,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 27,
-    "claims": {},
+    "sequence": 28,
+    "claims": {
+      "river-canvas": {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 3343697,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T06:57:13.950Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -324,7 +332,8 @@
     "confluence-data.confluence-data.ac1": "completed",
     "confluence-data.confluence-data.ac2": "completed",
     "confluence-data.confluence-data.ac3": "completed",
-    "confluence-data.confluence-data.ac4": "completed"
+    "confluence-data.confluence-data.ac4": "completed",
+    "river-canvas": "running"
   },
   "swarm": {
     "slotAssignments": [],
