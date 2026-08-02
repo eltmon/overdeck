@@ -207,7 +207,7 @@
     "recordedAt": "2026-08-02T18:21:43.270Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:21:52.625Z",
+  "updated": "2026-08-02T18:21:56.791Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -216,7 +216,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T18:21:50.732Z",
+    "updatedAt": "2026-08-02T18:21:52.003Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "testNotes": "npm run typecheck: PASS (root, hooks, evals, dashboard ratchet 55/55, frontend ratchet 0/0). npm run lint: FAIL at lint:slash-commands — packages/contracts/src/composer-commands.generated.ts is missing pan-parked and pan-parked-ack entries present in the live CLI registry (src/cli/commands/parked.ts). Verified via git log/git show that this drift is pre-existing on origin/main (commits 5ba22313a2d, dafc96071f5 added the commands; cc801b13e2d was the last manifest regen, predating them) and is NOT introduced by PAN-3426, whose only touch to parked.ts is an unrelated one-line typecheck fix (project.projectPath -> project.path). npx vitest run tests/unit/lib/orders/orders-validate.test.ts: FAIL — 2/14 tests fail ('blocks an empty book', 'moves only a plan-at-pickup missing-PRD finding to warnings'). Root cause: validateBookForStart() in src/lib/orders/validate.ts calls orderIssueStoreStatus() unconditionally before checking options.issueLookup, so the new store-unavailable block fires even when a test supplies its own issueLookup — contradicting the plan's own autoDecisions[3] ('the store probe applies only when the default lookup is in use') and violating xBRIEF item store-unavailable-finding.ac3 ('existing orders-validate.test.ts suite passes unchanged'). This is a real regression in PAN-3426's declared scope, not environmental. tests/unit/lib/orders/orders-resolver.test.ts and tests/unit/cli/flywheel-orders.test.ts pass (12/12 combined). Verdict: automated gates FAILED on both lint and test.",
     "verificationNotes": "Verification FAILED at typecheck (159485ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3426/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m384.51 kB\u001b[22m \u001b[2m│ gzip: 62.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 384.51 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5896ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m352.79 kB\u001b[22m \u001b[2m│ gzip: 59.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m577.86 kB\u001b[22m \u001b[2m│ gzip: 92.38 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.79 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m6437ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n✓ dashboard-types guard passed (55 known errors; none new)\n\n> @overdeck/core@0.48.0 typecheck:frontend\n> bash scripts/lint-frontend-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `rolldown-plugin-dts:generate`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
@@ -327,10 +327,10 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1329,
-            "output": 39411,
-            "cacheRead": 27612396,
-            "cacheWrite": 2844407
+            "input": 1340,
+            "output": 39644,
+            "cacheRead": 27870770,
+            "cacheWrite": 2845810
           }
         }
       },
@@ -354,15 +354,15 @@
           "cacheWrite": 202085
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1329,
-          "output": 39411,
-          "cacheRead": 27612396,
-          "cacheWrite": 2844407
+          "input": 1340,
+          "output": 39644,
+          "cacheRead": 27870770,
+          "cacheWrite": 2845810
         }
       },
       "costAtCloseOut": {
-        "usd": 51.3615233,
-        "pricingAsOf": "2026-08-02T18:21:52.614Z"
+        "usd": 51.3902903,
+        "pricingAsOf": "2026-08-02T18:21:56.782Z"
       }
     },
     "merges": [
