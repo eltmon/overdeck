@@ -632,40 +632,22 @@
       "timestamp": "2026-08-02T17:29:01.018Z",
       "reason": "end",
       "note": "Fixed slash-commands drift and baselined pre-existing stall-sweeper circular dependency"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T17:29Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-08-02T17:29:43.978Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "claude-sonnet-5",
-      "timestamp": "2026-08-02T17:29:44.220Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T17:29:43Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1577 (attempt 1/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (27984ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m386.77 kB\u001b[22m \u001b[2m│ gzip: 62.47 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 386.77 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5467ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m354.98 kB\u001b[22m \u001b[2m│ gzip: 60.13 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m580.91 kB\u001b[22m \u001b[2m│ gzip: 92.83 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.64 kB\u001b[22m \u001b[2m│ gzip:  5.85 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m817.91 kB\u001b[22m \u001b[2m│ gzip: 79.95 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5938ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/cli/commands/parked.ts(100,45): error TS2339: Property 'projectPath' does not exist on type 'ProjectConfig'.\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (79%)\n  - rolldown-plugin-dts:fake-js (16%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-1577 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-1577 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm `pan show PAN-1577` or `pan review pending` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change."
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:29:44.221Z",
+  "updated": "2026-08-02T17:29:46.623Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:29:04.997Z",
+    "updatedAt": "2026-08-02T17:29:43.962Z",
     "reviewNotes": "Role run agent-pan-1577-review already running. Use 'pan tell' to message it.",
-    "verificationNotes": "Verification FAILED at lint (128176ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(62620 chars elided)…\n0.74 kB\u001b[22m \u001b[2m│ gzip:   2.36 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcodex-app-server-host.d.ts\u001b[22m\u001b[39m                     \u001b[2m  3.16 kB\u001b[22m \u001b[2m│ gzip:   1.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  2.51 kB\u001b[22m \u001b[2m│ gzip:   1.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mverification-worker.d.ts\u001b[22m\u001b[39m                       \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 498 files, total: 17.14 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m7431ms\u001b[39m\n\n> @overdeck/core@0.48\n...(truncated)",
+    "verificationNotes": "Verification FAILED at typecheck (27984ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m386.77 kB\u001b[22m \u001b[2m│ gzip: 62.47 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 386.77 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5467ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m354.98 kB\u001b[22m \u001b[2m│ gzip: 60.13 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m580.91 kB\u001b[22m \u001b[2m│ gzip: 92.83 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.64 kB\u001b[22m \u001b[2m│ gzip:  5.85 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m817.91 kB\u001b[22m \u001b[2m│ gzip: 79.95 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5938ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/cli/commands/parked.ts(100,45): error TS2339: Property 'projectPath' does not exist on type 'ProjectConfig'.\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (79%)\n  - rolldown-plugin-dts:fake-js (16%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "conflictsSince": {
       "sha": "c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae",
       "detectedAt": "2026-08-01T20:18:08.878Z",
@@ -700,9 +682,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7245547,
-            "output": 92128,
-            "cacheRead": 23809536,
+            "input": 7804645,
+            "output": 94348,
+            "cacheRead": 25138688,
             "cacheWrite": 0
           }
         },
@@ -761,9 +743,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18701966,
-          "output": 335111,
-          "cacheRead": 71067648,
+          "input": 19261064,
+          "output": 337331,
+          "cacheRead": 72396800,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -774,8 +756,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 298.5547403,
-        "pricingAsOf": "2026-08-02T17:29:18.701Z"
+        "usd": 302.0814063,
+        "pricingAsOf": "2026-08-02T17:29:44.000Z"
       }
     },
     "merges": [
