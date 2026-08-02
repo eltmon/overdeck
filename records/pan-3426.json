@@ -162,6 +162,11 @@
       "timestamp": "2026-08-02T18:21:49.223Z",
       "reason": "end",
       "note": "Typecheck passes - resetting verification"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T18:22:01.632Z"
     }
   ],
   "feedback": [],
@@ -207,7 +212,7 @@
     "recordedAt": "2026-08-02T18:21:43.270Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:21:56.791Z",
+  "updated": "2026-08-02T18:22:01.680Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -371,7 +376,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 10,
