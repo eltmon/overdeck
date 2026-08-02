@@ -359,18 +359,18 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T18:46:26.138Z",
+  "updated": "2026-08-02T18:46:40.485Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
-    "updatedAt": "2026-08-02T18:44:45.429Z",
+    "updatedAt": "2026-08-02T18:46:40.465Z",
     "reviewNotes": "Approved; cycle delta is clean and the unchanged Windows separator finding remains non-promotable under the cycle-7 convergence gate",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -482,24 +482,6 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-02T18:33:20.845Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
-      }
     }
   },
   "closeOut": {
@@ -507,17 +489,17 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 4369,
-            "output": 600,
+            "input": 5335,
+            "output": 800,
             "cacheRead": 3,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 23878716,
-            "output": 199517,
-            "cacheRead": 60137472,
+            "input": 23883270,
+            "output": 199801,
+            "cacheRead": 60582912,
             "cacheWrite": 0
           }
         },
@@ -572,15 +554,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 4369,
-          "output": 600,
+          "input": 5335,
+          "output": 800,
           "cacheRead": 3,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 45248440,
-          "output": 702389,
-          "cacheRead": 259741696,
+          "input": 45252994,
+          "output": 702673,
+          "cacheRead": 260187136,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -591,8 +573,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 388.8809763,
-        "pricingAsOf": "2026-08-02T18:44:45.546Z"
+        "usd": 389.1369523,
+        "pricingAsOf": "2026-08-02T18:46:40.473Z"
       }
     },
     "merges": [
@@ -601,7 +583,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
