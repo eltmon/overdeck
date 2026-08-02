@@ -262,9 +262,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T18:42:16.349Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:17Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-08-02T19:17:04.857Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T19:17:06.399Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T19:17:04Z",
+      "markdownBody": "# Test failure\n\ntypecheck PASSED (root tsc, hooks, evals, dashboard-types ratchet 57 known/0 new, frontend-types ratchet 0/0). PAN-3419 regression tests PASSED: `npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-project-key.test.ts src/lib/overdeck/__tests__/conversation-fork-project.test.ts src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts src/dashboard/server/routes/__tests__/palette.test.ts` -> 5 files, 28 tests passed; frontend `npx vitest run src/components/CommandDeck/projectsData.test.ts src/components/CommandDeck/__tests__/ForkModal.test.tsx` -> 2 files, 13 tests passed. `npm run lint` FAILS at the `lint:slash-commands` step: packages/contracts/src/composer-commands.generated.ts is missing the `pan-parked` and `pan-parked-ack` entries that scripts/lint-slash-commands.sh expects from the current CLI registry, exit 1 with 'composer-command manifest has drifted from the CLI registry — run npm run generate:slash-commands and commit the result'. Verified this predates PAN-3419 and is unrelated to its diff: merge-base(HEAD, origin/main) == origin/main HEAD (branch is fully current with main, not behind), and origin/main's own committed composer-commands.generated.ts also has zero pan-parked matches -- the drift already exists on main from unrelated commits 5ba22313a2d/dafc96071f5 (pan parked / pan parked ack, PAN-3486) that never regenerated the manifest. This branch's own diff to that file only correctly adds the new --project entries for fork/handoff. Did not run npm run generate:slash-commands or otherwise edit code/config per test-role boundaries -- reporting the gate as failed rather than fixing forward. Full broad `--changed <merge-base>` vitest sweep was attempted but is impractically slow (pulls in most of the repo's test suite via the shared contracts package graph, >5min with no results); ran the xBRIEF's own named regression tests instead as the scoped substitute. testStatus is failed because a required configured gate (lint) is currently red.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3419`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/overdeck-remodel/overdeck-schema.ts",
@@ -359,7 +377,7 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T19:16:53.415Z",
+  "updated": "2026-08-02T19:17:06.400Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
