@@ -63,6 +63,8 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/orders.ts",
+      "src/cli/commands/parked.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
       "src/lib/orders/types.ts"
     ],
     "declaredScopeUntouched": [
@@ -87,14 +89,16 @@
     "actualChangedFiles": [
       "docs/ORDER-BOOKS.md",
       "src/cli/commands/orders.ts",
+      "src/cli/commands/parked.ts",
+      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
       "src/lib/orders/types.ts",
       "src/lib/orders/validate.ts",
       "tests/unit/lib/orders/orders-resolver.test.ts"
     ],
-    "recordedAt": "2026-08-02T17:30:49.499Z"
+    "recordedAt": "2026-08-02T17:40:59.485Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:40:46.393Z",
+  "updated": "2026-08-02T17:40:59.486Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "reviewing",
