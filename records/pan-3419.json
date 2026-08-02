@@ -328,7 +328,7 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T17:42:25.577Z",
+  "updated": "2026-08-02T17:48:16.231Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "failed",
@@ -338,7 +338,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T14:00:25.902Z",
     "updatedAt": "2026-08-02T16:50:26.314Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3419-review already running. Use 'pan tell' to message it.",
     "conflictsSince": {
