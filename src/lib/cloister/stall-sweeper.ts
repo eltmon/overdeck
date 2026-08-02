@@ -41,7 +41,7 @@ import { sessionExistsSync } from '../tmux.js';
 import { decideAutonomousRedrive } from './redrive-gate.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { spawnWorkAgentThroughAgentsEndpoint } from './work-agent-start.js';
-import { getCloisterEventStore } from './service.js';
+import { getCloisterEventStore } from './event-store-provider.js';
 import {
   clearSweeperRowState,
   readSweeperRowState,
