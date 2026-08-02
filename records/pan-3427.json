@@ -203,7 +203,7 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:06:24.216Z",
+  "updated": "2026-08-02T21:06:51.765Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -214,76 +214,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T21:05:09.636Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3427-review already running. Use 'pan tell' to message it.",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-02T20:56:36.501Z"
-      }
-    ],
+    "updatedAt": "2026-08-02T21:06:51.491Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
-    "reviewRequestedAt": "2026-08-02T21:04:14.604Z",
-    "reviewSpawnedAt": "2026-08-02T21:03:53.994Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "packages/contracts/src/composer-commands.generated.ts",
-        "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
-        "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
-        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
-        "src/dashboard/frontend/src/components/orders/projectScope.ts",
-        "src/lib/state-read-home.ts"
-      ],
-      "declaredScopeUntouched": [
-        "tests/unit/lib/orders/orders-writer.test.ts"
-      ],
-      "declaredScope": [
-        "configuration/order-books.mdx",
-        "docs/ORDER-BOOKS.md",
-        "src/cli/commands/flywheel-complete.ts",
-        "src/cli/commands/orders.ts",
-        "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
-        "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
-        "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
-        "src/dashboard/server/routes/__tests__/orders.test.ts",
-        "src/dashboard/server/routes/orders.ts",
-        "src/lib/orders/resolver.ts",
-        "src/lib/orders/writer.ts",
-        "sync-sources/skills/pan-orders/SKILL.md",
-        "tests/unit/cli/flywheel-complete.test.ts",
-        "tests/unit/cli/orders.test.ts",
-        "tests/unit/lib/orders/orders-resolver.test.ts",
-        "tests/unit/lib/orders/orders-writer.test.ts"
-      ],
-      "actualChangedFiles": [
-        "configuration/order-books.mdx",
-        "docs/ORDER-BOOKS.md",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "src/cli/commands/flywheel-complete.ts",
-        "src/cli/commands/orders.ts",
-        "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
-        "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
-        "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-        "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
-        "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
-        "src/dashboard/frontend/src/components/orders/projectScope.ts",
-        "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
-        "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
-        "src/dashboard/server/routes/__tests__/orders.test.ts",
-        "src/dashboard/server/routes/orders.ts",
-        "src/lib/orders/resolver.ts",
-        "src/lib/orders/writer.ts",
-        "src/lib/state-read-home.ts",
-        "sync-sources/skills/pan-orders/SKILL.md",
-        "tests/unit/cli/flywheel-complete.test.ts",
-        "tests/unit/cli/orders.test.ts",
-        "tests/unit/lib/orders/orders-resolver.test.ts"
-      ],
-      "recordedAt": "2026-08-02T21:03:43.259Z"
-    }
+    "reviewSpawnedAt": "2026-08-02T21:03:53.994Z"
   },
   "closeOut": {
     "usage": {
@@ -338,10 +272,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5766,
-            "output": 204012,
-            "cacheRead": 154252834,
-            "cacheWrite": 7884362
+            "input": 5768,
+            "output": 204525,
+            "cacheRead": 154858942,
+            "cacheWrite": 7885510
           }
         }
       },
@@ -359,15 +293,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5766,
-          "output": 204012,
-          "cacheRead": 154252834,
-          "cacheWrite": 7884362
+          "input": 5768,
+          "output": 204525,
+          "cacheRead": 154858942,
+          "cacheWrite": 7885510
         }
       },
       "costAtCloseOut": {
-        "usd": 98.6402021,
-        "pricingAsOf": "2026-08-02T21:05:15.520Z"
+        "usd": 98.7694281,
+        "pricingAsOf": "2026-08-02T21:06:51.631Z"
       }
     },
     "merges": [
@@ -376,7 +310,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
