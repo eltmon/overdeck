@@ -1158,3 +1158,8 @@ Operator batch-acknowledged 26 needs-you parked issues (acknowledged trips re-fi
 **Recommendation to operator:** PAN-1824 + PAN-1711 + PAN-3344 + PAN-3429 + PAN-3492 are five faces of ONE problem — nothing admission-controls heavy work on this host. They belong in a single order book, not five separate strikes.
 
 Also noted: memory-governor runway is now PSI-evidenced (operator-approved), so admission deferrals from idle swap are over — that removes the false-pressure deferrals seen earlier in the run.
+
+## RUN-79 tick 81 (2026-08-02 ~17:25Z) — quiet tick: round-3 leak PR in CI, campaign in review
+
+- #3494 (PAN-3431 round 3) still in CI (lint + test lanes). Nothing to merge; no ready set. MIN-934 working, MIN-933 in review — campaign holds at 4 of 5 with Lane B complete.
+- Status emitted this tick (rule holding). Surfaced the load-control order-book recommendation into `openQuestions` so it reaches the operator through the snapshot rather than only through chat.
