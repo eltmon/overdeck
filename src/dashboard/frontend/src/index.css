@@ -35,6 +35,58 @@
   src: url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2-variations'), url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2');
 }
 
+/* ─── Theme font tokens (PAN-3410 D-13) — :root carries Ledger's exact values;
+     [data-theme="broadsheet"] overrides them. Components never branch on
+     theme directly, only on these variables. ─── */
+:root {
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+[data-theme="broadsheet"] {
+  --font-sans: "Geist Variable", system-ui, sans-serif;
+  --font-display: "Geist Variable", system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+/* ─── Display-scale utilities (Broadsheet vocabulary; Ledger-safe fallback
+     per D-13 — values ported from design/style-guide/mockups/style-guide-v2.html) ─── */
+@layer components {
+  .display-xl {
+    @apply text-xl font-medium;
+  }
+  .display-lg {
+    @apply text-lg font-medium;
+  }
+  .eyebrow {
+    @apply text-xs uppercase tracking-wider font-medium text-muted-foreground;
+  }
+
+  [data-theme="broadsheet"] .display-xl {
+    font-family: var(--font-display);
+    font-size: clamp(3rem, 7vw, 4.5rem);
+    font-weight: 750;
+    letter-spacing: -0.03em;
+    line-height: 1.02;
+  }
+
+  [data-theme="broadsheet"] .display-lg {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 680;
+    letter-spacing: -0.025em;
+    line-height: 1.05;
+  }
+
+  [data-theme="broadsheet"] .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+  }
+}
+
 /* Suppress all transitions during theme changes */
 .no-transitions,
 .no-transitions *,
@@ -168,7 +220,7 @@
 @layer base {
   body {
     @apply bg-background text-foreground;
-    font-family: "DM Sans", system-ui, sans-serif;
+    font-family: var(--font-sans), system-ui, sans-serif;
     margin: 0;
     padding: 0;
     min-height: 100vh;
