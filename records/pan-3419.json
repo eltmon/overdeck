@@ -262,27 +262,9 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T18:42:16.349Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T19:17Z] test-agent → FAILED — seq 1",
-      "timestamp": "2026-08-02T19:17:04.857Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-08-02T19:17:06.399Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T19:17:04Z",
-      "markdownBody": "# Test failure\n\ntypecheck PASSED (root tsc, hooks, evals, dashboard-types ratchet 57 known/0 new, frontend-types ratchet 0/0). PAN-3419 regression tests PASSED: `npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-project-key.test.ts src/lib/overdeck/__tests__/conversation-fork-project.test.ts src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts src/dashboard/server/routes/__tests__/palette.test.ts` -> 5 files, 28 tests passed; frontend `npx vitest run src/components/CommandDeck/projectsData.test.ts src/components/CommandDeck/__tests__/ForkModal.test.tsx` -> 2 files, 13 tests passed. `npm run lint` FAILS at the `lint:slash-commands` step: packages/contracts/src/composer-commands.generated.ts is missing the `pan-parked` and `pan-parked-ack` entries that scripts/lint-slash-commands.sh expects from the current CLI registry, exit 1 with 'composer-command manifest has drifted from the CLI registry — run npm run generate:slash-commands and commit the result'. Verified this predates PAN-3419 and is unrelated to its diff: merge-base(HEAD, origin/main) == origin/main HEAD (branch is fully current with main, not behind), and origin/main's own committed composer-commands.generated.ts also has zero pan-parked matches -- the drift already exists on main from unrelated commits 5ba22313a2d/dafc96071f5 (pan parked / pan parked ack, PAN-3486) that never regenerated the manifest. This branch's own diff to that file only correctly adds the new --project entries for fork/handoff. Did not run npm run generate:slash-commands or otherwise edit code/config per test-role boundaries -- reporting the gate as failed rather than fixing forward. Full broad `--changed <merge-base>` vitest sweep was attempted but is impractically slow (pulls in most of the repo's test suite via the shared contracts package graph, >5min with no results); ran the xBRIEF's own named regression tests instead as the scoped substitute. testStatus is failed because a required configured gate (lint) is currently red.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3419`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/overdeck-remodel/overdeck-schema.ts",
@@ -377,11 +359,11 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T19:17:06.400Z",
+  "updated": "2026-08-02T19:17:06.672Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "failed",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -389,8 +371,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
-    "updatedAt": "2026-08-02T19:16:53.102Z",
+    "updatedAt": "2026-08-02T19:17:04.755Z",
     "reviewNotes": "Approved; cycle delta is clean and the unchanged Windows separator finding remains non-promotable under the cycle-7 convergence gate",
+    "testNotes": "typecheck PASSED (root tsc, hooks, evals, dashboard-types ratchet 57 known/0 new, frontend-types ratchet 0/0). PAN-3419 regression tests PASSED: `npx vitest run --configLoader runner src/lib/overdeck/__tests__/conversation-project-key.test.ts src/lib/overdeck/__tests__/conversation-fork-project.test.ts src/cli/commands/__tests__/handoff.test.ts tests/unit/cli/fork-client.test.ts src/dashboard/server/routes/__tests__/palette.test.ts` -> 5 files, 28 tests passed; frontend `npx vitest run src/components/CommandDeck/projectsData.test.ts src/components/CommandDeck/__tests__/ForkModal.test.tsx` -> 2 files, 13 tests passed. `npm run lint` FAILS at the `lint:slash-commands` step: packages/contracts/src/composer-commands.generated.ts is missing the `pan-parked` and `pan-parked-ack` entries that scripts/lint-slash-commands.sh expects from the current CLI registry, exit 1 with 'composer-command manifest has drifted from the CLI registry — run npm run generate:slash-commands and commit the result'. Verified this predates PAN-3419 and is unrelated to its diff: merge-base(HEAD, origin/main) == origin/main HEAD (branch is fully current with main, not behind), and origin/main's own committed composer-commands.generated.ts also has zero pan-parked matches -- the drift already exists on main from unrelated commits 5ba22313a2d/dafc96071f5 (pan parked / pan parked ack, PAN-3486) that never regenerated the manifest. This branch's own diff to that file only correctly adds the new --project entries for fork/handoff. Did not run npm run generate:slash-commands or otherwise edit code/config per test-role boundaries -- reporting the gate as failed rather than fixing forward. Full broad `--changed <merge-base>` vitest sweep was attempted but is impractically slow (pulls in most of the repo's test suite via the shared contracts package graph, >5min with no results); ran the xBRIEF's own named regression tests instead as the scoped substitute. testStatus is failed because a required configured gate (lint) is currently red.",
     "uatNotes": "UAT is required: acceptance criteria and the xBRIEF explicitly require the dashboard Fork/Handoff modal to render a Project <select> defaulted to the source conversation's project (fork-modal-project.ac1-3) and CommandDeck grouping/navigation to honor the explicit project association (grouping-explicit-first.ac1-4) -- both are observable dashboard UI behavior, not just unit-testable logic. Built and ran the workspace's own isolated Docker stack (not the host dashboard): rebuilt via `npm run build`, confirmed the running workspace API at https://api-feature-pan-3419.overdeck.localhost reports buildCommit=4ebc214d617b9799a398780d76665c2a7c157420 (matches this review's HEAD exactly) and buildDirty=false. Along the way found and worked around an orthogonal, pre-existing bug unrelated to PAN-3419: src/lib/cliproxy.ts's startCliproxyWatchdog() calls restartCliproxyTask() unconditionally (not gated by the peer-dashboard/OVERDECK_DISABLE_DEACON check other services use), and when the container has no cliproxy binary (workspace containers deliberately never mount host ~/.overdeck, per the single-deacon invariant) the spawn() ENOENT fires an unhandled 'error' event on the ChildProcess with no listener attached, crashing the whole peer-dashboard process within the first watchdog tick. Confirmed this is not caused by this PR (main.ts/cliproxy.ts are unchanged by this diff). Worked around it by seeding a fake cliproxy.pid (containing PID 1) into the container's ephemeral filesystem so isCliproxyRunningTask() short-circuits and the watchdog never calls restart -- an ephemeral container-runtime workaround, not a code/config edit, and the server has stayed up since (verified via /api/health returning 200 after the prior watchdog interval elapsed). Despite getting the workspace stack healthy, could not actually exercise the browser: this test role is configured with a Playwright MCP server but it never finished connecting in this session (no mcp__playwright__* tools ever became available), and the claude-in-chrome fallback reports 'Browser extension is not connected' (no Chrome extension reachable in this environment). No acceptance criterion involving the Fork/Handoff modal's Project select or CommandDeck grouping/routing was exercised or proven end-to-end. Recommend a retry in a session where Playwright MCP or a connected browser extension is actually reachable; consider also filing the cliproxy watchdog crash as a separate bug (it will crash every future workspace-container UAT run, on any issue, until src/lib/cliproxy.ts's startCliproxyTask/restartCliproxyTask spawn calls get an 'error' listener or the watchdog is peer-gated).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
@@ -557,10 +540,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 626,
-            "output": 140771,
-            "cacheRead": 52226440,
-            "cacheWrite": 1503076
+            "input": 628,
+            "output": 140995,
+            "cacheRead": 52476013,
+            "cacheWrite": 1505050
           }
         },
         "work": {
@@ -586,15 +569,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 626,
-          "output": 140771,
-          "cacheRead": 52226440,
-          "cacheWrite": 1503076
+          "input": 628,
+          "output": 140995,
+          "cacheRead": 52476013,
+          "cacheWrite": 1505050
         }
       },
       "costAtCloseOut": {
-        "usd": 393.0600143,
-        "pricingAsOf": "2026-08-02T19:16:53.197Z"
+        "usd": 393.1171083,
+        "pricingAsOf": "2026-08-02T19:17:05.221Z"
       }
     },
     "merges": [
