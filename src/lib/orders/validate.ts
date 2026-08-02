@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { OrderBook } from '@overdeck/contracts';
-import { listBooks } from './resolver.js';
+import { listBooks, orderIssueStoreStatus } from './resolver.js';
 import { liveOrderIssueLookup } from './resolver.js';
 import type {
   OrderBookFinding,
@@ -110,6 +110,16 @@ export function validateBookForStart(
 ): OrderBookValidationResult {
   const blocks: OrderBookFinding[] = [];
   const warns: OrderBookFinding[] = [];
+
+  const storeStatus = orderIssueStoreStatus();
+  if (!storeStatus.started && storeStatus.issueCount === 0) {
+    blocks.push({
+      code: 'store-unavailable',
+      issue: '',
+      message: 'Order issue store is unavailable; could not verify any issues are open',
+    });
+  }
+
   if (book.items.length === 0) {
     blocks.push({
       code: 'empty-book',
