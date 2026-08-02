@@ -37,12 +37,15 @@ const fixedTime = '2026-05-07T05:00:00.000Z'
 const now = () => fixedTime
 
 // Track fetch calls and control responses per test.
+type FetchResponse = { status: number; body?: Record<string, unknown>; reject?: boolean }
 let fetchCalls: { url: string; body: unknown; headers: Record<string, string> }[] = []
-let fetchResponse: { status: number } = { status: 200 }
+let fetchResponse: FetchResponse = { status: 200 }
+let fetchResponses = new Map<string, FetchResponse>()
 
 beforeEach(() => {
   fetchCalls = []
   fetchResponse = { status: 200 }
+  fetchResponses = new Map()
   // Neutralize any ambient OVERDECK_DASHBOARD_URL (set on developer machines
   // running a live `pan dev`) so the default-host tests assert against the
   // production fallback (http://localhost:3011), not the host's value. Tests
@@ -54,7 +57,13 @@ beforeEach(() => {
       const url = _url
       const body = init?.body ? JSON.parse(init.body as string) : undefined
       fetchCalls.push({ url, body, headers: init?.headers as Record<string, string> })
-      return { status: fetchResponse.status } as Response
+      const response = fetchResponses.get(url) ?? fetchResponse
+      if (response.reject) throw new Error('dashboard unavailable')
+      return {
+        status: response.status,
+        ok: response.status >= 200 && response.status < 300,
+        json: async () => response.body ?? {},
+      } as Response
     }),
   )
 })
@@ -489,7 +498,7 @@ describe('handleTurnEnd', () => {
 
   it('PAN-1134: POSTs activity idle and a turn cost event', async () => {
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636' },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', role: 'conversation' },
       {},
     )
     expect(fetchCalls.length).toBe(2)
@@ -501,28 +510,62 @@ describe('handleTurnEnd', () => {
     expect(fetchCalls[1]!.body).toMatchObject({ kind: 'cost-event', issueId: 'PAN-636', tool: 'turn_end' })
   })
 
-  it('posts work-complete when all issue beads are closed', async () => {
-    const workspace = join(h.home, 'workspace')
-    mkdirSync(join(workspace, '.beads'), { recursive: true })
-    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+  it('posts work-complete when the dashboard plan checklist is complete', async () => {
+    const checklistUrl = 'http://localhost:3011/api/agents/agent-pan-636/plan-checklist'
+    fetchResponses.set(checklistUrl, { status: 200, body: { success: true, complete: true, incomplete: [] } })
 
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace: '/workspace' },
       {},
     )
 
+    expect(fetchCalls.find(call => call.url === checklistUrl)?.body).toEqual({ issueId: 'PAN-636' })
     expect(fetchCalls.map(call => call.url)).toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
     expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(true)
   })
 
-  it('routes work turn-end completion from launcher session type env', async () => {
-    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
-    const workspace = join(h.home, 'workspace')
-    mkdirSync(join(workspace, '.beads'), { recursive: true })
-    writeFileSync(join(workspace, '.beads', 'issues.jsonl'), `${JSON.stringify({ id: 'b1', title: 'PAN-636 implementation', status: 'closed', labels: ['pan-636'] })}\n`)
+  it('does not post evidence-clean completion when the dashboard plan checklist is incomplete', async () => {
+    const checklistUrl = 'http://localhost:3011/api/agents/agent-pan-636/plan-checklist'
+    fetchResponses.set(checklistUrl, {
+      status: 200,
+      body: { success: true, complete: false, incomplete: ['    - item-one First item (pending)'] },
+    })
 
     await handleTurnEnd(
-      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', workspace },
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace: '/workspace' },
+      {},
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain(checklistUrl)
+    expect(fetchCalls.map(call => call.url)).not.toContain('http://localhost:3011/api/agents/agent-pan-636/work-complete')
+    expect(fetchCalls.some(call => (call.body as any).resolution === 'done')).toBe(false)
+  })
+
+  it('falls back to a structured completion marker when the plan checklist request fails', async () => {
+    const checklistUrl = 'http://localhost:3011/api/agents/agent-pan-636/plan-checklist'
+    fetchResponses.set(checklistUrl, { status: 503, reject: true })
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, role: 'work', issueId: 'PAN-636', workspace: '/workspace' },
+      { output: 'OVERDECK_WORK_COMPLETE' },
+    )
+
+    expect(fetchCalls.map(call => call.url)).toContain(checklistUrl)
+    expect(fetchCalls).toContainEqual(expect.objectContaining({
+      url: 'http://localhost:3011/api/agents/agent-pan-636/work-complete',
+      body: expect.objectContaining({ reason: 'structured-reply' }),
+    }))
+  })
+
+  it('routes work turn-end completion from launcher session type env', async () => {
+    vi.stubEnv('OVERDECK_SESSION_TYPE', 'work')
+    fetchResponses.set('http://localhost:3011/api/agents/agent-pan-636/plan-checklist', {
+      status: 200,
+      body: { success: true, complete: true, incomplete: [] },
+    })
+
+    await handleTurnEnd(
+      { agentId: 'agent-pan-636', home: h.home, pid: 7, now, issueId: 'PAN-636', workspace: '/workspace' },
       {},
     )
 
