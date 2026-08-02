@@ -30,17 +30,16 @@
     }
   ],
   "created": "2026-08-01T16:59:47.309Z",
-  "updated": "2026-08-02T05:27:05.766Z",
+  "updated": "2026-08-02T05:27:17.233Z",
   "pipeline": {
     "issueId": "PAN-3431",
     "reviewStatus": "pending",
-    "testStatus": "dispatch_failed",
-    "releaseStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "closedOut": true,
     "closedOutAt": "2026-08-01T19:02:25.120Z",
-    "updatedAt": "2026-08-02T05:27:00.979Z",
-    "testNotes": "Dispatch failed: Workspace for PAN-3431 does not exist at /home/eltmon/Projects/overdeck/workspaces/feature-pan-3431 — refusing to spawn test. A missing workspace would land the agent in $HOME at the folder-trust prompt. Recreate the workspace ('pan workspace rebuild PAN-3431') before retrying."
+    "updatedAt": "2026-08-02T05:27:11.907Z"
   },
   "closeOut": {
     "usage": {
@@ -64,7 +63,7 @@
       },
       "costAtCloseOut": {
         "usd": 85.83144300000001,
-        "pricingAsOf": "2026-08-02T05:27:05.757Z"
+        "pricingAsOf": "2026-08-02T05:27:11.914Z"
       }
     },
     "merges": [],
