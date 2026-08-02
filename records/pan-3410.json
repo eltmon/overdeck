@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:02:15.378Z",
+  "updated": "2026-08-02T03:02:38.886Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -47,8 +47,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "theme-token-scope": {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 2530918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:02:38.885Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -74,6 +82,7 @@
     "self-host-fonts.self-host-fonts.ac1": "completed",
     "self-host-fonts.self-host-fonts.ac2": "completed",
     "self-host-fonts.self-host-fonts.ac3": "completed",
-    "self-host-fonts.self-host-fonts.ac4": "completed"
+    "self-host-fonts.self-host-fonts.ac4": "completed",
+    "theme-token-scope": "running"
   }
 }
