@@ -1086,3 +1086,56 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **Campaign advanced serially again**: MIN-932 terminal ⇒ **MIN-933 started** (auto-planning → work). Campaign state: Lane A = MIN-930 ✅ → MIN-932 ✅ → MIN-933 planning; Lane B = MIN-931 ✅ → MIN-934 working. **3 of 5 terminal, both lanes live**, serial discipline unbroken across the whole campaign — no tail ever started before its head reached terminal.
 - **The postMergeLifecycle leftover-agent gap now has 4 specimens** (MIN-929, PAN-3406, PAN-3447, MIN-932): every promote leaves the work agent running, blocking close-out until an attributed pause clears it. It has recurred on every single promote today. Worth filing on the next occurrence rather than absorbing it a fifth time — the pause is a backstop standing in for a missing lifecycle step.
 - Read-door sweep: 17 PAN + 14 MIN + TIN-1; 4 typed blind spots unchanged. Clean UAT batch EMPTY.
+
+## RUN-79 tick 72 (2026-08-02 ~14:35Z) — PAN-3482 + PAN-3478 LANDED; verification storm root-caused (PAN-3492)
+
+- **PAN-3482 landed** (#3483 `547e675b5a`) — dashboard typecheck ratchet restored. **PAN-3478 landed** (#3484 `cf2538207c`) — the quality lint now names its issues, unblocking PAN-3447 follow-on planning. Both were ALREADY GREEN in CI while their strikes were still fighting the local gate: the merged-awareness gap (PAN-3417) again, costing real time.
+- **Root-caused the verification storm the strike reported → PAN-3492.** The respawning vitest workers for feature-pan-3419 are parented by the DASHBOARD SERVER, not the work agent — they are server-driven verification retries. The loop is self-amplifying: load → 5s fixture timeout (PAN-3344) → "failure" → immediate retry → more load. One issue's verification can starve every other agent's gate run; the reporting strike's 31 timeouts were collateral.
+- **My first intervention was WRONG and is recorded as such**: I paused `agent-pan-3419` with governor attribution, and fresh vitest generations kept spawning after the pause (17-18s elapsed on post-pause processes) because the server owns them. **Agent pause is not a load-shedding tool for server-driven verification.** The effective lever was `pan review abort PAN-3419`; unpaused the agent afterward since it was never the culprit.
+- This closes the loop on today's biggest systemic tax: PAN-3344 (fixture timeout) + PAN-3429 (governor won't shed) + PAN-3492 (retries amplify) are three faces of one problem — nothing admission-controls heavy test runs.
+
+## RUN-79 tick 73 (2026-08-02 ~14:40Z) — Hermes Lane B COMPLETE; PAN-3477 recovered from a vanished session (#3493)
+
+- **MIN-934 handed off — Hermes Lane B is DONE end to end** (MIN-931 ✅ → MIN-934 handed off). Campaign: **4 of 5 items terminal or handed off**, Lane A finishing on MIN-933. Serial discipline held for the entire campaign.
+- **strike-3477 vanished a SECOND time without signalling — but its fix was committed** (`b66dc5fd7d4 reap merged slot sessions`). Recovered it straight from the branch, merge-synced, **PR #3493**. Lesson: a vanished strike session is not a lost strike — ALWAYS check the branch for commits before re-dispatching. I nearly re-struck it a third time, which would have discarded finished work.
+- strike-3431 (leak round 3) verified genuinely working, not wedged: `1 shell still running` after a 3h8m churn. The frozen-cost-≠-wedge rule from tick 60 is now load-bearing twice.
+- Load down to 11.4 after the PAN-3492 storm abort. Close-outs for PAN-3482/3478 wait on main CI (in progress on both merges).
+
+## RUN-79 tick 74 (2026-08-02 ~14:55Z) — PAN-3477 landed+deployed; PAN-3482 + PAN-3478 closed out (40 total)
+
+- **PAN-3477 merged (`4be15e7626`), handed off, and DEPLOYED** — merged swarm slots are now reaped, auto-resume is swarm-aware, and zombies no longer charge against slot capacity. The PAN-3447 slot-3 loop is structurally dead.
+- **PAN-3482 + PAN-3478 closed out. 40 issues landed+closed this run.** The dashboard typecheck ratchet is restored and the quality lint now names its issues.
+- **My own miss, caught by the gate:** PAN-3478's close-out failed on `reviewStatus: pending` because I merged its PR at tick 72 but never ran `pan done --strike`. The DoD gate caught the skipped step exactly as designed — I had merged and moved on. Ran the handoff, then close-out passed clean. **Rule: merging a strike PR is only half the landing; the handoff is what records the verdict.** Worth noting the gate is what made this recoverable rather than a silently half-landed issue.
+
+## RUN-79 tick 75 (2026-08-02 ~15:15Z) — PAN-3477 closed out (41 total); leak curve REVERSED
+
+- **PAN-3477 closed out. 41 issues landed+closed this run.**
+- **Leak: first negative sample.** Fixed-uptime protocol (20m41s, the discipline prescribed two ticks ago): **RSS 1357→907MB = −150MB/min at 33 sessions**. The process is reclaiming, not growing; pre-fix at comparable uptime was ~1936MB and climbing, post-round-2 was +94MB/min. Absolute RSS (907MB at 20min) is the more meaningful signal than the negative slope.
+- **Did NOT declare it fixed** — wrote explicit closure criteria onto the issue instead: two consecutive non-positive fixed-uptime samples PLUS one sample through a deliberate 10-session attach burst, since the leak's worst behaviour was always attach-scoped and 33 steady-state sessions is not a ramp. After three premature "fixed" calls this run (composer wedge, leak round 1, leak round 2), the standard is now written down rather than remembered.
+- Campaign: 4 of 5 (Lane B complete, MIN-933 finishing Lane A). strike-3431 still working its 3h+ shell.
+
+## RUN-79 tick 76 (2026-08-02 ~15:40Z) — leak: 2 consecutive non-positive samples; closure HELD on the ramp criterion
+
+- **Sample 2 @ 41m26s: RSS 1031→751MB = −93MB/min at 32 sessions**, following sample 1's −150MB/min @ 20m41s. Two consecutive non-positive fixed-uptime samples ⇒ criteria 1 and 2 of the closure standard are met. **The absolute number is the real evidence: 751MB at 41min uptime, where the pre-fix process was 2.4-3.4GB by that age and needed a reload.**
+- **Held closure anyway** — criterion 3 (a sample through a ~10-session attach burst) is unobserved, and that criterion exists precisely because every earlier measurement showed the leak was ATTACH-SCOPED: acceptable in steady state, explosive during ramps. Two calm-water samples cannot rule out an attach-only retainer. Left the issue open with the standard restated for whoever catches the next natural ramp.
+- This is the discipline the run kept relearning, now applied without prompting: three premature "fixed" calls earlier (composer wedge, leak rounds 1 and 2) each cost real time; the cost of holding an issue open one extra tick is nearly zero by comparison.
+
+## RUN-79 tick 77 (2026-08-02 ~16:00Z) — ⚠️ SELF-CORRECTION: the two "reclaiming" leak samples were GC-phase artifacts
+
+- **Long-interval tracking contradicts both short samples**: 751MB @41min → **1849MB @64min = +48MB/min** over 23 minutes. The −150 and −93MB/min readings were taken inside GC collection phases. The heap is a sawtooth; a 180s window reports whichever phase it lands in **as if it were the trend**, and twice in a row it reported the exact opposite of the truth.
+- **Methodological rule established (posted to the issue): the sampling window must exceed the GC period.** Short live-delta windows are worse than useless for a sawtooth heap. Valid comparisons are only (a) RSS at the SAME uptime across builds, (b) average slope over ≥20 minutes. Closure criteria rewritten accordingly; the short-window method is discarded outright.
+- Honest scoreboard on this issue: the two landed fixes DID help materially (same-uptime RSS roughly halved, reload interval stretched from ~40min to none-yet-needed at 64min), but a retainer is still live. Round 3 continues.
+- **Four times this run I have nearly closed something on favorable-but-invalid evidence.** The failure mode is never "no data" — it is *data collected by a method that cannot answer the question*. Worth carrying: choose the measurement to match the phenomenon's timescale BEFORE trusting any reading.
+
+## RUN-79 tick 78 (2026-08-02 ~16:30Z) — leak criterion 3 ANSWERED: attach-scoped retainer confirmed live
+
+- **Caught the attach ramp** (server restart re-attaching 32 sessions) — the exact sample criterion 3 required. Result: **2191MB at 3m09s uptime** (≈1.8GB over baseline for 32 attaches), then **+8MB/min once settled**. Same-uptime comparison vs pre-fix (2458MB @8min/42 sessions) shows the ramp cost is proportionally unchanged.
+- **Verdict: the leak is now precisely characterized rather than merely "still present" — a large one-time per-attach cost that is never released, with the ongoing drip largely fixed.** That reframes round 3 from "find the leak" to "find state allocated during attach/session-registration and never freed on detach". Also explains why reload intervals tracked fleet churn rather than clock time: RSS is driven by CUMULATIVE ATTACH COUNT over a process's life.
+- Kept the issue open; criteria 1-2 stand as evidence the steady-state half is genuinely fixed, criterion 3 answered negatively. This is the payoff of holding closure through four temptations: the issue now carries a specific, testable hypothesis instead of a false "fixed".
+- Campaign: MIN-934 restored and working (+1031/−184); MIN-933 in review. 4 of 5.
+
+## RUN-79 tick 79 (2026-08-02 ~16:50Z) — leak round 3 in CI (#3494): the fix matches the measured shape
+
+- **strike-3431 round 3 committed and landed to CI**: `c4764c6f12b stream cost event log reads` + `ffc6d61387a preserve cost reader pagination` → **PR #3494**. The diagnosis and the fix line up: loading the FULL cost event log per read is precisely a large allocation on a path every session attach touches — exactly the "one-time per-attach cost never released" shape that criterion 3's ramp sample revealed. Measurement drove the fix rather than guesswork.
+- Wrote the verification protocol INTO the PR body (same-uptime or ≥20min slope; never 180s windows) so whoever validates it does not repeat the GC-phase error that twice reported the opposite of the truth on this issue.
+- Emitted a status snapshot this tick, per the rule added after the stale-snapshot false idle escalation.

@@ -19,7 +19,7 @@ vi.mock('../../../../lib/store', () => {
 });
 
 vi.mock('../../Sidebar', () => ({ GodViewSidebar: () => <aside aria-label="God View sidebar" /> }));
-vi.mock('../useConfluenceChoreography', () => ({ useConfluenceChoreography: vi.fn() }));
+vi.mock('../useConfluenceChoreography', () => ({ useConfluenceChoreography: vi.fn(), useSweepChoreography: vi.fn() }));
 vi.mock('../useConfluenceData', () => ({
   useConfluenceData: () => ({
     orbs: [],
@@ -61,6 +61,8 @@ vi.mock('../RiverCanvas', async () => {
         playTide: vi.fn(),
         playMerge: vi.fn(),
         playThaw: vi.fn(),
+        playSweep: vi.fn(),
+        playFlare: vi.fn(),
         pulseSun: vi.fn(),
         spawnFromSun: vi.fn(),
         gateFlash: vi.fn(),

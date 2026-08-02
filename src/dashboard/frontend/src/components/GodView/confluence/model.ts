@@ -124,6 +124,39 @@ export function computeLayout(width: number, height: number): LayoutRect {
 
 export type OrbState = 'active' | 'shelf' | 'stale' | 'failed';
 
+/**
+ * Parked-orbit identity (PAN-3485 / PAN-3490). One color per orbit so the
+ * Doldrums reads at a glance: amber family = operator-owned, hot colors =
+ * mechanical failures the sweeper acts on, ice = stale-but-living, ash =
+ * residue to reap. The beam effect is keyed off SWEEP_BEAM_COLOR so the
+ * lantern light never collides with the governor tide's amber.
+ */
+export const PARKED_ORBIT_COLORS: Record<string, string> = {
+  'stuck-flag': '#ffb800',
+  'needs-you': '#ffd75e',
+  'deacon-ignored': '#5a6478',
+  'operator-gate': '#7a8aaa',
+  'uat-failed': '#ff7700',
+  'merge-failed': '#ff2d7c',
+  conflicts: '#9d4edd',
+  'zombie-session': '#8a97a8',
+  'idle-running': '#bfe3ff',
+  'circuit-breaker': '#ff4444',
+};
+
+export function parkedOrbitColor(orbit: string | null | undefined): string {
+  return (orbit && PARKED_ORBIT_COLORS[orbit]) || '#bfe3ff';
+}
+
+/** Short orbit tag for orb labels — "stuck", not "stuck-flag". */
+export function parkedOrbitTag(orbit: string | null | undefined): string | null {
+  if (!orbit) return null;
+  return orbit.replace(/-(flag|failed|session|running|breaker|gate|ignored|you)$/u, '');
+}
+
+export const SWEEP_BEAM_COLOR = '#bfe3ff';
+export const SWEEP_FLARE_COLOR = '#ffd75e';
+
 export interface RiverOrbInput {
   paused?: boolean | null;
   yieldedByScheduler?: boolean | null;
