@@ -857,27 +857,32 @@
       "reason": "feedback",
       "note": "[2026-08-02T23:40Z] review-agent → FAILED — seq 5",
       "timestamp": "2026-08-02T23:40:32.757Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T23:50:06.801Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T23:50:00.557Z",
+  "updated": "2026-08-02T23:50:07.647Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
-    "updatedAt": "2026-08-02T23:49:45.574Z",
+    "updatedAt": "2026-08-02T23:50:00.657Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "7ec1b6ee2146619d8d443475847cdad7e2601550",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-02T23:10:22.124Z",
-    "reviewSpawnedAt": "2026-08-02T22:41:41.163Z"
+    "reviewSpawnedAt": "2026-08-02T23:50:00.656Z"
   },
   "closeOut": {
     "usage": {
@@ -975,7 +980,7 @@
       },
       "costAtCloseOut": {
         "usd": 509.2150783,
-        "pricingAsOf": "2026-08-02T23:49:45.680Z"
+        "pricingAsOf": "2026-08-02T23:50:02.407Z"
       }
     },
     "merges": [
@@ -1166,5 +1171,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
