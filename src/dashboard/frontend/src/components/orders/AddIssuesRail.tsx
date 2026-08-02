@@ -6,12 +6,14 @@ import { useDashboardStore, selectIssues } from '../../lib/store';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
 import type { Issue } from '../../types';
 import type { OrderBookView } from './BookStrip';
+import { withProject } from './projectScope';
 
 interface AddIssuesRailProps {
   book: OrderBookView;
   books: OrderBookView[];
   onBookChange: (book: OrderBookView) => void;
   issues?: Issue[];
+  project?: string | null;
 }
 
 function isOpenIssue(issue: Issue): boolean {
@@ -29,8 +31,8 @@ function membership(books: OrderBookView[]): Map<string, OrderBookView> {
   return result;
 }
 
-async function addIssue(bookId: string, issueId: string, lane: OrderBookLane): Promise<OrderBookView> {
-  const response = await fetch(`/api/orders/${encodeURIComponent(bookId)}/items`, {
+async function addIssue(bookId: string, issueId: string, lane: OrderBookLane, project?: string | null): Promise<OrderBookView> {
+  const response = await fetch(withProject(`/api/orders/${encodeURIComponent(bookId)}/items`, project), {
     method: 'POST', credentials: 'include', headers: await dashboardMutationJsonHeaders(),
     body: JSON.stringify({ item: { issue: issueId, lane } }),
   });
@@ -39,7 +41,7 @@ async function addIssue(bookId: string, issueId: string, lane: OrderBookLane): P
   return payload as OrderBookView;
 }
 
-export function AddIssuesRail({ book, books, onBookChange, issues }: AddIssuesRailProps) {
+export function AddIssuesRail({ book, books, onBookChange, issues, project }: AddIssuesRailProps) {
   const storeIssues = useDashboardStore(selectIssues) as Issue[];
   const availableIssues = issues ?? storeIssues;
   const [query, setQuery] = useState('');
@@ -61,7 +63,7 @@ export function AddIssuesRail({ book, books, onBookChange, issues }: AddIssuesRa
     setAdding(issueId);
     setError(null);
     try {
-      onBookChange(await addIssue(book.id, issueId, lane));
+      onBookChange(await addIssue(book.id, issueId, lane, project));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
