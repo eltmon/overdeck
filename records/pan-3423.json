@@ -67,9 +67,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T20:00:07.249Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T20:19Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T20:19:03.025Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T20:19:02Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3423\n\n# Review Synthesis — PAN-3423 — 2026-08-02T20:18:26Z\n\n## Verdict: CHANGES REQUESTED — specialist attention rows lose the existing Kill action\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/context.json\n- Branch: feature/pan-3423\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n- HEAD reviewed: 549fb5098324ff74de16b97ae316924c6e26e0cd\n- Cycle number: 3\n- Prior cycle SHA: 81939b22f4e3100cd65b3230e05a56aaebccfb09\n- PR merge base: d28b8893d9eba336166570587a15114995062a16\n- PR commits: 5\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/requirements.md | 0 after scope gate |\n\nThe two raw reviewer blockers are below the proportionality threshold of fifteen for this five-commit PR. The correctness finding is on PR-introduced code. Although the line is outside the cycle diff, the prior cycle's correctness reviewer failed before producing a report, so there is no prior correctness pass to carry forward; demoting this first successful correctness finding would convert an infrastructure failure into an implicit approval rather than enforce review convergence.\n\n## Blocking Findings\n\n### [correctness] Specialist attention rows lose their kill target — `src/dashboard/frontend/src/lib/system-health-attention.ts:97`\n`buildAttentionItems()` indexes only consumers whose `killTarget.kind === 'agent'`, then looks up every `snapshot.agents` entry through that map. `AgentHealthSnapshot` explicitly includes specialists, and specialist top consumers carry `killTarget.kind === 'specialist'`, so their matching `killConsumer` is always omitted. A stalled review, test, or planning specialist therefore retains its Open action but silently loses the existing Kill action required by the redesigned attention-row affordance. Index every non-container agent-health consumer by its matching identity, and add singleton and grouped specialist tests proving the existing `KillButton` receives a specialist target.\n\n## Non-blocking Findings\n\n### [requirements] [demoted: pre-existing] Header state badge has no visible painted state color — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:402`\nThe dot uses a border-color token with `border-current` but no border-width or background utility. The cited line is outside the PR diff and was already demoted in the prior synthesis, so the mandatory scope and convergence gates keep this real FR-5 gap advisory rather than allowing it to block this cycle.\n\n### [requirements] Resource-governor documentation describes superseded Open-action wiring — `docs/RESOURCE-GOVERNOR.md:400`\nThe guide still describes parsing an agent ID through `useStore()`, while the implementation now carries the canonical `issueId` and calls `useDashboardStore.getState().openIssue(issueId)`. The documentation line is outside this PR's changed-file set, so it remains advisory.\n\n### [requirements] Unrelated tiered-crews expectation is included through the main merge — `src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts:62`\nThe one-line blended-cost expectation has no trace to the SystemHealthPill requirements. It is test-only and attributable to the merged-main update, so it does not block this feature review.\n\n## Clean Sub-roles\n- security — no security blockers or advisories; React escaping and the existing confirmed kill/remove flow remain intact.\n- performance — no performance blockers or advisories; the new joins remain linear, and maximum consumer memory is computed once per list.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-549fb509/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3423 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -97,18 +110,18 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:00:07.249Z",
+  "updated": "2026-08-02T20:19:03.026Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:59:09.274Z",
-    "reviewNotes": "Correctness reviewer failed before producing a report, so correctness remains unverified.",
+    "updatedAt": "2026-08-02T20:19:02.232Z",
+    "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
       "sha": "d28b8893d9eba336166570587a15114995062a16",
@@ -119,8 +132,25 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewRequestedAt": "2026-08-02T19:58:47.095Z",
-    "reviewSpawnedAt": "2026-08-02T19:59:09.273Z"
+    "reviewSpawnedAt": "2026-08-02T19:59:09.273Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -135,17 +165,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1365530,
-            "output": 113148,
-            "cacheRead": 34015232,
+            "input": 3478607,
+            "output": 152114,
+            "cacheRead": 40700928,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 707319,
-            "output": 18303,
-            "cacheRead": 3285504,
+            "input": 1776465,
+            "output": 53094,
+            "cacheRead": 12468736,
             "cacheWrite": 0
           }
         },
@@ -181,9 +211,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 550926,
-            "output": 28895,
-            "cacheRead": 12955648,
+            "input": 669779,
+            "output": 39846,
+            "cacheRead": 24031744,
             "cacheWrite": 0
           }
         }
@@ -196,9 +226,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6147139,
-          "output": 290020,
-          "cacheRead": 61125632,
+          "input": 9448215,
+          "output": 374728,
+          "cacheRead": 88070656,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -209,8 +239,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 73.9510733,
-        "pricingAsOf": "2026-08-02T19:59:09.590Z"
+        "usd": 106.4702053,
+        "pricingAsOf": "2026-08-02T20:19:02.261Z"
       }
     },
     "merges": [
