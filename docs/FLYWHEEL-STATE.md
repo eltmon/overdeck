@@ -1003,3 +1003,9 @@ strike-3462 (deferred-deploy fix, `cadc19d9e9 keep queued blocker current`) repo
 - **Both operator-expedited PRs resynced onto the fixed main** (`28951731e73` for PAN-3467, `7a50dd163d7` for PAN-3468) — their prior failures were stale red-window results, so a merge-of-main triggers fresh CI rather than leaving them looking broken. Same pattern as tick 50's collateral sweep, now applied proactively.
 - Watch armed on #3470 (PAN-3467) — it is the gating one, since its fix must DEPLOY before `pan plan finalize` can promote the operator's spec. Sequence on green: merge both → `pan done --strike` ×2 → `pan reload` → finalize → `pan swarm PAN-3447`.
 - #3461 (PAN-3450) and #3472 (PAN-3462) also released by this merge; re-run their lanes next tick if still stale.
+
+## RUN-79 tick 62 (2026-08-02 ~05:10Z) — leak ROOT CAUSE fix in CI (#3476); all red-window collateral resynced
+
+- **strike-3431 signaled ready → PR #3476** — the parcel watcher removal, i.e. the actual cost-per-attach root cause. The 5-point RSS curve (attach-rate scaling, not uptime) is what pointed here; round 1 had only bounded the symptom. Two emergency restarts and ~hourly pre-emptive reloads today trace to this one structure.
+- **All four red-window collateral PRs resynced onto green main**: #3470/#3471 (expedites, earlier this tick), plus #3461 (PAN-3450) and #3472 (PAN-3462) now — each was showing a stale failure from CI runs taken while main was red. Resyncing beats re-driving: no agent gets sent to chase a cause that was never theirs.
+- Main CI running on `66f67f0ac0` (the red-main fix). MIN-932 at ctx 86% (compaction imminent, $126.39), MIN-934 $19.01 +846.
