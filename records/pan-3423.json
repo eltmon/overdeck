@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:09:36.704Z",
+  "updated": "2026-08-02T03:11:09.698Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "attention-section": {
-        "writerId": "agent-pan-3423",
-        "agentId": "agent-pan-3423",
-        "pid": 3259910,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:09:36.704Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3423",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Vitals tiles implemented: 4x2 grid (CPU, Memory, Overdeck, Swap) with meter bars. Bar colors follow 60/85 thresholds (green/amber/red) for CPU/memory/swap; Overdeck is neutral blue. Null metrics show 'Unavailable' with no bar. Swap tile includes 'historical · not live pressure' label. Tests pass, typecheck clean.",
         "releasedAt": "2026-08-02T03:08:47.401Z"
+      },
+      {
+        "writerId": "agent-pan-3423",
+        "agentId": "agent-pan-3423",
+        "pid": 3259910,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:09:36.704Z",
+        "itemId": "attention-section",
+        "outcome": "completed",
+        "reason": "Attention section complete: replaces flat bullet list with grouped severity-dotted rows. Groups identical agent codes with xN badge. Singleton agent rows have Open action. Context notes in closed details disclosure below rows. Grouped rows omit actions. Tests pass.",
+        "releasedAt": "2026-08-02T03:11:09.698Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "vitals-meter-tiles": {
         "reason": "Vitals tiles implemented: 4x2 grid (CPU, Memory, Overdeck, Swap) with meter bars. Bar colors follow 60/85 thresholds (green/amber/red) for CPU/memory/swap; Overdeck is neutral blue. Null metrics show 'Unavailable' with no bar. Swap tile includes 'historical · not live pressure' label. Tests pass, typecheck clean.",
         "updatedAt": "2026-08-02T03:08:47.401Z"
+      },
+      "attention-section": {
+        "reason": "Attention section complete: replaces flat bullet list with grouped severity-dotted rows. Groups identical agent codes with xN badge. Singleton agent rows have Open action. Context notes in closed details disclosure below rows. Grouped rows omit actions. Tests pass.",
+        "updatedAt": "2026-08-02T03:11:09.698Z"
       }
     }
   },
@@ -158,6 +165,11 @@
     "vitals-meter-tiles.vitals-meter-tiles.ac1": "completed",
     "vitals-meter-tiles.vitals-meter-tiles.ac2": "completed",
     "vitals-meter-tiles.vitals-meter-tiles.ac3": "completed",
-    "attention-section": "running"
+    "attention-section": "completed",
+    "attention-section.attention-section.ac1": "completed",
+    "attention-section.attention-section.ac2": "completed",
+    "attention-section.attention-section.ac3": "completed",
+    "attention-section.attention-section.ac4": "completed",
+    "attention-section.attention-section.ac5": "completed"
   }
 }
