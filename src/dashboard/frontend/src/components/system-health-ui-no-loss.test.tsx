@@ -228,9 +228,10 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getAllByText(/All clear.*spawn headroom.*relay running.*0 stalled/)).toHaveLength(1);
 
     // Chip row (new top status row, replaces old 8-tile status grid)
-    expect(within(dialog).getByLabelText('Admitted work agents: 2')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Containers: 1')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Webhook relay: Running')).toBeInTheDocument();
+    expect(within(dialog).getByRole('img', { name: 'healthy system health' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('group', { name: 'Admitted work agents: 2' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('group', { name: 'Containers: 1' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('group', { name: 'Webhook relay: Running' })).toBeInTheDocument();
 
     // Vitals tiles (4x2 grid with meter bars, replaces old 8-tile grid)
     expect(within(dialog).getByText('CPU')).toBeInTheDocument();
@@ -287,15 +288,15 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    expect(within(dialog).getByLabelText('Consumer kind: Work')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Consumer kind: Specialist')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Consumer kind: Container')).toBeInTheDocument();
+    expect(within(dialog).getByRole('note', { name: 'Consumer kind: Agent' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('note', { name: 'Consumer kind: Specialist' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('note', { name: 'Consumer kind: Container' })).toBeInTheDocument();
     expect(within(dialog).getByText('agent-pan-1 · PAN-1')).toBeInTheDocument();
     expect(within(dialog).getByText('specialist-review-agent · PAN-1')).toBeInTheDocument();
     expect(within(dialog).getByText('container-1')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('agent-pan-1 memory share: 100.0%')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('specialist-review-agent memory share: 100.0%')).toBeInTheDocument();
-    expect(within(dialog).getByLabelText('container-1 memory share: 50.0%')).toBeInTheDocument();
+    expect(within(dialog).getByRole('meter', { name: 'agent-pan-1 memory share: 100.0%' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('meter', { name: 'specialist-review-agent memory share: 100.0%' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('meter', { name: 'container-1 memory share: 50.0%' })).toBeInTheDocument();
   });
 
   it('groups agent attention rows and exposes each canonical Open and Kill action', async () => {
@@ -420,7 +421,7 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    expect(within(dialog).getAllByLabelText('critical attention').length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
     expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
   });

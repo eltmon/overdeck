@@ -56,6 +56,21 @@ function stateClasses(state: HealthState): string {
   }
 }
 
+function stateDotClass(state: HealthState): string {
+  switch (state) {
+    case 'critical':
+      return 'bg-destructive';
+    case 'warning':
+      return 'bg-warning';
+    case 'unavailable':
+      return 'bg-muted-foreground';
+    case 'measuring':
+      return 'bg-info';
+    case 'healthy':
+      return 'bg-success';
+  }
+}
+
 function topConsumerLabel(consumer: SystemHealthConsumer): string {
   if (consumer.issueId) return `${consumer.label} · ${consumer.issueId}`;
   if (consumer.currentIssue) return `${consumer.label} · ${consumer.currentIssue}`;
@@ -65,7 +80,7 @@ function topConsumerLabel(consumer: SystemHealthConsumer): string {
 function topConsumerKindLabel(consumer: SystemHealthConsumer): string {
   switch (consumer.type) {
     case 'agent':
-      return 'Work';
+      return 'Agent';
     case 'specialist':
       return 'Specialist';
     case 'container':
@@ -347,7 +362,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
 
   if (isLoading) {
     return (
-      <div className={`flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} aria-label="Loading system health">
+      <div role="status" className={`flex items-center gap-2 rounded-md border border-border px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} aria-label="Loading system health">
         <Loader2 aria-hidden="true" className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
         {!compact && <span>Health</span>}
       </div>
@@ -356,7 +371,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
 
   if (error || !data) {
     return (
-      <div className={`flex items-center gap-2 rounded-md border border-border bg-muted px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} title={(error as Error | undefined)?.message ?? 'Failed to load system health'} aria-label="Health unavailable">
+      <div role="alert" className={`flex items-center gap-2 rounded-md border border-border bg-muted px-2 py-1.5 text-xs text-muted-foreground ${compact ? 'justify-center px-1.5' : ''}`} title={(error as Error | undefined)?.message ?? 'Failed to load system health'} aria-label="Health unavailable">
         <CircleHelp aria-hidden="true" className="h-3.5 w-3.5" />
         {!compact && <span>Health unavailable · Retry</span>}
       </div>
@@ -397,9 +412,13 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
         >
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div id={POPOVER_TITLE_ID} className="mb-2 flex items-center gap-2">
-                <span className="font-semibold text-foreground">System health</span>
-                <span className={`inline-flex h-2 w-2 rounded-full ${stateClasses(data.state).split(' ')[0]} border-current`}></span>
+              <div className="mb-2 flex items-center gap-2">
+                <span id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</span>
+                <span
+                  role="img"
+                  aria-label={`${data.state} system health`}
+                  className={`inline-flex h-2 w-2 rounded-full ${stateDotClass(data.state)}`}
+                />
               </div>
               <div className="text-xs text-muted-foreground">Updated {Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago</div>
             </div>
@@ -479,15 +498,15 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
           </div>
 
           <div className="mb-3 flex flex-wrap gap-2">
-            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground" aria-label={`Admitted work agents: ${data.admission.admittedWorkAgentCount}`}>
+            <div role="group" className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground" aria-label={`Admitted work agents: ${data.admission.admittedWorkAgentCount}`}>
               <span className="text-muted-foreground">Admitted work agents</span>
               <span>{data.admission.admittedWorkAgentCount}</span>
             </div>
-            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground" aria-label={`Containers: ${data.summary.containerCount}`}>
+            <div role="group" className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground" aria-label={`Containers: ${data.summary.containerCount}`}>
               <span className="text-muted-foreground">Containers</span>
               <span>{data.summary.containerCount}</span>
             </div>
-            <div className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`} aria-label={`Webhook relay: ${relay?.status === 'running' ? 'Running' : 'Stopped'}`}>
+            <div role="group" className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`} aria-label={`Webhook relay: ${relay?.status === 'running' ? 'Running' : 'Stopped'}`}>
               <span className={`inline-block h-2 w-2 rounded-full ${relay?.status === 'running' ? 'bg-success' : 'bg-warning'}`}></span>
               <span className="text-muted-foreground">Webhook relay</span>
               <span>{relay?.status === 'running' ? 'Running' : 'Stopped'}</span>
@@ -506,7 +525,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                     <div key={`${item.code}-${item.agents.join(',')}`} className="text-xs">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex min-w-0 items-center gap-2">
-                          <span className={`inline-block h-2 w-2 rounded-full ${item.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`} aria-label={`${item.severity} attention`}></span>
+                          <span role="img" className={`inline-block h-2 w-2 rounded-full ${item.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`} aria-label={`${item.severity} attention`} />
                           <div className="min-w-0 flex-1">
                             <div className="text-foreground">
                               {item.title}
@@ -591,13 +610,21 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
-                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground" aria-label={`Consumer kind: ${topConsumerKindLabel(consumer)}`}>{topConsumerKindLabel(consumer)}</span>
+                        <span role="note" className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground" aria-label={`Consumer kind: ${topConsumerKindLabel(consumer)}`}>{topConsumerKindLabel(consumer)}</span>
                         {consumer.leaked && <span className="rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-medium text-warning">LEAKED</span>}
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">{consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
                       {memoryPercent > 0 && (
                         <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-                          <div className="h-full bg-info" style={{ width: `${memoryPercent}%` }} aria-label={`${consumer.label} memory share: ${memoryPercent.toFixed(1)}%`} />
+                          <div
+                            role="meter"
+                            aria-label={`${consumer.label} memory share: ${memoryPercent.toFixed(1)}%`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Number(memoryPercent.toFixed(1))}
+                            className="h-full bg-info"
+                            style={{ width: `${memoryPercent}%` }}
+                          />
                         </div>
                       )}
                     </div>

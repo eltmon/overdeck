@@ -100,7 +100,9 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
     const agentId = consumer.killTarget?.kind === 'agent'
       ? consumer.killTarget.agentId ?? consumer.id
       : consumer.id;
-    agentConsumers.set(agentId, consumer);
+    if (!agentConsumers.has(agentId)) {
+      agentConsumers.set(agentId, consumer);
+    }
   }
 
   const allReasons: Array<{

@@ -267,6 +267,47 @@ describe('system-health-attention', () => {
       });
     });
 
+    it('preserves the first matching consumer when duplicate identities appear', () => {
+      const snapshot = createSnapshot('healthy', {
+        agents: [{
+          id: 'agent-stalled',
+          issueId: 'PAN-1',
+          status: 'stalled',
+          reasons: [{
+            code: 'agent.runtime.inactive.stalled',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'agent-stalled has produced no activity for 35 min.',
+          }],
+        }],
+        topConsumers: [
+          {
+            id: 'agent-stalled',
+            label: 'agent-stalled',
+            type: 'agent',
+            memoryBytes: GIB,
+            memoryGb: 1,
+            issueId: 'PAN-1',
+            killTarget: { kind: 'agent', agentId: 'agent-stalled' },
+          },
+          {
+            id: 'duplicate-consumer',
+            label: 'duplicate-consumer',
+            type: 'agent',
+            memoryBytes: GIB / 2,
+            memoryGb: 0.5,
+            issueId: 'PAN-2',
+            killTarget: { kind: 'agent', agentId: 'agent-stalled' },
+          },
+        ],
+      });
+
+      const items = buildAttentionItems(snapshot);
+
+      expect(items[0]?.killConsumer?.label).toBe('agent-stalled');
+      expect(items[0]?.killConsumer?.issueId).toBe('PAN-1');
+    });
+
     it('carries the matching specialist kill consumer for a singleton specialist', () => {
       const snapshot = createSnapshot('healthy', {
         agents: [{

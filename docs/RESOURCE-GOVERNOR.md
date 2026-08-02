@@ -397,7 +397,7 @@ The dashboard System Health Pill popover displays live resource metrics and gove
 
 The pill header shows a state dot (red/amber/green) and a "Updated Ns ago" timestamp relative to the snapshot's `updatedAt`. A state transition into critical emits one toast notification with an action to jump to the popover focus-locked on leaked-first. A "Show all" button expands/collapses top consumers between leaked-only and full views.
 
-**Data flow:** `buildAttentionItems()` in `system-health-attention.ts` groups reasons by code, filters severity:info for collapsed disclosure, and sorts by critical-first, stalled-before-idle. `summaryLine()` constructs the header text from health state and stalled-agent count. `contextNotes()` returns only info reasons. The component passes control via `useStore()` open-issue navigation — the `Open` action parses the agent ID to derive an issue ID and route there.
+**Data flow:** `buildAttentionItems()` in `system-health-attention.ts` groups reasons by code, filters severity:info for collapsed disclosure, and sorts by critical-first, stalled-before-idle. `summaryLine()` constructs the header text from health state and stalled-agent count. `contextNotes()` returns only info reasons. Each attention target carries its canonical `issueId`; the component passes that value directly to `useDashboardStore().openIssue()` when the operator chooses `Open`.
 
 ## Related documents
 
