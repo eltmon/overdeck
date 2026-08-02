@@ -5,6 +5,7 @@ import { GodViewSidebar } from '../Sidebar';
 import { BottomStrip } from './BottomStrip';
 import { ConfluenceHelp } from './ConfluenceHelp';
 import { HookBus } from './HookBus';
+import { IssueRail } from './IssueRail';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography } from './useConfluenceChoreography';
@@ -59,6 +60,10 @@ export function GodViewConfluence({
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const [hover, setHover] = useState<HoverState | null>(null);
   const [selectedId, setSelectedId] = useState(() => selectedConfluenceIssueId());
+  // Operator-reopened D-3: orb/feed clicks open the in-canvas issue rail (the
+  // mockup UX); the real issue page is the rail's explicit action button.
+  const [railId, setRailId] = useState<string | null>(null);
+  const railOrb = railId ? orbs.find((orb) => orb.id === railId) ?? null : null;
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
 
   useEffect(() => {
@@ -83,6 +88,9 @@ export function GodViewConfluence({
       } else if (event.key === 'Escape' && helpOpen) {
         event.preventDefault();
         onHelpOpenChange(false);
+      } else if (event.key === 'Escape' && railId) {
+        event.preventDefault();
+        setRailId(null);
       } else if (event.key === 'f') {
         event.preventDefault();
         onToggleFullscreen();
@@ -90,7 +98,7 @@ export function GodViewConfluence({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [helpOpen, onHelpOpenChange, onToggleFullscreen]);
+  }, [helpOpen, onHelpOpenChange, onToggleFullscreen, railId]);
 
   useEffect(() => {
     let resizeTimer: number | undefined;
@@ -115,14 +123,22 @@ export function GodViewConfluence({
             ref={effectsRef}
             orbs={orbs}
             hookStream={hookStream}
-            selectedId={selectedId}
+            selectedId={railId ?? selectedId}
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}
-            onSelect={(orb) => {
-              if (orb) navigateToConfluenceIssue(orb.id);
-            }}
+            onSelect={(orb) => setRailId(orb ? orb.id : null)}
           />
+
+          {railOrb && (
+            <IssueRail
+              orb={railOrb}
+              agents={agents.filter((agent) => agent.issueId === railOrb.id)}
+              entries={hookStream.entries.filter((entry) => entry.issueId === railOrb.id)}
+              onClose={() => setRailId(null)}
+              onOpenIssue={navigateToConfluenceIssue}
+            />
+          )}
 
           {hover && (
             <OrbTooltip
@@ -140,7 +156,7 @@ export function GodViewConfluence({
         <GodViewSidebar
           agents={agents}
           onIssueHover={(issueId) => effectsRef.current?.emitRing(issueId, '#ffffff')}
-          onIssueSelect={navigateToConfluenceIssue}
+          onIssueSelect={(issueId) => setRailId(issueId)}
         />
       </div>
 

@@ -28,7 +28,19 @@ vi.mock('../../Sidebar', () => ({
 }));
 
 const data = {
-  orbs: [{ id: 'PAN-3447' } as ConfluenceOrb],
+  orbs: [{
+    id: 'PAN-3447',
+    project: 'overdeck',
+    role: 'work',
+    stage: 'WORK',
+    title: 'God View Confluence',
+    state: 'active',
+    labels: [],
+    staleMin: 0,
+    yieldReason: null,
+    warn: null,
+    broken: false,
+  } as unknown as ConfluenceOrb],
   hookStream: { entries: [], eventsPerMin: 0 },
   meta: { conversations: 0, mergeQ: 0, roleCounts: {} },
 } as unknown as ConfluenceData;
@@ -50,25 +62,47 @@ describe('Confluence issue drawer link', () => {
     window.history.replaceState({}, '', '/god-view');
   });
 
-  it('navigates a picked orb to the real issue drawer route', () => {
+  it('opens the in-canvas issue rail for a picked orb without leaving the god view', () => {
+    const pushState = vi.spyOn(window.history, 'pushState');
+    renderConfluence();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
+
+    expect(screen.getByLabelText('Issue rail for PAN-3447')).toBeInTheDocument();
+    expect(pushState).not.toHaveBeenCalled();
+    expect(window.location.pathname).toBe('/god-view');
+  });
+
+  it('navigates to the real issue page only via the rail action button', () => {
     const pushState = vi.spyOn(window.history, 'pushState');
     const dispatchEvent = vi.spyOn(window, 'dispatchEvent');
     renderConfluence();
 
     fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open issue page →' }));
 
     expect(pushState).toHaveBeenCalledWith({}, '', '/issues/PAN-3447');
     expect(dispatchEvent).toHaveBeenCalledWith(expect.any(PopStateEvent));
   });
 
-  it('does not navigate when canvas picking misses', () => {
-    const pushState = vi.spyOn(window.history, 'pushState');
+  it('closes the rail on canvas miss and on Escape', () => {
     renderConfluence();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
     fireEvent.click(screen.getByRole('button', { name: 'Canvas miss' }));
+    expect(screen.queryByLabelText('Issue rail for PAN-3447')).not.toBeInTheDocument();
 
-    expect(pushState).not.toHaveBeenCalled();
-    expect(window.location.pathname).toBe('/god-view');
+    fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByLabelText('Issue rail for PAN-3447')).not.toBeInTheDocument();
+  });
+
+  it('drives the selection ring from the open rail', () => {
+    renderConfluence();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Orb hit' }));
+
+    expect(screen.getByLabelText('Stubbed river canvas')).toHaveAttribute('data-selected-id', 'PAN-3447');
   });
 
   it('drives the selected ring from the current issue route', () => {

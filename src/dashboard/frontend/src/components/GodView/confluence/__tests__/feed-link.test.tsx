@@ -78,7 +78,19 @@ import { ActivityFeed } from '../../ActivityFeed';
 import { GodViewConfluence } from '../GodViewConfluence';
 
 const data = {
-  orbs: [],
+  orbs: [{
+    id: 'PAN-3447',
+    project: 'overdeck',
+    role: 'work',
+    stage: 'WORK',
+    title: 'God View Confluence',
+    state: 'active',
+    labels: [],
+    staleMin: 0,
+    yieldReason: null,
+    warn: null,
+    broken: false,
+  }],
   hookStream: {
     entries: [],
     eventTimes: [],
@@ -137,7 +149,7 @@ describe('Confluence feed and orb linking', () => {
     expect(onIssueSelect).toHaveBeenCalledTimes(1);
   });
 
-  it('flashes the matching orb white and opens the real issue drawer route', () => {
+  it('flashes the matching orb white and opens the in-canvas issue rail', () => {
     const pushState = vi.spyOn(window.history, 'pushState');
     render(
       <GodViewConfluence
@@ -152,6 +164,7 @@ describe('Confluence feed and orb linking', () => {
     expect(mocks.emitRing).toHaveBeenCalledWith('PAN-3447', '#ffffff');
 
     fireEvent.click(screen.getByRole('button', { name: 'Select feed issue' }));
-    expect(pushState).toHaveBeenCalledWith({}, '', '/issues/PAN-3447');
+    expect(screen.getByLabelText('Issue rail for PAN-3447')).toBeInTheDocument();
+    expect(pushState).not.toHaveBeenCalled();
   });
 });
