@@ -19,9 +19,10 @@ import {
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
 import type { ProjectConfig } from '../../../src/lib/projects.js';
 
-const { mockGetProjectSync, mockResolveStateReadHomeSync } = vi.hoisted(() => ({
+const { mockGetProjectSync, mockResolveStateReadHomeSync, mockStartFlywheelRun } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockResolveStateReadHomeSync: vi.fn(),
+  mockStartFlywheelRun: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/projects.js', async (importOriginal) => {
@@ -39,6 +40,10 @@ vi.mock('../../../src/lib/state-read-home.js', async (importOriginal) => {
     resolveStateReadHomeSync: mockResolveStateReadHomeSync,
   };
 });
+
+vi.mock('../../../src/cli/commands/flywheel.js', () => ({
+  startFlywheelRun: mockStartFlywheelRun,
+}));
 
 const roots: string[] = [];
 const at = '2026-07-18T12:00:00.000Z';
@@ -68,6 +73,7 @@ function gitFixture(): string {
 beforeEach(() => {
   mockGetProjectSync.mockReset().mockReturnValue(null);
   mockResolveStateReadHomeSync.mockReset();
+  mockStartFlywheelRun.mockReset();
 });
 
 afterEach(() => {
@@ -216,5 +222,22 @@ describe('pan orders commands', () => {
     const queued = await runOrdersQueue(created.id, { projectKey: 'other-project' });
     expect(queued.status).toBe('ready');
     expect(runOrdersShow(created.id, { projectKey: 'other-project' }).status).toBe('ready');
+  });
+
+  it('starts the Flywheel with cwd set to the selected --project, not the caller cwd', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockImplementation(() => ({ root: otherRoot, migrated: true }));
+    mockStartFlywheelRun.mockResolvedValue({ runId: 'RUN-CLI-CROSS' });
+
+    const created = await runOrdersCreate('Cross Start', {
+      projectKey: 'other-project',
+      now: () => new Date(at),
+    });
+
+    await expect(runOrdersStart(created.id, { projectKey: 'other-project' }))
+      .resolves.toEqual({ runId: 'RUN-CLI-CROSS' });
+    expect(mockStartFlywheelRun).toHaveBeenCalledWith({ cwd: '/fake/other-project', orders: created.id });
   });
 });

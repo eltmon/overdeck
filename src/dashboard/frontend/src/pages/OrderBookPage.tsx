@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { BookOpen, Loader2 } from 'lucide-react';
 
@@ -59,13 +59,19 @@ export function OrderBookPage() {
     staleTime: 60_000,
   });
 
+  // Bumped on every loadBooks call so a response from a superseded project
+  // switch can recognize it arrived late and skip applying its stale books.
+  const loadGeneration = useRef(0);
+
   const loadBooks = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setLoading(true);
     setError(null);
     try {
       const response = await fetch(withProject('/api/orders', projectKey));
       if (!response.ok) throw new Error(await readError(response));
       const payload = await response.json() as OrdersPayload;
+      if (loadGeneration.current !== generation) return;
       setBooks(payload.books);
       if (payload.project) setServerProject(payload.project);
       setSelectedId((current) => {
@@ -76,15 +82,19 @@ export function OrderBookPage() {
           ?? null;
       });
     } catch (cause) {
+      if (loadGeneration.current !== generation) return;
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
-      setLoading(false);
+      if (loadGeneration.current === generation) setLoading(false);
     }
   }, [projectKey]);
 
   const selectProject = useCallback((key: string) => {
     setProjectKey(key);
     setSelectedId(null);
+    // Clear immediately so the previous project's books never render under
+    // the newly-selected scope while the new fetch is in flight.
+    setBooks([]);
     setPreview(null);
     setActionMessage(null);
     const params = new URLSearchParams(window.location.search);

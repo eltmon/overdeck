@@ -15,12 +15,14 @@ const {
   mockFindProjectByPathSync,
   mockListProjectsSync,
   mockResolveStateReadHomeSync,
+  mockResolveStateReadHomeAsync,
   mockStartFlywheelRun,
 } = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
   mockListProjectsSync: vi.fn(),
   mockResolveStateReadHomeSync: vi.fn(),
+  mockResolveStateReadHomeAsync: vi.fn(),
   mockStartFlywheelRun: vi.fn(),
 }));
 
@@ -43,6 +45,7 @@ vi.mock('../../../../lib/state-read-home.js', async (importOriginal) => {
   return {
     ...actual,
     resolveStateReadHomeSync: mockResolveStateReadHomeSync,
+    resolveStateReadHomeAsync: mockResolveStateReadHomeAsync,
   };
 });
 

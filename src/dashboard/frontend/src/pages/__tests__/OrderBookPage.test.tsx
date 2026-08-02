@@ -242,6 +242,42 @@ describe('OrderBookPage', () => {
     ).toBe('mind-your-now'));
   });
 
+  it('ignores a stale project-A list response that resolves after switching to project B', async () => {
+    const projectABook = book({ id: '2026-07-18-a', name: 'Project A campaign' });
+    const projectBBook = book({ id: '2026-07-18-b', name: 'Project B campaign', status: 'ready' });
+    let resolveA: (() => void) | undefined;
+    let resolveB: (() => void) | undefined;
+
+    stubFetch(async (input) => {
+      const url = String(input);
+      if (url === '/api/orders') {
+        await new Promise<void>((resolve) => { resolveA = resolve; });
+        return ordersResponse([projectABook], 'panopticon-cli');
+      }
+      if (url === '/api/orders?project=mind-your-now') {
+        await new Promise<void>((resolve) => { resolveB = resolve; });
+        return ordersResponse([projectBBook], 'mind-your-now');
+      }
+      return ordersResponse([]);
+    });
+
+    render(<OrderBookPage />);
+    await waitFor(() => expect(resolveA).toBeDefined());
+
+    fireEvent.change(await screen.findByLabelText('Order book project'), { target: { value: 'mind-your-now' } });
+    await waitFor(() => expect(resolveB).toBeDefined());
+
+    // Resolve the new selection first, then let the superseded project-A
+    // request land late — it must not clobber project B's rendered books.
+    resolveB!();
+    expect(await screen.findByText('Project B campaign')).toBeInTheDocument();
+    resolveA!();
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByText('Project B campaign')).toBeInTheDocument();
+    expect(screen.queryByText('Project A campaign')).not.toBeInTheDocument();
+  });
+
   it('loads detail validation, previews the brief, and starts through order routes', async () => {
     const warning = { code: 'missing-prd', issue: 'PAN-3', message: 'PAN-3 will be planned at pickup' };
     const launchable = book({ id: '2026-07-18-launch', name: 'Launchable', status: 'ready', validation: { blocks: [], warns: [warning] } });

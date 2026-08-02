@@ -7,7 +7,7 @@ import type {
 import { Effect, Layer } from 'effect';
 import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
-import { backlogCandidates, computeBookProgress, getBook, listBooks, liveOrderIssueLookup } from '../../../lib/orders/resolver.js';
+import { backlogCandidates, computeBookProgress, getBook, getBookAsync, listBooks, liveOrderIssueLookup } from '../../../lib/orders/resolver.js';
 import type { OrderIssueLookup, OrderIssueState } from '../../../lib/orders/types.js';
 import { createOrderPrdLookup, hasOrderIssuePrd, validateBookForStart } from '../../../lib/orders/validate.js';
 import {
@@ -23,7 +23,7 @@ import {
 } from '../../../lib/orders/writer.js';
 import { findProjectByPathSync, getProjectSync, listProjectsSync, resolveProjectPath, type ProjectConfig } from '../../../lib/projects.js';
 import { projectKey as resolveCanonicalProjectKey } from '../../../lib/project-key.js';
-import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
+import { resolveStateReadHomeAsync, resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 import { jsonResponse } from '../http-helpers.js';
 import { rejectUnsafeDashboardMutationRequest } from './dashboard-auth.js';
 import { httpHandler } from './http-handler.js';
@@ -337,9 +337,13 @@ export async function getOrderPayload(
     if (deps.stateRoot || projectKey !== undefined) {
       throw new Error(`Order book not found: ${bookId}`);
     }
+    // Scan sequentially (not in parallel) to preserve registry-order first-match
+    // behavior, and via async fs reads so N candidate projects cannot stall the
+    // dashboard's shared HTTP/WebSocket event loop.
     for (const { key, config } of listProjectsSync()) {
       if (key === primary.project) continue;
-      const scannedBook = getBook(resolveStateReadHomeSync(config, key).root, bookId);
+      const scanRoot = (await resolveStateReadHomeAsync(config, key)).root;
+      const scannedBook = await getBookAsync(scanRoot, bookId);
       if (scannedBook) return enrichedBook(scannedBook, deps, undefined, key);
     }
     throw new Error(`Order book not found: ${bookId}`);

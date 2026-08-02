@@ -11,7 +11,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync } from '../../lib/projects.js';
+import { findProjectByPathSync, getProjectSync, resolveProjectPath, type ProjectConfig } from '../../lib/projects.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 
 interface OrdersCommandDeps {
@@ -36,17 +36,26 @@ interface OrdersMoveOptions {
   project?: string;
 }
 
-function stateRootFor(deps: OrdersCommandDeps = {}): string {
-  if (deps.stateRoot) return deps.stateRoot;
+interface OrdersProjectResolution {
+  stateRoot: string;
+  projectConfig?: ProjectConfig;
+}
+
+function resolveOrdersProject(deps: OrdersCommandDeps = {}): OrdersProjectResolution {
+  if (deps.stateRoot) return { stateRoot: deps.stateRoot };
   if (deps.projectKey !== undefined) {
     const project = getProjectSync(deps.projectKey);
     if (!project) throw new Error(`Unknown project: ${deps.projectKey}`);
-    return resolveStateReadHomeSync(project, deps.projectKey).root;
+    return { stateRoot: resolveStateReadHomeSync(project, deps.projectKey).root, projectConfig: project };
   }
   const cwd = deps.cwd ?? process.cwd();
   const project = findProjectByPathSync(cwd);
   if (!project) throw new Error(`No configured project contains ${cwd}`);
-  return resolveStateReadHomeSync(project).root;
+  return { stateRoot: resolveStateReadHomeSync(project).root, projectConfig: project };
+}
+
+function stateRootFor(deps: OrdersCommandDeps = {}): string {
+  return resolveOrdersProject(deps).stateRoot;
 }
 
 function requireBook(stateRoot: string, bookId: string): OrderBook {
@@ -110,9 +119,9 @@ export function formatBookList(books: readonly OrderBook[]): string {
   ].join('\n');
 }
 
-async function defaultStartOrderBook(bookId: string): Promise<{ runId: string }> {
+async function defaultStartOrderBook(bookId: string, project?: ProjectConfig): Promise<{ runId: string }> {
   const { startFlywheelRun } = await import('./flywheel.js');
-  return startFlywheelRun({ orders: bookId });
+  return startFlywheelRun({ cwd: project ? resolveProjectPath(project) : undefined, orders: bookId });
 }
 
 export async function runOrdersCreate(name: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
@@ -204,8 +213,9 @@ export async function runOrdersMove(
 }
 
 export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
-  requireBook(stateRootFor(deps), bookId);
-  return (deps.startOrderBook ?? defaultStartOrderBook)(bookId);
+  const resolved = resolveOrdersProject(deps);
+  requireBook(resolved.stateRoot, bookId);
+  return (deps.startOrderBook ?? ((id: string) => defaultStartOrderBook(id, resolved.projectConfig)))(bookId);
 }
 
 export async function runOrdersQueue(bookId: string, deps: OrdersCommandDeps = {}): Promise<OrderBook> {
