@@ -203,7 +203,7 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:05:12.693Z",
+  "updated": "2026-08-02T21:05:15.528Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -214,7 +214,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T21:05:05.494Z",
+    "updatedAt": "2026-08-02T21:05:09.636Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3427-review already running. Use 'pan tell' to message it.",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -366,7 +367,7 @@
       },
       "costAtCloseOut": {
         "usd": 98.6402021,
-        "pricingAsOf": "2026-08-02T21:05:12.683Z"
+        "pricingAsOf": "2026-08-02T21:05:15.520Z"
       }
     },
     "merges": [
