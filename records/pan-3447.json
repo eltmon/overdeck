@@ -66,18 +66,18 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T06:38:14.351Z",
+  "updated": "2026-08-02T06:46:25.323Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "failed",
+    "inspectStatus": "inspecting",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T06:38:13.195Z",
-    "inspectNotes": "AC1 'stable object identity across no-op polls' NOT met. orbSignature() [src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts:243] JSON.stringifies the entire orb, including the clock-derived floats staleMin/idleMin [:475, :491] computed from Date.now() [:450, :459]. Any memo re-run at a different millisecond therefore produces a different signature -> cache miss -> a brand-new orb object. syncSnapshot rebuilds agentsById as a fresh object on every snapshot poll [packages/contracts/src/event-reducers.ts:274-277], which re-runs the useMemo and is exactly the no-op poll the AC names, so in production orb identity is never preserved. The test passes only because vi.setSystemTime(NOW) freezes the clock [confluence/__tests__/useConfluenceData.test.ts:46] - a false green. REQUIRED FIX: compute the signature over the stable subset only (omit or floor staleMin/idleMin; consumers can derive age from orb.lastActivity), and strengthen the identity test to advance fake time (e.g. advanceTimersByTimeAsync) between the two polls before asserting toBe(original). SECONDARY (same fix area): useConfluenceOrbs' default parameter microStatesByAgentId = {} [:424] allocates a fresh object every call, so the memo dep churns on every render for any consumer that omits the argument - hoist a module-level EMPTY_MICRO_STATES constant. NOTE (non-blocking): publishDashboardDomainEvents fires before set() [src/dashboard/frontend/src/lib/store.ts:181-188], so telemetryEntry resolves issueId against the pre-event agentsById and a newly-created agent's first hook events land with issueId null. AC2 met (5-member convoy incl. synthesis via reviewSubRole parent mapping). AC3 met (60s window, +0.13 bump, x0.5 per 1.6s decay, hookName preserved end-to-end through contracts/bodyToEvent/hooks). AC4 met (thinkUntil/waitUntil/compactT/spend mapped; beads null is the PRD-sanctioned NFR-8 fallback per drafts/pan-3447.md:184)."
+    "updatedAt": "2026-08-02T06:46:25.275Z",
+    "inspectNotes": "Inspecting item confluence-data"
   },
   "closeOut": {
     "usage": {
@@ -92,9 +92,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8103984,
-            "output": 383600,
-            "cacheRead": 102219776,
+            "input": 8291922,
+            "output": 395568,
+            "cacheRead": 106114048,
             "cacheWrite": 0
           }
         }
@@ -107,15 +107,15 @@
           "cacheWrite": 92005
         },
         "openai/gpt-5.6-sol": {
-          "input": 8103984,
-          "output": 383600,
-          "cacheRead": 102219776,
+          "input": 8291922,
+          "output": 395568,
+          "cacheRead": 106114048,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 117.412509,
-        "pricingAsOf": "2026-08-02T06:38:13.435Z"
+        "usd": 120.658375,
+        "pricingAsOf": "2026-08-02T06:46:25.285Z"
       }
     },
     "merges": [],
