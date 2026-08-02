@@ -15,6 +15,9 @@ vi.mock('fs/promises', () => ({
 }));
 
 vi.mock('../config-yaml.js', () => ({
+  DEFAULT_CONFIG: {
+    ui: { openInEditorCommand: null, theme: 'broadsheet' },
+  },
   PARENT_MODEL_REF: 'parent',
   DEFAULT_MODEL_REFS: {
     plan: 'workhorse:expensive',
@@ -710,23 +713,26 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('PAN-123');
   });
 
-  it('persists a valid ui.theme value (PAN-3410)', async () => {
-    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
-    const settings = loadSettingsApi();
+  it('saveDesignLanguage persists a valid ui.theme value (PAN-3410)', async () => {
+    const { saveDesignLanguage } = await import('../settings-api.js');
 
-    await Effect.runPromise(saveSettingsApi({
-      ...settings,
-      ui: { theme: 'ledger' },
-    }));
+    await Effect.runPromise(saveDesignLanguage('ledger'));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('ui:');
     expect(written).toContain('theme: ledger');
   });
 
-  it('preserves an existing open_in_editor_command when only ui.theme is saved (no-loss, PAN-3410)', async () => {
+  it('the general saveSettingsApi never honors a caller-supplied ui.theme — only saveDesignLanguage may write it (PAN-3410 review finding, cycle 8)', async () => {
+    // A whole-document PUT /api/settings payload can carry a `ui.theme`
+    // snapshot materialized before a since-completed theme save (another
+    // tab, or the top-level Settings form's own pre-save refetch losing a
+    // race). Trusting it would silently revert the newer theme once this
+    // save's queued turn runs — saveSettingsApi must always carry forward
+    // whatever theme is *currently* on disk instead, regardless of what
+    // the caller's own `ui.theme` says.
     mockLoadConfig.mockReturnValue(baseConfig({
-      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger' },
+      ui: { openInEditorCommand: null, theme: 'ledger' },
     }));
     const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
     const settings = loadSettingsApi();
@@ -735,6 +741,19 @@ describe('saveSettingsApi', () => {
       ...settings,
       ui: { theme: 'broadsheet' },
     }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('theme: ledger');
+    expect(written).not.toContain('theme: broadsheet');
+  });
+
+  it('preserves an existing open_in_editor_command when saveDesignLanguage changes only the theme (no-loss, PAN-3410)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger' },
+    }));
+    const { saveDesignLanguage } = await import('../settings-api.js');
+
+    await Effect.runPromise(saveDesignLanguage('broadsheet'));
 
     const written = String(mockWriteFile.mock.calls[0]?.[1]);
     expect(written).toContain('open_in_editor_command: cursor {path}');
@@ -768,11 +787,13 @@ describe('saveSettingsApi', () => {
     // mockLoadConfig/mockWriteFile model a real config.yaml: every write
     // replaces `state` with exactly what that write's content says for
     // `mid`/`theme` (never leaves a field untouched the way "if includes X"
-    // checks would), and every read reflects the current `state`. This only
-    // passes if runSettingsWriteSerialized truly defers the second call's
-    // read until the first call's write has landed — without it, the second
-    // call's stale pre-write snapshot of the *other* field silently reverts
-    // whatever the first call just wrote.
+    // checks would), and every read reflects the current `state`. Two
+    // independent protections are exercised here: `workhorses.mid` surviving
+    // proves runSettingsWriteSerialized defers the second call's read until
+    // the first call's write has landed (cycle 6); `theme` surviving proves
+    // saveSettingsApi's `honorThemeFromSettings` gate (cycle 8) — this is
+    // the general full-document path, so its own `ui.theme` snapshot must
+    // never reach disk regardless of write ordering.
     let state = { workhorses: { mid: 'claude-sonnet-4-6' }, ui: { openInEditorCommand: null, theme: 'broadsheet' as const } };
     mockLoadConfig.mockImplementation(() => baseConfig(state));
     mockWriteFile.mockImplementation(async (_path: string, content: string) => {

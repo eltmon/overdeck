@@ -903,7 +903,22 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
   return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
 }
 
-async function saveSettingsApiPromiseUnlocked(settings: ApiSettingsConfig): Promise<void> {
+/**
+ * `honorThemeFromSettings` gates whether `settings.ui?.theme` is allowed to
+ * reach disk (PAN-3410 review finding, cycle 8). Only `saveDesignLanguagePromise`
+ * passes `true`, immediately after its own fresh `loadSettingsApi()` read
+ * inside the write queue. Every other caller — chiefly the general
+ * `PUT /api/settings` route, whose `settings` argument is a whole-document
+ * payload a client materialized from a GET that can predate a since-completed
+ * theme save — defaults to `false` and always carries forward the freshly
+ * re-read `currentConfig.ui.theme` below instead. Without this gate, that
+ * caller's queued turn would silently revert whichever theme was live when
+ * its GET ran, no matter how much later its own turn actually executes.
+ */
+async function saveSettingsApiPromiseUnlocked(
+  settings: ApiSettingsConfig,
+  { honorThemeFromSettings = false }: { honorThemeFromSettings?: boolean } = {},
+): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
@@ -956,13 +971,16 @@ async function saveSettingsApiPromiseUnlocked(settings: ApiSettingsConfig): Prom
     // open_in_editor_command, so a theme-only save must not blank an
     // editor command the operator set outside this API. Symmetrically, a
     // caller that omits `ui` entirely (or omits `theme` within it) must not
-    // blank a non-default theme the operator set outside this save.
-    ui: (settings.ui?.theme !== undefined
+    // blank a non-default theme the operator set outside this save. Beyond
+    // omission, `honorThemeFromSettings` (see the doc comment above) governs
+    // whether an EXPLICITLY-present `settings.ui.theme` is trusted at all —
+    // only saveDesignLanguagePromise's fresh-inside-the-queue read may set it.
+    ui: ((honorThemeFromSettings && settings.ui?.theme !== undefined)
       || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
       || currentConfig.ui.openInEditorCommand !== null)
       ? {
           ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
-          theme: settings.ui?.theme ?? currentConfig.ui.theme,
+          theme: honorThemeFromSettings ? (settings.ui?.theme ?? currentConfig.ui.theme) : currentConfig.ui.theme,
         }
       : undefined,
     conversationSearch: settings.conversationSearch,
@@ -1486,7 +1504,11 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
  * FR-7, cycle 5). That alone still left an in-process race: the read below
  * and `saveSettingsApiPromiseUnlocked`'s own write must both run as one turn
  * of `runSettingsWriteSerialized` — its own module comment above explains
- * why the read cannot happen before entering the queue (cycle 6).
+ * why the read cannot happen before entering the queue (cycle 6). Passing
+ * `honorThemeFromSettings: true` is what actually lets this call's `theme`
+ * reach disk at all — every other caller of `saveSettingsApiPromiseUnlocked`
+ * defaults to `false` and can never write a client-materialized theme snapshot,
+ * however fresh it looked when constructed (cycle 8).
  */
 async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
   await runSettingsWriteSerialized(async () => {
@@ -1494,7 +1516,7 @@ async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
     await saveSettingsApiPromiseUnlocked({
       ...current,
       ui: { ...current.ui, theme },
-    });
+    }, { honorThemeFromSettings: true });
   });
 }
 
