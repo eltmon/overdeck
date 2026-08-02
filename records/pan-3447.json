@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T05:51:10.619Z",
+  "updated": "2026-08-02T05:51:36.495Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -134,7 +134,7 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 24,
+    "sequence": 25,
     "claims": {},
     "claimHistory": [
       {
@@ -286,8 +286,8 @@
         "updatedAt": "2026-08-02T04:01:57.934Z"
       },
       "confluence-data": {
-        "reason": "Blocked by hook-stream-shaping: completed state has no hookName support in events, so the data hook cannot preserve hook identity.",
-        "updatedAt": "2026-08-02T05:51:10.618Z"
+        "reason": "The prerequisite task is terminal and cannot be reopened; this item will include the minimal event-shaping correction required to preserve hookName through the existing domain-event path.",
+        "updatedAt": "2026-08-02T05:51:36.494Z"
       }
     }
   },
@@ -308,7 +308,7 @@
     "aurora-shader.aurora-shader.ac1": "completed",
     "aurora-shader.aurora-shader.ac2": "completed",
     "aurora-shader.aurora-shader.ac3": "completed",
-    "confluence-data": "blocked"
+    "confluence-data": "pending"
   },
   "swarm": {
     "slotAssignments": [],
