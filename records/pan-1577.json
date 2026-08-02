@@ -570,7 +570,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T16:27:07.520Z",
+  "updated": "2026-08-02T16:27:10.697Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -579,7 +579,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T16:25:07.719Z",
+    "panDoneRecoveredAt": "2026-08-02T16:27:06.809Z",
+    "updatedAt": "2026-08-02T16:27:07.510Z",
     "reviewNotes": "all four current-cycle convoy reviewers failed to start",
     "conflictsSince": {
       "sha": "c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae",
@@ -592,8 +593,7 @@
     "reviewedAtCommit": "328720ae65861cf1fda59fe0e2d0bf32cf061cf1",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
     "reviewRequestedAt": "2026-08-02T16:27:06.809Z",
-    "reviewSpawnedAt": "2026-08-01T20:22:39.126Z",
-    "panDoneRecoveredAt": "2026-08-02T16:27:06.809Z"
+    "reviewSpawnedAt": "2026-08-01T20:22:39.126Z"
   },
   "closeOut": {
     "usage": {
@@ -648,10 +648,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2032,
-            "output": 392690,
-            "cacheRead": 442472591,
-            "cacheWrite": 22480540
+            "input": 2044,
+            "output": 394747,
+            "cacheRead": 445421708,
+            "cacheWrite": 22484347
           }
         }
       },
@@ -669,15 +669,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2032,
-          "output": 392690,
-          "cacheRead": 442472591,
-          "cacheWrite": 22480540
+          "input": 2044,
+          "output": 394747,
+          "cacheRead": 445421708,
+          "cacheWrite": 22484347
         }
       },
       "costAtCloseOut": {
-        "usd": 243.13353,
-        "pricingAsOf": "2026-08-02T16:25:12.479Z"
+        "usd": 243.753466,
+        "pricingAsOf": "2026-08-02T16:27:10.692Z"
       }
     },
     "merges": [
