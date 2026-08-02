@@ -174,22 +174,7 @@
       "timestamp": "2026-08-02T22:32:36.674Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "uat-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T22:01:59Z",
-      "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-3423`."
-    },
-    {
-      "seq": 4,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T22:32:36Z",
-      "markdownBody": "# Test failure\n\nAutomated gates on feature/pan-3423 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend guards all clean). npm run lint FAILED at lint:file-size: 'src/dashboard/server/routes/workspaces/merge-ops.ts is 1913 lines (allowed 1912)'. Root-caused: this file is untouched by PAN-3423 (git diff origin/main...HEAD --stat -- merge-ops.ts is empty; last touched by branch at fdcbcad2647, PAN-3328/#3348). origin/main advanced 2 commits past this branch's last main-merge (merge-base 5ac62149c3), including #3509 which shrank merge-ops.ts; the ratchet script compares against the live origin/main tip, so this branch's untouched copy now reads as 'grown' relative to a newer main it hasn't synced. This is branch staleness, not a defect introduced by this PR, but the configured lint gate genuinely fails as run and a main-sync/rebase is outside the test role's boundaries (no edit/commit/merge). Scoped PAN-3423 tests all pass: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention -> 3 files / 32 tests passed. Full frontend suite (src/dashboard/frontend) -> 306 files / 2986 tests passed. Full root-level `npm test` completed: 60 files / 83 tests failed, ALL with the identical signature 'Error: Hook timed out in 5000ms' inside beforeEach(() => odb = setupOverdeckTestDb()) -- a DB-fixture-setup timeout under heavy host contention (load average ~30 from ~17 concurrent Overdeck agents/workspaces on this machine at the time), not an assertion or logic failure, and none of the 60 failing files are in this PR's declared scope (tests/unit/lib/workspaces/*, src/cli/commands/conversations/__tests__/*, etc.). The in-scope file src/lib/agents/__tests__/agent-health.test.ts (FR-3, this PR's server-side change) was verified separately in isolation: 1 file / 12 tests PASSED in 152ms. Top-level status is failed on the lint gate alone, per the configured automated gates (typecheck, lint, test); the lint failure is unrelated to this PR's diff but blocks merge as configured.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3423`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/parked.ts",
@@ -222,24 +207,21 @@
     "recordedAt": "2026-08-02T22:06:29.456Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T22:32:46.591Z",
+  "updated": "2026-08-02T22:33:01.622Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T22:32:36.611Z",
-    "reviewNotes": "All four reviewers passed; prior correctness, accessibility, labeling, duplicate-consumer, and documentation gaps are resolved.",
-    "testNotes": "Automated gates on feature/pan-3423 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend guards all clean). npm run lint FAILED at lint:file-size: 'src/dashboard/server/routes/workspaces/merge-ops.ts is 1913 lines (allowed 1912)'. Root-caused: this file is untouched by PAN-3423 (git diff origin/main...HEAD --stat -- merge-ops.ts is empty; last touched by branch at fdcbcad2647, PAN-3328/#3348). origin/main advanced 2 commits past this branch's last main-merge (merge-base 5ac62149c3), including #3509 which shrank merge-ops.ts; the ratchet script compares against the live origin/main tip, so this branch's untouched copy now reads as 'grown' relative to a newer main it hasn't synced. This is branch staleness, not a defect introduced by this PR, but the configured lint gate genuinely fails as run and a main-sync/rebase is outside the test role's boundaries (no edit/commit/merge). Scoped PAN-3423 tests all pass: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention -> 3 files / 32 tests passed. Full frontend suite (src/dashboard/frontend) -> 306 files / 2986 tests passed. Full root-level `npm test` completed: 60 files / 83 tests failed, ALL with the identical signature 'Error: Hook timed out in 5000ms' inside beforeEach(() => odb = setupOverdeckTestDb()) -- a DB-fixture-setup timeout under heavy host contention (load average ~30 from ~17 concurrent Overdeck agents/workspaces on this machine at the time), not an assertion or logic failure, and none of the 60 failing files are in this PR's declared scope (tests/unit/lib/workspaces/*, src/cli/commands/conversations/__tests__/*, etc.). The in-scope file src/lib/agents/__tests__/agent-health.test.ts (FR-3, this PR's server-side change) was verified separately in isolation: 1 file / 12 tests PASSED in 152ms. Top-level status is failed on the lint gate alone, per the configured automated gates (typecheck, lint, test); the lint failure is unrelated to this PR's diff but blocks merge as configured.",
+    "updatedAt": "2026-08-02T22:33:01.193Z",
     "uatNotes": "UAT executed: built workspace dashboard (npm run build:dashboard), ran it isolated on PORT=3423 with OVERDECK_DISABLE_DEACON=1 (never touched the shared host dashboard on 3011), drove it with an isolated Playwright session. Opened the live SystemHealthPill popover (real Warning-state data) and confirmed: state-badge header + relative updated time; bordered summary line; chip row replacing the old tile grid; all 4 vitals tiles rendering real threshold-colored meter bars incl. swap 'historical - not live pressure' label; grouped xN attention row collapsed with no inline Kill/Open (closed-by-default disclosure only); singleton rows with working Open/Kill wiring (verified via source + aria-labels, not clicked, to avoid killing another agent's live session on this shared host); closed-by-default context-notes disclosure; top-consumers kind badges + proportional bars + 'No leaks' header; Escape closes the popover. LEAKED-tag, healthy all-clear variant, and exact FR-3 message text were not re-observed live (system stayed in Warning state) but are covered by passing unit/component tests. Full evidence and screenshot description in .pan/test/result.json. Cleaned up the port-3423 process and scratch files afterward.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewedAtCommit": "c2766bb2f260beeb97d35ee1d0aa770497fdd4d1",
     "reviewSpawnedAt": "2026-08-02T21:22:42.953Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -340,9 +322,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 1318000,
-            "output": 120075,
-            "cacheRead": 81423360,
+            "input": 1320936,
+            "output": 120273,
+            "cacheRead": 81760256,
             "cacheWrite": 0
           }
         }
@@ -355,9 +337,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20339189,
-          "output": 544152,
-          "cacheRead": 174377472,
+          "input": 20342125,
+          "output": 544350,
+          "cacheRead": 174714368,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -374,8 +356,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 215.2982193,
-        "pricingAsOf": "2026-08-02T22:32:46.576Z"
+        "usd": 215.4872873,
+        "pricingAsOf": "2026-08-02T22:33:01.257Z"
       }
     },
     "merges": [
