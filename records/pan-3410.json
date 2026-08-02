@@ -242,6 +242,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T10:23:35.084Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T10:34:36.537Z"
     }
   ],
   "feedback": [],
@@ -345,7 +350,7 @@
     "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T10:23:35.085Z",
+  "updated": "2026-08-02T10:34:36.538Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
