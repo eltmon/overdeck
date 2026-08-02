@@ -984,3 +984,9 @@ strike-3462 (deferred-deploy fix, `cadc19d9e9 keep queued blocker current`) repo
 - **SELF-CORRECTION:** at tick 56 I called PR #3461's failure on this exact test "real audit feedback, not flake" and queued PAN-3450 for rework. **Wrong — it was red-main collateral.** Two independent strikes then hit the same wall and diagnosed it precisely (strike-3467 named `SystemHealthPill.tsx`). Lesson repeated from the earlier episode: when a PR fails, check main's own CI on that test BEFORE attributing the failure to the PR. I had that exact rule from tick 49 and did not apply it here.
 - **Both operator-expedited strikes are blocked purely on this** — PAN-3467 (#3470) and PAN-3468 (#3471) each have their fix committed and pushed, refusing correctly to fix-forward someone else's regression. Landing PAN-3473 releases three PRs at once (plus #3461).
 - Neither expedite strike knows its branch is already pushed with a PR open (PAN-3417 merged-awareness gap, 4th+ specimen) — flywheel cannot `pan tell`, so they idle harmlessly until I merge.
+
+## RUN-79 tick 59 (2026-08-02 ~04:45Z) — red-main fix in CI (#3474); 4 PRs queued behind it
+
+- **strike-3473 fix pushed → PR #3474** (`5e78dab785 restore commitment diagnostic`, **+12/−0** — exactly the surgical restore the diagnosis called for; the metric existed upstream, only the pill surface had dropped it). Watch armed.
+- **One merge releases four blocked PRs**, all failing on inherited red rather than their own changes: #3470 (PAN-3467) + #3471 (PAN-3468) — both operator-expedited PAN-3447 unblockers — plus #3461 (PAN-3450) and #3472 (PAN-3462). Red-main episode #2 of the run; both were caught by no-loss/beads guards doing exactly their job, and both were reported first by strike agents refusing to fix-forward.
+- Sequence on green: merge #3474 → verify main greens → merge #3470 + #3471 → `pan reload` → `pan plan finalize` from `workspaces/feature-pan-3447` → `pan swarm PAN-3447`.
