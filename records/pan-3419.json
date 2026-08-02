@@ -432,7 +432,7 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T20:55:46.216Z",
+  "updated": "2026-08-02T20:56:46.522Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "reviewing",
@@ -443,109 +443,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:54:26.198Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-02T20:45:34.433Z"
-      }
-    ],
+    "updatedAt": "2026-08-02T20:56:36.880Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "5c151a89e751d37e91d834f25dc9e9ed9c639b3f",
-    "reviewRequestedAt": "2026-08-02T20:52:57.062Z",
-    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "docs/overdeck-remodel/overdeck-schema.ts",
-        "docs/review/PAN-3419-conversation-1827-project-association.md",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
-        "src/lib/projects-config-lock.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts",
-        "tests/unit/lib/overdeck/title-sources.test.ts",
-        "tests/unit/lib/projects-version-sync.test.ts"
-      ],
-      "declaredScopeUntouched": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx"
-      ],
-      "declaredScope": [
-        "features/conversations.mdx",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/fork.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-        "src/dashboard/server/routes/__tests__/palette.test.ts",
-        "src/dashboard/server/routes/palette.ts",
-        "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/projects.ts",
-        "sync-sources/rules/handoff-isolate-cwd.md",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/unit/cli/fork-client.test.ts"
-      ],
-      "actualChangedFiles": [
-        "docs/overdeck-remodel/overdeck-schema.ts",
-        "docs/review/PAN-3419-conversation-1827-project-association.md",
-        "drizzle/overdeck/0000_overdeck_init.sql",
-        "features/conversations.mdx",
-        "packages/contracts/src/composer-commands.generated.ts",
-        "scripts/file-size-allowlist.txt",
-        "src/cli/commands/__tests__/handoff.test.ts",
-        "src/cli/commands/fork-client.ts",
-        "src/cli/commands/fork.ts",
-        "src/cli/commands/handoff.ts",
-        "src/cli/index.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationList.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ForkModal.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ForkModal.test.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.test.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/projectsData.ts",
-        "src/dashboard/frontend/src/components/CommandDeck/useConversationMutations.ts",
-        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
-        "src/dashboard/frontend/src/components/Stage/index.tsx",
-        "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "src/dashboard/server/routes/__tests__/palette.test.ts",
-        "src/dashboard/server/routes/palette.ts",
-        "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
-        "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
-        "src/lib/overdeck/conversation-forks.ts",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "src/lib/overdeck/infra.ts",
-        "src/lib/projects-config-lock.ts",
-        "src/lib/projects.ts",
-        "sync-sources/rules/handoff-isolate-cwd.md",
-        "sync-sources/skills/pan-handoff/SKILL.md",
-        "tests/unit/cli/fork-client.test.ts",
-        "tests/unit/lib/overdeck/conversations.test.ts",
-        "tests/unit/lib/overdeck/title-sources.test.ts",
-        "tests/unit/lib/projects-version-sync.test.ts"
-      ],
-      "recordedAt": "2026-08-02T20:52:55.785Z"
-    }
+    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z"
   },
   "closeOut": {
     "usage": {
@@ -560,17 +461,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 28668662,
-            "output": 234348,
-            "cacheRead": 69577728,
+            "input": 30970157,
+            "output": 245432,
+            "cacheRead": 73883136,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 4038630,
-            "output": 69947,
-            "cacheRead": 15087104,
+            "input": 4294932,
+            "output": 74433,
+            "cacheRead": 15965696,
             "cacheWrite": 0
           }
         },
@@ -623,9 +524,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 50710472,
-          "output": 769715,
-          "cacheRead": 307752448,
+          "input": 53268269,
+          "output": 785285,
+          "cacheRead": 312936448,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -636,8 +537,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 455.3843333,
-        "pricingAsOf": "2026-08-02T20:54:26.215Z"
+        "usd": 471.2324183,
+        "pricingAsOf": "2026-08-02T20:56:37.100Z"
       }
     },
     "merges": [
