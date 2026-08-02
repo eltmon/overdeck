@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:38:29.721Z",
+  "updated": "2026-08-02T23:44:25.665Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,23 +73,8 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {
-      "migrate-fallback": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 980070,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:35:06.802Z"
-      },
-      "docs-write-door": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 993310,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:35:24.529Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -156,6 +141,28 @@
         "outcome": "completed",
         "reason": "Deleted REVIEW arm from rejectVerdictEvidenceHeadMismatch. Kept TEST arm unchanged. Created comprehensive test file.",
         "releasedAt": "2026-08-02T23:34:51.343Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 980070,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:35:06.802Z",
+        "itemId": "migrate-fallback",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3512 dead)",
+        "releasedAt": "2026-08-02T23:44:25.598Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 993310,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:35:24.529Z",
+        "itemId": "docs-write-door",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3512 dead)",
+        "releasedAt": "2026-08-02T23:44:25.598Z"
       }
     ],
     "statusReasons": {
@@ -178,6 +185,14 @@
       "retire-review-arm": {
         "reason": "Deleted REVIEW arm from rejectVerdictEvidenceHeadMismatch. Kept TEST arm unchanged. Created comprehensive test file.",
         "updatedAt": "2026-08-02T23:34:51.343Z"
+      },
+      "migrate-fallback": {
+        "reason": "stale claim released (agent-pan-3512 dead)",
+        "updatedAt": "2026-08-02T23:44:25.598Z"
+      },
+      "docs-write-door": {
+        "reason": "stale claim released (agent-pan-3512 dead)",
+        "updatedAt": "2026-08-02T23:44:25.598Z"
       }
     }
   },
@@ -204,7 +219,7 @@
     "retire-review-arm.retire-review-arm.ac2": "completed",
     "retire-review-arm.retire-review-arm.ac3": "completed",
     "retire-review-arm.retire-review-arm.ac4": "completed",
-    "migrate-fallback": "running",
-    "docs-write-door": "running"
+    "migrate-fallback": "pending",
+    "docs-write-door": "pending"
   }
 }
