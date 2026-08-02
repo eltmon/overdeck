@@ -1072,3 +1072,10 @@ Operator reported PAN-3479 on main: agent tombstones were NULLING `session_id`, 
 
 strike-3482 committed the fix (`4711669cca7 pass xbrief item ids to tiered handlers`) but stalled: launcher-git-guard blocks `git rebase`, and **the prescribed `pan sync-main` two-door endpoint is a NO-OP STUB** — a sharper fact than PAN-3440 had recorded. Correct double refusal by the agent (no bypass, no unrebased push). **A rebase was never required**: merged `origin/main` into the branch (history-preserving, sanctioned), pushed, **PR #3483**. Fourth time today this workaround unblocked a stalled strike.
 Appended to PAN-3440: its scope is not just "register strike workspaces" but "implement the path the guard's own error message points agents toward" — a guard whose prescribed alternative is a stub is a dead end by construction, and that is why strikes keep stalling here instead of self-serving. Recommended documenting merge-sync in the strike role prompt.
+
+## RUN-79 tick 70 (2026-08-02 ~14:10Z) — silent-lint fix landed (#3484); guard-stall now a recognized pattern
+
+- **strike-3478's fix pushed → PR #3484** (`9390359b75b surface quality lint issues`) — this is the one that unblocks PAN-3447 follow-on planning, which stalled precisely on the gate's silence. Same guard-stall as PAN-3482: agent committed, refused to bypass, waited. Merge-synced and landed. **Fifth guard-stall unblocked this way today.**
+- **The pattern is now unmistakable and worth acting on**: every strike that touches a behind-main branch stalls at the same wall, each burning an orchestrator round-trip, because the guard's prescribed alternative (`pan sync-main`) is a no-op stub (PAN-3440). Until 3440 lands, merge-sync-and-PR is the standing orchestrator response — do not wait for the agent to self-serve.
+- **strike-3477 vanished with no commits** (session gone, empty branch) — re-struck. Cause unknown; if it vanishes again with nothing committed, that is a spawn/crash class worth its own filing rather than a third re-dispatch.
+- strike-3431 leak round 3 progressing with real work ($21.05, +388/−164 — much larger than round 2's diff, consistent with hunting a second retainer).
