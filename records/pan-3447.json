@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T04:01:58.046Z",
+  "updated": "2026-08-02T04:18:16.507Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -84,8 +84,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 20,
-    "claims": {},
+    "sequence": 21,
+    "claims": {
+      "aurora-shader": {
+        "writerId": "agent-pan-3447-slot-2",
+        "agentId": "agent-pan-3447-slot-2",
+        "pid": 3186957,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T04:18:16.507Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -229,7 +237,7 @@
     "hook-stream-shaping.hook-stream-shaping.ac1": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac2": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac3": "completed",
-    "aurora-shader": "pending"
+    "aurora-shader": "running"
   },
   "swarm": {
     "slotAssignments": [
