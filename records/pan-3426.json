@@ -180,7 +180,7 @@
     "recordedAt": "2026-08-02T18:15:29.053Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:18:53.456Z",
+  "updated": "2026-08-02T18:18:56.744Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -189,7 +189,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T18:15:41.404Z",
+    "panDoneRecoveredAt": "2026-08-02T18:18:52.253Z",
+    "updatedAt": "2026-08-02T18:18:53.442Z",
     "reviewNotes": "Verification failed at lint",
     "testNotes": "npm run typecheck: PASS (root, hooks, evals, dashboard ratchet 55/55, frontend ratchet 0/0). npm run lint: FAIL at lint:slash-commands — packages/contracts/src/composer-commands.generated.ts is missing pan-parked and pan-parked-ack entries present in the live CLI registry (src/cli/commands/parked.ts). Verified via git log/git show that this drift is pre-existing on origin/main (commits 5ba22313a2d, dafc96071f5 added the commands; cc801b13e2d was the last manifest regen, predating them) and is NOT introduced by PAN-3426, whose only touch to parked.ts is an unrelated one-line typecheck fix (project.projectPath -> project.path). npx vitest run tests/unit/lib/orders/orders-validate.test.ts: FAIL — 2/14 tests fail ('blocks an empty book', 'moves only a plan-at-pickup missing-PRD finding to warnings'). Root cause: validateBookForStart() in src/lib/orders/validate.ts calls orderIssueStoreStatus() unconditionally before checking options.issueLookup, so the new store-unavailable block fires even when a test supplies its own issueLookup — contradicting the plan's own autoDecisions[3] ('the store probe applies only when the default lookup is in use') and violating xBRIEF item store-unavailable-finding.ac3 ('existing orders-validate.test.ts suite passes unchanged'). This is a real regression in PAN-3426's declared scope, not environmental. tests/unit/lib/orders/orders-resolver.test.ts and tests/unit/cli/flywheel-orders.test.ts pass (12/12 combined). Verdict: automated gates FAILED on both lint and test.",
     "verificationNotes": "Verification FAILED at lint (149352ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(65008 chars elided)…\nplay\":\"/pan parked\",\"description\":\"List every issue parked in a stall orbit (stuck flags, gates, failed merges, zombies), oldest first, with why + release condition\",\"args\":[],\"options\":[{\"flags\":\"--json\",\"description\":\"Print the raw parked rows as JSON\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"CLI\"},\n+  {\"id\":\"pan-parked-ack\",\"path\":[\"parked\",\"ack\"],\"display\":\"/pan parked ack\",\"description\":\"Batch-acknowledge parked rows (default orbit: needs-you), then print the flywheel hand-off\",\"args\":[],\"options\":[{\"flags\":\"--orbit <orbit>\",\"description\":\"Parked orbit to acknowledge\",\"required\":true,\"valueHint\":\"orbit\"},{\"flags\":\"--older-than <days>\",\"description\":\"Only rows parked at least this many days\",\"required\":true,\"valueHint\":\"days\"},{\"flags\":\"--dry-run\",\"description\":\"List what would be acknowledged without writing\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"CLI\"},\n   {\"id\":\"pan-docs\",\"path\":[\"docs\"],\"display\":\"/pan docs\",\"des\n...(truncated)",
@@ -237,17 +238,16 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T18:15:29.053Z"
-    },
-    "panDoneRecoveredAt": "2026-08-02T18:18:52.253Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 51011,
-            "output": 38103,
-            "cacheRead": 16462,
+            "input": 55403,
+            "output": 41156,
+            "cacheRead": 20561,
             "cacheWrite": 0
           }
         },
@@ -301,18 +301,18 @@
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1282,
-            "output": 38203,
-            "cacheRead": 26934999,
-            "cacheWrite": 2635551
+            "input": 1288,
+            "output": 38291,
+            "cacheRead": 27059842,
+            "cacheWrite": 2635817
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 51011,
-          "output": 38103,
-          "cacheRead": 16462,
+          "input": 55403,
+          "output": 41156,
+          "cacheRead": 20561,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -328,15 +328,15 @@
           "cacheWrite": 202085
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1282,
-          "output": 38203,
-          "cacheRead": 26934999,
-          "cacheWrite": 2635551
+          "input": 1288,
+          "output": 38291,
+          "cacheRead": 27059842,
+          "cacheWrite": 2635817
         }
       },
       "costAtCloseOut": {
-        "usd": 40.2087992,
-        "pricingAsOf": "2026-08-02T18:15:45.272Z"
+        "usd": 40.2421291,
+        "pricingAsOf": "2026-08-02T18:18:56.735Z"
       }
     },
     "merges": [
