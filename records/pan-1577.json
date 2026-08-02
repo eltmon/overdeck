@@ -637,11 +637,16 @@
       "timestamp": "2026-08-02T17:35:50.611Z",
       "reason": "end",
       "note": "Fixed parked.ts typecheck error (project.projectPath -> project.path)"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T17:46:02.286Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:46:00.930Z",
+  "updated": "2026-08-02T17:46:02.322Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
@@ -954,5 +959,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
