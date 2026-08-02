@@ -167,6 +167,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T16:21Z] review-agent → FAILED — seq 3",
       "timestamp": "2026-08-02T16:21:52.129Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T16:46:47.967Z"
     }
   ],
   "feedback": [
@@ -273,7 +278,7 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T16:26:25.175Z",
+  "updated": "2026-08-02T16:46:47.968Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -284,10 +289,17 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T14:00:25.902Z",
-    "updatedAt": "2026-08-02T16:26:25.031Z",
+    "updatedAt": "2026-08-02T16:46:47.848Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 4a88ab9 (1 path): scripts/file-size-allowlist.txt",
+        "detectedAt": "2026-08-02T16:46:39.150Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "2974be2f7e38e704ad0712cd8243ff5efb49ec11",
-      "detectedAt": "2026-08-02T16:25:38.589Z",
+      "sha": "4a88ab9d7d5e70a03f36dbf590055082c5c27f13",
+      "detectedAt": "2026-08-02T16:46:39.150Z",
       "paths": [
         "scripts/file-size-allowlist.txt"
       ]
@@ -347,17 +359,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 200,
-            "output": 57876,
-            "cacheRead": 23959312,
-            "cacheWrite": 333898
+            "input": 204,
+            "output": 59326,
+            "cacheRead": 24294588,
+            "cacheWrite": 670225
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5315325,
-            "output": 255505,
-            "cacheRead": 153541120,
+            "input": 5344345,
+            "output": 258431,
+            "cacheRead": 155180032,
             "cacheWrite": 0
           }
         }
@@ -370,21 +382,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31691582,
-          "output": 484681,
-          "cacheRead": 204513792,
+          "input": 31720602,
+          "output": 487607,
+          "cacheRead": 206152704,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 200,
-          "output": 57876,
-          "cacheRead": 23959312,
-          "cacheWrite": 333898
+          "input": 204,
+          "output": 59326,
+          "cacheRead": 24294588,
+          "cacheWrite": 670225
         }
       },
       "costAtCloseOut": {
-        "usd": 281.4622933,
-        "pricingAsOf": "2026-08-02T16:26:25.156Z"
+        "usd": 283.4370103,
+        "pricingAsOf": "2026-08-02T16:46:47.858Z"
       }
     },
     "merges": [
