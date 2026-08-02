@@ -227,7 +227,7 @@
     "recordedAt": "2026-08-02T10:30:36.339Z"
   },
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T10:31:26.585Z",
+  "updated": "2026-08-02T10:32:42.214Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -243,7 +243,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3481",
     "reviewedAtCommit": "24403f23c3c9cc23a43829e1dd753e70e309a3a6",
     "lastVerifiedCommit": "24403f23c3c9cc23a43829e1dd753e70e309a3a6",
-    "reviewRequestedAt": "2026-08-02T10:30:37.409Z",
+    "reviewRequestedAt": "2026-08-02T10:32:41.836Z",
     "reviewSpawnedAt": "2026-08-02T10:24:57.457Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -375,7 +375,8 @@
         "tests/scripts/notification-hook.test.ts"
       ],
       "recordedAt": "2026-08-02T10:30:36.339Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-02T10:32:41.836Z"
   },
   "closeOut": {
     "usage": {
