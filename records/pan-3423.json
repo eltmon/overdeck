@@ -128,18 +128,19 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:39:51.759Z",
+  "updated": "2026-08-02T20:39:55.816Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:39:49.049Z",
+    "updatedAt": "2026-08-02T20:39:51.612Z",
     "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
+    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
       "sha": "d28b8893d9eba336166570587a15114995062a16",
       "detectedAt": "2026-08-02T19:29:34.891Z",
@@ -251,9 +252,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 762803,
-            "output": 53394,
-            "cacheRead": 37646336,
+            "input": 765281,
+            "output": 53820,
+            "cacheRead": 38073344,
             "cacheWrite": 0
           }
         }
@@ -266,9 +267,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9545875,
-          "output": 388522,
-          "cacheRead": 101954560,
+          "input": 9548353,
+          "output": 388948,
+          "cacheRead": 102381568,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -279,8 +280,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.3142773,
-        "pricingAsOf": "2026-08-02T20:39:51.752Z"
+        "usd": 114.5529513,
+        "pricingAsOf": "2026-08-02T20:39:55.809Z"
       }
     },
     "merges": [
