@@ -31,6 +31,7 @@ export const bodyToEvent = (
           agentId,
           activity: source['activity'],
           currentTool: source['tool'] as string | undefined,
+          hookName: source['hookName'] as string | undefined,
         },
       };
     case 'thinking_start':

@@ -56,9 +56,15 @@ async function runHeartbeat(body: Record<string, unknown>) {
 }
 
 describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
-  it('new-shape activity → agent.activity_changed', () => {
-    const ev = bodyToEvent(AGENT, { kind: 'activity', activity: 'working', tool: 'Read' }, TS)
+  it('new-shape activity → agent.activity_changed with hook identity', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Read',
+      hookName: 'PreToolUse',
+    }, TS)
     expect(ev?.['type']).toBe('agent.activity_changed')
+    expect((ev?.['payload'] as Record<string, unknown>)['hookName']).toBe('PreToolUse')
     const decoded = decodeCandidate(ev)!
     expect(decoded._tag).toBe('Success')
   })
