@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createOrdersCommand,
@@ -16,6 +16,28 @@ import {
   runOrdersStart,
 } from '../../../src/cli/commands/orders.js';
 import { addItems, createBook } from '../../../src/lib/orders/writer.js';
+import type { ProjectConfig } from '../../../src/lib/projects.js';
+
+const { mockGetProjectSync, mockResolveStateReadHomeSync } = vi.hoisted(() => ({
+  mockGetProjectSync: vi.fn(),
+  mockResolveStateReadHomeSync: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/projects.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/projects.js')>();
+  return {
+    ...actual,
+    getProjectSync: mockGetProjectSync,
+  };
+});
+
+vi.mock('../../../src/lib/state-read-home.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../src/lib/state-read-home.js')>();
+  return {
+    ...actual,
+    resolveStateReadHomeSync: mockResolveStateReadHomeSync,
+  };
+});
 
 const roots: string[] = [];
 const at = '2026-07-18T12:00:00.000Z';
@@ -42,8 +64,14 @@ function gitFixture(): string {
   return root;
 }
 
+beforeEach(() => {
+  mockGetProjectSync.mockReset().mockReturnValue(null);
+  mockResolveStateReadHomeSync.mockReset();
+});
+
 afterEach(() => {
   while (roots.length) rmSync(roots.pop()!, { recursive: true, force: true });
+  process.exitCode = undefined;
   vi.restoreAllMocks();
 });
 
@@ -115,9 +143,40 @@ describe('pan orders commands', () => {
       'move',
       'start',
     ]);
+    for (const child of command.commands) {
+      expect(child.options.map((option) => option.long)).toContain('--project');
+    }
     const add = command.commands.find((child) => child.name() === 'add')!;
-    expect(add.options.map((option) => option.long)).toEqual(['--lane', '--after', '--reverify']);
+    expect(add.options.map((option) => option.long)).toEqual(['--lane', '--after', '--reverify', '--project']);
     const move = command.commands.find((child) => child.name() === 'move')!;
-    expect(move.options.map((option) => option.long)).toEqual(['--lane', '--order']);
+    expect(move.options.map((option) => option.long)).toEqual(['--lane', '--order', '--project']);
+  });
+
+  it('resolves --project through the projects registry regardless of cwd', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockImplementation(() => ({ root: otherRoot, migrated: true }));
+
+    const created = await runOrdersCreate('Cross Project', {
+      projectKey: 'other-project',
+      now: () => new Date(at),
+    });
+    expect(created.id).toBe('2026-07-18-cross-project');
+    expect(formatBookList(runOrdersList({ projectKey: 'other-project' }))).toContain('2026-07-18-cross-project');
+  });
+
+  it('throws Unknown project for an unregistered --project key', () => {
+    mockGetProjectSync.mockReturnValue(null);
+    expect(() => runOrdersList({ projectKey: 'ghost-project' })).toThrow('Unknown project: ghost-project');
+  });
+
+  it('exits non-zero with an unknown --project key from the command line', async () => {
+    mockGetProjectSync.mockReturnValue(null);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const command = createOrdersCommand();
+    await command.parseAsync(['list', '--project', 'ghost-project'], { from: 'user' });
+    expect(process.exitCode).toBe(1);
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('Unknown project: ghost-project'));
   });
 });
