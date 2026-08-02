@@ -52,7 +52,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:12:01.998Z",
+  "updated": "2026-08-02T19:12:20.949Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "failed",
@@ -62,16 +62,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:12:01.935Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3423-review already running. Use 'pan tell' to message it.",
-    "inspectNotes": "All 4 ACs met in src/dashboard/frontend/src/lib/system-health-attention.ts. AC1: info reasons filtered at all four reason sources (host/admission/services/agents, lines 92-131) and contextNotes covers exactly those same four sources (lines 15-22) — verified against SystemHealthSnapshot in packages/contracts/src/system-health.ts:253-278, which has no fifth reason-bearing field. AC2: agent-domain codes with >1 entry produce one row with agents=[both ids], agentId omitted, sub='2x agents: a, b' truncating at slice(0,2) + '+N more'. AC3: mapPresentationSeverity forces agent.runtime.inactive.stalled to critical and the comparator sorts critical first, then stalled before idle. AC4: healthy snapshot yields [] and summaryLine returns 'All clear - <N> GiB spawn headroom - relay running - 0 stalled agents'. NFR-2 satisfied: pure module, no React import. NON-BLOCKING (outside these ACs, for the component bead or review convoy): (1) reasonLabel line 78-82 returns the literal 'Retry' as the row TITLE for system.health_snapshot.unavailable (severity critical per src/dashboard/server/routes/misc/health.ts:57) and agent.persisted_state.unavailable (severity warning per src/lib/agents/health.ts:171) — both survive the info filter, so a real outage renders a row titled 'Retry'. In SystemHealthPill.tsx:114-117 that string was a suffix of 'Health unavailable - Retry', not a title. (2) Non-agent codes are grouped by code but rendered from entries[0] only, so two services emitting the same code would silently drop all but the first. (3) Grouped rows take severity from entries[0], so a mixed-severity group under one code under-reports. (4) FR-8 names memory percent in the summary line; only the all-clear variant carries headroom and neither non-healthy variant carries memory percent.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 7ac5339 (2 paths): src/dashboard/frontend/src/components/SystemHealthPill.tsx, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "detectedAt": "2026-08-02T19:11:48.679Z"
-      }
-    ],
+    "updatedAt": "2026-08-02T19:12:12.667Z",
     "conflictsSince": {
       "sha": "7ac5339817d1893a23bd1fe8f710da6d20578187",
       "detectedAt": "2026-08-02T19:11:48.679Z",
@@ -81,33 +72,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewSpawnedAt": "2026-08-02T19:06:27.966Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [],
-      "declaredScopeUntouched": [
-        "docs/RESOURCE-GOVERNOR.md",
-        "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
-        "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
-        "src/dashboard/frontend/src/lib/system-health-attention.ts",
-        "src/lib/agents/__tests__/agent-health.test.ts",
-        "src/lib/agents/health.ts"
-      ],
-      "declaredScope": [
-        "docs/RESOURCE-GOVERNOR.md",
-        "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
-        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
-        "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
-        "src/dashboard/frontend/src/lib/system-health-attention.ts",
-        "src/lib/agents/__tests__/agent-health.test.ts",
-        "src/lib/agents/health.ts"
-      ],
-      "actualChangedFiles": [
-        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
-      ],
-      "recordedAt": "2026-08-02T03:23:12.679Z"
-    }
+    "reviewSpawnedAt": "2026-08-02T19:06:27.966Z"
   },
   "closeOut": {
     "usage": {
@@ -177,7 +142,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.802447,
-        "pricingAsOf": "2026-08-02T19:12:01.966Z"
+        "pricingAsOf": "2026-08-02T19:12:13.063Z"
       }
     },
     "merges": [
