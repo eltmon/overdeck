@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:20:47.898Z",
+  "updated": "2026-08-02T23:30:43.125Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,16 +73,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "verdict-door": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 334686,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:20:47.898Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -105,12 +97,27 @@
         "outcome": "completed",
         "reason": "Added ReviewVerdictRejectedEvent and ReviewVerdictDispatchedEvent to packages/contracts/src/events.ts with correct type literals and payloads. Both events registered in DomainEvent union. Build and typecheck pass.",
         "releasedAt": "2026-08-02T23:20:37.252Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 334686,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:20:47.898Z",
+        "itemId": "verdict-door",
+        "outcome": "completed",
+        "reason": "Created review-verdict-writer.ts with recordReviewVerdict function implementing dispatch-not-drop semantics. Polyrepo-aware ancestor classification, test-gate reset on head disagreement, domain events emitted on acceptance/rejection. Comprehensive test suite added.",
+        "releasedAt": "2026-08-02T23:30:43.125Z"
       }
     ],
     "statusReasons": {
       "verdict-events": {
         "reason": "Added ReviewVerdictRejectedEvent and ReviewVerdictDispatchedEvent to packages/contracts/src/events.ts with correct type literals and payloads. Both events registered in DomainEvent union. Build and typecheck pass.",
         "updatedAt": "2026-08-02T23:20:37.252Z"
+      },
+      "verdict-door": {
+        "reason": "Created review-verdict-writer.ts with recordReviewVerdict function implementing dispatch-not-drop semantics. Polyrepo-aware ancestor classification, test-gate reset on head disagreement, domain events emitted on acceptance/rejection. Comprehensive test suite added.",
+        "updatedAt": "2026-08-02T23:30:43.125Z"
       }
     }
   },
@@ -119,6 +126,11 @@
     "verdict-events.verdict-events.ac1": "completed",
     "verdict-events.verdict-events.ac2": "completed",
     "verdict-events.verdict-events.ac3": "completed",
-    "verdict-door": "running"
+    "verdict-door": "completed",
+    "verdict-door.verdict-door.ac1": "completed",
+    "verdict-door.verdict-door.ac2": "completed",
+    "verdict-door.verdict-door.ac3": "completed",
+    "verdict-door.verdict-door.ac4": "completed",
+    "verdict-door.verdict-door.ac5": "completed"
   }
 }
