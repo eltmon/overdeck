@@ -47,6 +47,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T19:41Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-02T19:41:09.074Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:51Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-08-02T19:51:49.375Z"
     }
   ],
   "feedback": [
@@ -56,6 +61,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-02T19:41:09Z",
       "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3423`."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T19:51:49Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3423\n\n# Review Synthesis — PAN-3423 — 2026-08-02T19:51:12Z\n\n## Verdict: CHANGES REQUESTED — correctness review did not run because its Claude Code lifecycle-hook installation failed\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-81939b22/context.json\n- Branch: feature/pan-3423\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n- HEAD reviewed: 81939b22f4e3100cd65b3230e05a56aaebccfb09\n- Cycle number: 2\n- Prior cycle SHA: c562dc1093c62689a3c1bc8fb86b14acd40d6458\n- PR merge base: 0d880b96a9fd4dd847fbea68116c52295360b86a\n- PR commits: 2\n- Branch state at synthesis: the workspace advanced to 6abc3505090a9e4435cd567ce732dc627abcbc85 after convoy discovery; this report remains scoped to the manifest HEAD above.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-81939b22/security.md | 0 |\n| correctness | failed | — | 1 infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-81939b22/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-81939b22/requirements.md | 0 after scope gate |\n\n## Blocking Findings\n\n### [correctness] Reviewer failed before producing a usable report\nThe correctness reviewer reported: `Claude Code lifecycle hooks are unavailable: ETXTBSY: text file is busy, copyfile '/home/eltmon/Projects/overdeck/sync-sources/hooks/gh-issue-trailer-hook' -> '/home/eltmon/.overdeck/bin/gh-issue-trailer-hook'. Run pan up to install host prerequisites, then pan sync and retry.` Review policy forbids approval when any sub-role fails or times out, so the code's correctness dimension remains unverified for this cycle.\n\n## Non-blocking Findings\n\n### [requirements] [demoted: pre-existing] Header state badge has no visible painted state color — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:402`\nThe reviewer correctly observed that the dot uses the first border-color token from `stateClasses()` with `border-current`, but no border-width or background utility. The cited line is absent from the PR diff from `0d880b96a9fd4dd847fbea68116c52295360b86a` to the reviewed HEAD, so the mandatory PR scope gate demotes it from a blocker. It remains a real pre-existing FR-5 gap worth fixing in separately scoped work.\n\n### [requirements] Resource-governor documentation describes superseded Open-action wiring — `docs/RESOURCE-GOVERNOR.md:400`\nThe documentation still describes parsing an agent ID through `useStore()`, while the implementation now carries the canonical `issueId` and calls `useDashboardStore.getState().openIssue(issueId)`. The documentation file is outside this PR's changed-file set, so this remains advisory.\n\n## Clean Sub-roles\n- security — no security blockers or advisories; React escaping and the existing confirmed kill/remove flow remain intact.\n- performance — no performance blockers or advisories; the new joins are linear, and the consumer maximum is computed once rather than once per row.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-81939b22/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3423 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -85,18 +97,18 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:41:09.075Z",
+  "updated": "2026-08-02T19:51:49.376Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:40:48.192Z",
-    "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
+    "updatedAt": "2026-08-02T19:51:48.620Z",
+    "reviewNotes": "Correctness reviewer failed before producing a report, so correctness remains unverified.",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
       "sha": "d28b8893d9eba336166570587a15114995062a16",
@@ -107,25 +119,42 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewRequestedAt": "2026-08-02T19:38:55.573Z",
-    "reviewSpawnedAt": "2026-08-02T19:40:48.192Z"
+    "reviewSpawnedAt": "2026-08-02T19:40:48.192Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "6abc3505090a9e4435cd567ce732dc627abcbc85"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 303,
-            "output": 200,
-            "cacheRead": 0,
+            "input": 2275,
+            "output": 400,
+            "cacheRead": 3,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1095515,
-            "output": 93375,
-            "cacheRead": 30577664,
+            "input": 1362066,
+            "output": 112572,
+            "cacheRead": 33803264,
             "cacheWrite": 0
           }
         },
@@ -139,25 +168,25 @@
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 579890,
-            "output": 9736,
-            "cacheRead": 1472000,
+            "input": 967156,
+            "output": 14910,
+            "cacheRead": 3347968,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 1092966,
-            "output": 72428,
-            "cacheRead": 1692160,
+            "input": 1722715,
+            "output": 104180,
+            "cacheRead": 5429760,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 432754,
-            "output": 7520,
-            "cacheRead": 1516032,
+            "input": 833493,
+            "output": 10584,
+            "cacheRead": 2091520,
             "cacheWrite": 0
           }
         },
@@ -169,24 +198,24 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 233107,
-            "output": 9614,
-            "cacheRead": 1869312,
+            "input": 488004,
+            "output": 20889,
+            "cacheRead": 8012800,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 303,
-          "output": 200,
-          "cacheRead": 0,
+          "input": 2275,
+          "output": 400,
+          "cacheRead": 3,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4141551,
-          "output": 210976,
-          "cacheRead": 40412672,
+          "input": 6080753,
+          "output": 281438,
+          "cacheRead": 55970816,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -197,8 +226,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 51.192361,
-        "pricingAsOf": "2026-08-02T19:40:49.067Z"
+        "usd": 70.7842753,
+        "pricingAsOf": "2026-08-02T19:51:48.720Z"
       }
     },
     "merges": [
