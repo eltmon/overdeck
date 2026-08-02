@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:22:14.203Z",
+  "updated": "2026-08-02T03:22:38.716Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "docs-resource-governor": {
+        "writerId": "agent-pan-3423",
+        "agentId": "agent-pan-3423",
+        "pid": 7095,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:22:38.716Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3423",
@@ -203,6 +211,7 @@
     "no-loss-and-component-tests": "completed",
     "no-loss-and-component-tests.no-loss-and-component-tests.ac1": "completed",
     "no-loss-and-component-tests.no-loss-and-component-tests.ac2": "completed",
-    "no-loss-and-component-tests.no-loss-and-component-tests.ac3": "completed"
+    "no-loss-and-component-tests.no-loss-and-component-tests.ac3": "completed",
+    "docs-resource-governor": "running"
   }
 }
