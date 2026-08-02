@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:07:14.006Z",
+  "updated": "2026-08-02T18:07:17.588Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "routes-book-scan": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 603889,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:07:14.006Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -160,6 +152,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T18:00:25.931Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 603889,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:07:14.006Z",
+        "itemId": "routes-book-scan",
+        "outcome": "completed",
+        "reason": "getOrderPayload scans listProjectsSync() in registry order when the book is missing locally and no explicit project param given; enrichedBook now stamps the resolved project key; 3 new tests cover scan-hit, scan-miss 404, and no-scan-on-explicit-key",
+        "releasedAt": "2026-08-02T18:07:17.588Z"
       }
     ],
     "statusReasons": {
@@ -172,8 +175,8 @@
         "updatedAt": "2026-08-02T17:47:57.937Z"
       },
       "routes-book-scan": {
-        "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T18:00:25.931Z"
+        "reason": "getOrderPayload scans listProjectsSync() in registry order when the book is missing locally and no explicit project param given; enrichedBook now stamps the resolved project key; 3 new tests cover scan-hit, scan-miss 404, and no-scan-on-explicit-key",
+        "updatedAt": "2026-08-02T18:07:17.588Z"
       }
     }
   },
@@ -188,6 +191,9 @@
     "cli-project-option.cli-project-option.ac2": "completed",
     "cli-project-option.cli-project-option.ac3": "completed",
     "cli-project-option.cli-project-option.ac4": "completed",
-    "routes-book-scan": "running"
+    "routes-book-scan": "completed",
+    "routes-book-scan.routes-book-scan.ac1": "completed",
+    "routes-book-scan.routes-book-scan.ac2": "completed",
+    "routes-book-scan.routes-book-scan.ac3": "completed"
   }
 }
