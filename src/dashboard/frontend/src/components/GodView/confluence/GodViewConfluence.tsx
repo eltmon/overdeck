@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { HOOK_INVENTORY } from '@overdeck/contracts';
+import { useEffect, useRef, useState } from 'react';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
 import { ConfluenceHelp } from './ConfluenceHelp';
+import { HookBus } from './HookBus';
 import { OrbTooltip } from './OrbTooltip';
 import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography } from './useConfluenceChoreography';
@@ -49,12 +49,6 @@ export function GodViewConfluence({
   const [hover, setHover] = useState<HoverState | null>(null);
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
 
-  const hookCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const entry of hookStream.entries) counts.set(entry.hookName, (counts.get(entry.hookName) ?? 0) + 1);
-    return counts;
-  }, [hookStream.entries]);
-
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus()) return;
@@ -89,22 +83,7 @@ export function GodViewConfluence({
   return (
     <div className="confluence-root">
       <div className="confluence-main">
-        <aside className="confluence-hookbus gv-glass" aria-label="Hook bus">
-          <h3>HOOK BUS <em>· harness</em></h3>
-          <div className="confluence-hook-scroll">
-            {HOOK_INVENTORY.map((hook) => {
-              const count = hookCounts.get(hook.name) ?? 0;
-              return (
-                <div key={hook.name} className={`confluence-hook ${hook.wired ? 'wired' : 'unwired'} ${count ? 'hot' : ''}`}>
-                  <span className="led" />
-                  <span className="name">{hook.name}</span>
-                  <span className="count">{hook.wired ? count : '—'}</span>
-                </div>
-              );
-            })}
-          </div>
-          <p>LEDs fire on live hook events. <b>Dotted</b> hooks are dark fiber awaiting a producer.</p>
-        </aside>
+        <HookBus entries={hookStream.entries} />
 
         <section className={`confluence-stage ${hover ? 'orb-hover' : ''}`}>
           <RiverCanvas
