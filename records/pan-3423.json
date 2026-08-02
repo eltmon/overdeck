@@ -44,29 +44,7 @@
       "timestamp": "2026-08-02T19:40:14.583Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T19:38:24Z",
-      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3423` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3423`."
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T19:39:36Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-3423 (attempt 2/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n\n\n## REQUIRED: Fix the sync failure BEFORE resubmitting\n\n1. Run: `git fetch origin main`\n2. Run: `git merge origin/main`\n3. If git reports conflicts, resolve them and verify the merge succeeds cleanly\n4. Run the project's build and tests to verify nothing broke\n5. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-3423 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    },
-    {
-      "seq": 4,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T19:40:14Z",
-      "markdownBody": "VERIFICATION STUCK for PAN-3423 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-3423 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -94,17 +72,17 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:40:35.314Z",
+  "updated": "2026-08-02T19:40:47.717Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "skipped",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:40:33.674Z",
+    "updatedAt": "2026-08-02T19:40:46.299Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
@@ -206,7 +184,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.192361,
-        "pricingAsOf": "2026-08-02T19:40:34.184Z"
+        "pricingAsOf": "2026-08-02T19:40:46.318Z"
       }
     },
     "merges": [
