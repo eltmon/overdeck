@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:32:49.010Z",
+  "updated": "2026-08-02T23:33:04.598Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,8 +73,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "merge-gate-lock": {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 875113,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:33:04.598Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -150,6 +158,7 @@
     "test-gate-reset": "completed",
     "test-gate-reset.test-gate-reset.ac1": "completed",
     "test-gate-reset.test-gate-reset.ac2": "completed",
-    "test-gate-reset.test-gate-reset.ac3": "completed"
+    "test-gate-reset.test-gate-reset.ac3": "completed",
+    "merge-gate-lock": "running"
   }
 }
