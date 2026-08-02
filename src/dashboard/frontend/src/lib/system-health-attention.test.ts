@@ -219,11 +219,15 @@ describe('system-health-attention', () => {
       expect(item.agents).toHaveLength(2);
       expect(item.agents).toContain('agent-1');
       expect(item.agents).toContain('agent-2');
+      expect(item.targets).toEqual([
+        expect.objectContaining({ agentId: 'agent-1', issueId: 'PAN-1' }),
+        expect.objectContaining({ agentId: 'agent-2', issueId: 'PAN-2' }),
+      ]);
       expect(item.sub).toContain('2×');
       expect(item.agentId).toBeUndefined();
     });
 
-    it('returns an item with severity critical for code agent.runtime.inactive.stalled', () => {
+    it('carries the canonical issue and matching kill consumer for a singleton agent', () => {
       const snapshot = createSnapshot('healthy', {
         agents: [
           {
@@ -238,12 +242,29 @@ describe('system-health-attention', () => {
             }],
           },
         ],
+        topConsumers: [{
+          id: 'agent-stalled',
+          label: 'agent-stalled',
+          type: 'agent',
+          memoryBytes: GIB,
+          memoryGb: 1,
+          issueId: 'PAN-1',
+          killTarget: { kind: 'agent', agentId: 'agent-stalled' },
+        }],
       });
 
       const items = buildAttentionItems(snapshot);
       expect(items).toHaveLength(1);
-      expect(items[0]?.severity).toBe('critical');
-      expect(items[0]?.code).toBe('agent.runtime.inactive.stalled');
+      expect(items[0]).toMatchObject({
+        severity: 'critical',
+        code: 'agent.runtime.inactive.stalled',
+        agentId: 'agent-stalled',
+        issueId: 'PAN-1',
+      });
+      expect(items[0]?.killConsumer?.killTarget).toEqual({
+        kind: 'agent',
+        agentId: 'agent-stalled',
+      });
     });
 
     it('returns stalled items before idle items in the sort order', () => {

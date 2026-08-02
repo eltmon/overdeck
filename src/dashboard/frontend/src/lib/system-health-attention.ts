@@ -1,4 +1,10 @@
-import type { SystemHealthSnapshot, HealthReason } from '@overdeck/contracts';
+import type { HealthReason, SystemHealthConsumer, SystemHealthSnapshot } from '@overdeck/contracts';
+
+export interface AttentionAgentTarget {
+  agentId: string;
+  issueId?: string;
+  killConsumer?: SystemHealthConsumer;
+}
 
 export interface AttentionItem {
   severity: 'critical' | 'warning';
@@ -6,7 +12,10 @@ export interface AttentionItem {
   title: string;
   sub: string;
   agents: string[];
+  targets: AttentionAgentTarget[];
   agentId?: string;
+  issueId?: string;
+  killConsumer?: SystemHealthConsumer;
 }
 
 /**
@@ -85,10 +94,17 @@ function formatBytes(bytes: number): string {
  * Sorts by severity (critical first), then by code (stalled before idle).
  */
 export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionItem[] {
+  const agentConsumers = new Map<string, SystemHealthConsumer>();
+  for (const consumer of snapshot.topConsumers) {
+    const agentId = consumer.killTarget?.kind === 'agent'
+      ? consumer.killTarget.agentId
+      : undefined;
+    if (agentId) agentConsumers.set(agentId, consumer);
+  }
+
   const allReasons: Array<{
     reason: HealthReason;
-    agentId?: string;
-    agentIssueId?: string;
+    target?: AttentionAgentTarget;
   }> = [];
 
   // Collect host reasons
@@ -115,14 +131,17 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
   });
 
   // Collect agent reasons
-  snapshot.agents.forEach((agent, agentIndex) => {
+  snapshot.agents.forEach((agent) => {
     agent.reasons
       .filter(r => r.severity !== 'info')
       .forEach(reason => {
         allReasons.push({
           reason,
-          agentId: snapshot.agents[agentIndex]?.id,
-          agentIssueId: snapshot.agents[agentIndex]?.issueId,
+          target: {
+            agentId: agent.id,
+            issueId: agent.issueId,
+            killConsumer: agentConsumers.get(agent.id),
+          },
         });
       });
   });
@@ -130,8 +149,7 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
   // Group by reason code
   const grouped = new Map<string, Array<{
     reason: HealthReason;
-    agentId?: string;
-    agentIssueId?: string;
+    target?: AttentionAgentTarget;
   }>>();
   for (const item of allReasons) {
     const key = item.reason.code;
@@ -153,10 +171,10 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
 
     if (isGroupable) {
       // Grouped row
-      const agentIds = entries
-        .map(e => e.agentId)
-        .filter((id): id is string => id !== undefined);
-
+      const targets = entries
+        .map(e => e.target)
+        .filter((target): target is AttentionAgentTarget => target !== undefined);
+      const agentIds = targets.map(target => target.agentId);
       const subLine = agentIds.slice(0, 2).join(', ') + (agentIds.length > 2 ? ` +${agentIds.length - 2} more` : '');
 
       items.push({
@@ -165,11 +183,13 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
         title: reasonLabel(snapshot, reason) ?? code,
         sub: `${agentIds.length}× agents: ${subLine}`,
         agents: agentIds,
+        targets,
       });
     } else {
       // Singleton row
-      const agentId = firstEntry.agentId;
-      const issueId = firstEntry.agentIssueId;
+      const target = firstEntry.target;
+      const agentId = target?.agentId;
+      const issueId = target?.issueId;
       let sub = reason.message;
       if (agentId && issueId) {
         sub = `${agentId} · ${issueId}`;
@@ -183,7 +203,10 @@ export function buildAttentionItems(snapshot: SystemHealthSnapshot): AttentionIt
         title: reasonLabel(snapshot, reason) ?? code,
         sub,
         agents: agentId ? [agentId] : [],
+        targets: target ? [target] : [],
         agentId,
+        issueId,
+        killConsumer: target?.killConsumer,
       });
     }
   }
