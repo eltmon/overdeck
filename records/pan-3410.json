@@ -392,6 +392,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T17:11Z] review-agent → FAILED — seq 7",
       "timestamp": "2026-08-02T17:11:52.262Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T17:15Z] review-agent → FAILED — seq 8",
+      "timestamp": "2026-08-02T17:15:12.620Z"
     }
   ],
   "feedback": [
@@ -442,6 +447,13 @@
       "specialist": "review-agent",
       "outcome": "failed",
       "timestamp": "2026-08-02T17:11:52Z",
+      "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3410`."
+    },
+    {
+      "seq": 8,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T17:15:12Z",
       "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3410`."
     }
   ],
@@ -545,7 +557,7 @@
     "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T17:11:52.262Z",
+  "updated": "2026-08-02T17:15:12.621Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
