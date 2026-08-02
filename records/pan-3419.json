@@ -432,21 +432,41 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T20:56:46.522Z",
+  "updated": "2026-08-02T21:06:59.286Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:56:36.880Z",
+    "updatedAt": "2026-08-02T21:06:59.128Z",
+    "reviewNotes": "Approved; cycle-9 PR delta is allowlist-only and all four reviewers found no blocking regression",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewedAtCommit": "5c151a89e751d37e91d834f25dc9e9ed9c639b3f",
-    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z"
+    "reviewedAtCommit": "10aee59c028a77bfe2f14282390479e502b3f300",
+    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -461,17 +481,17 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 30970157,
-            "output": 245432,
-            "cacheRead": 73883136,
+            "input": 31447085,
+            "output": 257728,
+            "cacheRead": 78817280,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 4294932,
-            "output": 74433,
-            "cacheRead": 15965696,
+            "input": 4541148,
+            "output": 98796,
+            "cacheRead": 26424832,
             "cacheWrite": 0
           }
         },
@@ -524,9 +544,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53268269,
-          "output": 785285,
-          "cacheRead": 312936448,
+          "input": 53991413,
+          "output": 821944,
+          "cacheRead": 328329728,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -537,8 +557,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 471.2324183,
-        "pricingAsOf": "2026-08-02T20:56:37.100Z"
+        "usd": 483.6445483,
+        "pricingAsOf": "2026-08-02T21:06:59.219Z"
       }
     },
     "merges": [
