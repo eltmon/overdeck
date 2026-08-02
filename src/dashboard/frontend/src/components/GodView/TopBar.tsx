@@ -5,8 +5,8 @@ import type { ConfluenceData } from './confluence/useConfluenceData';
 
 interface TopBarProps {
   data: ConfluenceData;
-  onHelp: () => void;
-  onFullscreen: () => void;
+  onHelpToggle: () => void;
+  onFullscreenToggle: () => void;
 }
 
 const ECG_SAMPLE_COUNT = 130;
@@ -83,7 +83,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   return <span className="confluence-stat"><em>{label}</em><b>{value}</b></span>;
 }
 
-export function GodViewTopBar({ data, onHelp, onFullscreen }: TopBarProps) {
+export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBarProps) {
   const { hookStream, meta } = data;
   const [eventsPop, setEventsPop] = useState(false);
   const previousEvents = useRef(hookStream.eventsPerSec);
@@ -130,8 +130,20 @@ export function GodViewTopBar({ data, onHelp, onFullscreen }: TopBarProps) {
       <Stat label="❄ STALE" value={meta.staleTotal} />
       <Stat label="OLDEST" value={meta.total === 0 ? '—' : fmtAge(meta.oldestIdle)} />
       <span className={`confluence-active ${meta.active > 0 ? 'on' : ''}`}>{meta.active} active</span>
-      <button type="button" className="confluence-topbar-button" onClick={onHelp}>? HELP</button>
-      <button type="button" className="confluence-topbar-button icon" onClick={onFullscreen} aria-label="Toggle fullscreen">
+      <button
+        type="button"
+        className="confluence-topbar-button"
+        onClick={onHelpToggle}
+        aria-label="Open Confluence field guide"
+      >
+        ? HELP
+      </button>
+      <button
+        type="button"
+        className="confluence-topbar-button icon"
+        onClick={onFullscreenToggle}
+        aria-label="Toggle God View fullscreen"
+      >
         <Maximize2 aria-hidden="true" />
       </button>
     </div>

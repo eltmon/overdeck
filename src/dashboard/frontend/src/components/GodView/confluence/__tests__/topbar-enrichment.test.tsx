@@ -76,7 +76,11 @@ describe('God View enriched top bar', () => {
     const onHelp = vi.fn();
     const onFullscreen = vi.fn();
     const { container } = render(
-      <GodViewTopBar data={data()} onHelp={onHelp} onFullscreen={onFullscreen} />,
+      <GodViewTopBar
+        data={data()}
+        onHelpToggle={onHelp}
+        onFullscreenToggle={onFullscreen}
+      />,
     );
 
     expect(screen.getByText(/^\d{2}:34:56$/)).toBeInTheDocument();
@@ -94,8 +98,8 @@ describe('God View enriched top bar', () => {
     const ecg = screen.getByLabelText('Events per minute ECG');
     expect(ecg).toHaveAttribute('width', '130');
     expect(ecg).toHaveAttribute('height', '30');
-    fireEvent.click(screen.getByRole('button', { name: '? HELP' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Toggle fullscreen' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open Confluence field guide' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle God View fullscreen' }));
     expect(onHelp).toHaveBeenCalledOnce();
     expect(onFullscreen).toHaveBeenCalledOnce();
   });
@@ -104,8 +108,8 @@ describe('God View enriched top bar', () => {
     const { container } = render(
       <GodViewTopBar
         data={data({ system: null, beads: null, costPerMin: null, tokensToday: null })}
-        onHelp={vi.fn()}
-        onFullscreen={vi.fn()}
+        onHelpToggle={vi.fn()}
+        onFullscreenToggle={vi.fn()}
       />,
     );
     for (const label of ['CPU', 'MEM', 'SWAP']) {
@@ -120,7 +124,7 @@ describe('God View enriched top bar', () => {
 
   it('samples the ECG at 500 ms, caps the ring at 130, and pops when events change', () => {
     const { container, rerender } = render(
-      <GodViewTopBar data={data()} onHelp={vi.fn()} onFullscreen={vi.fn()} />,
+      <GodViewTopBar data={data()} onHelpToggle={vi.fn()} onFullscreenToggle={vi.fn()} />,
     );
     const initialDraws = vi.mocked(context.clearRect).mock.calls.length;
     act(() => vi.advanceTimersByTime(499));
@@ -129,7 +133,11 @@ describe('God View enriched top bar', () => {
     expect(vi.mocked(context.clearRect)).toHaveBeenCalledTimes(initialDraws + 1);
 
     rerender(
-      <GodViewTopBar data={data({ eventsPerSec: 2.5 })} onHelp={vi.fn()} onFullscreen={vi.fn()} />,
+      <GodViewTopBar
+        data={data({ eventsPerSec: 2.5 })}
+        onHelpToggle={vi.fn()}
+        onFullscreenToggle={vi.fn()}
+      />,
     );
     expect(container.querySelector('.confluence-event-pop')).toHaveClass('pop');
     act(() => vi.advanceTimersByTime(220));

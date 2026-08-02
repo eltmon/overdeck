@@ -1,10 +1,11 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { HOOK_INVENTORY } from '@overdeck/contracts';
 import { useDashboardStore, selectAgents } from '../../../lib/store';
 import type { Agent } from '../../../types';
 import { GodViewSidebar } from '../Sidebar';
+import { ConfluenceHelp } from './ConfluenceHelp';
 import { OrbTooltip } from './OrbTooltip';
-import { RiverCanvas, type RiverEffectsApi } from './RiverCanvas';
+import { RiverCanvas, type RiverCanvasHandle } from './RiverCanvas';
 import { useConfluenceChoreography } from './useConfluenceChoreography';
 import type { ConfluenceData, ConfluenceOrb } from './useConfluenceData';
 import './confluence.css';
@@ -25,11 +26,24 @@ export function navigateToConfluenceIssue(issueId: string): void {
 interface GodViewConfluenceProps {
   data: ConfluenceData;
   helpOpen: boolean;
-  onHelpChange: (open: boolean) => void;
+  onHelpOpenChange: (open: boolean) => void;
+  onToggleFullscreen: () => void;
 }
 
-export function GodViewConfluence({ data, helpOpen, onHelpChange }: GodViewConfluenceProps) {
-  const effectsRef = useRef<RiverEffectsApi>(null);
+function hasModalOrTextFocus(): boolean {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement)) return false;
+  if (active.isContentEditable || active.matches('input, textarea, select')) return true;
+  return active.closest('[role="dialog"], [aria-modal="true"]') !== null;
+}
+
+export function GodViewConfluence({
+  data,
+  helpOpen,
+  onHelpOpenChange,
+  onToggleFullscreen,
+}: GodViewConfluenceProps) {
+  const effectsRef = useRef<RiverCanvasHandle>(null);
   const { orbs, hookStream, meta } = data;
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const [hover, setHover] = useState<HoverState | null>(null);
@@ -40,6 +54,37 @@ export function GodViewConfluence({ data, helpOpen, onHelpChange }: GodViewConfl
     for (const entry of hookStream.entries) counts.set(entry.hookName, (counts.get(entry.hookName) ?? 0) + 1);
     return counts;
   }, [hookStream.entries]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || hasModalOrTextFocus()) return;
+      if (event.key === 'h' || event.key === '?') {
+        event.preventDefault();
+        onHelpOpenChange(!helpOpen);
+      } else if (event.key === 'Escape' && helpOpen) {
+        event.preventDefault();
+        onHelpOpenChange(false);
+      } else if (event.key === 'f') {
+        event.preventDefault();
+        onToggleFullscreen();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [helpOpen, onHelpOpenChange, onToggleFullscreen]);
+
+  useEffect(() => {
+    let resizeTimer: number | undefined;
+    const onFullscreenChange = () => {
+      if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(() => effectsRef.current?.resize(), 120);
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      if (resizeTimer !== undefined) window.clearTimeout(resizeTimer);
+    };
+  }, []);
 
   return (
     <div className="confluence-root">
@@ -84,7 +129,7 @@ export function GodViewConfluence({ data, helpOpen, onHelpChange }: GodViewConfl
           )}
 
           <div className="confluence-tag">PIPELINE FLOW · <b>PLAN → WORK → REVIEW → TEST → VERIFY → MERGE</b> · frost = stale · shelf = yielded</div>
-          <div className="confluence-hint"><b>h / ?</b> field guide · <b>hover</b> orb · <b>click</b> issue rail · <b>f</b> fullscreen</div>
+          <div className="confluence-hint"><b>h / ?</b> field guide · <b>hover</b> orb · <b>click</b> issue drawer · <b>f</b> fullscreen</div>
         </section>
 
         <GodViewSidebar agents={agents} />
@@ -100,13 +145,10 @@ export function GodViewConfluence({ data, helpOpen, onHelpChange }: GodViewConfl
       </footer>
 
       {helpOpen && (
-        <div className="confluence-help" role="dialog" aria-modal="true" aria-label="Confluence field guide">
-          <div>
-            <header><strong>CONFLUENCE FIELD GUIDE</strong><button type="button" onClick={() => onHelpChange(false)}>×</button></header>
-            <p>The river moves issues from PLAN through MERGE. Heat and motion follow live hook traffic; frost means an agent has gone quiet.</p>
-            <p>Amber shelf orbs are deliberately paused. Pink wrecks are failed merges. Review satellites show the four specialist verdicts and synthesis parent.</p>
-          </div>
-        </div>
+        <ConfluenceHelp
+          eventsPerMin={hookStream.eventsPerMin}
+          onClose={() => onHelpOpenChange(false)}
+        />
       )}
       <div className="confluence-crt" aria-hidden="true" />
       <div className="confluence-vignette" aria-hidden="true" />

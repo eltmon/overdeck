@@ -34,7 +34,12 @@ const data = {
 
 function renderConfluence() {
   return render(
-    <GodViewConfluence data={data} helpOpen={false} onHelpChange={vi.fn()} />,
+    <GodViewConfluence
+      data={data}
+      helpOpen={false}
+      onHelpOpenChange={vi.fn()}
+      onToggleFullscreen={vi.fn()}
+    />,
   );
 }
 
