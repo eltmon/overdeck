@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:36:04.975Z",
+  "updated": "2026-08-02T03:43:24.983Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "design-language-hook": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 1015124,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:36:04.974Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -119,6 +111,17 @@
         "outcome": "completed",
         "reason": "Added ApiSettingsConfig.ui.theme, GET/PUT wiring in loadSettingsApi/updateSettingsApiPromise/validateSettingsApi, and a no-loss merge in saveSettingsApiPromise that preserves the existing open_in_editor_command (which the API type never carries) when only theme is saved. Extended settings-api.test.ts with 5 new tests covering GET default/override, PUT persist, invalid-value rejection, and the no-loss case; had to seed baseConfig()'s mock with a ui block since existing tests would otherwise crash on the new config.ui.theme/currentConfig.ui.openInEditorCommand reads. Bumped scripts/file-size-allowlist.txt for settings-api.ts (1504→1533, PAN-3410) since it's already an untracked god file over the 1000-line ceiling and my additions grew it past origin/main's baseline.",
         "releasedAt": "2026-08-02T03:35:53.773Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 1015124,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:36:04.974Z",
+        "itemId": "design-language-hook",
+        "outcome": "completed",
+        "reason": "Added useDesignLanguage.ts mirroring useTheme.ts's zustand/eager-init/localStorage-mirror structure for the Overdeck Theme axis, never importing useTheme.ts or ui-theme.ts. setDesignLanguage follows SettingsPage.tsx's GET-then-merge-then-PUT pattern since PUT /api/settings fully replaces the settings document server-side (no partial merge) — confirmed by reading saveSettingsApiPromise/writeYamlConfigPreservingComments directly rather than assuming. reconcileFromServer wired into main.tsx beside initTelemetry(). Added a second flash-prevention inline script to index.html stamping data-theme before React mounts (verified it survives production minification in the built dist/index.html). 8 new hook tests all pass, typecheck and build clean.",
+        "releasedAt": "2026-08-02T03:43:24.983Z"
       }
     ],
     "statusReasons": {
@@ -137,6 +140,10 @@
       "settings-api-ui-theme": {
         "reason": "Added ApiSettingsConfig.ui.theme, GET/PUT wiring in loadSettingsApi/updateSettingsApiPromise/validateSettingsApi, and a no-loss merge in saveSettingsApiPromise that preserves the existing open_in_editor_command (which the API type never carries) when only theme is saved. Extended settings-api.test.ts with 5 new tests covering GET default/override, PUT persist, invalid-value rejection, and the no-loss case; had to seed baseConfig()'s mock with a ui block since existing tests would otherwise crash on the new config.ui.theme/currentConfig.ui.openInEditorCommand reads. Bumped scripts/file-size-allowlist.txt for settings-api.ts (1504→1533, PAN-3410) since it's already an untracked god file over the 1000-line ceiling and my additions grew it past origin/main's baseline.",
         "updatedAt": "2026-08-02T03:35:53.773Z"
+      },
+      "design-language-hook": {
+        "reason": "Added useDesignLanguage.ts mirroring useTheme.ts's zustand/eager-init/localStorage-mirror structure for the Overdeck Theme axis, never importing useTheme.ts or ui-theme.ts. setDesignLanguage follows SettingsPage.tsx's GET-then-merge-then-PUT pattern since PUT /api/settings fully replaces the settings document server-side (no partial merge) — confirmed by reading saveSettingsApiPromise/writeYamlConfigPreservingComments directly rather than assuming. reconcileFromServer wired into main.tsx beside initTelemetry(). Added a second flash-prevention inline script to index.html stamping data-theme before React mounts (verified it survives production minification in the built dist/index.html). 8 new hook tests all pass, typecheck and build clean.",
+        "updatedAt": "2026-08-02T03:43:24.983Z"
       }
     }
   },
@@ -161,6 +168,10 @@
     "settings-api-ui-theme.settings-api-ui-theme.ac2": "completed",
     "settings-api-ui-theme.settings-api-ui-theme.ac3": "completed",
     "settings-api-ui-theme.settings-api-ui-theme.ac4": "completed",
-    "design-language-hook": "running"
+    "design-language-hook": "completed",
+    "design-language-hook.design-language-hook.ac1": "completed",
+    "design-language-hook.design-language-hook.ac2": "completed",
+    "design-language-hook.design-language-hook.ac3": "completed",
+    "design-language-hook.design-language-hook.ac4": "completed"
   }
 }
