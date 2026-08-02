@@ -226,20 +226,22 @@
     "recordedAt": "2026-08-02T21:47:33.880Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T22:23:03.935Z",
+  "updated": "2026-08-02T22:23:06.404Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "passed",
     "testStatus": "passed",
+    "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T22:23:03.682Z",
+    "updatedAt": "2026-08-02T22:23:06.029Z",
     "reviewNotes": "Approved after cycle-3 convergence demoted unchanged findings; security clean and performance advisory only.",
     "testNotes": "npm run typecheck: PASS (root, hooks, evals, dashboard, frontend guards all clean). npm run lint: PASS (eslint + skills + slash-commands + prompts + file-size + circular-deps + ratchet + quarantine audits all clean). npm test (full suite, 1392 files): 41 files failed, all pre-existing setupOverdeckTestDb() beforeEach Hook-timed-out-in-5000ms failures under full-suite resource contention (conversations/, workspaces/, memory/, overdeck/ suites) -- none in files this branch touches. Re-ran all 10 orders-related test files in isolation (routes/__tests__/orders.test.ts, cli/orders.test.ts, cli/flywheel-complete.test.ts, lib/orders/*, OrderBookPage.test.tsx, OrderBookModule.test.tsx): 58/58 passed. Spot-checked 2 of the 41 unrelated failures in isolation (workspace-tables.test.ts, merge-set.test.ts): both passed cleanly, confirming resource-contention flake not a regression.",
+    "uatNotes": "UAT required: xBRIEF item frontend-project-picker adds a project picker to the /orders dashboard page with URL-driven state, and review cycle 3 fixed a live project-switching race condition there -- both are observable-dashboard-behavior per roles/test.md's UAT trigger list. Built dist/dashboard/server.js from this workspace and ran it directly on the host at port 3427 (OVERDECK_DISABLE_DEACON=1, peer-dashboard mode) after the workspace's own per-issue devcontainer stack (docker-compose.devcontainer.yml) proved unusable: its server container crash-loops on the pre-existing, already-filed https://github.com/eltmon/overdeck/issues/3497 (CLIProxy watchdog has no peer-dashboard guard and ENOENTs spawning a binary absent in that container) -- unrelated to this branch, out of scope to fix per boundaries. Verified live with Playwright against the two real production order books already on disk (panopticon-cli's default book, mind-your-now's '2026-08-01-myn-hermes-smoke-test-remediation'): (1) /orders loads with the picker defaulting to panopticon-cli and listing all 12 registered projects; (2) selecting mind-your-now updates the URL to ?project=mind-your-now, and the books list correctly swaps to the MYN book with no stale panopticon-cli data (exercises the review-fixed race condition) -- network capture confirmed every subsequent orders/backlog-candidates/single-book fetch carried ?project=mind-your-now; (3) a fresh hard navigation to /orders?project=mind-your-now shows the picker pre-selected to mind-your-now on load; (4) GET /api/orders?project=totally-not-a-real-project returned 400 'Unknown project: totally-not-a-real-project'; (5) GET /api/orders/2026-08-01-myn-hermes-smoke-test-remediation with no project param correctly cross-project-scanned and returned project:mind-your-now, live-exercising the async scan-on-miss fix from review cycle 3. Zero console errors/warnings across the whole session. The OrderBookModule back-link AC (renders '/orders?project=<key>' href) did not surface in the two live contexts checked (Flywheel page, sidebar) within the session's scope; that AC remains verified via its passing unit test (OrderBookModule.test.tsx, part of the 58/58 above) rather than live browser observation.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "e4ab153294dc602a7849da2142fd71b070c486bf",
@@ -393,7 +395,7 @@
       },
       "costAtCloseOut": {
         "usd": 157.06270130000001,
-        "pricingAsOf": "2026-08-02T22:23:03.744Z"
+        "pricingAsOf": "2026-08-02T22:23:06.075Z"
       }
     },
     "merges": [
