@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:14:59.563Z",
+  "updated": "2026-08-02T08:16:22.688Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,15 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 33,
+    "sequence": 34,
     "claims": {
-      "help-fullscreen": {
-        "writerId": "deacon-swarm",
-        "agentId": null,
-        "pid": 3215388,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T07:43:47.917Z"
-      },
       "orb-tooltip": {
         "writerId": "agent-pan-3447",
         "agentId": "agent-pan-3447",
@@ -315,6 +308,17 @@
         "outcome": "completed",
         "reason": "Added timer-free useConfluenceChoreography with a pure dispatch table for live hook, stage, merge, scheduler yield/resume, stale thaw, and plan dispatch changes. Hook effects preserve the mockup constants (heat +0.06, family rate +0.13, 13% tool ticker, 16% feed-style ticker), stage changes emit ring+sparks+gate flash, merge retirement avoids respawn loops, and RiverCanvas no longer duplicates event choreography. Added 3 dispatch-table tests covering every mapping, beneficiary fallback, failure no-op, and a source grep proving no simulator timers. Verified 9 focused choreography/data tests and full npm run typecheck. Commit 4441767915b pushed to origin/feature/pan-3447.",
         "releasedAt": "2026-08-02T08:05:42.247Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": null,
+        "pid": 3215388,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T07:43:47.917Z",
+        "itemId": "help-fullscreen",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-02T08:16:22.630Z"
       }
     ],
     "statusReasons": {
@@ -345,6 +349,10 @@
       "choreography": {
         "reason": "Added timer-free useConfluenceChoreography with a pure dispatch table for live hook, stage, merge, scheduler yield/resume, stale thaw, and plan dispatch changes. Hook effects preserve the mockup constants (heat +0.06, family rate +0.13, 13% tool ticker, 16% feed-style ticker), stage changes emit ring+sparks+gate flash, merge retirement avoids respawn loops, and RiverCanvas no longer duplicates event choreography. Added 3 dispatch-table tests covering every mapping, beneficiary fallback, failure no-op, and a source grep proving no simulator timers. Verified 9 focused choreography/data tests and full npm run typecheck. Commit 4441767915b pushed to origin/feature/pan-3447.",
         "updatedAt": "2026-08-02T08:05:42.247Z"
+      },
+      "help-fullscreen": {
+        "reason": "stale claim released (deacon-swarm dead)",
+        "updatedAt": "2026-08-02T08:16:22.630Z"
       }
     }
   },
@@ -376,7 +384,7 @@
     "river-canvas.river-canvas.ac3": "completed",
     "river-canvas.river-canvas.ac4": "completed",
     "river-canvas.river-canvas.ac5": "completed",
-    "help-fullscreen": "running",
+    "help-fullscreen": "pending",
     "choreography": "completed",
     "choreography.choreography.ac1": "completed",
     "choreography.choreography.ac2": "completed",
