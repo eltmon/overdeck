@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:34:51.344Z",
+  "updated": "2026-08-02T23:35:06.803Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,8 +73,16 @@
     }
   ],
   "tasks": {
-    "sequence": 12,
-    "claims": {},
+    "sequence": 13,
+    "claims": {
+      "migrate-fallback": {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 980070,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:35:06.802Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -188,6 +196,7 @@
     "retire-review-arm.retire-review-arm.ac1": "completed",
     "retire-review-arm.retire-review-arm.ac2": "completed",
     "retire-review-arm.retire-review-arm.ac3": "completed",
-    "retire-review-arm.retire-review-arm.ac4": "completed"
+    "retire-review-arm.retire-review-arm.ac4": "completed",
+    "migrate-fallback": "running"
   }
 }
