@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T02:46:09.928Z",
+  "updated": "2026-08-02T02:56:49.644Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -163,15 +163,7 @@
     "hook-stream-shaping.hook-stream-shaping.ac3": "completed"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 3,
-        "itemId": "hook-stream-shaping",
-        "agentId": "agent-pan-3447-slot-3",
-        "branch": "feature/pan-3447-slot-3",
-        "assignedAt": "2026-08-02T00:22:33.984Z"
-      }
-    ],
+    "slotAssignments": [],
     "slotCompletions": {
       "1": {
         "slotIndex": 1,
