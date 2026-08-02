@@ -233,10 +233,10 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-02T18:44:09.661Z",
+  "updated": "2026-08-02T18:57:47.709Z",
   "pipeline": {
     "issueId": "PAN-3450",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -245,7 +245,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-02T18:43:19.076Z",
+    "updatedAt": "2026-08-02T18:57:47.181Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3450-review already running. Use 'pan tell' to message it.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
@@ -300,49 +300,49 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 9211,
-            "output": 6549,
-            "cacheRead": 439,
+            "input": 13592,
+            "output": 11476,
+            "cacheRead": 615,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10051380,
-            "output": 107808,
-            "cacheRead": 31749120,
+            "input": 10530928,
+            "output": 117796,
+            "cacheRead": 36173312,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1457558,
-            "output": 12978,
-            "cacheRead": 1206784,
+            "input": 3168180,
+            "output": 56353,
+            "cacheRead": 16166400,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 587536,
-            "output": 4934,
-            "cacheRead": 371200,
+            "input": 2117804,
+            "output": 42650,
+            "cacheRead": 15123968,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 1741869,
-            "output": 16757,
-            "cacheRead": 2248192,
+            "input": 3429045,
+            "output": 56781,
+            "cacheRead": 16316416,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1114219,
-            "output": 11251,
-            "cacheRead": 481280,
+            "input": 2801493,
+            "output": 56956,
+            "cacheRead": 14894592,
             "cacheWrite": 0
           }
         },
@@ -357,21 +357,21 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 9211,
-          "output": 6549,
-          "cacheRead": 439,
+          "input": 13592,
+          "output": 11476,
+          "cacheRead": 615,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 18178150,
-          "output": 302227,
-          "cacheRead": 111265280,
+          "input": 25273038,
+          "output": 479035,
+          "cacheRead": 173883392,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 155.6321999,
-        "pricingAsOf": "2026-08-02T18:43:19.167Z"
+        "usd": 227.7489695,
+        "pricingAsOf": "2026-08-02T18:57:47.675Z"
       }
     },
     "merges": [
