@@ -360,6 +360,57 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="text-foreground">{summary}</div>
           </div>
 
+          <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">CPU</div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.cpuPercent == null ? 'Unavailable' : `${data.host.metrics.cpuPercent.toFixed(1)}%`}</div>
+              {data.host.metrics.cpuPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.cpuPercent < 60 ? 'bg-success' : data.host.metrics.cpuPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.cpuPercent)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Memory</div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.usedMemoryBytes == null || data.host.metrics.totalMemoryBytes == null ? 'Unavailable' : `${formatBytes(data.host.metrics.usedMemoryBytes)} / ${formatBytes(data.host.metrics.totalMemoryBytes)}`}</div>
+              {data.host.metrics.memoryUsedPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.memoryUsedPercent < 60 ? 'bg-success' : data.host.metrics.memoryUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.memoryUsedPercent)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Overdeck</div>
+              <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
+              {data.summary.overdeckMemoryPercent > 0 && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-info"
+                    style={{ width: `${Math.min(100, data.summary.overdeckMemoryPercent)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border border-border p-2">
+              <div className="text-muted-foreground">Swap <span className="text-[11px]">historical · not live pressure</span></div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.swapUsedPercent == null ? 'Unavailable' : `${data.host.metrics.swapUsedPercent.toFixed(1)}%`}</div>
+              {data.host.metrics.swapUsedPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.swapUsedPercent < 60 ? 'bg-success' : data.host.metrics.swapUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.swapUsedPercent)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="mb-3 flex flex-wrap gap-2">
             <div className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
               {data.admission.admittedWorkAgentCount} admitted agent{data.admission.admittedWorkAgentCount !== 1 ? 's' : ''}
