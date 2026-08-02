@@ -909,3 +909,8 @@ LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red 
 - **PAN-3446 landed** (#3449 squash `7c48949d04`, handed off) — reviewRunId recovery live; convoy dispatch no longer dead-ends when a parent's state loses its run id. Close-out on CI+deploy.
 - **Collateral sweep across all 8 open PRs** (the generalization from tick 49): 6 green, 1 in progress, **1 real collateral — #3444 (PAN-3338)**, whose test lane failed at 21:20Z on the exact red-main assertion (`has no live pan beads or bd ready instructions`), squarely inside the red window. Not its own defect. Resynced `feature/pan-3338` onto green main (`73b597fcec`); CI re-runs clean. Diagnosing before re-driving cost one log read and saved a wrong-cause rework cycle on someone else's work agent.
 - Fleet steady; no wedge specimens since the watcher deployed (~40 min).
+
+## RUN-79 interstitial (~00:00Z) — PAN-3446 CLOSED OUT (29 total); leak model refined to cost-per-attach
+
+Monitor tripped at 3245MB/50min/44 sessions (no system pressure — 18.6GB avail, PSI 0). Pre-emptive reload ALSO satisfied PAN-3446's deploy gate → **PAN-3446 closed out, 29 issues landed+closed this run.**
+**Leak model refined with the 5-point table:** average rate tracks RECENT ATTACHES, not standing session count (42-session/8-min sample burst at ~300MB/min during a fleet ramp; 44-session/50-min sample only ~65MB/min with mostly long-lived sessions). That is cost-per-attach never released — and it explains why a quiet-window measurement looked deceptively clean. Told the strike to instrument attach/detach and diff across a SPAWN BURST, not idle time.
