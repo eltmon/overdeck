@@ -119,9 +119,10 @@
 }
 
 .confluence-hook.wired { opacity: 1; }
-.confluence-hook.hot { border-color: rgba(0, 212, 255, .25); background: rgba(255, 255, 255, .03); }
+.confluence-hook.hot { border-color: color-mix(in srgb, var(--hook-color) 25%, transparent); background: rgba(255, 255, 255, .03); }
 .confluence-hook .led { width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: #22304a; }
-.confluence-hook.hot .led { background: var(--gv-blue); box-shadow: 0 0 9px var(--gv-blue); }
+.confluence-hook.wired .led { background: var(--hook-color); opacity: .45; }
+.confluence-hook.hot .led { opacity: 1; box-shadow: 0 0 9px var(--hook-color); }
 .confluence-hook .name { flex: 1; color: var(--gv-text-primary); font: 9.5px var(--gv-font-mono); white-space: nowrap; }
 .confluence-hook.unwired .name { color: var(--gv-text-secondary); text-decoration: dotted underline rgba(122, 138, 170, .5); text-underline-offset: 3px; }
 .confluence-hook .count { min-width: 28px; color: var(--gv-text-secondary); font: 9px var(--gv-font-mono); text-align: right; }

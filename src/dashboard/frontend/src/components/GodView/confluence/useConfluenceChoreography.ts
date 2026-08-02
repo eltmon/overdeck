@@ -91,10 +91,6 @@ export function planConfluenceChoreography({
       );
     }
 
-    if (before.mergeStatus !== 'merging' && orb.mergeStatus === 'merging') {
-      commands.push({ type: 'merge', issueId: orb.id });
-    }
-
     const yielded = orb.state === 'shelf' && (
       orb.yieldedByScheduler || orb.yieldReason?.toLowerCase().startsWith('yield:') === true
     );
@@ -150,8 +146,8 @@ function orbMap(orbs: readonly ConfluenceOrb[]): Map<string, ConfluenceOrb> {
   return new Map(orbs.map((orb) => [orb.id, orb]));
 }
 
-function eventKey(event: HookStreamEntry): string {
-  return `${event.ts}:${event.agentId}:${event.hookName}:${event.tool}`;
+function eventKey(event: HookStreamEntry): number {
+  return event.sequence;
 }
 
 export function useConfluenceChoreography(
@@ -160,7 +156,7 @@ export function useConfluenceChoreography(
   effectsRef: MutableRefObject<RiverEffectsApi | null>,
 ): void {
   const previousRef = useRef<Map<string, ConfluenceOrb> | null>(null);
-  const seenEventsRef = useRef(new Set<string>());
+  const seenEventsRef = useRef(new Set<number>());
 
   useEffect(() => {
     const current = orbMap(orbs);

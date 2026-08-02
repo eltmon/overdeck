@@ -366,6 +366,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">CPU</div>
               <div className="mt-1 font-semibold text-foreground">{data.host.metrics.cpuPercent == null ? 'Unavailable' : `${data.host.metrics.cpuPercent.toFixed(1)}%`}</div>
+              <div className="mt-1 text-muted-foreground">
+                Load/core {data.host.metrics.loadPerCore1m == null ? 'Unavailable' : data.host.metrics.loadPerCore1m.toFixed(2)}
+              </div>
               {data.host.metrics.cpuPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -378,6 +381,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Memory</div>
               <div className="mt-1 font-semibold text-foreground">{data.host.metrics.usedMemoryBytes == null || data.host.metrics.totalMemoryBytes == null ? 'Unavailable' : `${formatBytes(data.host.metrics.usedMemoryBytes)} / ${formatBytes(data.host.metrics.totalMemoryBytes)}`}</div>
+              <div className="mt-1 text-muted-foreground">
+                Avail {data.host.metrics.availableMemoryBytes == null ? 'Unavailable' : formatBytes(data.host.metrics.availableMemoryBytes)}
+              </div>
               {data.host.metrics.memoryUsedPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -390,6 +396,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Overdeck</div>
               <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
+              <div className="mt-1 text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
               {data.summary.overdeckMemoryPercent > 0 && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
@@ -417,15 +424,18 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
           </div>
 
           <div className="mb-3 flex flex-wrap gap-2">
-            <div className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
-              {data.admission.admittedWorkAgentCount} admitted agent{data.admission.admittedWorkAgentCount !== 1 ? 's' : ''}
+            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              <span>Admitted work agents</span>
+              <span>{data.admission.admittedWorkAgentCount}</span>
             </div>
-            <div className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
-              {data.summary.containerCount} container{data.summary.containerCount !== 1 ? 's' : ''}
+            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              <span>Containers</span>
+              <span>{data.summary.containerCount}</span>
             </div>
             <div className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`}>
               <span className={`inline-block h-2 w-2 rounded-full ${relay?.status === 'running' ? 'bg-success' : 'bg-warning'}`}></span>
-              Relay {relay?.status === 'running' ? 'running' : 'stopped'}
+              <span>Webhook relay</span>
+              <span>{relay?.status === 'running' ? 'Running' : 'Stopped'}</span>
             </div>
           </div>
 

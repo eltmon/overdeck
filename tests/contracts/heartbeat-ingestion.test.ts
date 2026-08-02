@@ -69,6 +69,22 @@ describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
     expect(decoded._tag).toBe('Success')
   })
 
+  it('hook_fired → agent.hook_fired without changing activity state', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'hook_fired',
+      hookName: 'Notification',
+      tool: 'Notification',
+    }, TS)
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    expect((ev as any).type).toBe('agent.hook_fired')
+    expect((ev as any).payload).toMatchObject({
+      agentId: AGENT,
+      hookName: 'Notification',
+      tool: 'Notification',
+    })
+  })
+
   it('new-shape thinking_start → agent.thinking_started', () => {
     const ev = bodyToEvent(AGENT, { kind: 'thinking_start', lastToolAt: TS }, TS)
     const decoded = decodeCandidate(ev)!

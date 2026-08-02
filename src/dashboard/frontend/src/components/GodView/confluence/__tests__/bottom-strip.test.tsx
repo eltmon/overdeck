@@ -9,8 +9,9 @@ import {
 } from '../BottomStrip';
 import type { HookStreamEntry } from '../useConfluenceData';
 
-function entry(hookName: string, ts: number): HookStreamEntry {
+function entry(hookName: string, ts: number, sequence = ts): HookStreamEntry {
   return {
+    sequence,
     agentId: 'agent-pan-3447',
     issueId: 'PAN-3447',
     tool: 'Bash',

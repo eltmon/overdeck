@@ -131,6 +131,34 @@ describe('useConfluenceOrbs', () => {
     expect(result.current.find((orb) => orb.id === 'PAN-4')).toBe(original);
   });
 
+  it('maps queued work into MERGE and exposes the primary agent harness', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-5': agent({
+          id: 'agent-pan-5',
+          issueId: 'PAN-5',
+          role: 'work',
+          runtime: 'claude-code',
+        }),
+      },
+      issuesRaw: [{ id: 'PAN-5', identifier: 'PAN-5', title: 'Queued', labels: [] }],
+      reviewStatusByIssueId: {
+        'PAN-5': { issueId: 'PAN-5', mergeStatus: 'queued' },
+      },
+    });
+
+    const client = queryClient();
+    client.setQueryData(['workspace-stack-health', ['PAN-5']], { workspaces: {} });
+    const { result } = renderHook(() => useConfluenceOrbs(), { wrapper: wrapper(client) });
+
+    expect(result.current[0]).toMatchObject({
+      stage: 'MERGE',
+      role: 'ship',
+      mergeStatus: 'queued',
+      harness: 'claude-code',
+    });
+  });
+
   it('groups four review specialists and the review parent into a five-member convoy', () => {
     const reviewAgents = [
       'agent-min-839-review-security',
@@ -178,17 +206,17 @@ describe('useHookStream', () => {
           currentTool: 'Read',
           hookName: 'PreToolUse',
         }, 1),
-        event('agent.activity_changed', {
+        event('agent.hook_fired', {
           agentId: 'agent-pan-1',
-          activity: 'working',
-          currentTool: 'Bash',
+          hookName: 'PostToolUseFailure',
+          tool: 'Bash',
         }, 2),
       ]);
     });
 
     expect(result.current.entries).toMatchObject([
       { agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Read', hookName: 'PreToolUse', family: 'tool_read' },
-      { agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Bash', hookName: 'PostToolUse', family: 'tool_exec' },
+      { sequence: 2, agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Bash', hookName: 'PostToolUseFailure', family: 'tool_exec' },
     ]);
     expect(result.current.eventsPerMin).toBe(2);
     expect(result.current.eventsPerSec).toBe(2);

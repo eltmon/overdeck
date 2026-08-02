@@ -4,8 +4,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HookBus } from '../HookBus';
 import type { HookStreamEntry } from '../useConfluenceData';
 
-function entry(hookName: string, ts: number): HookStreamEntry {
+function entry(hookName: string, ts: number, sequence = ts): HookStreamEntry {
   return {
+    sequence,
     agentId: 'agent-pan-3447',
     issueId: 'PAN-3447',
     tool: 'Bash',
@@ -39,6 +40,7 @@ describe('Confluence hook bus', () => {
 
     expect(preToolUse.querySelector('.count')).toHaveTextContent('1');
     expect(preToolUse).toHaveClass('hot');
+    expect(preToolUse).toHaveStyle({ '--hook-color': '#00d4ff' });
     expect(sessionEnd.querySelector('.count')).toHaveTextContent('—');
     expect(sessionEnd).not.toHaveClass('hot');
     expect(vi.getTimerCount()).toBe(1);
@@ -48,7 +50,7 @@ describe('Confluence hook bus', () => {
       <HookBus entries={[
         entry('PreToolUse', 1),
         entry('SessionEnd', 2),
-        entry('PreToolUse', 3),
+        entry('PreToolUse', 1, 3),
         entry('PostToolUse', 4),
       ]} />,
     );

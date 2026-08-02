@@ -110,6 +110,17 @@ export interface RiverCanvasProps {
   onSelect?: (orb: ConfluenceOrb | null) => void;
 }
 
+export function advanceMergeDwell(
+  stage: Stage,
+  mergeStatus: string | null,
+  remaining: number,
+  dt: number,
+): { remaining: number; shouldStart: boolean } {
+  if (stage !== 'MERGE') return { remaining, shouldStart: false };
+  const next = Math.max(0, remaining - dt);
+  return { remaining: next, shouldStart: next === 0 && mergeStatus === 'merging' };
+}
+
 interface Engine {
   api: RiverEffectsApi;
   update(props: RiverCanvasProps): void;
@@ -277,6 +288,8 @@ function createEngine(
   };
 
   const startMerge = (orb: RenderOrb) => {
+    if (orb.merging) return;
+    retiredIds.add(orb.id);
     orb.merging = true;
     orb.mergeVx = 2;
     orb.fading = null;
@@ -521,7 +534,11 @@ function createEngine(
       orb.wobA += dt * orb.wobSpeed * (1 + orb.heat * 2.2); orb.wobB += dt * orb.wobSpeed * 0.7; orb.compactT = Math.max(0, orb.compactT - dt);
       if (orb.fading !== null) { orb.fading -= dt; if (orb.fading <= 0) { renderOrbs.delete(orb.id); continue; } }
       if (orb.merging) { orb.mergeVx += dt * 260; orb.x += orb.mergeVx * dt; burst(orb.x, orb.y, '#e8edf8', 3, 40, 0.7, 2); if (orb.x > layout.portalX - 6) finishMerge(orb); continue; }
-      if (orb.state === 'active' && orb.stage === 'MERGE' && orb.mergeDwell > 0) { orb.mergeDwell -= dt; if (orb.mergeDwell <= 0 && !props.orbs.some((source) => source.id === orb.id)) startMerge(orb); }
+      if (orb.state === 'active' && orb.stage === 'MERGE') {
+        const dwell = advanceMergeDwell(orb.stage, orb.mergeStatus, orb.mergeDwell, dt);
+        orb.mergeDwell = dwell.remaining;
+        if (dwell.shouldStart) startMerge(orb);
+      }
       if (orb.state === 'shelf') { orb.y += (layout.shelfY - orb.y) * dt * 3; orb.x += (orb.tx - orb.x) * dt * 1.5; continue; }
       if (orb.state === 'failed') { orb.y += Math.sin(simT * 0.5 + orb.wobA) * dt * 3; orb.x += Math.cos(simT * 0.4 + orb.wobB) * dt * 2; if (Math.random() < dt * 0.8) burst(orb.x, orb.y, '#ff2d7c', 1, 22, 1.2, 1.4); continue; }
       if (orb.state === 'stale') { orb.staleMin += dt * 2; orb.x += (orb.tx + Math.sin(simT * 0.3 + orb.wobA) * 8 - orb.x) * dt * 1.2; orb.y += (orb.ty + Math.cos(simT * 0.22 + orb.wobB) * 4 - orb.y) * dt * 1.2; if (Math.random() < dt * 0.5) frostMotes(orb.x, orb.y, 1); continue; }

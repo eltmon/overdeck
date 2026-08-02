@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { HOOK_INVENTORY, WIRED_HOOK_NAMES } from '@overdeck/contracts';
 import type { HookStreamEntry } from './useConfluenceData';
 
@@ -9,18 +9,18 @@ interface HookBusProps {
   entries: readonly HookStreamEntry[];
 }
 
-function entryKey(entry: HookStreamEntry): string {
-  return `${entry.ts}:${entry.agentId}:${entry.issueId ?? ''}:${entry.tool}:${entry.hookName}`;
+function entryKey(entry: HookStreamEntry): number {
+  return entry.sequence;
 }
 
 export function HookBus({ entries }: HookBusProps) {
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [hotHooks, setHotHooks] = useState<ReadonlySet<string>>(new Set());
-  const seenEntries = useRef<Set<string>>(new Set());
+  const seenEntries = useRef<Set<number>>(new Set());
   const hotTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   useEffect(() => {
-    const nextSeen = new Set<string>();
+    const nextSeen = new Set<number>();
     const increments = new Map<string, number>();
     for (const entry of entries) {
       const key = entryKey(entry);
@@ -76,6 +76,7 @@ export function HookBus({ entries }: HookBusProps) {
               data-hook-name={hook.name}
               data-wired={hook.wired ? 'true' : 'false'}
               className={`confluence-hook ${hook.wired ? 'wired' : 'unwired'} ${hotHooks.has(hook.name) ? 'hot' : ''}`}
+              style={hook.wired ? { '--hook-color': hook.color } as CSSProperties : undefined}
             >
               <span className="led" />
               <span className="name">{hook.name}</span>

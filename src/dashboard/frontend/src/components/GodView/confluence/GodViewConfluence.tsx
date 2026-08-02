@@ -18,6 +18,16 @@ interface HoverState {
   canvasWidth: number;
 }
 
+export function selectedConfluenceIssueId(pathname = window.location.pathname): string | null {
+  const match = pathname.match(/^\/issues\/([^/]+)$/);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
 export function navigateToConfluenceIssue(issueId: string): void {
   const path = `/issues/${encodeURIComponent(issueId)}`;
   if (window.location.pathname !== path) window.history.pushState({}, '', path);
@@ -48,7 +58,21 @@ export function GodViewConfluence({
   const { orbs, hookStream, meta } = data;
   const agents = useDashboardStore(selectAgents) as unknown as Agent[];
   const [hover, setHover] = useState<HoverState | null>(null);
+  const [selectedId, setSelectedId] = useState(() => selectedConfluenceIssueId());
   useConfluenceChoreography(orbs, hookStream.entries, effectsRef);
+
+  useEffect(() => {
+    window.__orbs = orbs;
+    return () => {
+      if (window.__orbs === orbs) delete window.__orbs;
+    };
+  }, [orbs]);
+
+  useEffect(() => {
+    const onPopState = () => setSelectedId(selectedConfluenceIssueId());
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -91,6 +115,7 @@ export function GodViewConfluence({
             ref={effectsRef}
             orbs={orbs}
             hookStream={hookStream}
+            selectedId={selectedId}
             conversations={meta.conversations}
             mergeQueue={meta.mergeQ}
             onHover={(orb, point) => setHover(orb && point ? { orb, ...point } : null)}

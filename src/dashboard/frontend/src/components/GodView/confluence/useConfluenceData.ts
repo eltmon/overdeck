@@ -60,6 +60,7 @@ export interface ConfluenceOrb {
 }
 
 export interface HookStreamEntry {
+  sequence: number;
   agentId: string;
   issueId: string | null;
   tool: string;
@@ -204,12 +205,8 @@ function orbStage(
   review: ReviewStatusSnapshot | undefined,
 ): Stage {
   const mergeStatus = review?.mergeStatus ?? issue?.mergeStatus;
-  if (
-    mergeStatus === 'queued' ||
-    mergeStatus === 'merging' ||
-    mergeStatus === 'verifying' ||
-    mergedPendingCloseout(issue, review)
-  ) return 'VERIFY';
+  if (mergeStatus === 'queued' || mergeStatus === 'merging') return 'MERGE';
+  if (mergeStatus === 'verifying' || mergedPendingCloseout(issue, review)) return 'VERIFY';
   if (agents.some((agent) => agent.role === 'test')) return 'TEST';
   if (agents.some((agent) => agent.role === 'review' || agent.id.includes('-review'))) return 'REVIEW';
   if (agents.some((agent) => agent.role === 'plan')) return 'PLAN';
@@ -220,7 +217,7 @@ function primaryAgent(agents: readonly AgentSnapshot[], stage: Stage): AgentSnap
   const role = stage === 'PLAN' ? 'plan'
     : stage === 'REVIEW' ? 'review'
       : stage === 'TEST' ? 'test'
-        : stage === 'VERIFY' ? 'ship'
+        : stage === 'VERIFY' || stage === 'MERGE' ? 'ship'
           : 'work';
   return agents.find((agent) => agent.role === role && activeStatus(agent.status))
     ?? agents.find((agent) => activeStatus(agent.status))
@@ -256,9 +253,15 @@ function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnap
 
   switch (event.type) {
     case 'agent.activity_changed':
+      if (!event.payload.hookName) return null;
       agentId = event.payload.agentId;
-      tool = event.payload.currentTool ?? event.payload.hookName ?? event.payload.activity;
-      hookName = event.payload.hookName ?? 'PostToolUse';
+      tool = event.payload.currentTool ?? event.payload.hookName;
+      hookName = event.payload.hookName;
+      break;
+    case 'agent.hook_fired':
+      agentId = event.payload.agentId;
+      tool = event.payload.tool ?? event.payload.hookName;
+      hookName = event.payload.hookName;
       break;
     case 'agent.permission_requested':
       agentId = event.payload.agentId;
@@ -270,17 +273,13 @@ function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnap
       tool = 'UserPromptSubmit';
       hookName = 'UserPromptSubmit';
       break;
-    case 'agent.waiting_started':
-      agentId = event.payload.agentId;
-      tool = 'Notification';
-      hookName = 'Notification';
-      break;
     default:
       return null;
   }
 
   const agent = agentsById[agentId];
   return {
+    sequence: event.sequence,
     agentId,
     issueId: agent?.issueId ?? null,
     tool,
@@ -473,7 +472,7 @@ export function useConfluenceOrbs(
       const orb: ConfluenceOrb = {
         id,
         project: issueProject(id),
-        role: stage === 'VERIFY' ? 'ship' : (primary.role ?? 'work'),
+        role: stage === 'VERIFY' || stage === 'MERGE' ? 'ship' : (primary.role ?? 'work'),
         stage,
         title: issue?.title ?? id,
         heat: Math.min(1, 0.25 + issueAgents.filter((agent) => activeStatus(agent.status)).length * 0.15),
@@ -490,7 +489,7 @@ export function useConfluenceOrbs(
         warn: primary.status === 'error' || primary.troubled ? (primary.lastFailureReason ?? primary.status) : null,
         broken,
         model: primary.model ?? null,
-        harness: null,
+        harness: primary.runtime ?? null,
         labels: issue?.labels ?? [],
         glyph: modelGlyph(primary.model),
         lastActivity,

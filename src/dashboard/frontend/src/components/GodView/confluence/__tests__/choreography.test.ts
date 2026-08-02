@@ -1,5 +1,6 @@
+import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { RiverEffectsApi } from '../RiverCanvas';
+import { advanceMergeDwell, type RiverEffectsApi } from '../RiverCanvas';
 import {
   FEED_TICKER_CHANCE,
   HOOK_HEAT_BUMP,
@@ -7,6 +8,7 @@ import {
   TOOL_TICKER_CHANCE,
   planConfluenceChoreography,
   runConfluenceCommands,
+  useConfluenceChoreography,
 } from '../useConfluenceChoreography';
 import type { ConfluenceOrb, HookStreamEntry } from '../useConfluenceData';
 
@@ -40,8 +42,9 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
   };
 }
 
-function hook(issueId: string): HookStreamEntry {
+function hook(issueId: string, sequence = 1): HookStreamEntry {
   return {
+    sequence,
     agentId: `agent-${issueId.toLowerCase()}`,
     issueId,
     tool: 'Read',
@@ -66,7 +69,14 @@ function effects(): RiverEffectsApi {
 }
 
 describe('Confluence choreography dispatch table', () => {
-  it('maps hook, stage, merge, yield, resume, thaw, and dispatch changes to exact effects', () => {
+  it('holds queued and merging orbs in MERGE until their dwell expires', () => {
+    expect(advanceMergeDwell('MERGE', 'queued', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
+    expect(advanceMergeDwell('MERGE', 'merging', 2, 0.5)).toEqual({ remaining: 1.5, shouldStart: false });
+    expect(advanceMergeDwell('MERGE', 'merging', 1.5, 1.5)).toEqual({ remaining: 0, shouldStart: true });
+    expect(advanceMergeDwell('VERIFY', 'merging', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
+  });
+
+  it('maps hook, stage, yield, resume, thaw, and dispatch changes to exact effects', () => {
     expect(HOOK_HEAT_BUMP).toBe(0.06);
     expect(HOOK_RATE_BUMP).toBe(0.13);
     expect(TOOL_TICKER_CHANCE).toBe(0.13);
@@ -113,7 +123,7 @@ describe('Confluence choreography dispatch table', () => {
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-1', color: '#ffb800' });
     expect(commands).toContainEqual({ type: 'sparks', issueId: 'PAN-1', color: '#ffb800', heatBump: 0, specRateBump: 0 });
     expect(commands).toContainEqual({ type: 'gate', stage: 'REVIEW' });
-    expect(commands).toContainEqual({ type: 'merge', issueId: 'PAN-4' });
+    expect(commands).not.toContainEqual({ type: 'merge', issueId: 'PAN-4' });
     expect(commands).toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-50' });
     expect(commands).toContainEqual({ type: 'ring', issueId: 'PAN-3', color: '#39ff14' });
     expect(commands).toContainEqual({ type: 'sun' });
@@ -126,7 +136,7 @@ describe('Confluence choreography dispatch table', () => {
     expect(api.emitSparks).toHaveBeenCalledWith('PAN-2', '#00d4ff', 'agent-pan-2', 0.06);
     expect(api.emitRing).toHaveBeenCalledWith('PAN-1', '#ffb800');
     expect(api.gateFlash).toHaveBeenCalledWith('REVIEW');
-    expect(api.playMerge).toHaveBeenCalledWith('PAN-4');
+    expect(api.playMerge).not.toHaveBeenCalled();
     expect(api.playTide).toHaveBeenCalledWith('PAN-5', 'PAN-50');
     expect(api.pulseSun).toHaveBeenCalledOnce();
     expect(api.spawnFromSun).toHaveBeenCalledWith('PAN-99');
@@ -142,6 +152,23 @@ describe('Confluence choreography dispatch table', () => {
 
     expect(planConfluenceChoreography({ previous, current, hookEvents: [] }))
       .toContainEqual({ type: 'tide', targetId: 'PAN-5', beneficiaryId: 'PAN-11' });
+  });
+
+  it('emits sparks for same-second events with distinct domain sequences', () => {
+    const api = effects();
+    const effectsRef = { current: api };
+    const orbs = [orb('PAN-1')];
+    const first = hook('PAN-1', 1);
+    const second = hook('PAN-1', 2);
+    const { rerender } = renderHook(
+      ({ entries }) => useConfluenceChoreography(orbs, entries, effectsRef),
+      { initialProps: { entries: [first] } },
+    );
+
+    rerender({ entries: [first, second] });
+
+    expect(api.emitSparks).toHaveBeenCalledTimes(1);
+    expect(api.emitSparks).toHaveBeenCalledWith('PAN-1', '#00d4ff', 'agent-pan-1', HOOK_HEAT_BUMP);
   });
 
   it('plans and runs a frame without scheduling wall-clock choreography timers', () => {
