@@ -2665,6 +2665,19 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
+  // PAN-3485: the stall sweeper — walk the parked population and execute each
+  // orbit's autonomous un-park action (resume-with-feedback, merge re-eval,
+  // UAT re-drive, zombie reap, idle nudge→stop). Operator gates are respected,
+  // never overridden — re-surfaced on a TTL instead. Emits sweep.* events.
+  try {
+    const sweepActions = await (await import('./stall-sweeper.js')).runStallSweeperPatrol();
+    actions.push(...sweepActions);
+    for (const a of sweepActions) addLog('action', a, state.patrolCycle);
+  } catch (err: any) {
+    console.warn(`[deacon] stall sweeper patrol failed: ${err?.message ?? err}`);
+    addLog('warn', `Stall sweeper patrol failed: ${err?.message ?? err}`, state.patrolCycle);
+  }
+
   const { reconcileInFlightJournals } = await import('./advancing-selfheal.js');
   const reconciledJournalActions = await reconcileInFlightJournals();
   actions.push(...reconciledJournalActions);
