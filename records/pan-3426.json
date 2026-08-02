@@ -152,7 +152,7 @@
     "recordedAt": "2026-08-02T18:12:05.186Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:12:15.210Z",
+  "updated": "2026-08-02T18:12:23.020Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -161,8 +161,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T18:12:11.950Z",
+    "updatedAt": "2026-08-02T18:12:14.641Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
+    "verificationNotes": "Verification FAILED at lint (179770ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(65010 chars elided)…\nplay\":\"/pan parked\",\"description\":\"List every issue parked in a stall orbit (stuck flags, gates, failed merges, zombies), oldest first, with why + release condition\",\"args\":[],\"options\":[{\"flags\":\"--json\",\"description\":\"Print the raw parked rows as JSON\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"CLI\"},\n+  {\"id\":\"pan-parked-ack\",\"path\":[\"parked\",\"ack\"],\"display\":\"/pan parked ack\",\"description\":\"Batch-acknowledge parked rows (default orbit: needs-you), then print the flywheel hand-off\",\"args\":[],\"options\":[{\"flags\":\"--orbit <orbit>\",\"description\":\"Parked orbit to acknowledge\",\"required\":true,\"valueHint\":\"orbit\"},{\"flags\":\"--older-than <days>\",\"description\":\"Only rows parked at least this many days\",\"required\":true,\"valueHint\":\"days\"},{\"flags\":\"--dry-run\",\"description\":\"List what would be acknowledged without writing\",\"required\":false,\"valueHint\":null}],\"aliases\":[],\"category\":\"CLI\"},\n   {\"id\":\"pan-docs\",\"path\":[\"docs\"],\"display\":\"/pan docs\",\"des\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
     "reviewedAtCommit": "563f54f91d3882c218611201ff71c172527e7799",
     "reviewRequestedAt": "2026-08-02T18:12:06.420Z",
@@ -262,18 +263,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 46,
-            "output": 8136,
-            "cacheRead": 3472856,
-            "cacheWrite": 193579
+            "input": 50,
+            "output": 11293,
+            "cacheRead": 3862633,
+            "cacheWrite": 197862
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1180,
-            "output": 35522,
-            "cacheRead": 25488690,
-            "cacheWrite": 2160065
+            "input": 1196,
+            "output": 35789,
+            "cacheRead": 25632469,
+            "cacheWrite": 2248197
           }
         }
       },
@@ -291,21 +292,21 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 46,
-          "output": 8136,
-          "cacheRead": 3472856,
-          "cacheWrite": 193579
+          "input": 50,
+          "output": 11293,
+          "cacheRead": 3862633,
+          "cacheWrite": 197862
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1180,
-          "output": 35522,
-          "cacheRead": 25488690,
-          "cacheWrite": 2160065
+          "input": 1196,
+          "output": 35789,
+          "cacheRead": 25632469,
+          "cacheWrite": 2248197
         }
       },
       "costAtCloseOut": {
-        "usd": 39.179774,
-        "pricingAsOf": "2026-08-02T18:12:15.197Z"
+        "usd": 39.425908,
+        "pricingAsOf": "2026-08-02T18:12:22.492Z"
       }
     },
     "merges": [
