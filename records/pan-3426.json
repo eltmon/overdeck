@@ -228,35 +228,31 @@
     "recordedAt": "2026-08-02T21:30:16.397Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T21:30:16.398Z",
+  "updated": "2026-08-02T21:30:17.521Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
-    "testStatus": "failed",
-    "verificationStatus": "skipped",
-    "mergeStatus": "merged",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
+    "mergeStatus": "pending",
     "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T21:30:07.161Z",
+    "updatedAt": "2026-08-02T21:30:17.518Z",
     "testNotes": "PR #3495 (head 99fc16816eb) red on CI: 3 test failures + 1 lint failure. Uncommitted local diff (not from this test session) fixes all 4 (verified: 24/24 tests pass, typecheck clean) but this role cannot commit it. npm run lint STILL fails end-to-end even with that diff, at lint:circular: pre-existing deacon.ts>stall-sweeper.ts>service.ts cycle on main itself, unrelated to PAN-3426, already filed as github.com/eltmon/overdeck/issues/3501 (pipeline-wide blocker, strike agent recommended). Needs a work agent to commit/push the local fix and a strike on #3501.",
     "verificationNotes": "Merge already landed; verify-on-main owns post-merge validation.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
     "scopeDrift": {
-      "outsideDeclaredScope": [
-        "scripts/dashboard-types-baseline.txt",
-        "src/cli/commands/orders.ts",
-        "src/cli/commands/parked.ts",
-        "src/dashboard/server/routes/tiered-callouts.ts",
-        "src/dashboard/server/routes/tiered-inspect-escalation.ts",
-        "src/lib/orders/types.ts"
-      ],
+      "outsideDeclaredScope": [],
       "declaredScopeUntouched": [
+        "docs/ORDER-BOOKS.md",
         "src/cli/commands/flywheel-orders.ts",
         "src/cli/commands/flywheel.ts",
         "src/dashboard/server/services/issue-service-singleton.ts",
         "src/lib/orders/resolver.ts",
+        "src/lib/orders/validate.ts",
         "tests/unit/cli/flywheel-orders.test.ts",
+        "tests/unit/lib/orders/orders-resolver.test.ts",
         "tests/unit/lib/orders/orders-validate.test.ts"
       ],
       "declaredScope": [
@@ -270,19 +266,10 @@
         "tests/unit/lib/orders/orders-resolver.test.ts",
         "tests/unit/lib/orders/orders-validate.test.ts"
       ],
-      "actualChangedFiles": [
-        "docs/ORDER-BOOKS.md",
-        "scripts/dashboard-types-baseline.txt",
-        "src/cli/commands/orders.ts",
-        "src/cli/commands/parked.ts",
-        "src/dashboard/server/routes/tiered-callouts.ts",
-        "src/dashboard/server/routes/tiered-inspect-escalation.ts",
-        "src/lib/orders/types.ts",
-        "src/lib/orders/validate.ts",
-        "tests/unit/lib/orders/orders-resolver.test.ts"
-      ],
-      "recordedAt": "2026-08-02T18:21:43.270Z"
-    }
+      "actualChangedFiles": [],
+      "recordedAt": "2026-08-02T21:30:16.397Z"
+    },
+    "reviewRequestedAt": "2026-08-02T21:30:17.518Z"
   },
   "closeOut": {
     "usage": {
