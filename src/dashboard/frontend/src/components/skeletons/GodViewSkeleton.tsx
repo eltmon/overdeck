@@ -1,7 +1,7 @@
 /** Shimmer skeleton for God View — matches the grid + sidebar layout. */
 export function GodViewSkeleton() {
   return (
-    <div className="god-view flex flex-col h-full">
+    <div className="god-view flex flex-col flex-1 min-h-0">
       {/* Top bar skeleton */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-border shrink-0">
         <div className="h-4 w-48 animate-pulse bg-muted rounded" />
