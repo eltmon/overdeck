@@ -199,10 +199,10 @@
       "src/lib/orders/validate.ts",
       "tests/unit/lib/orders/orders-resolver.test.ts"
     ],
-    "recordedAt": "2026-08-02T18:15:29.053Z"
+    "recordedAt": "2026-08-02T18:21:43.270Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:21:39.355Z",
+  "updated": "2026-08-02T18:21:43.271Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
