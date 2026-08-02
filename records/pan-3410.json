@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T04:02:44.508Z",
+  "updated": "2026-08-02T04:03:13.304Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "skill-rewrite": {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 2285061,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T04:03:13.304Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -212,6 +220,7 @@
     "law-file-rewrite.law-file-rewrite.ac1": "completed",
     "law-file-rewrite.law-file-rewrite.ac2": "completed",
     "law-file-rewrite.law-file-rewrite.ac3": "completed",
-    "law-file-rewrite.law-file-rewrite.ac4": "completed"
+    "law-file-rewrite.law-file-rewrite.ac4": "completed",
+    "skill-rewrite": "running"
   }
 }
