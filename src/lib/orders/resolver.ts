@@ -63,6 +63,26 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
   return result;
 };
 
+export async function ensureOrderIssueStore(): Promise<void> {
+  // Lazy require avoids a static lib → dashboard server dependency.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { startSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+  await startSharedIssueService({ skipPolling: true });
+}
+
+export function orderIssueStoreStatus(): { started: boolean; issueCount: number } {
+  try {
+    // Lazy require avoids a static lib → dashboard server dependency.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { getSharedIssueService, isSharedIssueServiceStarted } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+    const started = isSharedIssueServiceStarted();
+    const issueCount = getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }).length as number;
+    return { started, issueCount };
+  } catch {
+    return { started: false, issueCount: 0 };
+  }
+}
+
 /** The sole order-book read door. */
 export function listBooks(stateRoot: string): OrderBook[] {
   return listOrderBookIds(stateRoot).map((id) => {
