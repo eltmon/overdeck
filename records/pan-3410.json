@@ -597,9 +597,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T22:18:10.996Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T22:23Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T22:23:13.459Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T22:23:13Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T22:22:22Z\n\n## Verdict: CHANGES REQUESTED — the new design-language mutation bypasses dashboard authentication and CSRF protection\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 4d4c7813e69ba52becd3136d62962d700c90855d\n- Merge base: 93b88ee71e00252c754df95590b169f36e346b6f\n- Cycle number: 6\n- Prior cycle SHA: 27a14570e72c8d856b0e8307d210572afd0f4a0b\n- PR commits: 17\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] New design-language mutation bypasses dashboard authentication and CSRF protection — `src/dashboard/server/routes/settings.ts:941`\nThe new `PUT /api/settings/design-language` route persists `config.yaml` changes without calling `rejectUnsafeDashboardMutationRequest(request)`, and the frontend request omits the established CSRF-bearing `dashboardMutationJsonHeaders()`. Any client that can reach the dashboard HTTP API can change the instance theme without a trusted session, origin, or CSRF token. The route and client request were added after the prior cycle, so this finding is inside both the PR diff and the cycle diff.\n\n### [correctness] Live terminals keep the old design-language font after a theme switch — `src/dashboard/frontend/src/components/XTerminal.tsx:462`\n`XTerminal` resolves `--font-mono` only when constructing the xterm instance. Existing terminals do not subscribe to Ledger/Broadsheet changes or update `terminal.options.fontFamily`, so switching themes leaves an open terminal on the previous font until it is destroyed and remounted. The concrete-font resolution was added after the prior cycle, so this finding is inside both the PR diff and the cycle diff.\n\n### [requirements] The new theme endpoint still does not make settings updates no-loss — `src/lib/settings-api.ts:1460`\n**Scope: in_pr_scope.** The narrow client request removes the browser-held full-document snapshot, but `saveDesignLanguagePromise()` still performs an unlocked full-document read-modify-write through `loadSettingsApi()` and `saveSettingsApi()`. A top-level settings save can interleave between that read and write, causing either the theme or unrelated edits to be silently overwritten; the added test supplies an already-updated snapshot and does not exercise overlapping writes. This code was added specifically after the prior cycle to address FR-7, so the blocker survives the cycle-6 convergence gate.\n\n## Non-blocking Findings\n\n### [performance] Scalar design-language operations still traverse full settings machinery — `src/lib/settings-api.ts:1460`\nThe startup read fetches the complete settings projection, while the narrow theme write still rebuilds and rewrites the full YAML document and runs unrelated analytics synchronization. This is bounded to startup and explicit theme changes, so it remains advisory.\n\n### [correctness] Unlocked full-document lost-update window\nThe correctness review independently identified the same server-side race as the requirements blocker above. It is deduplicated into the higher-severity FR-7 requirements finding rather than counted twice.\n\n## Convergence and Proportionality\nAll three blockers cite lines changed since the prior reviewed SHA, so none is demoted as previously reviewed. The PR contains 17 commits and three blockers, well below the proportionality threshold of 51 blockers.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -700,7 +713,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T22:18:10.997Z",
+  "updated": "2026-08-02T22:23:13.461Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
