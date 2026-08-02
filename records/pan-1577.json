@@ -817,6 +817,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T22:34:29.421Z"
+    },
+    {
+      "timestamp": "2026-08-02T22:41:31.928Z",
+      "reason": "end",
+      "note": "Fixed no-loss-matrix duplicate entries from main merge (parked/velocity routes)"
     }
   ],
   "feedback": [
@@ -843,16 +848,16 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T22:41:27.891Z",
+  "updated": "2026-08-02T22:41:31.929Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "skipped",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T22:41:27.884Z",
+    "updatedAt": "2026-08-02T22:41:31.652Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (855183ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts (5 tests | 1 failed) 24ms\n     × matrix has no duplicate surface entries 11ms (retry x1)\n\n Test Files  174 passed (174)\n      Tests  1946 passed (1946)\n   Start at  18:27:48\n   Duration  54.90s (transform 7.79s, setup 26.60s, import 75.13s, tests 42.82s, environment 47.01s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-FmNozQ/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep\n…(1277 chars elided)…\nuilding agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 7043ms\n     × \n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
@@ -922,10 +927,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2723,
-            "output": 524177,
-            "cacheRead": 552583630,
-            "cacheWrite": 24924609
+            "input": 2765,
+            "output": 531221,
+            "cacheRead": 556545329,
+            "cacheWrite": 25103117
           }
         }
       },
@@ -949,15 +954,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2723,
-          "output": 524177,
-          "cacheRead": 552583630,
-          "cacheWrite": 24924609
+          "input": 2765,
+          "output": 531221,
+          "cacheRead": 556545329,
+          "cacheWrite": 25103117
         }
       },
       "costAtCloseOut": {
-        "usd": 480.1033453,
-        "pricingAsOf": "2026-08-02T22:34:41.468Z"
+        "usd": 481.4124783,
+        "pricingAsOf": "2026-08-02T22:41:31.672Z"
       }
     },
     "merges": [
