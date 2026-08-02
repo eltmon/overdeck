@@ -11,6 +11,12 @@ export function setCloisterEventStoreProvider(provider: (() => CloisterEventStor
   cloisterEventStoreProvider = provider;
 }
 
+/**
+ * Read door for the process-local cloister event store (set by deacon-main in
+ * the deacon-child process). Cloister modules that emit domain events outside
+ * the service host append through this — never to the DB directly. Returns
+ * null when no provider is wired (CLI/test contexts).
+ */
 export function getCloisterEventStore(): CloisterEventStore | null {
   return cloisterEventStoreProvider?.() ?? null;
 }
