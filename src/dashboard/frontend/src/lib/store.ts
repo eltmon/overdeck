@@ -179,13 +179,13 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
   },
 
   applyEvent: (event) => {
-    publishDashboardDomainEvents([event])
     set((state) => applyEvent(state, event))
+    publishDashboardDomainEvents([event])
   },
 
   applyEvents: (events) => {
-    publishDashboardDomainEvents(events)
     set((state) => applyEvents(state, events))
+    publishDashboardDomainEvents(events)
   },
 
   seedRecentActivity: (entries) =>

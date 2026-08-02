@@ -61,7 +61,7 @@ afterEach(() => {
 });
 
 describe('useConfluenceOrbs', () => {
-  it('classifies live issues, maps stages and glyphs, carries health, and preserves orb identity', () => {
+  it('classifies live issues, maps stages and glyphs, carries health, and preserves orb identity', async () => {
     const staleAt = new Date(NOW.getTime() - 31 * 60_000).toISOString();
     useDashboardStore.setState({
       agentsById: {
@@ -123,7 +123,11 @@ describe('useConfluenceOrbs', () => {
     });
 
     const original = result.current.find((orb) => orb.id === 'PAN-4');
-    act(() => useDashboardStore.setState((state) => ({ sequence: state.sequence + 1 })));
+    await act(() => vi.advanceTimersByTimeAsync(1_000));
+    act(() => useDashboardStore.setState((state) => ({
+      agentsById: { ...state.agentsById },
+      sequence: state.sequence + 1,
+    })));
     expect(result.current.find((orb) => orb.id === 'PAN-4')).toBe(original);
   });
 
@@ -199,6 +203,31 @@ describe('useHookStream', () => {
     await act(() => vi.advanceTimersByTimeAsync(60_800));
     expect(result.current.eventsPerMin).toBe(0);
     expect(result.current.entries).toEqual([]);
+  });
+
+  it('resolves the first hook event against an agent created in the same batch', () => {
+    const { result } = renderHook(() => useHookStream());
+    const created = agent({ id: 'agent-pan-1', issueId: 'PAN-1' });
+
+    act(() => {
+      useDashboardStore.getState().applyEvents([
+        event('agent.created', {
+          agentId: created.id,
+          issueId: created.issueId,
+          agent: created,
+        }, 1),
+        event('agent.activity_changed', {
+          agentId: created.id,
+          activity: 'working',
+          currentTool: 'Read',
+          hookName: 'PreToolUse',
+        }, 2),
+      ]);
+    });
+
+    expect(result.current.entries).toMatchObject([
+      { agentId: created.id, issueId: created.issueId, hookName: 'PreToolUse' },
+    ]);
   });
 
   it('maps thinking, waiting, compaction, and cost events into orb micro-state', () => {

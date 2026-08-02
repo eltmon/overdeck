@@ -124,6 +124,7 @@ type WorkspaceHealthRecord = Record<string, {
 }>;
 
 const EMPTY_WORKSPACE_HEALTH: WorkspaceHealthRecord = {};
+const EMPTY_MICRO_STATES: Readonly<Record<string, ConfluenceMicroState>> = {};
 
 function emptySpecRates(): Record<HookFamilyKey, number> {
   return Object.fromEntries(HOOK_KEYS.map((key) => [key, 0])) as Record<HookFamilyKey, number>;
@@ -241,7 +242,9 @@ function aggregateMicroState(
 }
 
 function orbSignature(orb: ConfluenceOrb): string {
-  return JSON.stringify(orb);
+  return JSON.stringify(orb, (key, value) =>
+    key === 'staleMin' || key === 'idleMin' ? undefined : value,
+  );
 }
 
 function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnapshot>): HookStreamEntry | null {
@@ -421,7 +424,7 @@ export function useHookStream(): ConfluenceHookStream {
 }
 
 export function useConfluenceOrbs(
-  microStatesByAgentId: Readonly<Record<string, ConfluenceMicroState>> = {},
+  microStatesByAgentId: Readonly<Record<string, ConfluenceMicroState>> = EMPTY_MICRO_STATES,
 ): readonly ConfluenceOrb[] {
   const agentsById = useDashboardStore((state) => state.agentsById);
   const issuesRaw = useDashboardStore((state) => state.issuesRaw);
