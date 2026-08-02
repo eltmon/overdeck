@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:08:47.402Z",
+  "updated": "2026-08-02T03:09:36.704Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "attention-section": {
+        "writerId": "agent-pan-3423",
+        "agentId": "agent-pan-3423",
+        "pid": 3259910,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:09:36.704Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3423",
@@ -149,6 +157,7 @@
     "vitals-meter-tiles": "completed",
     "vitals-meter-tiles.vitals-meter-tiles.ac1": "completed",
     "vitals-meter-tiles.vitals-meter-tiles.ac2": "completed",
-    "vitals-meter-tiles.vitals-meter-tiles.ac3": "completed"
+    "vitals-meter-tiles.vitals-meter-tiles.ac3": "completed",
+    "attention-section": "running"
   }
 }
