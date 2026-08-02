@@ -177,6 +177,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T16:48Z] review-agent → FAILED — seq 4",
       "timestamp": "2026-08-02T16:48:59.965Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T16:50:21.095Z"
     }
   ],
   "feedback": [],
@@ -268,7 +273,7 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T16:49:51.294Z",
+  "updated": "2026-08-02T16:50:21.095Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "reviewing",
