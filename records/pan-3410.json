@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:16:42.662Z",
+  "updated": "2026-08-02T03:21:55.089Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "ui-theme-config-key": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 3828687,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:16:42.662Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -97,6 +89,17 @@
         "outcome": "completed",
         "reason": "Added --font-sans/--font-display/--font-mono CSS variables (:root=Ledger values, [data-theme=broadsheet] overrides to Geist/Geist Mono Variable); repointed tailwind.config.js fontFamily + hardcoded body font-family to the variables; added .display-xl/.display-lg/.eyebrow component classes ported from the style-guide-v2 mockup, with Ledger-safe fallback via @apply text-xl|text-lg|text-xs font-medium so the fallback is byte-identical to Tailwind's own scale. Had to add a tailwind safelist entry for the three new classes since they aren't consumed by any .tsx file yet and Tailwind's content-based purge was silently dropping display-xl/display-lg from the build (eyebrow survived only by accidental substring match on unrelated 'eyebrow' prop names elsewhere). Verified compiled CSS directly (Tailwind CLI + full vite build) rather than trusting typecheck alone. Pre-existing unrelated test failure noted: src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts (blendedCost assertion, last touched in old PAN-2684/PAN-2829 commits, untouched by this change).",
         "releasedAt": "2026-08-02T03:14:31.521Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 3828687,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:16:42.662Z",
+        "itemId": "ui-theme-config-key",
+        "outcome": "completed",
+        "reason": "Added UiConfig.theme + exported DesignLanguage type ('ledger'|'broadsheet') in schema.ts, defaulted to 'broadsheet' in defaults.ts/merge.ts, and validated in mergeConfigs with a loud throw for invalid values, matching the existing config.yaml validation pattern (plain Error, not the load.ts-level ConfigError class) already used elsewhere in merge.ts. Added config-yaml-ui-theme.test.ts covering default/round-trip/invalid-error. Had to bump scripts/file-size-allowlist.txt's schema.ts entry from 1040→1049 lines (PAN-3410) since the new field pushed the god-file guard's tracked line count; amended into the same unpushed commit rather than adding a second commit for the same item.",
+        "releasedAt": "2026-08-02T03:21:55.089Z"
       }
     ],
     "statusReasons": {
@@ -107,6 +110,10 @@
       "theme-token-scope": {
         "reason": "Added --font-sans/--font-display/--font-mono CSS variables (:root=Ledger values, [data-theme=broadsheet] overrides to Geist/Geist Mono Variable); repointed tailwind.config.js fontFamily + hardcoded body font-family to the variables; added .display-xl/.display-lg/.eyebrow component classes ported from the style-guide-v2 mockup, with Ledger-safe fallback via @apply text-xl|text-lg|text-xs font-medium so the fallback is byte-identical to Tailwind's own scale. Had to add a tailwind safelist entry for the three new classes since they aren't consumed by any .tsx file yet and Tailwind's content-based purge was silently dropping display-xl/display-lg from the build (eyebrow survived only by accidental substring match on unrelated 'eyebrow' prop names elsewhere). Verified compiled CSS directly (Tailwind CLI + full vite build) rather than trusting typecheck alone. Pre-existing unrelated test failure noted: src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts (blendedCost assertion, last touched in old PAN-2684/PAN-2829 commits, untouched by this change).",
         "updatedAt": "2026-08-02T03:14:31.521Z"
+      },
+      "ui-theme-config-key": {
+        "reason": "Added UiConfig.theme + exported DesignLanguage type ('ledger'|'broadsheet') in schema.ts, defaulted to 'broadsheet' in defaults.ts/merge.ts, and validated in mergeConfigs with a loud throw for invalid values, matching the existing config.yaml validation pattern (plain Error, not the load.ts-level ConfigError class) already used elsewhere in merge.ts. Added config-yaml-ui-theme.test.ts covering default/round-trip/invalid-error. Had to bump scripts/file-size-allowlist.txt's schema.ts entry from 1040→1049 lines (PAN-3410) since the new field pushed the god-file guard's tracked line count; amended into the same unpushed commit rather than adding a second commit for the same item.",
+        "updatedAt": "2026-08-02T03:21:55.089Z"
       }
     }
   },
@@ -121,6 +128,10 @@
     "theme-token-scope.theme-token-scope.ac2": "completed",
     "theme-token-scope.theme-token-scope.ac3": "completed",
     "theme-token-scope.theme-token-scope.ac4": "completed",
-    "ui-theme-config-key": "running"
+    "ui-theme-config-key": "completed",
+    "ui-theme-config-key.ui-theme-config-key.ac1": "completed",
+    "ui-theme-config-key.ui-theme-config-key.ac2": "completed",
+    "ui-theme-config-key.ui-theme-config-key.ac3": "completed",
+    "ui-theme-config-key.ui-theme-config-key.ac4": "completed"
   }
 }
