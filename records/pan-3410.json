@@ -182,9 +182,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T08:37:55.119Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T08:38Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T08:38:46.515Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T08:38:46Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T08:38:24Z\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers failed to run because their prior role sessions were already running\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 0d658cbc642518305a996e4031c030e764a8a96c\n- Cycle number: 3\n- Prior cycle SHA: bacc4d0375611d3efea52df9fdf2ed2caaf24d73\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | failed — role run already running | — | infrastructure failure |\n| correctness | failed — role run already running | — | infrastructure failure |\n| performance | failed — role run already running | — | infrastructure failure |\n| requirements | failed — role run already running | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer could not run\nThe security reviewer reported that its role run was already running and produced no report for this cycle. The security dimension remains unverified, so this cycle cannot approve the change.\n\n### [correctness] Reviewer could not run\nThe correctness reviewer reported that its role run was already running and produced no report for this cycle. The correctness dimension remains unverified, so this cycle cannot approve the change.\n\n### [performance] Reviewer could not run\nThe performance reviewer reported that its role run was already running and produced no report for this cycle. The performance dimension remains unverified, so this cycle cannot approve the change.\n\n### [requirements] Reviewer could not run\nThe requirements reviewer reported that its role run was already running and produced no report for this cycle. Requirements and acceptance-criteria coverage remain unverified, so this cycle cannot approve the change.\n\n## Non-blocking Findings\nNone. No reviewer produced a readable report from which findings could be synthesized.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -285,10 +298,10 @@
     "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T08:37:55.120Z",
+  "updated": "2026-08-02T08:38:46.516Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "skipped",
     "inspectStatus": "passed",
@@ -296,13 +309,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T07:31:49.490Z",
-    "updatedAt": "2026-08-02T08:37:18.498Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-02T08:38:45.927Z",
+    "reviewNotes": "All four convoy reviewers failed to run because their prior role sessions were already running",
     "verificationNotes": "Verification FAILED at test (791963ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/src/dashboard/frontend\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (4 tests | 1 failed) 243ms\n     × keeps every header metric and diagnostic visible by name 45ms\n\n Test Files  1 failed | 109 passed (110)\n      Tests  1 failed | 1358 passed (1359)\n   Start at  04:30:07\n   Duration  37.42s (transform 6.28s, setup 16.81s, import 48.03s, tests 37.13s, environment 28.53s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qmy2YN/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up\n…(698 chars elided)…\nl/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WCGq0l/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WCGq0l/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] comp\n...(truncated)",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
     "reviewedAtCommit": "bacc4d0375611d3efea52df9fdf2ed2caaf24d73",
-    "reviewRequestedAt": "2026-08-02T07:31:49.490Z",
     "reviewSpawnedAt": "2026-08-02T08:37:18.497Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -402,6 +414,24 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T07:31:17.191Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "0d658cbc642518305a996e4031c030e764a8a96c"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "0d658cbc642518305a996e4031c030e764a8a96c"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "0d658cbc642518305a996e4031c030e764a8a96c"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "0d658cbc642518305a996e4031c030e764a8a96c"
+      }
     }
   },
   "closeOut": {
@@ -409,38 +439,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 954873,
-            "output": 32793,
-            "cacheRead": 10957312,
+            "input": 1351328,
+            "output": 36220,
+            "cacheRead": 13413376,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1308,
-            "output": 308324,
-            "cacheRead": 298427131,
-            "cacheWrite": 17115671
+            "input": 1316,
+            "output": 309637,
+            "cacheRead": 301881810,
+            "cacheWrite": 17117549
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 954873,
-          "output": 32793,
-          "cacheRead": 10957312,
+          "input": 1351328,
+          "output": 36220,
+          "cacheRead": 13413376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1308,
-          "output": 308324,
-          "cacheRead": 298427131,
-          "cacheWrite": 17115671
+          "input": 1316,
+          "output": 309637,
+          "cacheRead": 301881810,
+          "cacheWrite": 17117549
         }
       },
       "costAtCloseOut": {
-        "usd": 116.797302,
-        "pricingAsOf": "2026-08-02T08:37:18.720Z"
+        "usd": 120.819196,
+        "pricingAsOf": "2026-08-02T08:38:45.954Z"
       }
     },
     "merges": [
@@ -449,7 +479,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3410",
