@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:38:26.997Z",
+  "updated": "2026-08-02T17:47:57.937Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "cli-project-option": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 3413676,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:36:56.619Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -117,12 +109,27 @@
         "outcome": "completed",
         "reason": "Threaded ?project=<key> through resolveOrdersStateRoot in orders.ts and all 10 routes; added registry-resolution + unknown-key tests; typecheck and vitest green",
         "releasedAt": "2026-08-02T17:35:49.851Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 3413676,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:36:56.619Z",
+        "itemId": "cli-project-option",
+        "outcome": "completed",
+        "reason": "Added --project <key> to every pan orders subcommand via stateRootFor registry resolution; updated SKILL.md and CLI tests; typecheck/tests/lint-skills all green",
+        "releasedAt": "2026-08-02T17:47:57.937Z"
       }
     ],
     "statusReasons": {
       "routes-project-param": {
         "reason": "Threaded ?project=<key> through resolveOrdersStateRoot in orders.ts and all 10 routes; added registry-resolution + unknown-key tests; typecheck and vitest green",
         "updatedAt": "2026-08-02T17:35:49.851Z"
+      },
+      "cli-project-option": {
+        "reason": "Added --project <key> to every pan orders subcommand via stateRootFor registry resolution; updated SKILL.md and CLI tests; typecheck/tests/lint-skills all green",
+        "updatedAt": "2026-08-02T17:47:57.937Z"
       }
     }
   },
@@ -132,6 +139,10 @@
     "routes-project-param.routes-project-param.ac2": "completed",
     "routes-project-param.routes-project-param.ac3": "completed",
     "routes-project-param.routes-project-param.ac4": "completed",
-    "cli-project-option": "running"
+    "cli-project-option": "completed",
+    "cli-project-option.cli-project-option.ac1": "completed",
+    "cli-project-option.cli-project-option.ac2": "completed",
+    "cli-project-option.cli-project-option.ac3": "completed",
+    "cli-project-option.cli-project-option.ac4": "completed"
   }
 }
