@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T02:52:19.192Z",
+  "updated": "2026-08-02T02:56:16.350Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -47,18 +47,29 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "routes-project-param": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3427",
         "agentId": "agent-pan-3427",
         "pid": 1506299,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T02:52:19.192Z"
+        "claimedAt": "2026-08-02T02:52:19.192Z",
+        "itemId": "routes-project-param",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T02:56:14.269Z"
+      }
+    ],
+    "statusReasons": {
+      "routes-project-param": {
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "updatedAt": "2026-08-02T02:56:14.269Z"
       }
     }
   },
   "statusOverrides": {
-    "routes-project-param": "running"
+    "routes-project-param": "pending"
   }
 }
