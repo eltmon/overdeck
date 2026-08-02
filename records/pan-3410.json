@@ -502,9 +502,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T19:19:01.787Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:33Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T19:33:29.487Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T19:33:29Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T19:32:39Z\n\n## Verdict: CHANGES REQUESTED — the canonical law, agent skill, and Appearance guide still publish an inaccurate and internally inconsistent two-theme contract\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 2d21006b1bf9f26738f111efa1ebcf483a8b9af4\n- Cycle number: 4\n- Prior cycle SHA: 0d658cbc642518305a996e4031c030e764a8a96c\n- PR merge base: 5db0f6406e515ce48df968126f9fab9429531127\n- PR commit count: 13\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/requirements.md | 1 after deduplication and convergence gating |\n\n## Blocking Findings\n\n### [requirements] The law, skill, and user documentation still do not define one accurate executable two-theme contract — `design/style-guide/STYLE-GUIDE.md:48`\nThe current cycle changed the canonical law, synced skill, and Appearance page, so this previously raised requirements blocker is eligible for re-review. The repair narrows Ledger fallbacks to the display and eyebrow utilities, but the canonical token example still describes Ledger values as living only at `:root` and shows a `:root`-only block even though the implementation now requires `:root, [data-theme=\"ledger\"]` to make nested Ledger scopes work. The law and skill also combine an unconditional no-theme-branch rule with four patterns described as having “no Ledger rendering,” without defining an executable rendering or omission mechanism for a globally selectable Ledger theme. The user page remains factually inaccurate when it says Ledger uses “DM Sans throughout” and applies a medium-weight cap to “every piece of text,” despite the documented Space Grotesk wordmark and SF Mono identifier exceptions. Align the token example with the implemented nested-scope selector, state one concrete contract for Broadsheet-only patterns under Ledger, and correct the Ledger prose across all three documents.\n\n## Non-blocking Findings\n\n### [correctness, requirements] Full-document theme writes can still lose concurrent settings changes — `src/dashboard/frontend/src/hooks/useDesignLanguage.ts:38`\n[demoted: previously reviewed, not promotable] The prior synthesis explicitly classified this GET→replacement-PUT race as non-blocking, and the cited `useDesignLanguage.ts` line did not change in the `0d658cbc..2d21006b` cycle diff. The current SettingsPage and settings-writer repairs remove the deterministic stale-form and omitted-`ui` failures, but the remaining overlap/rapid-click race cannot be promoted to a cycle-4 blocker under the convergence gate. An atomic partial update or serialized latest-selection-wins path remains the correct follow-up.\n\n### [requirements] The hardcoded font-family sweep remains incomplete — `src/dashboard/frontend/index.html:38`\n[demoted: previously reviewed, not promotable] The previous synthesis already classified the remaining direct font declarations as advisory, and the cited font sites did not change in this cycle. `XTerminal.tsx` and `BacklogDAG.tsx` are also outside the PR diff. The requirement claim should be narrowed, the PR-scoped initial-shell literal should be tokenized, or deliberate invariant exceptions should be documented, but this cannot block cycle 4.\n\n### [requirements] Unrelated `pan parked ack` changes have no PAN-3410 trace — `src/cli/commands/parked.ts:1`\nThe current cycle adds the parked CLI file and regenerated composer-command entries without a traced PAN-3410 requirement. The requirements reviewer emitted this as `≉`, so it remains non-blocking under the severity rules, but the unrelated lineage expands review and rollback scope and should be removed from the feature branch or attributed to its own issue.\n\n### [correctness] Broadsheet badge radius leaks through a nested Ledger scope — `src/dashboard/frontend/src/index.css:402`\nThe typography and display properties now obey the nearest theme scope, but the descendant badge selector still matches an outer Broadsheet ancestor through a nested Ledger scope. This does not break the current typography specimen, so the correctness reviewer kept it advisory; an inherited per-theme radius property would make the general nesting contract consistent.\n\n### [performance] Scalar theme operations traverse the full settings read/write and refresh path — `src/dashboard/frontend/src/hooks/useDesignLanguage.ts:38`\nA boot reconciliation loads the complete settings document, and a theme click performs a complete GET and PUT before applying the visual change, including unrelated TTS and conversation-search refresh work. The path is bounded and user-triggered, so it is advisory rather than a performance blocker; a narrow mutation routed through the settings write door would reduce latency and also address the concurrency advisory.\n\n### [requirements] Appearance specimen accessibility and hook initialization coverage\nThe decorative specimen remains part of each theme card button's accessible name, and the hook test seeds state directly rather than proving module-load localStorage initialization. Neither gap maps to a blocking manifest requirement in this cycle.\n\n## Convergence Note\nCycle 4 re-litigates only `0d658cbc642518305a996e4031c030e764a8a96c..2d21006b1bf9f26738f111efa1ebcf483a8b9af4`. The deterministic Settings-page reversion, omitted-`ui` deletion, nested typography leak, and missing follow-up reference were repaired in that diff. The documentation contract was also changed but remains incomplete, so that prior blocker survives. The concurrent full-document write and font-sweep findings were already reviewed as non-blocking and their cited lines did not change, so the convergence gate prevents promoting them now.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-2d21006b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -605,10 +618,10 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T19:19:01.788Z",
+  "updated": "2026-08-02T19:33:29.487Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -616,11 +629,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T19:17:11.768Z",
-    "reviewNotes": "settings saves can revert or erase Ledger, and nested Ledger scopes render as Broadsheet",
+    "updatedAt": "2026-08-02T19:33:28.687Z",
+    "reviewNotes": "Canonical law, style skill, and Appearance docs still publish an inaccurate and internally inconsistent two-theme contract",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewRequestedAt": "2026-08-02T18:40:33.820Z",
     "reviewSpawnedAt": "2026-08-02T19:17:11.764Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -720,6 +732,24 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T18:36:54.913Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "2d21006b1bf9f26738f111efa1ebcf483a8b9af4"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "2d21006b1bf9f26738f111efa1ebcf483a8b9af4"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "2d21006b1bf9f26738f111efa1ebcf483a8b9af4"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "2d21006b1bf9f26738f111efa1ebcf483a8b9af4"
+      }
     }
   },
   "closeOut": {
@@ -727,9 +757,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10454789,
-            "output": 313861,
-            "cacheRead": 59059712,
+            "input": 18511887,
+            "output": 459429,
+            "cacheRead": 90670080,
             "cacheWrite": 0
           }
         },
@@ -744,9 +774,9 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10454789,
-          "output": 313861,
-          "cacheRead": 59059712,
+          "input": 18511887,
+          "output": 459429,
+          "cacheRead": 90670080,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -757,8 +787,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 245.331533,
-        "pricingAsOf": "2026-08-02T19:17:24.425Z"
+        "usd": 305.789247,
+        "pricingAsOf": "2026-08-02T19:33:28.743Z"
       }
     },
     "merges": [
@@ -767,7 +797,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
