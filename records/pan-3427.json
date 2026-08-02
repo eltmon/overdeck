@@ -121,7 +121,7 @@
     "recordedAt": "2026-08-02T19:30:17.905Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:30:28.506Z",
+  "updated": "2026-08-02T19:30:32.264Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -131,7 +131,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:30:26.158Z",
+    "updatedAt": "2026-08-02T19:30:27.755Z",
     "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewRequestedAt": "2026-08-02T19:30:21.124Z",
@@ -204,10 +204,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 4955,
-            "output": 146489,
-            "cacheRead": 86955387,
-            "cacheWrite": 2753239
+            "input": 4957,
+            "output": 148005,
+            "cacheRead": 87430544,
+            "cacheWrite": 2753598
           }
         }
       },
@@ -219,15 +219,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4955,
-          "output": 146489,
-          "cacheRead": 86955387,
-          "cacheWrite": 2753239
+          "input": 4957,
+          "output": 148005,
+          "cacheRead": 87430544,
+          "cacheWrite": 2753598
         }
       },
       "costAtCloseOut": {
-        "usd": 25.7559368,
-        "pricingAsOf": "2026-08-02T19:30:28.495Z"
+        "usd": 25.8670298,
+        "pricingAsOf": "2026-08-02T19:30:32.251Z"
       }
     },
     "merges": [
