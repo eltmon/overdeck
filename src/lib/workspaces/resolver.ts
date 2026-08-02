@@ -6,8 +6,8 @@
  * every read of these tables goes through this resolver, never a store
  * directly.
  */
-import { realpathSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, realpathSync } from 'node:fs';
+import { join, resolve } from 'node:path';
 import { getOverdeckDatabaseSync } from '../overdeck/infra.js';
 import type { PinnedDocRow, PinScope, ProjectRow, ProjectTargetRow, WorkspaceKind, WorkspaceRow } from './types.js';
 
@@ -120,6 +120,77 @@ export function getWorkspaceForIssue(issueId: string): WorkspaceRow | null {
     )
     .get(issueId) as Record<string, unknown> | undefined;
   return row ? rowToWorkspace(row) : null;
+}
+
+export interface IssueWorkspaceSyncTarget {
+  path: string;
+  branchName: string;
+  registered: boolean;
+}
+
+/**
+ * Resolve the local checkout that `sync-main` may mutate for an issue.
+ *
+ * A caller-supplied cwd is accepted only when it belongs to the issue's
+ * registered workspace or one of the two canonical pipeline worktrees:
+ * `feature-<id>` and `feature-<id>-strike`. The strike fallback is deliberate:
+ * strike worktrees are short-lived and are not registry rows, but they still
+ * need the same merge-based sync door as normal issue workspaces.
+ */
+export function resolveIssueWorkspaceSyncTarget(
+  issueId: string,
+  projectPath: string,
+  requestedCwd?: string,
+): IssueWorkspaceSyncTarget | null {
+  const normalizedIssueId = issueId.toUpperCase();
+  const issueLower = issueId.toLowerCase();
+
+  if (requestedCwd) {
+    const registered = resolveWorkspaceForCwd(requestedCwd);
+    if (
+      registered?.kind === 'issue'
+      && registered.issueId?.toUpperCase() === normalizedIssueId
+      && !registered.isArchived
+    ) {
+      return {
+        path: registered.path,
+        branchName: registered.branchName ?? `feature/${issueLower}`,
+        registered: true,
+      };
+    }
+  }
+
+  const conventionTargets = [
+    {
+      path: join(projectPath, 'workspaces', `feature-${issueLower}`),
+      branchName: `feature/${issueLower}`,
+    },
+    {
+      path: join(projectPath, 'workspaces', `feature-${issueLower}-strike`),
+      branchName: `strike/${issueLower}`,
+    },
+  ];
+
+  if (requestedCwd) {
+    const resolvedCwd = realpathOrResolve(requestedCwd);
+    const target = conventionTargets.find((candidate) => {
+      const resolvedCandidate = realpathOrResolve(candidate.path);
+      return existsSync(candidate.path) && isPathPrefixMatch(resolvedCwd, resolvedCandidate);
+    });
+    return target ? { ...target, registered: false } : null;
+  }
+
+  const registered = getWorkspaceForIssue(issueId);
+  if (registered && existsSync(registered.path)) {
+    return {
+      path: registered.path,
+      branchName: registered.branchName ?? `feature/${issueLower}`,
+      registered: true,
+    };
+  }
+
+  const target = conventionTargets.find((candidate) => existsSync(candidate.path));
+  return target ? { ...target, registered: false } : null;
 }
 
 /** The singleton kind='main' workspace row for a project, or null. */
