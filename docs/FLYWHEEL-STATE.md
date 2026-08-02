@@ -1163,3 +1163,15 @@ Also noted: memory-governor runway is now PSI-evidenced (operator-approved), so 
 
 - #3494 (PAN-3431 round 3) still in CI (lint + test lanes). Nothing to merge; no ready set. MIN-934 working, MIN-933 in review — campaign holds at 4 of 5 with Lane B complete.
 - Status emitted this tick (rule holding). Surfaced the load-control order-book recommendation into `openQuestions` so it reaches the operator through the snapshot rather than only through chat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline file than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness rather than a real regression.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same collateral pattern as the red-main window earlier: check whether the failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak trajectory noted for the eventual verification: 2428MB @12m24s with 30 sessions on the CURRENT (pre-round-3) build — consistent with the attach-cost characterization, and the reference point round 3 must beat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same discipline as the red-main collateral sweep: establish whether a failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak reference for eventual verification: **2428MB @12m24s with 30 sessions** on the current (pre-round-3) build — consistent with the attach-cost characterization and the number round 3 must beat.
