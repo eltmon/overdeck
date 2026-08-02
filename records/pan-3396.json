@@ -444,7 +444,7 @@
     "recordedAt": "2026-08-02T01:10:51.778Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T02:24:29.887Z",
+  "updated": "2026-08-02T02:24:43.233Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "passed",
@@ -452,10 +452,10 @@
     "verificationStatus": "passed",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:31:12.761Z",
-    "updatedAt": "2026-08-02T02:24:29.871Z",
+    "updatedAt": "2026-08-02T02:24:43.131Z",
     "reviewNotes": "Role run agent-pan-3396-review already running. Use 'pan tell' to message it.",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD 48b5fba3656807360826f012d5f95ff9d190b8f6 (matches reviewedAtCommit, tree clean). `npm run typecheck` PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). `npm run lint` PASSED clean, exit 0 (all 18+ lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands, lint:ratchet-audit). The prior blocking failure (residue.test.ts: 3 assertion failures in 'returns stepSkipped when no open PRs/MRs found', 'fails on any repository operation errors while preserving partial progress', 'fails when coordinate extraction fails for required repositories') is RESOLVED by the latest commit 48b5fba365 'fix(tests): align residue test assertions with implementation contract'. Re-ran all 7 PAN-3396-scoped test files fresh: `npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts` -> 7 files passed, 152 passed / 1 skipped, 0 failed. Full `npm test` run: 72 files / 122 tests failed, but every failure is a `setupOverdeckTestDb()` beforeEach hook timeout (5000ms) or an unrelated schema-audit.test.ts test timeout, spread across SQLite/workspace/conversations/memory/costs test infrastructure -- none touch this issue's declared files_scope (pipeline-membership.ts, pipeline-membership-gather.ts, dod.ts, types.ts, close.ts, residue.ts, workflows.ts, record.ts, or their test files, all of which passed above). Re-ran 3 of the failing files in isolation (workspace-tables.test.ts, overdeck-test-db.test.ts, schema-audit.test.ts) and they still timed out identically. `uptime` showed load average 24.69/31.03/31.68 on a 24-core box with swap 8.0Gi/8.0Gi (100%) full, confirming severe resource contention from concurrently running agents (32 running per the workspace briefing) rather than a code defect -- this matches the identical failure signature (same hook, same timeout, same unrelated file set) the prior test-agent cycle already attributed to resource contention on this branch. This backend/CLI-only change (membership resolver lens + `pan close --residue`) has no dashboard/frontend surface: PRD NonGoals explicitly state 'Any frontend/dashboard change: bucket vocabulary is unchanged and the DTO already carries bucket/reasons-adjacent state' (drafts/pan-3396.md:247), and all acceptance criteria in the PRD and xBRIEF are vitest/lint commands with no UI wording -- browser UAT is not required and was not attempted.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -616,7 +616,7 @@
       },
       "costAtCloseOut": {
         "usd": 365.9562623,
-        "pricingAsOf": "2026-08-02T02:24:29.882Z"
+        "pricingAsOf": "2026-08-02T02:24:43.140Z"
       }
     },
     "merges": [
