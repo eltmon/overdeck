@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:15:51.167Z",
+  "updated": "2026-08-02T18:15:55.270Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "routes-start-project-cwd": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 626825,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:07:50.727Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -171,6 +163,17 @@
         "outcome": "completed",
         "reason": "getOrderPayload scans listProjectsSync() in registry order when the book is missing locally and no explicit project param given; enrichedBook now stamps the resolved project key; 3 new tests cover scan-hit, scan-miss 404, and no-scan-on-explicit-key",
         "releasedAt": "2026-08-02T18:07:17.588Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 626825,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:07:50.727Z",
+        "itemId": "routes-start-project-cwd",
+        "outcome": "completed",
+        "reason": "defaultStartOrderBook now takes the resolved ProjectConfig and calls startFlywheelRun with cwd=resolveProjectPath(project); resolveOrdersStateRoot extended to return projectConfig; 2 new tests cover cross-project start cwd and unchanged default-project behavior",
+        "releasedAt": "2026-08-02T18:15:55.270Z"
       }
     ],
     "statusReasons": {
@@ -185,6 +188,10 @@
       "routes-book-scan": {
         "reason": "getOrderPayload scans listProjectsSync() in registry order when the book is missing locally and no explicit project param given; enrichedBook now stamps the resolved project key; 3 new tests cover scan-hit, scan-miss 404, and no-scan-on-explicit-key",
         "updatedAt": "2026-08-02T18:07:17.588Z"
+      },
+      "routes-start-project-cwd": {
+        "reason": "defaultStartOrderBook now takes the resolved ProjectConfig and calls startFlywheelRun with cwd=resolveProjectPath(project); resolveOrdersStateRoot extended to return projectConfig; 2 new tests cover cross-project start cwd and unchanged default-project behavior",
+        "updatedAt": "2026-08-02T18:15:55.270Z"
       }
     }
   },
@@ -203,6 +210,9 @@
     "routes-book-scan.routes-book-scan.ac1": "completed",
     "routes-book-scan.routes-book-scan.ac2": "completed",
     "routes-book-scan.routes-book-scan.ac3": "completed",
-    "routes-start-project-cwd": "running"
+    "routes-start-project-cwd": "completed",
+    "routes-start-project-cwd.routes-start-project-cwd.ac1": "completed",
+    "routes-start-project-cwd.routes-start-project-cwd.ac2": "completed",
+    "routes-start-project-cwd.routes-start-project-cwd.ac3": "completed"
   }
 }
