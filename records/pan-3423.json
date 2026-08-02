@@ -178,7 +178,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T21:09:10.887Z",
+  "updated": "2026-08-02T21:09:18.984Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -189,8 +189,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T20:54:38.257Z",
-    "updatedAt": "2026-08-02T21:09:10.766Z",
-    "reviewNotes": "Correctness reviewer ended before verifying the specialist consumer-association fix.",
+    "updatedAt": "2026-08-02T21:09:17.260Z",
+    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "verificationNotes": "Verification FAILED at typecheck (544609ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m385.66 kB\u001b[22m \u001b[2m│ gzip: 62.29 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 385.66 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3865ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m353.94 kB\u001b[22m \u001b[2m│ gzip: 59.96 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m579.37 kB\u001b[22m \u001b[2m│ gzip: 92.64 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.86 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4382ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n✓ dashboard-types guard passed (57 known errors; none new)\n\n> @overdeck/core@0.48.0 typecheck:frontend\n> bash scripts/lint-frontend-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (78%)\n  - rolldown-plugin-dts:fake-js (18%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ dashboard frontend typecheck regressed: 1 errors (baseline 0).\n  Errors with no baseline match (yours to fix):\n  NEW: src/dashboard/frontend/src/components/SystemHealthPill.tsx: error TS6133: 'stateDotClass' is declared but its value is never read.\n  Baselined backlog (pre-existing — not yours):\n  Note: an edit that rewords a pre-existing error can relabel it as NEW;\n  the count delta (1) bounds how many are truly new.\n  Reproduce: npx tsc --noEmit -p src/dashboard/frontend/tsconfig.json\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1",
@@ -323,7 +323,7 @@
       },
       "costAtCloseOut": {
         "usd": 165.2517833,
-        "pricingAsOf": "2026-08-02T21:09:10.824Z"
+        "pricingAsOf": "2026-08-02T21:09:17.838Z"
       }
     },
     "merges": [
