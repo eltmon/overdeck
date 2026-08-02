@@ -72,7 +72,7 @@ export type OrderBookFindingCode =
   | 'unresolved-prerequisite'
   | 'prerequisite-cycle'
   | 'missing-prd'
-  | 'store-unavailable';
+  | 'issue-store-unavailable';
 
 export interface OrderBookFinding {
   code: OrderBookFindingCode;

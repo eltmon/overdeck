@@ -9,7 +9,11 @@ import {
   ensureOrderIssueStore,
   orderIssueStoreStatus,
 } from '../../../../src/lib/orders/resolver.js';
-import { startSharedIssueService } from '../../../../src/dashboard/server/services/issue-service-singleton.js';
+import {
+  getSharedIssueService,
+  isSharedIssueServiceStarted,
+  startSharedIssueService,
+} from '../../../../src/dashboard/server/services/issue-service-singleton.js';
 
 vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),
@@ -128,16 +132,23 @@ describe('orders resolver', () => {
   });
 
   describe('orderIssueStoreStatus', () => {
-    it('is defined and callable', () => {
-      expect(typeof orderIssueStoreStatus).toBe('function');
+    it('reports the shared service start state and issue count', async () => {
+      await ensureOrderIssueStore();
+      vi.mocked(isSharedIssueServiceStarted).mockReturnValue(true);
+      vi.mocked(getSharedIssueService).mockReturnValue({
+        getIssues: vi.fn(() => [{ identifier: 'PAN-1' }, { identifier: 'PAN-2' }]),
+      } as never);
+
+      expect(orderIssueStoreStatus()).toEqual({ started: true, issueCount: 2 });
     });
 
-    it('returns object with started and issueCount keys on error', () => {
-      const result = orderIssueStoreStatus();
-      expect(result).toHaveProperty('started');
-      expect(result).toHaveProperty('issueCount');
-      expect(typeof result.started).toBe('boolean');
-      expect(typeof result.issueCount).toBe('number');
+    it('falls back to unavailable when the shared service throws', async () => {
+      await ensureOrderIssueStore();
+      vi.mocked(isSharedIssueServiceStarted).mockImplementation(() => {
+        throw new Error('service unavailable');
+      });
+
+      expect(orderIssueStoreStatus()).toEqual({ started: false, issueCount: 0 });
     });
   });
 });

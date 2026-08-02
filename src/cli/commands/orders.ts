@@ -2,7 +2,7 @@ import type { OrderBook, OrderBookLane } from '@overdeck/contracts';
 import chalk from 'chalk';
 import { Command, InvalidArgumentError } from 'commander';
 
-import { ensureOrderIssueStore, getBook, listBooks } from '../../lib/orders/resolver.js';
+import { getBook, listBooks } from '../../lib/orders/resolver.js';
 import {
   addItems,
   createBook,
@@ -18,7 +18,6 @@ interface OrdersCommandDeps {
   stateRoot?: string;
   now?: () => Date;
   actor?: string;
-  prepareIssueStore?: () => Promise<void>;
   startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
 }
 
@@ -196,7 +195,6 @@ export async function runOrdersMove(
 }
 
 export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
-  await (deps.prepareIssueStore ?? ensureOrderIssueStore)();
   requireBook(stateRootFor(deps), bookId);
   return (deps.startOrderBook ?? defaultStartOrderBook)(bookId);
 }
