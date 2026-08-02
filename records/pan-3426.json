@@ -117,6 +117,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T18:14Z] verification-gate → FAILED — seq 3",
       "timestamp": "2026-08-02T18:14:04.230Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-02T18:14:48.107Z"
     }
   ],
   "feedback": [
@@ -170,7 +175,7 @@
     "recordedAt": "2026-08-02T18:12:05.186Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T18:14:06.720Z",
+  "updated": "2026-08-02T18:14:48.157Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -335,7 +340,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 10,
