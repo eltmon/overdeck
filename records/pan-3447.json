@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T05:51:52.736Z",
+  "updated": "2026-08-02T05:52:55.178Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -340,5 +340,6 @@
     "policy": {
       "mode": "always"
     }
-  }
+  },
+  "reviewMode": "quick"
 }
