@@ -62,22 +62,9 @@
       "timestamp": "2026-08-02T17:41:04.814Z",
       "reason": "end",
       "note": "Fixed typecheck errors: corrected projectPath to path in parked.ts and taskId to itemId in tiered-inspect-escalation.ts"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T17:42Z] verification-gate → FAILED — seq 1",
-      "timestamp": "2026-08-02T17:42:50.014Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T17:42:49Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-3426 (attempt 1/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (75926ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3426/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m384.51 kB\u001b[22m \u001b[2m│ gzip: 62.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 384.51 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5239ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m352.79 kB\u001b[22m \u001b[2m│ gzip: 59.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m577.86 kB\u001b[22m \u001b[2m│ gzip: 92.38 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.79 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5953ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (76%)\n  - rolldown-plugin-dts:fake-js (19%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ stale baseline: 56 errors but baselined at 57 — run: bash scripts/lint-dashboard-types.sh --update\n\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-3426 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-3426 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm `pan show PAN-3426` or `pan review pending` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/orders.ts",
@@ -116,17 +103,18 @@
     "recordedAt": "2026-08-02T17:40:59.485Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:42:50.015Z",
+  "updated": "2026-08-02T17:43:10.672Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:41:45.752Z",
+    "updatedAt": "2026-08-02T17:42:49.992Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "verificationNotes": "Verification FAILED at typecheck (75926ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3426/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m384.51 kB\u001b[22m \u001b[2m│ gzip: 62.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 384.51 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5239ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m352.79 kB\u001b[22m \u001b[2m│ gzip: 59.72 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m577.86 kB\u001b[22m \u001b[2m│ gzip: 92.38 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.79 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5953ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (76%)\n  - rolldown-plugin-dts:fake-js (19%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ stale baseline: 56 errors but baselined at 57 — run: bash scripts/lint-dashboard-types.sh --update\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
     "reviewRequestedAt": "2026-08-02T17:41:00.553Z",
     "reviewSpawnedAt": "2026-08-02T17:40:23.998Z",
@@ -173,9 +161,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 13536,
-            "output": 8619,
-            "cacheRead": 131,
+            "input": 18390,
+            "output": 11865,
+            "cacheRead": 963,
             "cacheWrite": 0
           }
         },
@@ -190,9 +178,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 13536,
-          "output": 8619,
-          "cacheRead": 131,
+          "input": 18390,
+          "output": 11865,
+          "cacheRead": 963,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -203,8 +191,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 3.8160701,
-        "pricingAsOf": "2026-08-02T17:41:45.860Z"
+        "usd": 3.8372373,
+        "pricingAsOf": "2026-08-02T17:42:50.046Z"
       }
     },
     "merges": [
