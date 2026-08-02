@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:20:31.195Z",
+  "updated": "2026-08-02T23:20:37.252Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,16 +73,8 @@
     }
   ],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "verdict-events": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 321578,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:20:31.194Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -94,16 +86,30 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3512 dead)",
         "releasedAt": "2026-08-02T23:08:37.546Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 321578,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:20:31.194Z",
+        "itemId": "verdict-events",
+        "outcome": "completed",
+        "reason": "Added ReviewVerdictRejectedEvent and ReviewVerdictDispatchedEvent to packages/contracts/src/events.ts with correct type literals and payloads. Both events registered in DomainEvent union. Build and typecheck pass.",
+        "releasedAt": "2026-08-02T23:20:37.252Z"
       }
     ],
     "statusReasons": {
       "verdict-events": {
-        "reason": "stale claim released (agent-pan-3512 dead)",
-        "updatedAt": "2026-08-02T23:08:37.546Z"
+        "reason": "Added ReviewVerdictRejectedEvent and ReviewVerdictDispatchedEvent to packages/contracts/src/events.ts with correct type literals and payloads. Both events registered in DomainEvent union. Build and typecheck pass.",
+        "updatedAt": "2026-08-02T23:20:37.252Z"
       }
     }
   },
   "statusOverrides": {
-    "verdict-events": "running"
+    "verdict-events": "completed",
+    "verdict-events.verdict-events.ac1": "completed",
+    "verdict-events.verdict-events.ac2": "completed",
+    "verdict-events.verdict-events.ac3": "completed"
   }
 }
