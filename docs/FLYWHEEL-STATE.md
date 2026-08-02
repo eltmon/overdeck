@@ -1100,3 +1100,9 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **strike-3477 vanished a SECOND time without signalling — but its fix was committed** (`b66dc5fd7d4 reap merged slot sessions`). Recovered it straight from the branch, merge-synced, **PR #3493**. Lesson: a vanished strike session is not a lost strike — ALWAYS check the branch for commits before re-dispatching. I nearly re-struck it a third time, which would have discarded finished work.
 - strike-3431 (leak round 3) verified genuinely working, not wedged: `1 shell still running` after a 3h8m churn. The frozen-cost-≠-wedge rule from tick 60 is now load-bearing twice.
 - Load down to 11.4 after the PAN-3492 storm abort. Close-outs for PAN-3482/3478 wait on main CI (in progress on both merges).
+
+## RUN-79 tick 74 (2026-08-02 ~14:55Z) — PAN-3477 landed+deployed; PAN-3482 + PAN-3478 closed out (40 total)
+
+- **PAN-3477 merged (`4be15e7626`), handed off, and DEPLOYED** — merged swarm slots are now reaped, auto-resume is swarm-aware, and zombies no longer charge against slot capacity. The PAN-3447 slot-3 loop is structurally dead.
+- **PAN-3482 + PAN-3478 closed out. 40 issues landed+closed this run.** The dashboard typecheck ratchet is restored and the quality lint now names its issues.
+- **My own miss, caught by the gate:** PAN-3478's close-out failed on `reviewStatus: pending` because I merged its PR at tick 72 but never ran `pan done --strike`. The DoD gate caught the skipped step exactly as designed — I had merged and moved on. Ran the handoff, then close-out passed clean. **Rule: merging a strike PR is only half the landing; the handoff is what records the verdict.** Worth noting the gate is what made this recoverable rather than a silently half-landed issue.
