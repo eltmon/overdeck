@@ -10,9 +10,7 @@ import {
   ChevronDown,
   CircleCheck,
   CircleHelp,
-  Cpu,
   Loader2,
-  MemoryStick,
   Skull,
   X,
 } from 'lucide-react';
@@ -21,6 +19,7 @@ import { toast } from 'sonner';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { useKillAgent } from '../hooks/useKillAgent';
+import { buildAttentionItems, summaryLine } from '../lib/system-health-attention';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
 import { useConfirm } from './DialogProvider';
 
@@ -34,14 +33,6 @@ function formatBytes(bytes: number): string {
   }
   const mib = bytes / (1024 ** 2);
   return `${mib.toFixed(0)} MB`;
-}
-
-function formatOptionalBytes(bytes: number | null): string {
-  return bytes == null ? 'Unavailable' : formatBytes(bytes);
-}
-
-function formatOptionalNumber(value: number | null, digits = 1): string {
-  return value == null ? 'Unavailable' : value.toFixed(digits);
 }
 
 function stateClasses(state: HealthState): string {
@@ -267,6 +258,8 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
 
   const reasons = useMemo(() => data ? healthReasons(data) : [], [data]);
   const copy = data ? healthCopy(data, reasons) : 'Health unavailable · Retry';
+  const attentionItems = useMemo(() => data ? buildAttentionItems(data) : [], [data]);
+  const summary = useMemo(() => data ? summaryLine(data, attentionItems) : '', [data, attentionItems]);
 
   useEffect(() => {
     if (!data) return;
@@ -313,7 +306,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
     );
   }
 
-  const metrics = data.host.metrics;
   const relay = data.services.find((service) => service.id === 'smee-relay' || service.id === 'webhook-relay');
 
   return (
@@ -348,8 +340,11 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
         >
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</div>
-              <div className="text-xs text-muted-foreground">Updated {new Date(data.updatedAt).toLocaleTimeString()}</div>
+              <div id={POPOVER_TITLE_ID} className="mb-2 flex items-center gap-2">
+                <span className="font-semibold text-foreground">System health</span>
+                <span className={`inline-flex h-2 w-2 rounded-full ${stateClasses(data.state).split(' ')[0]} border-current`}></span>
+              </div>
+              <div className="text-xs text-muted-foreground">Updated {Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago</div>
             </div>
             <button
               type="button"
@@ -361,40 +356,20 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
 
-          <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
-            <div className="rounded-lg border border-border p-2">
-              <div className="flex items-center gap-1 text-muted-foreground"><Cpu aria-hidden="true" className="h-3.5 w-3.5" />CPU</div>
-              <div className="mt-1 font-semibold text-foreground">{metrics.cpuPercent == null ? 'Unavailable' : `${metrics.cpuPercent.toFixed(1)}%`}</div>
-              <div className="text-muted-foreground">Load/core {formatOptionalNumber(metrics.loadPerCore1m, 2)}</div>
+          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-2 text-sm">
+            <div className="text-foreground">{summary}</div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-2">
+            <div className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              {data.admission.admittedWorkAgentCount} admitted agent{data.admission.admittedWorkAgentCount !== 1 ? 's' : ''}
             </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="flex items-center gap-1 text-muted-foreground"><MemoryStick aria-hidden="true" className="h-3.5 w-3.5" />Memory</div>
-              <div className="mt-1 font-semibold text-foreground">{formatOptionalBytes(metrics.usedMemoryBytes)} / {formatOptionalBytes(metrics.totalMemoryBytes)}</div>
-              <div className="text-muted-foreground">Avail {formatOptionalBytes(metrics.availableMemoryBytes)}</div>
+            <div className="rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              {data.summary.containerCount} container{data.summary.containerCount !== 1 ? 's' : ''}
             </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Overdeck</div>
-              <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
-              <div className="text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
-            </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Swap</div>
-              <div className="mt-1 font-semibold text-foreground">{metrics.swapUsedPercent == null ? 'Unavailable' : `${metrics.swapUsedPercent.toFixed(1)}%`}</div>
-              <div className="text-muted-foreground">Overcommit {metrics.virtualCommitmentPercent == null ? 'Unavailable' : `${metrics.virtualCommitmentPercent.toFixed(1)}%`}</div>
-            </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Admitted work agents</div>
-              <div className="mt-1 font-semibold text-foreground">{data.admission.admittedWorkAgentCount}</div>
-            </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Containers</div>
-              <div className="mt-1 font-semibold text-foreground">{data.summary.containerCount}</div>
-            </div>
-            <div className="col-span-2 rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Webhook relay</div>
-              <div className="mt-1 font-semibold text-foreground">
-                {relay?.message ?? data.summary.smeeRelay.message}
-              </div>
+            <div className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`}>
+              <span className={`inline-block h-2 w-2 rounded-full ${relay?.status === 'running' ? 'bg-success' : 'bg-warning'}`}></span>
+              Relay {relay?.status === 'running' ? 'running' : 'stopped'}
             </div>
           </div>
 
