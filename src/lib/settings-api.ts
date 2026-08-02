@@ -1342,6 +1342,18 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
     settings.ui.theme !== 'broadsheet'
   ) {
     errors.push('ui.theme must be ledger or broadsheet');
+  } else if (
+    // PAN-3410 review finding (cycle 9): PUT /api/settings validated an
+    // explicit theme change, then silently discarded it and reported success
+    // — saveSettingsApiPromiseUnlocked's honorThemeFromSettings gate (cycle 8)
+    // never lets the general save path write it. Rejecting an actual change
+    // here at validation time makes that impossible, while a caller that
+    // echoes back the theme it already read (the common whole-document
+    // round trip) is unaffected — only a genuine attempted change is rejected.
+    settings.ui?.theme !== undefined &&
+    settings.ui.theme !== loadConfigSync().config.ui.theme
+  ) {
+    errors.push('ui.theme cannot be changed through PUT /api/settings — use PUT /api/settings/design-language instead');
   }
 
   return {

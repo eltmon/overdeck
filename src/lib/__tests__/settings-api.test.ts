@@ -1059,15 +1059,37 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('memory.sidebar_refresh_interval_ms must be a positive integer');
   });
 
-  it('accepts valid ui.theme values and rejects anything else (PAN-3410)', async () => {
+  it('accepts an ui.theme value that matches the current on-disk theme and rejects an invalid enum value (PAN-3410)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'ledger' },
+    }));
     const { validateSettingsApi } = await import('../settings-api.js');
 
     expect(validateSettingsApi({ ...validSettings, ui: { theme: 'ledger' } }).valid).toBe(true);
-    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'broadsheet' } }).valid).toBe(true);
 
     const result = validateSettingsApi({ ...validSettings, ui: { theme: 'neon' as never } });
     expect(result.valid).toBe(false);
     expect(result.errors).toContain('ui.theme must be ledger or broadsheet');
+  });
+
+  it('rejects PUT /api/settings attempting to change ui.theme away from the current on-disk value instead of silently discarding it (PAN-3410 review finding, cycle 9)', async () => {
+    // A valid enum value that does NOT match what's currently on disk means
+    // the caller is trying to CHANGE the theme through the general endpoint
+    // — saveSettingsApiPromiseUnlocked's honorThemeFromSettings gate would
+    // silently drop it and report success; reject it here instead, at
+    // validation time, with a message pointing at the correct endpoint.
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
+    }));
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    const result = validateSettingsApi({ ...validSettings, ui: { theme: 'ledger' } });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('ui.theme cannot be changed through PUT /api/settings — use PUT /api/settings/design-language instead');
+
+    // Echoing back the theme unchanged (the ordinary whole-document round
+    // trip) is unaffected.
+    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'broadsheet' } }).valid).toBe(true);
   });
 });
 

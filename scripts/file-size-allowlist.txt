@@ -31,5 +31,5 @@
 1268 src/lib/projects.ts # PAN-3358
 1170 src/dashboard/server/routes/settings.ts # PAN-3410
 1532 src/lib/model-capabilities.ts # PAN-3388
-1628 src/lib/settings-api.ts # PAN-3410
+1640 src/lib/settings-api.ts # PAN-3410
 1022 src/dashboard/frontend/src/components/XTerminal.tsx # PAN-3410
