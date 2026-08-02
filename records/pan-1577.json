@@ -692,11 +692,16 @@
       "reason": "feedback",
       "note": "[2026-08-02T18:09Z] review-agent → CHANGES-REQUESTED — seq 5",
       "timestamp": "2026-08-02T18:09:52.318Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T18:13:08.791Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T18:13:07.498Z",
+  "updated": "2026-08-02T18:13:08.817Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
@@ -1009,5 +1014,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
