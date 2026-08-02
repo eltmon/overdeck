@@ -228,10 +228,10 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-02T18:29:18.372Z",
+  "updated": "2026-08-02T18:40:44.709Z",
   "pipeline": {
     "issueId": "PAN-3450",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -240,8 +240,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-02T17:04:21.532Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-3450-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-08-02T18:40:43.472Z",
+    "reviewNotes": "Agent re-review request (9/25): Re-verify current HEAD d8b4dbb6 after branch updates; prior review evidence was rejected against stale verified target 4b3c72d8",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
@@ -293,11 +293,19 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 4417,
+            "output": 3815,
+            "cacheRead": 436,
+            "cacheWrite": 0
+          }
+        },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 9581509,
-            "output": 77919,
-            "cacheRead": 19405312,
+            "input": 10045710,
+            "output": 105942,
+            "cacheRead": 30879744,
             "cacheWrite": 0
           }
         },
@@ -343,16 +351,22 @@
         }
       },
       "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 4417,
+          "output": 3815,
+          "cacheRead": 436,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.6-sol": {
-          "input": 17708279,
-          "output": 272338,
-          "cacheRead": 98921472,
+          "input": 18172480,
+          "output": 300361,
+          "cacheRead": 110395904,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 146.172271,
-        "pricingAsOf": "2026-08-02T17:04:21.540Z"
+        "usd": 155.0947176,
+        "pricingAsOf": "2026-08-02T18:40:43.896Z"
       }
     },
     "merges": [
