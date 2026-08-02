@@ -111,13 +111,15 @@ export function validateBookForStart(
   const blocks: OrderBookFinding[] = [];
   const warns: OrderBookFinding[] = [];
 
-  const storeStatus = orderIssueStoreStatus();
-  if (!storeStatus.started && storeStatus.issueCount === 0) {
-    blocks.push({
-      code: 'store-unavailable',
-      issue: '',
-      message: 'Order issue store is unavailable; could not verify any issues are open',
-    });
+  if (!options.issueLookup) {
+    const storeStatus = orderIssueStoreStatus();
+    if (!storeStatus.started && storeStatus.issueCount === 0) {
+      blocks.push({
+        code: 'store-unavailable',
+        issue: '',
+        message: 'Order issue store is unavailable; could not verify any issues are open',
+      });
+    }
   }
 
   if (book.items.length === 0) {
