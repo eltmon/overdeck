@@ -1,0 +1,917 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-02T22:52:40.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3512: The verdict write door — recordReviewVerdict + dispatch-not-drop + fallback kill-conditional (write-side of the verdict-of-record contract)",
+    "updated": "2026-08-02T23:00:48.118Z"
+  },
+  "plan": {
+    "id": "pan-3512",
+    "title": "The verdict write door — recordReviewVerdict + dispatch-not-drop + fallback kill-conditional (write-side of the verdict-of-record contract)",
+    "status": "proposed",
+    "uid": "98ecbdb8-f79e-4a9d-afd5-1f98cef05e27",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-02T22:52:40.000Z",
+    "updated": "2026-08-02T23:00:48.118Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3512",
+        "label": "PAN-3512",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3511",
+        "label": "PAN-3511 (read side)",
+        "type": "issue"
+      }
+    ],
+    "tags": [
+      "review",
+      "cloister",
+      "verdict",
+      "write-door",
+      "merge-gate"
+    ],
+    "narratives": {
+      "Problem": "rejectVerdictEvidenceHeadMismatch (src/lib/review-verdict-guards.ts:69, invoked from src/lib/review-status.ts:196) silently deletes a terminal review verdict whenever the review's evidence head differs from the row's lastVerifiedCommit: one console.warn, the OLD status re-emitted, no event, no activity entry, no route to an honest next step. On 2026-08-02 that destroyed five APPROVED verdicts on PAN-1577 in one evening, because the deacon fallback synthesized APPROVED at a FRESHER head than the stale row anchor and then killed the convoy parent unconditionally (deacon-review-signals.ts:247) regardless of the rejected write. Underneath sit nine terminal-verdict write sites with no shared contract and no way for any caller to learn whether its write landed.",
+      "Proposal": "Introduce one verdict write door, src/lib/cloister/review-verdict-writer.ts exporting recordReviewVerdict(issueId, input): Promise<{landed:true;classification}|{landed:false;reason}>. It classifies the evidence head against the row head with a polyrepo-aware ancestor probe: provably-stale evidence is rejected WITH a review.verdict_rejected domain event and an activity entry (never silently), and every other disagreement LANDS the verdict, anchors reviewedAtCommit to the evidence head, resets the test gate to pending in the same update, and emits review.verdict_dispatched. Resetting the test gate is what keeps the merge gate honest: reviewGatesPassedSync cannot return true at a head no gate ran against, and the existing reactive review->test handoff dispatches the test role at the new head. The REVIEW arm of rejectVerdictEvidenceHeadMismatch is then deleted (the TEST arm survives untouched), nine call sites migrate to the door, and the deacon fallback's killSession plus its blocked-feedback delivery become conditional on landed === true.",
+      "NonGoals": "- Do NOT edit src/lib/review-status.ts: it is at EXACTLY its allowlisted 1034 lines (PAN-3253) and this issue must leave it at zero delta.\n- Do NOT change the TEST arm of rejectVerdictEvidenceHeadMismatch (src/lib/review-verdict-guards.ts:56-63); test-verdict writes keep today's guard.\n- Do NOT implement the read side (artifact consults in feedback-target, infra-failure, sweeper stuck-flag; journal-vs-artifact disagreement) — that is PAN-3511.\n- Do NOT create the sweeper restore call site in src/lib/cloister/stall-sweeper.ts; PAN-3512 ships only the 'sweeper-restore' writer tag and its fixture, PAN-3511 WI-6 wires the call.\n- Do NOT migrate terminal-verdict writers that carry no evidence head and are pure reconciliation: review mode 'none' skip (review-agent.ts:353), review spawn failure (review-agent.ts:773), merged-issue reconcile (deacon-merge.ts:531), PAN-869 COMMENTED backfill (review-status.ts:861), verification-failed writes (review-pipeline.ts:356,374), merge fulfillment reconcile (merge-fulfillment.ts:445). They never reached the guard.\n- Do NOT call runVerificationForIssue from inside the door; the reactive test dispatch owns re-verification.\n- Do NOT change readyForMerge derivation, reviewGatesPassedSync, or any merge path.\n- Do NOT delete a verdict artifact when a write is rejected; the artifact is the verdict of record.\n- No browser/UAT verification is required for this issue: it changes no rendered surface."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Delete the guard's REVIEW arm outright instead of making it conditional on a marker field threaded through setReviewStatusSync.",
+        "rationale": "A marker field would grow src/lib/review-status.ts, which is at exactly its allowlisted 1034-line ceiling with zero headroom (PAN-3253). Owning the whole decision inside the new door module keeps that file at zero delta and puts the rule in one place. Safe because every evidence-carrying writer migrates in the same issue."
+      },
+      {
+        "summary": "On a landed head disagreement the door resets the test gate (testStatus passed|skipped -> pending) in the same update, rather than relying solely on the merge-time gate.",
+        "rationale": "The issue's requirement offers 'confirm and cite, or add the block'. The merge-time gate IS confirmed and cited (triggerMerge Step 3, merge-ops.ts:994-1070), but it protects the merge, not the advertised state: between landing and merging, the issue would sit readyForMerge=true, auto-merge eligible, and merge-train eligible at a head only the reviewer saw. The reset makes the regression structurally impossible and also triggers the existing reactive review->test dispatch, which is the verification re-run the issue asks for."
+      },
+      {
+        "summary": "The door does not invoke runVerificationForIssue inline; it resets the test gate and lets the reactive review->test handoff dispatch the test role.",
+        "rationale": "Verification is the full quality-gate suite (minutes). Calling it from a deacon patrol callback would block the patrol tick. The reactive handoff at review-status.ts:479-502 already dispatches the test role when review passes with testStatus pending, its canSkipTests shortcut is false by construction when heads differ, and deacon.ts:1336 is the existing backstop if the reactive path misses."
+      },
+      {
+        "summary": "Scope expanded from the issue's five named writers to the nine call sites found by a tree census, and the census is recorded in the PRD.",
+        "rationale": "The issue says 'every verdict writer migrates' and names five. The tree at c7b6d2e5f1e has nine terminal-review-verdict sites, and two the issue did not name (deacon-review-unsignaled.ts:316, deacon.ts:1557) carry evidence heads — so deleting the guard's review arm without migrating them would silently drop them out of protection. Six other writers carry no evidence head, never reached the guard, and stay put."
+      },
+      {
+        "summary": "A composite-vs-bare head-anchor shape disagreement classifies as 'indeterminate' and LANDS, never as 'stale'.",
+        "rationale": "PAN-3254 (workspace-anchor-drift.ts:88-96) established that a shape disagreement is a producer disagreement rather than evidence about code; treating it as drift re-drove MIN-901 through 426 identical review cycles in 19.5 hours. Once the test gate is reset, landing is the conservative option: an unlanded verdict is invisible, a landed one is re-gated."
+      },
+      {
+        "summary": "The 'sweeper-restore' writer tag ships with a unit fixture but no call site.",
+        "rationale": "The sweeper restore is created by PAN-3511 WI-6, a separate in-flight issue editing the same files. Shipping the tag now means PAN-3511 wires a call rather than negotiating a contract, and avoids a cross-branch conflict in stall-sweeper.ts."
+      }
+    ],
+    "items": [
+      {
+        "id": "verdict-events",
+        "title": "Register review.verdict_rejected and review.verdict_dispatched domain events",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "api",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "build:contracts completes without errors",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "FR-3",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Add two Schema.Struct event definitions to packages/contracts/src/events.ts following the exact shape of ReviewCoordinatorDiedEvent (:749-759). ReviewVerdictRejectedEvent has type literal 'review.verdict_rejected' and payload { issueId: IssueId, workspaceId: optional String, writer: String, verdict: String, evidenceHead: String, rowHead: String, reason: String }. ReviewVerdictDispatchedEvent has type literal 'review.verdict_dispatched' and payload { issueId: IssueId, workspaceId: optional String, writer: String, verdict: String, evidenceHead: String, rowHead: String, classification: String, testGateReset: Boolean }. Export both the const and the matching `export type X = typeof X.Type`. Register both in the exported event union alongside ReviewCoordinatorDiedEvent at :1371. A reducer case in packages/contracts/src/event-reducers.ts is NOT required — sweep.unparked (events.ts:1286) is registered with no case and works."
+        },
+        "items": [
+          {
+            "id": "verdict-events.ac1",
+            "title": "packages/contracts/src/events.ts contains ReviewVerdictRejectedEvent, whose type literal is 'review.verdict_rejected' and whose payload struct declares writer, verdict, evidenceHead, rowHead and reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-events.ac2",
+            "title": "packages/contracts/src/events.ts contains ReviewVerdictDispatchedEvent, whose type literal is 'review.verdict_dispatched' and whose payload struct declares classification and a boolean testGateReset",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-events.ac3",
+            "title": "Both event structs appear in the exported event union next to ReviewCoordinatorDiedEvent, and `npm run build:contracts` passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "verdict-door",
+        "title": "Create recordReviewVerdict — the single verdict write door",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-writer.ts",
+            "src/lib/cloister/__tests__/review-verdict-writer.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "review-verdict-writer.test.ts passes with all evidence-classification cases",
+            "typecheck completes without errors",
+            "lint:circular reports no new cycle"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-3",
+            "NFR-4",
+            "NFR-5"
+          ],
+          "foundationFor": [
+            "test-gate-reset",
+            "merge-gate-lock",
+            "retire-review-arm",
+            "migrate-fallback",
+            "migrate-quick-signal",
+            "migrate-coordinator",
+            "migrate-orphan-restore",
+            "migrate-unsignaled",
+            "migrate-infra-bypass"
+          ],
+          "parallelSafeReason": "Creates one new module plus its own new test file; no other item edits either path until this lands, and its only blocks-edge predecessor is the contracts event registration."
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/review-verdict-writer.ts exporting the VerdictWriter union ('coordinator' | 'fallback' | 'quick-signal' | 'orphan-restore' | 'sweeper-restore' | 'unsignaled-recovery' | 'infra-bypass'), the VerdictInput interface, the VerdictOutcome union, and async recordReviewVerdict(issueId, input) — the exact signatures are in PRD section 6.1. Flow: read the row with getReviewStatusSync; when input.evidenceHead is absent, or status.lastVerifiedCommit is absent, or the two anchors are equal, build the update and call setReviewStatusSync exactly as today and return { landed: true, classification: 'no-evidence' | 'anchor-match' } (this preserves NFR-4 byte for byte). When the anchors differ, call the module-private classifyEvidenceAgainstAnchor: 'stale' emits a review.verdict_rejected event via getCloisterEventStore()?.append plus an emitActivityEntrySync entry naming the writer, both heads, and the reason, then returns { landed: false, reason: 'stale-evidence-head' } WITHOUT touching the row; any other classification lands the verdict with reviewedAtCommit set to the evidence head, emits review.verdict_dispatched plus an activity entry, and returns { landed: true, classification: 'dispatched' }. The classifier is polyrepo-aware per PRD section 6.2: parseCompositeSnapshot (src/lib/git-utils.ts:359) on both anchors, repo roots from resolveWorkspaceRepoRootsSync (src/lib/project-repos.ts) with the workspace path resolved the way readLatestSynthesisVerdict does (src/lib/cloister/synthesis-verdict.ts:60-66), and a per-repo execFileAsync('git', ['merge-base', '--is-ancestor', evidenceSha, rowSha], { cwd: root.dir, timeout: 10_000 }) probe. 'stale' requires every repo to answer ancestor-or-equal with at least one sha differing; a shape disagreement, a differing repo key set, an unresolvable root, or any non-clean exec failure yields 'indeterminate'. NEVER use execSync. The test-gate reset belongs to the next item — implement recordReviewVerdict here without it. Tests use the vi.hoisted mock pattern from src/lib/cloister/__tests__/verdict-preservation.test.ts:1-20 to stub getReviewStatusSync, setReviewStatusSync, the event store, and execFileAsync."
+        },
+        "items": [
+          {
+            "id": "verdict-door.ac1",
+            "title": "Given a VerdictInput with no evidenceHead, recordReviewVerdict calls setReviewStatusSync once with the verdict fields and returns { landed: true, classification: 'no-evidence' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-door.ac2",
+            "title": "Given an evidenceHead that a per-repo `git merge-base --is-ancestor` probe proves is a strict ancestor of the row's lastVerifiedCommit, recordReviewVerdict returns { landed: false, reason: 'stale-evidence-head' }, makes zero setReviewStatusSync calls, and appends one review.verdict_rejected event",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-door.ac3",
+            "title": "Given an evidenceHead the probe shows is NOT an ancestor of the row head, recordReviewVerdict lands the verdict with reviewedAtCommit set to that evidenceHead, appends one review.verdict_dispatched event, and returns { landed: true, classification: 'dispatched' }",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-door.ac4",
+            "title": "Given a bare-SHA evidenceHead against a composite 'repoKey@sha' row anchor, the classifier produces 'indeterminate' and the verdict still lands — it is never rejected as stale",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "verdict-door.ac5",
+            "title": "Given a composite anchor pair where one repo is behind and another is ahead, the classifier produces 'fresh' and the verdict lands; `git grep -c execSync src/lib/cloister/review-verdict-writer.ts` returns 0",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "test-gate-reset",
+        "title": "Reset the test gate on a landed head disagreement",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-writer.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-verdict-writer.test.ts passes including the three test-gate-reset cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-6"
+          ],
+          "foundationFor": [
+            "merge-gate-lock"
+          ]
+        },
+        "narrative": {
+          "Action": "In recordReviewVerdict's landing branch (the head-disagreement path only), add the testGateReset clause from PRD section 6.1: when status.testStatus is 'passed' or 'skipped', include testStatus: 'pending' and a testNotes string naming both heads through formatAnchorShort (src/lib/git-utils.ts:370) and the writer, in the SAME update object passed to setReviewStatusSync. Emit the event's testGateReset boolean accordingly. Do not add the reset on the no-evidence or anchor-match paths. This is legal against the only testStatus regression guard (src/lib/review-status.ts:229-238), which rejects only passed -> failed|dispatch_failed. Why it matters, from PRD section 3.5: with testStatus pending, reviewGatesPassedSync (src/lib/review-status-reconcile.ts:126) returns false so readyForMerge cannot flip true at an unverified head, AND the reactive review->test handoff at src/lib/review-status.ts:479-502 fires — its canSkipTests shortcut is false by construction because reviewedAtCommit !== lastVerifiedCommit — so it emits review.approved and dispatches the test role, which is the verification re-run at the evidence head. Extend the existing test file with the three cases in the acceptance criteria."
+        },
+        "items": [
+          {
+            "id": "test-gate-reset.ac1",
+            "title": "Given a row with testStatus 'passed' and a fresh evidence head, the update passed to setReviewStatusSync carries testStatus 'pending' and a testNotes string naming both shortened head anchors and the writer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-gate-reset.ac2",
+            "title": "Given a row whose testStatus is already 'pending', the update passed to setReviewStatusSync contains no testStatus key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "test-gate-reset.ac3",
+            "title": "Given equal evidence and row anchors, or no evidence head at all, the update contains no testStatus key and the emitted event reports testGateReset false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "merge-gate-lock",
+        "title": "Lock the merge-gate invariant with a regression test",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "test",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts"
+          ],
+          "expected_outputs": [
+            "verdict-write-door-merge-gate.test.ts passes with both assertions"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts. Capture the update object recordReviewVerdict passes to a mocked setReviewStatusSync for a fresh-evidence 'passed' verdict on a row with testStatus 'passed', verificationStatus 'passed', uatStatus undefined and mergeStatus 'pending'. Merge that update over the row and feed the result to the REAL reviewGatesPassedSync imported from src/lib/review-status-reconcile.js — assert it returns false. Then assert the control: the same merged row with the testStatus reset stripped out makes reviewGatesPassedSync return true. The control is the point of the test — it fails loudly if a future change drops the reset, instead of silently passing. Add a header comment citing PRD section 3 and stating that triggerMerge's post-rebase gate (src/dashboard/server/routes/workspaces/merge-ops.ts:994-1070) is the second line of defence, not the first."
+        },
+        "items": [
+          {
+            "id": "merge-gate-lock.ac1",
+            "title": "Given the update the door produces for a fresh-evidence passed verdict on an otherwise merge-ready row, the real reviewGatesPassedSync returns false",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "merge-gate-lock.ac2",
+            "title": "Given that same row with the test-gate reset removed, the real reviewGatesPassedSync returns true — proving the test detects a dropped reset rather than passing vacuously",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "retire-review-arm",
+        "title": "Retire the REVIEW arm of rejectVerdictEvidenceHeadMismatch",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/review-verdict-guards.ts",
+            "src/lib/__tests__/review-verdict-guards.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/review-verdict-guards.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "review-verdict-guards.test.ts passes with the review-arm and test-arm cases",
+            "typecheck completes without errors",
+            "lint:file-size reports no violation (src/lib/review-status.ts unchanged at 1034 lines)"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-verdict-guards.ts, delete the REVIEW arm of findVerdictEvidenceHeadMismatch — the block starting `const terminalReview = update.reviewStatus !== undefined` at :42 through the `return { gate: 'review', evidenceHead: reviewEvidenceHead, targetHead: status.lastVerifiedCommit };` at :53 — plus the now-unused reviewerEvidenceHeads/reviewEvidenceHead locals and any interface fields they alone required. Keep the TEST arm at :56-65 byte-identical: the operator's correction on the issue is explicit that test-verdict writes keep today's guard. Leave the call site at src/lib/review-status.ts:196-198 completely untouched — that file is at exactly its allowlisted 1034 lines and this issue must produce zero delta there. Create src/lib/__tests__/review-verdict-guards.test.ts covering the three acceptance criteria; there is no existing test file for this module."
+        },
+        "items": [
+          {
+            "id": "retire-review-arm.ac1",
+            "title": "Given a terminal review update carrying a reviewedAtCommit that differs from status.lastVerifiedCommit, rejectVerdictEvidenceHeadMismatch returns false and never invokes onReject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-review-arm.ac2",
+            "title": "Given a terminal review update whose only evidence is reviewerVerdicts[*].atCommit differing from status.lastVerifiedCommit, rejectVerdictEvidenceHeadMismatch returns false and never invokes onReject",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-review-arm.ac3",
+            "title": "Given a terminal test update whose lastVerifiedCommit differs from status.reviewedAtCommit, rejectVerdictEvidenceHeadMismatch still returns true and still invokes onReject exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "retire-review-arm.ac4",
+            "title": "`git diff --stat origin/main -- src/lib/review-status.ts` produces no output, proving the allowlisted file was not touched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-fallback",
+        "title": "Migrate the deacon fallback and make killSession conditional on landed",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-review-signals-verdict-door.test.ts passes including the rejected-write case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-6"
+          ],
+          "parallelSafeReason": "Touches one deacon module and one new test file that no other item lists in files_scope; the door contract it consumes is frozen by the time this dispatches."
+        },
+        "narrative": {
+          "Action": "Replace the setReviewStatusSync call at src/lib/cloister/deacon-review-signals.ts:230-235 with an awaited recordReviewVerdict(state.issueId, { verdict: synthesis.verdict, notes: …, reviewerVerdicts: anchoredVerdicts, ...(fallbackHead ? { evidenceHead: fallbackHead } : {}), runId: state.reviewRunId, writer: 'fallback' }) — the exact before/after is in PRD section 6.5. Note the change in shape: evidenceHead is now passed for EVERY verdict, not only 'blocked' as today, because the reviewedAtCommit anchor is what makes the reactive canSkipTests comparison meaningful. When the outcome is not landed, push an action string and a logDeaconEventSync line naming the reason, then `continue` — skipping BOTH the deliverReviewVerdictFeedback call at :236-245 and the killSession call at :247, so the convoy parent stays alive for the PAN-2584 liveness deadline to handle. Do NOT delete the synthesis.md written at :218; the artifact is the verdict of record and PAN-3511's read side honors it. Create the test file with vi.hoisted mocks for recordReviewVerdict, killSession, and deliverReviewVerdictFeedback."
+        },
+        "items": [
+          {
+            "id": "migrate-fallback.ac1",
+            "title": "Given all reviewer reports present and a wedged parent, the fallback calls recordReviewVerdict with writer 'fallback' and an evidenceHead for a passed verdict as well as a blocked one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-fallback.ac2",
+            "title": "Given recordReviewVerdict returns { landed: false }, the fallback invokes neither killSession nor deliverReviewVerdictFeedback and records a deacon action naming the rejection reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-fallback.ac3",
+            "title": "Given recordReviewVerdict returns { landed: true } for a blocked verdict on a live session, the fallback delivers feedback and then calls killSession exactly once",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-fallback.ac4",
+            "title": "`git grep -n \"setReviewStatusSync\" src/lib/cloister/deacon-review-signals.ts` returns no line writing a terminal reviewStatus",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-quick-signal",
+        "title": "Migrate the quick-signal CLI and surface a rejected write to the caller",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/done.ts",
+            "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "specialists-done-verdict-door.test.ts passes including the non-zero exit case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "FR-7"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/cli/commands/specialists/done.ts, keep the case 'review' branch's existing head-snapshot logic (:143-171) but route the terminal verdict fields — reviewStatus, reviewNotes, reviewerVerdicts, reviewedAtCommit, and the passed-verdict verificationStatus override at :172-176 (pass it via VerdictInput.extra) — through an awaited recordReviewVerdict(normalizedIssueId, { …, writer: 'quick-signal' }) instead of the shared setReviewStatusSync at :244. Every non-review specialist keeps calling setReviewStatusSync unchanged. When the outcome is not landed, print the reason with chalk.red, set process.exitCode = 1, and return before the feedback-delivery block at :246 — a review agent must not believe it signalled when the verdict did not land. The existing flushReviewStatusJournalWrites drain (PAN-2689) still applies on the landed path."
+        },
+        "items": [
+          {
+            "id": "migrate-quick-signal.ac1",
+            "title": "Given `pan admin specialists done review --status passed`, the command calls recordReviewVerdict with writer 'quick-signal' and the snapshotted workspace head as evidenceHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-quick-signal.ac2",
+            "title": "Given recordReviewVerdict returns { landed: false }, the command prints the rejection reason and exits with a non-zero exit code without attempting feedback delivery",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-quick-signal.ac3",
+            "title": "Given `pan admin specialists done test --status passed`, the command still calls setReviewStatusSync and never reaches recordReviewVerdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-coordinator",
+        "title": "Migrate the coordinator HTTP specialists/done route",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "api",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/routes/specialists/legacy-routes.ts",
+            "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+            "npm run typecheck:dashboard"
+          ],
+          "expected_outputs": [
+            "legacy-routes-verdict-door.test.ts passes for the review and non-review cases",
+            "typecheck:dashboard completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/dashboard/server/routes/specialists/legacy-routes.ts, move the case 'review' fields built at :198-200 out of the shared update object and into an awaited recordReviewVerdict(normalizedIssueId, { verdict: status === 'passed' ? 'passed' : 'blocked', notes, writer: 'coordinator' }) call; the shared setReviewStatusBase at :232 keeps serving every other specialist. This route's verdict write carries no evidence head today, so the door takes its no-evidence path and behavior is unchanged (NFR-4) — the migration exists so the door is genuinely single. Leave the second, anchor-only write at :330 untouched: it carries no terminal reviewStatus and never reached the guard. Keep the route's downstream side effects (reportTieredInspectFailureEscalation, feedback delivery, reactive dispatch logging) reading the returned status the same way they do now."
+        },
+        "items": [
+          {
+            "id": "migrate-coordinator.ac1",
+            "title": "Given POST /api/specialists/done with specialist 'review', the handler calls recordReviewVerdict with writer 'coordinator' and does not pass reviewStatus to setReviewStatusBase",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-coordinator.ac2",
+            "title": "Given POST /api/specialists/done with specialist 'test', 'uat', or 'ship', the handler still calls setReviewStatusBase and never reaches recordReviewVerdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-coordinator.ac3",
+            "title": "Given a passed review POST, the anchor-only reviewedAtCommit write further down the same handler still runs and preserves today's post-verdict head snapshot",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-orphan-restore",
+        "title": "Migrate both orphan-restore verdict writes",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-status.ts",
+            "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "deacon-review-status-verdict-door.test.ts passes for both restore sites",
+            "typecheck completes without errors",
+            "lint:file-size reports no violation for deacon-review-status.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Route both orphan-restore verdict writes in src/lib/cloister/deacon-review-status.ts through the door with writer 'orphan-restore'. The history-snapshot restore at :565 passes no evidenceHead and carries its reviewRetryCount/recoveryStartedAt/testStatus fields via VerdictInput.extra. The artifact restore at :592 additionally passes evidenceHead: artifact.headSha and carries its stuck-clearing fields (stuck, stuckReason, stuckAt, stuckDetails) via extra — those must survive into the same atomic update or the issue deadlocks at passed+stuck. Both call sites are already inside async functions. Watch the file-size ceiling: deacon-review-status.ts is at 978 lines against a 1000-line ceiling and is NOT allowlisted, leaving 22 lines of headroom; if the edit would exceed it, shrink by extracting the update-building into a small local helper rather than adding an allowlist row."
+        },
+        "items": [
+          {
+            "id": "migrate-orphan-restore.ac1",
+            "title": "Given an orphaned reviewing row with a passed review in history, the restore calls recordReviewVerdict with writer 'orphan-restore' and its reviewRetryCount reset survives into the update",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-orphan-restore.ac2",
+            "title": "Given a fresh passed synthesis artifact and no passed review in history, the restore calls recordReviewVerdict with evidenceHead set to the artifact headSha",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-orphan-restore.ac3",
+            "title": "Given the row carries stuckReason 'review_infrastructure_failure', the artifact restore's update still clears stuck, stuckReason, stuckAt and stuckDetails in the same write",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-orphan-restore.ac4",
+            "title": "`npm run lint:file-size` passes, and src/lib/cloister/deacon-review-status.ts stays at or below 1000 lines without a new allowlist row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-unsignaled",
+        "title": "Migrate the three unsignaled-recovery verdict writes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-unsignaled.ts",
+            "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "deacon-review-unsignaled-verdict-door.test.ts passes for all three sites",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Route all three terminal-verdict writes in src/lib/cloister/deacon-review-unsignaled.ts through the door with writer 'unsignaled-recovery': reconcileUnappliedReviewVerdicts at :316 (passes evidenceHead: currentHead — this one carries evidence today and is why the site is in scope), the alive-but-unresponsive auto-complete at :423, and the dead-session auto-complete at :451 (both pass no evidenceHead, so the door takes its no-evidence path and behavior is unchanged). At :316 the blocked-feedback delivery that follows at :323-337 must run only when the outcome is landed, for the same reason as the fallback's kill-conditional. The nudge branches that only message an agent are untouched."
+        },
+        "items": [
+          {
+            "id": "migrate-unsignaled.ac1",
+            "title": "Given reconcileUnappliedReviewVerdicts applies an on-disk verdict, it calls recordReviewVerdict with writer 'unsignaled-recovery' and evidenceHead set to the snapshotted current head",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-unsignaled.ac2",
+            "title": "Given that write returns { landed: false }, deliverReviewVerdictFeedback is not called for the blocked verdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-unsignaled.ac3",
+            "title": "Given a dead review session with a verdict report on disk, checkCompletedButUnsignaledReviews calls recordReviewVerdict with no evidenceHead and the verdict still lands",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "migrate-infra-bypass",
+        "title": "Migrate the review-infrastructure bypass verdict write",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon.ts",
+            "scripts/file-size-allowlist.txt"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "lint:file-size reports no violation for src/lib/cloister/deacon.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ]
+        },
+        "narrative": {
+          "Action": "Route the review-infrastructure bypass write at src/lib/cloister/deacon.ts:1557 through the door with writer 'infra-bypass', passing evidenceHead: reviewedAtCommit when the live snapshot succeeded and carrying the four stuck-clearing fields (stuck, stuckReason, stuckAt, stuckDetails) via VerdictInput.extra — clearing them is mandatory or the issue deadlocks at passed+stuck. This site carries a LIVE workspace head, so under dispatch-not-drop it lands and re-gates instead of being silently rejected against a stale row anchor; that is the intended behavior change. deacon.ts is allowlisted at 3569 lines: if this edit grows the file past that, add or update the row in scripts/file-size-allowlist.txt with the '# PAN-3512' issue reference in the SAME commit; if it shrinks the file, leave the allowlist alone."
+        },
+        "items": [
+          {
+            "id": "migrate-infra-bypass.ac1",
+            "title": "Given verification passed while review infrastructure repeatedly failed, the bypass calls recordReviewVerdict with writer 'infra-bypass' and the live head anchor as evidenceHead",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-infra-bypass.ac2",
+            "title": "Given the bypass runs, the update reaching recordReviewVerdict contains stuck false plus undefined stuckReason, stuckAt and stuckDetails, so the issue exits the passed+stuck deadlock",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "migrate-infra-bypass.ac3",
+            "title": "`npm run lint:file-size` passes, with scripts/file-size-allowlist.txt updated in this same commit if and only if deacon.ts grew past 3569 lines",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-write-door",
+        "title": "Document the verdict write door in the review architecture doc",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-02T22:52:40.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3512",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -c 'verdict write door' docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "npm run lint:file-size"
+          ],
+          "expected_outputs": [
+            "grep returns a count of at least 1",
+            "lint:file-size reports no violation"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a '### The verdict write door (PAN-3512)' subsection under the existing '## Verdict application and fallback sweeps' heading (docs/REVIEW-AGENT-ARCHITECTURE.md:110). It must state: the recordReviewVerdict signature and its VerdictOutcome; the table of all seven writer tags and which call site each covers; the dispatch-not-drop rule with its three classifications (stale rejects loudly with a review.verdict_rejected event, fresh and indeterminate land with review.verdict_dispatched); the test-gate reset and why it exists — that readyForMerge is derived from reviewGatesPassedSync on every write, so a landed verdict at an unverified head would otherwise advertise merge-readiness, and that triggerMerge's post-rebase gate is the second line of defence not the first; the fallback kill-conditional; and one sentence for future guard authors, that a new review guard routes through recordReviewVerdict or it does not merge. Use a distinct '###' heading rather than editing the surrounding prose, because PAN-3511 WI-8 is editing the same section on another branch."
+        },
+        "items": [
+          {
+            "id": "docs-write-door.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains a '### The verdict write door (PAN-3512)' subsection that names all seven writer tags and the call site each one covers",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-write-door.ac2",
+            "title": "That subsection states the three evidence classifications and which domain event each emits",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-write-door.ac3",
+            "title": "That subsection contains the test-gate-reset rationale in terms of reviewGatesPassedSync and readyForMerge, plus the sentence requiring a new review guard to route through recordReviewVerdict",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "verdict-events",
+        "to": "verdict-door",
+        "type": "blocks"
+      },
+      {
+        "from": "verdict-door",
+        "to": "test-gate-reset",
+        "type": "blocks"
+      },
+      {
+        "from": "test-gate-reset",
+        "to": "merge-gate-lock",
+        "type": "blocks"
+      },
+      {
+        "from": "test-gate-reset",
+        "to": "retire-review-arm",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-fallback",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-quick-signal",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-coordinator",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-orphan-restore",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-unsignaled",
+        "type": "blocks"
+      },
+      {
+        "from": "retire-review-arm",
+        "to": "migrate-infra-bypass",
+        "type": "blocks"
+      },
+      {
+        "from": "migrate-fallback",
+        "to": "docs-write-door",
+        "type": "informs"
+      },
+      {
+        "from": "migrate-infra-bypass",
+        "to": "docs-write-door",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-02-PAN-3512-the-verdict-write-door-recordreviewverdict-dispatch-not-drop-fallback-kill-conditional-write-side-of-the-verdict-of-record-contract.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
