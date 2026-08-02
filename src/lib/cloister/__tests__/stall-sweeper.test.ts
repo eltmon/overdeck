@@ -65,20 +65,22 @@ interface Harness {
   };
 }
 
-function harness(rows: ParkedRow[]): Harness {
+function harness(rows: ParkedRow[], opts: { liveAgents?: string[] } = {}): Harness {
   const calls: Harness['calls'] = {
     spawn: [], stop: [], message: [], feedback: [], review: [], clearStuck: [], resetMerge: [], events: [], activity: [],
   };
+  const live = new Set(opts.liveAgents ?? []);
   const deps: StallSweeperDeps = {
     now: NOW,
     resolveRows: async () => rows,
     spawnWorkAgent: async (issueId) => { calls.spawn.push(issueId); return { spawned: true }; },
     stopAgent: async (agentId) => { calls.stop.push(agentId); },
-    messageAgent: async (agentId, text) => { calls.message.push(`${agentId}::${text}`); return {}; },
+    messageAgent: async (agentId, text) => { calls.message.push(`${agentId}::${text}`); return { delivered: true, queuedToMail: false }; },
     writeFeedback: async (issueId, stage, summary) => { calls.feedback.push(`${issueId}::${stage}::${summary}`); },
     dispatchReview: async (issueId) => { calls.review.push(issueId); },
     clearStuck: (issueId) => { calls.clearStuck.push(issueId); },
     resetMergeForEvaluation: (issueId) => { calls.resetMerge.push(issueId); },
+    isAgentLive: (agentId) => live.has(agentId),
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
   };
@@ -234,5 +236,57 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
     const { deps, calls } = harness(rows);
     await runStallSweeperPatrol(deps);
     expect(calls.resetMerge.length).toBeLessThanOrEqual(4);
+  });
+});
+
+describe('warm-agent re-drive (PAN-2579)', () => {
+  it('stuck re-drive MESSAGES a live warm agent instead of spawning a duplicate', async () => {
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
+      { liveAgents: ['agent-pan-1'] },
+    );
+    await runStallSweeperPatrol(deps);
+    expect(calls.spawn).toHaveLength(0);
+    expect(calls.message).toHaveLength(1);
+    expect(calls.message[0]).toContain('agent-pan-1');
+    expect(calls.message[0]).toContain('.pan/feedback');
+    expect(calls.clearStuck).toEqual(['PAN-1']);
+    expect(calls.feedback).toHaveLength(1);
+  });
+
+  it('uat re-drive also prefers the warm path for a live agent', async () => {
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'uat-failed', details: { uatNotes: 'broken' } })],
+      { liveAgents: ['agent-pan-1'] },
+    );
+    await runStallSweeperPatrol(deps);
+    expect(calls.spawn).toHaveLength(0);
+    expect(calls.message).toHaveLength(1);
+    expect(calls.events.some((e) => e.type === 'sweep.action' && e.payload['action'] === 'uat-redrive')).toBe(true);
+  });
+});
+
+describe('delivery-outcome honesty', () => {
+  it('an unconfirmed warm delivery is NOT a re-drive: no feedback write, no stuck clear', async () => {
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
+      { liveAgents: ['agent-pan-1'] },
+    );
+    deps.messageAgent = async () => ({ delivered: false, queuedToMail: false, reason: 'composer unverified' });
+    const actions = await runStallSweeperPatrol(deps);
+    expect(calls.feedback).toHaveLength(0);
+    expect(calls.clearStuck).toHaveLength(0);
+    expect(calls.events.some((e) => e.type === 'sweep.unparked')).toBe(false);
+    expect(actions.some((a) => a.includes('delivery unconfirmed'))).toBe(true);
+    expect(readSweeperRowState('PAN-1', 'stuck-flag')?.actionCount ?? 0).toBe(0);
+  });
+
+  it('an unconfirmed idle nudge records no nudge state (retries next scan)', async () => {
+    const { deps } = harness(
+      [parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 420 } })],
+    );
+    deps.messageAgent = async () => ({ delivered: false, queuedToMail: false, reason: 'composer unverified' });
+    await runStallSweeperPatrol(deps);
+    expect(readSweeperRowState('PAN-1', 'idle-running')?.lastNudgedAt).toBeUndefined();
   });
 });
