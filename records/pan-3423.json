@@ -197,18 +197,18 @@
     "recordedAt": "2026-08-02T21:19:44.181Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T21:29:00.363Z",
+  "updated": "2026-08-02T21:29:08.903Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:20:50.385Z",
-    "updatedAt": "2026-08-02T21:28:58.209Z",
+    "updatedAt": "2026-08-02T21:29:08.884Z",
     "reviewNotes": "All four reviewers passed; prior correctness, accessibility, labeling, duplicate-consumer, and documentation gaps are resolved.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
@@ -244,24 +244,6 @@
         "src/dashboard/frontend/src/lib/system-health-attention.ts"
       ],
       "recordedAt": "2026-08-02T21:19:44.181Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "cf1794e72af5f339bb72bffe3cb26f133887620a"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "cf1794e72af5f339bb72bffe3cb26f133887620a"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "cf1794e72af5f339bb72bffe3cb26f133887620a"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "cf1794e72af5f339bb72bffe3cb26f133887620a"
-      }
     }
   },
   "closeOut": {
@@ -277,9 +259,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 13719056,
-            "output": 241069,
-            "cacheRead": 69166592,
+            "input": 13721360,
+            "output": 241309,
+            "cacheRead": 69616128,
             "cacheWrite": 0
           }
         },
@@ -338,9 +320,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20149031,
-          "output": 510953,
-          "cacheRead": 156916736,
+          "input": 20151335,
+          "output": 511193,
+          "cacheRead": 157366272,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -351,8 +333,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 198.4840753,
-        "pricingAsOf": "2026-08-02T21:28:58.297Z"
+        "usd": 198.7275633,
+        "pricingAsOf": "2026-08-02T21:29:08.891Z"
       }
     },
     "merges": [
@@ -361,7 +343,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 16,
