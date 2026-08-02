@@ -1,10 +1,16 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  listSlotAgents,
   reconcileSlotState,
   type ReconciledSlotAgent,
   type ReconciledSlotAssignment,
   type ReconciledSlotBranch,
 } from '../../../../src/lib/agents/slot-reconcile.js';
+import { listAgentStates } from '../../../../src/lib/agents/queries.js';
+
+vi.mock('../../../../src/lib/agents/queries.js', () => ({
+  listAgentStates: vi.fn(() => []),
+}));
 import type { XBriefDocument } from '../../../../src/lib/xbrief/types.js';
 
 function makeDoc(itemIds: string[]): XBriefDocument {
@@ -77,9 +83,28 @@ describe('reconcileSlotState', () => {
         status: 'merged',
         branch: 'feature/pan-1762-slot-1',
         agentId: undefined,
+        mergedVia: 'completed-status',
       },
     ]);
     expect(result.pending).toEqual([]);
+  });
+
+  it('uses the merged plan view to prove completion when status overrides were already applied', async () => {
+    const plan = makeDoc(['a']);
+    plan.plan.items[0].status = 'completed';
+
+    const result = await reconcileSlotState('PAN-1762', '/workspace', plan, {
+      deps: deps(
+        [{ slotIndex: 1, branch: 'feature/pan-1762-slot-1', merged: true }],
+        [{ slotIndex: 1, agentId: 'agent-pan-1762-slot-1', status: 'running', slotItemId: 'a' }],
+      ),
+    });
+
+    expect(result.merged[0]).toMatchObject({
+      itemId: 'a',
+      status: 'merged',
+      mergedVia: 'completed-status',
+    });
   });
 
   it('returns a clean initial state when no durable slot ownership exists', async () => {
@@ -133,5 +158,20 @@ describe('reconcileSlotState', () => {
       },
     ]);
     expect(result.pending).toEqual([]);
+  });
+});
+
+describe('listSlotAgents', () => {
+  it('excludes tombstoned retained-transcripts rows from slot occupancy (PAN-3465)', () => {
+    vi.mocked(listAgentStates).mockReturnValue([
+      { id: 'agent-pan-1762-slot-1', status: 'stopped', phase: 'retained-transcripts' },
+      { id: 'agent-pan-1762-slot-2', status: 'running' },
+    ] as never);
+
+    const agents = listSlotAgents('PAN-1762');
+
+    expect(agents).toEqual([
+      { slotIndex: 2, agentId: 'agent-pan-1762-slot-2', status: 'running' },
+    ]);
   });
 });

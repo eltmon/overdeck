@@ -162,7 +162,7 @@ export async function completePlanningArtifacts(options: {
   const issueLower = issueId.toLowerCase();
   const upperIssueId = issueId.toUpperCase();
   const workspacePlanPath = await Effect.runPromise(Effect.gen(function* () {
-    return (yield* findWorkspaceDraftPlan(workspacePath)) ?? (yield* findPlan(workspacePath));
+    return (yield* findWorkspaceDraftPlan(workspacePath, 'authored-first')) ?? (yield* findPlan(workspacePath));
   }));
   if (!workspacePlanPath) {
     throw new Error(`No workspace xBRIEF found for ${upperIssueId} at ${workspacePath}/.overdeck/spec.vbrief.json`);
@@ -618,7 +618,7 @@ export async function completePlanningForIssue(options: {
       }
 
       const workspacePlanPath = await (async () =>
-        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath))) ?? (await Effect.runPromise(findPlan(workspacePath)))
+        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath, 'authored-first'))) ?? (await Effect.runPromise(findPlan(workspacePath)))
       )();
       if (workspacePlanPath) {
         const workspaceDoc = await Effect.runPromise(readPlan(workspacePlanPath));

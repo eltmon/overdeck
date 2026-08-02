@@ -13,7 +13,7 @@
  *   terminal state. The pipeline is everything that needs attention to reach a
  *   correct, consistent end state — not just the happy-path in-flight set.
  *
- * Built from durable lenses only (L1–L4 + L6-spec), so membership survives the cutover and
+ * Built from durable lenses only (L1–L4 + L6-spec + L7-record), so membership survives the cutover and
  * a fresh `~/.overdeck` (no `state.json`) by construction:
  *
  *   L1  open PR              · L1-merged  a merged PR exists (the merge oracle)
@@ -21,6 +21,7 @@
  *                              paired with L1-merged, which wins)
  *   L3  issue open           · L4  current-phase label
  *   L6-spec  xBRIEF exists   · durable plan on the `overdeck-state` branch
+ *   L7-record  close-out record  · pipeline.closedOut === true via the record door
  *
  * L5 (agents / DB / state.json) is a *liveness accelerator* only — it can
  * annotate "is an agent running right now," but it NEVER decides membership.
@@ -63,6 +64,8 @@ export interface IssueLensSignals {
   hasXbriefSpec: boolean;
   /** Durable Definition-of-Ready signal from the issue's `ready` label. */
   explicitlyReady: boolean;
+  /** L7-record — a terminal close-out record exists (pipeline.closedOut === true via the record door, durable only). */
+  hasTerminalCloseOut: boolean;
 }
 
 export interface PipelineMembership {
@@ -128,6 +131,15 @@ export function resolvePipelineMembership(s: IssueLensSignals): PipelineMembersh
     // Closed ⇒ terminal, regardless of lingering state — except an open PR, which
     // is a live mergeable artifact that needs closing.
     if (s.hasOpenPr) {
+      // Closed with open PR: reclassify to clean_terminal if a terminal close-out
+      // record exists (L7-record), since the record confirms durable closure intent.
+      // The still-open PR is residue to be closed on the forge.
+      if (s.hasTerminalCloseOut) {
+        return result(
+          'clean_terminal',
+          'issue closed out (durable close-out record) — the still-open PR is residue; close it on the forge',
+        );
+      }
       return result('zombie_pr', 'issue is closed but a PR is still open — close/reconcile the PR');
     }
     return result(

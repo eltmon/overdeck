@@ -22,6 +22,8 @@ import {
   type SwarmRecoveryAction,
 } from '../../lib/cloister/deacon-swarm.js';
 import { reconcileSlotState } from '../../lib/agents/slot-reconcile.js';
+import { resolveSwarmPolicy } from '../../lib/swarm-policy.js';
+import { writeSwarmPolicyMode } from '../../lib/cloister/deacon-swarm-record.js';
 import { countRunningSwarmSlotsForIssue, getConcurrencyLimits } from '../../lib/cloister/concurrency.js';
 import type { ProjectConfig } from '../../lib/workspace-config.js';
 import { getReviewStatusSync, setDeaconIgnored } from '../../lib/review-status.js';
@@ -50,6 +52,8 @@ export interface SwarmCommandDeps {
   getFailedMergeBlock: typeof getFailedMergeBlock;
   getFailedMergeBlocks: typeof getFailedMergeBlocks;
   recoverFailedMergeSlot: typeof recoverFailedMergeSlot;
+  resolveSwarmPolicy: typeof resolveSwarmPolicy;
+  writeSwarmPolicyMode: typeof writeSwarmPolicyMode;
   console: ConsoleLike;
 }
 
@@ -103,6 +107,8 @@ const defaultDeps: SwarmCommandDeps = {
   getFailedMergeBlock,
   getFailedMergeBlocks,
   recoverFailedMergeSlot,
+  resolveSwarmPolicy,
+  writeSwarmPolicyMode,
   console,
 };
 
@@ -126,6 +132,20 @@ export async function swarmCommand(
   }
 
   const workspacePath = await deps.ensureWorkspace(issue, loaded.project);
+  // PAN-3459: an explicit start is the issue-level opt-in. Deacon patrols
+  // re-resolve the swarm policy with manual=false, so under the default
+  // global `swarm.mode: off` they would skip this issue after wave 1 —
+  // completed slot branches would never merge and remaining items would
+  // never dispatch. Persist the opt-in before coordinating so the promise
+  // below ("coordination will continue in Deacon") is actually true.
+  const policy = deps.resolveSwarmPolicy(issue);
+  if (policy.mode === 'off') {
+    await deps.writeSwarmPolicyMode(workspacePath, issue, 'always');
+    deps.console.log(chalk.dim(
+      `Persisted swarm.policy.mode=always for ${issue} — the effective swarm mode was off (from ${policy.source.mode} config), `
+      + 'which would otherwise stop the Deacon from coordinating this swarm after this command.',
+    ));
+  }
   // Manual dispatch runs the IDENTICAL reconcile → classify → merge → gc →
   // dispatch pipeline the Deacon patrol runs — including the operator-hold
   // skip, advance backoff, failed-merge block, duplicate guards, bounded
@@ -787,6 +807,14 @@ function swarmIneligibleReasons(readiness: SwarmReadinessVerdict): string[] {
   if (slotEligibleCount < 2) {
     reasons.push(`only ${slotEligibleCount} slot-eligible item${slotEligibleCount === 1 ? '' : 's'} found; swarm dispatch requires at least 2`);
   }
+
+  // Per-item lines explain WHY an ineligible plan cannot dispatch. They are
+  // diagnostics, not gates: a plan that passes the aggregate checks above may
+  // legitimately contain readiness:'sequential' items (the tri-state contract;
+  // e.g. PAN-3092 shipped 6 ready + 1 sequential). The Deacon's dispatch gate
+  // (deacon-swarm.ts dispatchEligible) checks only the aggregates — refusing
+  // here on any non-eligible item made every mixed plan un-swarmable (PAN-3447).
+  if (reasons.length === 0) return reasons;
 
   for (const item of readiness.items.filter(item => !item.slotEligible)) {
     if (item.missingScope) reasons.push(`${item.id}: missing files_scope`);
