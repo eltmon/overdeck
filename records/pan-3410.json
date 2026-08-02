@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:52:08.536Z",
+  "updated": "2026-08-02T04:02:44.508Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "law-file-rewrite": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 1765332,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:52:08.536Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -141,6 +133,17 @@
         "outcome": "completed",
         "reason": "Added a Ledger/Broadsheet two-card picker to AppearanceSection.tsx above the existing shimmer toggle (preserved verbatim). Each card's specimen div carries its own data-theme attribute and reuses .eyebrow/.display-lg from theme-token-scope so both specimens render correctly side-by-side without any component-level theme branching. Wired to the real useDesignLanguage() store; wrote 4 new component tests (both cards + specimens render, click flips attribute + persists mirror + PUTs ui.theme, selected/unselected treatment, shimmer toggle unchanged). Full Settings suite: 144 pass, same pre-existing unrelated tiered-crews.test.ts failure noted previously. Typecheck, build, lint, file-size guard all clean.",
         "releasedAt": "2026-08-02T03:51:54.882Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 1765332,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:52:08.536Z",
+        "itemId": "law-file-rewrite",
+        "outcome": "completed",
+        "reason": "Rewrote design/style-guide/STYLE-GUIDE.md to v2.0: new §2 Themes section (two-theme comparison, ui.theme config, data-theme scoping, Ledger-safe fallbacks table, governance, D-11 unchanged-rules list verbatim), rewrote §3 Typography (both font stacks by CSS variable, self-hosted @font-face replacing the Google Fonts snippet, weight-tier table, display scale, rewritten mono rule), added D-4..D-9 pattern recipes to §8 Components each with a copy-paste recipe + canonical example + Broadsheet-only marker, added the D-10 page-not-modal doctrine to Dialogs/Modals, and documented the Broadsheet badge radius change in §6/§8. All code blocks transcribed verbatim from the actual index.css/index.html implementation, not from memory. Renumbered every subsequent section (old 2-18 -> new 3-19) and fixed both internal 'see Section N' cross-references. scripts/lint-skills.sh green; grep -c Broadsheet=48, Ledger=41.",
+        "releasedAt": "2026-08-02T04:02:44.507Z"
       }
     ],
     "statusReasons": {
@@ -167,6 +170,10 @@
       "appearance-theme-picker": {
         "reason": "Added a Ledger/Broadsheet two-card picker to AppearanceSection.tsx above the existing shimmer toggle (preserved verbatim). Each card's specimen div carries its own data-theme attribute and reuses .eyebrow/.display-lg from theme-token-scope so both specimens render correctly side-by-side without any component-level theme branching. Wired to the real useDesignLanguage() store; wrote 4 new component tests (both cards + specimens render, click flips attribute + persists mirror + PUTs ui.theme, selected/unselected treatment, shimmer toggle unchanged). Full Settings suite: 144 pass, same pre-existing unrelated tiered-crews.test.ts failure noted previously. Typecheck, build, lint, file-size guard all clean.",
         "updatedAt": "2026-08-02T03:51:54.882Z"
+      },
+      "law-file-rewrite": {
+        "reason": "Rewrote design/style-guide/STYLE-GUIDE.md to v2.0: new §2 Themes section (two-theme comparison, ui.theme config, data-theme scoping, Ledger-safe fallbacks table, governance, D-11 unchanged-rules list verbatim), rewrote §3 Typography (both font stacks by CSS variable, self-hosted @font-face replacing the Google Fonts snippet, weight-tier table, display scale, rewritten mono rule), added D-4..D-9 pattern recipes to §8 Components each with a copy-paste recipe + canonical example + Broadsheet-only marker, added the D-10 page-not-modal doctrine to Dialogs/Modals, and documented the Broadsheet badge radius change in §6/§8. All code blocks transcribed verbatim from the actual index.css/index.html implementation, not from memory. Renumbered every subsequent section (old 2-18 -> new 3-19) and fixed both internal 'see Section N' cross-references. scripts/lint-skills.sh green; grep -c Broadsheet=48, Ledger=41.",
+        "updatedAt": "2026-08-02T04:02:44.507Z"
       }
     }
   },
@@ -201,6 +208,10 @@
     "appearance-theme-picker.appearance-theme-picker.ac2": "completed",
     "appearance-theme-picker.appearance-theme-picker.ac3": "completed",
     "appearance-theme-picker.appearance-theme-picker.ac4": "completed",
-    "law-file-rewrite": "running"
+    "law-file-rewrite": "completed",
+    "law-file-rewrite.law-file-rewrite.ac1": "completed",
+    "law-file-rewrite.law-file-rewrite.ac2": "completed",
+    "law-file-rewrite.law-file-rewrite.ac3": "completed",
+    "law-file-rewrite.law-file-rewrite.ac4": "completed"
   }
 }
