@@ -57,11 +57,71 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T19:05:20.082Z"
+    },
+    {
+      "timestamp": "2026-08-02T19:30:25.295Z",
+      "reason": "end",
+      "note": "Anomalies first: this session restarted from a crash multiple times (transcript\nresumed, task-door claims reset to pending each time — verified against git log\nand pan task show rather than trusting the stale workspace .overdeck/spec.vbrief.json\ncopy, which never reflected live status). Two pre-existing bugs were found and\nfiled separately (not fixed here, out of scope):\n- https://github.com/eltmon/overdeck/issues/3497 — this workspace's own UAT\n  devcontainer crash-loops because ~/.overdeck is correctly not mounted into it\n  (single-deacon-invariant), but the CLIProxy watchdog has no peer-dashboard\n  guard and keeps trying to spawn a binary that will never exist there.\n- https://github.com/eltmon/overdeck/issues/3504 — main is currently\n  typecheck-red: src/cli/commands/parked.ts references a nonexistent\n  ProjectConfig.projectPath field (should be .path), landed directly on main\n  in an unrelated commit. Every file this issue touched still typechecks clean\n  in isolation; this is the only error anywhere in the repo.\nA `npm test` full-suite run showed 65 failed test files, all in unrelated\nconversations/ and workspaces/ suites, all failing on the identical\nsetupOverdeckTestDb() beforeEach hook timing out at 5000ms; re-running two of\nthose files in isolation passed cleanly (19/19), confirming resource-contention\nflake under full-suite load, not a regression from this work. The first `pan\ndone` rebase (onto origin/main) succeeded cleanly with no conflicts, but the\nsubsequent push was killed by a timeout signal before completing; verified the\nremote hadn't moved, then re-pushed the same rebased history successfully.\n\nSummary: PAN-3427 made order books reachable across every registered project,\nnot just the dashboard server's own cwd project, across all four surfaces:\n\n- Dashboard routes (src/dashboard/server/routes/orders.ts): every /api/orders*\n  route accepts ?project=<key>, resolved through the projects registry\n  (getProjectSync + resolveStateReadHomeSync); an unknown key is a 400, not a\n  404; GET /api/orders/:id falls back to scanning other registered projects in\n  registry order when the book isn't in the default root; POST .../start\n  launches the Flywheel in the book's own project root via resolveProjectPath\n  instead of the server's cwd.\n- CLI (src/cli/commands/orders.ts): every `pan orders` verb takes --project\n  <key>; added `pan orders queue <id>` to move a draft to ready through the\n  write door.\n- Flywheel continuation (src/cli/commands/flywheel-complete.ts): when the\n  completing project's own queue is empty, continuation scans every tracked\n  project's ready queue in registry order and starts the first hit in its own\n  project root with no carried-over brief.\n- Dashboard frontend (OrderBookPage.tsx + rails + OrderBookModule.tsx): a\n  project picker in the page header, deep-linkable via ?project=<key>,\n  threaded through every fetch the page makes.\n- Docs: docs/ORDER-BOOKS.md and configuration/order-books.mdx updated to cover\n  all of the above.\n\nAll 9 xBRIEF items landed as separate commits, each pushed before being marked\ndone. Every item's own scoped verify_commands (typecheck + its test file(s) +\nlint-skills where applicable) passed; full `npm run lint` is green with no new\nerrors."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
+      "src/dashboard/frontend/src/components/orders/projectScope.ts"
+    ],
+    "declaredScopeUntouched": [
+      "tests/unit/lib/orders/orders-writer.test.ts"
+    ],
+    "declaredScope": [
+      "configuration/order-books.mdx",
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/flywheel-complete.ts",
+      "src/cli/commands/orders.ts",
+      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
+      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+      "src/dashboard/server/routes/__tests__/orders.test.ts",
+      "src/dashboard/server/routes/orders.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/writer.ts",
+      "sync-sources/skills/pan-orders/SKILL.md",
+      "tests/unit/cli/flywheel-complete.test.ts",
+      "tests/unit/cli/orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts",
+      "tests/unit/lib/orders/orders-writer.test.ts"
+    ],
+    "actualChangedFiles": [
+      "configuration/order-books.mdx",
+      "docs/ORDER-BOOKS.md",
+      "packages/contracts/src/composer-commands.generated.ts",
+      "src/cli/commands/flywheel-complete.ts",
+      "src/cli/commands/orders.ts",
+      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
+      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
+      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
+      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
+      "src/dashboard/frontend/src/components/orders/projectScope.ts",
+      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
+      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
+      "src/dashboard/server/routes/__tests__/orders.test.ts",
+      "src/dashboard/server/routes/orders.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/writer.ts",
+      "sync-sources/skills/pan-orders/SKILL.md",
+      "tests/unit/cli/flywheel-complete.test.ts",
+      "tests/unit/cli/orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts"
+    ],
+    "recordedAt": "2026-08-02T19:30:17.905Z"
+  },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:30:21.127Z",
+  "updated": "2026-08-02T19:30:25.349Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -71,8 +131,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:30:21.124Z",
+    "updatedAt": "2026-08-02T19:30:25.292Z",
     "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewRequestedAt": "2026-08-02T19:30:21.124Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -128,49 +189,50 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T19:30:17.905Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3506"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 197,
-            "output": 324,
-            "cacheRead": 64,
+            "input": 1762,
+            "output": 1034,
+            "cacheRead": 128,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 220,
-            "output": 53257,
-            "cacheRead": 13429012,
-            "cacheWrite": 561566
+            "input": 4955,
+            "output": 146489,
+            "cacheRead": 86955387,
+            "cacheWrite": 2753239
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 197,
-          "output": 324,
-          "cacheRead": 64,
+          "input": 1762,
+          "output": 1034,
+          "cacheRead": 128,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 220,
-          "output": 53257,
-          "cacheRead": 13429012,
-          "cacheWrite": 561566
+          "input": 4955,
+          "output": 146489,
+          "cacheRead": 86955387,
+          "cacheWrite": 2753239
         }
       },
       "costAtCloseOut": {
-        "usd": 4.6245574,
-        "pricingAsOf": "2026-08-02T17:38:26.901Z"
+        "usd": 25.7559368,
+        "pricingAsOf": "2026-08-02T19:30:25.331Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3506"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -417,60 +479,5 @@
     "docs-order-books": "completed",
     "docs-order-books.docs-order-books.ac1": "completed",
     "docs-order-books.docs-order-books.ac2": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "packages/contracts/src/composer-commands.generated.ts",
-      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
-      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
-      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
-      "src/dashboard/frontend/src/components/orders/projectScope.ts"
-    ],
-    "declaredScopeUntouched": [
-      "tests/unit/lib/orders/orders-writer.test.ts"
-    ],
-    "declaredScope": [
-      "configuration/order-books.mdx",
-      "docs/ORDER-BOOKS.md",
-      "src/cli/commands/flywheel-complete.ts",
-      "src/cli/commands/orders.ts",
-      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
-      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
-      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
-      "src/dashboard/server/routes/__tests__/orders.test.ts",
-      "src/dashboard/server/routes/orders.ts",
-      "src/lib/orders/resolver.ts",
-      "src/lib/orders/writer.ts",
-      "sync-sources/skills/pan-orders/SKILL.md",
-      "tests/unit/cli/flywheel-complete.test.ts",
-      "tests/unit/cli/orders.test.ts",
-      "tests/unit/lib/orders/orders-resolver.test.ts",
-      "tests/unit/lib/orders/orders-writer.test.ts"
-    ],
-    "actualChangedFiles": [
-      "configuration/order-books.mdx",
-      "docs/ORDER-BOOKS.md",
-      "packages/contracts/src/composer-commands.generated.ts",
-      "src/cli/commands/flywheel-complete.ts",
-      "src/cli/commands/orders.ts",
-      "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
-      "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
-      "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
-      "src/dashboard/frontend/src/components/orders/OrderBookModule.tsx",
-      "src/dashboard/frontend/src/components/orders/__tests__/OrderBookModule.test.tsx",
-      "src/dashboard/frontend/src/components/orders/projectScope.ts",
-      "src/dashboard/frontend/src/pages/OrderBookPage.tsx",
-      "src/dashboard/frontend/src/pages/__tests__/OrderBookPage.test.tsx",
-      "src/dashboard/server/routes/__tests__/orders.test.ts",
-      "src/dashboard/server/routes/orders.ts",
-      "src/lib/orders/resolver.ts",
-      "src/lib/orders/writer.ts",
-      "sync-sources/skills/pan-orders/SKILL.md",
-      "tests/unit/cli/flywheel-complete.test.ts",
-      "tests/unit/cli/orders.test.ts",
-      "tests/unit/lib/orders/orders-resolver.test.ts"
-    ],
-    "recordedAt": "2026-08-02T19:30:17.905Z"
   }
 }
