@@ -39,9 +39,9 @@ TS=$(date -Iseconds)
 # ── Emit agent.activity_changed(working, tool) ─────────────────────────────
 if [ "$HAVE_JQ" = "1" ]; then
   BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" \
-    '{kind: "activity", activity: "working", tool: $tool, timestamp: $ts}')
+    '{kind: "activity", activity: "working", tool: $tool, hookName: "PostToolUse", timestamp: $ts}')
 else
-  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"timestamp\":\"$TS\"}"
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"hookName\":\"PostToolUse\",\"timestamp\":\"$TS\"}"
 fi
 pan_emit_event "$AGENT_ID" "$BODY"
 
