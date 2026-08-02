@@ -12,6 +12,11 @@
       "timestamp": "2026-08-02T04:56:44.990Z",
       "reason": "end",
       "note": "No deviations from the plan's substance, but the plan's scope estimates were undercounts in two places, both extended to fully satisfy their acceptance criteria: (1) the mechanical font-token sweep's files_scope named 4 files but a full-frontend grep (per ac1) found hardcoded font-family declarations in 5 more (Stage/stage.module.css, styles/decisions.module.css, chat/ContextWindowMeter.module.css, CommandDeck/ProjectOverview.tsx, CommandDeck/ActivityView/index.tsx) — all swept the same way. (2) XTerminal.tsx's fontFamily was deliberately left untokenized: xterm's WebGL addon renders glyphs through a canvas atlas that doesn't resolve CSS custom properties, so wiring it would silently break terminal rendering rather than just changing its look — documented in the commit and PR.\n\nHazard discovered mid-implementation: the Tailwind content-based purge silently dropped the new .display-xl/.display-lg/.eyebrow utility classes from the production build (they aren't referenced by any .tsx file yet — that's broadsheet-mechanical-migration's/future features' job). Caught by inspecting the compiled CSS directly rather than trusting typecheck; fixed with a tailwind.config.js safelist entry.\n\nTwo file-size god-file ratchet bumps were required as a side effect of adding fields (config-yaml/schema.ts, settings-api.ts) — both already-tracked god files over the 1000-line ceiling, bumped with PAN-3410 references per the existing allowlist convention.\n\nPre-existing, unrelated test failures observed and NOT touched: src/dashboard/frontend's tiered-crews.test.ts (blendedCost assertion, stale pricing data, last modified in old PAN-2684/PAN-2829 commits) failed consistently throughout this session's frontend test runs; a further ~20 backend tests failed only under the full concurrent npm test run tonight (DB-fixture \"Hook timed out in 5000ms\" errors) but passed cleanly (30/30) when re-run in isolation, confirming they're resource-contention flakes from this machine's ~33 other concurrently running agents, not regressions from this change.\n\nDelivered: self-hosted Geist/Geist Mono/DM Sans/Space Grotesk fonts (zero external requests, ~174KB, OFL-licensed); the data-theme token scope (--font-sans/--font-display/--font-mono, .display-xl/.display-lg/.eyebrow with Ledger-safe fallbacks); ui.theme config key (enum, default broadsheet, loud invalid-value error) surfaced through GET/PUT /api/settings with a no-loss merge for open_in_editor_command; useDesignLanguage hook + pre-mount data-theme boot script; the Settings → Appearance Overdeck Theme two-card picker with live self-themed specimens; STYLE-GUIDE.md v2.0 and the pan-style-guide skill rewritten for both themes; configuration/appearance.mdx published plus the NewProjectModal page-migration follow-up (#3469) filed and linked; and the bounded mechanical font/badge-radius sweep with 6 committed before/after screenshots proving Ledger layout parity and Broadsheet's intended type changes."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T05:03:35.644Z"
     }
   ],
   "feedback": [],
@@ -113,7 +118,7 @@
     "recordedAt": "2026-08-02T04:56:38.778Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T04:59:29.245Z",
+  "updated": "2026-08-02T05:03:35.644Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
