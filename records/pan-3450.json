@@ -63,10 +63,10 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-02T01:43:24.658Z",
+  "updated": "2026-08-02T01:47:43.275Z",
   "pipeline": {
     "issueId": "PAN-3450",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -74,10 +74,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-02T01:43:24.519Z",
+    "updatedAt": "2026-08-02T01:47:43.206Z",
+    "reviewNotes": "Stale manifest path traversal can delete files outside the managed sync target",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
-    "reviewRequestedAt": "2026-08-02T01:40:58.038Z",
     "reviewSpawnedAt": "2026-08-02T01:43:24.517Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -120,11 +120,69 @@
         "tests/unit/lib/sync-prune-target.test.ts"
       ],
       "recordedAt": "2026-08-02T01:40:06.706Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 598895,
+            "output": 10016,
+            "cacheRead": 3555840,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1457558,
+            "output": 12978,
+            "cacheRead": 1206784,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 587536,
+            "output": 4934,
+            "cacheRead": 371200,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1741869,
+            "output": 16757,
+            "cacheRead": 2248192,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1114219,
+            "output": 11251,
+            "cacheRead": 481280,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "openai/gpt-5.6-sol": {
             "input": 2771346,
@@ -136,15 +194,15 @@
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 2771346,
-          "output": 113598,
-          "cacheRead": 61644800,
+          "input": 8271423,
+          "output": 169534,
+          "cacheRead": 69508096,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 48.08707,
-        "pricingAsOf": "2026-08-02T01:43:24.588Z"
+        "usd": 81.197183,
+        "pricingAsOf": "2026-08-02T01:47:43.261Z"
       }
     },
     "merges": [
