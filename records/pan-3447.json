@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T05:46:56.356Z",
+  "updated": "2026-08-02T05:47:41.254Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -75,55 +75,53 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T05:12:53.834Z",
-    "deaconIgnored": true,
-    "deaconIgnoredAt": "2026-08-02T05:12:53.832Z",
-    "deaconIgnoredReason": "orphan slot-2 duplicated the aurora-shader item that slot-3 already merged (78098fa908); reconciling before the PAN-3467/3468 re-plan"
+    "updatedAt": "2026-08-02T05:47:40.694Z",
+    "deaconIgnored": false
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 56,
-            "output": 17169,
-            "cacheRead": 6291761,
-            "cacheWrite": 33276
+            "input": 67,
+            "output": 21341,
+            "cacheRead": 9683065,
+            "cacheWrite": 85161
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7090864,
-            "output": 245312,
-            "cacheRead": 64709120,
+            "input": 7552547,
+            "output": 262258,
+            "cacheRead": 69617664,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 56,
-          "output": 17169,
-          "cacheRead": 6291761,
-          "cacheWrite": 33276
+          "input": 67,
+          "output": 21341,
+          "cacheRead": 9683065,
+          "cacheWrite": 85161
         },
         "openai/gpt-5.6-sol": {
-          "input": 7090864,
-          "output": 245312,
-          "cacheRead": 64709120,
+          "input": 7552547,
+          "output": 262258,
+          "cacheRead": 69617664,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 82.734967,
-        "pricingAsOf": "2026-08-02T05:12:54.680Z"
+        "usd": 92.254612,
+        "pricingAsOf": "2026-08-02T05:47:41.236Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "k3[1m]",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3447",
