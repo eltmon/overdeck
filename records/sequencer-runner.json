@@ -1,0 +1,21 @@
+{
+  "issueId": "SEQUENCER-RUNNER",
+  "schemaVersion": 2,
+  "created": "2026-08-02T16:17:33.384Z",
+  "updated": "2026-08-02T16:17:33.385Z",
+  "pipeline": {
+    "issueId": "SEQUENCER-RUNNER",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-02T16:17:33.384Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  }
+}
