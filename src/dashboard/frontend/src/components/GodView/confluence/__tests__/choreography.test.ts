@@ -121,7 +121,8 @@ describe('Confluence choreography dispatch table', () => {
     ]);
     const current = new Map([
       ['PAN-1', orb('PAN-1', { stage: 'REVIEW', role: 'review' })],
-      ['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })],
+      // PAN-2's data says it is ALIVE again (stale → active): the honest thaw.
+      ['PAN-2', orb('PAN-2', { state: 'active' })],
       ['PAN-3', orb('PAN-3')],
       ['PAN-4', orb('PAN-4', { mergeStatus: 'merging' })],
       ['PAN-5', orb('PAN-5', { state: 'shelf', yieldReason: 'yield: freeing a slot for PAN-50' })],
@@ -137,6 +138,7 @@ describe('Confluence choreography dispatch table', () => {
       random: () => rolls.shift() ?? 1,
     });
 
+    // Thaw is data-driven (stale → active in the snapshot), never beat-driven.
     expect(commands).toContainEqual({ type: 'thaw', issueId: 'PAN-2' });
     expect(commands).toContainEqual({
       type: 'sparks',
@@ -300,5 +302,20 @@ describe('planSweepCommands', () => {
       sweepEvent('agent.activity_changed', { agentId: 'agent-pan-1' }),
     ]);
     expect(commands).toHaveLength(0);
+  });
+});
+
+describe('honest thaw semantics (PAN-3490 follow-up)', () => {
+  it('a hook beat on an orb that STAYS stale sparks but never thaws', () => {
+    const previous = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 42 })]]);
+    const current = new Map([['PAN-2', orb('PAN-2', { state: 'stale', staleMin: 43 })]]);
+    const commands = planConfluenceChoreography({
+      previous,
+      current,
+      hookEvents: [hook('PAN-2')],
+      random: () => 1,
+    });
+    expect(commands.filter((command) => command.type === 'thaw')).toHaveLength(0);
+    expect(commands.some((command) => command.type === 'sparks' && command.issueId === 'PAN-2')).toBe(true);
   });
 });
