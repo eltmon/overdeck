@@ -6,6 +6,7 @@ import '@xterm/xterm/css/xterm.css';
 import { Sun, Moon, SunMoon } from 'lucide-react';
 import { toast } from 'sonner';
 import { useTheme } from '../hooks/useTheme';
+import { useDesignLanguage } from '../hooks/useDesignLanguage';
 import {
   createReconnectJitter,
   nextReconnectDelay,
@@ -125,6 +126,7 @@ const isMac = navigator.platform.toLowerCase().includes('mac');
 
 export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: autoCopyProp, embedded }: XTerminalProps) {
   const isDark = useTheme((s) => s.resolvedTheme) !== 'light';
+  const designLanguage = useDesignLanguage((s) => s.designLanguage);
   // Per-pane theme override (PAN-1520). 'auto' follows the dashboard; 'dark'/'light'
   // pin this one pane. Sessions spawned before a dashboard theme change keep
   // rendering their old Claude theme (Claude only detects via OSC 11 once, at
@@ -847,6 +849,16 @@ export function XTerminal({ sessionName, token, onDisconnect, autoCopyOnSelect: 
       terminalInstance.current.options.theme = xtermTheme(effectiveIsDark);
     }
   }, [effectiveIsDark]);
+
+  // Re-font a live terminal when the Overdeck Theme (Ledger/Broadsheet)
+  // changes — resolveMonoFontFamily() only ran once, at Terminal construction,
+  // so without this effect an open terminal kept the font of whichever theme
+  // was active when it was created (PAN-3410 review finding — correctness).
+  useEffect(() => {
+    if (terminalInstance.current) {
+      terminalInstance.current.options.fontFamily = resolveMonoFontFamily();
+    }
+  }, [designLanguage]);
 
   const handleClick = () => {
     terminalInstance.current?.focus();

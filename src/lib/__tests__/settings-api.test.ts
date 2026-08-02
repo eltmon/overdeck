@@ -760,6 +760,42 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('mid: gpt-5.5');
     expect(written).toContain('theme: ledger');
   });
+
+  it('a theme save and a full-document save fired concurrently both survive — the second write reads the first write\'s result, never a pre-write snapshot (real overlapping-writes regression, PAN-3410 FR-7 cycle-6)', async () => {
+    // Unlike the previous test (the concurrent change is already committed
+    // *before* saveDesignLanguage is even called), this drives the two saves
+    // through Promise.all so their reads and writes can genuinely interleave.
+    // mockLoadConfig/mockWriteFile model a real config.yaml: every write
+    // replaces `state` with exactly what that write's content says for
+    // `mid`/`theme` (never leaves a field untouched the way "if includes X"
+    // checks would), and every read reflects the current `state`. This only
+    // passes if runSettingsWriteSerialized truly defers the second call's
+    // read until the first call's write has landed — without it, the second
+    // call's stale pre-write snapshot of the *other* field silently reverts
+    // whatever the first call just wrote.
+    let state = { workhorses: { mid: 'claude-sonnet-4-6' }, ui: { openInEditorCommand: null, theme: 'broadsheet' as const } };
+    mockLoadConfig.mockImplementation(() => baseConfig(state));
+    mockWriteFile.mockImplementation(async (_path: string, content: string) => {
+      const mid = /mid: (\S+)/.exec(content)?.[1];
+      const theme = /theme: (\S+)/.exec(content)?.[1];
+      state = {
+        workhorses: { mid: mid ?? state.workhorses.mid },
+        ui: { ...state.ui, theme: (theme as 'ledger' | 'broadsheet' | undefined) ?? state.ui.theme },
+      };
+    });
+
+    const { loadSettingsApi, saveSettingsApi, saveDesignLanguage } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Promise.all([
+      Effect.runPromise(saveSettingsApi({ ...settings, workhorses: { ...settings.workhorses, mid: 'gpt-5.5' } })),
+      Effect.runPromise(saveDesignLanguage('ledger')),
+    ]);
+
+    expect(state.workhorses.mid).toBe('gpt-5.5');
+    expect(state.ui.theme).toBe('ledger');
+    expect(mockWriteFile).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('validateSettingsApi', () => {

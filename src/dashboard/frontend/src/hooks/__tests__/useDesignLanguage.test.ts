@@ -3,6 +3,8 @@ import { renderHook, act } from '@testing-library/react';
 import { installStrictFetchMock } from '../../test-utils/strictFetchMock';
 import { useDesignLanguage } from '../useDesignLanguage';
 
+vi.mock('../../lib/wsTransport', () => ({ dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })) }));
+
 describe('useDesignLanguage', () => {
   let mockLocalStorage: Record<string, string>;
   let fetchControl: ReturnType<typeof installStrictFetchMock>;

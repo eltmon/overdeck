@@ -942,6 +942,9 @@ const putDesignLanguageRoute = HttpRouter.add(
   'PUT',
   '/api/settings/design-language',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
     const body = yield* readJsonBody;
 
     return yield* Effect.promise(async () => {

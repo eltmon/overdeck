@@ -874,7 +874,36 @@ function providerConfigForSave(
   return pruneUndefined({ enabled, auth, plan, harness });
 }
 
+/**
+ * Serializes every config.yaml write behind one in-process queue (PAN-3410
+ * review finding — FR-7 no-loss guarantee, cycle 6). Removing the client's
+ * GET-then-PUT round trip (cycle 5) only closed the network-latency-sized
+ * race window; two settings writes issued back-to-back in the same process
+ * (a theme change alongside the top-level Settings form's save, or two rapid
+ * theme changes) could still interleave their own read-modify-write, since
+ * both read the pre-write config before either finished writing it. Callers
+ * must do their OWN `loadConfigSync()`/`loadSettingsApi()` read *inside* the
+ * queued callback (see `saveDesignLanguagePromise` below) — reading before
+ * enqueueing bakes in the same staleness a queue further down cannot undo.
+ */
+let settingsWriteQueue: Promise<unknown> = Promise.resolve();
+
+function runSettingsWriteSerialized<T>(fn: () => Promise<T>): Promise<T> {
+  const turn = settingsWriteQueue.then(fn, fn);
+  // Swallow rejections in the queue's own chain — a failed write must not
+  // permanently wedge every subsequent write behind a forever-rejected turn.
+  settingsWriteQueue = turn.then(
+    () => undefined,
+    () => undefined,
+  );
+  return turn;
+}
+
 async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void> {
+  return runSettingsWriteSerialized(() => saveSettingsApiPromiseUnlocked(settings));
+}
+
+async function saveSettingsApiPromiseUnlocked(settings: ApiSettingsConfig): Promise<void> {
   const { config: currentConfig } = loadConfigSync();
   // Convert API format to YAML format
   const yamlConfig: YamlConfig = {
@@ -1453,16 +1482,20 @@ async function saveOpenRouterFavoritesPromise(favorites: string[]): Promise<void
  * theme changed: that GET-then-PUT round trip leaves a client-round-trip-sized
  * window in which a concurrent settings save (another tab, or the top-level
  * Settings form) commits, then gets silently overwritten by this save's now-stale
- * snapshot of every other field. Reading `loadSettingsApi()` fresh and saving
- * immediately, in one server-side call with no network round trip in between,
- * removes that window (PAN-3410 review finding — no-loss guarantee, FR-7).
+ * snapshot of every other field (PAN-3410 review finding — no-loss guarantee,
+ * FR-7, cycle 5). That alone still left an in-process race: the read below
+ * and `saveSettingsApiPromiseUnlocked`'s own write must both run as one turn
+ * of `runSettingsWriteSerialized` — its own module comment above explains
+ * why the read cannot happen before entering the queue (cycle 6).
  */
 async function saveDesignLanguagePromise(theme: DesignLanguage): Promise<void> {
-  const current = loadSettingsApi();
-  await Effect.runPromise(saveSettingsApi({
-    ...current,
-    ui: { ...current.ui, theme },
-  }));
+  await runSettingsWriteSerialized(async () => {
+    const current = loadSettingsApi();
+    await saveSettingsApiPromiseUnlocked({
+      ...current,
+      ui: { ...current.ui, theme },
+    });
+  });
 }
 
 /**

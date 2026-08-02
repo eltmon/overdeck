@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { dashboardMutationJsonHeaders } from '../lib/wsTransport.js';
 
 export type DesignLanguage = 'ledger' | 'broadsheet';
 
@@ -37,11 +38,14 @@ export const useDesignLanguage = create<DesignLanguageState>((set) => ({
   // round trip, there is no client-held stale snapshot of every other field
   // that a concurrent settings save (another tab, or the top-level Settings
   // form) could be clobbered by (PAN-3410 review finding — no-loss guarantee,
-  // FR-7).
+  // FR-7). dashboardMutationJsonHeaders() mints the session and attaches the
+  // CSRF token every other settings mutation carries (PAN-3410 review
+  // finding — security).
   setDesignLanguage: async (designLanguage: DesignLanguage) => {
+    const headers = await dashboardMutationJsonHeaders();
     const putRes = await fetch('/api/settings/design-language', {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ theme: designLanguage }),
     });
     if (!putRes.ok) throw new Error(`Failed to save ui.theme (HTTP ${putRes.status})`);

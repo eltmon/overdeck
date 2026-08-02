@@ -11,6 +11,8 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }));
 
+vi.mock('../../../lib/wsTransport', () => ({ dashboardMutationJsonHeaders: vi.fn(async () => ({ 'Content-Type': 'application/json', 'x-overdeck-csrf-token': 'test' })) }));
+
 const DEFAULT_UI_PREFERENCES: UIPreferences = { readyToMergeShimmer: true };
 
 function renderSection(uiPrefs: UIPreferences, updateUIPrefs = vi.fn()) {
