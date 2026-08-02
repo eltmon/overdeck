@@ -432,41 +432,23 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T21:07:00.718Z",
+  "updated": "2026-08-02T21:07:01.852Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-02T21:06:59.128Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-02T21:07:01.651Z",
     "reviewNotes": "Approved; cycle-9 PR delta is allowlist-only and all four reviewers found no blocking regression",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "10aee59c028a77bfe2f14282390479e502b3f300",
-    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "10aee59c028a77bfe2f14282390479e502b3f300"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-02T20:54:26.197Z"
   },
   "closeOut": {
     "usage": {
@@ -558,7 +540,7 @@
       },
       "costAtCloseOut": {
         "usd": 483.6445483,
-        "pricingAsOf": "2026-08-02T21:06:59.219Z"
+        "pricingAsOf": "2026-08-02T21:07:01.683Z"
       }
     },
     "merges": [
@@ -567,7 +549,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
