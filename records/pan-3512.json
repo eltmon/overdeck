@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:33:46.700Z",
+  "updated": "2026-08-02T23:34:51.344Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,16 +73,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "retire-review-arm": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 914022,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:33:46.700Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -138,6 +130,17 @@
         "outcome": "completed",
         "reason": "Created regression test verifying test-gate reset prevents merge-readiness at unverified heads.",
         "releasedAt": "2026-08-02T23:33:39.214Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 914022,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:33:46.700Z",
+        "itemId": "retire-review-arm",
+        "outcome": "completed",
+        "reason": "Deleted REVIEW arm from rejectVerdictEvidenceHeadMismatch. Kept TEST arm unchanged. Created comprehensive test file.",
+        "releasedAt": "2026-08-02T23:34:51.343Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "merge-gate-lock": {
         "reason": "Created regression test verifying test-gate reset prevents merge-readiness at unverified heads.",
         "updatedAt": "2026-08-02T23:33:39.214Z"
+      },
+      "retire-review-arm": {
+        "reason": "Deleted REVIEW arm from rejectVerdictEvidenceHeadMismatch. Kept TEST arm unchanged. Created comprehensive test file.",
+        "updatedAt": "2026-08-02T23:34:51.343Z"
       }
     }
   },
@@ -177,6 +184,10 @@
     "merge-gate-lock": "completed",
     "merge-gate-lock.merge-gate-lock.ac1": "completed",
     "merge-gate-lock.merge-gate-lock.ac2": "completed",
-    "retire-review-arm": "running"
+    "retire-review-arm": "completed",
+    "retire-review-arm.retire-review-arm.ac1": "completed",
+    "retire-review-arm.retire-review-arm.ac2": "completed",
+    "retire-review-arm.retire-review-arm.ac3": "completed",
+    "retire-review-arm.retire-review-arm.ac4": "completed"
   }
 }
