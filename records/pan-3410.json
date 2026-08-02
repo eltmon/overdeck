@@ -642,9 +642,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T22:55:45.756Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T23:00Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T23:00:06.679Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T23:00:06Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T22:59:29Z\n\n## Verdict: CHANGES REQUESTED — a queued full-document Settings save can still overwrite a completed theme save\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 75a2d964ee54d9f1ea25017f58d7565ea1db7a37\n- Merge base: c7b6d2e5f1e168ada9c830ad12cb7cd315b122c5\n- Cycle number: 8\n- Prior cycle SHA: 4d4c7813e69ba52becd3136d62962d700c90855d\n- PR commits: 20\n- Note: the immediately preceding e6f38e4f review run did not produce a synthesis, so convergence is measured from the latest completed synthesis at 4d4c7813.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] A queued full-document save can still overwrite a theme save that completed first — `src/lib/settings-api.ts:902`\n**Scope: in_pr_scope.** FR-7 requires the `ui.theme` settings path to be no-loss under overlapping saves. The new queue serializes server-side disk writes, and the dedicated theme mutation reads within its queued callback, but the general `PUT /api/settings` path queues an already-materialized full-document payload assembled by `SettingsPage.saveSettings()`. If that payload captured Broadsheet before a dedicated request commits Ledger, then enters the queue second, `saveSettingsApiPromiseUnlocked()` writes the stale `settings.ui.theme` and silently restores Broadsheet. The added overlapping-write test exercises only the safe reverse order—full save first, theme save second—so it does not prove the required order-independent behavior.\n\nThis blocker survives the cycle-8 convergence gate because the cited queue implementation, full-save wrapper, and overlapping-write regression test were added after the prior completed synthesis at `4d4c7813`. It remains the same unresolved FR-7 no-loss requirement rather than a promotion of previously accepted code.\n\n## Non-blocking Findings\n\n### [correctness] Stale full-document ordering race — `src/lib/settings-api.ts:902`\nThe correctness reviewer independently identified the same ordering defect but classified it as advisory. It is deduplicated into the blocking FR-7 requirements finding above.\n\n### [correctness] Latest-operation ordering during browser reconciliation\nA late startup reconciliation or older rapid-toggle response can overwrite a newer local selection. The reviewer kept this as advisory because the reviewed blocking requirement is the persistent settings no-loss guarantee.\n\n### [performance] Scalar design-language operations still traverse full settings machinery — `src/lib/settings-api.ts:1491`\nStartup fetches the complete settings projection to read one enum, while a theme write rebuilds and rewrites the complete YAML document and awaits unrelated analytics synchronization. The path runs only at startup and explicit theme changes, so it is bounded and non-blocking.\n\n## Convergence and Proportionality\nThe single blocker cites code changed since the prior completed synthesis, so it is promotable under the cycle-8 convergence gate. The PR contains 20 commits and one blocker, below the proportionality threshold of 60 blockers.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -745,7 +758,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T23:00:06.007Z",
+  "updated": "2026-08-02T23:00:06.679Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "blocked",
