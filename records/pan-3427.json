@@ -61,7 +61,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:09:06.800Z",
+  "updated": "2026-08-02T19:09:32.527Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -120,16 +120,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 29,
-    "claims": {
-      "docs-order-books": {
-        "writerId": "agent-pan-3427-review-supervisor",
-        "agentId": "agent-pan-3427-review-supervisor",
-        "pid": 385598,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T19:09:06.799Z"
-      }
-    },
+    "sequence": 30,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -274,6 +266,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T19:04:26.566Z"
+      },
+      {
+        "writerId": "agent-pan-3427-review-supervisor",
+        "agentId": "agent-pan-3427-review-supervisor",
+        "pid": 385598,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T19:09:06.799Z",
+        "itemId": "docs-order-books",
+        "outcome": "completed",
+        "reason": "Docs landed in 259ddb690167; eslint, lint:prompts, lint:file-size, lint:skills, lint:slash-commands all pass.",
+        "releasedAt": "2026-08-02T19:09:32.526Z"
       }
     ],
     "statusReasons": {
@@ -312,9 +315,8 @@
         "forced": true
       },
       "docs-order-books": {
-        "reason": "Resumed session authoring the docs item; prior owner agent-pan-3427 is stopped",
-        "updatedAt": "2026-08-02T19:09:06.799Z",
-        "forced": true
+        "reason": "Docs landed in 259ddb690167; eslint, lint:prompts, lint:file-size, lint:skills, lint:slash-commands all pass.",
+        "updatedAt": "2026-08-02T19:09:32.526Z"
       }
     }
   },
@@ -355,6 +357,8 @@
     "frontend-project-picker.frontend-project-picker.ac2": "completed",
     "frontend-project-picker.frontend-project-picker.ac3": "completed",
     "frontend-project-picker.frontend-project-picker.ac4": "completed",
-    "docs-order-books": "running"
+    "docs-order-books": "completed",
+    "docs-order-books.docs-order-books.ac1": "completed",
+    "docs-order-books.docs-order-books.ac2": "completed"
   }
 }
