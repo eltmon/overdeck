@@ -61,7 +61,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:05:20.082Z",
+  "updated": "2026-08-02T19:06:50.809Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -120,8 +120,16 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 27,
-    "claims": {},
+    "sequence": 28,
+    "claims": {
+      "docs-order-books": {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 226662,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T19:06:50.809Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -341,6 +349,7 @@
     "frontend-project-picker.frontend-project-picker.ac1": "completed",
     "frontend-project-picker.frontend-project-picker.ac2": "completed",
     "frontend-project-picker.frontend-project-picker.ac3": "completed",
-    "frontend-project-picker.frontend-project-picker.ac4": "completed"
+    "frontend-project-picker.frontend-project-picker.ac4": "completed",
+    "docs-order-books": "running"
   }
 }
