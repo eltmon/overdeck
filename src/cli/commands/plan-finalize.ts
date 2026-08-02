@@ -194,7 +194,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     return exitCli(1);
   }
 
-  const planPath = findWorkspaceDraftPlanSync(workspacePath) ?? findPlanSync(workspacePath);
+  const planPath = findWorkspaceDraftPlanSync(workspacePath, 'authored-first') ?? findPlanSync(workspacePath);
   if (!planPath) {
     const msg = `xBRIEF plan not readable at ${workspacePath}/.pan/spec.vbrief.json`;
     if (options.json) console.log(JSON.stringify({ success: false, error: msg }));
