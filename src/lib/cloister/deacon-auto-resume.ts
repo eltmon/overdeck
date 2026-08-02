@@ -31,6 +31,7 @@ import {
   recordAgentFailure,
   resetAgentFailureCount,
   resumeAgent,
+  stopAgent,
   saveAgentState,
   saveAgentStateSync,
   deliverInitialPromptWithRetry,
@@ -48,6 +49,7 @@ import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
 import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
+import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -641,6 +643,20 @@ export async function handleAgentStoppedEvent(
   }
   if (!isAutoResumableRole(state.role)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
+    return null;
+  }
+
+  if (isTerminalSwarmSlotAgent(state)) {
+    if (await Effect.runPromise(sessionExists(agentId))) {
+      try {
+        await Effect.runPromise(stopAgent(agentId));
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reaped — assigned swarm item is terminal`);
+      } catch (err) {
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reap failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — assigned swarm item is terminal`);
+    }
     return null;
   }
 
