@@ -90,7 +90,7 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-02T19:11:37.832Z",
+  "updated": "2026-08-02T19:27:01.766Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "passed",
@@ -102,7 +102,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T20:55:37.668Z",
-    "updatedAt": "2026-08-02T19:11:35.248Z",
+    "updatedAt": "2026-08-02T19:27:01.639Z",
     "reviewNotes": "Verification infrastructure error: Verification worker 566942 exceeded 3900000ms after CPU admission",
     "testNotes": "All configured project gates pass at HEAD 38e80a9a31 (reviewed commit). `bun install --frozen-lockfile` clean. `npm run typecheck` clean (root tsc, hooks, evals, dashboard-types ratchet 57 known/none new, frontend-types ratchet 0 known/none new). `npm run lint` clean (eslint src/ + effect/permissions/state-writes/state-paths/overdeck-boundaries/pipeline-membership/workspace-doors/agent-dir-removal/skills/slash-commands/prompts/prompt-trailer/file-size/source-introspection/no-coderabbit/circular/ratchet-audit/quarantine-audit all pass, no new issues). `npm run build` clean. `npm run build:dashboard:server:bundle` clean. Configured test gate (root+frontend vitest --changed against merge-base 4c8c663e5 with origin/main, run concurrently per projects.yaml): root suite 519/520 test files passed, 5061/5062 tests passed; the single failure (tests/lib/memory/cli.test.ts, a beforeEach DB-setup hook timeout) is outside this change's files_scope and reproduces cleanly in isolation (8/8 passed alone) and together with agent-enrichment-service.test.ts (39/39 passed) — consistent with known resource contention from concurrent agent test runs on this host, not a regression. Frontend suite: 693/693 tests passed across 38 files, including the two PAN-3338-specific files (issue-pipeline-state.test.ts 6/6, simple-derive.test.ts including all new PAN-3338 characterization cases). Root-scoped PAN-3338 backend test files (planning-promotion-status-event.test.ts, agent-enrichment-service.test.ts) re-verified in isolation: 39/39 passed.",
     "uatNotes": "Operator-directed deterministic browser UAT at the /ws/rpc boundary, closing the structural gap the prior run hit (isolated peer container has no tracker data and OVERDECK_DISABLE_DEACON=1, so it cannot host a live plan-agent lifecycle — tracked separately as PAN-3362). Method: seeded a DashboardSnapshot fixture directly into the browser's client-side cache (localStorage key pan-snapshot-cache-v1, read by src/dashboard/frontend/src/lib/snapshotCache.ts) via Playwright addInitScript, then used page.routeWebSocket to accept-but-never-forward the /ws/rpc socket so the container's real empty snapshot could never overwrite the seed (EventRouter renders the cached snapshot synchronously before the WS bootstrap runs, EventRouter.tsx:148-152). This drives the REAL built PAN-3338 frontend bundle (buildCommit 38e80a9a31, the reviewed+approved HEAD) inside the sanctioned isolated workspace-container (feature-pan-3338.overdeck.localhost) end-to-end, with zero backend/DB writes. Two scenarios verified against the live rendered DOM with screenshots: (1) AC1 — agent role=plan, durable status=stopped (finalize-time, per D1/D2), hasLiveTmuxSession=true, idle 10h: home renders 'The plan is ready · PAN-9001' with a 'Start work' button, and no card anywhere reads 'Planning'. (2) AC2 — agent role=plan, status=running, hasPlan=false, started 5m ago: home renders 'Planning · started 5m ago' under Working, with no Start-work affordance and no ready-to-start card. Both prove the exact regression this issue fixes: durable status (not tmux liveness) drives the projection, and elapsed idle time no longer matters. AC3 (agents-table status and read-model status agree for a stopped-but-live agent) is a backend row/event-atomicity property, not a visual one — proven by src/lib/overdeck/__tests__/planning-promotion-status-event.test.ts (39/39 passing per the test gate notes already on this verdict) plus review's correctness/requirements sign-off on the atomic write-door routing. Verification script and screenshots kept out of the tracked diff (gitignored .tmp/pan-3338-uat/, workspace confirmed clean via git status) since they exercise fixture data (PAN-9001/PAN-9002), not real pipeline state, and were not part of the reviewed/approved scope.",
@@ -140,7 +140,9 @@
         "src/lib/overdeck/planning-promotion.ts"
       ],
       "recordedAt": "2026-08-01T20:44:15.443Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-02T19:27:01.639Z"
   },
   "closeOut": {
     "usage": {
@@ -224,7 +226,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3444"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-02T19:27:01.758Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 38e80a9a31904e56a409ef2fa565cc85e599be78",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3444 MERGED at 2026-08-02T19:10:01Z",
+          "status": "pass",
+          "mergedAt": "2026-08-02T19:10:01Z",
+          "mergeCommit": "95f5aed252012805420b4e13c19fb23a9e0c98ba"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 95f5aed252012805420b4e13c19fb23a9e0c98ba",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit 7ac53398 contains merge 95f5aed2",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 8 agent state directories (15 transcript files preserved); No strike branch strike/pan-3338 found; Pruned 52 checkpoint ref(s) for agent-pan-3338, planning-pan-3338, strike-pan-3338; No specialist registry entries for PAN-3338"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
