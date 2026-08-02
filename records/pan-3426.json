@@ -62,6 +62,11 @@
       "timestamp": "2026-08-02T17:41:04.814Z",
       "reason": "end",
       "note": "Fixed typecheck errors: corrected projectPath to path in parked.ts and taskId to itemId in tiered-inspect-escalation.ts"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-haiku-4-5",
+      "timestamp": "2026-08-02T17:43:34.191Z"
     }
   ],
   "feedback": [],
@@ -103,7 +108,7 @@
     "recordedAt": "2026-08-02T17:40:59.485Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:43:10.672Z",
+  "updated": "2026-08-02T17:43:34.192Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
