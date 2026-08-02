@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:36.539Z",
+  "updated": "2026-08-02T17:30:49.500Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -142,5 +142,38 @@
     "docs-order-books-cli-start": "completed",
     "docs-order-books-cli-start.docs-order-books-cli-start.ac1": "completed",
     "docs-order-books-cli-start.docs-order-books-cli-start.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "src/cli/commands/orders.ts",
+      "src/lib/orders/types.ts"
+    ],
+    "declaredScopeUntouched": [
+      "src/cli/commands/flywheel-orders.ts",
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/services/issue-service-singleton.ts",
+      "src/lib/orders/resolver.ts",
+      "tests/unit/cli/flywheel-orders.test.ts",
+      "tests/unit/lib/orders/orders-validate.test.ts"
+    ],
+    "declaredScope": [
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/flywheel-orders.ts",
+      "src/cli/commands/flywheel.ts",
+      "src/dashboard/server/services/issue-service-singleton.ts",
+      "src/lib/orders/resolver.ts",
+      "src/lib/orders/validate.ts",
+      "tests/unit/cli/flywheel-orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts",
+      "tests/unit/lib/orders/orders-validate.test.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/ORDER-BOOKS.md",
+      "src/cli/commands/orders.ts",
+      "src/lib/orders/types.ts",
+      "src/lib/orders/validate.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts"
+    ],
+    "recordedAt": "2026-08-02T17:30:49.499Z"
   }
 }
