@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T02:50:44.918Z",
+  "updated": "2026-08-02T03:02:15.378Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -47,18 +47,33 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "self-host-fonts": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3410",
         "agentId": "agent-pan-3410",
         "pid": 1441722,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T02:50:44.918Z"
+        "claimedAt": "2026-08-02T02:50:44.918Z",
+        "itemId": "self-host-fonts",
+        "outcome": "completed",
+        "reason": "Self-hosted Geist, Geist Mono, DM Sans, and Space Grotesk variable woff2 (174KB total) with per-family OFL licenses under public/fonts/; added @font-face rules to index.css, removed the four Google Fonts <link> tags from index.html, updated recovery.test.ts's cross-origin example off Google Fonts, and added tests/unit/dashboard/fonts-local.test.ts covering all four ACs.",
+        "releasedAt": "2026-08-02T03:02:15.378Z"
+      }
+    ],
+    "statusReasons": {
+      "self-host-fonts": {
+        "reason": "Self-hosted Geist, Geist Mono, DM Sans, and Space Grotesk variable woff2 (174KB total) with per-family OFL licenses under public/fonts/; added @font-face rules to index.css, removed the four Google Fonts <link> tags from index.html, updated recovery.test.ts's cross-origin example off Google Fonts, and added tests/unit/dashboard/fonts-local.test.ts covering all four ACs.",
+        "updatedAt": "2026-08-02T03:02:15.378Z"
       }
     }
   },
   "statusOverrides": {
-    "self-host-fonts": "running"
+    "self-host-fonts": "completed",
+    "self-host-fonts.self-host-fonts.ac1": "completed",
+    "self-host-fonts.self-host-fonts.ac2": "completed",
+    "self-host-fonts.self-host-fonts.ac3": "completed",
+    "self-host-fonts.self-host-fonts.ac4": "completed"
   }
 }
