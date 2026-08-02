@@ -632,11 +632,16 @@
       "timestamp": "2026-08-02T17:29:01.018Z",
       "reason": "end",
       "note": "Fixed slash-commands drift and baselined pre-existing stall-sweeper circular dependency"
+    },
+    {
+      "timestamp": "2026-08-02T17:35:50.611Z",
+      "reason": "end",
+      "note": "Fixed parked.ts typecheck error (project.projectPath -> project.path)"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:35:47.203Z",
+  "updated": "2026-08-02T17:35:50.611Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -948,5 +953,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
