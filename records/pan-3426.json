@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:18.558Z",
+  "updated": "2026-08-02T17:30:26.306Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -48,8 +48,16 @@
   "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "docs-order-books-cli-start": {
+        "writerId": "agent-pan-3426",
+        "agentId": "agent-pan-3426",
+        "pid": 3086055,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:30:26.306Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3426",
@@ -123,6 +131,7 @@
     "store-unavailable-finding": "completed",
     "store-unavailable-finding.store-unavailable-finding.ac1": "completed",
     "store-unavailable-finding.store-unavailable-finding.ac2": "completed",
-    "store-unavailable-finding.store-unavailable-finding.ac3": "completed"
+    "store-unavailable-finding.store-unavailable-finding.ac3": "completed",
+    "docs-order-books-cli-start": "running"
   }
 }
