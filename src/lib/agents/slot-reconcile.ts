@@ -6,6 +6,7 @@ import { analyzeSwarmReadiness } from '../xbrief/swarm-readiness.js';
 import type { XBriefDocument } from '../xbrief/types.js';
 import { listAgentStates } from './queries.js';
 import type { AgentState } from './agent-state.js';
+import { RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 
 const execAsync = promisify(exec);
 
@@ -131,6 +132,10 @@ export function listSlotAgents(issueId: string): ReconciledSlotAgent[] {
   const pattern = new RegExp(`^agent-${escapeRegExp(issueLower)}-slot-(\\d+)$`);
   return listAgentStates({ role: 'work' })
     .map(agent => {
+      // PAN-3465: tombstoned rows (removeAgent keeps them for transcript
+      // linkage) are not live slot occupants — counting them wedged dispatch
+      // with "all slot indexes occupied" after a swarm reset.
+      if (agent.phase === RETAINED_TRANSCRIPTS_PHASE) return null;
       const match = pattern.exec(agent.id);
       if (!match) return null;
       const entry: ReconciledSlotAgent = {
