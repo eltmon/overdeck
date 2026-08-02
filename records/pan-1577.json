@@ -557,11 +557,36 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T16:46:12.705Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T16:48Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-02T16:48:59.909Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T16:49Z] review-agent → FAILED — seq 2",
+      "timestamp": "2026-08-02T16:49:00.084Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T16:48:59Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
+    },
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T16:49:00Z",
+      "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-1577`."
+    }
+  ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T16:46:12.705Z",
+  "updated": "2026-08-02T16:49:00.085Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
