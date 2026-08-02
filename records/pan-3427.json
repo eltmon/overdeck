@@ -226,7 +226,7 @@
     "recordedAt": "2026-08-02T21:47:33.880Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:48:07.382Z",
+  "updated": "2026-08-02T21:51:35.809Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -237,7 +237,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T21:47:59.094Z",
+    "updatedAt": "2026-08-02T21:51:29.880Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
     "reviewRequestedAt": "2026-08-02T21:47:35.162Z",
@@ -305,84 +305,84 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 62873,
-            "output": 47648,
-            "cacheRead": 24132,
+            "input": 84848,
+            "output": 59305,
+            "cacheRead": 30090,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 965051,
-            "output": 21100,
-            "cacheRead": 10172416,
+            "input": 1061589,
+            "output": 24394,
+            "cacheRead": 11503616,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1331612,
-            "output": 19371,
-            "cacheRead": 5253632,
+            "input": 2701809,
+            "output": 50507,
+            "cacheRead": 13281792,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 1805153,
-            "output": 23674,
-            "cacheRead": 3525120,
+            "input": 2606691,
+            "output": 38442,
+            "cacheRead": 9294336,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 1109549,
-            "output": 24309,
-            "cacheRead": 5265920,
+            "input": 3110385,
+            "output": 49273,
+            "cacheRead": 10618368,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1128608,
-            "output": 22852,
-            "cacheRead": 4655104,
+            "input": 1905339,
+            "output": 33178,
+            "cacheRead": 9457152,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5875,
-            "output": 213759,
-            "cacheRead": 168586500,
-            "cacheWrite": 9081619
+            "input": 5877,
+            "output": 214221,
+            "cacheRead": 169216484,
+            "cacheWrite": 9082961
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 62873,
-          "output": 47648,
-          "cacheRead": 24132,
+          "input": 84848,
+          "output": 59305,
+          "cacheRead": 30090,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 6339973,
-          "output": 111306,
-          "cacheRead": 28872192,
+          "input": 11385813,
+          "output": 195794,
+          "cacheRead": 54155264,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5875,
-          "output": 213759,
-          "cacheRead": 168586500,
-          "cacheWrite": 9081619
+          "input": 5877,
+          "output": 214221,
+          "cacheRead": 169216484,
+          "cacheWrite": 9082961
         }
       },
       "costAtCloseOut": {
-        "usd": 108.3493782,
-        "pricingAsOf": "2026-08-02T21:48:04.376Z"
+        "usd": 148.969586,
+        "pricingAsOf": "2026-08-02T21:51:31.655Z"
       }
     },
     "merges": [
@@ -391,7 +391,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
