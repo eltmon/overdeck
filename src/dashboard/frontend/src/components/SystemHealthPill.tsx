@@ -489,21 +489,36 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                   Show all
                 </button>
               )}
-              <div className="text-xs text-muted-foreground">Leaked specialists: {data.summary.leakedSpecialistCount}</div>
+              <div className="text-xs text-muted-foreground">
+                {data.summary.leakedSpecialistCount > 0 ? `⚠ ${data.summary.leakedSpecialistCount} leaked specialist${data.summary.leakedSpecialistCount !== 1 ? 's' : ''}` : 'No leaks'}
+              </div>
             </div>
           </div>
           <div className="max-h-72 space-y-2 overflow-auto pr-1">
-            {leakedFirstConsumers.map((consumer) => (
-              <div key={consumer.id} className={`rounded-lg border p-2 ${consumer.leaked ? 'border-warning/40 bg-warning/10' : 'border-border'}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
-                    <div className="text-xs text-muted-foreground">{consumer.type} · {consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
+            {leakedFirstConsumers.map((consumer) => {
+              const maxMemory = Math.max(...leakedFirstConsumers.map(c => c.memoryGb), 1);
+              const memoryPercent = (consumer.memoryGb / maxMemory) * 100;
+              return (
+                <div key={consumer.id} className={`rounded-lg border p-2 ${consumer.leaked ? 'border-warning/40 bg-warning/10' : 'border-border'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{consumer.type}</span>
+                        {consumer.leaked && <span className="rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-medium text-warning">LEAKED</span>}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
+                      {memoryPercent > 0 && (
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-full bg-info" style={{ width: `${memoryPercent}%` }} />
+                        </div>
+                      )}
+                    </div>
+                    <KillButton consumer={consumer} onSelectLeaked={() => setHighlightLeakedOnly(true)} />
                   </div>
-                  <KillButton consumer={consumer} onSelectLeaked={() => setHighlightLeakedOnly(true)} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
