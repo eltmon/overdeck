@@ -951,3 +951,10 @@ Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 ac
 - **PAN-3450's auto-merge has NOT fired and that is CORRECT** — scheduled for 03:10Z but PR #3461's `test` lane is still IN_PROGRESS; the queue is waiting on checks, exactly as designed, and `/auto-merge/problems` is empty. **Deliberately did NOT treat this as another "scheduled thing never fires" defect** — checked the mechanism's actual blocking input before concluding, which is the correction I owed after the PAN-3462 sequence (where I first over-trusted a promise, then risked over-generalizing the distrust).
 - Tick-53 state commit reached origin (rode along when the other session pushed — no bypass). Two fresh unpushed commits from them now sit ahead; same PAN-3062 pattern, harmless as long as I keep committing only my allowlisted path and never force.
 - strike-3462 + strike-3431 still working; campaign MIN-932 in flight; MIN-931 in review/test; #3444/#3402 green but verdicts not yet flipped to ready.
+
+## RUN-79 tick 55 (2026-08-02 ~03:45Z) — 🏁 MIN-931 SHIPPED + CLOSED; Lane B tail MIN-934 dispatched (32 total)
+
+- **Operator promoted uat/min-crow-0801 carrying MIN-931** (Hermes campaign Lane B head, 27 items) — closed out clean, no gates, no overrides. **32 issues landed+closed this run.**
+- **Campaign advanced on its dependency chain:** MIN-931 terminal ⇒ MIN-934's hard dep (its `guarded_write`, same files) satisfied ⇒ **MIN-934 started** (auto-planning → work). Campaign now: Lane A = MIN-930 ✅ → MIN-932 working → MIN-933 queued; Lane B = MIN-931 ✅ → MIN-934 planning. **2 of 5 terminal**, both lanes live, serial discipline held throughout (never started a tail before its head reached terminal).
+- Read-door sweep: 17 PAN + 14 MIN + TIN-1 in pipeline (MIN list shrank as zombies/closed rows drained). 4 typed blind spots unchanged. Clean UAT batch EMPTY (candidate null).
+- Schema note: `emit-status` rejected the snapshot for a missing `system.mainHead` — typed error, fixed by reading `origin/main`. Worth remembering the field is required.
