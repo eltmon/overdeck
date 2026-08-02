@@ -482,22 +482,9 @@
       "timestamp": "2026-08-02T18:37:01.543Z",
       "reason": "end",
       "note": "Implementation complete"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T18:45Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-08-02T18:45:08.241Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-02T18:45:08Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T18:44:11Z\n\n## Verdict: CHANGES REQUESTED — settings saves can revert or erase Ledger, and nested Ledger scopes render as Broadsheet\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 0d658cbc642518305a996e4031c030e764a8a96c\n- Cycle number: 3\n- Prior cycle SHA: bacc4d0375611d3efea52df9fdf2ed2caaf24d73\n- Workspace HEAD observed during synthesis: 0b4aad072ffb279ae98643e177afaaee7c8032ee (the branch moved after the manifest and reviewer forks were created; this verdict applies to the manifest SHA above and does not approve the moved head)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/correctness.md | 3 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/requirements.md | 4 after deduplication and scope gating |\n\n## Blocking Findings\n\n### [correctness] A later Settings-page save reverts the selected design language — `src/dashboard/frontend/src/hooks/useDesignLanguage.ts:38`\n`setDesignLanguage` independently reads and replaces the full settings document, but it does not update `SettingsPage`'s already-loaded `formData`. After a user selects Ledger, any later parent-controlled autosave sends the stale Broadsheet `ui` object and overwrites the new choice while the current page and local mirror still display Ledger. The next boot reconciles from the overwritten server value and reverses the user's selection. Theme mutation must share the canonical current settings state or use an atomic server-side partial update, with a regression test covering theme selection followed by another Settings-page save.\n\n### [correctness, requirements] A settings payload that omits optional `ui` deletes an existing Ledger choice — `src/lib/settings-api.ts:924`\n`ApiSettingsConfig.ui` is optional, but the YAML projection emits `ui: undefined` when the caller omits it and no editor command is configured. The comment-preserving writer then deletes the persisted `ui` section, so `theme: ledger` silently falls back to Broadsheet after an unrelated save. Resolve the value as `settings.ui?.theme ?? currentConfig.ui.theme`, retain the editor-command preservation, and add the omitted-`ui` Ledger regression test required by the no-loss settings trace.\n\n### [correctness, requirements] Nested Ledger scopes inherit Broadsheet tokens and display rules — `src/dashboard/frontend/src/index.css:41`\nLedger values are declared only on `:root`, while Broadsheet values and display utilities use `[data-theme=\"broadsheet\"]` ancestor selectors. A Ledger specimen nested under the default Broadsheet document therefore keeps Broadsheet custom properties and still matches the outer Broadsheet display selectors. The Settings picker does not provide the promised self-themed comparison, and the documented nested-scope contract is false. Ledger needs an explicit scope and the utilities need inherited theme-owned values that do not leak through an outer ancestor; tests must cover both nesting directions.\n\n### [requirements] The law, skill, and user docs define contradictory two-theme behavior — `design/style-guide/STYLE-GUIDE.md:54`\nThe changed law and skill require unconditional Broadsheet markup with Ledger-safe fallbacks and forbid theme branching, but they define fallbacks only for the display and eyebrow utilities while later stating that chips, soft cards, keycap CTAs, and dot-metadata patterns do not exist under Ledger. They also use `font-display` for display utilities while another rule reserves it only for the sidebar wordmark. `configuration/appearance.mdx` repeats the unsupported universal-fallback claim. Because the law and executable skill disagree, downstream agents cannot satisfy FR-3 and FR-4 consistently; the fallback-or-omission rule and typography token ownership must be made unambiguous across all three documents.\n\n### [requirements] The required NewProjectModal follow-up issue is not evidenced — `design/style-guide/STYLE-GUIDE.md:755`\nThe traced documentation item explicitly requires filing the deferred NewProjectModal page migration. The docs say it is tracked, but the manifest and changed documentation provide no issue ID or URL. File the follow-up and record the tracker reference so the item is mechanically verifiable.\n\n## Non-blocking Findings\n\n### [correctness] Full-document GET→PUT can lose concurrent settings changes — `src/dashboard/frontend/src/hooks/useDesignLanguage.ts:38`\nThe unguarded read-modify-write can overwrite a concurrent settings mutation or let rapid theme clicks complete out of order. This is distinct from the deterministic stale-`SettingsPage` blocker above; an atomic partial update or serialized latest-selection-wins mutation would remove both failure modes.\n\n### [performance] Theme switching traverses the full settings persistence and refresh path — `src/dashboard/frontend/src/hooks/useDesignLanguage.ts:38`\nA theme click performs two requests and waits for full YAML persistence plus unrelated TTS and conversation-search refresh work before applying the visual change. The path is bounded and user-triggered, so it is advisory rather than a performance blocker; a partial settings mutation could avoid the extra work.\n\n### [requirements] Remaining hardcoded font declarations — `src/dashboard/frontend/src/components/XTerminal.tsx:450`\n[demoted: pre-existing, out of PR scope] The requirements reviewer found direct font literals in `XTerminal.tsx` and `BacklogDAG.tsx`, but those cited lines are outside the PR diff. Under the mandatory scope gate they cannot block this PR, even though they indicate that the repository-wide sweep claim should be narrowed or completed in a later PR-scoped change.\n\n### [advisory context] Accessibility, recovery fallback, and stylelint cleanup\nThe manifest's advisory CodeRabbit context also identifies a decorative specimen that should be hidden from assistive technology, a recovery-path `var()` declaration whose fallback is outside the custom-property expression, and several font-family/stylelint normalization errors. These are non-gating in this synthesis because they were advisory context rather than convoy blockers.\n\n## Convergence Note\nThis is nominally cycle 3, but both prior synthesis records were infrastructure-only failures: no reviewer produced a readable report, so none of the changed feature code was previously seen-and-passed or seen-and-classified as non-blocking. The convergence rule prevents promotion of previously reviewed findings; it does not convert wholly unreviewed code into an implicit pass. The newly produced PR-scoped blockers above therefore remain blocking. The raw `bacc4d03..0d658cbc` cycle diff contains only merged mainline files and none of the cited feature lines, which confirms this cycle was an infrastructure retry rather than a code-fix review.\n\n## Clean Sub-roles\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-0d658cbc/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -598,10 +585,10 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T18:45:08.242Z",
+  "updated": "2026-08-02T18:45:10.092Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -609,7 +596,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T18:40:34.662Z",
+    "updatedAt": "2026-08-02T18:45:07.458Z",
+    "reviewNotes": "settings saves can revert or erase Ledger, and nested Ledger scopes render as Broadsheet",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
     "reviewedAtCommit": "0d658cbc642518305a996e4031c030e764a8a96c",
@@ -713,6 +701,24 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T18:36:54.913Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "0b4aad072ffb279ae98643e177afaaee7c8032ee"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "0b4aad072ffb279ae98643e177afaaee7c8032ee"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "0b4aad072ffb279ae98643e177afaaee7c8032ee"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "0b4aad072ffb279ae98643e177afaaee7c8032ee"
+      }
     }
   },
   "closeOut": {
@@ -720,38 +726,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10104417,
-            "output": 272465,
-            "cacheRead": 55093248,
+            "input": 10448783,
+            "output": 313611,
+            "cacheRead": 58798592,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1730,
-            "output": 378403,
-            "cacheRead": 352333210,
-            "cacheWrite": 28843351
+            "input": 1772,
+            "output": 398489,
+            "cacheRead": 356361893,
+            "cacheWrite": 28871874
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 10104417,
-          "output": 272465,
-          "cacheRead": 55093248,
+          "input": 10448783,
+          "output": 313611,
+          "cacheRead": 58798592,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1730,
-          "output": 378403,
-          "cacheRead": 352333210,
-          "cacheWrite": 28843351
+          "input": 1772,
+          "output": 398489,
+          "cacheRead": 356361893,
+          "cacheWrite": 28871874
         }
       },
       "costAtCloseOut": {
-        "usd": 232.605207,
-        "pricingAsOf": "2026-08-02T18:40:38.110Z"
+        "usd": 238.492078,
+        "pricingAsOf": "2026-08-02T18:45:07.497Z"
       }
     },
     "merges": [
@@ -760,7 +766,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
