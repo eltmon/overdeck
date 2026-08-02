@@ -178,7 +178,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T21:02:37.384Z",
+  "updated": "2026-08-02T21:02:43.703Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "blocked",
@@ -189,10 +189,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T20:54:38.257Z",
-    "updatedAt": "2026-08-02T21:02:36.444Z",
+    "updatedAt": "2026-08-02T21:02:43.688Z",
     "reviewNotes": "Correctness reviewer ended before verifying the specialist consumer-association fix.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewedAtCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd",
+    "reviewedAtCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1",
     "reviewSpawnedAt": "2026-08-02T20:58:50.680Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -232,24 +232,6 @@
         "src/lib/cloister/stall-sweeper.ts"
       ],
       "recordedAt": "2026-08-02T20:39:42.438Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
-      }
     }
   },
   "closeOut": {
@@ -340,7 +322,7 @@
       },
       "costAtCloseOut": {
         "usd": 161.2477163,
-        "pricingAsOf": "2026-08-02T21:02:36.500Z"
+        "pricingAsOf": "2026-08-02T21:02:43.695Z"
       }
     },
     "merges": [
