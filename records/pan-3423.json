@@ -11,42 +11,42 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T02:56:38.100Z",
+  "updated": "2026-08-02T02:56:59.652Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T02:56:38.077Z",
-    "inspectNotes": "Inspecting item attention-model-module"
+    "updatedAt": "2026-08-02T02:56:57.129Z",
+    "inspectNotes": "Commit b2b9ca15 is unrelated to this bead: its entire diff is +7 lines of prose appended to docs/FLYWHEEL-STATE.md:931 (flywheel run-79 tick 52 log). No frontend code is touched. NFR-2's required module src/dashboard/frontend/src/lib/system-health-attention.ts does not exist at this commit (verified: ls returns ENOENT), so buildAttentionItems, contextNotes, and summaryLine are all absent. AC1 (info-severity split), AC2 (grouping by code with agents.length/no agentId/'+N more' sub-line), AC3 (critical agent.runtime.inactive.stalled ordered before warnings), and AC4 (healthy snapshot -> empty items + all-clear summary naming spawn headroom) are each unimplementable against this diff. Required fix: land the actual attention-model module and re-deliver its commit; this delivery appears to be a mis-routed flywheel docs commit rather than bead work."
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 298,
-            "output": 23712,
-            "cacheRead": 6359073,
-            "cacheWrite": 218547
+            "input": 309,
+            "output": 23916,
+            "cacheRead": 6664688,
+            "cacheWrite": 219235
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 298,
-          "output": 23712,
-          "cacheRead": 6359073,
-          "cacheWrite": 218547
+          "input": 309,
+          "output": 23916,
+          "cacheRead": 6664688,
+          "cacheWrite": 219235
         }
       },
       "costAtCloseOut": {
-        "usd": 1.027953,
-        "pricingAsOf": "2026-08-02T02:56:38.089Z"
+        "usd": 1.060405,
+        "pricingAsOf": "2026-08-02T02:56:58.903Z"
       }
     },
     "merges": [],
