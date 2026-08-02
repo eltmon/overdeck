@@ -197,6 +197,15 @@ function activeStatus(status: AgentSnapshot['status']): boolean {
   return status === 'running' || status === 'starting';
 }
 
+/** "Active" means PRODUCING, not registered: activity inside this window. */
+const ACTIVE_RECENT_WINDOW_MS = 15 * 60_000;
+
+function recentlyActive(agent: AgentSnapshot, now: number): boolean {
+  if (!activeStatus(agent.status)) return false;
+  const stamp = Date.parse(agent.lastActivity ?? agent.startedAt ?? '');
+  return Number.isFinite(stamp) && now - stamp < ACTIVE_RECENT_WINDOW_MS;
+}
+
 /** Agent statuses that mean the agent is (or could imminently be) working the issue.
  * Registry rows for long-dead agents of closed-out issues must NOT put an orb on
  * the river — that residue is what once flooded the doldrums with 90+ closed issues.
@@ -800,7 +809,10 @@ export function useConfluenceMeta(
       oldestIdle: orbs.reduce((oldest, orb) => Math.max(oldest, orb.idleMin), 0),
       beads: null,
       system,
-      active: Object.values(agentsById).filter((agent) => activeStatus(agent.status)).length,
+      // The operator's definition: an agent counts as active only while it is
+      // actually producing (activity in the last 15 minutes) — a 'running'
+      // registry row that has sat idle for hours is not live work.
+      active: Object.values(agentsById).filter((agent) => recentlyActive(agent, now.getTime())).length,
       total: Object.keys(agentsById).length,
       roleCounts,
       parkedTotal: parked?.summary.total ?? null,
