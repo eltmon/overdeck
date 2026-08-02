@@ -670,19 +670,19 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T21:48:30.106Z",
+  "updated": "2026-08-02T21:48:33.276Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T21:48:29.878Z",
+    "updatedAt": "2026-08-02T21:48:30.603Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added a dedicated PUT /api/settings/design-language endpoint for the theme write (removes the GET-then-PUT client round trip that could clobber a concurrent settings save, per FR-7 no-loss guarantee); swept remaining hardcoded font-family declarations (boot shell, XTerminal, BacklogDAG) onto the --font-mono/--font-sans token chain, using a resolved computed-style value where xterm needs a concrete string; added a settings-api regression test overlapping a theme save with a concurrent field change.",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -847,7 +847,7 @@
       },
       "costAtCloseOut": {
         "usd": 374.4708213,
-        "pricingAsOf": "2026-08-02T21:48:29.966Z"
+        "pricingAsOf": "2026-08-02T21:48:33.116Z"
       }
     },
     "merges": [
