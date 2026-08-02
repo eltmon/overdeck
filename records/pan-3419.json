@@ -118,12 +118,16 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/overdeck-remodel/overdeck-schema.ts",
+      "docs/review/PAN-3419-conversation-1827-project-association.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
       "packages/contracts/src/composer-commands.generated.ts",
       "src/dashboard/frontend/src/components/Stage/index.tsx",
       "src/dashboard/frontend/src/components/chat/ConversationPanel.tsx",
+      "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
+      "src/lib/projects-config-lock.ts",
       "tests/unit/lib/overdeck/conversations.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
+      "tests/unit/lib/overdeck/title-sources.test.ts",
+      "tests/unit/lib/projects-version-sync.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/dashboard/frontend/src/components/CommandDeck/ConversationPanel.tsx"
@@ -159,6 +163,7 @@
     ],
     "actualChangedFiles": [
       "docs/overdeck-remodel/overdeck-schema.ts",
+      "docs/review/PAN-3419-conversation-1827-project-association.md",
       "drizzle/overdeck/0000_overdeck_init.sql",
       "features/conversations.mdx",
       "packages/contracts/src/composer-commands.generated.ts",
@@ -180,22 +185,25 @@
       "src/dashboard/server/routes/__tests__/palette.test.ts",
       "src/dashboard/server/routes/palette.ts",
       "src/lib/overdeck/__tests__/conversation-fork-project.test.ts",
+      "src/lib/overdeck/__tests__/conversation-project-cwd.test.ts",
       "src/lib/overdeck/__tests__/conversation-project-key.test.ts",
       "src/lib/overdeck/conversation-forks.ts",
       "src/lib/overdeck/conversation-runtime.ts",
       "src/lib/overdeck/conversations.ts",
       "src/lib/overdeck/infra.ts",
+      "src/lib/projects-config-lock.ts",
       "src/lib/projects.ts",
       "sync-sources/rules/handoff-isolate-cwd.md",
       "sync-sources/skills/pan-handoff/SKILL.md",
       "tests/unit/cli/fork-client.test.ts",
       "tests/unit/lib/overdeck/conversations.test.ts",
-      "tests/unit/lib/overdeck/title-sources.test.ts"
+      "tests/unit/lib/overdeck/title-sources.test.ts",
+      "tests/unit/lib/projects-version-sync.test.ts"
     ],
-    "recordedAt": "2026-08-01T18:21:54.888Z"
+    "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T13:57:59.036Z",
+  "updated": "2026-08-02T13:58:11.862Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
