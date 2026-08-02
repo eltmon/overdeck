@@ -82,6 +82,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T19:38Z] review-agent → FAILED — seq 3",
       "timestamp": "2026-08-02T19:38:34.301Z"
+    },
+    {
+      "timestamp": "2026-08-02T19:40:55.646Z",
+      "reason": "end",
+      "note": "Fixed the verification-blocking typecheck error: src/cli/commands/parked.ts used a nonexistent ProjectConfig.projectPath field (should be .path). This bug landed directly on main in an unrelated commit and was inherited when this branch rebased onto origin/main; filed as https://github.com/eltmon/overdeck/issues/3504 and fixed the reference here since it was blocking this issue's own verification gate. Full npm run typecheck (root, hooks, evals, dashboard, frontend) now passes clean."
     }
   ],
   "feedback": [
@@ -158,7 +163,7 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:40:49.919Z",
+  "updated": "2026-08-02T19:40:55.647Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
