@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:06:10.708Z",
+  "updated": "2026-08-02T08:14:59.563Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -384,15 +384,7 @@
     "orb-tooltip": "running"
   },
   "swarm": {
-    "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "help-fullscreen",
-        "agentId": "agent-pan-3447-slot-1",
-        "branch": "feature/pan-3447-slot-1",
-        "assignedAt": "2026-08-02T07:43:50.005Z"
-      }
-    ],
+    "slotAssignments": [],
     "slotCompletions": {
       "1": {
         "slotIndex": 1,
