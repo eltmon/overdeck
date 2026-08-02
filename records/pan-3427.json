@@ -103,6 +103,7 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
+      "src/cli/commands/parked.ts",
       "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
       "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
       "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
@@ -136,6 +137,7 @@
       "packages/contracts/src/composer-commands.generated.ts",
       "src/cli/commands/flywheel-complete.ts",
       "src/cli/commands/orders.ts",
+      "src/cli/commands/parked.ts",
       "src/dashboard/frontend/src/components/orders/AddIssuesRail.tsx",
       "src/dashboard/frontend/src/components/orders/BacklogCandidatesRail.tsx",
       "src/dashboard/frontend/src/components/orders/LaneEditor.tsx",
@@ -153,10 +155,10 @@
       "tests/unit/cli/orders.test.ts",
       "tests/unit/lib/orders/orders-resolver.test.ts"
     ],
-    "recordedAt": "2026-08-02T19:30:17.905Z"
+    "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:40:44.780Z",
+  "updated": "2026-08-02T19:40:48.847Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
