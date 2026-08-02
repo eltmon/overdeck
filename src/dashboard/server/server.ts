@@ -40,6 +40,7 @@ import { setupAutoPresoWebSocket } from './ws-autopreso.js';
 import { websocketRpcRouteLayer } from './ws-rpc.js'
 import { issuesRouteLayer } from './routes/issues.js'
 import { pipelineMembershipRouteLayer } from './routes/pipeline-membership.js'
+import { parkedRouteLayer } from './routes/parked.js'
 import { agentsRouteLayer } from './routes/agents.js'
 import { workspacesRouteLayer } from './routes/workspaces.js'
 import { workspaceRegistryRouteLayer } from './routes/workspace-registry.js'
@@ -336,6 +337,7 @@ export const makeRoutesLayer = Layer.mergeAll(
   websocketRpcRouteLayer,
   issuesRouteLayer,
   pipelineMembershipRouteLayer,
+  parkedRouteLayer,
   agentsRouteLayer,
   workspacesRouteLayer,
   workspaceRegistryRouteLayer,
