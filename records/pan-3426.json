@@ -201,20 +201,16 @@
   ],
   "feedback": [],
   "scopeDrift": {
-    "outsideDeclaredScope": [
-      "scripts/dashboard-types-baseline.txt",
-      "src/cli/commands/orders.ts",
-      "src/cli/commands/parked.ts",
-      "src/dashboard/server/routes/tiered-callouts.ts",
-      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
-      "src/lib/orders/types.ts"
-    ],
+    "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
+      "docs/ORDER-BOOKS.md",
       "src/cli/commands/flywheel-orders.ts",
       "src/cli/commands/flywheel.ts",
       "src/dashboard/server/services/issue-service-singleton.ts",
       "src/lib/orders/resolver.ts",
+      "src/lib/orders/validate.ts",
       "tests/unit/cli/flywheel-orders.test.ts",
+      "tests/unit/lib/orders/orders-resolver.test.ts",
       "tests/unit/lib/orders/orders-validate.test.ts"
     ],
     "declaredScope": [
@@ -228,21 +224,11 @@
       "tests/unit/lib/orders/orders-resolver.test.ts",
       "tests/unit/lib/orders/orders-validate.test.ts"
     ],
-    "actualChangedFiles": [
-      "docs/ORDER-BOOKS.md",
-      "scripts/dashboard-types-baseline.txt",
-      "src/cli/commands/orders.ts",
-      "src/cli/commands/parked.ts",
-      "src/dashboard/server/routes/tiered-callouts.ts",
-      "src/dashboard/server/routes/tiered-inspect-escalation.ts",
-      "src/lib/orders/types.ts",
-      "src/lib/orders/validate.ts",
-      "tests/unit/lib/orders/orders-resolver.test.ts"
-    ],
-    "recordedAt": "2026-08-02T18:21:43.270Z"
+    "actualChangedFiles": [],
+    "recordedAt": "2026-08-02T21:30:16.397Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T21:30:09.310Z",
+  "updated": "2026-08-02T21:30:16.398Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
