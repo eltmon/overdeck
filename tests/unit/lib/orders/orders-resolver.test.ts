@@ -117,4 +117,24 @@ describe('orders resolver', () => {
     expect(progress.drained).toBe(true);
     expect(progress.landed).toBe(1);
   });
+
+  describe('ensureOrderIssueStore', () => {
+    it('is defined and callable', () => {
+      expect(typeof ensureOrderIssueStore).toBe('function');
+    });
+  });
+
+  describe('orderIssueStoreStatus', () => {
+    it('is defined and callable', () => {
+      expect(typeof orderIssueStoreStatus).toBe('function');
+    });
+
+    it('returns object with started and issueCount keys on error', () => {
+      const result = orderIssueStoreStatus();
+      expect(result).toHaveProperty('started');
+      expect(result).toHaveProperty('issueCount');
+      expect(typeof result.started).toBe('boolean');
+      expect(typeof result.issueCount).toBe('number');
+    });
+  });
 });
