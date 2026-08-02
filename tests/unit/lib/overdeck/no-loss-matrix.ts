@@ -251,6 +251,8 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/flywheel/conversation',                      kind: 'http', disposition: 'RELOCATE',    door: 'Conversations (flywheel agent conversation)' },
   { surface: 'GET /api/flywheel/current',                           kind: 'http', disposition: 'AGGREGATE',   door: 'SettingsResolver.getFlywheelRuntime + run-state' },
   { surface: 'GET /api/flywheel/stats',                             kind: 'http', disposition: 'RELOCATE',    door: 'flywheel telemetry' },
+  { surface: 'GET /api/parked',                                     kind: 'http', disposition: 'READ',        door: 'resolveParkedPopulation() (parked resolver)' },
+  { surface: 'GET /api/velocity',                                   kind: 'http', disposition: 'READ',        door: 'velocity resolver (sweep/stall telemetry)' },
   { surface: 'GET /api/flywheel/config',                            kind: 'http', disposition: 'READ',        door: 'SettingsResolver.getFlywheelConfig' },
   { surface: 'POST /api/flywheel/config',                           kind: 'http', disposition: 'WRITE',       door: 'SettingsWriter.setFlywheelConfig' },
   { surface: 'GET /api/flywheel/auto-merge/pending',                kind: 'http', disposition: 'READ',        door: 'MergeResolver.listAutoMerges({active})' },
