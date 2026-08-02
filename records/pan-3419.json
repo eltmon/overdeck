@@ -243,7 +243,7 @@
     "recordedAt": "2026-08-02T13:58:11.859Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T14:31:26.585Z",
+  "updated": "2026-08-02T14:32:01.018Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -254,8 +254,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T14:00:25.902Z",
-    "updatedAt": "2026-08-02T14:31:26.443Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-02T14:32:00.637Z",
     "verificationNotes": "Verification FAILED at test (764194ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3419\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (6 tests | 3 failed) 354ms\n     × keeps every header metric and diagnostic visible by name in redesigned layout 53ms\n     × groups top consumers by kind badge and displays proportional memory bars 24ms\n     × displays attention section with severity dots and grouped agent rows when critical 20ms\n\n Test Files  1 failed | 152 passed (153)\n      Tests  3 failed | 1793 passed (1796)\n   Start at  10:25:15\n   Duration  41.98s (transform 6.77s, setup 18.82s, import 59.69s, tests 37.48s, environment 32.04s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-cFSbIN/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Wor\n…(899 chars elided)…\nG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qk2NHG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qk2NHG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] comp\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "fdaf4f0e435898076262870e4c3c8a600ffc163b",
@@ -424,7 +423,7 @@
       },
       "costAtCloseOut": {
         "usd": 267.713706,
-        "pricingAsOf": "2026-08-02T14:31:26.488Z"
+        "pricingAsOf": "2026-08-02T14:32:00.712Z"
       }
     },
     "merges": [
