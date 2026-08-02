@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:26:46.961Z",
+  "updated": "2026-08-02T09:27:00.556Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,8 +135,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 47,
-    "claims": {},
+    "sequence": 48,
+    "claims": {
+      "smoke-test": {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1577223,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:27:00.556Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -448,6 +456,10 @@
       "bottom-strip": {
         "reason": "Bottom strip now draws the real 60-second wired-hook telemetry trace with burst formulas, per-channel rates, aggregate current/peak labels, and live role counts; focused, Confluence, lint, and typecheck gates pass",
         "updatedAt": "2026-08-02T09:26:46.961Z"
+      },
+      "smoke-test": {
+        "reason": "Add full Confluence canvas fallback smoke coverage and isolated browser verification",
+        "updatedAt": "2026-08-02T09:27:00.556Z"
       }
     }
   },
@@ -511,7 +523,8 @@
     "bottom-strip.bottom-strip.ac1": "completed",
     "bottom-strip.bottom-strip.ac2": "completed",
     "bottom-strip.bottom-strip.ac3": "completed",
-    "bottom-strip.bottom-strip.ac4": "completed"
+    "bottom-strip.bottom-strip.ac4": "completed",
+    "smoke-test": "running"
   },
   "swarm": {
     "slotAssignments": [],
