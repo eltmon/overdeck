@@ -78,7 +78,7 @@ export interface StallSweeperDeps {
   resolveRows?: () => Promise<ParkedRow[]>;
   spawnWorkAgent?: (issueId: string) => Promise<{ spawned: boolean; skippedReason?: string; error?: string }>;
   stopAgent?: (agentId: string) => Promise<void>;
-  messageAgent?: (agentId: string, message: string) => Promise<unknown>;
+  messageAgent?: (agentId: string, message: string) => Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }>;
   writeFeedback?: (issueId: string, stage: string, summary: string, markdownBody: string) => Promise<void>;
   dispatchReview?: (issueId: string) => Promise<void>;
   clearStuck?: (issueId: string) => void;
@@ -244,7 +244,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 interface SweepActions {
   spawn: (issueId: string) => Promise<{ spawned: boolean; skippedReason?: string; error?: string }>;
   stop: (agentId: string) => Promise<void>;
-  message: (agentId: string, text: string) => Promise<unknown>;
+  message: (agentId: string, text: string) => Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }>;
   writeFeedback: (issueId: string, stage: string, summary: string, markdownBody: string) => Promise<void>;
   dispatchReview: (issueId: string) => Promise<void>;
   clearStuck: (issueId: string) => void;
@@ -267,11 +267,18 @@ async function resumeWorkAgentWithFeedback(
   // start-agent endpoint ("already running") and was the sweeper's entire
   // spawn-failed failure class on its first live night.
   if (actions.isAgentLive(agentId)) {
-    await actions.writeFeedback(row.issueId, stage, summary, markdownBody);
-    await actions.message(
+    const outcome = await actions.message(
       agentId,
       `Pipeline rework for ${row.issueId} — ${summary}. Read the newest file in \`.pan/feedback\`, address it, commit, push, then run \`pan done ${row.issueId}\`.`,
     );
+    // Honesty check: a pasted-but-unsubmitted composer is NOT a re-drive
+    // (restored sessions wedge exactly this way — text sits, Enter never
+    // lands). Only confirmed delivery (or a durable mail queue) earns the
+    // feedback file and the cleared flag downstream.
+    if (!outcome.delivered && !outcome.queuedToMail) {
+      return { ok: false, note: `delivery unconfirmed (${outcome.reason ?? 'no delivery path accepted'})` };
+    }
+    await actions.writeFeedback(row.issueId, stage, summary, markdownBody);
     return { ok: true, note: `messaged warm ${agentId} with ${stage} feedback` };
   }
   const agentState = getAgentStateSync(agentId);
@@ -385,7 +392,11 @@ async function sweepRow(
       }
       // Step 1: nudge once, remember the activity stamp it must beat.
       if (state?.lastNudgedAt && now - Date.parse(state.lastNudgedAt) < IDLE_NUDGE_GRACE_MS) return false;
-      await actions.message(agentId, `You have been idle for ${Math.floor(lastActivity / 60)}h with no pipeline stage owning your next move. If you have unfinished xBRIEF items, continue them now. If your work is complete, run \`pan done ${issueId}\`. If you are blocked, say so plainly in one sentence.`);
+      const nudgeOutcome = await actions.message(agentId, `You have been idle for ${Math.floor(lastActivity / 60)}h with no pipeline stage owning your next move. If you have unfinished xBRIEF items, continue them now. If your work is complete, run \`pan done ${issueId}\`. If you are blocked, say so plainly in one sentence.`);
+      if (!nudgeOutcome.delivered && !nudgeOutcome.queuedToMail) {
+        outcome.actions.push(`sweeper: ${issueId} idle nudge delivery unconfirmed (${nudgeOutcome.reason ?? 'no delivery path accepted'})`);
+        return false;
+      }
       writeSweeperRowState(issueId, orbit, {
         actionCount: (state?.actionCount ?? 0) + 1,
         lastActionAt: new Date(now).toISOString(),

@@ -91,7 +91,13 @@ export function planConfluenceChoreography({
     const orb = current.get(event.issueId);
     if (!orb) continue;
     const color = familyColor(event.family);
-    if (orb.state === 'stale') commands.push({ type: 'thaw', issueId: orb.id });
+    // A beat on a frozen orb shows as sparks — NEVER a thaw. A single beat
+    // (a delivery echo, a restore banner hook, one PostCompact) is not
+    // re-engagement; the thaw plays only when the enrichment-confirmed
+    // agent data flips the orb out of 'stale' (see the diff loop below).
+    // Beat-driven thaws were the pop-and-snap-back flicker the operator
+    // reported: orb rises on a beat, real lastActivity stays ancient, the
+    // next reconcile slams it back into the Doldrums.
     commands.push({
       type: 'sparks',
       issueId: orb.id,
@@ -124,6 +130,13 @@ export function planConfluenceChoreography({
         { type: 'sparks', issueId: orb.id, color, heatBump: 0, specRateBump: 0 },
         { type: 'gate', stage: orb.stage },
       );
+    }
+
+    // The honest thaw: the enrichment-confirmed snapshot says the agent is
+    // alive again (state flipped stale → anything else). One beat never
+    // reaches this — it takes sustained, poller-confirmed activity.
+    if (before.state === 'stale' && orb.state !== 'stale') {
+      commands.push({ type: 'thaw', issueId: orb.id });
     }
 
     const yielded = orb.state === 'shelf' && (
