@@ -122,9 +122,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T20:59:39.409Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T21:02Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T21:02:37.384Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T21:02:37Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3423\n\n# Review Synthesis — PAN-3423 — 2026-08-02T21:01:50Z\n\n## Verdict: CHANGES REQUESTED — correctness reviewer ended before producing a report\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-a0f3252b/context.json\n- Branch: feature/pan-3423\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n- HEAD reviewed: a0f3252b639b37be5e19b6b0d53d4c80b11962a1\n- Cycle number: 5\n- Prior cycle SHA: 549fb5098324ff74de16b97ae316924c6e26e0cd\n- PR merge base: 5ac62149c3326712f3d279938881aa8941165992\n- PR commits: 9\n\nThe intervening `23b14e11` review directory has no synthesis, so it does not establish a prior verdict; the cycle diff is measured from the latest completed synthesis at `549fb5098324ff74de16b97ae316924c6e26e0cd`.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-a0f3252b/security.md | 0 |\n| correctness | failed | — | 1 infrastructure failure |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-a0f3252b/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-a0f3252b/requirements.md | 0 after scope gate |\n\nThe two raw blockers—one reviewer failure and one requirements finding—are below the proportionality threshold of twenty-seven for this nine-commit PR. The cycle diff contains the specialist-consumer association fix and its new tests, but correctness policy forbids approval because that reviewer ended before verifying the changed code.\n\n## Blocking Findings\n\n### [correctness] Reviewer ended before writing a usable report\nThe correctness reviewer signaled `reviewer session ended before writing a report`. This cycle changes the exact association logic that caused the prior specialist Kill-action blocker, so the fix requires a successful correctness pass. Review policy forbids approval when a sub-role fails or times out, regardless of the other reports.\n\n## Non-blocking Findings\n\n### [requirements] [demoted: pre-existing] Header state badge has no visible painted state color — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:402`\nThe dot uses a border-color token with `border-current` but no border-width or background utility. The cited line is outside the PR diff and has already been demoted in earlier syntheses, so the mandatory scope and convergence gates keep this FR-5 gap advisory.\n\n### [requirements] Top-consumer kind badge misclassifies planning agents as work agents — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:65`\nThe broad `agent` consumer category is rendered as `Work`, although it can include planning agents. Use a neutral `Agent` label unless a canonical role is available. The requirements reviewer classified this secondary FR-7 accuracy issue as advisory.\n\n### [requirements] Duplicate consumer keys can replace the intended attention action — `src/dashboard/frontend/src/lib/system-health-attention.ts:97`\nThe consumer map overwrites an earlier entry when another consumer resolves to the same agent ID. Because the source list is ordered, preserving the first match avoids selecting a later target. This cycle introduced the relevant mapping line, but the requirements reviewer classified the duplicate-key case as advisory; the failed correctness pass remains the blocker that prevents this risk from being treated as verified.\n\n### [requirements] New ARIA labels are not consistently exposed through semantic roles — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:481`\nSeveral chips, indicators, badges, and memory bars place `aria-label` on generic elements without semantic roles, so the raw attributes tested by `getByLabelText` do not guarantee equivalent accessibility-tree output. The manifest has no separate accessibility acceptance criterion, so this remains advisory.\n\n### [requirements] Resource-governor documentation describes superseded Open-action wiring — `docs/RESOURCE-GOVERNOR.md:400`\nThe guide still describes parsing an agent ID, while the implementation now carries the canonical `issueId`. The documentation line is outside this PR's changed-file set, so it remains advisory.\n\n### [requirements] Untraced main-synchronization changes remain in the PR diff\nThe changes in `src/cli/commands/parked.ts` and `src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts` do not trace to PAN-3423 requirements. They appear inherited from main synchronization and are not implementation evidence for this issue.\n\n## Clean Sub-roles\n- security — no security blockers or advisories; existing confirmation, escaping, and write-door boundaries remain intact.\n- performance — no performance blockers or advisories; the production path remains linear and avoids repeated maximum scans.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-a0f3252b/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3423 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -165,10 +178,10 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:59:39.410Z",
+  "updated": "2026-08-02T21:02:37.384Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -176,11 +189,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T20:54:38.257Z",
-    "updatedAt": "2026-08-02T20:58:50.682Z",
-    "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
+    "updatedAt": "2026-08-02T21:02:36.444Z",
+    "reviewNotes": "Correctness reviewer ended before verifying the specialist consumer-association fix.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd",
-    "reviewRequestedAt": "2026-08-02T20:54:38.257Z",
     "reviewSpawnedAt": "2026-08-02T20:58:50.680Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -220,6 +232,24 @@
         "src/lib/cloister/stall-sweeper.ts"
       ],
       "recordedAt": "2026-08-02T20:39:42.438Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "a0f3252b639b37be5e19b6b0d53d4c80b11962a1"
+      }
     }
   },
   "closeOut": {
@@ -235,9 +265,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 7155083,
-            "output": 188314,
-            "cacheRead": 51792896,
+            "input": 9026437,
+            "output": 209306,
+            "cacheRead": 57411584,
             "cacheWrite": 0
           }
         },
@@ -296,9 +326,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 13305754,
-          "output": 439549,
-          "cacheRead": 129569280,
+          "input": 15177108,
+          "output": 460541,
+          "cacheRead": 135187968,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -309,8 +339,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 148.4518423,
-        "pricingAsOf": "2026-08-02T20:58:50.735Z"
+        "usd": 161.2477163,
+        "pricingAsOf": "2026-08-02T21:02:36.500Z"
       }
     },
     "merges": [
