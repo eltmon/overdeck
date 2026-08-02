@@ -52,7 +52,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T04:02:55.346Z",
+  "updated": "2026-08-02T04:02:57.632Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "blocked",
@@ -63,10 +63,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T03:23:52.525Z",
-    "updatedAt": "2026-08-02T04:02:24.507Z",
-    "reviewNotes": "Attention-row actions derive invalid issue IDs; the no-loss suite is red",
+    "updatedAt": "2026-08-02T04:02:25.345Z",
     "inspectNotes": "All 4 ACs met in src/dashboard/frontend/src/lib/system-health-attention.ts. AC1: info reasons filtered at all four reason sources (host/admission/services/agents, lines 92-131) and contextNotes covers exactly those same four sources (lines 15-22) — verified against SystemHealthSnapshot in packages/contracts/src/system-health.ts:253-278, which has no fifth reason-bearing field. AC2: agent-domain codes with >1 entry produce one row with agents=[both ids], agentId omitted, sub='2x agents: a, b' truncating at slice(0,2) + '+N more'. AC3: mapPresentationSeverity forces agent.runtime.inactive.stalled to critical and the comparator sorts critical first, then stalled before idle. AC4: healthy snapshot yields [] and summaryLine returns 'All clear - <N> GiB spawn headroom - relay running - 0 stalled agents'. NFR-2 satisfied: pure module, no React import. NON-BLOCKING (outside these ACs, for the component bead or review convoy): (1) reasonLabel line 78-82 returns the literal 'Retry' as the row TITLE for system.health_snapshot.unavailable (severity critical per src/dashboard/server/routes/misc/health.ts:57) and agent.persisted_state.unavailable (severity warning per src/lib/agents/health.ts:171) — both survive the info filter, so a real outage renders a row titled 'Retry'. In SystemHealthPill.tsx:114-117 that string was a suffix of 'Health unavailable - Retry', not a title. (2) Non-agent codes are grouped by code but rendered from entries[0] only, so two services emitting the same code would silently drop all but the first. (3) Grouped rows take severity from entries[0], so a mixed-severity group under one code under-reports. (4) FR-8 names memory percent in the summary line; only the all-clear variant carries headroom and neither non-healthy variant carries memory percent.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
+    "reviewedAtCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458",
+    "reviewRequestedAt": "2026-08-02T03:23:52.525Z",
     "reviewSpawnedAt": "2026-08-02T03:52:18.472Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -93,24 +94,6 @@
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
       ],
       "recordedAt": "2026-08-02T03:23:12.679Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
-      }
     }
   },
   "closeOut": {
@@ -181,7 +164,7 @@
       },
       "costAtCloseOut": {
         "usd": 29.322164,
-        "pricingAsOf": "2026-08-02T04:02:24.543Z"
+        "pricingAsOf": "2026-08-02T04:02:57.622Z"
       }
     },
     "merges": [
