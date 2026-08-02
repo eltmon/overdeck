@@ -612,6 +612,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T17:15Z] review-agent → FAILED — seq 11",
       "timestamp": "2026-08-02T17:15:11.185Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T17:15Z] review-agent → FAILED — seq 12",
+      "timestamp": "2026-08-02T17:15:12.833Z"
     }
   ],
   "feedback": [
@@ -691,10 +696,17 @@
       "outcome": "failed",
       "timestamp": "2026-08-02T17:15:11Z",
       "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
+    },
+    {
+      "seq": 12,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T17:15:12Z",
+      "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-1577`."
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:15:11.185Z",
+  "updated": "2026-08-02T17:15:12.833Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
