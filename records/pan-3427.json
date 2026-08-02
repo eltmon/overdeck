@@ -117,6 +117,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T20:41:53.993Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-02T20:43:40.740Z"
     }
   ],
   "feedback": [
@@ -186,7 +191,7 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T20:41:53.994Z",
+  "updated": "2026-08-02T20:43:40.742Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "failed",
@@ -196,10 +201,24 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:13:03.216Z",
+    "updatedAt": "2026-08-02T20:43:40.592Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (27032ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n",
     "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 5ac6214 (1 path): packages/contracts/src/composer-commands.generated.ts",
+        "detectedAt": "2026-08-02T20:43:16.991Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "5ac62149c3326712f3d279938881aa8941165992",
+      "detectedAt": "2026-08-02T20:43:16.991Z",
+      "paths": [
+        "packages/contracts/src/composer-commands.generated.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
     "reviewSpawnedAt": "2026-08-02T19:43:14.268Z",
@@ -266,9 +285,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 44163,
-            "output": 32424,
-            "cacheRead": 11608,
+            "input": 54585,
+            "output": 43806,
+            "cacheRead": 23117,
             "cacheWrite": 0
           }
         },
@@ -314,18 +333,18 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5658,
-            "output": 183939,
-            "cacheRead": 126236146,
-            "cacheWrite": 4652251
+            "input": 5660,
+            "output": 184072,
+            "cacheRead": 126789969,
+            "cacheWrite": 4652765
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 44163,
-          "output": 32424,
-          "cacheRead": 11608,
+          "input": 54585,
+          "output": 43806,
+          "cacheRead": 23117,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -335,15 +354,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5658,
-          "output": 183939,
-          "cacheRead": 126236146,
-          "cacheWrite": 4652251
+          "input": 5660,
+          "output": 184072,
+          "cacheRead": 126789969,
+          "cacheWrite": 4652765
         }
       },
       "costAtCloseOut": {
-        "usd": 84.6819188,
-        "pricingAsOf": "2026-08-02T20:13:03.222Z"
+        "usd": 84.8637857,
+        "pricingAsOf": "2026-08-02T20:43:40.605Z"
       }
     },
     "merges": [
