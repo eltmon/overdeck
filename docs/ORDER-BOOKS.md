@@ -70,10 +70,13 @@ draft → ready → running → drained → complete → next ready book
 
 ## Validation before start
 
+Before start, the CLI entry point `pan orders start <id>` calls `ensureOrderIssueStore()`, which initializes the shared issue service with `skipPolling: true`. This mode primes the in-memory issue cache from the tracker without polling for updates, allowing all validation checks to resolve issue state locally. The service is a read-only cache for the duration of the start operation; it does not auto-refresh.
+
 `validateBookForStart()` returns separate `blocks` and `warns` arrays. Start refuses a book with any block and names every finding.
 
 Validation blocks when:
 
+- the order issue store is unavailable (store priming failed);
 - an item is closed or cannot be resolved as open;
 - an issue belongs to another non-complete book;
 - a prerequisite cannot be resolved;
@@ -81,6 +84,8 @@ Validation blocks when:
 - a Lane B item has no draft PRD or canonical spec.
 
 A Lane B item with `planAtPickup: true` converts the missing-PRD finding to a warning. Warnings remain visible but do not disable **Queue book** or **Start run**.
+
+The dashboard route `POST /api/orders/:id/start` does not prime the issue store itself (the server-side service is already running). The CLI start path uses `ensureOrderIssueStore()` to support offline or CI invocations where the server may not be available; validation calls `orderIssueStoreStatus()` to detect when the store is unavailable and report it as a blocking finding.
 
 The dashboard route `POST /api/orders/:id/start` and the CLI start path use the same validator and Flywheel start function.
 
