@@ -72,6 +72,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T20:19Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-02T20:19:03.025Z"
+    },
+    {
+      "timestamp": "2026-08-02T20:39:48.729Z",
+      "reason": "end",
+      "note": "Resolved the target-branch conflicts without losing either System Health design, restored specialist attention Kill actions, and fixed merged-main quality-gate regressions. Build, dashboard build, typecheck, lint, full frontend tests, and focused Cloister/CLI tests pass."
     }
   ],
   "feedback": [
@@ -123,7 +128,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:39:43.421Z",
+  "updated": "2026-08-02T20:39:48.771Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -133,7 +138,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:39:43.419Z",
+    "updatedAt": "2026-08-02T20:39:48.724Z",
     "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Merging is not possible because you have unmerged files.\nhint: Fix them up in the work tree, and then use 'git add/rm <file>'\nhint: as appropriate to mark resolution and make a commit.\nfatal: Exiting because of an unresolved conflict.\n",
     "conflictsSince": {
@@ -146,8 +151,8 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "549fb5098324ff74de16b97ae316924c6e26e0cd",
-    "reviewSpawnedAt": "2026-08-02T19:59:09.273Z",
     "reviewRequestedAt": "2026-08-02T20:39:43.419Z",
+    "reviewSpawnedAt": "2026-08-02T19:59:09.273Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -201,9 +206,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3478607,
-            "output": 152114,
-            "cacheRead": 40700928,
+            "input": 3483243,
+            "output": 152360,
+            "cacheRead": 40970240,
             "cacheWrite": 0
           }
         },
@@ -247,9 +252,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 669779,
-            "output": 39846,
-            "cacheRead": 24031744,
+            "input": 762803,
+            "output": 53394,
+            "cacheRead": 37646336,
             "cacheWrite": 0
           }
         }
@@ -262,9 +267,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9448215,
-          "output": 374728,
-          "cacheRead": 88070656,
+          "input": 9545875,
+          "output": 388522,
+          "cacheRead": 101954560,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -275,8 +280,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 106.4702053,
-        "pricingAsOf": "2026-08-02T20:19:09.397Z"
+        "usd": 114.3142773,
+        "pricingAsOf": "2026-08-02T20:39:48.764Z"
       }
     },
     "merges": [
