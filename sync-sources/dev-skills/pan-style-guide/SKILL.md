@@ -76,9 +76,12 @@ Ledger but never breaks:
 | `.eyebrow` | `text-xs uppercase tracking-wider font-medium` |
 
 Chips, soft cards, keycap CTAs, and dot-metadata lines have **no** Ledger
-fallback and no Ledger rendering at all — they're new vocabulary, Broadsheet-
-only by design. A component built with them is a Broadsheet-only component;
-don't reach for them on a surface that must still render under Ledger.
+fallback — no `:root` or `[data-theme="ledger"]` rule exists for them at all.
+This is authoring discipline, not a CSS or runtime guard: nothing detects or
+blocks their use under Ledger, they would just render unstyled (bare Tailwind
+utilities, no theming) if reached while Ledger is active. A component built
+with them is a Broadsheet-only component by construction; don't reach for
+them on a surface that must still render under Ledger.
 
 ## The rules agents violate most (memorize these)
 

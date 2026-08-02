@@ -395,12 +395,20 @@ body::after {
   /* Broadsheet badge radius (PAN-3410 D-11) — the one deliberate radius
      change in the whole revision. Targets any element carrying a
      badge-bg-* class (the sanctioned badge formula) so existing call
-     sites don't need to be touched individually; two-selector specificity
-     beats the plain .rounded-sm utility without !important. Ledger is
-     untouched — badges keep rounded-sm because this selector never
-     matches outside [data-theme="broadsheet"]. */
-  [data-theme="broadsheet"] [class*="badge-bg-"] {
-    border-radius: var(--radius-md);
+     sites don't need to be touched individually. Consumed through a
+     custom property (same pattern as the display-scale utilities above)
+     rather than a bare `[data-theme="broadsheet"] [class*="badge-bg-"]`
+     descendant-selector override, so a nested [data-theme="ledger"] scope
+     (e.g. inside the Broadsheet document) correctly falls back to
+     rounded-sm instead of inheriting the outer document's radius. */
+  [data-theme="broadsheet"] {
+    --badge-radius: var(--radius-md);
+  }
+  [data-theme="ledger"] {
+    --badge-radius: initial;
+  }
+  [class*="badge-bg-"] {
+    border-radius: var(--badge-radius, var(--radius-sm));
   }
   .drawer-gate-border-pass {
     border-color: color-mix(in srgb, var(--success) 32%, transparent);

@@ -47,7 +47,7 @@ Overdeck ships two complete, named design languages, selectable via the **Overde
 
 ### Theme Scope
 
-A single `data-theme="ledger"` or `data-theme="broadsheet"` attribute on `<html>` carries the theme. Every theme-varying token — font-family CSS variables, the display-scale utilities, the weight-tier rules — is defined per-scope: Ledger's values live at `:root` (they are the default, unscoped values), and `[data-theme="broadsheet"]` overrides them. A component that sets its own `data-theme` attribute on a container (e.g. a side-by-side theme specimen) scopes every token underneath it independently of the document root — this is how the Settings → Appearance picker renders both mini-specimens in their own fonts simultaneously.
+A single `data-theme="ledger"` or `data-theme="broadsheet"` attribute on `<html>` carries the theme. Every theme-varying token — font-family CSS variables and the display-scale utilities' custom properties — is defined per-scope: Ledger's values are declared on **both** `:root` (the document-level default, unscoped) **and** `[data-theme="ledger"]` explicitly, and `[data-theme="broadsheet"]` overrides them. Declaring Ledger's values a second time, on the attribute selector and not just `:root`, is what makes nesting work: a component that sets its own `data-theme` attribute on a container (e.g. a side-by-side theme specimen) re-declares — and so resets — every token underneath it at that DOM level, independently of the document root, regardless of which theme the ancestor document is in. This is how the Settings → Appearance picker renders both mini-specimens in their own fonts simultaneously, in either direction (Ledger nested in Broadsheet, or Broadsheet nested in Ledger). Relying on `:root` alone would only reset the tokens for the true document root, not for a nested scope — see `src/dashboard/frontend/src/index.css`'s `:root, [data-theme="ledger"] { ... }` and the `[data-theme="broadsheet"]` / `[data-theme="ledger"]` custom-property pairs for `.display-xl`/`.display-lg`/`.eyebrow`.
 
 ### Ledger-Safe Fallbacks
 
@@ -59,14 +59,14 @@ Three utilities — the §3 "Display Scale" pair and §8's Eyebrow — are never
 | `.display-lg` | `text-lg font-medium` | ~40px, weight 680, tracking -0.025em |
 | `.eyebrow` | `text-xs uppercase tracking-wider font-medium` | 11px Geist Mono, uppercase, `tracking-[0.12em]`, `text-muted-foreground` |
 
-The other four §8 pattern recipes — Chips, Soft Card, Large CTA + Keycap, and Dot-Metadata Line — have no Ledger-safe fallback and no Ledger rendering at all. They are new vocabulary, Broadsheet-only by design (see Governance below): a component built with them is a Broadsheet-only component, not a component that degrades gracefully under Ledger. Don't use them on a surface that must still render under Ledger.
+The other four §8 pattern recipes — Chips, Soft Card, Large CTA + Keycap, and Dot-Metadata Line — have no Ledger-safe fallback: no `:root` or `[data-theme="ledger"]` rule exists for `.chip`/`.soft-card`/`.keycap`/`.dot-metadata` at all. **The contract for these four is authoring discipline, not a CSS or runtime guard:** nothing detects or blocks their use under Ledger. If one of these classes is ever reached while Ledger is active, it renders with no themed styling — bare Tailwind-utility output, not a designed fallback — because none was written. They are adopted feature-by-feature on new, Broadsheet-first surfaces (New Workspace page first, per Governance's mechanical-migration rule below); an existing Ledger-reachable surface must simply never call them.
 
-A surface written against the Broadsheet vocabulary degrades in scale and texture under Ledger — it never breaks and never needs a theme conditional.
+A surface written *only* against the three utilities in the table above (`.display-xl`, `.display-lg`, `.eyebrow`) degrades in scale and texture under Ledger automatically, via CSS token scope — it never breaks and never needs a theme conditional. A surface that also reaches for chips, soft cards, the keycap CTA, or dot-metadata lines is a Broadsheet-only surface by construction, full stop — the "never breaks" guarantee does not extend to it.
 
 ### Governance
 
-- **Components never write `if (theme === 'broadsheet')` branches.** A component authored against the Broadsheet vocabulary renders correctly under Ledger purely because the same class names resolve to the fallback values above. Theme-aware rendering lives entirely in CSS token scope, never in component logic.
-- **New patterns are Broadsheet-only, forever.** Hero placeholders, eyebrows, chips, soft cards, the large CTA + keycap, and dot-metadata lines (§8) are not backported to Ledger. Ledger receives bug fixes only — never new visual vocabulary.
+- **Components never write `if (theme === 'broadsheet')` branches.** For the three utilities with a real Ledger fallback (`.display-xl`, `.display-lg`, `.eyebrow`), this holds unconditionally — the same class names resolve to the fallback values automatically via CSS token scope, never component logic. For the four fallback-less patterns (chips, soft cards, keycap CTA, dot-metadata), the rule is narrower: don't write a theme conditional *to work around the missing fallback* — instead, simply don't put those classes on a surface Ledger can reach. See "Ledger-Safe Fallbacks" above for the exact mechanism (or lack of one) each utility gets.
+- **New patterns are Broadsheet-only, forever, and unenforced by CSS.** Hero placeholders, eyebrows, chips, soft cards, the large CTA + keycap, and dot-metadata lines (§8) are not backported to Ledger — Ledger receives bug fixes only, never new visual vocabulary. Enforcement is authoring/review discipline: nothing at runtime stops one of these classes from being used on a Ledger-reachable surface, it would simply render unstyled if it were.
 - **The mechanical migration is bounded to Broadsheet.** Font-family and weight-utility changes land entirely inside the `[data-theme="broadsheet"]` scope. Ledger rendering stays byte-for-byte identical to today's styles — no font swap, no weight change, no utility change. Component-by-component adoption of the new patterns happens per-feature (New Workspace page first), not as part of the base migration.
 - **Both docs move together.** This law file and its distilled agent-facing form (`sync-sources/dev-skills/pan-style-guide/SKILL.md`) must describe both themes consistently — same tier table, same pattern names, same governance. `pan sync` distributes the skill to every harness.
 
@@ -142,8 +142,15 @@ All four families are self-hosted as variable `woff2` files under `src/dashboard
 ### Theme Font Tokens
 
 ```css
-/* :root carries Ledger's exact values; [data-theme="broadsheet"] overrides them. */
-:root {
+/* :root carries Ledger's exact values as the document-level default.
+   [data-theme="ledger"] restates the same values explicitly — not just
+   relying on :root — so a Ledger scope NESTED inside a Broadsheet
+   document (e.g. the Settings -> Appearance comparison specimens)
+   resets these variables at that DOM level instead of inheriting
+   Broadsheet's from an outer ancestor. [data-theme="broadsheet"]
+   overrides both. */
+:root,
+[data-theme="ledger"] {
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
