@@ -636,7 +636,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:29:13.955Z",
+  "updated": "2026-08-02T17:29:19.119Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
@@ -757,7 +757,7 @@
       },
       "costAtCloseOut": {
         "usd": 298.5547403,
-        "pricingAsOf": "2026-08-02T17:29:06.603Z"
+        "pricingAsOf": "2026-08-02T17:29:18.701Z"
       }
     },
     "merges": [
@@ -948,5 +948,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
