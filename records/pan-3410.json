@@ -298,19 +298,19 @@
     "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T08:38:52.691Z",
+  "updated": "2026-08-02T08:39:21.619Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "skipped",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T07:31:49.490Z",
-    "updatedAt": "2026-08-02T08:38:52.669Z",
-    "reviewNotes": "All four convoy reviewers failed to run because their prior role sessions were already running",
+    "updatedAt": "2026-08-02T08:39:18.602Z",
+    "reviewNotes": "Agent re-review request (1/25): Re-requesting: all four convoy reviewers failed with 'role run already running' (infrastructure contention), not a code finding. No changes since HEAD 0d658cbc642518305a996e4031c030e764a8a96c.",
     "verificationNotes": "Verification FAILED at test (791963ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/src/dashboard/frontend\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (4 tests | 1 failed) 243ms\n     × keeps every header metric and diagnostic visible by name 45ms\n\n Test Files  1 failed | 109 passed (110)\n      Tests  1 failed | 1358 passed (1359)\n   Start at  04:30:07\n   Duration  37.42s (transform 6.28s, setup 16.81s, import 48.03s, tests 37.13s, environment 28.53s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-qmy2YN/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up\n…(698 chars elided)…\nl/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WCGq0l/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-WCGq0l/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] comp\n...(truncated)",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
@@ -421,38 +421,38 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1351328,
-            "output": 36220,
-            "cacheRead": 13413376,
+            "input": 1353748,
+            "output": 36446,
+            "cacheRead": 13799424,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 1316,
-            "output": 309637,
-            "cacheRead": 301881810,
-            "cacheWrite": 17117549
+            "input": 1320,
+            "output": 310640,
+            "cacheRead": 303612093,
+            "cacheWrite": 17119290
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1351328,
-          "output": 36220,
-          "cacheRead": 13413376,
+          "input": 1353748,
+          "output": 36446,
+          "cacheRead": 13799424,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 1316,
-          "output": 309637,
-          "cacheRead": 301881810,
-          "cacheWrite": 17117549
+          "input": 1320,
+          "output": 310640,
+          "cacheRead": 303612093,
+          "cacheWrite": 17119290
         }
       },
       "costAtCloseOut": {
-        "usd": 120.819196,
-        "pricingAsOf": "2026-08-02T08:38:52.683Z"
+        "usd": 121.391547,
+        "pricingAsOf": "2026-08-02T08:39:18.659Z"
       }
     },
     "merges": [
