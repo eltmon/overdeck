@@ -2,7 +2,7 @@
   "issueId": "PAN-3512",
   "schemaVersion": 2,
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T22:46:22.463Z",
+  "updated": "2026-08-02T22:46:23.646Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3512: The verdict write door — recordReviewVerdict + dispatch-not-drop + fallback kill-conditional (write-side of the verdict-of-record contract)",
       "timestamp": "2026-08-02T22:46:22.463Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-opus-5"
 }
