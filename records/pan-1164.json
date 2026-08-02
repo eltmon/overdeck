@@ -2,7 +2,7 @@
   "issueId": "PAN-1164",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:30.346Z",
-  "updated": "2026-08-02T17:02:42.394Z",
+  "updated": "2026-08-02T17:03:00.107Z",
   "pipeline": {
     "issueId": "PAN-1164",
     "reviewStatus": "pending",
@@ -18,14 +18,5 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1164",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-28T21:04:30.344Z"
-    }
-  ]
+  "recoveryTrips": []
 }
