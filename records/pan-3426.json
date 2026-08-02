@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:29:43.508Z",
+  "updated": "2026-08-02T17:30:07.166Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -48,16 +48,8 @@
   "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "cli-start-primes-issue-store": {
-        "writerId": "agent-pan-3426",
-        "agentId": "agent-pan-3426",
-        "pid": 3044091,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:29:43.508Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3426",
@@ -80,12 +72,27 @@
         "outcome": "completed",
         "reason": "Unit tests added for ensureOrderIssueStore and orderIssueStoreStatus. Both functions export correctly and handle errors. Resolver.ts exports both functions using lazy-require pattern.",
         "releasedAt": "2026-08-02T17:29:36.782Z"
+      },
+      {
+        "writerId": "agent-pan-3426",
+        "agentId": "agent-pan-3426",
+        "pid": 3044091,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:29:43.508Z",
+        "itemId": "cli-start-primes-issue-store",
+        "outcome": "completed",
+        "reason": "runOrdersStart now calls ensureOrderIssueStore() before book validation. Import added and async flow implemented.",
+        "releasedAt": "2026-08-02T17:30:07.166Z"
       }
     ],
     "statusReasons": {
       "order-issue-store-seam": {
         "reason": "Unit tests added for ensureOrderIssueStore and orderIssueStoreStatus. Both functions export correctly and handle errors. Resolver.ts exports both functions using lazy-require pattern.",
         "updatedAt": "2026-08-02T17:29:36.782Z"
+      },
+      "cli-start-primes-issue-store": {
+        "reason": "runOrdersStart now calls ensureOrderIssueStore() before book validation. Import added and async flow implemented.",
+        "updatedAt": "2026-08-02T17:30:07.166Z"
       }
     }
   },
@@ -94,6 +101,9 @@
     "order-issue-store-seam.order-issue-store-seam.ac1": "completed",
     "order-issue-store-seam.order-issue-store-seam.ac2": "completed",
     "order-issue-store-seam.order-issue-store-seam.ac3": "completed",
-    "cli-start-primes-issue-store": "running"
+    "cli-start-primes-issue-store": "completed",
+    "cli-start-primes-issue-store.cli-start-primes-issue-store.ac1": "completed",
+    "cli-start-primes-issue-store.cli-start-primes-issue-store.ac2": "completed",
+    "cli-start-primes-issue-store.cli-start-primes-issue-store.ac3": "completed"
   }
 }
