@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:16:56.852Z",
+  "updated": "2026-08-02T09:17:09.239Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,8 +135,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 43,
-    "claims": {},
+    "sequence": 44,
+    "claims": {
+      "hook-bus": {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1321811,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:17:09.238Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -418,6 +426,10 @@
       "feed-orb-linking": {
         "reason": "Feed rows now expose data-issue wiring, show provenance tooltips, flash matching orbs, and open the real issue drawer; focused tests and typecheck pass",
         "updatedAt": "2026-08-02T09:16:56.851Z"
+      },
+      "hook-bus": {
+        "reason": "Extract and verify the event-driven hook inventory rail",
+        "updatedAt": "2026-08-02T09:17:09.238Z"
       }
     }
   },
@@ -471,7 +483,8 @@
     "feed-orb-linking": "completed",
     "feed-orb-linking.feed-orb-linking.ac1": "completed",
     "feed-orb-linking.feed-orb-linking.ac2": "completed",
-    "feed-orb-linking.feed-orb-linking.ac3": "completed"
+    "feed-orb-linking.feed-orb-linking.ac3": "completed",
+    "hook-bus": "running"
   },
   "swarm": {
     "slotAssignments": [],
