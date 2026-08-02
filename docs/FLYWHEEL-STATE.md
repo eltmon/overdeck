@@ -931,3 +931,10 @@ Two facts worth carrying: (1) swarm `verify_commands` run the FULL root suite, s
 ## RUN-79 note (~02:30Z) — RSS tripwire at 3157MB: deliberately NOT reloading
 
 Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 across all windows. The reload that would reset RSS is the SAME operation the deploy gate has already queued (pending post-merge lifecycle, since 02:24Z); retrying would fight a gate protecting in-flight work. Waiting: when the gate fires it resets RSS **and** unblocks PAN-3396's close-out together. Recorded so this non-action is not mistaken for a missed alert — RSS alone, with zero pressure and a queued deploy, is not an emergency.
+
+## RUN-79 tick 52 (2026-08-02 ~02:45Z) — PAN-3396 + PAN-3451 CLOSED OUT (31 total); deferred-deploy defect found (PAN-3462)
+
+- **Both promoted issues closed out.** 31 issues landed+closed this run.
+- **NEW DEFECT — the deploy gate's promise is unkept (PAN-3462, struck).** The gate deferred my reload with "fires automatically as soon as the window clears — do not retry"; I obeyed. ~20 min later `pending-post-merge.json` was GONE (window open per `deploy-window.ts:34-41`) but **no deploy had fired** and `pending-deploy.json` still sat queued with `deferralCount: 2`. A manual reload then worked instantly. Nothing converts a cleared window into an actual deploy — so an orchestrator that follows the instruction waits forever. Second occurrence today (the 22:24Z deferral also needed a manual retry). Fix direction: the patrol owning the marker must re-assess and fire, or the message must stop promising automatic firing; plus age-based escalation using the marker's existing `escalated` field.
+- **My own correction:** at 02:30Z I chose to WAIT on the gate rather than reload, reasoning it would self-clear. That was wrong — deferring to a mechanism that does not exist is how work stalls silently. Verify the mechanism, don't trust the message.
+- Post-reload the close-outs first failed on a health-check timeout during warm-up; retried after polling `/api/health` — a warm-up race worth remembering, not a defect.
