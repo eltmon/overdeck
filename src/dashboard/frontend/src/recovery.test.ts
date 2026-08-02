@@ -65,11 +65,18 @@ describe('sameOriginResourceUrl', () => {
     const script = document.createElement('script');
     script.src = 'https://us-assets.i.posthog.com/array/key/config.js';
     const link = document.createElement('link');
-    link.href = 'https://fonts.googleapis.com/css2?family=DM+Sans';
+    link.href = 'https://example.com/fonts/DMSans-Variable.woff2';
 
     expect(sameOriginResourceUrl(script)).toBeNull();
     expect(sameOriginResourceUrl(link)).toBeNull();
     expect(sameOriginResourceUrl('https://example.com/assets/chunk.js')).toBeNull();
+  });
+
+  it('accepts the self-hosted font path as a same-origin resource', () => {
+    const link = document.createElement('link');
+    link.href = `${window.location.origin}/fonts/DMSans-Variable.woff2`;
+
+    expect(sameOriginResourceUrl(link)).toBe(`${window.location.origin}/fonts/DMSans-Variable.woff2`);
   });
 });
 
