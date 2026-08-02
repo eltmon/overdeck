@@ -1133,3 +1133,9 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **Verdict: the leak is now precisely characterized rather than merely "still present" — a large one-time per-attach cost that is never released, with the ongoing drip largely fixed.** That reframes round 3 from "find the leak" to "find state allocated during attach/session-registration and never freed on detach". Also explains why reload intervals tracked fleet churn rather than clock time: RSS is driven by CUMULATIVE ATTACH COUNT over a process's life.
 - Kept the issue open; criteria 1-2 stand as evidence the steady-state half is genuinely fixed, criterion 3 answered negatively. This is the payoff of holding closure through four temptations: the issue now carries a specific, testable hypothesis instead of a false "fixed".
 - Campaign: MIN-934 restored and working (+1031/−184); MIN-933 in review. 4 of 5.
+
+## RUN-79 tick 79 (2026-08-02 ~16:50Z) — leak round 3 in CI (#3494): the fix matches the measured shape
+
+- **strike-3431 round 3 committed and landed to CI**: `c4764c6f12b stream cost event log reads` + `ffc6d61387a preserve cost reader pagination` → **PR #3494**. The diagnosis and the fix line up: loading the FULL cost event log per read is precisely a large allocation on a path every session attach touches — exactly the "one-time per-attach cost never released" shape that criterion 3's ramp sample revealed. Measurement drove the fix rather than guesswork.
+- Wrote the verification protocol INTO the PR body (same-uptime or ≥20min slope; never 180s windows) so whoever validates it does not repeat the GC-phase error that twice reported the opposite of the truth on this issue.
+- Emitted a status snapshot this tick, per the rule added after the stale-snapshot false idle escalation.
