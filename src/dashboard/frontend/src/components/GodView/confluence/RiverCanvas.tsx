@@ -178,14 +178,19 @@ function projectColor(project: string): string {
   return PROJECT_RING[project as keyof typeof PROJECT_RING] ?? STAGE_COLORS.PLAN;
 }
 
-function createSatellite(member: ConfluenceConvoyMember, index: number, total: number): Satellite {
+function createSatellite(member: ConfluenceConvoyMember, index: number, total: number, arriving = false): Satellite {
+  // Satellites present when the orb first renders sit in settled orbit; only a
+  // member that joins an already-visible convoy spirals in from far orbit.
+  // (Spawning every satellite arriving from r=210 scattered "· arriving" labels
+  // across the whole canvas on first mount.)
+  const baseRadius = 30 + Math.max(1, total) * 3;
   return {
     ...member,
     angle: index * (Math.PI * 2 / Math.max(1, total)),
     heat: Math.random(),
     flash: 0,
-    orbitR: 210,
-    arriving: true,
+    orbitR: arriving ? 210 : baseRadius,
+    arriving,
     sx: 0,
     sy: 0,
   };
@@ -263,7 +268,8 @@ function createEngine(
   const ticker = (text: string, color: string) => {
     if (tickers.length >= TICKER_LIMIT) return;
     const riverHeight = layout.riverBottom - layout.riverTop;
-    tickers.push({ text, color, x: layout.padX + 10 + Math.random() * 140,
+    const trimmed = text.length > 48 ? `${text.slice(0, 47)}…` : text;
+    tickers.push({ text: trimmed, color, x: layout.padX + 10 + Math.random() * 140,
       y: layout.riverTop + riverHeight * 0.38 + Math.random() * riverHeight * 0.4, life: 0, maxLife: 9 });
   };
   const flashGate = (stage: Stage | number) => {
@@ -367,7 +373,7 @@ function createEngine(
       Object.assign(current, source, {
         convoy: source.convoy?.map((member, index, members) => existingSatellites.get(member.role)
           ? Object.assign(existingSatellites.get(member.role)!, member)
-          : createSatellite(member, index, members.length)) ?? null,
+          : createSatellite(member, index, members.length, true)) ?? null,
         compactT: Math.max(current.compactT, source.compactT),
         fading: null,
       });
@@ -522,7 +528,7 @@ function createEngine(
         const blink = 0.5 + 0.5 * Math.sin(simT * 3 + orb.wobA); fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = `rgba(255,45,124,${0.35 + blink * 0.55})`; fx.lineWidth = 1.6; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); drawLabel(orb, `✗ ${orb.id} · merge failed`, 'rgba(255,120,165,.9)'); fx.globalAlpha = 1; continue;
       }
       if (orb.state === 'shelf') {
-        fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2); drawLabel(orb, `⏸ ${orb.id}`, 'rgba(255,184,0,.75)'); if (orb.yieldReason) { fx.font = '500 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(orb.yieldReason, orb.x, orb.y - orb.radius - 21); } fx.textAlign = 'left'; fx.globalAlpha = 1; continue;
+        fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 1.5, 0, 7); fx.fill(); fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.62, 0, 7); fx.fill(); fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.95, 0, 7); fx.stroke(); fx.setLineDash([]); fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"'; fx.textAlign = 'center'; fx.fillText('⏸', orb.x, orb.y + 2); drawLabel(orb, `⏸ ${orb.id}`, 'rgba(255,184,0,.75)'); if (orb.yieldReason) { const reason = orb.yieldReason.length > 58 ? `${orb.yieldReason.slice(0, 57)}…` : orb.yieldReason; fx.font = '500 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.5)'; fx.fillText(reason, orb.x, orb.y - orb.radius - 21); } fx.textAlign = 'left'; fx.globalAlpha = 1; continue;
       }
       const glow = fx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, radius * 3); glow.addColorStop(0, hexA(baseRole, 0.45 * (0.3 + orb.heat) * (1 - orb.frost * 0.6))); glow.addColorStop(1, hexA(baseRole, 0)); fx.fillStyle = glow; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 3, 0, 7); fx.fill();
       fx.fillStyle = color; fx.shadowColor = baseRole; fx.shadowBlur = (14 + orb.heat * 22) * (1 - orb.frost * 0.7); fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.6, 0, 7); fx.fill(); fx.shadowBlur = 0; fx.fillStyle = `rgba(255,255,255,${0.35 + orb.heat * 0.5})`; fx.beginPath(); fx.arc(orb.x, orb.y, radius * 0.28, 0, 7); fx.fill();

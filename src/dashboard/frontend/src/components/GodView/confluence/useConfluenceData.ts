@@ -169,6 +169,21 @@ function activeStatus(status: AgentSnapshot['status']): boolean {
   return status === 'running' || status === 'starting';
 }
 
+/** Agent statuses that mean the agent is (or could imminently be) working the issue.
+ * Registry rows for long-dead agents of closed-out issues must NOT put an orb on
+ * the river — that residue is what once flooded the doldrums with 90+ closed issues. */
+const LIVE_AGENT_STATUSES = new Set<string>(['running', 'starting', 'healthy', 'warning', 'stuck', 'stalled']);
+const ACTIVE_MERGE_STATUSES = new Set<string>(['pending', 'queued', 'merging', 'verifying']);
+/** Doldrums emissary cap — mirrors the mockup's "few emissaries of the N frozen" pattern
+ * so a large stale population never becomes an unreadable label wall. */
+const STALE_ORB_LIMIT = 14;
+
+function closedIssueState(issue: IssueRecord | undefined): boolean {
+  if (!issue) return false;
+  const state = String(issue.state ?? issue.status ?? '').toLowerCase();
+  return state === 'closed' || state === 'done' || state === 'completed' || state === 'cancelled';
+}
+
 function reviewSubRole(agent: AgentSnapshot): string | null {
   if (agent.role !== 'review' && !agent.id.includes('-review')) return null;
   const match = agent.id.match(/-review-(security|correctness|performance|requirements|synthesis)$/i);
@@ -257,8 +272,18 @@ function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnap
     case 'agent.activity_changed':
       agentId = event.payload.agentId;
       if (!event.payload.hookName) {
+        // The per-tool heartbeat (sync-sources/hooks/heartbeat-hook) fires on
+        // PostToolUse but its ingestion path does not thread hookName through.
+        // A tool-carrying beat IS a PostToolUse — synthesize the name so the
+        // hook bus LEDs and telemetry channels light from real events instead
+        // of everything collapsing into an unnamed lifecycle bucket.
+        if (event.payload.currentTool) {
+          tool = event.payload.currentTool;
+          hookName = 'PostToolUse';
+          break;
+        }
         source = 'lifecycle';
-        tool = event.payload.currentTool ?? event.payload.activity;
+        tool = event.payload.activity;
         hookName = 'Lifecycle';
         break;
       }
@@ -461,9 +486,17 @@ export function useConfluenceOrbs(
     const liveIds = new Set<string>();
     const now = Date.now();
     for (const [id, issueAgents] of agentsByIssue) {
-      liveIds.add(id);
       const issue = issuesById.get(id.toUpperCase());
       const review = reviewStatusByIssueId[id];
+      // Membership: an orb exists only for issues the pipeline is actually
+      // touching — a live/paused agent or an in-flight merge. Closed-out issues
+      // never render, no matter what agent residue remains in the registry.
+      const hasLiveAgent = issueAgents.some((agent) =>
+        LIVE_AGENT_STATUSES.has(String(agent.status)) || agent.paused === true);
+      const mergeActive = ACTIVE_MERGE_STATUSES.has(String(review?.mergeStatus ?? issue?.mergeStatus ?? ''));
+      if (!hasLiveAgent && !mergeActive) continue;
+      if (closedIssueState(issue)) continue;
+      liveIds.add(id);
       const stage = orbStage(issueAgents, issue, review);
       const primary = primaryAgent(issueAgents, stage);
       const lastActivity = latestActivity(issueAgents);
@@ -520,7 +553,13 @@ export function useConfluenceOrbs(
     for (const id of cache.current.keys()) {
       if (!liveIds.has(id)) cache.current.delete(id);
     }
-    return next.sort((a, b) => a.id.localeCompare(b.id));
+    const staleOrbs = next.filter((orb) => orb.state === 'stale')
+      .sort((a, b) => a.staleMin - b.staleMin)
+      .slice(0, STALE_ORB_LIMIT);
+    const keepStale = new Set(staleOrbs.map((orb) => orb.id));
+    return next
+      .filter((orb) => orb.state !== 'stale' || keepStale.has(orb.id))
+      .sort((a, b) => a.id.localeCompare(b.id));
   }, [agents, issuesRaw, microStatesByAgentId, reviewStatusByIssueId, workspaceHealth]);
 }
 

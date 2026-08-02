@@ -264,7 +264,9 @@ describe('useHookStream', () => {
     });
 
     expect(result.current.entries).toMatchObject([
-      { sequence: 1, source: 'lifecycle', issueId: 'PAN-1', tool: 'Bash', hookName: 'Lifecycle', family: 'lifecycle' },
+      // A tool-carrying beat without a hookName IS the PostToolUse heartbeat —
+      // it must light the named hook channels, not an unnamed lifecycle bucket.
+      { sequence: 1, source: 'hook', issueId: 'PAN-1', tool: 'Bash', hookName: 'PostToolUse', family: 'tool_exec' },
       { sequence: 2, source: 'lifecycle', issueId: 'PAN-1', tool: 'idle', hookName: 'Lifecycle', family: 'lifecycle' },
       { sequence: 3, source: 'lifecycle', issueId: 'PAN-1', tool: 'stopped', hookName: 'Lifecycle', family: 'lifecycle' },
     ]);
