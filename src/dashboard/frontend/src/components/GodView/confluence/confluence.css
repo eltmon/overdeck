@@ -120,7 +120,7 @@
 }
 
 .confluence-tag { left: 12px; }
-.confluence-hint { right: 12px; padding: 5px 11px; border: 1px solid var(--gv-border); border-radius: 999px; background: rgba(13, 18, 32, .7); }
+.confluence-hint { right: 12px; padding: 5px 11px; border: 1px solid var(--gv-border); border-radius: 999px; background: rgba(13, 18, 32, .7); font-size: 9px; letter-spacing: .06em; }
 .confluence-tag b,
 .confluence-hint b { color: var(--gv-blue); }
 
@@ -201,16 +201,40 @@
   position: fixed;
   z-index: 45;
   inset: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(4, 6, 13, .72);
   backdrop-filter: blur(10px);
 }
 
-.confluence-help > div { width: min(680px, 92%); padding: 22px 26px; border: 1px solid rgba(0, 212, 255, .28); border-radius: 18px; background: rgba(13, 18, 32, .96); box-shadow: 0 20px 80px rgba(0, 0, 0, .7); }
-.confluence-help header { display: flex; align-items: center; padding-bottom: 10px; border-bottom: 1px solid var(--gv-border); }
-.confluence-help strong { color: var(--gv-blue); letter-spacing: .1em; }
-.confluence-help p { margin-top: 12px; color: var(--gv-text-secondary); font-size: 11px; line-height: 1.55; }
+.confluence-help .h-panel {
+  width: min(1180px, 94%);
+  max-height: 92%;
+  overflow-y: auto;
+  padding: 22px 26px;
+  border: 1px solid rgba(0, 212, 255, .28);
+  border-radius: 18px;
+  background: rgba(13, 18, 32, .96);
+  box-shadow: 0 20px 80px rgba(0, 0, 0, .7), 0 0 50px rgba(0, 212, 255, .06);
+}
+
+.confluence-help .h-head { display: flex; align-items: baseline; gap: 12px; padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--gv-border); }
+.confluence-help .h-title { color: var(--gv-blue); font-size: 18px; font-weight: 700; letter-spacing: .1em; }
+.confluence-help .h-sub { color: var(--gv-text-dim); font: 11px var(--gv-font-mono); }
+.confluence-help .h-close { width: 28px; height: 28px; margin-left: auto; border: 1px solid var(--gv-border); border-radius: 8px; color: var(--gv-text-secondary); background: none; cursor: pointer; font-size: 14px; }
+.confluence-help .h-close:hover { border-color: var(--gv-blue); color: var(--gv-blue); }
+.confluence-help .h-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 10px; }
+.confluence-help .h-card { padding: 11px 13px; border: 1px solid var(--gv-border); border-radius: 12px; background: rgba(255, 255, 255, .015); }
+.confluence-help .h-card h4 { margin-bottom: 6px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.confluence-help .h-card p { color: var(--gv-text-secondary); font-size: 11px; line-height: 1.5; }
+.confluence-help .h-card p + p { margin-top: 4px; }
+.confluence-help .h-card b { color: var(--gv-text-primary); }
+.confluence-help .h-demo { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 7px 0 3px; }
+.confluence-help .legend-dot { width: 10px; height: 10px; flex-shrink: 0; border-radius: 50%; }
+.confluence-help .legend-lbl { color: var(--gv-text-secondary); font: 9px var(--gv-font-mono); }
+.confluence-help kbd { padding: 1px 6px; border: 1px solid var(--gv-border); border-bottom-width: 2px; border-radius: 5px; color: var(--gv-text-primary); background: rgba(255, 255, 255, .07); font: 9px var(--gv-font-mono); }
+.confluence-help .h-foot { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--gv-border); color: var(--gv-text-dim); font: 11px var(--gv-font-mono); }
 
 .confluence-crt,
 .confluence-vignette { position: fixed; z-index: 40; inset: 0; pointer-events: none; }

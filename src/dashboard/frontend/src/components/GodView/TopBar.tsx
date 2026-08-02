@@ -5,6 +5,8 @@ import type { Agent } from '../../types';
 
 interface TopBarProps {
   agents: Agent[];
+  onHelpToggle: () => void;
+  onFullscreenToggle: () => void;
 }
 
 function SystemClock() {
@@ -41,7 +43,7 @@ function HealthSparkline({ label, value, color }: { label: string; value: number
   );
 }
 
-export function GodViewTopBar({ agents }: TopBarProps) {
+export function GodViewTopBar({ agents, onHelpToggle, onFullscreenToggle }: TopBarProps) {
   const systemHealth = useGodViewStore((s) => s.systemHealth);
   const activeCount = agents.filter((a) => a.status !== 'stopped' && a.status !== 'dead').length;
 
@@ -110,6 +112,27 @@ export function GodViewTopBar({ agents }: TopBarProps) {
       <div className="text-xs" style={{ color: 'var(--gv-text-secondary)' }}>
         {agents.length} total agents
       </div>
+
+      <button
+        type="button"
+        className="rounded-lg border px-2.5 py-1 text-[10px] font-semibold tracking-wider transition-colors"
+        style={{ borderColor: 'rgba(57, 255, 20, 0.35)', color: 'var(--gv-green)' }}
+        title="Help (?)"
+        aria-label="Open Confluence field guide"
+        onClick={onHelpToggle}
+      >
+        ? HELP
+      </button>
+      <button
+        type="button"
+        className="h-7 w-8 rounded-lg border text-sm transition-colors"
+        style={{ borderColor: 'var(--gv-border)', color: 'var(--gv-text-secondary)' }}
+        title="Fullscreen (f)"
+        aria-label="Toggle God View fullscreen"
+        onClick={onFullscreenToggle}
+      >
+        ⛶
+      </button>
     </div>
   );
 }

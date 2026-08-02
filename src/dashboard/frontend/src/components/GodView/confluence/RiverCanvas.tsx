@@ -94,6 +94,10 @@ export interface RiverEffectsApi {
   gateFlash(stage: Stage | number): void;
 }
 
+export interface RiverCanvasHandle extends RiverEffectsApi {
+  resize(): void;
+}
+
 export interface RiverCanvasProps {
   orbs: readonly ConfluenceOrb[];
   hookStream: ConfluenceHookStream;
@@ -554,7 +558,7 @@ function createEngine(
   };
 }
 
-export const RiverCanvas = forwardRef<RiverEffectsApi, RiverCanvasProps>(function RiverCanvas(props, ref) {
+export const RiverCanvas = forwardRef<RiverCanvasHandle, RiverCanvasProps>(function RiverCanvas(props, ref) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const glRef = useRef<HTMLCanvasElement>(null);
   const fxRef = useRef<HTMLCanvasElement>(null);
@@ -570,6 +574,7 @@ export const RiverCanvas = forwardRef<RiverEffectsApi, RiverCanvasProps>(functio
     pulseSun: () => engineRef.current?.api.pulseSun(),
     spawnFromSun: (...args) => engineRef.current?.api.spawnFromSun(...args),
     gateFlash: (...args) => engineRef.current?.api.gateFlash(...args),
+    resize: () => engineRef.current?.resize(),
   }), []);
 
   useEffect(() => {
