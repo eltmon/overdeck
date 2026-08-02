@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:18:29.875Z",
+  "updated": "2026-08-02T08:22:09.517Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,15 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 35,
+    "sequence": 36,
     "claims": {
-      "orb-tooltip": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 1535439,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T08:06:10.707Z"
-      },
       "help-fullscreen": {
         "writerId": "deacon-swarm",
         "agentId": null,
@@ -326,6 +319,17 @@
         "outcome": "released",
         "reason": "stale claim released (deacon-swarm dead)",
         "releasedAt": "2026-08-02T08:16:22.630Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1535439,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T08:06:10.707Z",
+        "itemId": "orb-tooltip",
+        "outcome": "completed",
+        "reason": "Implemented per-frame acquire/drop hysteresis with mouseleave clearing, the complete union-field DOM tooltip, right-edge flipping, scoped CSS, and focused tests. Focused tooltip tests, frontend ESLint/typecheck, and full project typecheck pass; commit 00cfc2f301f is pushed.",
+        "releasedAt": "2026-08-02T08:22:09.516Z"
       }
     ],
     "statusReasons": {
@@ -360,6 +364,10 @@
       "help-fullscreen": {
         "reason": "stale claim released (deacon-swarm dead)",
         "updatedAt": "2026-08-02T08:16:22.630Z"
+      },
+      "orb-tooltip": {
+        "reason": "Implemented per-frame acquire/drop hysteresis with mouseleave clearing, the complete union-field DOM tooltip, right-edge flipping, scoped CSS, and focused tests. Focused tooltip tests, frontend ESLint/typecheck, and full project typecheck pass; commit 00cfc2f301f is pushed.",
+        "updatedAt": "2026-08-02T08:22:09.516Z"
       }
     }
   },
@@ -396,7 +404,10 @@
     "choreography.choreography.ac1": "completed",
     "choreography.choreography.ac2": "completed",
     "choreography.choreography.ac3": "completed",
-    "orb-tooltip": "running"
+    "orb-tooltip": "completed",
+    "orb-tooltip.orb-tooltip.ac1": "completed",
+    "orb-tooltip.orb-tooltip.ac2": "completed",
+    "orb-tooltip.orb-tooltip.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
