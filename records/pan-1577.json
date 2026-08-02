@@ -739,7 +739,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T19:29:43.524Z",
+  "updated": "2026-08-02T19:29:56.543Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -749,14 +749,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T17:36:14.540Z",
-    "updatedAt": "2026-08-02T19:29:43.217Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
-    "verificationNotes": "Verification FAILED at test (2843867ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (6 tests | 3 failed) 323ms\n     × keeps every header metric and diagnostic visible by name in redesigned layout 52ms\n     × groups top consumers by kind badge and displays proportional memory bars 20ms\n     × displays attention section with severity dots and grouped agent rows when critical 20ms\n ❯ |root| tests/unit/lib/overdeck/bootstrap.test.ts (4 tests | 2 failed) 24028ms\n     × AC1: BootstrapObservabilityLive seeds getSnapshot from resolvers on boot 11391ms (retry x1)\n     × AC2: snapshot sequence advances when EventBus emits — no direct store polling 12625ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 2 failed) 24452ms\n     × resolves Db as a Drizzle-over-node-sqlite service 11308ms (retry x1)\n     × emits, reads, and streams events through EventBusLive 12574ms (retry x1)\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 8525ms\n     × searches observations with issue, tag, workspace, and sibling filters 7097ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 3 failed) 36436ms\n     × subscribes to domain events emitted through EventBus 11478ms (retry x1)\n     × replays gap-fill events from the events transport 12588ms (retry x1)\n     × fails replay with SnapshotRequired when the requested offset predates retained events 12367ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 3 failed) 36731ms\n     × reports exactly one missing index and column 11597ms (retry x1)\n     × ignores extra tables and columns and succeeds in query-only mode 12665ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 12456ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/no-loss-matrix.test.ts (5 tests | 1 failed) 34ms\n     × AC1/AC2: eve\n…(2469 chars elided)…\nture-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-4aw2vG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-4aw2vG/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context \n...(truncated)",
+    "updatedAt": "2026-08-02T19:29:53.893Z",
     "blockerReasons": [
       {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since d28b889 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-08-02T19:29:34.891Z"
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-02T19:29:53.892Z"
       }
     ],
     "conflictsSince": {
@@ -769,7 +767,6 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "7ec1b6ee2146619d8d443475847cdad7e2601550",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
-    "reviewRequestedAt": "2026-08-02T17:36:14.540Z",
     "reviewSpawnedAt": "2026-08-02T18:57:23.866Z"
   },
   "closeOut": {
@@ -868,7 +865,7 @@
       },
       "costAtCloseOut": {
         "usd": 404.4598333,
-        "pricingAsOf": "2026-08-02T19:29:43.495Z"
+        "pricingAsOf": "2026-08-02T19:29:53.944Z"
       }
     },
     "merges": [
