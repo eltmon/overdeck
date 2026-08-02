@@ -2,7 +2,7 @@
   "issueId": "PAN-3486",
   "schemaVersion": 2,
   "created": "2026-08-02T14:14:34.696Z",
-  "updated": "2026-08-02T14:14:34.696Z",
+  "updated": "2026-08-02T14:14:37.253Z",
   "pipeline": {
     "issueId": "PAN-3486",
     "reviewStatus": "pending",
@@ -25,5 +25,7 @@
       "note": "Planning session started for PAN-3486: Parked-population resolver — one read door for every stall orbit (+ pan parked)",
       "timestamp": "2026-08-02T14:14:34.695Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "k3[1m]"
 }
