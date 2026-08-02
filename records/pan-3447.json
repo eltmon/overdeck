@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T07:53:58.821Z",
+  "updated": "2026-08-02T08:05:42.248Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,7 +135,7 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 31,
+    "sequence": 32,
     "claims": {
       "help-fullscreen": {
         "writerId": "deacon-swarm",
@@ -143,13 +143,6 @@
         "pid": 3215388,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-02T07:43:47.917Z"
-      },
-      "choreography": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 332535,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T07:53:58.821Z"
       }
     },
     "claimHistory": [
@@ -304,6 +297,17 @@
         "outcome": "completed",
         "reason": "Ported the Confluence mockup engine into RiverCanvas with stacked WebGL/fx/trail canvases, exact draw order, six pipeline lanes and energy waveform, orb/convoy/frost/merge/micro-state rendering, bounded particle/ticker pools, effects API, ResizeObserver DPR<=2 re-anchoring, prop reconciliation, hover/select/fullscreen/help composition wiring, and God View mounting. Verified npm run typecheck, npm run lint, focused Confluence tests (20/20), frontend production build, and isolated Playwright screenshot plus hover/click/help interactions. The repository-wide npm test -- confluence wrapper was attempted twice; all Confluence tests passed directly, while unrelated root DB setup hooks timed out under 10 concurrent Vitest processes (22 failures first run, 5 second run). Commit 5b0690055ae pushed to origin/feature/pan-3447.",
         "releasedAt": "2026-08-02T07:42:52.142Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 332535,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T07:53:58.821Z",
+        "itemId": "choreography",
+        "outcome": "completed",
+        "reason": "Added timer-free useConfluenceChoreography with a pure dispatch table for live hook, stage, merge, scheduler yield/resume, stale thaw, and plan dispatch changes. Hook effects preserve the mockup constants (heat +0.06, family rate +0.13, 13% tool ticker, 16% feed-style ticker), stage changes emit ring+sparks+gate flash, merge retirement avoids respawn loops, and RiverCanvas no longer duplicates event choreography. Added 3 dispatch-table tests covering every mapping, beneficiary fallback, failure no-op, and a source grep proving no simulator timers. Verified 9 focused choreography/data tests and full npm run typecheck. Commit 4441767915b pushed to origin/feature/pan-3447.",
+        "releasedAt": "2026-08-02T08:05:42.247Z"
       }
     ],
     "statusReasons": {
@@ -330,6 +334,10 @@
       "river-canvas": {
         "reason": "Ported the Confluence mockup engine into RiverCanvas with stacked WebGL/fx/trail canvases, exact draw order, six pipeline lanes and energy waveform, orb/convoy/frost/merge/micro-state rendering, bounded particle/ticker pools, effects API, ResizeObserver DPR<=2 re-anchoring, prop reconciliation, hover/select/fullscreen/help composition wiring, and God View mounting. Verified npm run typecheck, npm run lint, focused Confluence tests (20/20), frontend production build, and isolated Playwright screenshot plus hover/click/help interactions. The repository-wide npm test -- confluence wrapper was attempted twice; all Confluence tests passed directly, while unrelated root DB setup hooks timed out under 10 concurrent Vitest processes (22 failures first run, 5 second run). Commit 5b0690055ae pushed to origin/feature/pan-3447.",
         "updatedAt": "2026-08-02T07:42:52.142Z"
+      },
+      "choreography": {
+        "reason": "Added timer-free useConfluenceChoreography with a pure dispatch table for live hook, stage, merge, scheduler yield/resume, stale thaw, and plan dispatch changes. Hook effects preserve the mockup constants (heat +0.06, family rate +0.13, 13% tool ticker, 16% feed-style ticker), stage changes emit ring+sparks+gate flash, merge retirement avoids respawn loops, and RiverCanvas no longer duplicates event choreography. Added 3 dispatch-table tests covering every mapping, beneficiary fallback, failure no-op, and a source grep proving no simulator timers. Verified 9 focused choreography/data tests and full npm run typecheck. Commit 4441767915b pushed to origin/feature/pan-3447.",
+        "updatedAt": "2026-08-02T08:05:42.247Z"
       }
     }
   },
@@ -362,7 +370,10 @@
     "river-canvas.river-canvas.ac4": "completed",
     "river-canvas.river-canvas.ac5": "completed",
     "help-fullscreen": "running",
-    "choreography": "running"
+    "choreography": "completed",
+    "choreography.choreography.ac1": "completed",
+    "choreography.choreography.ac2": "completed",
+    "choreography.choreography.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [
