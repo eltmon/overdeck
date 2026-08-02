@@ -108,6 +108,7 @@ function baseConfig(overrides: Record<string, unknown> = {}) {
       defaultConversationModel: 'claude-sonnet-4-6',
       trackerKeys: {},
       tmux: { configMode: 'managed' },
+      ui: { openInEditorCommand: null, theme: 'broadsheet' },
       conversations: {
         compactionModel: 'claude-haiku-4-5',
         manualCompactMode: 'claude-code',
@@ -219,6 +220,15 @@ describe('loadSettingsApi', () => {
     expect(loadSettingsApi().experimental?.streamdownRenderer).toBe(true);
     expect(loadSettingsApi().experimental?.showHarnessModelPermutations).toBe(true);
     expect(loadSettingsApi().experimental?.experimentalFeatures).toBe(true);
+  });
+
+  it('resolves ui.theme, defaulting to broadsheet when unset (PAN-3410)', async () => {
+    const { loadSettingsApi } = await import('../settings-api.js');
+
+    expect(loadSettingsApi().ui?.theme).toBe('broadsheet');
+
+    mockLoadConfig.mockReturnValue(baseConfig({ ui: { openInEditorCommand: null, theme: 'ledger' } }));
+    expect(loadSettingsApi().ui?.theme).toBe('ledger');
   });
 
   it('returns seeded workhorses and roles without legacy overrides', async () => {
@@ -699,6 +709,37 @@ describe('saveSettingsApi', () => {
     expect(written).toContain('mutedSources:');
     expect(written).toContain('PAN-123');
   });
+
+  it('persists a valid ui.theme value (PAN-3410)', async () => {
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      ui: { theme: 'ledger' },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('ui:');
+    expect(written).toContain('theme: ledger');
+  });
+
+  it('preserves an existing open_in_editor_command when only ui.theme is saved (no-loss, PAN-3410)', async () => {
+    mockLoadConfig.mockReturnValue(baseConfig({
+      ui: { openInEditorCommand: 'cursor {path}', theme: 'ledger' },
+    }));
+    const { loadSettingsApi, saveSettingsApi } = await import('../settings-api.js');
+    const settings = loadSettingsApi();
+
+    await Effect.runPromise(saveSettingsApi({
+      ...settings,
+      ui: { theme: 'broadsheet' },
+    }));
+
+    const written = String(mockWriteFile.mock.calls[0]?.[1]);
+    expect(written).toContain('open_in_editor_command: cursor {path}');
+    expect(written).toContain('theme: broadsheet');
+  });
 });
 
 describe('validateSettingsApi', () => {
@@ -939,6 +980,17 @@ describe('validateSettingsApi', () => {
     expect(result.errors).toContain('memory.per_day_cost_cap_usd must be greater than or equal to 0');
     expect(result.errors).toContain('memory.rollup_pending_threshold must be a positive integer');
     expect(result.errors).toContain('memory.sidebar_refresh_interval_ms must be a positive integer');
+  });
+
+  it('accepts valid ui.theme values and rejects anything else (PAN-3410)', async () => {
+    const { validateSettingsApi } = await import('../settings-api.js');
+
+    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'ledger' } }).valid).toBe(true);
+    expect(validateSettingsApi({ ...validSettings, ui: { theme: 'broadsheet' } }).valid).toBe(true);
+
+    const result = validateSettingsApi({ ...validSettings, ui: { theme: 'neon' as never } });
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain('ui.theme must be ledger or broadsheet');
   });
 });
 

@@ -212,6 +212,10 @@ export interface ApiSettingsConfig {
   tmux?: {
     config_mode?: 'managed' | 'inherit-user';
   };
+  /** Overdeck Theme design language (PAN-3410). open_in_editor_command is config.yaml-only, not surfaced here. */
+  ui?: {
+    theme?: 'ledger' | 'broadsheet';
+  };
   tracker_keys?: {
     linear?: string;
     github?: string;
@@ -722,6 +726,9 @@ export function loadSettingsApi(): ApiSettingsConfig {
     tmux: {
       config_mode: config.tmux.configMode,
     },
+    ui: {
+      theme: config.ui.theme,
+    },
     conversationSearch: config.conversationSearch,
     conversations: conversationSettings,
     memory: {
@@ -807,6 +814,7 @@ async function writeYamlConfigPreservingComments(yamlConfig: YamlConfig): Promis
     ['api_keys', config.api_keys],
     ['openrouter', config.openrouter],
     ['tmux', config.tmux],
+    ['ui', config.ui],
     ['conversationSearch', config.conversationSearch],
     ['conversations', config.conversations],
     ['memory', config.memory],
@@ -913,6 +921,15 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
       : sanitizeApiTtsConfig(settings.tts),
     openrouter: settings.openrouter,
     tmux: settings.tmux,
+    // No-loss (PAN-3410): the API surface only carries `theme`, never
+    // open_in_editor_command, so a theme-only save must not blank an
+    // editor command the operator set outside this API.
+    ui: (settings.ui?.theme !== undefined || currentConfig.ui.openInEditorCommand !== null)
+      ? {
+          ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
+          ...(settings.ui?.theme !== undefined ? { theme: settings.ui.theme } : {}),
+        }
+      : undefined,
     conversationSearch: settings.conversationSearch,
     conversations: settings.conversations,
     memory: settings.memory
@@ -1022,6 +1039,10 @@ async function updateSettingsApiPromise(updates: Partial<ApiSettingsConfig>): Pr
     tmux: {
       ...current.tmux,
       ...updates.tmux,
+    },
+    ui: {
+      ...current.ui,
+      ...updates.ui,
     },
     conversationSearch: {
       ...current.conversationSearch,
@@ -1260,6 +1281,14 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
   if (settings.tiered_execution !== undefined) {
     const tieredExecutionError = validateTieredExecutionSettings(settings.tiered_execution, loadConfigSync().config.providerAuth);
     if (tieredExecutionError) errors.push(tieredExecutionError);
+  }
+
+  if (
+    settings.ui?.theme !== undefined &&
+    settings.ui.theme !== 'ledger' &&
+    settings.ui.theme !== 'broadsheet'
+  ) {
+    errors.push('ui.theme must be ledger or broadsheet');
   }
 
   return {
