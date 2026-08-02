@@ -1079,3 +1079,10 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **The pattern is now unmistakable and worth acting on**: every strike that touches a behind-main branch stalls at the same wall, each burning an orchestrator round-trip, because the guard's prescribed alternative (`pan sync-main`) is a no-op stub (PAN-3440). Until 3440 lands, merge-sync-and-PR is the standing orchestrator response — do not wait for the agent to self-serve.
 - **strike-3477 vanished with no commits** (session gone, empty branch) — re-struck. Cause unknown; if it vanishes again with nothing committed, that is a spawn/crash class worth its own filing rather than a third re-dispatch.
 - strike-3431 leak round 3 progressing with real work ($21.05, +388/−164 — much larger than round 2's diff, consistent with hunting a second retainer).
+
+## RUN-79 tick 71 (2026-08-02 ~14:15Z) — MIN-932 shipped + closed; Lane A tail MIN-933 dispatched (38 total)
+
+- **Operator promoted uat/min-sable-0802 carrying MIN-932** (Hermes Lane A item 2) — closed out after clearing a leftover running work agent with an attributed pause. **38 issues landed+closed this run.**
+- **Campaign advanced serially again**: MIN-932 terminal ⇒ **MIN-933 started** (auto-planning → work). Campaign state: Lane A = MIN-930 ✅ → MIN-932 ✅ → MIN-933 planning; Lane B = MIN-931 ✅ → MIN-934 working. **3 of 5 terminal, both lanes live**, serial discipline unbroken across the whole campaign — no tail ever started before its head reached terminal.
+- **The postMergeLifecycle leftover-agent gap now has 4 specimens** (MIN-929, PAN-3406, PAN-3447, MIN-932): every promote leaves the work agent running, blocking close-out until an attributed pause clears it. It has recurred on every single promote today. Worth filing on the next occurrence rather than absorbing it a fifth time — the pause is a backstop standing in for a missing lifecycle step.
+- Read-door sweep: 17 PAN + 14 MIN + TIN-1; 4 typed blind spots unchanged. Clean UAT batch EMPTY.
