@@ -482,6 +482,26 @@
       "timestamp": "2026-08-02T18:37:01.543Z",
       "reason": "end",
       "note": "Implementation complete"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T19:19:01.637Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T19:19:01.703Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T19:19:01.748Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T19:19:01.787Z"
     }
   ],
   "feedback": [],
@@ -585,7 +605,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T19:17:24.472Z",
+  "updated": "2026-08-02T19:19:01.788Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "reviewing",
@@ -747,7 +767,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
