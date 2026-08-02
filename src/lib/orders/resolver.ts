@@ -7,6 +7,22 @@ import { backlogSequencePath, listOrderBookIds, readOrderBook, readOrderBookAsyn
 import type { OrderBookProgress, OrderIssueLookup, OrderIssueState } from './types.js';
 
 const COMPLETE_STATUS = 'complete';
+type IssueServiceModule = typeof import('../../dashboard/server/services/issue-service-singleton.js');
+let issueServiceModule: IssueServiceModule | null = null;
+
+function loadIssueServiceModuleSync(): IssueServiceModule {
+  if (issueServiceModule) return issueServiceModule;
+  // Lazy require avoids a static lib → dashboard server dependency.
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  issueServiceModule = require('../../dashboard/server/services/issue-service-singleton.js') as IssueServiceModule;
+  return issueServiceModule;
+}
+
+async function loadIssueServiceModule(): Promise<IssueServiceModule> {
+  if (issueServiceModule) return issueServiceModule;
+  issueServiceModule = await import('../../dashboard/server/services/issue-service-singleton.js');
+  return issueServiceModule;
+}
 
 function labelNames(issue: Record<string, unknown>): string[] {
   const labels = Array.isArray(issue.labels) ? issue.labels : [];
@@ -42,9 +58,7 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
   const wanted = new Set(issueIds.map((id) => id.toUpperCase()));
   const result = new Map<string, OrderIssueState>();
   try {
-    // Lazy require avoids a static lib → dashboard server dependency.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+    const { getSharedIssueService } = loadIssueServiceModuleSync();
     const issues = getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }) as Array<Record<string, unknown>>;
     for (const issue of issues) {
       const id = issueIdentifier(issue);
@@ -64,17 +78,13 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
 };
 
 export async function ensureOrderIssueStore(): Promise<void> {
-  // Lazy require avoids a static lib → dashboard server dependency.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+  const { startSharedIssueService } = await loadIssueServiceModule();
   await startSharedIssueService({ skipPolling: true });
 }
 
 export function orderIssueStoreStatus(): { started: boolean; issueCount: number } {
   try {
-    // Lazy require avoids a static lib → dashboard server dependency.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { getSharedIssueService, isSharedIssueServiceStarted } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+    const { getSharedIssueService, isSharedIssueServiceStarted } = loadIssueServiceModuleSync();
     const started = isSharedIssueServiceStarted();
     const issueCount = getSharedIssueService().getIssues({ cycle: 'all', includeCompleted: true }).length as number;
     return { started, issueCount };
