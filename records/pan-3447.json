@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:55:17.314Z",
+  "updated": "2026-08-02T09:11:03.550Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,8 +135,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 41,
-    "claims": {},
+    "sequence": 42,
+    "claims": {
+      "feed-orb-linking": {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1152854,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:11:03.550Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -403,6 +411,10 @@
       "topbar-enrichment": {
         "reason": "Added the ordered FR-19 stat strip, 130-sample/500 ms ECG, change pulse, unavailable-state dashes, shared page-level Confluence subscription, and third SWAP gauge. Full typecheck, full lint, all 33 Confluence tests, and isolated Playwright rendering/control verification pass; commit a7b74e239a9 is pushed.",
         "updatedAt": "2026-08-02T08:55:17.314Z"
+      },
+      "feed-orb-linking": {
+        "reason": "Implement sidebar feed hover/click linking to Confluence orbs and issue drawer",
+        "updatedAt": "2026-08-02T09:11:03.550Z"
       }
     }
   },
@@ -452,7 +464,8 @@
     "help-fullscreen.help-fullscreen.ac3": "completed",
     "topbar-enrichment.topbar-enrichment.ac1": "completed",
     "topbar-enrichment.topbar-enrichment.ac2": "completed",
-    "topbar-enrichment.topbar-enrichment.ac3": "completed"
+    "topbar-enrichment.topbar-enrichment.ac3": "completed",
+    "feed-orb-linking": "running"
   },
   "swarm": {
     "slotAssignments": [],
