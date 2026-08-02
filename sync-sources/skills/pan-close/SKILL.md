@@ -54,6 +54,19 @@ pan close PAN-1234 --force --accept-deploy
 # Row 7 deploy: MISS-ACCEPTED — override is now durable and auditable
 ```
 
+## Residue Disposition
+
+For tracker-closed pre-record-era issues with stale convention PRs/MRs (PAN-3396), use `--residue`:
+
+```bash
+pan close PAN-1234 --residue "pre-record-era stale PR cleanup"
+```
+
+`--residue` records a residue disposition: closes stale convention PRs/MRs with an honest "no merge claim"
+comment, verifies the tracker issue is closed, skips the Definition-of-Done gate with verified evidence,
+and marks the issue terminal without asserting a merge claim. Residue is operator-conversation-only and
+cannot be combined with `--abandon` or `--accept-*` flags.
+
 ## What It Does
 
 Runs the close-out ceremony after mechanically checking review, tests, branch verification,
