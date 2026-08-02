@@ -758,6 +758,40 @@ export const ReviewCoordinatorDiedEvent = Schema.Struct({
 })
 export type ReviewCoordinatorDiedEvent = typeof ReviewCoordinatorDiedEvent.Type
 
+/** A terminal review verdict was rejected due to stale evidence. */
+export const ReviewVerdictRejectedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_rejected"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewVerdictRejectedEvent = typeof ReviewVerdictRejectedEvent.Type
+
+/** A terminal review verdict was landed and dispatched with a fresh evidence head. */
+export const ReviewVerdictDispatchedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_dispatched"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    classification: Schema.String,
+    testGateReset: Schema.Boolean,
+  }),
+})
+export type ReviewVerdictDispatchedEvent = typeof ReviewVerdictDispatchedEvent.Type
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
