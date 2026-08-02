@@ -5,7 +5,7 @@
   min-height: 52px;
   align-items: center;
   gap: 10px;
-  margin: 10px 12px 0;
+  margin: 10px 0 0 12px;
   padding: 7px 10px;
   overflow-x: auto;
   border-color: rgba(0, 212, 255, .2);
@@ -48,7 +48,7 @@
   min-height: 0;
   flex-direction: column;
   gap: 8px;
-  padding: 2px 12px 10px;
+  padding: 2px 0 0 12px;
   color: var(--gv-text-primary);
   isolation: isolate;
 }
