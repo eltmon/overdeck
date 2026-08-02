@@ -200,10 +200,10 @@
       "tests/lib/settings-api.test.ts",
       "tests/unit/dashboard/fonts-local.test.ts"
     ],
-    "recordedAt": "2026-08-02T07:11:01.048Z"
+    "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T07:31:13.564Z",
+  "updated": "2026-08-02T07:31:17.195Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "failed",
