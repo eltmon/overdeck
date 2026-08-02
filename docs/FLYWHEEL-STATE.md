@@ -919,3 +919,11 @@ Monitor tripped at 3245MB/50min/44 sessions (no system pressure — 18.6GB avail
 
 Operator conversation reported PAN-3447's swarm silently orphaned after wave 1: global `swarm.mode` off + explicit `pan swarm` never persisted an issue-level opt-in ⇒ every deacon patrol skipped coordination (completed slot branches unmerged, 3 items undispatched). Fixed as **PAN-3459 / `3d5ecd9d70`** — `pan swarm` now stamps `swarm.policy.mode=always` into the issue record before dispatching. **Verified that commit IS in the currently deployed build (`5059cfb2891d`, my 00:00Z reload), so no deploy is pending.** Record stamped manually by the operator; deacon is coordinating again (patrol 45953 on slot-2 merge verify). **NOT double-driving PAN-3447** — no `pan swarm`, no dispatch, no merge from me.
 Two facts worth carrying: (1) swarm `verify_commands` run the FULL root suite, so those patrols are long and will retry under host-load flake (today's PAN-3344 pattern hit 6 strikes); (2) "silently orphaned after wave 1" is now a recognizable signature — if a swarm stalls with completed-but-unmerged slot branches, check the issue record's swarm policy before anything else.
+
+## RUN-79 tick 51 (2026-08-02 ~02:28Z) — uat/pan-crow-0802 promoted (PAN-3396 + PAN-3451); both close-outs self-clearing gates
+
+- **Operator promoted uat/pan-crow-0802** carrying PAN-3396 + PAN-3451. Neither closed out yet, both for legitimate self-clearing reasons — no overrides taken:
+  - **PAN-3396** — deploy-gated (live build `5059cfb2` predates merge `02447e81`). Attempted a reload; the deploy gate refused with its explicit reason ("post-merge lifecycle is pending", queued 02:24:02Z, fires automatically, do not retry or --force). Respected.
+  - **PAN-3451** — its own `verifying_on_main` agent is still running. Closing now would cut off in-flight verification.
+- Full read-door sweep: 18 PAN + 20 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged. **Clean UAT batch EMPTY** (candidate null) — nothing review+test passed, so nothing assembled.
+- Two gates in one tick both stating their reason and self-clearing is the PAN-3383 observability work compounding — a year ago these would have been silent stalls needing a human.
