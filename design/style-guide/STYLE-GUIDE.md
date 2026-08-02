@@ -51,13 +51,15 @@ A single `data-theme="ledger"` or `data-theme="broadsheet"` attribute on `<html>
 
 ### Ledger-Safe Fallbacks
 
-Broadsheet-only utilities (§3 "Display Scale", §8 pattern recipes) are never conditionally rendered. Instead, each one resolves to a Ledger-safe fallback value at `:root` and is overridden only under `[data-theme="broadsheet"]`:
+Three utilities — the §3 "Display Scale" pair and §8's Eyebrow — are never conditionally rendered. Instead, each one resolves to a Ledger-safe fallback value at `:root` and is overridden only under `[data-theme="broadsheet"]`:
 
 | Utility | Ledger-safe fallback (`:root` default) | Broadsheet value |
 |---|---|---|
 | `.display-xl` | `text-xl font-medium` (today's page-title size) | `clamp(48px, 7vw, 72px)`, tracking-tight, weight 750 |
 | `.display-lg` | `text-lg font-medium` | ~40px, weight 680, tracking -0.025em |
 | `.eyebrow` | `text-xs uppercase tracking-wider font-medium` | 11px Geist Mono, uppercase, `tracking-[0.12em]`, `text-muted-foreground` |
+
+The other four §8 pattern recipes — Chips, Soft Card, Large CTA + Keycap, and Dot-Metadata Line — have no Ledger-safe fallback and no Ledger rendering at all. They are new vocabulary, Broadsheet-only by design (see Governance below): a component built with them is a Broadsheet-only component, not a component that degrades gracefully under Ledger. Don't use them on a surface that must still render under Ledger.
 
 A surface written against the Broadsheet vocabulary degrades in scale and texture under Ledger — it never breaks and never needs a theme conditional.
 
@@ -238,7 +240,7 @@ Broadsheet adds two display-tier utilities for page-level typography — a vocab
 
 **Broadsheet widens this by one sanctioned use: the eyebrow label (§8 "Eyebrow").** `font-mono` (resolving to Geist Mono Variable) is also used for uppercase category/kicker labels and quiet text-buttons (e.g. `CANCEL`). This is the one deliberate exception to "mono is identifiers-only," and it does not apply under Ledger — Ledger's `.eyebrow` fallback uses `font-body`, not mono (see the Ledger-Safe Fallbacks table in §2).
 
-**Rule 3 (both themes): `font-display` is ONLY for the sidebar "Overdeck" wordmark.** No other non–God-View surface uses `font-display`. Under Ledger this renders as Space Grotesk; under Broadsheet, as Geist Variable — the rule is about *where* the token is used, not which font it resolves to.
+**Rule 3 (Ledger): `font-display` is ONLY for the sidebar "Overdeck" wordmark.** No other non–God-View Ledger surface uses `font-display` — this is what keeps Space Grotesk exclusive to the wordmark under Ledger (§3 "Why These Fonts"). **Under Broadsheet this exclusivity is relaxed by design:** `--font-display` resolves to the same Geist Variable family as `--font-sans`, so the wordmark (§9) and the two display-tier utilities (`.display-xl`, `.display-lg`, above) both use `font-display` — there is no separate "display font" to protect once Ledger's Space-Grotesk-vs-DM-Sans distinction no longer applies.
 
 **Rule 4 (both themes): God View has its own scoped typography system** (`src/dashboard/frontend/src/components/GodView/*`) and is the only deliberate exception to Rules 1–3.
 
@@ -752,7 +754,7 @@ RULE: Pick ONE pattern per context. Don't mix dots + badges + colored text
 - Confirmations (delete, discard, force actions)
 - Quick forms of **4 fields or fewer**
 
-This doctrine applies dashboard-wide under either theme; it is not a Broadsheet-only pattern. `NewProjectModal.tsx` and `NewWorkspaceModal.tsx` (PAN-3330) predate this rule — the New Workspace flow's page migration is PAN-3411, and migrating `NewProjectModal` to a routed page is a tracked follow-up issue, not something this guide lets you silently skip.
+This doctrine applies dashboard-wide under either theme; it is not a Broadsheet-only pattern. `NewProjectModal.tsx` and `NewWorkspaceModal.tsx` (PAN-3330) predate this rule — the New Workspace flow's page migration is PAN-3411, and migrating `NewProjectModal` to a routed page is tracked as [PAN-3469](https://github.com/eltmon/overdeck/issues/3469), not something this guide lets you silently skip.
 
 For dialogs that remain modals (confirmations, short forms), the recipe is unchanged in both themes:
 

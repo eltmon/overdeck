@@ -37,8 +37,13 @@
 
 /* ─── Theme font tokens (PAN-3410 D-13) — :root carries Ledger's exact values;
      [data-theme="broadsheet"] overrides them. Components never branch on
-     theme directly, only on these variables. ─── */
-:root {
+     theme directly, only on these variables. [data-theme="ledger"] restates
+     the :root values explicitly (not just relying on :root) so a Ledger
+     scope NESTED inside a Broadsheet document — e.g. the Settings ->
+     Appearance theme-comparison specimens — resets these variables at that
+     DOM level instead of inheriting Broadsheet's from the ancestor. ─── */
+:root,
+[data-theme="ledger"] {
   --font-sans: "DM Sans", system-ui, sans-serif;
   --font-display: "Space Grotesk", system-ui, sans-serif;
   --font-mono: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
@@ -51,39 +56,82 @@
 }
 
 /* ─── Display-scale utilities (Broadsheet vocabulary; Ledger-safe fallback
-     per D-13 — values ported from design/style-guide/mockups/style-guide-v2.html) ─── */
+     per D-13 — values ported from design/style-guide/mockups/style-guide-v2.html).
+     Broadsheet values live in per-utility CSS custom properties rather than
+     `[data-theme="broadsheet"] .display-xl` descendant-selector overrides:
+     a descendant selector matches through ANY ancestor carrying that
+     attribute, so a nested [data-theme="ledger"] scope (the Appearance
+     picker's specimens) would still inherit Broadsheet's rules from the
+     outer html[data-theme="broadsheet"]. Custom properties instead cascade
+     by DOM proximity — [data-theme="ledger"] invalidates the property at
+     that scope (falling back to the literal Ledger/Tailwind value below)
+     regardless of how deep the nesting goes, in both directions. ─── */
 @layer components {
+  [data-theme="broadsheet"] {
+    --display-xl-family: var(--font-display);
+    --display-xl-size: clamp(3rem, 7vw, 4.5rem);
+    --display-xl-weight: 750;
+    --display-xl-tracking: -0.03em;
+    --display-xl-leading: 1.02;
+
+    --display-lg-family: var(--font-display);
+    --display-lg-size: 2.5rem;
+    --display-lg-weight: 680;
+    --display-lg-tracking: -0.025em;
+    --display-lg-leading: 1.05;
+
+    --eyebrow-family: var(--font-mono);
+    --eyebrow-size: 11px;
+    --eyebrow-weight: 500;
+    --eyebrow-tracking: 0.12em;
+  }
+
+  /* Explicitly invalidate the Broadsheet display-scale properties inside a
+     nested Ledger scope so var()'s fallback (the Tailwind text-xl/text-lg/
+     text-xs + font-medium values applied below) takes over again. */
+  [data-theme="ledger"] {
+    --display-xl-family: initial;
+    --display-xl-size: initial;
+    --display-xl-weight: initial;
+    --display-xl-tracking: initial;
+    --display-xl-leading: initial;
+
+    --display-lg-family: initial;
+    --display-lg-size: initial;
+    --display-lg-weight: initial;
+    --display-lg-tracking: initial;
+    --display-lg-leading: initial;
+
+    --eyebrow-family: initial;
+    --eyebrow-size: initial;
+    --eyebrow-weight: initial;
+    --eyebrow-tracking: initial;
+  }
+
   .display-xl {
     @apply text-xl font-medium;
+    font-family: var(--display-xl-family, var(--font-sans));
+    font-size: var(--display-xl-size, 1.25rem);
+    font-weight: var(--display-xl-weight, 500);
+    letter-spacing: var(--display-xl-tracking, normal);
+    line-height: var(--display-xl-leading, 1.75rem);
   }
+
   .display-lg {
     @apply text-lg font-medium;
+    font-family: var(--display-lg-family, var(--font-sans));
+    font-size: var(--display-lg-size, 1.125rem);
+    font-weight: var(--display-lg-weight, 500);
+    letter-spacing: var(--display-lg-tracking, normal);
+    line-height: var(--display-lg-leading, 1.75rem);
   }
+
   .eyebrow {
     @apply text-xs uppercase tracking-wider font-medium text-muted-foreground;
-  }
-
-  [data-theme="broadsheet"] .display-xl {
-    font-family: var(--font-display);
-    font-size: clamp(3rem, 7vw, 4.5rem);
-    font-weight: 750;
-    letter-spacing: -0.03em;
-    line-height: 1.02;
-  }
-
-  [data-theme="broadsheet"] .display-lg {
-    font-family: var(--font-display);
-    font-size: 2.5rem;
-    font-weight: 680;
-    letter-spacing: -0.025em;
-    line-height: 1.05;
-  }
-
-  [data-theme="broadsheet"] .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: 0.12em;
+    font-family: var(--eyebrow-family, var(--font-sans));
+    font-size: var(--eyebrow-size, 0.75rem);
+    font-weight: var(--eyebrow-weight, 500);
+    letter-spacing: var(--eyebrow-tracking, 0.05em);
   }
 }
 

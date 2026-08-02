@@ -60,18 +60,25 @@ weight system, a display scale, and the new component vocabulary below.
 **The theme rule for new surfaces:** author against the Broadsheet
 vocabulary (`.display-xl`, `.display-lg`, `.eyebrow`, chips, soft cards,
 keycap CTAs, dot-metadata lines) using the class names as given. Never write
-`if (theme === 'broadsheet')` or any other conditional-markup branch — every
-Broadsheet-only class already resolves to a Ledger-safe fallback at `:root`
-(see the table below), so a surface written this way degrades in scale and
-texture under Ledger but never breaks. This is not optional — a component
-that branches on theme is a style-guide violation regardless of which theme
-it produces correct output for.
+`if (theme === 'broadsheet')` or any other conditional-markup branch. This is
+not optional — a component that branches on theme is a style-guide violation
+regardless of which theme it produces correct output for.
+
+Only three of those classes actually have a Ledger-safe fallback — they
+resolve to a scaled-down value at `:root` instead of being conditionally
+rendered, so a surface built from them degrades in scale and texture under
+Ledger but never breaks:
 
 | Broadsheet class | Ledger-safe fallback |
 |---|---|
 | `.display-xl` | `text-xl font-medium` |
 | `.display-lg` | `text-lg font-medium` |
 | `.eyebrow` | `text-xs uppercase tracking-wider font-medium` |
+
+Chips, soft cards, keycap CTAs, and dot-metadata lines have **no** Ledger
+fallback and no Ledger rendering at all — they're new vocabulary, Broadsheet-
+only by design. A component built with them is a Broadsheet-only component;
+don't reach for them on a surface that must still render under Ledger.
 
 ## The rules agents violate most (memorize these)
 

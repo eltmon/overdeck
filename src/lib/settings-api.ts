@@ -8,6 +8,7 @@ import { readFile, writeFile } from 'fs/promises';
 import { parseDocument } from 'yaml';
 import { Data, Effect } from 'effect';
 import {
+  DEFAULT_CONFIG,
   DEFAULT_ROLES,
   DEFAULT_WORKHORSES,
   PARENT_MODEL_REF,
@@ -923,11 +924,15 @@ async function saveSettingsApiPromise(settings: ApiSettingsConfig): Promise<void
     tmux: settings.tmux,
     // No-loss (PAN-3410): the API surface only carries `theme`, never
     // open_in_editor_command, so a theme-only save must not blank an
-    // editor command the operator set outside this API.
-    ui: (settings.ui?.theme !== undefined || currentConfig.ui.openInEditorCommand !== null)
+    // editor command the operator set outside this API. Symmetrically, a
+    // caller that omits `ui` entirely (or omits `theme` within it) must not
+    // blank a non-default theme the operator set outside this save.
+    ui: (settings.ui?.theme !== undefined
+      || currentConfig.ui.theme !== DEFAULT_CONFIG.ui.theme
+      || currentConfig.ui.openInEditorCommand !== null)
       ? {
           ...(currentConfig.ui.openInEditorCommand !== null ? { open_in_editor_command: currentConfig.ui.openInEditorCommand } : {}),
-          ...(settings.ui?.theme !== undefined ? { theme: settings.ui.theme } : {}),
+          theme: settings.ui?.theme ?? currentConfig.ui.theme,
         }
       : undefined,
     conversationSearch: settings.conversationSearch,
