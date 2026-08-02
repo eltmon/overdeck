@@ -145,7 +145,7 @@
     "recordedAt": "2026-08-02T20:39:42.438Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T20:43:02.441Z",
+  "updated": "2026-08-02T20:43:33.252Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "reviewing",
@@ -155,14 +155,22 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T20:42:29.172Z",
+    "updatedAt": "2026-08-02T20:43:33.198Z",
     "reviewNotes": "Specialist attention rows lose the existing Kill action because the consumer join indexes work-agent targets only.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 5ac6214 (3 paths): src/cli/commands/parked.ts, src/lib/cloister/event-store-provider.ts, src/lib/cloister/service.ts",
+        "detectedAt": "2026-08-02T20:43:16.991Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "d28b8893d9eba336166570587a15114995062a16",
-      "detectedAt": "2026-08-02T19:29:34.891Z",
+      "sha": "5ac62149c3326712f3d279938881aa8941165992",
+      "detectedAt": "2026-08-02T20:43:16.991Z",
       "paths": [
-        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
-        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
+        "src/cli/commands/parked.ts",
+        "src/lib/cloister/event-store-provider.ts",
+        "src/lib/cloister/service.ts"
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
@@ -222,9 +230,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3483243,
-            "output": 152360,
-            "cacheRead": 40970240,
+            "input": 6358824,
+            "output": 167782,
+            "cacheRead": 44404224,
             "cacheWrite": 0
           }
         },
@@ -283,9 +291,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 9549997,
-          "output": 389218,
-          "cacheRead": 102810624,
+          "input": 12425578,
+          "output": 404640,
+          "cacheRead": 106244608,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -296,8 +304,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 114.7837993,
-        "pricingAsOf": "2026-08-02T20:42:29.189Z"
+        "usd": 131.3413563,
+        "pricingAsOf": "2026-08-02T20:43:33.210Z"
       }
     },
     "merges": [
