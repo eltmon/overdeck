@@ -37,6 +37,7 @@ import {
   type ParkedRow,
 } from '../parked/resolver.js';
 import { clearWorkspaceStuck, dispatchReviewHostSide, setReviewStatusSync } from '../review-status.js';
+import { sessionExistsSync } from '../tmux.js';
 import { decideAutonomousRedrive } from './redrive-gate.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { spawnWorkAgentThroughAgentsEndpoint } from './work-agent-start.js';
@@ -82,6 +83,7 @@ export interface StallSweeperDeps {
   dispatchReview?: (issueId: string) => Promise<void>;
   clearStuck?: (issueId: string) => void;
   resetMergeForEvaluation?: (issueId: string) => void;
+  isAgentLive?: (agentId: string) => boolean;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -172,6 +174,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   const resetMerge = deps.resetMergeForEvaluation ?? ((issueId: string) => {
     setReviewStatusSync(issueId, { mergeStatus: 'pending', mergeRetryCount: 0, mergeNotes: 'stall sweeper: reset for merge re-evaluation' });
   });
+  const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
 
@@ -225,7 +228,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     if (actionBudget <= 0) continue;
 
     const acted = await sweepRow(row, state, now, {
-      spawn, stop, message, writeFeedback, dispatchReview, clearStuck, resetMerge, emitActivity, emitEvent,
+      spawn, stop, message, writeFeedback, dispatchReview, clearStuck, resetMerge, isAgentLive, emitActivity, emitEvent,
     }, outcome);
     if (acted) {
       recordAction(issueId, orbit, state, now);
@@ -246,6 +249,7 @@ interface SweepActions {
   dispatchReview: (issueId: string) => Promise<void>;
   clearStuck: (issueId: string) => void;
   resetMerge: (issueId: string) => void;
+  isAgentLive: (agentId: string) => boolean;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
 }
@@ -255,9 +259,21 @@ async function resumeWorkAgentWithFeedback(
   stage: string,
   summary: string,
   markdownBody: string,
-  actions: Pick<SweepActions, 'spawn' | 'writeFeedback'>,
+  actions: Pick<SweepActions, 'spawn' | 'writeFeedback' | 'message' | 'isAgentLive'>,
 ): Promise<{ ok: boolean; note: string }> {
   const agentId = `agent-${row.issueId.toLowerCase()}`;
+  // Warm path (PAN-2579): the agent is ALIVE — deliver the feedback to it
+  // directly. Spawning here is not just wasteful, it is refused by the
+  // start-agent endpoint ("already running") and was the sweeper's entire
+  // spawn-failed failure class on its first live night.
+  if (actions.isAgentLive(agentId)) {
+    await actions.writeFeedback(row.issueId, stage, summary, markdownBody);
+    await actions.message(
+      agentId,
+      `Pipeline rework for ${row.issueId} — ${summary}. Read the newest file in \`.pan/feedback\`, address it, commit, push, then run \`pan done ${row.issueId}\`.`,
+    );
+    return { ok: true, note: `messaged warm ${agentId} with ${stage} feedback` };
+  }
   const agentState = getAgentStateSync(agentId);
   const gate = decideAutonomousRedrive(agentState ?? {}, { owesRework: true });
   if (gate.decision !== 'proceed') {
