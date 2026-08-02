@@ -478,6 +478,63 @@ export async function readIssueRecord(
   }
 }
 
+/**
+ * Batch-read issue records with bounded concurrency to avoid event-loop starvation.
+ * Resolves the state home ONCE per project (synchronously), derives record paths from that,
+ * then reads record bodies asynchronously without repeating state-home resolution.
+ */
+export async function batchReadIssueRecords(
+  project: ProjectConfig,
+  issueIds: string[],
+): Promise<Map<string, PanIssueRecord | null>> {
+  const result = new Map<string, PanIssueRecord | null>();
+
+  // Resolve state home once per project — single synchronous marker read, never repeated
+  const stateHome = resolveStateReadHomeSync(project);
+  const recordsDir = stateHome.migrated
+    ? join(stateHome.root, RECORD_DIRNAME)
+    : null;
+
+  const batchSize = 10;
+  for (let i = 0; i < issueIds.length; i += batchSize) {
+    const batch = issueIds.slice(i, i + batchSize);
+    await Promise.allSettled(
+      batch.map(async (id) => {
+        try {
+          let record: PanIssueRecord | null = null;
+
+          if (recordsDir) {
+            // Migrated: read from state home without re-resolving marker
+            const path = join(recordsDir, `${id.toLowerCase()}.json`);
+            try {
+              const raw = await fsp.readFile(path, 'utf-8');
+              record = JSON.parse(raw) as PanIssueRecord;
+            } catch {
+              record = null;
+            }
+          } else {
+            // Unmigrated: derive legacy path from already-resolved state home
+            const basePath = getIssueRecordBasePath(project, id);
+            const legacyPath = join(basePath, '.pan', RECORD_DIRNAME, `${id.toLowerCase()}.json`);
+            try {
+              const raw = await fsp.readFile(legacyPath, 'utf-8');
+              record = JSON.parse(raw) as PanIssueRecord;
+            } catch {
+              record = null;
+            }
+          }
+
+          result.set(id, record);
+        } catch {
+          result.set(id, null);
+        }
+      }),
+    );
+  }
+
+  return result;
+}
+
 export function readIssueRecordSync(project: ProjectConfig, issueId: string): PanIssueRecord | null {
   const path = getIssueRecordPath(project, issueId);
   try {
@@ -881,6 +938,25 @@ export function markRecordPipelineClosedOutSync(
   record.pipeline.closedOutAt = now;
   record.pipeline.readyForMerge = false;
   record.pipeline.mergeStatus = 'merged';
+  record.pipeline.updatedAt = now;
+  const recordPath = writeIssueRecordSync(project, issueId, record);
+  queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+/** PAN-3396: mark residue disposition closed-out without asserting merge landing. */
+export function markRecordPipelineResidueClosedOutSync(
+  project: ProjectConfig,
+  issueId: string,
+): void {
+  const record = ensureIssueRecordSync(project, issueId);
+  const now = new Date().toISOString();
+  // Residue never claims mergeStatus (which is unknowable for recordless work);
+  // closedOut marks the record terminal, readyForMerge false prevents re-drive.
+  record.pipeline.closedOut = true;
+  record.pipeline.closedOutAt = now;
+  record.pipeline.readyForMerge = false;
+  // Explicitly delete any existing mergeStatus — residue disposition never claims a merge
+  delete record.pipeline.mergeStatus;
   record.pipeline.updatedAt = now;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
