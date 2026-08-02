@@ -359,18 +359,27 @@
     "recordedAt": "2026-08-02T18:33:20.845Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T18:42:16.350Z",
+  "updated": "2026-08-02T18:45:06.257Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:36:27.365Z",
-    "updatedAt": "2026-08-02T18:39:35.865Z",
+    "updatedAt": "2026-08-02T18:44:45.429Z",
+    "reviewNotes": "Approved; cycle delta is clean and the unchanged Windows separator finding remains non-promotable under the cycle-7 convergence gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-02T18:00:48.013Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "4a88ab9d7d5e70a03f36dbf590055082c5c27f13",
       "detectedAt": "2026-08-02T16:46:39.150Z",
@@ -379,8 +388,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewedAtCommit": "481e1e134d010a65962497d898467af6580f8fbe",
-    "reviewRequestedAt": "2026-08-02T18:36:27.365Z",
+    "reviewedAtCommit": "4ebc214d617b9799a398780d76665c2a7c157420",
     "reviewSpawnedAt": "2026-08-02T18:39:35.862Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -474,6 +482,24 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-02T18:33:20.845Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "4ebc214d617b9799a398780d76665c2a7c157420"
+      }
     }
   },
   "closeOut": {
@@ -489,9 +515,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 19813637,
-            "output": 162573,
-            "cacheRead": 48278528,
+            "input": 23878716,
+            "output": 199517,
+            "cacheRead": 60137472,
             "cacheWrite": 0
           }
         },
@@ -552,9 +578,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 41183361,
-          "output": 665445,
-          "cacheRead": 247882752,
+          "input": 45248440,
+          "output": 702389,
+          "cacheRead": 259741696,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -565,8 +591,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 361.5177893,
-        "pricingAsOf": "2026-08-02T18:39:37.753Z"
+        "usd": 388.8809763,
+        "pricingAsOf": "2026-08-02T18:44:45.546Z"
       }
     },
     "merges": [
