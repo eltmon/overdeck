@@ -157,6 +157,7 @@ export function GodViewConfluence({
 
         <GodViewSidebar
           agents={agents}
+          velocity={meta.velocity}
           onIssueHover={(issueId) => effectsRef.current?.emitRing(issueId, '#ffffff')}
           onIssueSelect={(issueId) => setRailId(issueId)}
         />

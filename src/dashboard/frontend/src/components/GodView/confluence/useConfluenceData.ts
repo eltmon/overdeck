@@ -140,6 +140,8 @@ export interface ConfluenceMeta {
   /** PAN-3490: parked population size + orbit histogram (null while /api/parked has never answered). */
   parkedTotal: number | null;
   parkedByOrbit: Readonly<Record<string, number>> | null;
+  /** PAN-3491: real stage transitions over the trailing hour (null while /api/velocity has never answered). */
+  velocity: { transitionsPerHour: number; byStage: Record<string, number> } | null;
 }
 
 export interface ConfluenceData {
@@ -719,6 +721,17 @@ async function fetchConversations(): Promise<ConversationSummary[]> {
   return response.json() as Promise<ConversationSummary[]>;
 }
 
+interface VelocityResponse {
+  transitionsPerHour?: number;
+  byStage?: Record<string, number>;
+}
+
+async function fetchVelocity(): Promise<VelocityResponse> {
+  const response = await fetch('/api/velocity');
+  if (!response.ok) throw new Error('Failed to fetch pipeline velocity');
+  return response.json() as Promise<VelocityResponse>;
+}
+
 function isMergeActivityToday(entry: unknown, midnight: number): boolean {
   if (!entry || typeof entry !== 'object') return false;
   const record = entry as Record<string, unknown>;
@@ -750,6 +763,13 @@ export function useConfluenceMeta(
     refetchInterval: 10_000,
   });
   const parked = useParked();
+  const { data: velocity } = useQuery({
+    queryKey: ['pipeline-velocity'],
+    queryFn: fetchVelocity,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
 
   return useMemo(() => {
     const now = new Date();
@@ -785,8 +805,11 @@ export function useConfluenceMeta(
       roleCounts,
       parkedTotal: parked?.summary.total ?? null,
       parkedByOrbit: parked?.summary.byOrbit ?? null,
+      velocity: velocity?.transitionsPerHour != null
+        ? { transitionsPerHour: velocity.transitionsPerHour, byStage: velocity.byStage ?? {} }
+        : null,
     };
-  }, [agentsById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked]);
+  }, [agentsById, conversations, costSummary, hookStream.costEvents, orbs, recentActivity, reviewStatusByIssueId, system, parked, velocity]);
 }
 
 export function useConfluenceData(): ConfluenceData {

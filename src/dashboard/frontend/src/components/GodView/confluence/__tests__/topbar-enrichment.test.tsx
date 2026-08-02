@@ -86,7 +86,7 @@ describe('God View enriched top bar', () => {
     expect(screen.getByText(/^\d{2}:34:56$/)).toBeInTheDocument();
     expect([...container.querySelectorAll('.confluence-stat em')].map((node) => node.textContent))
       .toEqual([
-        'EV/S', 'EV/M', 'LOAD', 'WIP', 'BLOCKED', 'READY', 'MERGE Q', '$/MIN',
+        'EV/S', 'EV/M', 'VEL', 'LOAD', 'WIP', 'BLOCKED', 'READY', 'MERGE Q', '$/MIN',
         'MERGES', 'TOKENS', '❄ STALE', '🧹 PARKED', 'OLDEST',
       ]);
     for (const value of ['1.5', '90', '2.50', '6', '2', '8', '3', '$1.25', '4', '38.5M', '5', '47m', '7 active']) {

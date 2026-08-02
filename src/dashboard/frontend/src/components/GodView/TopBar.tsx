@@ -79,8 +79,8 @@ function Meter({ label, value }: { label: string; value: number | null }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return <span className="confluence-stat"><em>{label}</em><b>{value}</b></span>;
+function Stat({ label, value, title }: { label: string; value: string | number; title?: string }) {
+  return <span className="confluence-stat" title={title}><em>{label}</em><b>{value}</b></span>;
 }
 
 export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBarProps) {
@@ -114,6 +114,13 @@ export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBar
         <EventsEcg eventsPerMin={hookStream.eventsPerMin} />
         <Stat label="EV/M" value={hookStream.eventsPerMin} />
       </span>
+      <Stat
+        label="VEL"
+        value={meta.velocity ? `${meta.velocity.transitionsPerHour}/h` : '—'}
+        title={meta.velocity
+          ? `real stage transitions in the last hour — plan ${meta.velocity.byStage['plan'] ?? 0} · work ${meta.velocity.byStage['work'] ?? 0} · review ${meta.velocity.byStage['review'] ?? 0} · test ${meta.velocity.byStage['test'] ?? 0} · verify ${meta.velocity.byStage['verify'] ?? 0} · merge ${meta.velocity.byStage['merge'] ?? 0}`
+          : 'velocity unavailable'}
+      />
       <span className="confluence-meters">
         <Meter label="CPU" value={system?.cpu ?? null} />
         <Meter label="MEM" value={system?.memPercent ?? null} />
