@@ -15,6 +15,15 @@
         }
       })();
     </script>
+    <script>
+      // Flash prevention (PAN-3410): apply the Overdeck Theme design language
+      // (Ledger/Broadsheet — independent from the dark/light color scheme
+      // above) before React mounts. Default is broadsheet.
+      (function() {
+        var designLanguage = localStorage.getItem('overdeck.ui.designLanguage');
+        document.documentElement.dataset.theme = designLanguage === 'ledger' ? 'ledger' : 'broadsheet';
+      })();
+    </script>
     <style>
       /* Pre-mount paint: keep the document dark/light per theme so a reload
          during a server restart never flashes a blank page (PAN-1580). The
