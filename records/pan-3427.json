@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:22:39.856Z",
+  "updated": "2026-08-02T18:27:22.572Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "cli-queue-verb": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 1309825,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:22:39.856Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -193,6 +185,17 @@
         "outcome": "completed",
         "reason": "Added firstReadyBookInQueue(stateRoot) to resolver.ts; advanceQueue now calls it instead of duplicating the index-scan loop; 2 new resolver tests cover queue-order + skip-non-ready and empty/no-ready cases",
         "releasedAt": "2026-08-02T18:22:28.980Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 1309825,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:22:39.856Z",
+        "itemId": "cli-queue-verb",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T18:27:22.489Z"
       }
     ],
     "statusReasons": {
@@ -215,6 +218,10 @@
       "resolver-first-ready": {
         "reason": "Added firstReadyBookInQueue(stateRoot) to resolver.ts; advanceQueue now calls it instead of duplicating the index-scan loop; 2 new resolver tests cover queue-order + skip-non-ready and empty/no-ready cases",
         "updatedAt": "2026-08-02T18:22:28.980Z"
+      },
+      "cli-queue-verb": {
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "updatedAt": "2026-08-02T18:27:22.489Z"
       }
     }
   },
@@ -240,6 +247,6 @@
     "resolver-first-ready": "completed",
     "resolver-first-ready.resolver-first-ready.ac1": "completed",
     "resolver-first-ready.resolver-first-ready.ac2": "completed",
-    "cli-queue-verb": "running"
+    "cli-queue-verb": "pending"
   }
 }
