@@ -220,8 +220,8 @@ describe('system health UI no-loss audit', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
 
-    // Summary line (new header box)
-    expect(within(dialog).getByText(/All clear.*spawn headroom.*relay running.*0 stalled/)).toBeInTheDocument();
+    // Summary line remains visible even when the healthy state repeats it in the empty attention section.
+    expect(within(dialog).getAllByText(/All clear.*spawn headroom.*relay running.*0 stalled/).length).toBeGreaterThan(0);
 
     // Chip row (new top status row, replaces old 8-tile status grid)
     expect(within(dialog).getByText('Admitted work agents')).toBeInTheDocument();
@@ -285,9 +285,13 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Top consumers section with kind badges
-    expect(within(dialog).getByText(/Work|Specialist|Container/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/agent-pan-1|specialist-review-agent|container-1/)).toBeInTheDocument();
+    // Top consumers section with every kind badge and consumer label.
+    for (const kind of ['agent', 'specialist', 'container']) {
+      expect(within(dialog).getByText(kind)).toBeInTheDocument();
+    }
+    for (const label of ['agent-pan-1 · PAN-1', 'specialist-review-agent · PAN-1', 'container-1']) {
+      expect(within(dialog).getByText(label)).toBeInTheDocument();
+    }
   });
 
   it('displays attention section with severity dots and grouped agent rows when critical', () => {
@@ -313,8 +317,9 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Attention section should exist with agent activity issue
-    expect(within(dialog).getByText(/agent-stalled|activity stalled/)).toBeInTheDocument();
+    // Attention section should retain both the grouped reason and the affected agent.
+    expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
+    expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {
