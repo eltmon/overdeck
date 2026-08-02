@@ -634,7 +634,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T17:02:24.190Z",
+  "updated": "2026-08-02T17:03:03.796Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -750,16 +750,7 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "recoveryTrips": [
-    {
-      "issue": "PAN-1577",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-07-28T21:04:35.248Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 18,
     "claims": {},
