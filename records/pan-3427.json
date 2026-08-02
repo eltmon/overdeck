@@ -152,6 +152,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T21:45Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-02T21:45:35.387Z"
+    },
+    {
+      "timestamp": "2026-08-02T21:47:40.485Z",
+      "reason": "end",
+      "note": "Synced main twice in quick succession (main moved twice during this session): merged origin/main at 7727644 (conflict in tests/unit/lib/orders/orders-resolver.test.ts — both sides had added independent test blocks at the same location: this branch's firstReadyBookInQueue tests and main's ensureOrderIssueStore/orderIssueStoreStatus tests; resolved by keeping both), then merged again at 93b88ee (clean, no conflicts). Verified after each merge: full npx tsc --noEmit clean, and npx vitest run tests/unit/lib/orders/ green (29/29). Both merges pushed."
     }
   ],
   "feedback": [
@@ -221,7 +226,7 @@
     "recordedAt": "2026-08-02T21:47:33.880Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:47:35.168Z",
+  "updated": "2026-08-02T21:47:40.565Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -232,11 +237,11 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T21:47:35.162Z",
+    "updatedAt": "2026-08-02T21:47:40.456Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
-    "reviewSpawnedAt": "2026-08-02T21:46:04.830Z",
     "reviewRequestedAt": "2026-08-02T21:47:35.162Z",
+    "reviewSpawnedAt": "2026-08-02T21:46:04.830Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/composer-commands.generated.ts",
@@ -308,9 +313,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 594538,
-            "output": 15282,
-            "cacheRead": 6768128,
+            "input": 879678,
+            "output": 17552,
+            "cacheRead": 8353792,
             "cacheWrite": 0
           }
         },
@@ -348,10 +353,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5863,
-            "output": 212253,
-            "cacheRead": 164813675,
-            "cacheWrite": 9079616
+            "input": 5871,
+            "output": 212862,
+            "cacheRead": 167327680,
+            "cacheWrite": 9080910
           }
         }
       },
@@ -363,21 +368,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 5969460,
-          "output": 105488,
-          "cacheRead": 25467904,
+          "input": 6254600,
+          "output": 107758,
+          "cacheRead": 27053568,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5863,
-          "output": 212253,
-          "cacheRead": 164813675,
-          "cacheWrite": 9079616
+          "input": 5871,
+          "output": 212862,
+          "cacheRead": 167327680,
+          "cacheWrite": 9080910
         }
       },
       "costAtCloseOut": {
-        "usd": 103.8454722,
-        "pricingAsOf": "2026-08-02T21:46:10.211Z"
+        "usd": 106.6442462,
+        "pricingAsOf": "2026-08-02T21:47:40.533Z"
       }
     },
     "merges": [
@@ -386,7 +391,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
