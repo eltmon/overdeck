@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:26.306Z",
+  "updated": "2026-08-02T17:30:29.796Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -48,16 +48,8 @@
   "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "docs-order-books-cli-start": {
-        "writerId": "agent-pan-3426",
-        "agentId": "agent-pan-3426",
-        "pid": 3086055,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:30:26.306Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3426",
@@ -102,6 +94,17 @@
         "outcome": "completed",
         "reason": "Added store-unavailable finding code to OrderBookFindingCode type. validateBookForStart checks orderIssueStoreStatus and blocks with actionable message when store is unavailable.",
         "releasedAt": "2026-08-02T17:30:18.558Z"
+      },
+      {
+        "writerId": "agent-pan-3426",
+        "agentId": "agent-pan-3426",
+        "pid": 3086055,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:30:26.306Z",
+        "itemId": "docs-order-books-cli-start",
+        "outcome": "completed",
+        "reason": "Updated docs/ORDER-BOOKS.md with comprehensive documentation of CLI start priming, skipPolling mode behavior, and store-unavailable finding.",
+        "releasedAt": "2026-08-02T17:30:29.796Z"
       }
     ],
     "statusReasons": {
@@ -116,6 +119,10 @@
       "store-unavailable-finding": {
         "reason": "Added store-unavailable finding code to OrderBookFindingCode type. validateBookForStart checks orderIssueStoreStatus and blocks with actionable message when store is unavailable.",
         "updatedAt": "2026-08-02T17:30:18.558Z"
+      },
+      "docs-order-books-cli-start": {
+        "reason": "Updated docs/ORDER-BOOKS.md with comprehensive documentation of CLI start priming, skipPolling mode behavior, and store-unavailable finding.",
+        "updatedAt": "2026-08-02T17:30:29.796Z"
       }
     }
   },
@@ -132,6 +139,8 @@
     "store-unavailable-finding.store-unavailable-finding.ac1": "completed",
     "store-unavailable-finding.store-unavailable-finding.ac2": "completed",
     "store-unavailable-finding.store-unavailable-finding.ac3": "completed",
-    "docs-order-books-cli-start": "running"
+    "docs-order-books-cli-start": "completed",
+    "docs-order-books-cli-start.docs-order-books-cli-start.ac1": "completed",
+    "docs-order-books-cli-start.docs-order-books-cli-start.ac2": "completed"
   }
 }
