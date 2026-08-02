@@ -239,21 +239,22 @@
     "recordedAt": "2026-08-02T22:33:24.453Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T22:36:44.381Z",
+  "updated": "2026-08-02T22:41:37.878Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T22:35:58.790Z",
-    "updatedAt": "2026-08-02T22:36:41.993Z",
+    "updatedAt": "2026-08-02T22:41:37.799Z",
     "uatNotes": "UAT executed: built workspace dashboard (npm run build:dashboard), ran it isolated on PORT=3423 with OVERDECK_DISABLE_DEACON=1 (never touched the shared host dashboard on 3011), drove it with an isolated Playwright session. Opened the live SystemHealthPill popover (real Warning-state data) and confirmed: state-badge header + relative updated time; bordered summary line; chip row replacing the old tile grid; all 4 vitals tiles rendering real threshold-colored meter bars incl. swap 'historical - not live pressure' label; grouped xN attention row collapsed with no inline Kill/Open (closed-by-default disclosure only); singleton rows with working Open/Kill wiring (verified via source + aria-labels, not clicked, to avoid killing another agent's live session on this shared host); closed-by-default context-notes disclosure; top-consumers kind badges + proportional bars + 'No leaks' header; Escape closes the popover. LEAKED-tag, healthy all-clear variant, and exact FR-3 message text were not re-observed live (system stayed in Warning state) but are covered by passing unit/component tests. Full evidence and screenshot description in .pan/test/result.json. Cleaned up the port-3423 process and scratch files afterward.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
+    "lastVerifiedCommit": "8adf445f585895d3a32a9336a78b5c82f52934b0",
     "reviewRequestedAt": "2026-08-02T22:35:58.790Z",
     "reviewSpawnedAt": "2026-08-02T22:33:01.642Z",
     "scopeDrift": {
@@ -303,9 +304,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 16501462,
-            "output": 247956,
-            "cacheRead": 71897088,
+            "input": 17389371,
+            "output": 267809,
+            "cacheRead": 76985856,
             "cacheWrite": 0
           }
         },
@@ -372,9 +373,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23131817,
-          "output": 552187,
-          "cacheRead": 178702336,
+          "input": 24019726,
+          "output": 572040,
+          "cacheRead": 183791104,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -391,8 +392,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 231.6648413,
-        "pricingAsOf": "2026-08-02T22:36:44.371Z"
+        "usd": 239.2443603,
+        "pricingAsOf": "2026-08-02T22:41:37.856Z"
       }
     },
     "merges": [
