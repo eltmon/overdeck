@@ -1106,3 +1106,10 @@ Appended to PAN-3440: its scope is not just "register strike workspaces" but "im
 - **PAN-3477 merged (`4be15e7626`), handed off, and DEPLOYED** — merged swarm slots are now reaped, auto-resume is swarm-aware, and zombies no longer charge against slot capacity. The PAN-3447 slot-3 loop is structurally dead.
 - **PAN-3482 + PAN-3478 closed out. 40 issues landed+closed this run.** The dashboard typecheck ratchet is restored and the quality lint now names its issues.
 - **My own miss, caught by the gate:** PAN-3478's close-out failed on `reviewStatus: pending` because I merged its PR at tick 72 but never ran `pan done --strike`. The DoD gate caught the skipped step exactly as designed — I had merged and moved on. Ran the handoff, then close-out passed clean. **Rule: merging a strike PR is only half the landing; the handoff is what records the verdict.** Worth noting the gate is what made this recoverable rather than a silently half-landed issue.
+
+## RUN-79 tick 75 (2026-08-02 ~15:15Z) — PAN-3477 closed out (41 total); leak curve REVERSED
+
+- **PAN-3477 closed out. 41 issues landed+closed this run.**
+- **Leak: first negative sample.** Fixed-uptime protocol (20m41s, the discipline prescribed two ticks ago): **RSS 1357→907MB = −150MB/min at 33 sessions**. The process is reclaiming, not growing; pre-fix at comparable uptime was ~1936MB and climbing, post-round-2 was +94MB/min. Absolute RSS (907MB at 20min) is the more meaningful signal than the negative slope.
+- **Did NOT declare it fixed** — wrote explicit closure criteria onto the issue instead: two consecutive non-positive fixed-uptime samples PLUS one sample through a deliberate 10-session attach burst, since the leak's worst behaviour was always attach-scoped and 33 steady-state sessions is not a ramp. After three premature "fixed" calls this run (composer wedge, leak round 1, leak round 2), the standard is now written down rather than remembered.
+- Campaign: 4 of 5 (Lane B complete, MIN-933 finishing Lane A). strike-3431 still working its 3h+ shell.
