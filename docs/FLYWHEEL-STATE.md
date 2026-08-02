@@ -972,3 +972,8 @@ Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 ac
 - **PAN-3467 → PR #3470** (`0009c93707 fix(plan): prefer authored workspace spec`) and **PAN-3468 → PR #3471** (`11eaa2cb38 fix(planning): separate readiness from DAG position`). Both committed with exactly the right framing — 3468's commit message names the actual conceptual error (readiness conflated with DAG position), which is why the coordinator endgamed with pending items.
 - Watch armed on #3470's test lane (PAN-3467 is the one that must DEPLOY before the PAN-3447 unstick). Sequence on green: merge → `pan done --strike` → **`pan reload`** → `pan plan finalize` from `workspaces/feature-pan-3447` → `pan swarm PAN-3447`.
 - Operator drives PAN-3447's live slots and any fallback serial agent; I only supply the deployed fix + the two unstick commands.
+
+## RUN-79 interstitial (~04:28Z) — strike-3462 landed via CI (#3472); PAN-3344 tally now NINE strikes
+
+strike-3462 (deferred-deploy fix, `cadc19d9e9 keep queued blocker current`) reported the load flake with a **failure-count gradient: 21 → 39 → 65 timeouts across three back-to-back runs on unchanged code**, 13k+ passing each time. That gradient is the cleanest proof yet that it is contention, not the change — same commit, same suite, monotonically worse as the host loaded. Pushed + **PR #3472**, CI arbitrates.
+**PAN-3344 tally: 9 strikes today could not use local verification.** Appended the gradient plus the blunt framing: the project has effectively lost pre-push verification on the machine where agents work. This is now the run's most expensive systemic tax — every instance costs an orchestrator round-trip and a landing decision.
