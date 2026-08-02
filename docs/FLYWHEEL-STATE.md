@@ -927,3 +927,7 @@ Two facts worth carrying: (1) swarm `verify_commands` run the FULL root suite, s
   - **PAN-3451** — its own `verifying_on_main` agent is still running. Closing now would cut off in-flight verification.
 - Full read-door sweep: 18 PAN + 20 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged. **Clean UAT batch EMPTY** (candidate null) — nothing review+test passed, so nothing assembled.
 - Two gates in one tick both stating their reason and self-clearing is the PAN-3383 observability work compounding — a year ago these would have been silent stalls needing a human.
+
+## RUN-79 note (~02:30Z) — RSS tripwire at 3157MB: deliberately NOT reloading
+
+Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 across all windows. The reload that would reset RSS is the SAME operation the deploy gate has already queued (pending post-merge lifecycle, since 02:24Z); retrying would fight a gate protecting in-flight work. Waiting: when the gate fires it resets RSS **and** unblocks PAN-3396's close-out together. Recorded so this non-action is not mistaken for a missed alert — RSS alone, with zero pressure and a queued deploy, is not an emergency.
