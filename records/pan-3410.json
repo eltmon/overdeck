@@ -649,15 +649,7 @@
       "timestamp": "2026-08-02T23:00:06.679Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-02T23:00:06Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T22:59:29Z\n\n## Verdict: CHANGES REQUESTED — a queued full-document Settings save can still overwrite a completed theme save\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 75a2d964ee54d9f1ea25017f58d7565ea1db7a37\n- Merge base: c7b6d2e5f1e168ada9c830ad12cb7cd315b122c5\n- Cycle number: 8\n- Prior cycle SHA: 4d4c7813e69ba52becd3136d62962d700c90855d\n- PR commits: 20\n- Note: the immediately preceding e6f38e4f review run did not produce a synthesis, so convergence is measured from the latest completed synthesis at 4d4c7813.\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] A queued full-document save can still overwrite a theme save that completed first — `src/lib/settings-api.ts:902`\n**Scope: in_pr_scope.** FR-7 requires the `ui.theme` settings path to be no-loss under overlapping saves. The new queue serializes server-side disk writes, and the dedicated theme mutation reads within its queued callback, but the general `PUT /api/settings` path queues an already-materialized full-document payload assembled by `SettingsPage.saveSettings()`. If that payload captured Broadsheet before a dedicated request commits Ledger, then enters the queue second, `saveSettingsApiPromiseUnlocked()` writes the stale `settings.ui.theme` and silently restores Broadsheet. The added overlapping-write test exercises only the safe reverse order—full save first, theme save second—so it does not prove the required order-independent behavior.\n\nThis blocker survives the cycle-8 convergence gate because the cited queue implementation, full-save wrapper, and overlapping-write regression test were added after the prior completed synthesis at `4d4c7813`. It remains the same unresolved FR-7 no-loss requirement rather than a promotion of previously accepted code.\n\n## Non-blocking Findings\n\n### [correctness] Stale full-document ordering race — `src/lib/settings-api.ts:902`\nThe correctness reviewer independently identified the same ordering defect but classified it as advisory. It is deduplicated into the blocking FR-7 requirements finding above.\n\n### [correctness] Latest-operation ordering during browser reconciliation\nA late startup reconciliation or older rapid-toggle response can overwrite a newer local selection. The reviewer kept this as advisory because the reviewed blocking requirement is the persistent settings no-loss guarantee.\n\n### [performance] Scalar design-language operations still traverse full settings machinery — `src/lib/settings-api.ts:1491`\nStartup fetches the complete settings projection to read one enum, while a theme write rebuilds and rewrites the complete YAML document and awaits unrelated analytics synchronization. The path runs only at startup and explicit theme changes, so it is bounded and non-blocking.\n\n## Convergence and Proportionality\nThe single blocker cites code changed since the prior completed synthesis, so it is promotable under the cycle-8 convergence gate. The PR contains 20 commits and one blocker, below the proportionality threshold of 60 blockers.\n\n## Clean Sub-roles\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-75a2d964/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -758,10 +750,10 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T23:00:37.543Z",
+  "updated": "2026-08-02T23:12:40.072Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "running",
@@ -770,13 +762,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T23:00:12.884Z",
+    "updatedAt": "2026-08-02T23:12:39.631Z",
     "reviewNotes": "A queued full-document Settings save can still overwrite a completed theme save",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
     "verificationNotes": "Verification FAILED at typecheck (77701ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m385.66 kB\u001b[22m \u001b[2m│ gzip: 62.29 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 385.66 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3710ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m353.94 kB\u001b[22m \u001b[2m│ gzip: 59.96 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m579.37 kB\u001b[22m \u001b[2m│ gzip: 92.64 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.86 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4081ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (75%)\n  - rolldown-plugin-dts:fake-js (20%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewedAtCommit": "75a2d964ee54d9f1ea25017f58d7565ea1db7a37",
     "reviewSpawnedAt": "2026-08-02T22:54:19.233Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -891,9 +882,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 36029014,
-            "output": 768354,
-            "cacheRead": 166090752,
+            "input": 36032448,
+            "output": 768602,
+            "cacheRead": 166437888,
             "cacheWrite": 0
           }
         },
@@ -907,10 +898,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 6425,
-            "output": 598033,
-            "cacheRead": 499627413,
-            "cacheWrite": 31165326
+            "input": 6527,
+            "output": 627885,
+            "cacheRead": 530127769,
+            "cacheWrite": 31213936
           }
         }
       },
@@ -922,21 +913,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 36029014,
-          "output": 768354,
-          "cacheRead": 166090752,
+          "input": 36032448,
+          "output": 768602,
+          "cacheRead": 166437888,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6697,
-          "output": 647519,
-          "cacheRead": 536098875,
-          "cacheWrite": 31515749
+          "input": 6799,
+          "output": 677371,
+          "cacheRead": 566599231,
+          "cacheWrite": 31564359
         }
       },
       "costAtCloseOut": {
-        "usd": 478.7408263,
-        "pricingAsOf": "2026-08-02T23:00:12.892Z"
+        "usd": 485.4593253,
+        "pricingAsOf": "2026-08-02T23:12:39.682Z"
       }
     },
     "merges": [
@@ -945,7 +936,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
