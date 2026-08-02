@@ -166,7 +166,7 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:59:16.179Z",
+  "updated": "2026-08-02T19:59:18.783Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "failed",
@@ -176,7 +176,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:59:08.220Z",
+    "updatedAt": "2026-08-02T19:59:08.251Z",
     "reviewNotes": "Verification failed at typecheck",
     "verificationNotes": "Verification FAILED at typecheck (27032ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n",
     "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd.",
@@ -246,9 +246,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 35425,
-            "output": 22624,
-            "cacheRead": 5135,
+            "input": 35677,
+            "output": 23274,
+            "cacheRead": 5138,
             "cacheWrite": 0
           }
         },
@@ -303,9 +303,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 35425,
-          "output": 22624,
-          "cacheRead": 5135,
+          "input": 35677,
+          "output": 23274,
+          "cacheRead": 5138,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -322,8 +322,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 75.4508695,
-        "pricingAsOf": "2026-08-02T19:59:12.213Z"
+        "usd": 75.4543718,
+        "pricingAsOf": "2026-08-02T19:59:18.777Z"
       }
     },
     "merges": [
