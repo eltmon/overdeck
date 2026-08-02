@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:07.166Z",
+  "updated": "2026-08-02T17:30:14.680Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -48,8 +48,16 @@
   "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 6,
-    "claims": {},
+    "sequence": 7,
+    "claims": {
+      "store-unavailable-finding": {
+        "writerId": "agent-pan-3426",
+        "agentId": "agent-pan-3426",
+        "pid": 3074979,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:30:14.680Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3426",
@@ -104,6 +112,7 @@
     "cli-start-primes-issue-store": "completed",
     "cli-start-primes-issue-store.cli-start-primes-issue-store.ac1": "completed",
     "cli-start-primes-issue-store.cli-start-primes-issue-store.ac2": "completed",
-    "cli-start-primes-issue-store.cli-start-primes-issue-store.ac3": "completed"
+    "cli-start-primes-issue-store.cli-start-primes-issue-store.ac3": "completed",
+    "store-unavailable-finding": "running"
   }
 }
