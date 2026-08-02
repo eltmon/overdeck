@@ -739,7 +739,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T19:46:58.288Z",
+  "updated": "2026-08-02T19:53:13.612Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -748,7 +748,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T17:36:14.540Z",
     "updatedAt": "2026-08-02T19:46:58.242Z",
     "blockerReasons": [
       {
