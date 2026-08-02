@@ -383,6 +383,22 @@ The **preemptive scheduler** (PAN-2507) is also configured under `[concurrency]`
 | `max_yielded` | `3` | Anti-thrash: the most work agents that may be in the yielded (scheduler-paused) state at once. |
 | `yield_cooldown_secs` | `600` | Anti-thrash: an agent resumed from a yield may not be re-yielded until this many seconds elapse. |
 
+## SystemHealthPill (PAN-3423)
+
+The dashboard System Health Pill popover displays live resource metrics and governor state through a redesigned hierarchical interface. When healthy, it presents a one-line "All clear" summary with spawn headroom and service status; in degraded or critical states, it surfaces a prioritized **attention section** grouping identical failure patterns across multiple agents into single rows with count badges (e.g. "4× agents: agent-A, agent-B +2 more").
+
+**Sections:**
+
+1. **Summary line** — a one-sentence answer to "do I need to act now?" — renders healthy state with spawn headroom in GiB (or "Limited"), relay status, and stalled-agent count. Critical states name the critical-issue count and affected stalled agents.
+2. **Chip row** — three status chips showing admitted work agents, running containers, and webhook-relay health (all running instances of the main status row).
+3. **Vitals tiles** — a 4×2 grid displaying CPU%, load/core, total/used/available memory, Overdeck RSS, swap %, and virtual-commitment %. Each tile has a proportional meter bar with threshold colors (green <60%, amber 60–85%, red >85% for memory metrics; Overdeck accent blue otherwise).
+4. **Attention section** — severity-color-coded rows (red dot for critical, amber for warning) grouped by reason code. Identical codes across agents fold into one row with agent count and abbreviated list (first two named, "+N more" if >2). Rows remain closed by default; a nested "Show context reasons" disclosure expands severity:info notes like sampling unavailable or retry guidance.
+5. **Top consumers** — memory-ranked list of agents, specialists, and containers sorted by RSS, each with a kind badge and proportional memory bar. Leaked specialists badge with amber "LEAKED" tag. Sections collapse to "⚠ N leaked" or "No leaks" when critical.
+
+The pill header shows a state dot (red/amber/green) and a "Updated Ns ago" timestamp relative to the snapshot's `updatedAt`. A state transition into critical emits one toast notification with an action to jump to the popover focus-locked on leaked-first. A "Show all" button expands/collapses top consumers between leaked-only and full views.
+
+**Data flow:** `buildAttentionItems()` in `system-health-attention.ts` groups reasons by code, filters severity:info for collapsed disclosure, and sorts by critical-first, stalled-before-idle. `summaryLine()` constructs the header text from health state and stalled-agent count. `contextNotes()` returns only info reasons. The component passes control via `useStore()` open-issue navigation — the `Open` action parses the agent ID to derive an issue ID and route there.
+
 ## Related documents
 
 - [`docs/AGENT-STATE-PLANES.md`](AGENT-STATE-PLANES.md) — the liveness oracle section notes that

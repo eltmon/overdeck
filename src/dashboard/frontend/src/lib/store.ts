@@ -72,6 +72,26 @@ export interface DashboardStore extends DashboardState {
   syncDrawerFromUrl(): void
 }
 
+export type DashboardDomainEventListener = (events: readonly DomainEvent[]) => void
+
+const dashboardDomainEventListeners = new Set<DashboardDomainEventListener>()
+
+export function subscribeDashboardDomainEvents(listener: DashboardDomainEventListener): () => void {
+  dashboardDomainEventListeners.add(listener)
+  return () => dashboardDomainEventListeners.delete(listener)
+}
+
+function publishDashboardDomainEvents(events: readonly DomainEvent[]): void {
+  if (events.length === 0) return
+  for (const listener of dashboardDomainEventListeners) {
+    try {
+      listener(events)
+    } catch (error) {
+      console.error('[DashboardStore] domain event listener failed:', error)
+    }
+  }
+}
+
 // ─── Initial state ────────────────────────────────────────────────────────────
 
 const initialState: DashboardState = {
@@ -158,11 +178,15 @@ export const useDashboardStore = create<DashboardStore>((set) => ({
     set((state) => syncSnapshot(state, snapshot))
   },
 
-  applyEvent: (event) =>
-    set((state) => applyEvent(state, event)),
+  applyEvent: (event) => {
+    set((state) => applyEvent(state, event))
+    publishDashboardDomainEvents([event])
+  },
 
-  applyEvents: (events) =>
-    set((state) => applyEvents(state, events)),
+  applyEvents: (events) => {
+    set((state) => applyEvents(state, events))
+    publishDashboardDomainEvents(events)
+  },
 
   seedRecentActivity: (entries) =>
     set((state) => {

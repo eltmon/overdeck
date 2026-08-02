@@ -50,6 +50,7 @@ interface OverdeckBridge {
 
 interface Window {
   overdeckBridge?: OverdeckBridge;
+  __orbs?: readonly import('../components/GodView/confluence/useConfluenceData').ConfluenceOrb[];
 }
 
 declare module 'framer-motion' {

@@ -142,6 +142,7 @@ export default defineConfig(async () => {
       alwaysBundle: [/^@overdeck\//],
       neverBundle: [
         '@lydell/node-pty',
+        '@parcel/watcher',
         'ssh2',
         // PAN-1645: playwright is loaded only via a runtime `await import('playwright')`
         // (artifact thumbnails). Bundling it pulls in playwright-core's prebundled

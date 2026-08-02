@@ -61,7 +61,7 @@ function readySlot(overrides: Partial<ClassifiedSwarmSlot> = {}): ClassifiedSwar
   };
 }
 
-function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> {
+function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks' | 'stopSlotAgent'> {
   return {
     verifyAndMergeSlot: vi.fn(async () => ({
       verified: true,
@@ -75,6 +75,7 @@ function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'app
     })),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     fireTieredCommitHooks: vi.fn(async () => []),
+    stopSlotAgent: vi.fn(async () => undefined),
   };
 }
 
@@ -111,7 +112,10 @@ describe('deacon-swarm loop safety', () => {
     const fakeDeps = mergeDeps();
 
     await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [readySlot()], fakeDeps))
-      .resolves.toEqual(['[swarm] merged slot 1 (item wi-a) for PAN-2203']);
+      .resolves.toEqual([
+        '[swarm] reaped merged agent agent-pan-2203-slot-1',
+        '[swarm] merged slot 1 (item wi-a) for PAN-2203',
+      ]);
     await expect(mergeReadySlots('PAN-2203', '/workspace', doc(), [readySlot()], fakeDeps))
       .resolves.toEqual(['[swarm] skipped merge slot 1 (item wi-a) for PAN-2203: refire cooldown']);
 
