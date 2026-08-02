@@ -367,6 +367,11 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-02T16:35:06.106Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T16:48Z] review-agent → FAILED — seq 3",
+      "timestamp": "2026-08-02T16:48:59.996Z"
     }
   ],
   "feedback": [
@@ -382,6 +387,13 @@
       "specialist": "review-agent",
       "outcome": "failed",
       "timestamp": "2026-08-02T16:21:52Z",
+      "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3410`."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T16:48:59Z",
       "markdownBody": "## Pipeline Rework Required\n\nverification exhausted its cycles without passing.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3410`."
     }
   ],
@@ -485,7 +497,7 @@
     "recordedAt": "2026-08-02T07:31:17.191Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T16:35:06.106Z",
+  "updated": "2026-08-02T16:48:59.996Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
