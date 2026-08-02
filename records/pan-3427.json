@@ -218,10 +218,10 @@
       "tests/unit/cli/orders.test.ts",
       "tests/unit/lib/orders/orders-resolver.test.ts"
     ],
-    "recordedAt": "2026-08-02T21:03:43.259Z"
+    "recordedAt": "2026-08-02T21:47:33.880Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:47:31.707Z",
+  "updated": "2026-08-02T21:47:33.883Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "reviewing",
