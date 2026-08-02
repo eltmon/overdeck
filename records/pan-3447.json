@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T05:52:55.178Z",
+  "updated": "2026-08-02T06:34:31.793Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -134,16 +134,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 26,
-    "claims": {
-      "confluence-data": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 96543,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T05:51:52.736Z"
-      }
-    },
+    "sequence": 27,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -274,6 +266,17 @@
         "outcome": "blocked",
         "reason": "Blocked by hook-stream-shaping: completed state has no hookName support in events, so the data hook cannot preserve hook identity.",
         "releasedAt": "2026-08-02T05:51:10.618Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 96543,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T05:51:52.736Z",
+        "itemId": "confluence-data",
+        "outcome": "completed",
+        "reason": "Implemented stable per-issue orbs, five-member review convoys, live hook telemetry with 60s windows/rate decay/energy, micro-states, and HUD metadata fallbacks. Root-cause check found the completed hook-stream prerequisite had not preserved hookName; this commit adds hookName to the existing activity event schema, heartbeat ingestion, and wired hook payloads. Verified npm test -- confluence (13,109 tests green across root/frontend), heartbeat-ingestion (18 green), npm run typecheck, and npm run lint.",
+        "releasedAt": "2026-08-02T06:34:31.793Z"
       }
     ],
     "statusReasons": {
@@ -294,8 +297,8 @@
         "updatedAt": "2026-08-02T04:01:57.934Z"
       },
       "confluence-data": {
-        "reason": "The prerequisite task is terminal and cannot be reopened; this item will include the minimal event-shaping correction required to preserve hookName through the existing domain-event path.",
-        "updatedAt": "2026-08-02T05:51:36.494Z"
+        "reason": "Implemented stable per-issue orbs, five-member review convoys, live hook telemetry with 60s windows/rate decay/energy, micro-states, and HUD metadata fallbacks. Root-cause check found the completed hook-stream prerequisite had not preserved hookName; this commit adds hookName to the existing activity event schema, heartbeat ingestion, and wired hook payloads. Verified npm test -- confluence (13,109 tests green across root/frontend), heartbeat-ingestion (18 green), npm run typecheck, and npm run lint.",
+        "updatedAt": "2026-08-02T06:34:31.793Z"
       }
     }
   },
@@ -316,7 +319,11 @@
     "aurora-shader.aurora-shader.ac1": "completed",
     "aurora-shader.aurora-shader.ac2": "completed",
     "aurora-shader.aurora-shader.ac3": "completed",
-    "confluence-data": "running"
+    "confluence-data": "completed",
+    "confluence-data.confluence-data.ac1": "completed",
+    "confluence-data.confluence-data.ac2": "completed",
+    "confluence-data.confluence-data.ac3": "completed",
+    "confluence-data.confluence-data.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
