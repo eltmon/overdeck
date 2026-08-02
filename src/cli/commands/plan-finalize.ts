@@ -99,6 +99,7 @@ interface PromotePlanningResult {
   success: boolean;
   message: string | null;
   error: string | null;
+  qualityIssues: QualityIssue[];
   workAgentSpawned: boolean;
   workAgentMessage: string | null;
   workAgentError: string | null;
@@ -304,6 +305,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
   let promoted = false;
   let promoteMessage: string | null = null;
   let promoteError: string | null = null;
+  let promotionQualityIssues: QualityIssue[] = [];
   let workAgentSpawned = false;
   let workAgentMessage: string | null = null;
   let workAgentError: string | null = null;
@@ -318,6 +320,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
     promoted = promotion.success;
     promoteMessage = promotion.message;
     promoteError = promotion.error;
+    promotionQualityIssues = promotion.qualityIssues;
 
     workAgentSpawned = promotion.workAgentSpawned;
     workAgentMessage = promotion.workAgentMessage;
@@ -367,6 +370,7 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       workAgentSpawned,
       ...(promoteMessage ? { promoteMessage } : {}),
       ...(promoteError ? { promoteError } : {}),
+      ...(promotionQualityIssues.length > 0 ? { qualityIssues: promotionQualityIssues } : {}),
       ...(promotionMarkerError ? { promotionMarkerError } : {}),
       ...(workAgentMessage ? { workAgentMessage } : {}),
       ...(workAgentError ? { workAgentError } : {}),
@@ -401,6 +405,11 @@ export async function planFinalizeCommand(options: PlanFinalizeOptions = {}): Pr
       if (promoteError) console.log(chalk.dim('  Promotion error: ' + promoteError));
       if (promotionMarkerError) console.log(chalk.dim('  Marker error: ' + promotionMarkerError));
     }
+    if (!promoted && !noPromote && promotionQualityIssues.length > 0) {
+      for (const line of formatQualityIssues(promotionQualityIssues)) {
+        console.error(chalk.red('  ' + line));
+      }
+    }
   }
 
   if (!noPromote && !promoted) {
@@ -430,10 +439,32 @@ function promoteBackoffMs(completedAttempts: number): number {
   return PROMOTE_BASE_DELAY_MS * 2 ** completedAttempts; // 1s, 2s, 4s, 8s
 }
 
-const promoteFailure = (error: string): PromotePlanningResult => ({
-  success: false, message: null, error,
+const promoteFailure = (error: string, qualityIssues: QualityIssue[] = []): PromotePlanningResult => ({
+  success: false, message: null, error, qualityIssues,
   workAgentSpawned: false, workAgentMessage: null, workAgentError: null, workAgentSkipReason: null,
 });
+
+function qualityIssuesFromResponse(parsed: unknown): QualityIssue[] {
+  if (!parsed || typeof parsed !== 'object') return [];
+  const response = parsed as { error?: unknown; qualityIssues?: unknown };
+  const issues = Array.isArray(response.qualityIssues)
+    ? response.qualityIssues.filter((value: unknown): value is QualityIssue => {
+      if (!value || typeof value !== 'object') return false;
+      const candidate = value as Partial<QualityIssue>;
+      return (candidate.itemId === null || typeof candidate.itemId === 'string')
+        && typeof candidate.rule === 'string'
+        && typeof candidate.message === 'string'
+        && (candidate.severity === 'error' || candidate.severity === 'warn');
+    })
+    : [];
+  if (issues.length > 0 || response.error !== 'xBRIEF quality lint failed') return issues;
+  return [{
+    itemId: null,
+    rule: 'quality-issues-missing',
+    message: 'The complete-planning endpoint rejected the plan without returning any quality issues. This is an evaluator bug; do not bypass the gate.',
+    severity: 'error',
+  }];
+}
 
 export async function promotePlanning(issueId: string, autoSpawn = false, opts: { noPrd?: boolean } = {}): Promise<PromotePlanningResult> {
   const url = `${getDashboardApiUrlSync()}/api/issues/${issueId}/complete-planning`;
@@ -461,13 +492,14 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
       if (!response.ok) {
         const err = (parsed && (parsed.error || parsed.message)) || text.slice(0, 200) || `HTTP ${response.status}`;
         lastError = String(err);
+        const qualityIssues = qualityIssuesFromResponse(parsed);
         if (PROMOTE_RETRYABLE_STATUS.has(response.status) && hasMoreAttempts) {
           const delay = promoteBackoffMs(attempt);
           console.error(chalk.dim(`complete-planning HTTP ${response.status}; retrying in ${delay / 1000}s (attempt ${attempt + 1}/${PROMOTE_MAX_ATTEMPTS})…`));
           await new Promise<void>((r) => setTimeout(r, delay));
           continue;
         }
-        return promoteFailure(lastError);
+        return promoteFailure(lastError, qualityIssues);
       }
       const workAgentSpawned = parsed?.workAgentSpawned === true;
       const workAgentSkipReason = typeof parsed?.workAgentSkipReason === 'string' ? parsed.workAgentSkipReason : null;
@@ -477,6 +509,7 @@ export async function promotePlanning(issueId: string, autoSpawn = false, opts: 
         success: true,
         message: parsed?.message ?? null,
         error: null,
+        qualityIssues: [],
         workAgentSpawned,
         workAgentMessage: workAgentSession ? `Session: ${workAgentSession}` : (workAgentSkipReason ? `Skip reason: ${workAgentSkipReason}` : null),
         workAgentError,
