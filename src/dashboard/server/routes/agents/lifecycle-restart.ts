@@ -659,6 +659,19 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
         }> = [];
 
         for (const agent of running) {
+          // One-shot roles (review/test convoy members) run once, write their
+          // artifact, and exit WITHOUT saving a sessionId — there is nothing
+          // to resume, and attempting it only ever yields "No session ID
+          // found". Report them as skipped, not failed: the operator's
+          // "16 failed" was 16 completed one-shots mislabeled.
+          if (agent.role === 'review' || agent.role === 'test') {
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'skipped: one-shot role completes fresh — nothing to resume' });
+            continue;
+          }
+          if (!agent.sessionId) {
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'skipped: no resumable session' });
+            continue;
+          }
           try {
             const result = await restartAgent(agent.id, { graceful: false, force });
             if (result.success) {

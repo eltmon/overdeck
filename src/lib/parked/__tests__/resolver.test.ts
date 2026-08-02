@@ -227,3 +227,13 @@ describe('guard-exit inventory (PAN-3488)', () => {
     }
   });
 });
+
+describe('orchestrator idle exemption (first-night flywheel kill)', () => {
+  it('flywheel/sequencer/conversation agents never classify idle-running', () => {
+    for (const role of ['flywheel', 'sequencer', 'conversation']) {
+      const idleAgent = [{ ...baseAgent({ role, lastActivity: new Date(NOW - 26 * HOUR).toISOString() }), tmuxActive: true }];
+      const rows = classifyParked(signals({ reviewStatus: baseStatus({}), liveAgents: idleAgent }));
+      expect(rows, `role ${role} must never be idle-running`).toHaveLength(0);
+    }
+  });
+});

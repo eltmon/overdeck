@@ -27,7 +27,7 @@ export function GodViewPage() {
   }, []);
 
   return (
-    <div ref={rootRef} className="god-view flex flex-col h-full">
+    <div ref={rootRef} className="god-view flex flex-col flex-1 min-h-0">
       <GodViewTopBar
         data={data}
         onHelpToggle={() => setHelpOpen((open) => !open)}
