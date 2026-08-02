@@ -198,7 +198,7 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:04:15.118Z",
+  "updated": "2026-08-02T21:04:18.453Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -208,7 +208,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T21:04:11.328Z",
+    "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
+    "updatedAt": "2026-08-02T21:04:16.192Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -276,8 +277,7 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T21:03:43.259Z"
-    },
-    "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -361,7 +361,7 @@
       },
       "costAtCloseOut": {
         "usd": 98.2466771,
-        "pricingAsOf": "2026-08-02T21:04:11.583Z"
+        "pricingAsOf": "2026-08-02T21:04:17.971Z"
       }
     },
     "merges": [
