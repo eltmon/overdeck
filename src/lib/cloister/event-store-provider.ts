@@ -1,14 +1,8 @@
-/** Process-local event-store provider shared by Cloister services and patrol modules. */
 import type { DomainEvent } from '@overdeck/contracts';
-
-export interface CloisterEventStoreEvent {
-  type: string;
-  payload?: unknown;
-}
 
 export interface CloisterEventStore {
   append(event: Omit<DomainEvent, 'sequence'>): number;
-  subscribe?: (fn: (event: CloisterEventStoreEvent) => void) => () => void;
+  subscribe?: (fn: (event: { type: string; payload?: unknown }) => void) => () => void;
 }
 
 let cloisterEventStoreProvider: (() => CloisterEventStore) | null = null;
@@ -17,7 +11,12 @@ export function setCloisterEventStoreProvider(provider: (() => CloisterEventStor
   cloisterEventStoreProvider = provider;
 }
 
-/** Return the injected event store, or null in CLI and isolated test contexts. */
+/**
+ * Read door for the process-local cloister event store (set by deacon-main in
+ * the deacon-child process). Cloister modules that emit domain events outside
+ * the service host append through this — never to the DB directly. Returns
+ * null when no provider is wired (CLI/test contexts).
+ */
 export function getCloisterEventStore(): CloisterEventStore | null {
   return cloisterEventStoreProvider?.() ?? null;
 }
