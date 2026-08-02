@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T03:11:39.606Z",
+  "updated": "2026-08-02T03:13:14.410Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "aurora-shader": {
-        "writerId": "deacon-swarm",
-        "agentId": "conv-20260801-3774",
-        "pid": 3460054,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:11:37.464Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -170,6 +162,17 @@
         "outcome": "completed",
         "reason": "Live checkpoint passed on 2026-08-02: a headless browser subscribed to the production dashboard's /ws/rpc stream while agent-pan-3447-slot-3 executed a tool-heavy turn. The stream delivered 7 agent.activity_changed events carrying currentTool in one second (10 observed total), above the required 5/s; the event-store diagnostic independently showed 8/s bursts. Fallback agent.tool_used fanout was not needed and no server code or fallback test was added. The downstream confluence-data selector must preserve an explicit hookName when present; a tool-only activity event is counted exactly once as PostToolUse with no Pre/Post pairing inference. Non-Claude harnesses with no tool stream remain lifecycle-only.",
         "releasedAt": "2026-08-02T00:30:05.586Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": "conv-20260801-3774",
+        "pid": 3460054,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:11:37.464Z",
+        "itemId": "aurora-shader",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-02T03:13:14.283Z"
       }
     ],
     "statusReasons": {
@@ -184,6 +187,10 @@
       "hook-stream-shaping": {
         "reason": "Live checkpoint passed on 2026-08-02: a headless browser subscribed to the production dashboard's /ws/rpc stream while agent-pan-3447-slot-3 executed a tool-heavy turn. The stream delivered 7 agent.activity_changed events carrying currentTool in one second (10 observed total), above the required 5/s; the event-store diagnostic independently showed 8/s bursts. Fallback agent.tool_used fanout was not needed and no server code or fallback test was added. The downstream confluence-data selector must preserve an explicit hookName when present; a tool-only activity event is counted exactly once as PostToolUse with no Pre/Post pairing inference. Non-Claude harnesses with no tool stream remain lifecycle-only.",
         "updatedAt": "2026-08-02T00:30:05.586Z"
+      },
+      "aurora-shader": {
+        "reason": "stale claim released (deacon-swarm dead)",
+        "updatedAt": "2026-08-02T03:13:14.283Z"
       }
     }
   },
@@ -200,7 +207,7 @@
     "hook-stream-shaping.hook-stream-shaping.ac1": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac2": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac3": "completed",
-    "aurora-shader": "running"
+    "aurora-shader": "pending"
   },
   "swarm": {
     "slotAssignments": [
