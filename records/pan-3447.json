@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T00:22:33.984Z",
+  "updated": "2026-08-02T00:24:42.887Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "hook-stream-shaping": {
-        "writerId": "deacon-swarm",
-        "agentId": "conv-20260801-3774",
-        "pid": 2592801,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T00:17:37.977Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -117,6 +109,17 @@
         "itemId": "confluence-model",
         "outcome": "completed",
         "releasedAt": "2026-08-01T23:03:20.524Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": "conv-20260801-3774",
+        "pid": 2592801,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T00:17:37.977Z",
+        "itemId": "hook-stream-shaping",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-02T00:24:42.798Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +130,10 @@
       "confluence-model": {
         "reason": "stale claim released (deacon-swarm dead)",
         "updatedAt": "2026-08-01T22:28:11.475Z"
+      },
+      "hook-stream-shaping": {
+        "reason": "stale claim released (deacon-swarm dead)",
+        "updatedAt": "2026-08-02T00:24:42.798Z"
       }
     }
   },
@@ -139,7 +146,7 @@
     "confluence-model.confluence-model.ac1": "completed",
     "confluence-model.confluence-model.ac2": "completed",
     "confluence-model.confluence-model.ac3": "completed",
-    "hook-stream-shaping": "running"
+    "hook-stream-shaping": "pending"
   },
   "swarm": {
     "slotAssignments": [
