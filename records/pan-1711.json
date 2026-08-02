@@ -2,7 +2,7 @@
   "issueId": "PAN-1711",
   "schemaVersion": 2,
   "created": "2026-07-28T21:04:46.471Z",
-  "updated": "2026-08-02T17:03:13.051Z",
+  "updated": "2026-08-02T17:19:15.701Z",
   "pipeline": {
     "issueId": "PAN-1711",
     "reviewStatus": "pending",
@@ -18,5 +18,14 @@
     "merges": [],
     "ranOn": "eltmon-z790"
   },
-  "recoveryTrips": []
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1711",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-02T17:19:15.699Z"
+    }
+  ]
 }
