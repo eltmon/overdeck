@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-02T00:08:49.706Z",
+  "updated": "2026-08-02T00:08:56.045Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "passed",
@@ -98,7 +98,7 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-02T00:08:49.156Z",
+    "updatedAt": "2026-08-02T00:08:53.421Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3451-review",
     "testNotes": "Backend-only change (dashboard route + pi/ohmypi extension internals + docs.HOOKS.md); no UI-facing acceptance criteria. Root: npm run typecheck clean (tsc + hooks + evals + dashboard shrink-only ratchet 57 known/0 new + frontend 0 known/0 new). npm run lint exit 0, all guard sub-checks passed (circular 77 baselined/0 new, ratchet-audit, quarantine-audit 12 entries, file-size, skills, slash-commands, prompts, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, agent-dir-removal, no-coderabbit-merge-gate); only pre-existing unrelated warnings (effect-acp .d.ts import warnings). packages/pi-extension: typecheck clean, vitest 38/38 passed. packages/ohmypi-extension: typecheck clean, vitest 39/39 passed. Targeted new/touched tests all green: tests/unit/dashboard/server/routes/plan-checklist.test.ts, src/lib/work/__tests__/done-preflight-checklist.test.ts, tests/unit/dashboard/routes/agents-no-loss.test.ts (10/10). Acceptance-criteria greps confirmed: no 'issues.jsonl|allIssueBeadsClosed|beadMatchesIssue|isClosedBead|xbriefSatisfied|all beads closed' hits in either extension package; docs/HOOKS.md names the plan-checklist endpoint and checkIncompletePlanItemsPromise gate with no 'beads' residue. git diff of packages/pi-extension/src/index.ts and packages/ohmypi-extension/src/index.ts vs main are hunk-for-hunk identical modulo naming, confirming AC4 (fork parity). Full `npm test` run twice (exit 1 both times): run1 77/13100 tests failed across 70 files, run2 70/13100 across 67 files, 62 files common to both, 8 fixed on rerun, 5 different new ones appeared. Every failure shares one signature -- 'Hook timed out in 5000ms' inside setupOverdeckTestDb()'s beforeEach -- across files entirely disjoint from this PR's declared and actual changed-file scope (workspaces resolver/writer/rebuild/relocate, conversations CLI commands, memory/cost/overdeck-db tests, none touching agents.ts, runtime-events.ts, done-preflight.ts, or the pi/ohmypi packages). System was under heavy contention throughout both runs: load average 29-33 on a 24-core box, swap 100% full, ~93 node processes (other Overdeck agents on the shared machine). Re-running one sampled failing file alone (tests/unit/lib/workspaces/resolver.test.ts) passed cleanly (13/13). The shifting failure set between runs plus scope-disjointness plus isolated-pass confirms this is pre-existing shared-machine CPU/swap contention, not a regression introduced by this branch.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -215,7 +215,7 @@
       },
       "costAtCloseOut": {
         "usd": 93.732798,
-        "pricingAsOf": "2026-08-02T00:08:49.272Z"
+        "pricingAsOf": "2026-08-02T00:08:55.967Z"
       }
     },
     "merges": [
