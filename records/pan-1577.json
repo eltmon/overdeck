@@ -873,22 +873,21 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T23:07:38.243Z",
+  "updated": "2026-08-02T23:07:48.654Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T23:07:38.098Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-02T23:07:44.629Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (1064291ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n ❯ |root| tests/lib/memory/cli.test.ts (8 tests | 1 failed) 7840ms\n     × searches observations with issue, tag, workspace, and sibling filters 5714ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 21201ms\n     × resolves Db as a Drizzle-over-node-sqlite service 11290ms (retry x1)\n\n Test Files  174 passed (174)\n      Tests  1946 passed (1946)\n   Start at  19:00:33\n   Duration  50.16s (transform 6.48s, setup 24.40s, import 67.39s, tests 42.15s, environment 41.74s)\n\n ❯ |root| src/lib/memory/__tests__/backfill.test.ts (4 tests | 1 failed) 6427ms\n     × a fixture session whose cwd matches a workspace produces a written observation 5715ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-UsAx0B/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep]\n…(3001 chars elided)…\n resolves canonical merged status even when the raw status map is stale 6ms (retry x1)\n     × persists scope drift through the review status journal update 6ms (retry x1)\n     × finalizes verification when no-code-drift skips the post-review test role 9ms (retry x1)\n     × keeps a required UAT failure latched across a review retry and no-code test skip 8ms (retry x1)\n     × settles a pending verification when the merge lands 16ms (retry x1)\n     × leaves verification pending when a merge lifecycle reset restarts the work 14ms (retry x1)\n     × consumes a serviced review request when review passes 10ms (retry x1)\n     × preserves a review request newer than the current spawn 9ms (retry x1)\n     × consumes a review request without a spawn timestamp when review blocks 10ms (retry x1)\n     × preserves a pending review request during non-verdict updates 9ms (retry x1)\n ❯ |root| tests/unit/lib/flywheel-merge-order.test.ts (21 tests | 3 failed) 31ms\n     × treats active\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "7ec1b6ee2146619d8d443475847cdad7e2601550",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
-    "reviewRequestedAt": "2026-08-02T22:41:27.884Z",
     "reviewSpawnedAt": "2026-08-02T22:41:41.163Z"
   },
   "closeOut": {
@@ -987,7 +986,7 @@
       },
       "costAtCloseOut": {
         "usd": 507.7806913,
-        "pricingAsOf": "2026-08-02T23:07:38.158Z"
+        "pricingAsOf": "2026-08-02T23:07:45.025Z"
       }
     },
     "merges": [
