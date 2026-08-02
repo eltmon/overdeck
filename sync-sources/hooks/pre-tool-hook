@@ -26,9 +26,9 @@ TS=$(date -Iseconds)
 # jq -n produces correctly-escaped JSON even if TOOL_NAME contains quotes.
 if command -v jq >/dev/null 2>&1; then
   BODY=$(jq -n --arg tool "$TOOL_NAME" --arg ts "$TS" \
-    '{kind: "activity", activity: "working", tool: $tool, timestamp: $ts}')
+    '{kind: "activity", activity: "working", tool: $tool, hookName: "PreToolUse", timestamp: $ts}')
 else
-  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"timestamp\":\"$TS\"}"
+  BODY="{\"kind\":\"activity\",\"activity\":\"working\",\"tool\":\"$TOOL_NAME\",\"hookName\":\"PreToolUse\",\"timestamp\":\"$TS\"}"
 fi
 
 pan_emit_event "$AGENT_ID" "$BODY"

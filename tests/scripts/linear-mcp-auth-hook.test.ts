@@ -126,10 +126,17 @@ describe('linear-mcp-auth-hook', () => {
 
     await runHook(tempDir, failureInput, environment())
 
-    expect(eventBodies(eventLog)).toEqual([{
-      kind: 'linear_mcp_auth_required',
-      authUrl: null,
-    }])
+    expect(eventBodies(eventLog)).toEqual([
+      {
+        kind: 'hook_fired',
+        hookName: 'PostToolUseFailure',
+        tool: 'mcp__linear__list_issues',
+      },
+      {
+        kind: 'linear_mcp_auth_required',
+        authUrl: null,
+      },
+    ])
     expect(existsSync(markerPath())).toBe(true)
   })
 
@@ -159,7 +166,11 @@ describe('linear-mcp-auth-hook', () => {
     const result = await runHook(tempDir, failureInput, environment())
 
     expect(result.code).toBe(0)
-    expect(eventBodies(eventLog)).toEqual([])
+    expect(eventBodies(eventLog)).toEqual([{
+      kind: 'hook_fired',
+      hookName: 'PostToolUseFailure',
+      tool: 'mcp__linear__get_issue',
+    }])
     expect(existsSync(markerPath())).toBe(false)
   })
 
