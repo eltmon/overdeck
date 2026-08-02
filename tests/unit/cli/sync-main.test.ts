@@ -22,7 +22,7 @@ vi.mock('ora', () => ({
 }));
 
 // Import after mocks
-import { syncMainCommand } from '../../../src/cli/commands/sync-main.js';
+import { syncMainCommand, workspacePathForSyncMain } from '../../../src/cli/commands/sync-main.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,6 +65,20 @@ describe('syncMainCommand', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       'http://localhost:3011/api/issues/PAN-242/sync-main',
+      expect.objectContaining({ method: 'POST' }),
+    );
+  });
+
+  it('identifies a strike workspace from a nested cwd and sends it to the sync route', async () => {
+    const strikeWorkspace = '/repo/workspaces/feature-pan-242-strike';
+    vi.spyOn(process, 'cwd').mockReturnValue(`${strikeWorkspace}/src/lib`);
+    const fetchMock = mockFetch(200, { success: true, commitCount: 1, message: 'Synced 1 commit(s) from main' });
+
+    await syncMainCommand('PAN-242');
+
+    expect(workspacePathForSyncMain('PAN-242', `${strikeWorkspace}/src/lib`)).toBe(strikeWorkspace);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `http://localhost:3011/api/issues/PAN-242/sync-main?workspacePath=${encodeURIComponent(strikeWorkspace)}`,
       expect.objectContaining({ method: 'POST' }),
     );
   });
