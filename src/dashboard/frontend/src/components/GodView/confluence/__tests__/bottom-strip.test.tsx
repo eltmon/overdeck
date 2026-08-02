@@ -9,9 +9,15 @@ import {
 } from '../BottomStrip';
 import type { HookStreamEntry } from '../useConfluenceData';
 
-function entry(hookName: string, ts: number, sequence = ts): HookStreamEntry {
+function entry(
+  hookName: string,
+  ts: number,
+  sequence = ts,
+  source: HookStreamEntry['source'] = 'hook',
+): HookStreamEntry {
   return {
     sequence,
+    source,
     agentId: 'agent-pan-3447',
     issueId: 'PAN-3447',
     tool: 'Bash',
@@ -46,6 +52,18 @@ describe('Confluence bottom strip', () => {
     expect(traceTickHeight(2, 20)).toBeCloseTo(6.1);
     expect(traceTickHeight(2, 20)).toBeGreaterThan(traceTickHeight(1, 20));
     expect(frame.events.some((event) => event.hookName === 'SessionEnd')).toBe(false);
+  });
+
+  it('excludes lifecycle-only beats from hook trace channels and aggregates', () => {
+    const frame = buildTraceFrame([
+      entry('PreToolUse', 59_000),
+      entry('Lifecycle', 59_500, 2, 'lifecycle'),
+    ], 60_000, 240);
+
+    expect(frame.events).toHaveLength(1);
+    expect(frame.aggregateCurrent).toBe(0);
+    expect(frame.aggregateBuckets.at(-2)).toBe(1);
+    expect(frame.channels.reduce((total, channel) => total + channel.count, 0)).toBe(1);
   });
 
   it('reports per-window rates and dims zero-event channels by .38', () => {

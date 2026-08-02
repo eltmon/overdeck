@@ -25,7 +25,11 @@ export function HookBus({ entries }: HookBusProps) {
     for (const entry of entries) {
       const key = entryKey(entry);
       nextSeen.add(key);
-      if (seenEntries.current.has(key) || !WIRED_HOOKS.has(entry.hookName)) continue;
+      if (
+        seenEntries.current.has(key)
+        || entry.source !== 'hook'
+        || !WIRED_HOOKS.has(entry.hookName)
+      ) continue;
       increments.set(entry.hookName, (increments.get(entry.hookName) ?? 0) + 1);
     }
     seenEntries.current = nextSeen;

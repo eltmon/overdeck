@@ -1,6 +1,10 @@
 import { renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { advanceMergeDwell, type RiverEffectsApi } from '../RiverCanvas';
+import {
+  advanceMergeDwell,
+  resolveMergeReconciliation,
+  type RiverEffectsApi,
+} from '../RiverCanvas';
 import {
   FEED_TICKER_CHANCE,
   HOOK_HEAT_BUMP,
@@ -45,6 +49,7 @@ function orb(id: string, overrides: Partial<ConfluenceOrb> = {}): ConfluenceOrb 
 function hook(issueId: string, sequence = 1): HookStreamEntry {
   return {
     sequence,
+    source: 'hook',
     agentId: `agent-${issueId.toLowerCase()}`,
     issueId,
     tool: 'Read',
@@ -74,6 +79,24 @@ describe('Confluence choreography dispatch table', () => {
     expect(advanceMergeDwell('MERGE', 'merging', 2, 0.5)).toEqual({ remaining: 1.5, shouldStart: false });
     expect(advanceMergeDwell('MERGE', 'merging', 1.5, 1.5)).toEqual({ remaining: 0, shouldStart: true });
     expect(advanceMergeDwell('VERIFY', 'merging', 0, 1)).toEqual({ remaining: 0, shouldStart: false });
+  });
+
+  it('recovers a failed merge during or after the portal comet', () => {
+    expect(resolveMergeReconciliation('failed', true, false, true)).toEqual({
+      retired: false,
+      cancelMerge: true,
+      shouldSpawn: false,
+    });
+    expect(resolveMergeReconciliation('failed', false, true, false)).toEqual({
+      retired: false,
+      cancelMerge: false,
+      shouldSpawn: true,
+    });
+    expect(resolveMergeReconciliation('active', false, true, false)).toEqual({
+      retired: true,
+      cancelMerge: false,
+      shouldSpawn: false,
+    });
   });
 
   it('maps hook, stage, yield, resume, thaw, and dispatch changes to exact effects', () => {
@@ -169,6 +192,33 @@ describe('Confluence choreography dispatch table', () => {
 
     expect(api.emitSparks).toHaveBeenCalledTimes(1);
     expect(api.emitSparks).toHaveBeenCalledWith('PAN-1', '#00d4ff', 'agent-pan-1', HOOK_HEAT_BUMP);
+  });
+
+  it('emits lifecycle-only sparks without requiring a named hook', () => {
+    const commands = planConfluenceChoreography({
+      previous: new Map([['PAN-1', orb('PAN-1')]]),
+      current: new Map([['PAN-1', orb('PAN-1', { harness: 'codex' })]]),
+      hookEvents: [{
+        sequence: 1,
+        source: 'lifecycle',
+        agentId: 'agent-pan-1',
+        issueId: 'PAN-1',
+        tool: 'idle',
+        hookName: 'Lifecycle',
+        family: 'lifecycle',
+        ts: Date.parse('2026-08-02T12:00:00.000Z'),
+      }],
+      random: () => 1,
+    });
+
+    expect(commands).toContainEqual({
+      type: 'sparks',
+      issueId: 'PAN-1',
+      color: '#e8edf8',
+      agentId: 'agent-pan-1',
+      heatBump: HOOK_HEAT_BUMP,
+      specRateBump: HOOK_RATE_BUMP,
+    });
   });
 
   it('plans and runs a frame without scheduling wall-clock choreography timers', () => {

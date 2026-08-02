@@ -4,9 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HookBus } from '../HookBus';
 import type { HookStreamEntry } from '../useConfluenceData';
 
-function entry(hookName: string, ts: number, sequence = ts): HookStreamEntry {
+function entry(
+  hookName: string,
+  ts: number,
+  sequence = ts,
+  source: HookStreamEntry['source'] = 'hook',
+): HookStreamEntry {
   return {
     sequence,
+    source,
     agentId: 'agent-pan-3447',
     issueId: 'PAN-3447',
     tool: 'Bash',
@@ -67,6 +73,18 @@ describe('Confluence hook bus', () => {
     act(() => vi.advanceTimersByTime(1));
     expect(preToolUse).not.toHaveClass('hot');
     expect(hookRow(container, 'PostToolUse')).not.toHaveClass('hot');
+  });
+
+  it('ignores lifecycle-only beats without fabricating hook counts', () => {
+    const { container } = render(
+      <HookBus entries={[entry('Lifecycle', 1, 1, 'lifecycle')]} />,
+    );
+
+    for (const hookName of WIRED_HOOK_NAMES) {
+      expect(hookRow(container, hookName).querySelector('.count')).toHaveTextContent('0');
+      expect(hookRow(container, hookName)).not.toHaveClass('hot');
+    }
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it('keeps unwired rows dotted, unchanged, and timer-free', () => {

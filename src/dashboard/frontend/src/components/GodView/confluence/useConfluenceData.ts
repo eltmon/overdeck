@@ -61,6 +61,7 @@ export interface ConfluenceOrb {
 
 export interface HookStreamEntry {
   sequence: number;
+  source: 'hook' | 'lifecycle';
   agentId: string;
   issueId: string | null;
   tool: string;
@@ -250,11 +251,17 @@ function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnap
   let agentId: string | undefined;
   let tool: string | undefined;
   let hookName: string | undefined;
+  let source: HookStreamEntry['source'] = 'hook';
 
   switch (event.type) {
     case 'agent.activity_changed':
-      if (!event.payload.hookName) return null;
       agentId = event.payload.agentId;
+      if (!event.payload.hookName) {
+        source = 'lifecycle';
+        tool = event.payload.currentTool ?? event.payload.activity;
+        hookName = 'Lifecycle';
+        break;
+      }
       tool = event.payload.currentTool ?? event.payload.hookName;
       hookName = event.payload.hookName;
       break;
@@ -280,11 +287,12 @@ function telemetryEntry(event: DomainEvent, agentsById: Record<string, AgentSnap
   const agent = agentsById[agentId];
   return {
     sequence: event.sequence,
+    source,
     agentId,
     issueId: agent?.issueId ?? null,
     tool,
     hookName,
-    family: toolToFamily(tool),
+    family: source === 'lifecycle' ? 'lifecycle' : toolToFamily(tool),
     ts: Date.parse(event.timestamp) || Date.now(),
   };
 }

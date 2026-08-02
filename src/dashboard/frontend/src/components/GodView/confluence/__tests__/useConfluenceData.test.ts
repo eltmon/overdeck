@@ -215,8 +215,8 @@ describe('useHookStream', () => {
     });
 
     expect(result.current.entries).toMatchObject([
-      { agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Read', hookName: 'PreToolUse', family: 'tool_read' },
-      { sequence: 2, agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Bash', hookName: 'PostToolUseFailure', family: 'tool_exec' },
+      { source: 'hook', agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Read', hookName: 'PreToolUse', family: 'tool_read' },
+      { sequence: 2, source: 'hook', agentId: 'agent-pan-1', issueId: 'PAN-1', tool: 'Bash', hookName: 'PostToolUseFailure', family: 'tool_exec' },
     ]);
     expect(result.current.eventsPerMin).toBe(2);
     expect(result.current.eventsPerSec).toBe(2);
@@ -231,6 +231,43 @@ describe('useHookStream', () => {
     await act(() => vi.advanceTimersByTimeAsync(60_800));
     expect(result.current.eventsPerMin).toBe(0);
     expect(result.current.entries).toEqual([]);
+  });
+
+  it('maps non-Claude activity changes to lifecycle-only choreography beats', () => {
+    useDashboardStore.setState({
+      agentsById: {
+        'agent-pan-1': agent({
+          id: 'agent-pan-1',
+          issueId: 'PAN-1',
+          runtime: 'codex',
+        }),
+      },
+    });
+    const { result } = renderHook(() => useHookStream());
+
+    act(() => {
+      useDashboardStore.getState().applyEvents([
+        event('agent.activity_changed', {
+          agentId: 'agent-pan-1',
+          activity: 'working',
+          currentTool: 'Bash',
+        }, 1),
+        event('agent.activity_changed', {
+          agentId: 'agent-pan-1',
+          activity: 'idle',
+        }, 2),
+        event('agent.activity_changed', {
+          agentId: 'agent-pan-1',
+          activity: 'stopped',
+        }, 3),
+      ]);
+    });
+
+    expect(result.current.entries).toMatchObject([
+      { sequence: 1, source: 'lifecycle', issueId: 'PAN-1', tool: 'Bash', hookName: 'Lifecycle', family: 'lifecycle' },
+      { sequence: 2, source: 'lifecycle', issueId: 'PAN-1', tool: 'idle', hookName: 'Lifecycle', family: 'lifecycle' },
+      { sequence: 3, source: 'lifecycle', issueId: 'PAN-1', tool: 'stopped', hookName: 'Lifecycle', family: 'lifecycle' },
+    ]);
   });
 
   it('resolves the first hook event against an agent created in the same batch', () => {

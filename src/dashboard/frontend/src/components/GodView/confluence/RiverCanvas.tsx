@@ -121,6 +121,18 @@ export function advanceMergeDwell(
   return { remaining: next, shouldStart: next === 0 && mergeStatus === 'merging' };
 }
 
+export function resolveMergeReconciliation(
+  sourceState: ConfluenceOrb['state'],
+  hasCurrent: boolean,
+  retired: boolean,
+  mergeInFlight: boolean,
+): { retired: boolean; cancelMerge: boolean; shouldSpawn: boolean } {
+  if (sourceState === 'failed') {
+    return { retired: false, cancelMerge: hasCurrent && mergeInFlight, shouldSpawn: !hasCurrent };
+  }
+  return { retired, cancelMerge: false, shouldSpawn: !hasCurrent && !retired };
+}
+
 interface Engine {
   api: RiverEffectsApi;
   update(props: RiverCanvasProps): void;
@@ -289,12 +301,12 @@ function createEngine(
 
   const startMerge = (orb: RenderOrb) => {
     if (orb.merging) return;
-    retiredIds.add(orb.id);
     orb.merging = true;
     orb.mergeVx = 2;
     orb.fading = null;
   };
   const finishMerge = (orb: RenderOrb) => {
+    retiredIds.add(orb.id);
     burst(layout.portalX - 10, orb.y, '#e8edf8', 90, 160, 1.8, 3);
     ring(layout.portalX - 10, orb.y, '#39ff14', 130, 3);
     ring(layout.portalX - 10, orb.y, '#00d4ff', 90, 2);
@@ -324,7 +336,7 @@ function createEngine(
       tide.targetId = targetId ?? list().find((orb) => orb.state === 'active' && orb.stage === 'WORK')?.id ?? null;
       tide.beneficiaryId = beneficiaryId ?? list().find((orb) => orb.state === 'shelf')?.id ?? null;
     },
-    playMerge(issueId) { const orb = orbAt(issueId); if (orb) { retiredIds.add(issueId); startMerge(orb); } },
+    playMerge(issueId) { const orb = orbAt(issueId); if (orb) startMerge(orb); },
     playThaw(issueId) { const orb = orbAt(issueId); if (orb) thaw(orb); },
     pulseSun() { ring(layout.sunX, layout.sunY, '#9d4edd', 90, 2.5); },
     spawnFromSun(issueId) { const source = props.orbs.find((orb) => orb.id === issueId); if (source && !orbAt(issueId)) spawnOrb(source, true); },
@@ -336,7 +348,19 @@ function createEngine(
     const live = new Set(next.orbs.map((orb) => orb.id));
     for (const source of next.orbs) {
       const current = orbAt(source.id);
-      if (!current) { if (!retiredIds.has(source.id)) spawnOrb(source); continue; }
+      const mergeState = resolveMergeReconciliation(
+        source.state,
+        current !== undefined,
+        retiredIds.has(source.id),
+        current?.merging ?? false,
+      );
+      if (!mergeState.retired) retiredIds.delete(source.id);
+      if (!current) { if (mergeState.shouldSpawn) spawnOrb(source); continue; }
+      if (mergeState.cancelMerge) {
+        current.merging = false;
+        current.mergeVx = 0;
+        current.mergeDwell = 0;
+      }
       const previousStage = current.stage;
       const previousSpend = current.spend;
       const existingSatellites = new Map(current.convoy?.map((satellite) => [satellite.role, satellite]) ?? []);

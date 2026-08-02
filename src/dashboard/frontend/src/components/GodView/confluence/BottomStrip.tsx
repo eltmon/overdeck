@@ -54,7 +54,10 @@ export function buildTraceFrame(
   const wiredNames = new Set<string>(WIRED_HOOK_INVENTORY.map((hook) => hook.name));
   const events = entries.filter((entry) => {
     const age = now - entry.ts;
-    return wiredNames.has(entry.hookName) && age >= 0 && age <= TRACE_WINDOW_MS;
+    return entry.source === 'hook'
+      && wiredNames.has(entry.hookName)
+      && age >= 0
+      && age <= TRACE_WINDOW_MS;
   });
   const aggregateBuckets = Array.from({ length: TRACE_SECONDS }, () => 0);
   for (const event of events) {
