@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:48:13.669Z",
+  "updated": "2026-08-02T17:53:49.142Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -85,16 +85,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "routes-book-scan": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 4049970,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:48:13.669Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -128,6 +120,17 @@
         "outcome": "completed",
         "reason": "Added --project <key> to every pan orders subcommand via stateRootFor registry resolution; updated SKILL.md and CLI tests; typecheck/tests/lint-skills all green",
         "releasedAt": "2026-08-02T17:47:57.937Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 4049970,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:48:13.669Z",
+        "itemId": "routes-book-scan",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T17:53:46.060Z"
       }
     ],
     "statusReasons": {
@@ -138,6 +141,10 @@
       "cli-project-option": {
         "reason": "Added --project <key> to every pan orders subcommand via stateRootFor registry resolution; updated SKILL.md and CLI tests; typecheck/tests/lint-skills all green",
         "updatedAt": "2026-08-02T17:47:57.937Z"
+      },
+      "routes-book-scan": {
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "updatedAt": "2026-08-02T17:53:46.060Z"
       }
     }
   },
@@ -152,6 +159,6 @@
     "cli-project-option.cli-project-option.ac2": "completed",
     "cli-project-option.cli-project-option.ac3": "completed",
     "cli-project-option.cli-project-option.ac4": "completed",
-    "routes-book-scan": "running"
+    "routes-book-scan": "pending"
   }
 }
