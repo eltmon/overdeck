@@ -734,30 +734,22 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-02T19:18:40Z",
-      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T19:54:08.025Z",
+  "updated": "2026-08-02T19:55:32.073Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:54:07.432Z",
+    "updatedAt": "2026-08-02T19:55:31.597Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "7ec1b6ee2146619d8d443475847cdad7e2601550",
     "lastVerifiedCommit": "170fd3f3cf7fcd6e206f4232e6548784f6c6627e",
-    "reviewSpawnedAt": "2026-08-02T18:57:23.866Z"
+    "reviewSpawnedAt": "2026-08-02T19:55:31.596Z"
   },
   "closeOut": {
     "usage": {
@@ -820,10 +812,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2537,
-            "output": 496133,
-            "cacheRead": 531547521,
-            "cacheWrite": 24433252
+            "input": 2567,
+            "output": 500700,
+            "cacheRead": 535597588,
+            "cacheWrite": 24444481
           }
         }
       },
@@ -847,15 +839,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2537,
-          "output": 496133,
-          "cacheRead": 531547521,
-          "cacheWrite": 24433252
+          "input": 2567,
+          "output": 500700,
+          "cacheRead": 535597588,
+          "cacheWrite": 24444481
         }
       },
       "costAtCloseOut": {
-        "usd": 407.6603933,
-        "pricingAsOf": "2026-08-02T19:54:07.584Z"
+        "usd": 408.5442103,
+        "pricingAsOf": "2026-08-02T19:55:31.941Z"
       }
     },
     "merges": [
