@@ -90,7 +90,7 @@
     "recordedAt": "2026-08-01T20:44:15.443Z"
   },
   "created": "2026-08-01T15:03:35.593Z",
-  "updated": "2026-08-01T23:51:21.308Z",
+  "updated": "2026-08-02T17:03:32.668Z",
   "pipeline": {
     "issueId": "PAN-3338",
     "reviewStatus": "passed",
@@ -227,16 +227,7 @@
   },
   "harness": "claude-code",
   "model": "claude-sonnet-5",
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3338",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T15:48:55.966Z"
-    }
-  ],
+  "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
     "claims": {},
