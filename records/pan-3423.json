@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:23:05.529Z",
+  "updated": "2026-08-02T03:23:12.681Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -217,5 +217,31 @@
     "docs-resource-governor": "completed",
     "docs-resource-governor.docs-resource-governor.ac1": "completed",
     "docs-resource-governor.docs-resource-governor.ac2": "completed"
+  },
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+      "src/dashboard/frontend/src/lib/system-health-attention.ts",
+      "src/lib/agents/__tests__/agent-health.test.ts",
+      "src/lib/agents/health.ts"
+    ],
+    "declaredScope": [
+      "docs/RESOURCE-GOVERNOR.md",
+      "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+      "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+      "src/dashboard/frontend/src/lib/system-health-attention.ts",
+      "src/lib/agents/__tests__/agent-health.test.ts",
+      "src/lib/agents/health.ts"
+    ],
+    "actualChangedFiles": [
+      "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+      "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
+    ],
+    "recordedAt": "2026-08-02T03:23:12.679Z"
   }
 }
