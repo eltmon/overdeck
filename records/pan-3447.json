@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:17:09.239Z",
+  "updated": "2026-08-02T09:21:19.090Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 44,
-    "claims": {
-      "hook-bus": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 1321811,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T09:17:09.238Z"
-      }
-    },
+    "sequence": 45,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -375,6 +367,17 @@
         "outcome": "completed",
         "reason": "Feed rows now expose data-issue wiring, show provenance tooltips, flash matching orbs, and open the real issue drawer; focused tests and typecheck pass",
         "releasedAt": "2026-08-02T09:16:56.851Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1321811,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:17:09.238Z",
+        "itemId": "hook-bus",
+        "outcome": "completed",
+        "reason": "Hook bus now renders the contracts inventory, counts wired events with per-row 420 ms hot timers, preserves dark fiber, and avoids frame-loop DOM updates; focused and Confluence tests plus typecheck pass",
+        "releasedAt": "2026-08-02T09:21:19.090Z"
       }
     ],
     "statusReasons": {
@@ -428,8 +431,8 @@
         "updatedAt": "2026-08-02T09:16:56.851Z"
       },
       "hook-bus": {
-        "reason": "Extract and verify the event-driven hook inventory rail",
-        "updatedAt": "2026-08-02T09:17:09.238Z"
+        "reason": "Hook bus now renders the contracts inventory, counts wired events with per-row 420 ms hot timers, preserves dark fiber, and avoids frame-loop DOM updates; focused and Confluence tests plus typecheck pass",
+        "updatedAt": "2026-08-02T09:21:19.090Z"
       }
     }
   },
@@ -484,7 +487,11 @@
     "feed-orb-linking.feed-orb-linking.ac1": "completed",
     "feed-orb-linking.feed-orb-linking.ac2": "completed",
     "feed-orb-linking.feed-orb-linking.ac3": "completed",
-    "hook-bus": "running"
+    "hook-bus": "completed",
+    "hook-bus.hook-bus.ac1": "completed",
+    "hook-bus.hook-bus.ac2": "completed",
+    "hook-bus.hook-bus.ac3": "completed",
+    "hook-bus.hook-bus.ac4": "completed"
   },
   "swarm": {
     "slotAssignments": [],
