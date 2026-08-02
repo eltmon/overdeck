@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-02T23:33:04.598Z",
+  "updated": "2026-08-02T23:33:39.214Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -73,16 +73,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "merge-gate-lock": {
-        "writerId": "agent-pan-3512",
-        "agentId": "agent-pan-3512",
-        "pid": 875113,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T23:33:04.598Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3512",
@@ -127,6 +119,17 @@
         "outcome": "completed",
         "reason": "Added three test cases for test-gate-reset scenarios. Verified testStatus transitions and testGateReset event flags.",
         "releasedAt": "2026-08-02T23:32:49.010Z"
+      },
+      {
+        "writerId": "agent-pan-3512",
+        "agentId": "agent-pan-3512",
+        "pid": 875113,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T23:33:04.598Z",
+        "itemId": "merge-gate-lock",
+        "outcome": "completed",
+        "reason": "Created regression test verifying test-gate reset prevents merge-readiness at unverified heads.",
+        "releasedAt": "2026-08-02T23:33:39.214Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "test-gate-reset": {
         "reason": "Added three test cases for test-gate-reset scenarios. Verified testStatus transitions and testGateReset event flags.",
         "updatedAt": "2026-08-02T23:32:49.010Z"
+      },
+      "merge-gate-lock": {
+        "reason": "Created regression test verifying test-gate reset prevents merge-readiness at unverified heads.",
+        "updatedAt": "2026-08-02T23:33:39.214Z"
       }
     }
   },
@@ -159,6 +166,8 @@
     "test-gate-reset.test-gate-reset.ac1": "completed",
     "test-gate-reset.test-gate-reset.ac2": "completed",
     "test-gate-reset.test-gate-reset.ac3": "completed",
-    "merge-gate-lock": "running"
+    "merge-gate-lock": "completed",
+    "merge-gate-lock.merge-gate-lock.ac1": "completed",
+    "merge-gate-lock.merge-gate-lock.ac2": "completed"
   }
 }
