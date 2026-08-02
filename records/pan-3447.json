@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:22:27.174Z",
+  "updated": "2026-08-02T08:30:21.222Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,7 +135,7 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 37,
+    "sequence": 38,
     "claims": {
       "help-fullscreen": {
         "writerId": "deacon-swarm",
@@ -143,13 +143,6 @@
         "pid": 2330131,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-02T08:18:27.647Z"
-      },
-      "issue-rail-link": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 2870554,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T08:22:27.174Z"
       }
     },
     "claimHistory": [
@@ -337,6 +330,17 @@
         "outcome": "completed",
         "reason": "Implemented per-frame acquire/drop hysteresis with mouseleave clearing, the complete union-field DOM tooltip, right-edge flipping, scoped CSS, and focused tests. Focused tooltip tests, frontend ESLint/typecheck, and full project typecheck pass; commit 00cfc2f301f is pushed.",
         "releasedAt": "2026-08-02T08:22:09.516Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 2870554,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T08:22:27.174Z",
+        "itemId": "issue-rail-link",
+        "outcome": "completed",
+        "reason": "Canvas hit navigation now uses the canonical /issues/<id> deep link; misses are no-ops, and the preview rail markup/CSS is removed. RTL hit/miss tests, all 29 Confluence tests, focused ESLint, and full typecheck pass; commit 6779e02ed6a is pushed.",
+        "releasedAt": "2026-08-02T08:30:21.222Z"
       }
     ],
     "statusReasons": {
@@ -375,6 +379,10 @@
       "orb-tooltip": {
         "reason": "Implemented per-frame acquire/drop hysteresis with mouseleave clearing, the complete union-field DOM tooltip, right-edge flipping, scoped CSS, and focused tests. Focused tooltip tests, frontend ESLint/typecheck, and full project typecheck pass; commit 00cfc2f301f is pushed.",
         "updatedAt": "2026-08-02T08:22:09.516Z"
+      },
+      "issue-rail-link": {
+        "reason": "Canvas hit navigation now uses the canonical /issues/<id> deep link; misses are no-ops, and the preview rail markup/CSS is removed. RTL hit/miss tests, all 29 Confluence tests, focused ESLint, and full typecheck pass; commit 6779e02ed6a is pushed.",
+        "updatedAt": "2026-08-02T08:30:21.222Z"
       }
     }
   },
@@ -415,7 +423,9 @@
     "orb-tooltip.orb-tooltip.ac1": "completed",
     "orb-tooltip.orb-tooltip.ac2": "completed",
     "orb-tooltip.orb-tooltip.ac3": "completed",
-    "issue-rail-link": "running"
+    "issue-rail-link": "completed",
+    "issue-rail-link.issue-rail-link.ac1": "completed",
+    "issue-rail-link.issue-rail-link.ac2": "completed"
   },
   "swarm": {
     "slotAssignments": [
