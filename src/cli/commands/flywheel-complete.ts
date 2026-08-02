@@ -7,10 +7,10 @@ import {
   readFlywheelLaunchMetadata,
 } from '../../dashboard/server/services/flywheel-run-state.js';
 import { isFlywheelAutoPickupBacklog } from '../../lib/overdeck/control-settings.js';
-import { computeBookProgress, getBook } from '../../lib/orders/resolver.js';
+import { computeBookProgress, firstReadyBookInQueue, getBook } from '../../lib/orders/resolver.js';
 import type { OrderBookProgress } from '../../lib/orders/types.js';
 import { advanceQueue } from '../../lib/orders/writer.js';
-import { findProjectByPathSync } from '../../lib/projects.js';
+import { findProjectByPathSync, listProjectsSync, resolveProjectPath } from '../../lib/projects.js';
 import { resolveStateReadHomeSync } from '../../lib/state-read-home.js';
 
 export interface CompleteFlywheelOptions {
@@ -41,6 +41,8 @@ export interface CompleteFlywheelDeps {
   advance?: typeof advanceQueue;
   autoPickupBacklog?: () => boolean;
   readRetro?: (path: string) => Promise<string | null>;
+  listProjects?: typeof listProjectsSync;
+  firstReady?: typeof firstReadyBookInQueue;
 }
 
 export interface CompleteFlywheelResult {
@@ -50,6 +52,7 @@ export interface CompleteFlywheelResult {
   continuation: 'next-book' | 'backlog' | 'needs-you';
   nextRunId?: string;
   nextBookId?: string;
+  nextProjectKey?: string;
 }
 
 function stateRootFor(workspace: string): string {
@@ -87,6 +90,27 @@ export function appendFlywheelRetrospective(report: string, retro: string | null
 
 function nonTerminalIssues(progress: OrderBookProgress): string[] {
   return progress.items.filter((item) => !item.terminal).map((item) => item.issue);
+}
+
+/**
+ * A ready book is an explicit operator release, so continuation looks past the
+ * completing project: every tracked project's ready queue is scanned in registry
+ * order and the first hit wins. Run scope governs backlog pickup, not this.
+ */
+function findCrossProjectContinuation(
+  stateRoot: string,
+  deps: CompleteFlywheelDeps,
+): { projectKey: string; cwd: string; book: OrderBook } | null {
+  const firstReady = deps.firstReady ?? firstReadyBookInQueue;
+  for (const { key, config } of (deps.listProjects ?? listProjectsSync)()) {
+    const projectStateRoot = resolveStateReadHomeSync(config, key).root;
+    if (projectStateRoot === stateRoot) continue;
+    const book = firstReady(projectStateRoot);
+    // resolveProjectPath returns the project's primary root, which the Flywheel
+    // start path requires — it uses options.cwd verbatim.
+    if (book) return { projectKey: key, cwd: resolveProjectPath(config), book };
+  }
+  return null;
 }
 
 export async function completeFlywheelRun(
@@ -133,6 +157,21 @@ export async function completeFlywheelRun(
       nextBookId: nextBook.id,
     };
   }
+  const crossProject = findCrossProjectContinuation(stateRoot, deps);
+  if (crossProject) {
+    // No brief: requireFlywheelBrief resolves the target project's own default
+    // docs/flywheel-brief.md, so the completing project's brief never leaks over.
+    const next = await deps.start({ cwd: crossProject.cwd, orders: crossProject.book.id });
+    return {
+      runId: status.runId,
+      reportPath: join(runDir, 'report.md'),
+      retrospectiveIncluded: report.retrospectiveIncluded,
+      continuation: 'next-book',
+      nextRunId: next.runId,
+      nextBookId: crossProject.book.id,
+      nextProjectKey: crossProject.projectKey,
+    };
+  }
   if ((deps.autoPickupBacklog ?? isFlywheelAutoPickupBacklog)()) {
     const next = await deps.start(startOptions);
     return {
@@ -156,7 +195,8 @@ export function createFlywheelCompleteCommand(deps: CompleteFlywheelDeps) {
     try {
       const result = await completeFlywheelRun(options, deps);
       if (result.continuation === 'next-book') {
-        console.log(`Completed ${result.runId}; started ${result.nextRunId} with order book ${result.nextBookId}.`);
+        const project = result.nextProjectKey ? ` (project: ${result.nextProjectKey})` : '';
+        console.log(`Completed ${result.runId}; started ${result.nextRunId} with order book ${result.nextBookId}${project}.`);
       } else if (result.continuation === 'backlog') {
         console.log(`Completed ${result.runId}; started ${result.nextRunId} in backlog mode.`);
       } else {
