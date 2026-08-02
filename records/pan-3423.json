@@ -232,6 +232,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T23:20:46.358Z"
+    },
+    {
+      "timestamp": "2026-08-02T23:23:11.121Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -269,7 +274,7 @@
     "recordedAt": "2026-08-02T23:23:05.476Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T23:23:06.517Z",
+  "updated": "2026-08-02T23:23:11.162Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -280,7 +285,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T23:23:06.516Z",
+    "updatedAt": "2026-08-02T23:23:11.117Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "uatNotes": "UAT executed: built workspace dashboard (npm run build:dashboard), ran it isolated on PORT=3423 with OVERDECK_DISABLE_DEACON=1 (never touched the shared host dashboard on 3011), drove it with an isolated Playwright session. Opened the live SystemHealthPill popover (real Warning-state data) and confirmed: state-badge header + relative updated time; bordered summary line; chip row replacing the old tile grid; all 4 vitals tiles rendering real threshold-colored meter bars incl. swap 'historical - not live pressure' label; grouped xN attention row collapsed with no inline Kill/Open (closed-by-default disclosure only); singleton rows with working Open/Kill wiring (verified via source + aria-labels, not clicked, to avoid killing another agent's live session on this shared host); closed-by-default context-notes disclosure; top-consumers kind badges + proportional bars + 'No leaks' header; Escape closes the popover. LEAKED-tag, healthy all-clear variant, and exact FR-3 message text were not re-observed live (system stayed in Warning state) but are covered by passing unit/component tests. Full evidence and screenshot description in .pan/test/result.json. Cleaned up the port-3423 process and scratch files afterward.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
@@ -334,9 +339,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 17553209,
-            "output": 268361,
-            "cacheRead": 77027840,
+            "input": 19733301,
+            "output": 286855,
+            "cacheRead": 81686016,
             "cacheWrite": 0
           }
         },
@@ -388,9 +393,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 1708676,
-            "output": 126697,
-            "cacheRead": 88731648,
+            "input": 2075792,
+            "output": 127303,
+            "cacheRead": 89818112,
             "cacheWrite": 0
           }
         }
@@ -403,9 +408,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 24561714,
-          "output": 577826,
-          "cacheRead": 189097472,
+          "input": 27108922,
+          "output": 596926,
+          "cacheRead": 194842112,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -422,8 +427,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 244.7810643,
-        "pricingAsOf": "2026-08-02T23:20:14.545Z"
+        "usd": 260.9624243,
+        "pricingAsOf": "2026-08-02T23:23:11.150Z"
       }
     },
     "merges": [
