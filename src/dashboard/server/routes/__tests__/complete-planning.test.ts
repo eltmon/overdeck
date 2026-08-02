@@ -266,6 +266,32 @@ describe('completePlanningArtifacts', () => {
     expect(promoted.plan.status).toBe('proposed');
   });
 
+  it('promotes the authored .pan spec when a stored .overdeck draft also exists', async () => {
+    const issueId = 'PAN-3467';
+    const { projectPath, workspacePath } = makeProject(issueId);
+    await Promise.all([
+      mkdir(join(workspacePath, '.overdeck'), { recursive: true }),
+      mkdir(join(workspacePath, '.pan'), { recursive: true }),
+    ]);
+    const storedDraft = makeDoc(issueId);
+    storedDraft.plan.title = 'Stored server draft';
+    const authoredDoc = makeDoc(issueId);
+    authoredDoc.plan.title = 'Operator-authored plan';
+    authoredDoc.plan.items[0]!.id = 'operator-authored';
+    writeFileSync(join(workspacePath, '.overdeck', 'spec.vbrief.json'), JSON.stringify(storedDraft, null, 2));
+    writeFileSync(join(workspacePath, '.pan', 'spec.vbrief.json'), JSON.stringify(authoredDoc, null, 2));
+
+    const result = await completePlanningArtifacts({
+      projectPath,
+      workspacePath,
+      issueId,
+    });
+
+    const promoted = JSON.parse(readFileSync(result.proposed.path, 'utf-8')) as XBriefDocument;
+    expect(promoted.plan.title).toBe('Operator-authored plan');
+    expect(promoted.plan.items[0]?.id).toBe('operator-authored');
+  });
+
   it('rejects quality lint failures before writing a proposed spec', async () => {
     const issueId = 'PAN-1149';
     const { projectPath, workspacePath } = makeProject(issueId);

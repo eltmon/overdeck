@@ -35,16 +35,19 @@ import { resolveProjectReposForIssueSync } from '../project-repos.js';
 import {
   getProjectConfigFromWorkspacePath,
   markRecordPipelineClosedOutSync,
+  markRecordPipelineResidueClosedOutSync,
   writeCloseOutDodGate,
 } from '../pan-dir/record.js';
 import { pruneStoppedAgentsForIssue } from '../cloister/agent-gc.js';
+import { isTrackerIssueClosed } from '../cloister/issue-closed.js';
 import { evaluateDodGate, readCompletedCloseOut } from './dod-gate.js';
+import { closeResidueConventionPrs, extractGitHubCoordinates, extractGitLabProject } from './residue.js';
 import {
   capturePipelineStage,
   resolvePipelineTelemetryContext,
   type PipelineTelemetryContext,
 } from '../telemetry/pipeline.js';
-import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
+import { acceptFlagFor, BRANCH_ABSENT_MERGE_ERROR, buildAbandonedDodGate, buildResidueDodGate, DOD_ROWS, type DodGateResult, type DodRowId } from './dod.js';
 
 const execAsync = promisify(exec);
 
@@ -205,16 +208,104 @@ export function closeOut(
     });
     allSteps.push(uatEvidenceStep);
 
-    // 1. Evaluate every pre-teardown Definition-of-Done row before any cleanup.
-    // PAN-3211: an abandoned disposition skips the gate entirely (PAN-3211).
+    // 1. Collect residue evidence BEFORE building the gate (if residue disposition)
     const abandon = opts.abandonDisposition;
-    const dodGate: DodGateResult = abandon
+    const residue = opts.residueDisposition;
+    let residueEvidence: string[] = [];
+    let trackerClosedEvidence: string[] = [];
+
+    if (residue) {
+      // Pre-verify tracker is closed for residue disposition
+      try {
+        const isClosed = yield* Effect.promise(() => isTrackerIssueClosed(ctx.issueId));
+        if (!isClosed) {
+          allSteps.push(stepFailed('close-out:residue-precondition', 'Residue disposition requires the tracker issue to be already closed'));
+          return buildResult('close-out', ctx.issueId, allSteps, start);
+        }
+        trackerClosedEvidence.push('Tracker issue verified closed');
+      } catch (err) {
+        allSteps.push(stepFailed('close-out:residue-precondition', `Could not verify tracker closure: ${err instanceof Error ? err.message : String(err)}`));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Resolve forge coordinates and close stale PRs/MRs
+      const prRepos = resolveProjectReposForIssueSync(ctx.issueId);
+      if (!prRepos || prRepos.length === 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', 'Could not resolve any configured repositories for residue cleanup'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Resolve all GitHub and GitLab coordinates
+      const githubPaths = prRepos.filter(r => r.forge === 'github').map(r => r.repoPath);
+      const gitlabPaths = prRepos.filter(r => r.forge === 'gitlab').map(r => r.repoPath);
+
+      const resolveCoords = yield* Effect.promise(async () => {
+        const githubRepos: string[] = [];
+        const gitlabRepos: string[] = [];
+        const errors: string[] = [];
+
+        for (const repoPath of githubPaths) {
+          const coords = await extractGitHubCoordinates(repoPath);
+          if (coords) {
+            githubRepos.push(coords);
+          } else {
+            errors.push(`GitHub coordinate extraction failed for ${repoPath}`);
+          }
+        }
+
+        for (const repoPath of gitlabPaths) {
+          const proj = await extractGitLabProject(repoPath);
+          if (proj) {
+            gitlabRepos.push(proj);
+          } else {
+            errors.push(`GitLab project extraction failed for ${repoPath}`);
+          }
+        }
+
+        return { githubRepos, gitlabRepos, errors };
+      });
+
+      // Fail if any configured repository could not be resolved
+      if (resolveCoords.errors.length > 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', `Could not resolve all forge coordinates: ${resolveCoords.errors.join('; ')}`));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Fail if no repositories were successfully resolved
+      if (resolveCoords.githubRepos.length === 0 && resolveCoords.gitlabRepos.length === 0) {
+        allSteps.push(stepFailed('close-out:residue-precondition', 'No forge coordinates were resolved for residue cleanup'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+
+      // Execute residue cleanup
+      const residueStep = yield* Effect.promise(() => closeResidueConventionPrs({
+        issueId: ctx.issueId,
+        projectPath: ctx.projectPath,
+        github: resolveCoords.githubRepos.length > 0 ? { repos: resolveCoords.githubRepos } : undefined,
+        gitlab: resolveCoords.gitlabRepos.length > 0 ? { projects: resolveCoords.gitlabRepos } : undefined,
+      }));
+      allSteps.push(residueStep);
+      if (!residueStep.success && !residueStep.skipped) {
+        allSteps.push(stepFailed('close-out:abort', 'Stopped — residue PR/MR close failed'));
+        return buildResult('close-out', ctx.issueId, allSteps, start);
+      }
+      residueEvidence = residueStep.details ?? [];
+    }
+
+    // 2. Build the Definition-of-Done gate with collected evidence
+    let dodGate: DodGateResult = abandon
       ? buildAbandonedDodGate(abandon.reason, abandon.by)
+      : residue
+      ? buildResidueDodGate(residue.reason, residue.by, [
+          ...trackerClosedEvidence,
+          ...residueEvidence,
+        ])
       : yield* Effect.promise(() => evaluateDodGate(ctx, {
           acceptedRows: opts.dodAcceptedRows,
           acceptedBy: opts.dodAcceptedBy,
           verifyMerged: verifyBranchMergedImpl,
         }));
+
     for (const row of dodGate.rows) {
       const details = [`expected: ${row.expected}`, `observed: ${row.observed}`];
       if (row.acceptedBy) {
@@ -240,6 +331,9 @@ export function closeOut(
       ));
       return buildResult('close-out', ctx.issueId, allSteps, start, dodGate);
     }
+
+    // 3. Move PRD + archive workspace artifacts
+    // (Note: step numbering adjusted due to upfront residue cleanup)
 
     // 2. Move PRD + archive workspace artifacts
     const archiveSteps = yield* archivePlanning(ctx, opts);
@@ -302,9 +396,18 @@ export function closeOut(
     }
 
     // 8. Mark durable pipeline terminal before clearing the DB cache.
-    const markTerminal = yield* markPipelineClosedOutStep(ctx);
+    const markTerminal = yield* markPipelineClosedOutStep(ctx, residue);
     allSteps.push(markTerminal);
-    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon);
+
+    // Update gate with verified residue evidence before recording if a residue row exists
+    if (residue && residueEvidence.length > 0) {
+      const residueRow = dodGate.rows.find(row => (row.id as string) === 'residue');
+      if (residueRow) {
+        residueRow.observed = residueEvidence.join('; ');
+      }
+    }
+
+    const recordDodGate = yield* recordDodGateStep(ctx, dodGate, abandon, residue);
     allSteps.push(recordDodGate);
     if (!recordDodGate.success) {
       allSteps.push(stepFailed('close-out:abort', 'Stopped — Definition-of-Done audit could not be persisted; review status preserved'));
@@ -330,12 +433,16 @@ export function closeOut(
   });
 }
 
-function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepResult> {
+function markPipelineClosedOutStep(ctx: LifecycleContext, residue?: { reason: string; by: string }): Effect.Effect<StepResult> {
   const step = 'close-out:mark-pipeline-terminal';
   return Effect.try({
     try: () => {
       const project = getProjectConfigFromWorkspacePath(ctx.projectPath);
-      markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      if (residue) {
+        markRecordPipelineResidueClosedOutSync(project, ctx.issueId.toUpperCase());
+      } else {
+        markRecordPipelineClosedOutSync(project, ctx.issueId.toUpperCase());
+      }
       return stepOk(step, ['Marked durable pipeline journal closed-out']);
     },
     catch: (err) => err,
@@ -346,7 +453,7 @@ function markPipelineClosedOutStep(ctx: LifecycleContext): Effect.Effect<StepRes
   );
 }
 
-function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
+function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abandonDisposition?: { reason: string; by: string }, residueDisposition?: { reason: string; by: string }): Effect.Effect<StepResult> {
   const step = 'close-out:record-dod-gate';
   return Effect.tryPromise({
     try: async () => {
@@ -356,6 +463,7 @@ function recordDodGateStep(ctx: LifecycleContext, dodGate: DodGateResult, abando
         rows: dodGate.rows,
         accepted: dodGate.accepted,
         ...(abandonDisposition ? { disposition: abandonDisposition } : {}),
+        ...(residueDisposition ? { disposition: residueDisposition } : {}),
       });
       return stepOk(step, ['Recorded Definition-of-Done gate with 8 rows']);
     },

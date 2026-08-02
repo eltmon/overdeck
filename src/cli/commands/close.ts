@@ -20,6 +20,7 @@ import { resolveProjectFromIssueSync, extractTeamPrefix, findProjectByTeamSync }
 import { resolveBareNumericIdSync } from '../../lib/issue-id.js';
 import { mapGitHubStateToCanonical, type CanonicalState } from '../../core/state-mapping.js';
 import { acceptFlagFor, canAcceptDodMisses, DOD_ROWS, type DodRowId } from '../../lib/lifecycle/dod.js';
+import { isTrackerIssueClosed } from '../../lib/cloister/issue-closed.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -27,11 +28,36 @@ interface CloseOutOptions {
   force?: boolean;
   json?: boolean;
   abandon?: string;
+  residue?: string;
   [key: string]: boolean | string | undefined;
 }
 
 function optionNameForRow(id: DodRowId): string {
   return `accept${id.split('-').map(part => part[0]!.toUpperCase() + part.slice(1)).join('')}`;
+}
+
+export function checkResidueFlagEligibility(args: {
+  residueReason: string | null;
+  abandonRequested: boolean;
+  dodAcceptedRows: DodRowId[];
+  agentId: string | undefined;
+}): string | null {
+  if (!args.residueReason) return null;
+
+  if (args.residueReason.trim().length === 0) {
+    return '--residue requires a non-empty reason';
+  }
+  if (args.abandonRequested) {
+    return '--residue cannot be combined with --abandon flags';
+  }
+  if (args.dodAcceptedRows.length > 0) {
+    return '--residue cannot be combined with --accept-* flags';
+  }
+  if (!args.agentId?.startsWith('conv-')) {
+    return '--residue is operator-conversation-only (conv-*)';
+  }
+
+  return null;
 }
 
 function renderDodGate(result: WorkflowResult): void {
@@ -65,6 +91,10 @@ export function registerCloseCommand(program: Command): void {
   command.option(
     '--abandon <reason>',
     'Record an abandoned disposition (PAN-3211): skip the DoD gate and close without landing evidence. Operator-conversation only; cannot be combined with --accept-* flags',
+  );
+  command.option(
+    '--residue <reason>',
+    'Record a residue disposition (PAN-3396): close stale convention PRs/MRs, skip the DoD gate with verified evidence, and mark terminal without merge claim. Operator-conversation only; cannot be combined with --abandon or --accept-* flags',
   );
   command.action((id, options) => closeOutCommand(id, options));
 }
@@ -196,6 +226,32 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     }
   }
 
+  // PAN-3396: --residue records an honest residue disposition for tracker-closed
+  // pre-record-era issues with stale convention PRs/MRs. Similar to --abandon,
+  // it is operator-conversation-only, mutually exclusive with --abandon and --accept-*,
+  // and requires the tracker to confirm the issue is already closed.
+  const residueReason = typeof options.residue === 'string' && options.residue.trim().length > 0
+    ? options.residue.trim()
+    : null;
+  if (options.residue !== undefined && !residueReason) {
+    console.error(chalk.red('--residue requires a non-empty reason recorded in the durable record.'));
+    return exitCli(1);
+  }
+  if (residueReason) {
+    if (dodAcceptedRows.length > 0) {
+      console.error(chalk.red('--residue cannot be combined with --accept-* flags: a close either proves landing (accept overrides) or records a residue disposition.'));
+      return exitCli(1);
+    }
+    if (abandonReason) {
+      console.error(chalk.red('--residue cannot be combined with --abandon flags: choose one disposition path.'));
+      return exitCli(1);
+    }
+    if (!isOperatorConversation) {
+      console.error(chalk.red('--residue is operator-conversation-only (conv-*). Pipeline agents and the flywheel may not record a residue disposition.'));
+      return exitCli(1);
+    }
+  }
+
   const issueLower = issueId.toLowerCase();
   const issueUpper = issueId.toUpperCase();
 
@@ -295,6 +351,16 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
 
   console.log(chalk.blue(`\nRunning close-out for ${issueUpper}...\n`));
 
+  // PAN-3396: --residue requires tracker-closed verification
+  if (residueReason) {
+    const isClosed = await isTrackerIssueClosed(issueId);
+    if (!isClosed) {
+      console.error(chalk.red(`Cannot record residue disposition: ${issueUpper} is still open on the tracker.`));
+      console.error(chalk.red('The tracker issue must be closed before recording a residue disposition.'));
+      return exitCli(1);
+    }
+  }
+
   const ctx = {
     issueId,
     projectPath,
@@ -308,6 +374,9 @@ export async function closeOutCommand(id: string, options: CloseOutOptions): Pro
     dodAcceptedBy: process.env.OVERDECK_AGENT_ID || userInfo().username,
     ...(abandonReason
       ? { abandonDisposition: { reason: abandonReason, by: process.env.OVERDECK_AGENT_ID || userInfo().username } }
+      : {}),
+    ...(residueReason
+      ? { residueDisposition: { reason: residueReason, by: process.env.OVERDECK_AGENT_ID || userInfo().username } }
       : {}),
   }));
 

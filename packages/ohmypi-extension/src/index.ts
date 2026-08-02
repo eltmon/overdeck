@@ -448,66 +448,12 @@ async function recordCostEvent(env: HookEnv, event: ToolExecutionEndEvent | Turn
   await postEvent(env, body)
 }
 
-function isClosedBead(issue: Record<string, unknown>): boolean {
-  const status = String(issue['status'] ?? '').toLowerCase()
-  return status === 'closed' || status === 'done' || status === 'completed'
-}
-
-function beadMatchesIssue(issue: Record<string, unknown>, issueId: string): boolean {
-  const label = issueId.toLowerCase()
-  const labels = Array.isArray(issue['labels']) ? issue['labels'] : []
-  return labels.some((entry) => String(entry).toLowerCase() === label)
-    || String(issue['title'] ?? '').toLowerCase().includes(issueId.toLowerCase())
-    || String(issue['id'] ?? '').toLowerCase().includes(issueId.toLowerCase())
-}
-
-async function allIssueBeadsClosed(workspace: string, issueId: string): Promise<boolean> {
-  let raw = ''
-  try {
-    raw = await readFile(join(workspace, '.beads', 'issues.jsonl'), 'utf8')
-  } catch {
-    return false
-  }
-  const issues = raw.split('\n')
-    .filter((line) => line.trim())
-    .map((line) => {
-      try { return JSON.parse(line) as Record<string, unknown> } catch { return null }
-    })
-    .filter((issue): issue is Record<string, unknown> => !!issue && beadMatchesIssue(issue, issueId))
-
-  return issues.length > 0 && issues.every(isClosedBead)
-}
-
-function statusComplete(value: unknown): boolean {
-  return String(value ?? '').toLowerCase() === 'completed'
-}
-
-function planItemsComplete(plan: Record<string, unknown>): boolean {
-  const root = (plan['plan'] && typeof plan['plan'] === 'object') ? plan['plan'] as Record<string, unknown> : plan
-  const items = Array.isArray(root['items']) ? root['items'] as Record<string, unknown>[] : []
-  if (items.length === 0) return true
-  return items.every((item) => {
-    const subItems = Array.isArray(item['subItems']) ? item['subItems'] as Record<string, unknown>[] : []
-    return statusComplete(item['status']) && subItems.every((subItem) => statusComplete(subItem['status']))
-  })
-}
-
-async function xbriefSatisfied(workspace: string): Promise<boolean> {
-  for (const path of [join(workspace, '.pan', 'spec.vbrief.json'), join(workspace, '.pan', 'continue.json')]) {
-    try {
-      const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>
-      if (!planItemsComplete(parsed)) return false
-      return true
-    } catch {}
-  }
-  return true
-}
-
 async function evidenceClean(env: HookEnv): Promise<boolean> {
   const issueId = await issueIdFor(env)
   const workspace = await workspaceFor(env)
   if (!issueId || !workspace) return false
-  return await allIssueBeadsClosed(workspace, issueId) && await xbriefSatisfied(workspace)
+  const result = await postJsonWithTimeout(env, `${getDashboardUrl()}/api/agents/${env.agentId}/plan-checklist`, { issueId })
+  return result?.['complete'] === true
 }
 
 async function readTurnOutput(env: HookEnv, event: TurnEndEvent): Promise<string> {
@@ -543,7 +489,7 @@ async function markStuck(env: HookEnv, reason: string): Promise<void> {
 
 const COMPLETION_PHRASES = [
   'Implementation complete',
-  'all beads closed',
+  'all tasks closed',
   'ready for review',
   'work complete',
 ]
@@ -582,7 +528,7 @@ async function updateProgress(env: HookEnv, kind: 'tool' | 'turn', timestamp: st
 export async function handleWorkAgentTurnEnd(env: HookEnv, event: TurnEndEvent): Promise<void> {
   const output = await readTurnOutput(env, event)
   if (await evidenceClean(env)) {
-    await postWorkComplete(env, 'evidence-clean', 'All issue beads are closed and the plan is satisfied')
+    await postWorkComplete(env, 'evidence-clean', 'All xBRIEF plan items are complete')
     return
   }
 

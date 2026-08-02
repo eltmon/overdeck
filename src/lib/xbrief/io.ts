@@ -129,11 +129,23 @@ function workspaceDraftPath(workspacePath: string): string {
   return getWorkspacePanPaths(workspacePath).specPath;
 }
 
-function readableWorkspaceDraftPath(workspacePath: string): string | null {
-  const canonicalPath = workspaceDraftPath(workspacePath);
-  if (existsSync(canonicalPath)) return canonicalPath;
-  const legacyPath = getLegacyWorkspacePanPaths(workspacePath).specPath;
-  return existsSync(legacyPath) ? legacyPath : null;
+// Runtime reads prefer `.overdeck/`, but planning finalization must prefer the
+// `.pan/` path that the planning and write-xbrief contracts tell agents to author.
+type WorkspaceDraftOrder = 'runtime-first' | 'authored-first';
+
+function workspaceDraftPaths(workspacePath: string, order: WorkspaceDraftOrder): string[] {
+  const runtimePath = workspaceDraftPath(workspacePath);
+  const authoredPath = getLegacyWorkspacePanPaths(workspacePath).specPath;
+  return order === 'authored-first'
+    ? [authoredPath, runtimePath]
+    : [runtimePath, authoredPath];
+}
+
+function readableWorkspaceDraftPath(
+  workspacePath: string,
+  order: WorkspaceDraftOrder = 'runtime-first',
+): string | null {
+  return workspaceDraftPaths(workspacePath, order).find(existsSync) ?? null;
 }
 
 function workspaceContinuePath(workspacePath: string): string {
@@ -147,8 +159,11 @@ function readableWorkspaceContinuePath(workspacePath: string): string {
   return existsSync(legacyPath) ? legacyPath : canonicalPath;
 }
 
-export function findWorkspaceDraftPlanSync(workspacePath: string): string | null {
-  const path = readableWorkspaceDraftPath(workspacePath);
+export function findWorkspaceDraftPlanSync(
+  workspacePath: string,
+  order: WorkspaceDraftOrder = 'runtime-first',
+): string | null {
+  const path = readableWorkspaceDraftPath(workspacePath, order);
   if (!path) return null;
 
   const issueId = issueIdFromWorkspacePath(workspacePath);
@@ -515,12 +530,10 @@ export const readPlan = (
 
 export const findWorkspaceDraftPlan = (
   workspacePath: string,
+  order: WorkspaceDraftOrder = 'runtime-first',
 ): Effect.Effect<string | null, FsError> =>
   Effect.gen(function* () {
-    const paths = [
-      workspaceDraftPath(workspacePath),
-      getLegacyWorkspacePanPaths(workspacePath).specPath,
-    ];
+    const paths = workspaceDraftPaths(workspacePath, order);
     let path: string | null = null;
     for (const candidate of paths) {
       const exists = yield* Effect.tryPromise({

@@ -26,6 +26,7 @@ describe('supervisor lifecycle', () => {
   let startSupervisorProcessSync: typeof supervisor.startSupervisorProcessSync;
   let stopSupervisorProcessSync: typeof supervisor.stopSupervisorProcessSync;
   let isSupervisorRunningSync: typeof supervisor.isSupervisorRunningSync;
+  let resolveSupervisorPrimaryRepoRoot: typeof supervisor.resolveSupervisorPrimaryRepoRoot;
 
   beforeEach(async () => {
     home = mkdtempSync(join(tmpdir(), 'pan-sup-'));
@@ -50,6 +51,7 @@ describe('supervisor lifecycle', () => {
     startSupervisorProcessSync = mod.startSupervisorProcessSync;
     stopSupervisorProcessSync = mod.stopSupervisorProcessSync;
     isSupervisorRunningSync = mod.isSupervisorRunningSync;
+    resolveSupervisorPrimaryRepoRoot = mod.resolveSupervisorPrimaryRepoRoot;
   });
 
   afterEach(() => {
@@ -66,6 +68,20 @@ describe('supervisor lifecycle', () => {
     writeFileSync(join(dir, 'server.js'), '// dummy supervisor bundle\n', 'utf-8');
   }
 
+  it('resolves the primary checkout from the active dashboard bundle', () => {
+    const deployRoot = join(home, 'deployments', 'dashboard', '.pan-reload-generation-a');
+    const serverPath = join(deployRoot, 'dist', 'dashboard', 'server.js');
+    mkdirSync(join(deployRoot, 'dist', 'dashboard'), { recursive: true });
+    writeFileSync(serverPath, '// active dashboard bundle\n', 'utf-8');
+    writeFileSync(join(home, 'active-dashboard-bundle.json'), `${JSON.stringify({
+      repoRoot: '/home/dev/Projects/overdeck',
+      deployRoot,
+      serverPath,
+    })}\n`, 'utf-8');
+
+    expect(resolveSupervisorPrimaryRepoRoot()).toBe('/home/dev/Projects/overdeck');
+  });
+
   describe('startSupervisorProcessSync', () => {
     it('removes the pidfile and logs an error when the child dies immediately', () => {
       makeBundle();
@@ -76,6 +92,9 @@ describe('supervisor lifecycle', () => {
 
       expect(() => startSupervisorProcessSync()).toThrow(/exited immediately/);
 
+      expect(spawn).toHaveBeenCalledWith(process.execPath, [join(home, 'dist', 'supervisor', 'server.js')], expect.objectContaining({
+        cwd: home,
+      }));
       expect(existsSync(join(home, 'supervisor.pid'))).toBe(false);
       expect(isSupervisorRunningSync()).toBe(false);
       expect(errorSpy).toHaveBeenCalledWith(expect.stringContaining('exited immediately'));

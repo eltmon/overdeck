@@ -13,6 +13,9 @@ const mocks = vi.hoisted(() => ({
   appendOperatorInterventionEvent: vi.fn(),
   logAgentLifecycleSync: vi.fn(),
   resumeAgent: vi.fn(),
+  getLatestSessionIdSync: vi.fn(),
+  captureTranscriptUserRecordSnapshot: vi.fn(),
+  watchForEatenAgentMessage: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
@@ -46,6 +49,14 @@ vi.mock('../../../../src/lib/agents/delivery.js', () => ({
   resilientDeliveryMethod: (method: unknown) => method,
 }));
 
+vi.mock('../../../../src/lib/agents/eaten-message-watcher.js', () => ({
+  watchForEatenAgentMessage: mocks.watchForEatenAgentMessage,
+}));
+
+vi.mock('../../../../src/lib/transcript-landing.js', () => ({
+  captureTranscriptUserRecordSnapshot: mocks.captureTranscriptUserRecordSnapshot,
+}));
+
 vi.mock('../../../../src/lib/tmux.js', () => ({
   createSession: vi.fn(),
   killSession: vi.fn(),
@@ -64,7 +75,7 @@ vi.mock('../../../../src/lib/agents/runtime-command.js', () => ({
 }));
 
 vi.mock('../../../../src/lib/agents/activity.js', () => ({
-  getLatestSessionIdSync: vi.fn(),
+  getLatestSessionIdSync: mocks.getLatestSessionIdSync,
 }));
 
 vi.mock('../../../../src/lib/agents/supervisor-channels.js', () => ({
@@ -124,6 +135,14 @@ describe('messageAgent', () => {
     mocks.waitForAgentIdle.mockResolvedValue(true);
     mocks.deliverAgentMessage.mockResolvedValue({ ok: true });
     mocks.resumeAgent.mockResolvedValue({ success: true, messageDelivered: true });
+    mocks.getLatestSessionIdSync.mockReturnValue(undefined);
+    mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
+      sessionFile: '/tmp/session.jsonl',
+      userRecordCount: 0,
+      fileSize: 0,
+      readOffset: 0,
+    });
+    mocks.watchForEatenAgentMessage.mockResolvedValue('landed');
     mocks.getCodexAppServerStatus.mockRejectedValue(new Error('no app-server'));
   });
 
@@ -158,6 +177,54 @@ describe('messageAgent', () => {
       'agent-pan-2262',
       expect.stringContaining('queued mail without resume'),
     );
+  });
+
+  it('watches keyed Claude feedback for submit-time compaction loss', async () => {
+    mocks.getAgentStateSync.mockReturnValue({
+      id: 'agent-pan-2262',
+      issueId: 'PAN-2262',
+      status: 'running',
+      workspace: '/repo',
+      harness: 'claude-code',
+      sessionId: 'session-2262',
+      deliveryMethod: 'supervisor',
+    });
+    mocks.captureTranscriptUserRecordSnapshot.mockResolvedValue({
+      sessionFile: '/tmp/session-2262.jsonl',
+      userRecordCount: 7,
+      fileSize: 4_096,
+      readOffset: 4_000,
+    });
+
+    await expect(messageAgent(
+      'agent-pan-2262',
+      'review feedback',
+      'internal',
+      { dedupKey: 'review-feedback:cycle-3' },
+    )).resolves.toEqual({
+      delivered: true,
+      queuedToMail: false,
+    });
+
+    expect(mocks.captureTranscriptUserRecordSnapshot).toHaveBeenCalledWith('/repo', 'session-2262');
+    expect(mocks.captureTranscriptUserRecordSnapshot.mock.invocationCallOrder[0])
+      .toBeLessThan(mocks.deliverAgentMessage.mock.invocationCallOrder[0]!);
+    expect(mocks.deliverAgentMessage).toHaveBeenCalledWith(
+      'agent-pan-2262',
+      'review feedback',
+      'messageAgent:internal',
+      'supervisor',
+      { dedupKey: 'review-feedback:cycle-3' },
+    );
+    expect(mocks.watchForEatenAgentMessage).toHaveBeenCalledWith({
+      agentId: 'agent-pan-2262',
+      workspace: '/repo',
+      sessionId: 'session-2262',
+      message: 'review feedback',
+      caller: 'messageAgent:internal',
+      deliveryMethod: 'supervisor',
+      fromByteOffset: 4_000,
+    });
   });
 
   it('reports paused-agent mail as undelivered with the gate reason', async () => {

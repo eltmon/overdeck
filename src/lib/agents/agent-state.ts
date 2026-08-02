@@ -111,8 +111,10 @@ export interface AgentState {
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
 
-  // Work type system (PAN-118)
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  // Work type system (PAN-118). 'retained-transcripts' is the tombstone phase
+  // (PAN-3465): removeAgent keeps the row for transcript linkage after the
+  // state dir is retired — such rows are not live agents.
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis' | 'retained-transcripts';
   workType?: string; // Current work type ID
 
   /**

@@ -108,6 +108,10 @@ vi.mock('../../../src/lib/agents.js', () => ({
   getProviderAuthMode: vi.fn(async () => 'apikey'),
 }));
 
+vi.mock('../../../src/lib/agents/agent-state.js', () => ({
+  saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+}));
+
 vi.mock('../../../src/lib/config-yaml.js', () => ({
   loadConfig: vi.fn(() => ({ config: {} })),
   loadConfigSync: mockLoadConfigSync,
@@ -1082,6 +1086,65 @@ describe('convoy orchestration', () => {
     expect(mockSpawnRun).toHaveBeenCalledWith('PAN-1059', 'review', expect.objectContaining({
       prompt: expect.stringContaining('REVIEW TASK for PAN-1059 — SECURITY REVIEW'),
     }));
+  });
+
+  it('repairs and persists missing parent run metadata before accepting discovery-ready', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    const reviewDir = dirname(manifestPath);
+    for (const role of ['security', 'performance', 'requirements']) {
+      writeFileSync(`${reviewDir}/${role}.md`, `${role} complete`, 'utf-8');
+    }
+    const parent = {
+      id: 'agent-pan-1059-review',
+      issueId: 'PAN-1059',
+      workspace,
+      role: 'review',
+      model: 'review-model',
+      status: 'starting',
+      startedAt: '2000-01-01T00:00:00.000Z',
+    };
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === parent.id ? parent : null,
+    );
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+    }));
+
+    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toMatchObject({ success: true, launched: 1 });
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
+      reviewRunId: REVIEW_AGENT_RUN_ID,
+      reviewContextManifestPath: manifestPath,
+    }));
+  });
+
+  it('fails discovery-ready before launch when repaired parent state cannot be persisted', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    writeReviewManifest(workspace);
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            issueId: 'PAN-1059',
+            workspace,
+            role: 'review',
+            model: 'review-model',
+            status: 'starting',
+            startedAt: '2000-01-01T00:00:00.000Z',
+          }
+        : null,
+    );
+    mockSaveAgentStateAsync.mockRejectedValueOnce(new Error('database unavailable'));
+
+    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+
+    expect(result).toEqual({
+      success: false,
+      message: 'Could not persist active review run state for PAN-1059: database unavailable',
+    });
+    expect(mockSpawnRun).not.toHaveBeenCalled();
   });
 
   it('re-dispatches only the missing reviewer when sibling reports already exist', async () => {

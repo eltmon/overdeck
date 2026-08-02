@@ -9,8 +9,10 @@ import { prepareHarnessLaunch } from '../harness-binary.js';
 import { appendOperatorInterventionEvent } from '../operator-interventions.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
+import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { ALLOW_SESSION_ROTATION_ON_RESUME } from '../session-rotation.js';
 import type { ModelId } from '../settings.js';
+import { captureTranscriptUserRecordSnapshot } from '../transcript-landing.js';
 import { createSession, killSession, listPaneValues, sessionExists } from '../tmux.js';
 import {
   clearReadySignal,
@@ -34,6 +36,7 @@ import {
   deliverResumeMessageWithTranscriptConfirmation,
   resilientDeliveryMethod,
 } from './delivery.js';
+import { watchForEatenAgentMessage } from './eaten-message-watcher.js';
 import { formatMailFileContent, isMonitorLive } from './monitor-transport.js';
 import { getAgentRuntimeStateSync } from './runtime-state.js';
 import {
@@ -565,7 +568,26 @@ export async function messageAgent(
   }
 
   const deliveryMethod = resolveAgentDeliveryMethod(agentState);
-  const delivery = await deliverWithOptionalKey(normalizedId, message, `messageAgent:${caller}`, deliveryMethod, opts.dedupKey);
+  const deliveryCaller = `messageAgent:${caller}`;
+  const transcriptSessionId = getHarnessBehavior(expectedHarness).transcriptKind === 'claude-jsonl'
+    ? agentState?.sessionId ?? getLatestSessionIdSync(normalizedId)
+    : undefined;
+  let transcriptWatch: { sessionId: string; fromByteOffset: number } | undefined;
+  if (agentState?.workspace && transcriptSessionId) {
+    const snapshot = await captureTranscriptUserRecordSnapshot(agentState.workspace, transcriptSessionId);
+    transcriptWatch = {
+      sessionId: transcriptSessionId,
+      fromByteOffset: snapshot.readOffset ?? snapshot.fileSize ?? 0,
+    };
+  }
+
+  const delivery = await deliverWithOptionalKey(
+    normalizedId,
+    message,
+    deliveryCaller,
+    deliveryMethod,
+    opts.dedupKey,
+  );
 
   // Save a durable backup. Unlike `.pending.md` busy-turn mail, the Codex hook
   // does not replay ordinary `.md` backups because they have already landed.
@@ -576,6 +598,26 @@ export async function messageAgent(
     queueAgentMail(normalizedId, message, false);
   }
   await appendTellInterventionForUserSource(normalizedId, caller);
+
+  if (delivery.ok && transcriptWatch && agentState?.workspace) {
+    void watchForEatenAgentMessage({
+      agentId: normalizedId,
+      workspace: agentState.workspace,
+      sessionId: transcriptWatch.sessionId,
+      message,
+      caller: deliveryCaller,
+      deliveryMethod,
+      fromByteOffset: transcriptWatch.fromByteOffset,
+    }).then((outcome) => {
+      if (outcome === 'redelivered') {
+        console.log(`[agents] ${normalizedId}: redelivered message eaten by submit-time compaction`);
+      }
+    }).catch((error: unknown) => {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[agents] eaten-message watcher failed for ${normalizedId}: ${errorMessage}`);
+    });
+  }
+
   return {
     delivered: delivery.ok,
     queuedToMail: opts.dedupKey === undefined,

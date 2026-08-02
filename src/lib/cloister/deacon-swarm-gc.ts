@@ -7,6 +7,20 @@ import type { CoordinateSwarmSlotsDeps } from './deacon-swarm.js';
 
 const MERGED_LIVE_SLOT_IDLE_MS = 30 * 60 * 1000;
 
+export async function reapMergedSlotAgent(
+  issueId: string,
+  slot: Pick<ReconciledSlotItem, 'slotIndex' | 'agentId'>,
+  stopSlotAgent: (agentId: string) => Promise<void> = id => Effect.runPromise(stopAgent(id)),
+): Promise<string> {
+  const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
+  try {
+    await stopSlotAgent(agentId);
+    return `[swarm] reaped merged agent ${agentId}`;
+  } catch (err) {
+    return `[swarm] could not reap merged agent ${agentId}: ${err instanceof Error ? err.message : String(err)}`;
+  }
+}
+
 export async function gcMergedSlots(
   issueId: string,
   workspacePath: string,
@@ -30,14 +44,17 @@ export async function gcMergedSlots(
 
     const agentId = slot.agentId ?? `agent-${issueId.toLowerCase()}-slot-${slot.slotIndex}`;
     if (sessionNames.has(agentId)) {
+      const completionProven = slot.mergedVia === 'completed-status';
       const lastActivity = (deps.getAgentLastActivity ?? (id => getAgentStateSync(id)?.lastActivity))(agentId);
       const idleFor = lastActivity ? Date.now() - Date.parse(lastActivity) : 0;
-      if (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS) {
+      if (!completionProven && (!Number.isFinite(idleFor) || idleFor < MERGED_LIVE_SLOT_IDLE_MS)) {
         actions.push(`[swarm] gc skipped slot ${slot.slotIndex} (item ${slot.itemId}) for ${issueId}: agent session alive`);
         continue;
       }
       await (deps.stopSlotAgent ?? (id => Effect.runPromise(stopAgent(id))))(agentId);
-      actions.push(`[swarm] gc reaped idle merged agent ${agentId}`);
+      actions.push(completionProven
+        ? `[swarm] gc reaped merged agent ${agentId}`
+        : `[swarm] gc reaped idle merged agent ${agentId}`);
     }
 
     const slotWorkspace = `${workspacePath}-slot-${slot.slotIndex}`;

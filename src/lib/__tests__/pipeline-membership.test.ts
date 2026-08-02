@@ -12,6 +12,7 @@ const sig = (over: Partial<IssueLensSignals>): IssueLensSignals => ({
   phaseLabel: null,
   hasXbriefSpec: false,
   explicitlyReady: false,
+  hasTerminalCloseOut: false,
   ...over,
 });
 
@@ -26,6 +27,27 @@ describe('resolvePipelineMembership (PAN-1980)', () => {
     const r = resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true }));
     expect(r.bucket).toBe('zombie_pr');
     expect(r.inPipeline).toBe(true);
+  });
+
+  it('clean_terminal: closed issue + open PR + hasTerminalCloseOut true (L7-record) → clean_terminal with residue reason', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, hasTerminalCloseOut: true }));
+    expect(r.bucket).toBe('clean_terminal');
+    expect(r.inPipeline).toBe(false);
+    expect(r.reasons[0]).toContain('close-out record');
+    expect(r.reasons[0]).toContain('residue');
+  });
+
+  it('zombie_pr: closed issue + open PR without terminal close-out record → zombie_pr (FR-2 unchanged)', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, hasTerminalCloseOut: false }));
+    expect(r.bucket).toBe('zombie_pr');
+    expect(r.inPipeline).toBe(true);
+  });
+
+  it('clean_terminal: closed + openPR + closedOut + phaseLabel → clean_terminal with labelDrift stale_present', () => {
+    const r = resolvePipelineMembership(sig({ issueOpen: false, hasOpenPr: true, hasTerminalCloseOut: true, phaseLabel: 'in-progress' }));
+    expect(r.bucket).toBe('clean_terminal');
+    expect(r.inPipeline).toBe(false);
+    expect(r.labelDrift).toBe('stale_present');
   });
 
   it('post_merge_limbo: open issue with a merged PR (never closed out)', () => {

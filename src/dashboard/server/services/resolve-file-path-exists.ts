@@ -38,11 +38,15 @@ export async function resolveFilePathExists(
   if (path.length === 0 || path.length > MAX_PATH_LENGTH) {
     return { exists: false, kind: null };
   }
-  if (cwd.length > MAX_PATH_LENGTH) {
+  if (cwd !== undefined && cwd.length > MAX_PATH_LENGTH) {
     return { exists: false, kind: null };
   }
-
-  const target = isAbsolute(path) ? path : resolve(cwd, path);
+  // Absolute paths never touch cwd; a relative path with no cwd has no
+  // resolution base, so it cannot exist from this resolver's perspective.
+  const target = isAbsolute(path) ? path : cwd !== undefined ? resolve(cwd, path) : null;
+  if (target === null) {
+    return { exists: false, kind: null };
+  }
 
   try {
     const s = await stat(target);

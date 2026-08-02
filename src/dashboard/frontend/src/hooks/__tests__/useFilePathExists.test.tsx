@@ -54,6 +54,19 @@ describe('useFilePathExists', () => {
     expect(wsTransportMock.resolveFilePathExists).not.toHaveBeenCalled();
   });
 
+  it('queries the server for absolute paths even without a cwd', async () => {
+    // Transcript surfaces render without a cwd; absolute paths still need the
+    // existence gate so they can become chips instead of plain anchors.
+    wsTransportMock.resolveFilePathExists.mockResolvedValue({ exists: true, kind: 'file' });
+    const { result } = renderHook(() => useFilePathExists(undefined, '/home/eltmon/project/src/App.tsx'));
+
+    await waitFor(() => expect(result.current.state).toBe('exists'));
+    expect(wsTransportMock.resolveFilePathExists).toHaveBeenCalledWith({
+      cwd: undefined,
+      path: '/home/eltmon/project/src/App.tsx',
+    });
+  });
+
   it('reads from cache on second render — no second RPC call', async () => {
     wsTransportMock.resolveFilePathExists.mockResolvedValue({ exists: true, kind: 'dir' });
     const first = renderHook(() => useFilePathExists('/cwd', 'src/components/Foo'));

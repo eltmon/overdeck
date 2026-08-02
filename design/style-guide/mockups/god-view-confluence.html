@@ -1,0 +1,2143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GOD VIEW — Confluence (mockup)</title>
+<!--
+  CONFLUENCE (PAN-3447) — the SUM of two god-view concepts:
+    · "The River"       (PAN-3441, god-view-river.html, Claude Code harness)
+    · "Spectrum Deck"   (PAN-3443, god-view-spectrum-kimi-code-harness.html, Kimi Code harness)
+  Every feature of both parents has a home here — see the PRD's no-loss audit table.
+  The production port lives in src/dashboard/frontend/src/components/GodView/confluence/.
+  God-view tokens (PAN-341) + deliberate style-guide breakage (operator-exempt surface).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── God View design tokens (mirrors src/dashboard/frontend/src/components/GodView/theme.css) ── */
+:root{
+  --gv-bg:#0a0e1a; --gv-surface:rgba(21,27,43,.62); --gv-surface-solid:#151b2b;
+  --gv-border:rgba(30,38,56,.8); --gv-border-bright:rgba(0,212,255,.3);
+  --gv-blue:#00d4ff; --gv-pink:#ff2d7c; --gv-green:#39ff14; --gv-amber:#ffb800;
+  --gv-purple:#9d4edd; --gv-orange:#ff7700; --gv-red:#ff4444; --gv-ice:#bfe3ff;
+  --gv-text-primary:#e8edf8; --gv-text-secondary:#7a8aaa; --gv-text-dim:#4a5a7a;
+  --gv-font-display:'Space Grotesk',system-ui,sans-serif;
+  --gv-font-mono:'JetBrains Mono','Fira Code',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--gv-bg)}
+body{color:var(--gv-text-primary);font-family:var(--gv-font-display)}
+
+/* full-window WebGL nebula/aurora/grid — behind every glass panel */
+#gl{position:fixed;inset:0;z-index:0;display:block}
+/* CRT scanlines + vignette over everything (winamp garnish) */
+#crt{position:fixed;inset:0;z-index:40;pointer-events:none;mix-blend-mode:overlay;opacity:.5;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.025) 0 1px,transparent 1px 3px)}
+#vign{position:fixed;inset:0;z-index:41;pointer-events:none;
+  background:radial-gradient(ellipse 120% 90% at 50% 45%,transparent 55%,rgba(2,4,10,.55) 100%)}
+
+#app{position:fixed;inset:0;z-index:10;display:flex;flex-direction:column;gap:8px;padding:10px 12px}
+.glass{background:var(--gv-surface);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--gv-border);border-radius:12px}
+.mono{font-family:var(--gv-font-mono)}
+
+/* ── Top bar — River metrics + Spectrum metrics, all of them ─────── */
+#topbar{display:flex;align-items:center;gap:12px;padding:6px 14px;flex:0 0 auto;border-color:rgba(0,212,255,.22)}
+#topbar .logo{display:flex;align-items:center;gap:8px}
+#topbar .logo .bolt{color:var(--gv-blue);font-size:16px;animation:logoGlow 3s ease-in-out infinite}
+@keyframes logoGlow{0%,100%{filter:drop-shadow(0 0 4px rgba(0,212,255,.5))}50%{filter:drop-shadow(0 0 12px rgba(0,212,255,1))}}
+#topbar .logo b{font-size:13px;letter-spacing:.18em;color:var(--gv-blue)}
+#topbar .logo small{font-size:8px;letter-spacing:.16em;color:var(--gv-text-dim);display:block;margin-top:1px}
+.vr{width:1px;align-self:stretch;background:var(--gv-border)}
+#clock{font-family:var(--gv-font-mono);font-size:13px;color:var(--gv-blue);text-shadow:0 0 8px rgba(0,212,255,.5)}
+.tb-stat{display:flex;flex-direction:column;align-items:center;line-height:1.1}
+.tb-stat .v{font-family:var(--gv-font-mono);font-size:12.5px;font-weight:600}
+.tb-stat .k{font-size:7.5px;letter-spacing:.13em;color:var(--gv-text-dim);text-transform:uppercase;white-space:nowrap}
+#evs.pulse{animation:evspop .18s ease-out}
+@keyframes evspop{0%{transform:scale(1.3)}100%{transform:scale(1)}}
+.tb-meter{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:48px}
+.tb-meter .bar{width:44px;height:5px;border-radius:2px;background:rgba(255,255,255,.07);overflow:hidden}
+.tb-meter .bar i{display:block;height:100%;width:100%;border-radius:2px;transform-origin:left center;transition:transform .5s}
+.tb-meter label{font-size:8px;letter-spacing:.1em;color:var(--gv-text-secondary);font-family:var(--gv-font-mono);white-space:nowrap}
+.tb-meter label b{font-weight:600}
+#active-pill{display:flex;align-items:center;gap:7px;padding:4px 11px;border-radius:999px;
+  background:rgba(57,255,20,.08);border:1px solid rgba(57,255,20,.35);color:var(--gv-green);
+  font-family:var(--gv-font-mono);font-size:10.5px;font-weight:600;white-space:nowrap}
+#active-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--gv-green);animation:gvPulse 2s ease-in-out infinite}
+@keyframes gvPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.6;transform:scale(.85)}}
+#active-pill span{color:var(--gv-text-secondary);font-weight:400}
+.tb-btn{cursor:pointer;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--gv-blue);
+  font-family:var(--gv-font-mono);font-size:10px;letter-spacing:.1em;padding:5px 9px;border-radius:8px}
+.tb-btn:hover{background:rgba(0,212,255,.18);box-shadow:0 0 14px rgba(0,212,255,.3)}
+.tb-btn.green{border-color:rgba(57,255,20,.35);background:rgba(57,255,20,.08);color:var(--gv-green)}
+.tb-btn.green:hover{background:rgba(57,255,20,.18);box-shadow:0 0 14px rgba(57,255,20,.3)}
+.tb-spacer{flex:1}
+
+/* ── Main row ───────────────────────────────────────────────────── */
+#main{display:flex;flex:1;gap:8px;min-height:0}
+
+/* HOOK BUS — left rail (Spectrum Deck) */
+#hookbus{width:200px;flex:0 0 auto;padding:10px 10px 8px;display:flex;flex-direction:column;gap:6px;overflow:hidden}
+#hookbus h3,#sidebar h3{font-size:10px;font-weight:700;letter-spacing:.2em;color:var(--gv-text-secondary);text-transform:uppercase}
+#hookbus h3 em{font-style:normal;color:var(--gv-blue)}
+.hb-scroll{flex:1 1 auto;overflow:hidden auto;scrollbar-width:none;display:flex;flex-direction:column;gap:3px}
+.hb-scroll::-webkit-scrollbar{display:none}
+.hook{display:flex;align-items:center;gap:7px;padding:3px 6px;border-radius:6px;border:1px solid transparent}
+.hook .led{width:7px;height:7px;border-radius:50%;background:#22304a;flex:0 0 auto;transition:background .4s,box-shadow .4s}
+.hook .nm{font-family:var(--gv-font-mono);font-size:9.5px;color:var(--gv-text-primary);flex:1 1 auto;white-space:nowrap}
+.hook .ct{font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-secondary);min-width:28px;text-align:right}
+.hook.wired .nm{color:#bfe9ff}
+.hook.unwired{opacity:.42}
+.hook.unwired .nm{color:var(--gv-text-secondary);text-decoration:dotted underline rgba(122,138,170,.5);text-underline-offset:3px}
+.hook.hot .led{background:var(--hc,var(--gv-blue));box-shadow:0 0 9px var(--hc,var(--gv-blue));transition:none}
+.hook.hot{border-color:color-mix(in srgb,var(--hc,var(--gv-blue)) 35%,transparent);background:rgba(255,255,255,.03)}
+.hb-sep{font-size:8px;letter-spacing:.18em;color:var(--gv-text-dim);margin:5px 2px 1px}
+.hb-note{flex:0 0 auto;font-size:8.5px;line-height:1.45;color:var(--gv-text-dim);border-top:1px solid var(--gv-border);padding-top:6px}
+.hb-note b{color:var(--gv-amber);font-weight:600}
+
+/* STAGE — center canvas (the river) */
+#stage-wrap{position:relative;flex:1;min-width:0;border-radius:12px;overflow:hidden;
+  border:1px solid rgba(0,212,255,.14);background:rgba(6,9,18,.42)}
+#fx{position:absolute;inset:0;width:100%;height:100%;display:block;z-index:2}
+#stage-wrap .tag{position:absolute;left:12px;bottom:8px;z-index:14;font-family:var(--gv-font-mono);font-size:8.5px;
+  letter-spacing:.14em;color:var(--gv-text-dim);pointer-events:none}
+#stage-wrap .tag b{color:var(--gv-blue)}
+#stage-wrap.orb-hover #fx{cursor:pointer}
+
+/* SIDEBAR — right rail */
+#sidebar{width:246px;flex:0 0 auto;display:flex;flex-direction:column;gap:9px;padding:12px;overflow:hidden;
+  border-color:rgba(0,212,255,.1)}
+#feed{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:6px;scrollbar-width:thin;scrollbar-color:rgba(0,212,255,.2) transparent}
+.feed-item{display:flex;gap:8px;align-items:flex-start;animation:slideIn .25s ease-out;font-size:11px;line-height:1.25;
+  cursor:pointer;padding:1px 4px;border-radius:5px}
+.feed-item:hover{background:rgba(0,212,255,.08)}
+@keyframes slideIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:translateX(0)}}
+.feed-item .fi-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.feed-item .fi-body{min-width:0}
+.feed-item .fi-name{font-family:var(--gv-font-mono);font-size:10.5px;font-weight:600}
+.feed-item .fi-time{color:var(--gv-text-dim);font-size:9px;font-family:var(--gv-font-mono);margin-left:5px}
+.feed-item .fi-msg{color:var(--gv-text-secondary);font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px}
+.side-sep{height:1px;background:var(--gv-border);flex-shrink:0}
+#donut-wrap{display:flex;gap:10px;align-items:center;flex-shrink:0}
+#donut-legend{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-family:var(--gv-font-mono)}
+#donut-legend .lg-row{display:flex;align-items:center;gap:6px;color:var(--gv-text-secondary)}
+#donut-legend .lg-dot{width:7px;height:7px;border-radius:50%}
+#donut-legend .lg-n{margin-left:auto;color:var(--gv-text-primary);font-weight:600;padding-left:10px}
+#gauges{display:flex;justify-content:space-around;flex-shrink:0}
+.gauge{position:relative;width:64px;height:64px}
+.gauge canvas{width:100%;height:100%}
+.gauge .g-val{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  font-family:var(--gv-font-mono);font-weight:700;font-size:12px}
+.gauge .g-val small{font-size:8px;letter-spacing:.12em;color:var(--gv-text-dim);font-weight:400}
+.gauge-sub{text-align:center;font-size:8.5px;color:var(--gv-text-dim);font-family:var(--gv-font-mono);margin-top:-2px}
+
+/* ── Bottom strip: hook telemetry trace + roles ─────────────────── */
+#bottom{flex:0 0 140px;display:flex;gap:8px}
+#tracebox{flex:1 1 auto;position:relative;overflow:hidden;padding:6px 10px 4px}
+#trace{position:absolute;inset:6px 10px 16px;width:calc(100% - 20px);height:calc(100% - 22px)}
+#tracebox .cap{position:absolute;left:10px;bottom:3px;font-family:var(--gv-font-mono);font-size:8px;letter-spacing:.18em;color:var(--gv-text-dim)}
+#tracebox .cap b{color:var(--gv-green)}
+#rolebox{width:148px;flex:0 0 auto;padding:8px 10px;display:flex;flex-direction:column;gap:2.5px;justify-content:center}
+#rolebox div{display:flex;align-items:center;gap:6px;font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-secondary)}
+#rolebox i{width:8px;height:8px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
+#rolebox b{color:var(--gv-text-primary);font-weight:400;margin-left:auto}
+
+#error-overlay{position:fixed;top:6px;left:6px;z-index:99;background:#4d0f1f;color:#ffb3c2;font:12px monospace;
+  padding:8px 10px;border-radius:8px;display:none;max-width:60vw;white-space:pre-wrap}
+
+/* ── Orb tooltip (absolute inside stage — hysteresis-tracked) ────── */
+#tooltip{position:absolute;z-index:20;display:none;pointer-events:none;min-width:230px;max-width:300px;
+  background:rgba(13,18,32,.92);backdrop-filter:blur(14px);border:1px solid rgba(0,212,255,.25);border-radius:12px;
+  padding:10px 12px;box-shadow:0 8px 40px rgba(0,0,0,.6),0 0 24px rgba(0,212,255,.08)}
+#tooltip .t-id{font-family:var(--gv-font-mono);font-weight:700;font-size:14px;color:var(--gv-blue)}
+#tooltip .t-title{font-size:11px;color:var(--gv-text-secondary);margin-top:2px;line-height:1.3}
+#tooltip .t-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.chip{font-family:var(--gv-font-mono);font-size:9px;letter-spacing:.08em;padding:2px 7px;border-radius:999px;border:1px solid}
+#tooltip .t-row{display:flex;justify-content:space-between;font-family:var(--gv-font-mono);font-size:11px;margin-top:5px;color:var(--gv-text-secondary)}
+#tooltip .t-row b{color:var(--gv-text-primary);font-weight:600}
+#tooltip .t-hint{margin-top:8px;font-size:9px;letter-spacing:.1em;color:var(--gv-text-dim);text-transform:uppercase}
+
+/* ── Feed tooltip (fixed, follows cursor over sidebar rows) ──────── */
+#tip{position:fixed;z-index:44;pointer-events:none;min-width:190px;max-width:280px;
+  padding:8px 10px;border-radius:9px;background:rgba(9,13,25,.95);border:1px solid rgba(0,212,255,.35);
+  box-shadow:0 0 20px rgba(0,212,255,.15);display:none}
+#tip .t-head{display:flex;align-items:center;gap:7px}
+#tip .t-issue{font-family:var(--gv-font-mono);font-weight:600;font-size:11.5px;color:var(--gv-text-primary)}
+#tip .t-badge{font-family:var(--gv-font-mono);font-size:7.5px;letter-spacing:.1em;padding:1.5px 7px;border-radius:99px}
+#tip .t-msg{margin-top:5px;font-size:9.5px;color:var(--gv-text-primary);line-height:1.45;white-space:normal}
+#tip .t-row{display:flex;justify-content:space-between;gap:12px;font-family:var(--gv-font-mono);font-size:8.5px;color:var(--gv-text-secondary);margin-top:4px}
+#tip .t-row b{color:var(--gv-text-primary);font-weight:400}
+#tip .t-cta{margin-top:6px;font-family:var(--gv-font-mono);font-size:8px;letter-spacing:.1em;color:var(--gv-green)}
+
+/* ── Issue rail (mock of the dashboard issue drawer) ─────────────── */
+#rail{position:absolute;top:0;left:0;bottom:0;width:390px;z-index:30;display:flex;flex-direction:column;gap:11px;
+  background:rgba(11,15,27,.94);backdrop-filter:blur(18px);border-right:1px solid rgba(0,212,255,.2);
+  padding:16px;transform:translateX(-102%);transition:transform .35s cubic-bezier(.22,1,.36,1);overflow-y:auto}
+#rail.open{transform:translateX(0)}
+#rail .r-head{display:flex;align-items:center;gap:10px}
+#rail .r-id{font-family:var(--gv-font-mono);font-weight:700;font-size:16px}
+#rail .r-stage{font-family:var(--gv-font-mono);font-size:7.5px;letter-spacing:.14em;padding:2px 8px;border-radius:99px}
+#rail .r-close{margin-left:auto;background:none;border:1px solid var(--gv-border);color:var(--gv-text-secondary);
+  border-radius:8px;width:26px;height:26px;cursor:pointer;font-size:13px}
+#rail .r-close:hover{border-color:var(--gv-blue);color:var(--gv-blue)}
+#rail .r-title{font-size:11px;color:var(--gv-text-secondary);line-height:1.4}
+#rail .r-chips{display:flex;gap:5px;flex-wrap:wrap}
+#rail h4{font-size:9px;letter-spacing:.16em;color:var(--gv-text-dim);text-transform:uppercase;margin-top:4px}
+#rail .stepper{display:flex;align-items:center;gap:0}
+#rail .step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+#rail .step .s-dot{width:10px;height:10px;border-radius:50%;border:1.5px solid var(--gv-text-dim);background:transparent}
+#rail .step .s-name{font-family:var(--gv-font-mono);font-size:8px;color:var(--gv-text-dim)}
+#rail .step.done .s-dot{background:var(--gv-green);border-color:var(--gv-green);box-shadow:0 0 8px rgba(57,255,20,.5)}
+#rail .step.done .s-name{color:var(--gv-green)}
+#rail .step.now .s-dot{background:var(--gv-blue);border-color:var(--gv-blue);box-shadow:0 0 10px var(--gv-blue);animation:gvPulse 1.6s infinite}
+#rail .step.now .s-name{color:var(--gv-blue)}
+#rail .s-bar{flex:1;height:1px;background:var(--gv-border);margin:0 2px 14px}
+.r-agent{border:1px solid var(--gv-border);border-radius:8px;padding:7px 9px;background:rgba(255,255,255,.02);
+  display:flex;flex-direction:column;gap:4px;margin-top:5px}
+.r-agent .ra-top{display:flex;align-items:center;gap:7px}
+.r-agent .ra-role{font-family:var(--gv-font-mono);font-size:7.5px;letter-spacing:.1em;padding:1px 7px;border-radius:99px}
+.r-agent .ra-id{font-family:var(--gv-font-mono);font-size:8.5px;color:var(--gv-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.r-agent .ra-rows{display:flex;flex-wrap:wrap;gap:2px 12px}
+.r-agent .ra-row{font-family:var(--gv-font-mono);font-size:8px;color:var(--gv-text-secondary)}
+.r-agent .ra-row b{color:var(--gv-text-primary);font-weight:400}
+#rail .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+#rail .stat{border:1px solid var(--gv-border);border-radius:8px;padding:7px 9px}
+#rail .stat .sv{font-family:var(--gv-font-mono);font-size:14px;font-weight:600}
+#rail .stat .sk{font-size:9px;letter-spacing:.12em;color:var(--gv-text-dim);text-transform:uppercase}
+#rail .banner{font-family:var(--gv-font-mono);font-size:11px;padding:8px 10px;border-radius:8px;line-height:1.4}
+.r-evs{display:flex;flex-direction:column;gap:4px}
+.r-ev{display:flex;gap:6px;align-items:baseline;font-size:9px;line-height:1.35}
+.r-ev .src{font-family:var(--gv-font-mono);font-size:8px;font-weight:600;min-width:58px;flex:0 0 auto}
+.r-ev .msg{color:var(--gv-text-secondary);flex:1}
+.r-ev .age{font-family:var(--gv-font-mono);font-size:7.5px;color:var(--gv-text-dim);flex:0 0 auto}
+.r-empty{font-size:9.5px;color:var(--gv-text-dim);font-style:italic}
+#rail .r-actions{display:flex;gap:8px;margin-top:auto;padding-top:10px}
+#rail .r-btn{flex:1;text-align:center;font-family:var(--gv-font-mono);font-size:11px;font-weight:600;padding:9px 0;
+  border-radius:9px;text-decoration:none;border:1px solid rgba(0,212,255,.4);color:var(--gv-blue);background:rgba(0,212,255,.08)}
+#rail .r-btn:hover{background:rgba(0,212,255,.18)}
+#rail .r-btn.ghost{border-color:var(--gv-border);color:var(--gv-text-secondary);background:transparent}
+#rail .r-btn.ghost:hover{border-color:var(--gv-text-secondary)}
+#rail .r-foot{font-family:var(--gv-font-mono);font-size:8px;color:var(--gv-text-dim);padding-top:6px;border-top:1px solid var(--gv-border)}
+#rail .r-foot b{color:var(--gv-green);font-weight:400}
+
+/* ── Help overlay ────────────────────────────────────────────────── */
+#help{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;
+  background:rgba(4,6,13,.72);backdrop-filter:blur(10px)}
+#help.open{display:flex}
+#help .h-panel{width:min(1180px,94%);max-height:92%;overflow-y:auto;background:rgba(13,18,32,.96);
+  border:1px solid rgba(0,212,255,.28);border-radius:18px;padding:22px 26px;
+  box-shadow:0 20px 80px rgba(0,0,0,.7),0 0 50px rgba(0,212,255,.06)}
+#help .h-head{display:flex;align-items:baseline;gap:12px;border-bottom:1px solid var(--gv-border);padding-bottom:10px;margin-bottom:14px}
+#help .h-title{font-size:18px;font-weight:700;letter-spacing:.1em;color:var(--gv-blue)}
+#help .h-sub{font-family:var(--gv-font-mono);font-size:11px;color:var(--gv-text-dim)}
+#help .h-close{margin-left:auto;background:none;border:1px solid var(--gv-border);color:var(--gv-text-secondary);
+  border-radius:8px;width:28px;height:28px;cursor:pointer;font-size:14px}
+#help .h-close:hover{border-color:var(--gv-blue);color:var(--gv-blue)}
+#help .h-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+#help .h-card{border:1px solid var(--gv-border);border-radius:12px;padding:11px 13px;background:rgba(255,255,255,.015)}
+#help .h-card h4{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+#help .h-card p{font-size:11px;line-height:1.5;color:var(--gv-text-secondary)}
+#help .h-card p+p{margin-top:4px}
+#help .h-card b{color:var(--gv-text-primary)}
+#help .h-demo{display:flex;align-items:center;gap:8px;margin:7px 0 3px;flex-wrap:wrap}
+#help .legend-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+#help .legend-lbl{font-family:var(--gv-font-mono);font-size:9px;color:var(--gv-text-secondary)}
+#help kbd{font-family:var(--gv-font-mono);font-size:9px;background:rgba(255,255,255,.07);border:1px solid var(--gv-border);
+  border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--gv-text-primary)}
+#help .h-foot{margin-top:14px;padding-top:10px;border-top:1px solid var(--gv-border);
+  font-family:var(--gv-font-mono);font-size:11px;color:var(--gv-text-dim);display:flex;gap:18px;flex-wrap:wrap}
+
+/* ── Hint chip ───────────────────────────────────────────────────── */
+#hint{position:absolute;right:12px;bottom:8px;z-index:15;font-family:var(--gv-font-mono);font-size:9px;
+  color:var(--gv-text-dim);background:rgba(13,18,32,.7);border:1px solid var(--gv-border);border-radius:999px;
+  padding:5px 11px;letter-spacing:.06em;pointer-events:none}
+#hint b{color:var(--gv-blue)}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="error-overlay"></div>
+
+<div id="app">
+  <header id="topbar" class="glass">
+    <div class="logo"><span class="bolt">⚡</span>
+      <div><b>GOD&nbsp;VIEW</b><small>CONFLUENCE · RIVER × SPECTRUM DECK</small></div></div>
+    <div class="vr"></div>
+    <div id="clock" class="mono">--:--:--</div>
+    <div class="vr"></div>
+    <div class="tb-stat"><span class="v" id="evs" style="color:var(--gv-green);text-shadow:0 0 10px rgba(57,255,20,.6)">0</span><span class="k">events/s</span></div>
+    <canvas id="ecg" width="110" height="28"></canvas>
+    <div class="tb-stat"><span class="v" id="evm" style="color:var(--gv-blue)">0</span><span class="k">events/min</span></div>
+    <div class="vr"></div>
+    <div class="tb-meter"><div class="bar"><i id="cpu-fill" style="background:var(--gv-blue);transform:scaleX(.55)"></i></div><label>CPU <b id="cpuV" style="color:var(--gv-blue)">--%</b></label></div>
+    <div class="tb-meter"><div class="bar"><i id="mem-fill" style="background:var(--gv-purple);transform:scaleX(.82)"></i></div><label>MEM <b id="memV" style="color:var(--gv-purple)">--%</b></label></div>
+    <div class="tb-meter"><div class="bar"><i id="swp-fill" style="background:var(--gv-red);transform:scaleX(1)"></i></div><label>SWP <b id="swpV" style="color:var(--gv-red)">--%</b></label></div>
+    <div class="tb-stat"><span class="v" id="loadV" style="color:var(--gv-amber)">—</span><span class="k">load</span></div>
+    <div class="vr"></div>
+    <div class="tb-stat"><span class="v" id="wipV" style="color:var(--gv-text-primary)">—</span><span class="k">wip</span></div>
+    <div class="tb-stat"><span class="v" id="blockedV" style="color:var(--gv-pink)">—</span><span class="k">blocked</span></div>
+    <div class="tb-stat"><span class="v" id="readyV" style="color:var(--gv-green)">—</span><span class="k">ready</span></div>
+    <div class="tb-stat"><span class="v" id="mqV" style="color:var(--gv-text-secondary)">0</span><span class="k">merge q</span></div>
+    <div class="vr"></div>
+    <div class="tb-stat"><span class="v" id="costV" style="color:var(--gv-amber)">$0.00</span><span class="k">spend/min</span></div>
+    <div class="tb-stat"><span class="v" id="merges" style="color:var(--gv-green)">0</span><span class="k">merges today</span></div>
+    <div class="tb-stat"><span class="v" id="tokens" style="color:var(--gv-amber)">0</span><span class="k">tokens today</span></div>
+    <div class="tb-stat"><span class="v" id="stale-count" style="color:#9fc7ff">0</span><span class="k">❄ stale</span></div>
+    <div class="tb-stat"><span class="v" id="oldest-stale" style="color:#9fc7ff">—</span><span class="k">oldest idle</span></div>
+    <div class="tb-spacer"></div>
+    <div id="active-pill"><span class="dot"></span><b id="active-n">0</b>&nbsp;active&nbsp;<span id="total-agents">· 0 total</span></div>
+    <button class="tb-btn green" id="help-btn" title="help (?)">? HELP</button>
+    <button class="tb-btn" id="fs-btn" title="Fullscreen (f)">⛶</button>
+  </header>
+
+  <div id="main">
+    <aside id="hookbus" class="glass">
+      <h3>HOOK BUS <em>· harness</em></h3>
+      <div class="hb-scroll" id="hb"></div>
+      <div class="hb-note">LEDs fire on live hook events. <b>Dotted</b> = hook exists upstream but is <b>not wired</b> into Overdeck — dark fiber, ready to light up.</div>
+    </aside>
+
+    <section id="stage-wrap">
+      <canvas id="fx"></canvas>
+      <div id="tooltip"></div>
+      <aside id="rail"></aside>
+      <div class="tag">PIPELINE FLOW · <b>PLAN → WORK → REVIEW → TEST → VERIFY → MERGE</b> · frost = stale · shelf = yielded</div>
+      <div id="hint"><b>h / ?</b> field guide · <b>hover</b> orb / feed row · <b>click</b> issue rail · <b>f</b> fullscreen</div>
+    </section>
+
+    <aside id="sidebar" class="glass">
+      <h3>Activity</h3>
+      <div id="feed"></div>
+      <div class="side-sep"></div>
+      <h3>Agents</h3>
+      <div id="donut-wrap">
+        <canvas id="donut" width="96" height="96" style="width:86px;height:86px"></canvas>
+        <div id="donut-legend" style="flex:1"></div>
+      </div>
+      <div class="side-sep"></div>
+      <h3>System</h3>
+      <div id="gauges">
+        <div><div class="gauge"><canvas id="gauge-cpu" width="128" height="128"></canvas><div class="g-val" id="gcpu-val" style="color:var(--gv-blue)">0%<small>CPU</small></div></div><div class="gauge-sub" id="gcpu-sub">load —</div></div>
+        <div><div class="gauge"><canvas id="gauge-mem" width="128" height="128"></canvas><div class="g-val" id="gmem-val" style="color:var(--gv-purple)">0%<small>MEM</small></div></div><div class="gauge-sub" id="gmem-sub">— / —</div></div>
+        <div><div class="gauge"><canvas id="gauge-swp" width="128" height="128"></canvas><div class="g-val" id="gswp-val" style="color:var(--gv-red)">0%<small>SWP</small></div></div><div class="gauge-sub" id="gswp-sub">— / —</div></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer id="bottom">
+    <div id="tracebox" class="glass">
+      <canvas id="trace"></canvas>
+      <div class="cap">HOOK TELEMETRY · <b>one channel per wired hook · last 60 s · right edge = now</b></div>
+    </div>
+    <div id="rolebox" class="glass"></div>
+  </footer>
+</div>
+
+<div id="crt"></div>
+<div id="vign"></div>
+<div id="tip"></div>
+<div id="help"><div class="h-panel" id="help-panel"></div></div>
+
+<script src="god-view-snapshot.js"></script>
+<script>
+/* Optional external live snapshot: design/style-guide/mockups/god-view-snapshot.js
+   sets window.GODVIEW_SNAPSHOT. When absent, FALLBACK below is used. */
+'use strict';
+window.addEventListener('error', e => {
+  const el = document.getElementById('error-overlay');
+  el.style.display = 'block';
+  el.textContent = 'Error: ' + e.message + '\n' + (e.filename||'') + ':' + (e.lineno||'');
+});
+
+/* ════════════════════════ DATA ════════════════════════ */
+const FALLBACK = {
+  capturedAt: new Date().toISOString(),
+  system: { cpuPct: 55, memPct: 86, memUsedGB: 53.7, memTotalGB: 62.0, loadAvg: '8.4' },
+  totals: { active: 34, total: 182 },
+  roleCounts: { plan: 14, work: 7, review: 3, test: 3, flywheel: 1, sequencer: 1, strike: 5 },
+  staleTotal: 8,
+  issues: [
+    { id: 'PAN-3419', project: 'overdeck', stage: 'VERIFY',  role: 'ship',   heat: .95, model: 'gpt-5.6-sol', title: 'cockpit terminal toggle' },
+    { id: 'PAN-3422', project: 'overdeck', stage: 'WORK',    role: 'work',   heat: .9,  model: 'claude-sonnet-5', title: 'sync-main guard' },
+    { id: 'PAN-3413', project: 'overdeck', stage: 'REVIEW',  role: 'review', heat: .85, model: 'gpt-5.6-sol', title: 'font detector exemption', convoy: ['security','correctness','performance','requirements'] },
+    { id: 'PAN-3407', project: 'overdeck', stage: 'MERGE',   role: 'ship',   heat: .8,  model: 'gpt-5.6-sol', title: 'terminal visible state' },
+    { id: 'PAN-3385', project: 'overdeck', stage: 'PLAN',    role: 'plan',   heat: .7,  model: 'k3[1m]', title: 'river viz planning' },
+    { id: 'PAN-3371', project: 'overdeck', stage: 'TEST',    role: 'test',   heat: .72, model: 'claude-sonnet-5', title: 'workspace registry' },
+    { id: 'MYN-1204', project: 'myn',      stage: 'WORK',    role: 'work',   heat: .92, model: 'gpt-5.6-sol', title: 'Kaia briefing stream' },
+    { id: 'MYN-1180', project: 'myn',      stage: 'WORK',    role: 'work',   heat: .3,  title: 'legacy reminder port', staleMin: 47 },
+  ],
+  paused: [ { id: 'PAN-3331', project: 'overdeck', role: 'work', yieldReason: 'yield: freeing a slot', idleMin: 12 } ],
+  failed: [ { id: 'PAN-2869', project: 'overdeck' } ],
+  backlog: ['PAN-3426','PAN-3431','MYN-1211','MYN-1216','PAN-3437','MYN-1220'],
+  conversations: { active: 12 },
+  sequencer: true,
+  eventsPerMinute: 96,
+  mergesToday: 7, tokensToday: 41200000,
+};
+const SNAP = (typeof window.GODVIEW_SNAPSHOT === 'object' && window.GODVIEW_SNAPSHOT) || FALLBACK;
+/* Confluence extras — data the river snapshot doesn't carry (beads counts from
+   `bd stats`, swap from /proc, spend baseline from the costs surface) */
+const EXTRAS = {
+  beads: { wip: 32, blocked: 456, ready: 356 },
+  swap: { pct: 100, usedGB: 8.2, totalGB: 8.2 },
+  costRatePerMin: 2.40,
+  broken: ['PAN-3362'],           // red hazard ring: stack exited underneath the agent
+  convoyForming: ['PAN-3419'],    // supervisor satellite spiraling in
+};
+
+/* ════════════════════════ CONSTANTS ════════════════════════ */
+const STAGES = ['PLAN','WORK','REVIEW','TEST','VERIFY','MERGE'];
+const STAGE_COLORS = { PLAN:'#00d4ff', WORK:'#39ff14', REVIEW:'#ffb800', TEST:'#ff2d7c', VERIFY:'#9d4edd', MERGE:'#e8edf8' };
+const ROLE_COLORS = { plan:'#00d4ff', work:'#39ff14', review:'#ffb800', test:'#ff2d7c', ship:'#e8edf8',
+                      flywheel:'#9d4edd', strike:'#ff7700', sequencer:'#7a8aaa', knowledge:'#9d4edd', conversation:'#00d4ff' };
+const PROJECT_RING = { overdeck:'#00d4ff', myn:'#ff2d7c' };
+const ICE = '#bfe3ff';
+/* hook-level event taxonomy — one bucket per harness hook family (spark colors) */
+const HOOKS = {
+  tool_read:   { color:'#00d4ff', label:'Read/Grep',  tools:['Read','Grep','Glob','TLDR'] },
+  tool_write:  { color:'#ffb800', label:'Edit/Write', tools:['Edit','Write','NotebookEdit'] },
+  tool_exec:   { color:'#39ff14', label:'Bash',       tools:['Bash','Task Create'] },
+  tool_web:    { color:'#4aa8ff', label:'Web',        tools:['WebFetch','WebSearch'] },
+  tool_agent:  { color:'#9d4edd', label:'Subagent',   tools:['Agent','SendMessage'] },
+  lifecycle:   { color:'#e8edf8', label:'Lifecycle',  tools:['Stop','Notification','UserPromptSubmit','PreCompact','SessionStart'] },
+};
+const HOOK_KEYS = Object.keys(HOOKS);
+/* full harness-hook inventory — wired (registered via claude-hooks-registration.ts)
+   vs unwired (exist upstream, zero references in src) */
+const HOOKBUS = [
+  {name:'PreToolUse',        wired:true, c:'#00d4ff'},
+  {name:'PostToolUse',       wired:true, c:'#39ff14'},
+  {name:'PostToolUseFailure',wired:true, c:'#ff4444'},
+  {name:'Stop',              wired:true, c:'#ff2d7c'},
+  {name:'SessionStart',      wired:true, c:'#9d4edd'},
+  {name:'Notification',      wired:true, c:'#ffb800'},
+  {name:'UserPromptSubmit',  wired:true, c:'#00d4ff'},
+  {name:'PreCompact',        wired:true, c:'#ff7700'},
+  {name:'PostCompact',       wired:true, c:'#ff7700'},
+  {name:'PermissionRequest', wired:true, c:'#ffb800'},
+  {name:'SessionEnd',        wired:false},
+  {name:'SubagentStart',     wired:false},
+  {name:'SubagentStop',      wired:false},
+  {name:'StopFailure',       wired:false},
+  {name:'PermissionDenied',  wired:false},
+  {name:'TaskCreated',       wired:false},
+  {name:'TaskCompleted',     wired:false},
+  {name:'TeammateIdle',      wired:false},
+  {name:'ConfigChange',      wired:false},
+  {name:'WorktreeCreate',    wired:false},
+  {name:'InstructionsLoaded',wired:false},
+];
+/* model string → orb-core glyph letter */
+function modelGlyph(model) {
+  if (!model) return null;
+  const m = String(model).toLowerCase();
+  if (m.includes('sonnet')) return 'S';
+  if (m.includes('gpt')) return 'G';
+  if (m.includes('opus')) return 'O';
+  if (m.includes('fable')) return 'F';
+  if (m.includes('k3') || m.includes('kimi')) return 'K';
+  return '?';
+}
+
+/* ════════════════════════ CANVAS SETUP ════════════════════════ */
+const wrap = document.getElementById('stage-wrap');
+const fxCv = document.getElementById('fx');
+const fx = fxCv.getContext('2d');
+const trailCv = document.createElement('canvas');
+const trail = trailCv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+
+const glCv = document.getElementById('gl');
+const GDPR = Math.min(window.devicePixelRatio || 1, 1.75);
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = wrap.clientWidth; H = wrap.clientHeight;
+  for (const c of [fxCv, trailCv]) { c.width = W * DPR; c.height = H * DPR; }
+  fx.setTransform(DPR,0,0,DPR,0,0);
+  trail.setTransform(DPR,0,0,DPR,0,0);
+  glCv.width = Math.floor(innerWidth * GDPR); glCv.height = Math.floor(innerHeight * GDPR);
+  if (gl) gl.viewport(0, 0, glCv.width, glCv.height);
+  sizeAux();
+  layout();
+  for (const o of orbs) positionOrb(o); // re-anchor after relayout
+}
+window.addEventListener('resize', resize);
+
+/* ════════════════════ WEBGL BACKGROUND — nebula + aurora + grid ════════════════════
+   The sum of both parents' shaders: Spectrum Deck's fbm nebula + synthwave
+   perspective grid floor, plus the River's aurora bands. One energy uniform. */
+const VERT = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
+const FRAG = `
+precision highp float;
+uniform vec2 uRes; uniform float uTime; uniform float uEnergy;
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*noise(p);p=p*2.03+vec2(17.3,9.1);a*=.55;}return v;}
+void main(){
+  vec2 uv = gl_FragCoord.xy/uRes;
+  vec2 p = (gl_FragCoord.xy - .5*uRes)/uRes.y;
+  float t = uTime*.05;
+  vec3 col = vec3(.016,.023,.048);                       /* deep space base */
+  /* nebula (spectrum deck) */
+  float warp = fbm(p*2.2 - vec2(t*.6, t*.3));
+  float n = fbm(p*1.55 + vec2(t, -t*.7) + warp*.85);
+  col += vec3(.022,.090,.165) * smoothstep(.34,.86,n) * (.55 + uEnergy*.7);
+  col += vec3(.150,.048,.220) * smoothstep(.55,.96, fbm(p*2.6 - vec2(t*.8, 0.) + warp*.4)) * (.4 + uEnergy*.65);
+  col += vec3(.000,.330,.430) * pow(smoothstep(.60,.985,n), 3.) * (.45 + uEnergy*1.4);
+  /* aurora bands (river) */
+  float speed = .4 + uEnergy*1.6;
+  for(int i=0;i<3;i++){
+    float fi = float(i);
+    float y = uv.y + (fbm(vec2(uv.x*2.2 + t*4.*speed*(1.+fi*.35), fi*3.7 + t*3.)) - .5)*.55 - .22 - fi*.22;
+    float band = exp(-abs(y)*9.0);
+    vec3 tint = mix(vec3(0.,.83,1.), vec3(.62,.31,.87), fi/2.);
+    if(i==2) tint = mix(tint, vec3(1.,.18,.49), .35);
+    col += tint * band * (.08 + uEnergy*.26);
+  }
+  /* starfield twinkle */
+  vec2 sp = floor(p*220.);
+  float star = step(.9975, hash(sp));
+  col += vec3(.75,.88,1.) * star * (.25+.35*sin(uTime*2.2+hash(sp+7.)*40.)) * .55;
+  /* perspective grid floor (spectrum deck) */
+  float hor = .30;
+  if (uv.y < hor) {
+    float z = 1./max(hor - uv.y, .0012);
+    vec2 gp = vec2(p.x*z*.85, z*.5 - uTime*1.15);
+    vec2 gf = abs(fract(gp)-.5);
+    float line = smoothstep(.085,.02, min(gf.x,gf.y) * (.3 + z*.13));
+    float fade = exp(-z*.62) * smoothstep(.0,.05, hor-uv.y);
+    col += vec3(.0,.42,.58) * line * fade * (.45 + uEnergy*.85);
+    col += vec3(.0,.26,.44) * smoothstep(.012,.0, hor-uv.y) * .5;      /* horizon glow */
+    col += vec3(.5,.09,.4) * smoothstep(.004,.0, hor-uv.y) * .3;
+  }
+  /* scanline shimmer + vignette */
+  col *= .965 + .035*sin(gl_FragCoord.y*1.7 + uTime*5.);
+  float r = length(p*vec2(.82,1.05));
+  col *= 1. - smoothstep(.62,1.25,r)*.5;
+  gl_FragColor = vec4(col,1.);
+}`;
+let gl = null, glProg = null, glU = {};
+try {
+  gl = glCv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'high-performance' });
+  if (gl) {
+    const mk = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
+    glProg = gl.createProgram();
+    gl.attachShader(glProg, mk(gl.VERTEX_SHADER, VERT));
+    gl.attachShader(glProg, mk(gl.FRAGMENT_SHADER, FRAG));
+    gl.linkProgram(glProg);
+    if (!gl.getProgramParameter(glProg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(glProg));
+    gl.useProgram(glProg);
+    const buf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(glProg, 'p');
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    glU = { res: gl.getUniformLocation(glProg,'uRes'), time: gl.getUniformLocation(glProg,'uTime'), energy: gl.getUniformLocation(glProg,'uEnergy') };
+  }
+} catch (e) { console.warn('WebGL unavailable, canvas-only mode', e); gl = null; }
+if (!gl) glCv.style.background = 'radial-gradient(ellipse at 50% 30%, #101a33 0%, #0a0e1a 70%)';
+
+/* ════════════════════════ LAYOUT ════════════════════════ */
+const L = {}; // layout rects (the spectrum analyzer moved to the bottom strip, so no in-stage spectrumH)
+let expectedStale = 1, expectedShelf = 1; // final counts, set in boot before spawning
+function layout() {
+  L.padX = 26;
+  L.riverTop = 92;
+  L.doldrumsH = 64;
+  L.shelfH = 34;
+  L.riverBottom = H - L.doldrumsH - L.shelfH - 22;
+  L.colW = (W - L.padX*2) / STAGES.length;
+  L.colX = i => L.padX + i * L.colW;
+  L.colCX = i => L.padX + (i + .5) * L.colW;
+  L.shelfY = H - L.doldrumsH - L.shelfH + L.shelfH/2 - 10;
+  L.doldrumsY = H - L.doldrumsH + L.doldrumsH/2 - 12;
+  L.portalX = W - L.padX - 8;
+  L.sunX = 64; L.sunY = 52;
+}
+
+/* ════════════════════════ WORLD STATE ════════════════════════ */
+const orbs = [];
+const particles = [];
+const pulses = [];
+const tickers = [];
+const gateFlashes = [];
+let mergesToday = SNAP.mergesToday || 0;
+let tokensToday = SNAP.tokensToday || 0;
+let energy = .35;                       // EMA of activity, drives shader + waves
+const eventTimes = [];                  // for events/min
+let backlogIdx = 0;
+const S = { evCount: 0, evPerSec: 0, lastEvSec: Math.floor(performance.now()/1000),
+            costRate: EXTRAS.costRatePerMin, mergeQ: 0 };
+
+function stageIdx(stage) { const i = STAGES.indexOf(stage); return i < 0 ? 1 : i; }
+
+function spawnOrb(def, opts = {}) {
+  const orb = {
+    id: def.id, project: def.project || 'overdeck', role: def.role || 'work',
+    stage: def.stage || 'WORK', title: def.title || '',
+    heat: def.heat != null ? def.heat : .5,
+    staleMin: def.staleMin || 0,
+    state: opts.state || (def.staleMin > 30 ? 'stale' : 'active'),
+    convoy: def.convoy ? def.convoy.map((r, i) => ({ role: r, angle: i * (Math.PI*2 / def.convoy.length),
+      heat: Math.random(), flash: 0, orbitR: 0, arriving: false })) : null,
+    x: 0, y: 0, tx: 0, ty: 0,
+    wobA: Math.random() * Math.PI * 2, wobB: Math.random() * Math.PI * 2,
+    wobSpeed: .4 + Math.random() * .5,
+    orbitR: 0, orbitA: Math.random() * Math.PI * 2,
+    entering: opts.entering || false, merging: false, mergeVx: 0, mergeDwell: 0,
+    yieldT: 0,
+    yieldReason: def.yieldReason || null,
+    warn: def.warn || null,
+    broken: EXTRAS.broken.includes(def.id),
+    model: def.model || null,
+    harness: def.harness || null,
+    labels: def.labels || [],
+    glyph: modelGlyph(def.model),
+    idleMin: 0, frost: 0, frostHold: 0,   // gradual frost accrual (spectrum deck)
+    waitUntil: 0, thinkUntil: 0, compactT: 0,
+    flashT: 0, ev: 0,
+    radius: 11 + Math.random() * 3,
+  };
+  if (EXTRAS.convoyForming.includes(orb.id) && !orb.convoy) {
+    orb.convoy = [{ role: 'supervisor', angle: 2.1, heat: .5, flash: 0, orbitR: 210, arriving: true }];
+  }
+  orbs.push(orb); // push first: positionOrb indexes into the live array for spreads
+  positionOrb(orb, true);
+  if (orb.state === 'stale' || orb.state === 'failed') { orb.x = orb.tx; orb.y = orb.ty; }
+  else if (opts.fromSun) { orb.x = L.sunX; orb.y = L.sunY; }
+  else { orb.x = orb.tx + (opts.entering ? -60 : 0); orb.y = orb.ty; }
+  return orb;
+}
+
+function positionOrb(orb, snap) {
+  if (orb.state === 'stale') {
+    const idx = Math.max(0, orbs.filter(o => o.state === 'stale').indexOf(orb));
+    orb.tx = L.padX + 70 + (idx / expectedStale) * (W * .72 - L.padX);
+    orb.ty = L.doldrumsY + (idx % 2 ? 13 : -11);
+    return;
+  }
+  if (orb.state === 'failed') {
+    orb.tx = L.portalX - 52 - (hashStr(orb.id) % 3) * 34;
+    orb.ty = L.riverTop + 50 + (hashStr(orb.id) % Math.max(40, L.riverBottom - L.riverTop - 120));
+    return;
+  }
+  if (orb.state === 'shelf') {
+    const idx = Math.max(0, orbs.filter(o => o.state === 'shelf').indexOf(orb));
+    orb.tx = L.padX + 140 + (idx / Math.max(1, expectedShelf - 1 || 1)) * (W * .5);
+    orb.ty = L.shelfY;
+    return;
+  }
+  const ci = stageIdx(orb.stage);
+  const jitter = ((hashStr(orb.id) % 100) / 100 - .5) * L.colW * .45;
+  orb.tx = L.colCX(ci) + jitter;
+  const laneN = orbs.filter(o => o !== orb && o.stage === orb.stage && o.state === 'active').length;
+  orb.ty = L.riverTop + 40 + ((hashStr(orb.id) + laneN * 53) % Math.max(60, (L.riverBottom - L.riverTop - 80)));
+}
+function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h; }
+
+/* particles */
+function burst(x, y, color, n, speed, life, size, spread = Math.PI*2, dir = 0) {
+  for (let i = 0; i < n; i++) {
+    if (particles.length > 1600) return;
+    const a = dir + (Math.random() - .5) * spread;
+    const v = speed * (.3 + Math.random() * .9);
+    particles.push({ x, y, vx: Math.cos(a)*v, vy: Math.sin(a)*v, life: 0, maxLife: life * (.5 + Math.random()*.8),
+      color, size: size * (.5 + Math.random()), kind: 'spark' });
+  }
+}
+function frostMotes(x, y, n) {
+  for (let i = 0; i < n; i++) {
+    if (particles.length > 1600) return;
+    particles.push({ x: x + (Math.random()-.5)*30, y: y + (Math.random()-.5)*14, vx: (Math.random()-.5)*8,
+      vy: 6 + Math.random()*10, life: 0, maxLife: 2.5 + Math.random()*2, color: ICE, size: 1 + Math.random()*1.5, kind: 'frost' });
+  }
+}
+function snowFall(x, y) {
+  if (particles.length > 1600) return;
+  particles.push({ x: x + (Math.random()-.5)*26, y: y - 8, vx: (Math.random()-.5)*6,
+    vy: 9 + Math.random()*12, life: 0, maxLife: 1.6 + Math.random()*1.4, color: ICE, size: 1 + Math.random()*1.4, kind: 'snow' });
+}
+function ring(x, y, color, maxR, width = 2) { pulses.push({ x, y, r: 6, maxR, color, alpha: .8, width }); }
+function dollar(o) {
+  if (particles.length > 1600) return;
+  particles.push({ x: o.x + (Math.random()-.5)*12, y: o.y - 8, vx: (Math.random()-.5)*10,
+    vy: -(22 + Math.random()*16), life: 0, maxLife: 1.6, color: '#ffb800', size: 9, kind: 'dollar' });
+}
+function ticker(text, color) {
+  if (tickers.length >= 6) return;
+  const rh = L.riverBottom - L.riverTop;
+  tickers.push({ text, color, x: L.padX + 10 + Math.random() * 140, y: L.riverTop + rh * .38 + Math.random() * rh * .4, life: 0, maxLife: 9 });
+}
+function gateFlash(x) { gateFlashes.push({ x, t: 0 }); }
+
+/* ════════════════════════ HOOK BUS (DOM) ════════════════════════ */
+const hbEl = document.getElementById('hb');
+HOOKBUS.forEach((h, i) => {
+  h.count = 0; h.hotT = 0;
+  const d = document.createElement('div');
+  d.className = 'hook ' + (h.wired ? 'wired' : 'unwired');
+  d.style.setProperty('--hc', h.c || '#4a5a7a');
+  d.innerHTML = `<span class="led"></span><span class="nm">${h.name}</span><span class="ct">${h.wired ? '0' : '—'}</span>`;
+  h.el = d; h.ledEl = d.querySelector('.led'); h.ctEl = d.querySelector('.ct');
+  hbEl.appendChild(d);
+  if (i === 9) {
+    const sep = document.createElement('div');
+    sep.className = 'hb-sep'; sep.textContent = '── UNWIRED · DARK FIBER ──';
+    hbEl.appendChild(sep);
+  }
+});
+function fireHook(name) {
+  const h = HOOKBUS.find(x => x.name === name);
+  if (!h || !h.wired) return;
+  h.count++; h.hotT = performance.now();
+  h.el.classList.add('hot'); h.ctEl.textContent = h.count;
+  recordTrace(name);
+}
+setInterval(() => { // LED cool-down
+  const now = performance.now();
+  for (const h of HOOKBUS) {
+    if (h.el.classList.contains('hot') && now - h.hotT > 420) h.el.classList.remove('hot');
+  }
+}, 200);
+
+/* ════════════════════════ FEED + ISSUE LOG (DOM) ════════════════════════ */
+const feedEl = document.getElementById('feed');
+const FEED_COLORS = { ship:'var(--gv-green)', 'start-agent':'var(--gv-blue)', plan:'var(--gv-blue)', 'complete-planning':'var(--gv-blue)',
+  work:'var(--gv-green)', review:'var(--gv-amber)', test:'var(--gv-pink)', flywheel:'var(--gv-purple)', strike:'var(--gv-orange)',
+  hook:'var(--gv-text-dim)', merge:'var(--gv-green)', stale:'#9fc7ff', yield:'var(--gv-amber)', memory:'var(--gv-green)',
+  permission:'var(--gv-amber)', notification:'var(--gv-amber)', cost:'var(--gv-amber)', sequencer:'var(--gv-orange)',
+  'stop-hook':'var(--gv-text-secondary)', fail:'var(--gv-red)' };
+const issueLog = {};
+function logIssue(issue, kind, msg, t) {
+  if (!issue) return;
+  const arr = issueLog[issue] = issueLog[issue] || [];
+  arr.unshift({ t, kind, msg });
+  if (arr.length > 10) arr.pop();
+}
+function feed(kind, msg, id) {
+  const t = Date.now();
+  const el = document.createElement('div');
+  el.className = 'feed-item';
+  el.dataset.issue = id || ''; el.dataset.kind = kind; el.dataset.msg = msg; el.dataset.t = t;
+  el.innerHTML = `<span class="fi-dot" style="background:${FEED_COLORS[kind]||'var(--gv-blue)'};box-shadow:0 0 6px ${FEED_COLORS[kind]||'var(--gv-blue)'}"></span>
+    <div class="fi-body"><span class="fi-name" style="color:${FEED_COLORS[kind]||'var(--gv-text-primary)'}">${kind}</span><span class="fi-time">now</span>
+    <div class="fi-msg">${id ? `<b style="color:var(--gv-text-primary)">${id}</b> ` : ''}${msg}</div></div>`;
+  feedEl.prepend(el);
+  while (feedEl.children.length > 26) feedEl.lastChild.remove();
+  logIssue(id, kind, msg, t);
+}
+function ageFeed() {
+  [...feedEl.children].forEach((el) => {
+    const t = el.querySelector('.fi-time');
+    const prev = t.textContent;
+    let s = prev === 'now' ? 0 : parseInt(prev);
+    s += 1;
+    t.textContent = s < 60 ? s + 's ago' : Math.floor(s/60) + 'm ago';
+  });
+}
+
+/* donut */
+function drawDonut() {
+  const cv = document.getElementById('donut'), c = cv.getContext('2d');
+  const counts = SNAP.roleCounts || {};
+  const total = Object.values(counts).reduce((a,b)=>a+b,0) || 1;
+  c.clearRect(0,0,96,96);
+  let a = -Math.PI/2;
+  for (const [role, n] of Object.entries(counts)) {
+    const sweep = (n/total) * Math.PI * 2;
+    c.beginPath(); c.strokeStyle = ROLE_COLORS[role] || '#7a8aaa'; c.lineWidth = 13;
+    c.arc(48, 48, 34, a + .03, a + sweep - .03); c.stroke();
+    a += sweep;
+  }
+  c.fillStyle = '#e8edf8'; c.font = '700 20px "Space Grotesk"'; c.textAlign = 'center';
+  c.fillText(String(SNAP.totals ? SNAP.totals.active : total), 48, 47);
+  c.font = '9px "JetBrains Mono"'; c.fillStyle = '#7a8aaa'; c.fillText('agents', 48, 60);
+  const lg = document.getElementById('donut-legend');
+  lg.innerHTML = Object.entries(counts).map(([r,n]) =>
+    `<div class="lg-row"><span class="lg-dot" style="background:${ROLE_COLORS[r]||'#7a8aaa'}"></span>${r}<span class="lg-n">${n}</span></div>`).join('');
+}
+
+/* role box (bottom strip) */
+function buildRolebox() {
+  const rb = document.getElementById('rolebox');
+  const counts = SNAP.roleCounts || {};
+  rb.innerHTML = Object.entries(counts).map(([r, n]) =>
+    `<div><i style="background:${ROLE_COLORS[r]||'#7a8aaa'};color:${ROLE_COLORS[r]||'#7a8aaa'}"></i>${r.toUpperCase()}<b>${n}</b></div>`).join('');
+}
+
+/* gauges */
+function drawGauge(id, pct, color) {
+  const c = document.getElementById(id).getContext('2d');
+  c.clearRect(0,0,128,128);
+  c.lineWidth = 11; c.lineCap = 'round';
+  c.strokeStyle = 'rgba(255,255,255,.07)';
+  c.beginPath(); c.arc(64,64,50,-Math.PI*1.25,Math.PI*.25); c.stroke();
+  c.strokeStyle = color; c.shadowColor = color; c.shadowBlur = 10;
+  c.beginPath(); c.arc(64,64,50,-Math.PI*1.25,-Math.PI*1.25 + Math.PI*1.5*pct/100); c.stroke();
+  c.shadowBlur = 0;
+}
+
+/* ECG events/min sparkline */
+const ecg = document.getElementById('ecg').getContext('2d');
+const ecgBuf = new Array(110).fill(0);
+function drawECG() {
+  ecg.clearRect(0,0,110,28);
+  ecg.strokeStyle = '#00d4ff'; ecg.lineWidth = 1.4; ecg.shadowColor = '#00d4ff'; ecg.shadowBlur = 4;
+  ecg.beginPath();
+  const max = Math.max(20, ...ecgBuf);
+  ecgBuf.forEach((v, i) => { const y = 25 - (v/max)*22; i ? ecg.lineTo(i, y) : ecg.moveTo(i, y); });
+  ecg.stroke(); ecg.shadowBlur = 0;
+}
+
+/* ════════════════════════ EVENT SIMULATOR ════════════════════════ */
+const TOOL_DETAILS = {
+  tool_read:  ['src/lib/cloister/memory-governor.ts', 'xBRIEF item 4', 'server.ts:142', 'review diff chunk', 'specs/ on overdeck-state'],
+  tool_write: ['item 3 → statusOverrides', 'fix: rebase guard', 'add yield attribution', 'tests: convergence gate', 'update xBRIEF checklist'],
+  tool_exec:  ['npm run typecheck ✓', 'vitest 214 passed', 'git push feature branch', 'bun install (2.1s)', 'pan task done ✓'],
+  tool_web:   ['fetch tracker issue', 'search: node-pty exit 0', 'docs: Effect RPC schema'],
+  tool_agent: ['spawn convoy reviewer', 'Explore: merge-agent flow', 'synthesis subagent'],
+  lifecycle:  ['Stop · turn ended', 'Notification · input wanted', 'UserPromptSubmit', 'PreCompact · compacting', 'SessionStart · resumed'],
+};
+function pickWeighted(arr, w) {
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += w(arr[i]);
+  let r = Math.random() * s;
+  for (const a of arr) { r -= w(a); if (r <= 0) return a; }
+  return arr[arr.length - 1];
+}
+function pickFamily(waitBias) {
+  // read/write/exec dominate; lifecycle when waiting
+  const keys = ['tool_read','tool_write','tool_exec','tool_web','tool_agent','lifecycle'];
+  const w =    [ .28,        .22,         .24,        .06,       .06,         .14 ];
+  let r = Math.random();
+  for (let i = 0; i < keys.length; i++) { r -= w[i]; if (r <= 0) return keys[i]; }
+  return 'lifecycle';
+}
+
+/* one simulated hook event on one orb — the merged roll table:
+   every event feeds BOTH parents' surfaces (sparks + LED + spectrum band + feed) */
+function fireHookEvent(orb) {
+  const roll = Math.random();
+  orb.idleMin = 0; orb.ev++;
+  S.evCount++;
+  eventTimes.push(performance.now());
+  tokensToday += 800 + Math.floor(Math.random()*4200);
+  orb.heat = Math.min(1, orb.heat + .06);
+  if (orb.convoy) { const sat = orb.convoy[Math.floor(Math.random()*orb.convoy.length)]; sat.flash = 1; }
+
+  const bk = pickFamily();
+  const hk = HOOKS[bk];
+  const tool = hk.tools[Math.floor(Math.random() * hk.tools.length)];
+  const detail = TOOL_DETAILS[bk][Math.floor(Math.random() * TOOL_DETAILS[bk].length)];
+
+  if (roll < .40) {                     /* PreToolUse — the fast pace of tool calls */
+    fireHook('PreToolUse');
+    burst(orb.x, orb.y, hk.color, 6 + Math.floor(Math.random()*8), 60, 1.1, 2.2);
+    if (Math.random() < .10) feed(orb.role, `PreToolUse · ${tool}`, orb.id);
+  } else if (roll < .62) {              /* PostToolUse */
+    fireHook('PostToolUse');
+    burst(orb.x, orb.y, hk.color, 4, 50, .9, 2);
+    if (Math.random() < .16) { dollar(orb); S.costRate += .02; }
+    if (Math.random() < .12) feed(orb.role, `${tool} — ${detail}`, orb.id);
+  } else if (roll < .655) {             /* PostToolUseFailure */
+    fireHook('PostToolUseFailure');
+    burst(orb.x, orb.y, '#ff4444', 5, 70, 1.1, 2);
+    feed('fail', 'tool call failed — auto-retry', orb.id);
+  } else if (roll < .72) {              /* Notification → waiting */
+    fireHook('Notification');
+    orb.waitUntil = simT + 4 + Math.random()*5;
+    ring(orb.x, orb.y, '#ffb800', 50, 2);
+    feed('notification', `waiting — ${['tool_permission','user_question','disambiguation'][Math.floor(Math.random()*3)]}`, orb.id);
+  } else if (roll < .80) {              /* UserPromptSubmit → thinking */
+    fireHook('UserPromptSubmit');
+    orb.thinkUntil = simT + 2.5 + Math.random()*3.5;
+    burst(orb.x, orb.y, '#e8edf8', 3, 40, .8, 1.6);
+  } else if (roll < .89) {              /* Stop — turn ended */
+    fireHook('Stop');
+    ring(orb.x, orb.y, ROLE_COLORS[orb.role] || '#00d4ff', 42, 1.6);
+    if (Math.random() < .3) feed('stop-hook', 'turn complete · resolution=working', orb.id);
+  } else if (roll < .95) {              /* PreCompact → PostCompact */
+    fireHook('PreCompact');
+    orb.compactT = .8;
+    setTimeout(() => { fireHook('PostCompact'); ring(orb.x, orb.y, '#ff7700', 60, 2);
+      feed('memory', 'context compaction complete', orb.id); }, 900);
+  } else {                              /* cost event */
+    dollar(orb); S.costRate += .05;
+    if (Math.random() < .4) feed('cost', 'cost-event · tokens billed', orb.id);
+  }
+  if (Math.random() < .13) ticker(`${orb.id} · ${tool}`, hk.color);
+}
+
+function advanceStage(orb) {
+  const ci = stageIdx(orb.stage);
+  if (ci >= STAGES.length - 1) return;
+  orb.stage = STAGES[ci + 1];
+  orb.heat = Math.min(1, orb.heat + .2);
+  positionOrb(orb);
+  gateFlash(L.colX(ci + 1));
+  ring(orb.x, orb.y, STAGE_COLORS[orb.stage], 70, 2.5);
+  burst(orb.x, orb.y, STAGE_COLORS[orb.stage], 26, 90, 1.4, 2.6);
+  fireHook('Stop');
+  feed(orb.role, `advanced → ${orb.stage}`, orb.id);
+  ticker(`${orb.id} → ${orb.stage}`, STAGE_COLORS[orb.stage]);
+  if (orb.stage === 'MERGE') {
+    orb.mergeDwell = 1.5 + Math.random()*2;       // brief merge-queue dwell before the comet
+    S.mergeQ++;
+  }
+}
+
+function startMerge(orb) {
+  orb.merging = true; orb.mergeVx = 2;
+  feed('merge', 'rebased · merging to main…', orb.id);
+}
+function finishMerge(orb) {
+  burst(L.portalX - 10, orb.y, '#e8edf8', 90, 160, 1.8, 3);
+  ring(L.portalX - 10, orb.y, '#39ff14', 130, 3);
+  ring(L.portalX - 10, orb.y, '#00d4ff', 90, 2);
+  mergesToday++;
+  S.mergeQ = Math.max(0, S.mergeQ - 1);
+  fireHook('SessionStart');
+  feed('merge', 'MERGED ✓ to main', orb.id);
+  ticker(`${orb.id} MERGED ✓`, '#39ff14');
+  if (railOrb === orb) closeRail();
+  orbs.splice(orbs.indexOf(orb), 1);
+  // flywheel launches a replacement shortly after — the circle of life
+  setTimeout(launchFromSun, 1400 + Math.random()*1200);
+}
+
+function launchFromSun() {
+  const pool = SNAP.backlog || FALLBACK.backlog;
+  const id = pool[backlogIdx++ % pool.length];
+  const project = /^(MYN|MIN)/.test(id) ? 'myn' : 'overdeck';
+  ring(L.sunX, L.sunY, '#9d4edd', 90, 2.5);
+  burst(L.sunX, L.sunY, '#9d4edd', 30, 80, 1.2, 2.4);
+  const orb = spawnOrb({ id, project, stage: 'PLAN', role: 'plan', heat: .7, title: 'new dispatch' }, { fromSun: true });
+  fireHook('SessionStart');
+  feed('flywheel', `start-agent dispatched`, id);
+  ticker(`${id} dispatched by flywheel`, '#9d4edd');
+  return orb;
+}
+
+/* preemption tide — the governor pauses one agent so another can run */
+const tide = { active: false, x: 0, target: null, beneficiary: null, t: 0 };
+function startTide() {
+  const candidates = orbs.filter(o => o.state === 'active' && o.stage === 'WORK' && !o.merging);
+  const shelved = orbs.filter(o => o.state === 'shelf');
+  if (!candidates.length) return;
+  tide.target = candidates[Math.floor(Math.random()*candidates.length)];
+  tide.beneficiary = shelved.length ? shelved[0] : orbs.filter(o => o.state === 'active' && o.stage === 'REVIEW')[0] || null;
+  tide.active = true; tide.x = L.padX - 40; tide.t = 0;
+  feed('yield', `preemptive scheduler — yielding ${tide.target.id} to free a slot`, null);
+}
+function tidePass(orb) {
+  if (orb === tide.target && orb.state === 'active') {
+    orb.state = 'shelf'; orb.yieldT = 0;
+    orb.yieldReason = orb.yieldReason || 'yield: freeing a slot for a review cycle';
+    burst(orb.x, orb.y, '#ffb800', 20, 70, 1.2, 2.2);
+    ring(orb.x, orb.y, '#ffb800', 60, 2);
+    fireHook('Notification');
+    feed('yield', `⏸ paused · slot freed`, orb.id);
+  }
+  if (orb === tide.beneficiary && orb.state === 'shelf') {
+    orb.state = 'active'; orb.stage = 'WORK'; orb.role = 'work'; orb.yieldReason = null; positionOrb(orb);
+    ring(orb.x, orb.y, '#39ff14', 80, 3);
+    burst(orb.x, orb.y, '#39ff14', 30, 100, 1.4, 2.6);
+    fireHook('SessionStart');
+    feed('work', `▶ resumed — work agent re-dispatched`, orb.id);
+  } else if (orb === tide.beneficiary && orb.state === 'active') {
+    orb.heat = 1;
+    ring(orb.x, orb.y, '#39ff14', 70, 2.5);
+    feed('review', `review dispatch admitted into freed slot`, orb.id);
+  }
+}
+
+/* staleness / thaw */
+function thaw(orb) {
+  const wasIdle = orb.staleMin;
+  orb.state = 'active'; orb.stage = 'WORK'; orb.staleMin = 0; orb.heat = .8;
+  orb.frost = 0; orb.idleMin = 0; orb.frostHold = 0;
+  positionOrb(orb);
+  burst(orb.x, orb.y, ICE, 40, 90, 1.6, 2.4); // steam
+  ring(orb.x, orb.y, '#00d4ff', 80, 2.5);
+  fireHook('SessionStart');
+  feed('strike', `thawed — agent re-attached after ${fmtAge(wasIdle)} idle`, orb.id);
+  ticker(`${orb.id} thawed`, '#00d4ff');
+}
+/* an active orb that fully frosts sinks into the doldrums */
+function sinkToDoldrums(orb) {
+  orb.state = 'stale';
+  orb.staleMin = Math.max(31, Math.round(orb.idleMin));
+  expectedStale = Math.max(expectedStale, orbs.filter(o => o.state === 'stale').length);
+  for (const o of orbs) if (o.state === 'stale') positionOrb(o);
+  feed('stale', `❄ frosted over — sinking to the doldrums`, orb.id);
+  ticker(`${orb.id} ❄ frozen`, ICE);
+}
+
+/* ════════════════════════ RENDER ════════════════════════ */
+let last = performance.now(), simT = 0;
+let nextTransition = 5, nextTide = 16, nextThaw = 24, nextConvoyPulse = 7, nextAmbience = 11, nextPermission = 26;
+
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; simT += dt;
+
+  /* ── simulation ── */
+  const targetEps = (SNAP.eventsPerMinute || 90) / 60;
+  const actives = orbs.filter(o => o.state === 'active' && !o.merging);
+  if (actives.length && Math.random() < targetEps * dt * 1.6) {
+    const weight = o => (.15 + o.heat) * (o.waitUntil > simT ? .12 : 1);
+    const orb = pickWeighted(actives, weight);
+    fireHookEvent(orb);
+    if (Math.random() < .4) fireHookEvent(pickWeighted(actives, weight));
+  }
+  // decay
+  for (const o of orbs) o.heat = Math.max(o.state === 'stale' ? .04 : .12, o.heat * Math.pow(.5, dt / 9));
+  // events/min window + energy EMA
+  const cutoff = now - 60000;
+  while (eventTimes.length && eventTimes[0] < cutoff) eventTimes.shift();
+  const evm = eventTimes.length;
+  energy += ((Math.min(1, evm / 110)) - energy) * dt * 1.5;
+  // per-second events counter (EV/S pill with pulse pop)
+  const sec = Math.floor(now / 1000);
+  if (sec !== S.lastEvSec) {
+    S.evPerSec = S.evCount; S.evCount = 0; S.lastEvSec = sec;
+    const el = document.getElementById('evs');
+    el.textContent = S.evPerSec;
+    el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+  }
+  S.costRate += (EXTRAS.costRatePerMin - S.costRate) * dt * .04;
+
+  // frost accrual on quiet active orbs (spectrum deck) — idle clock runs at 2 min/s
+  for (const o of orbs) {
+    if (o.state === 'active' && !o.merging) {
+      o.idleMin += dt * 2;
+      o.frost = Math.max(0, Math.min(1, (o.idleMin - 8) / 26));
+      if (o.frost > .55 && Math.random() < dt * 5) snowFall(o.x, o.y);
+      if (o.frost >= 1) { o.frostHold += dt; if (o.frostHold > 6) sinkToDoldrums(o); }
+      else o.frostHold = 0;
+    } else if (o.state === 'stale') {
+      o.staleMin += dt * 2;
+    }
+  }
+
+  // choreography
+  if (simT > nextTransition) { nextTransition = simT + 5 + Math.random()*8;
+    const hot = actives.filter(o => !o.merging && o.heat > .45 && o.stage !== 'MERGE');
+    if (hot.length) advanceStage(hot[Math.floor(Math.random()*hot.length)]); }
+  if (simT > nextTide) { nextTide = simT + 34 + Math.random()*20; startTide(); }
+  if (simT > nextThaw) { nextThaw = simT + 26 + Math.random()*22;
+    const st = orbs.filter(o => o.state === 'stale'); if (st.length) thaw(st[0]); }
+  if (simT > nextConvoyPulse) { nextConvoyPulse = simT + 9 + Math.random()*8;
+    for (const o of orbs) if (o.convoy && o.state === 'active') {
+      const s = o.convoy[Math.floor(Math.random()*o.convoy.length)];
+      s.flash = 1; feed('review', `${s.role} verdict posted`, o.id); } }
+  if (simT > nextAmbience) { nextAmbience = simT + 12 + Math.random()*6;
+    if (Math.random() < .6) { ring(L.sunX, L.sunY, '#9d4edd', 70, 2); fireHook('PreToolUse');
+      feed('flywheel', 'tick — scanning pipeline', null); }
+    else if (SNAP.sequencer) { ring(L.sunX + 118, L.sunY - 2, '#ff7700', 40, 1.6); fireHook('PostToolUse');
+      feed('sequencer', 'evaluating priorities · admission check', null); } }
+  if (simT > nextPermission) { nextPermission = simT + 24 + Math.random()*14;
+    if (actives.length) { const o = actives[Math.floor(Math.random()*actives.length)];
+      fireHook('PermissionRequest'); o.waitUntil = simT + 3 + Math.random()*4;
+      ring(o.x, o.y, '#ffb800', 46, 1.8);
+      feed('permission', 'PermissionRequest — auto-approve policy check', o.id); } }
+
+  // tide sweep
+  if (tide.active) {
+    tide.t += dt; tide.x = L.padX - 40 + (tide.t / 1.6) * (W - L.padX*2 + 80);
+    for (const o of orbs) if (Math.abs(o.x - tide.x) < 30) tidePass(o);
+    if (tide.x > W - L.padX + 40) tide.active = false;
+  }
+
+  /* ── movement ── */
+  for (const o of orbs) {
+    o.wobA += dt * o.wobSpeed * (1 + o.heat * 2.2);
+    o.wobB += dt * o.wobSpeed * .7;
+    if (o.compactT > 0) o.compactT -= dt;
+    if (o.merging) {
+      o.mergeVx += dt * 260; o.x += o.mergeVx * dt;
+      burst(o.x, o.y, '#e8edf8', 3, 40, .7, 2);
+      if (o.x > L.portalX - 6) finishMerge(o);
+      continue;
+    }
+    if (o.state === 'active' && o.stage === 'MERGE' && o.mergeDwell > 0) {
+      o.mergeDwell -= dt;
+      if (o.mergeDwell <= 0) startMerge(o);
+    }
+    if (o.state === 'shelf') {
+      o.y += ((L.shelfY) - o.y) * dt * 3;
+      o.x += (o.tx - o.x) * dt * 1.5;
+      continue;
+    }
+    if (o.state === 'failed') {
+      o.y += Math.sin(simT * .5 + o.wobA) * dt * 3;
+      o.x += Math.cos(simT * .4 + o.wobB) * dt * 2;
+      if (Math.random() < dt * .8) burst(o.x, o.y, '#ff2d7c', 1, 22, 1.2, 1.4);
+      continue;
+    }
+    if (o.state === 'stale') {
+      o.x += ((o.tx + Math.sin(simT * .3 + o.wobA) * 8) - o.x) * dt * 1.2;
+      o.y += ((o.ty + Math.cos(simT * .22 + o.wobB) * 4) - o.y) * dt * 1.2;
+      if (Math.random() < dt * .5) frostMotes(o.x, o.y, 1);
+      continue;
+    }
+    // active: drift toward anchor + sine bob + frantic orbit when hot
+    const orbitR = o.heat * 26;
+    o.orbitA += dt * (1 + o.heat * 4);
+    const ox = Math.cos(o.orbitA) * orbitR, oy = Math.sin(o.orbitA) * orbitR * .7;
+    const bx = Math.sin(o.wobA) * 10, by = Math.cos(o.wobB) * 8;
+    o.x += ((o.tx + ox + bx) - o.x) * dt * 3.2;
+    o.y += ((o.ty + oy + by) - o.y) * dt * 3.2;
+    // soft separation from same-stage neighbors — keeps labels readable
+    for (const q of orbs) {
+      if (q === o || q.state !== 'active' || q.stage !== o.stage || q.merging) continue;
+      const dx = o.x - q.x, dy = o.y - q.y;
+      const d2 = dx * dx + dy * dy;
+      if (d2 > 1 && d2 < 74 * 74) {
+        const d = Math.sqrt(d2), push = (74 - d) / 74 * 26 * dt;
+        o.x += (dx / d) * push; o.y += (dy / d) * push;
+      }
+    }
+    if (o.convoy) for (const s of o.convoy) {
+      s.angle += dt * (0.6 + s.heat);
+      s.flash = Math.max(0, s.flash - dt * 2);
+      const baseR = 30 + o.convoy.length * 3;
+      if (s.arriving) {                       // spiral-in (spectrum deck convoy forming)
+        s.orbitR = Math.max(baseR, s.orbitR - dt * 36);
+        if (s.orbitR <= baseR) { s.arriving = false;
+          feed('review', `convoy satellite in orbit — ${s.role}`, o.id);
+          ring(o.x, o.y, '#ffb800', 60, 2); }
+      } else s.orbitR = baseR;
+    }
+  }
+
+  // particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life += dt;
+    if (p.life > p.maxLife) { particles.splice(i, 1); continue; }
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.kind === 'spark') { p.vy -= 14 * dt; p.vx *= (1 - dt * 1.4); }
+    if (p.kind === 'frost') { p.vx += Math.sin(simT * 2 + p.y) * dt * 4; }
+    if (p.kind === 'snow') { p.vx += Math.sin(p.life * 6) * dt * 8; }
+    if (p.kind === 'dollar') { p.vy *= (1 - dt * .5); }
+  }
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i]; p.r += dt * (p.maxR - 6) * 1.6; p.alpha -= dt * 1.1;
+    if (p.alpha <= 0 || p.r >= p.maxR) pulses.splice(i, 1);
+  }
+  for (let i = tickers.length - 1; i >= 0; i--) {
+    const t = tickers[i]; t.life += dt; t.x += dt * 34;
+    if (t.life > t.maxLife) tickers.splice(i, 1);
+  }
+  for (let i = gateFlashes.length - 1; i >= 0; i--) {
+    const g = gateFlashes[i]; g.t += dt;
+    if (g.t > .8) gateFlashes.splice(i, 1);
+  }
+
+  /* ── draw GL background ── */
+  if (gl && !document.hidden) {
+    gl.uniform2f(glU.res, glCv.width, glCv.height);
+    gl.uniform1f(glU.time, simT);
+    gl.uniform1f(glU.energy, energy);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  /* ── fx canvas ── */
+  fx.clearRect(0, 0, W, H);
+
+  // trails fade + stamp
+  trail.globalCompositeOperation = 'destination-out';
+  trail.fillStyle = 'rgba(0,0,0,0.055)';
+  trail.fillRect(0, 0, W, H);
+  trail.globalCompositeOperation = 'lighter';
+  for (const o of orbs) {
+    if (o.state === 'stale' || o.state === 'shelf') continue;
+    const rc = ROLE_COLORS[o.role] || '#00d4ff';
+    const g = trail.createRadialGradient(o.x, o.y, 0, o.x, o.y, 5 + o.heat * 8);
+    g.addColorStop(0, hexA(rc, .5 * (0.25 + o.heat)));
+    g.addColorStop(1, hexA(rc, 0));
+    trail.fillStyle = g;
+    trail.beginPath(); trail.arc(o.x, o.y, 5 + o.heat * 8, 0, 7); trail.fill();
+  }
+
+  drawRiver();
+  drawZones();
+  drawPortal();
+  drawSun();
+
+  // composite trails additively
+  fx.globalCompositeOperation = 'lighter';
+  fx.drawImage(trailCv, 0, 0, W, H);
+  fx.globalCompositeOperation = 'source-over';
+
+  drawGateFlashes();
+  drawConvoys();
+  drawOrbs();
+  drawParticles();
+  drawPulses();
+  drawTickers();
+  drawTide();
+  drawStageHeaders();
+  drawConstellation();
+  drawSequencer();
+
+  /* hover tracking — orbs move, so re-pick every frame (with stickiness) */
+  if (mouse.inside) {
+    let hit = pickOrb(mouse.x, mouse.y);
+    if (!hit && hoverOrb) {
+      // hysteresis: a hot orb orbits under a still cursor — only drop hover
+      // when the cursor is clearly outside the orb's whole dance circle
+      const dx = mouse.x - hoverOrb.x, dy = mouse.y - hoverOrb.y;
+      const dropR = Math.max(52, hoverOrb.radius * 4.2);
+      if (dx * dx + dy * dy < dropR * dropR) hit = hoverOrb;
+    }
+    if (hit !== hoverOrb) {
+      hoverOrb = hit;
+      wrap.classList.toggle('orb-hover', !!hit);
+      if (hit) showTooltip(hit); else hideTooltip();
+    } else if (hit) {
+      positionTooltip(hit);
+    }
+  }
+
+  drawTrace();
+
+  /* ── HUD ── */
+  hudTick(evm);
+  requestAnimationFrame(frame);
+}
+
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+function mixC(h1, h2, t) {
+  const a = parseInt(h1.slice(1), 16), b = parseInt(h2.slice(1), 16);
+  const r = Math.round(((a>>16)&255) + (((b>>16)&255) - ((a>>16)&255)) * t);
+  const g = Math.round(((a>>8)&255) + (((b>>8)&255) - ((a>>8)&255)) * t);
+  const bl = Math.round((a&255) + ((b&255) - (a&255)) * t);
+  return `rgba(${r},${g},${bl},1)`;
+}
+function fmtAge(m) { if (!m) return '—'; if (m >= 1440) return Math.round(m/1440) + 'd'; if (m >= 60) return Math.round(m/60) + 'h'; return Math.round(m) + 'm'; }
+
+function drawRiver() {
+  const midY = (L.riverTop + L.riverBottom) / 2, rh = L.riverBottom - L.riverTop;
+  // luminous flow band
+  const grad = fx.createLinearGradient(0, L.riverTop, 0, L.riverBottom);
+  grad.addColorStop(0, 'rgba(0,212,255,0.015)');
+  grad.addColorStop(.5, 'rgba(0,212,255,0.06)');
+  grad.addColorStop(1, 'rgba(0,212,255,0.015)');
+  fx.fillStyle = grad;
+  fx.fillRect(L.padX, L.riverTop, W - L.padX*2, rh);
+  // stage-gradient waveform ribbon (spectrum deck) — total event energy drawn large
+  const ribbon = fx.createLinearGradient(L.padX, 0, W - L.padX, 0);
+  STAGES.forEach((s, i) => ribbon.addColorStop(i / (STAGES.length - 1), STAGE_COLORS[s]));
+  for (const pass of [{ w: 6, a: .07 }, { w: 1.8, a: .34 }]) {
+    fx.strokeStyle = ribbon; fx.globalAlpha = pass.a; fx.lineWidth = pass.w;
+    fx.beginPath();
+    for (let x = L.padX; x <= W - L.padX; x += 7) {
+      const y = midY + (Math.sin(x * .011 + simT * 1.9) * .5 + Math.sin(x * .023 - simT * 1.15) * .3
+        + Math.sin(x * .005 + simT * .55) * .42) * (14 + 70 * energy);
+      x === L.padX ? fx.moveTo(x, y) : fx.lineTo(x, y);
+    }
+    fx.stroke();
+  }
+  fx.globalAlpha = 1;
+  // three cyan sine layers — the river's own waves
+  for (let layer = 0; layer < 3; layer++) {
+    const amp = (10 + layer * 9) * (0.7 + energy * 1.1);
+    const speed = simT * (0.7 + layer * 0.45) * (1 + energy);
+    fx.beginPath();
+    for (let x = L.padX; x <= W - L.padX; x += 6) {
+      const y = midY + Math.sin(x * 0.012 + speed + layer * 1.7) * amp + Math.sin(x * 0.031 - speed * 1.4) * amp * .35;
+      x === L.padX ? fx.moveTo(x, y) : fx.lineTo(x, y);
+    }
+    fx.strokeStyle = `rgba(0,212,255,${0.05 + layer * 0.035 + energy * 0.05})`;
+    fx.lineWidth = 1.5 - layer * .3;
+    fx.stroke();
+  }
+  // flow chevrons scrolling right
+  fx.save(); fx.globalAlpha = .10 + energy * .08;
+  fx.strokeStyle = '#00d4ff'; fx.lineWidth = 1.5;
+  const off = (simT * 60) % 90;
+  for (let x = L.padX - 90 + off; x < W - L.padX; x += 90) {
+    fx.beginPath(); fx.moveTo(x, midY - 7); fx.lineTo(x + 9, midY); fx.lineTo(x, midY + 7); fx.stroke();
+  }
+  fx.restore();
+  // stage separators + gate chevrons
+  for (let i = 1; i < STAGES.length; i++) {
+    const x = L.colX(i);
+    const g = fx.createLinearGradient(0, L.riverTop - 30, 0, L.riverBottom + 6);
+    g.addColorStop(0, 'rgba(0,212,255,0)'); g.addColorStop(.5, 'rgba(0,212,255,0.14)'); g.addColorStop(1, 'rgba(0,212,255,0)');
+    fx.fillStyle = g; fx.fillRect(x - .5, L.riverTop - 30, 1, L.riverBottom - L.riverTop + 36);
+    fx.strokeStyle = 'rgba(0,212,255,.25)'; fx.lineWidth = 1.5;
+    fx.beginPath(); fx.moveTo(x - 5, midY - 9); fx.lineTo(x + 3, midY); fx.lineTo(x - 5, midY + 9); fx.stroke();
+  }
+}
+
+function drawGateFlashes() {
+  const midY = (L.riverTop + L.riverBottom) / 2;
+  for (const g of gateFlashes) {
+    const r = 8 + g.t * 75, al = Math.max(0, 1 - g.t * 1.4);
+    fx.strokeStyle = `rgba(0,212,255,${al * .8})`; fx.lineWidth = 2;
+    fx.beginPath(); fx.arc(g.x, midY, r, 0, 7); fx.stroke();
+  }
+}
+
+function drawStageHeaders() {
+  fx.textAlign = 'center';
+  for (let i = 0; i < STAGES.length; i++) {
+    const x = L.colCX(i), stage = STAGES[i];
+    const inLane = orbs.filter(o => o.stage === stage && o.state === 'active');
+    const n = inLane.length;
+    const lanePulse = Math.min(1, inLane.reduce((p, o) => p + o.heat, 0) / 3);
+    const col = STAGE_COLORS[stage];
+    fx.font = '700 12px "Space Grotesk"';
+    fx.fillStyle = hexA(col, .5 + lanePulse * .45);
+    fx.shadowColor = col; fx.shadowBlur = 8;
+    fx.fillText(stage, x, L.riverTop - 44);
+    fx.shadowBlur = 0;
+    fx.font = '10px "JetBrains Mono"';
+    fx.fillStyle = 'rgba(122,138,170,.8)';
+    fx.fillText(stage === 'MERGE' ? `queue ${S.mergeQ}` : (n > 0 ? n + ' ●' : '·'), x, L.riverTop - 30);
+    // stage underline
+    fx.fillStyle = hexA(col, .25 + (n ? .25 : 0));
+    fx.fillRect(x - 26, L.riverTop - 25, 52, 2);
+  }
+  fx.textAlign = 'left';
+}
+
+function drawZones() {
+  // shelf
+  fx.fillStyle = 'rgba(255,184,0,0.04)';
+  fx.fillRect(L.padX, L.shelfY - L.shelfH/2, W - L.padX*2, L.shelfH);
+  fx.strokeStyle = 'rgba(255,184,0,0.16)'; fx.setLineDash([4, 6]); fx.lineWidth = 1;
+  fx.beginPath(); fx.moveTo(L.padX, L.shelfY - L.shelfH/2); fx.lineTo(W - L.padX, L.shelfY - L.shelfH/2); fx.stroke();
+  fx.setLineDash([]);
+  fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,0.5)';
+  fx.textAlign = 'right';
+  fx.fillText('⏸ SHELF — parked / yielded by governor', W - L.padX - 8, L.shelfY - L.shelfH/2 + 11);
+  fx.textAlign = 'left';
+  // doldrums
+  const g = fx.createLinearGradient(0, L.doldrumsY - L.doldrumsH/2, 0, L.doldrumsY + L.doldrumsH/2);
+  g.addColorStop(0, 'rgba(120,170,255,0.02)'); g.addColorStop(1, 'rgba(120,170,255,0.08)');
+  fx.fillStyle = g; fx.fillRect(L.padX, L.doldrumsY - L.doldrumsH/2, W - L.padX*2, L.doldrumsH);
+  fx.strokeStyle = 'rgba(159,199,255,0.2)';
+  fx.beginPath(); fx.moveTo(L.padX, L.doldrumsY - L.doldrumsH/2); fx.lineTo(W - L.padX, L.doldrumsY - L.doldrumsH/2); fx.stroke();
+  fx.fillStyle = 'rgba(159,199,255,0.55)';
+  fx.textAlign = 'right';
+  fx.fillText(`❄ DOLDRUMS — stale, no hook activity${SNAP.staleTotal ? ' · ' + SNAP.staleTotal + ' frozen' : ''}`, W - L.padX - 8, L.doldrumsY - L.doldrumsH/2 + 11);
+  fx.textAlign = 'left';
+  // ambient frost motes
+  if (Math.random() < .12) frostMotes(L.padX + Math.random() * (W - L.padX*2), L.doldrumsY - 20, 1);
+}
+
+function drawPortal() {
+  const y0 = L.riverTop - 20, y1 = L.riverBottom + 6;
+  const pulse = .5 + .5 * Math.sin(simT * 2.4);
+  const g = fx.createLinearGradient(L.portalX - 26, 0, L.portalX + 4, 0);
+  g.addColorStop(0, 'rgba(232,237,248,0)');
+  g.addColorStop(1, `rgba(232,237,248,${.28 + pulse * .3})`);
+  fx.fillStyle = g; fx.fillRect(L.portalX - 26, y0, 30, y1 - y0);
+  fx.fillStyle = `rgba(255,255,255,${.5 + pulse * .4})`;
+  fx.fillRect(L.portalX - 1, y0, 2, y1 - y0);
+  fx.save();
+  fx.translate(L.portalX + 11, (y0 + y1)/2); fx.rotate(Math.PI/2);
+  fx.font = '600 9px "JetBrains Mono"'; fx.textAlign = 'center';
+  fx.fillStyle = 'rgba(232,237,248,.55)';
+  fx.fillText('M A I N', 0, 0);
+  fx.restore();
+}
+
+function drawSun() {
+  const pulse = .5 + .5 * Math.sin(simT * 1.8);
+  const r = 16 + pulse * 3;
+  const g = fx.createRadialGradient(L.sunX, L.sunY, 0, L.sunX, L.sunY, r * 3.2);
+  g.addColorStop(0, 'rgba(157,78,221,.75)'); g.addColorStop(.35, 'rgba(157,78,221,.22)'); g.addColorStop(1, 'rgba(157,78,221,0)');
+  fx.fillStyle = g; fx.beginPath(); fx.arc(L.sunX, L.sunY, r * 3.2, 0, 7); fx.fill();
+  fx.fillStyle = '#cfa8ff'; fx.shadowColor = '#9d4edd'; fx.shadowBlur = 16;
+  fx.beginPath(); fx.arc(L.sunX, L.sunY, r * .55, 0, 7); fx.fill(); fx.shadowBlur = 0;
+  // double rotating dashed rings (orchestrator portal treatment)
+  fx.save(); fx.translate(L.sunX, L.sunY); fx.rotate(simT * .5);
+  fx.strokeStyle = 'rgba(157,78,221,.6)'; fx.setLineDash([3, 7]); fx.lineWidth = 1.4;
+  fx.beginPath(); fx.arc(0, 0, r + 7, 0, 7); fx.stroke();
+  fx.rotate(-simT * .9);
+  fx.strokeStyle = 'rgba(157,78,221,.3)'; fx.setLineDash([2, 9]);
+  fx.beginPath(); fx.arc(0, 0, r + 14, 0, 7); fx.stroke();
+  fx.setLineDash([]); fx.restore();
+  fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(207,168,255,.85)'; fx.textAlign = 'center';
+  fx.fillText('FLYWHEEL', L.sunX, L.sunY + r + 20);
+  fx.textAlign = 'left';
+}
+
+function drawConvoys() {
+  for (const o of orbs) {
+    if (!o.convoy || o.state !== 'active') continue;
+    // dashed orbit path
+    const baseR = 30 + o.convoy.length * 3;
+    fx.strokeStyle = 'rgba(255,184,0,.16)'; fx.setLineDash([2, 5]); fx.lineWidth = 1;
+    fx.beginPath(); fx.arc(o.x, o.y, baseR, 0, 7); fx.stroke(); fx.setLineDash([]);
+    for (const s of o.convoy) {
+      const orbitR = s.orbitR || baseR;
+      const sx = o.x + Math.cos(s.angle) * orbitR, sy = o.y + Math.sin(s.angle) * orbitR;
+      s.sx = sx; s.sy = sy;
+      fx.strokeStyle = `rgba(255,184,0,${.14 + s.flash * .5})`;
+      fx.lineWidth = 1 + s.flash * 1.5;
+      fx.beginPath(); fx.moveTo(o.x, o.y); fx.lineTo(sx, sy); fx.stroke();
+    }
+  }
+}
+
+const SAT_LETTERS = { security: 'S', correctness: 'C', performance: 'P', requirements: 'R', synthesis: 'Σ', supervisor: '◎', lead: 'L' };
+
+function drawOrbs() {
+  for (const o of orbs) {
+    const baseRole = ROLE_COLORS[o.role] || '#00d4ff';
+    const rc = o.frost > .02 ? mixC(baseRole, ICE, o.frost * .8) : baseRole;
+    const pr = PROJECT_RING[o.project] || '#00d4ff';
+    const compact = o.compactT > 0 ? 1 - o.compactT * .35 : 1;
+    const r = o.radius * (0.85 + o.heat * .45) * (o.merging ? 1.2 : 1) * compact;
+
+    if (o.state === 'stale') {
+      // frosted orb: desaturated, icy rim, crystalline speckle + frost crown
+      fx.globalAlpha = .75;
+      const g = fx.createRadialGradient(o.x, o.y, 0, o.x, o.y, r * 1.6);
+      g.addColorStop(0, 'rgba(120,150,200,.5)'); g.addColorStop(1, 'rgba(120,150,200,0)');
+      fx.fillStyle = g; fx.beginPath(); fx.arc(o.x, o.y, r * 1.6, 0, 7); fx.fill();
+      fx.fillStyle = 'rgba(70,90,130,.9)'; fx.beginPath(); fx.arc(o.x, o.y, r * .7, 0, 7); fx.fill();
+      fx.strokeStyle = 'rgba(191,227,255,.75)'; fx.lineWidth = 1.2;
+      fx.beginPath(); fx.arc(o.x, o.y, r * .85, 0, 7); fx.stroke();
+      // frost crystals
+      fx.fillStyle = 'rgba(191,227,255,.8)';
+      for (let i = 0; i < 5; i++) {
+        const a = (hashStr(o.id) % 628) / 100 + i * 1.3;
+        fx.fillRect(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 1.4, 1.4);
+      }
+      drawFrostCrown(o, r * .9, 1);
+      fx.globalAlpha = 1;
+      drawLabel(o, `❄ ${o.id} · ${fmtAge(o.staleMin)} idle`, 'rgba(159,199,255,.85)');
+      if (o === railOrb) drawSelection(o, r);
+      drawFlash(o, r);
+      continue;
+    }
+    if (o.state === 'failed') {
+      // merge wreck — blinking hull near the portal, trailing debris
+      const blink = .5 + .5 * Math.sin(simT * 3 + o.wobA);
+      const g = fx.createRadialGradient(o.x, o.y, 0, o.x, o.y, r * 2.2);
+      g.addColorStop(0, 'rgba(255,45,124,.3)'); g.addColorStop(1, 'rgba(255,45,124,0)');
+      fx.fillStyle = g; fx.beginPath(); fx.arc(o.x, o.y, r * 2.2, 0, 7); fx.fill();
+      fx.fillStyle = 'rgba(96,22,48,.95)'; fx.beginPath(); fx.arc(o.x, o.y, r * .62, 0, 7); fx.fill();
+      fx.strokeStyle = `rgba(255,45,124,${.35 + blink * .55})`; fx.lineWidth = 1.6;
+      fx.beginPath(); fx.arc(o.x, o.y, r * .95, 0, 7); fx.stroke();
+      drawLabel(o, `✗ ${o.id} · merge failed`, 'rgba(255,120,165,.9)');
+      if (o === railOrb) drawSelection(o, r);
+      drawFlash(o, r);
+      continue;
+    }
+    if (o.state === 'shelf') {
+      fx.globalAlpha = .55;
+      fx.fillStyle = 'rgba(255,184,0,.18)'; fx.beginPath(); fx.arc(o.x, o.y, r * 1.5, 0, 7); fx.fill();
+      fx.fillStyle = 'rgba(140,110,40,.9)'; fx.beginPath(); fx.arc(o.x, o.y, r * .62, 0, 7); fx.fill();
+      fx.strokeStyle = 'rgba(255,184,0,.55)'; fx.setLineDash([3, 3]); fx.lineWidth = 1;
+      fx.beginPath(); fx.arc(o.x, o.y, r * .95, 0, 7); fx.stroke(); fx.setLineDash([]);
+      // ⏸ glyph in the core (spectrum deck paused treatment)
+      fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 8px "JetBrains Mono"';
+      fx.textAlign = 'center'; fx.textBaseline = 'middle';
+      fx.fillText('⏸', o.x, o.y + .5);
+      fx.textBaseline = 'alphabetic'; fx.textAlign = 'left';
+      fx.globalAlpha = 1;
+      drawLabel(o, `⏸ ${o.id}`, 'rgba(255,184,0,.75)');
+      if (o.yieldReason) {
+        fx.font = '500 8.5px "JetBrains Mono"'; fx.textAlign = 'center';
+        fx.fillStyle = 'rgba(255,184,0,.5)';
+        fx.fillText(o.yieldReason, o.x, o.y - o.radius - 21);
+        fx.textAlign = 'left';
+      }
+      if (o === railOrb) drawSelection(o, r);
+      drawFlash(o, r);
+      continue;
+    }
+
+    // active: glow halo + core + project ring
+    const glow = fx.createRadialGradient(o.x, o.y, 0, o.x, o.y, r * 3);
+    glow.addColorStop(0, hexA(baseRole, .45 * (0.3 + o.heat) * (1 - o.frost * .6)));
+    glow.addColorStop(1, hexA(baseRole, 0));
+    fx.fillStyle = glow; fx.beginPath(); fx.arc(o.x, o.y, r * 3, 0, 7); fx.fill();
+
+    fx.fillStyle = rc;
+    fx.shadowColor = baseRole; fx.shadowBlur = (14 + o.heat * 22) * (1 - o.frost * .7);
+    fx.beginPath(); fx.arc(o.x, o.y, r * .6, 0, 7); fx.fill();
+    fx.shadowBlur = 0;
+    // hot core
+    fx.fillStyle = 'rgba(255,255,255,' + (.35 + o.heat * .5) + ')';
+    fx.beginPath(); fx.arc(o.x, o.y, r * .28, 0, 7); fx.fill();
+    // model glyph in the core (spectrum deck)
+    if (o.glyph) {
+      fx.fillStyle = 'rgba(10,14,26,.92)'; fx.font = '700 8px "JetBrains Mono"';
+      fx.textAlign = 'center'; fx.textBaseline = 'middle';
+      fx.fillText(o.glyph, o.x, o.y + .5);
+      fx.textBaseline = 'alphabetic'; fx.textAlign = 'left';
+    }
+    // project ring
+    fx.strokeStyle = hexA(pr, .8); fx.lineWidth = 1.6;
+    fx.beginPath(); fx.arc(o.x, o.y, r * .92, 0, 7); fx.stroke();
+
+    // frost crown while frosting in place (spectrum deck)
+    if (o.frost > .25) drawFrostCrown(o, r, o.frost);
+
+    // waiting: amber dashed rotating ring (permission / question pending)
+    if (o.waitUntil > simT) {
+      fx.save(); fx.translate(o.x, o.y); fx.rotate(simT * 1.8);
+      fx.strokeStyle = 'rgba(255,184,0,.9)'; fx.setLineDash([5, 4]); fx.lineWidth = 1.8;
+      fx.beginPath(); fx.arc(0, 0, r * 1.18, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
+    }
+    // thinking: white inner arc shimmer
+    if (o.thinkUntil > simT) {
+      fx.strokeStyle = 'rgba(255,255,255,.75)'; fx.lineWidth = 1.6;
+      fx.beginPath(); fx.arc(o.x, o.y, r * .55, simT * 4, simT * 4 + 2.2); fx.stroke();
+    }
+    // broken stack: red hazard flicker + error sparks
+    if (o.broken) {
+      const fl = .5 + .5 * Math.sin(simT * 9);
+      fx.strokeStyle = `rgba(255,68,68,${.4 + fl * .5})`; fx.lineWidth = 2.2;
+      fx.beginPath(); fx.arc(o.x, o.y, r * 1.3, 0, 7); fx.stroke();
+      if (Math.random() < .05) burst(o.x, o.y, '#ff4444', 3, 40, .8, 1.6);
+    }
+
+    // convoy satellites (letters + labels)
+    if (o.convoy) for (const s of o.convoy) {
+      const sr = 4.6 + s.flash * 2.5;
+      fx.fillStyle = s.flash > 0 ? '#ffe9b8' : '#ffb800';
+      fx.shadowColor = '#ffb800'; fx.shadowBlur = 6 + s.flash * 18;
+      fx.beginPath(); fx.arc(s.sx, s.sy, sr, 0, 7); fx.fill(); fx.shadowBlur = 0;
+      fx.fillStyle = 'rgba(10,14,26,.9)'; fx.font = '700 6px "JetBrains Mono"'; fx.textAlign = 'center';
+      fx.fillText(SAT_LETTERS[s.role] || s.role[0].toUpperCase(), s.sx, s.sy + 2.2);
+      if (s.arriving) {
+        fx.fillStyle = 'rgba(255,184,0,.7)'; fx.font = '400 6.5px "JetBrains Mono"';
+        fx.fillText(s.role.toUpperCase() + ' · arriving', s.sx, s.sy + 14);
+      }
+      fx.textAlign = 'left';
+    }
+
+    if (o.warn && !o.broken) {
+      const blink = .5 + .5 * Math.sin(simT * 4);
+      fx.strokeStyle = `rgba(255,184,0,${.3 + blink * .5})`; fx.setLineDash([4, 3]); fx.lineWidth = 1.4;
+      fx.beginPath(); fx.arc(o.x, o.y, r * 1.28, 0, 7); fx.stroke(); fx.setLineDash([]);
+    }
+    if (o === railOrb) drawSelection(o, r);
+    drawFlash(o, r);
+
+    const labelColor = o.broken ? 'rgba(255,120,120,.95)' : o.warn ? 'rgba(255,184,0,.95)'
+      : o.frost > .5 ? 'rgba(191,227,255,.9)' : 'rgba(232,237,248,.92)';
+    const labelText = o.broken ? `${o.id} ⚠` : o.warn ? `${o.id} ⚠` : o.id;
+    drawLabel(o, labelText, labelColor);
+    // tag line under the label (spectrum deck): role · live hook rate, or state
+    fx.font = '400 7px "JetBrains Mono"'; fx.textAlign = 'center';
+    const tag = o.broken ? '⚠ stack broken' : o.frost > .5 ? `stale ${fmtAge(o.idleMin)}` :
+      o.waitUntil > simT ? 'waiting…' : o.thinkUntil > simT ? 'thinking…' :
+      `${o.role} · ~${Math.round(o.heat * 34)} ev/m`;
+    fx.fillStyle = o.broken ? 'rgba(255,68,68,.85)' : o.frost > .5 ? 'rgba(191,227,255,.7)' : 'rgba(122,138,170,.6)';
+    fx.fillText(tag, o.x, o.y + r + 16);
+    fx.textAlign = 'left';
+  }
+}
+
+function drawFrostCrown(o, r, frost) {
+  fx.strokeStyle = `rgba(191,227,255,${frost * .85})`; fx.lineWidth = 1;
+  for (let k = 0; k < 6; k++) {
+    const a = k * Math.PI/3 + simT * .15;
+    fx.beginPath();
+    fx.moveTo(o.x + Math.cos(a) * (r + 2), o.y + Math.sin(a) * (r + 2));
+    fx.lineTo(o.x + Math.cos(a) * (r + 4 + 7 * frost), o.y + Math.sin(a) * (r + 4 + 7 * frost));
+    fx.stroke();
+  }
+}
+function drawSelection(o, r) {
+  fx.save(); fx.translate(o.x, o.y); fx.rotate(simT * 1.4);
+  fx.strokeStyle = 'rgba(255,255,255,.85)'; fx.setLineDash([6, 5]); fx.lineWidth = 1.4;
+  fx.beginPath(); fx.arc(0, 0, r + 9, 0, 7); fx.stroke(); fx.setLineDash([]); fx.restore();
+}
+function drawFlash(o, r) {
+  if (o.flashT > simT) {
+    const fk = Math.max(0, Math.min(1, (o.flashT - simT) / .8));
+    fx.strokeStyle = `rgba(255,255,255,${fk * .9})`; fx.lineWidth = 2;
+    fx.beginPath(); fx.arc(o.x, o.y, r + 5 + (1 - fk) * 12, 0, 7); fx.stroke();
+  }
+}
+
+function drawLabel(o, text, color) {
+  fx.font = '600 10px "JetBrains Mono"';
+  fx.textAlign = 'center';
+  fx.shadowColor = 'rgba(0,0,0,.9)'; fx.shadowBlur = 4;
+  fx.fillStyle = color;
+  fx.fillText(text, o.x, o.y - o.radius - 8);
+  fx.shadowBlur = 0;
+  fx.textAlign = 'left';
+}
+
+function drawParticles() {
+  fx.globalCompositeOperation = 'lighter';
+  for (const p of particles) {
+    const t = 1 - p.life / p.maxLife;
+    if (p.kind === 'dollar') {
+      fx.globalAlpha = t;
+      fx.fillStyle = p.color; fx.font = `700 ${p.size}px "JetBrains Mono"`; fx.textAlign = 'center';
+      fx.fillText('$', p.x, p.y);
+      fx.textAlign = 'left';
+      continue;
+    }
+    fx.globalAlpha = t * (p.kind === 'frost' || p.kind === 'snow' ? .5 : .85);
+    fx.fillStyle = p.color;
+    fx.beginPath(); fx.arc(p.x, p.y, p.size * (p.kind === 'frost' || p.kind === 'snow' ? 1 : t + .3), 0, 7); fx.fill();
+  }
+  fx.globalAlpha = 1;
+  fx.globalCompositeOperation = 'source-over';
+}
+
+function drawPulses() {
+  for (const p of pulses) {
+    fx.globalAlpha = Math.max(0, p.alpha);
+    fx.strokeStyle = p.color; fx.lineWidth = p.width;
+    fx.beginPath(); fx.arc(p.x, p.y, p.r, 0, 7); fx.stroke();
+  }
+  fx.globalAlpha = 1;
+}
+
+function drawTickers() {
+  fx.font = '500 10px "JetBrains Mono"';
+  for (const t of tickers) {
+    const a = t.life < 1 ? t.life : Math.max(0, 1 - (t.life - (t.maxLife - 2)) / 2);
+    fx.globalAlpha = a * .55;
+    fx.fillStyle = t.color;
+    fx.fillText(t.text, t.x, t.y);
+  }
+  fx.globalAlpha = 1;
+}
+
+/* conversations constellation — tiny live stars, one per active conv-* session */
+function drawConstellation() {
+  const n = (SNAP.conversations && SNAP.conversations.active) || 0;
+  if (!n) return;
+  const totalW = n * 14 + 150;
+  const x0 = (W - totalW) / 2, y = 30;
+  fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(0,212,255,.5)';
+  fx.fillText(`◈ ${n} CONVERSATIONS`, x0, y + 3);
+  for (let i = 0; i < n; i++) {
+    const cx = x0 + 130 + i * 14 + Math.sin(i * 3.7) * 3;
+    const cy = y + Math.sin(simT * 1.3 + i * 1.7) * 4;
+    const tw = .4 + .6 * Math.abs(Math.sin(simT * 2 + i));
+    fx.fillStyle = `rgba(0,212,255,${.2 + tw * .55})`;
+    fx.beginPath(); fx.arc(cx, cy, 2 + tw * 1.2, 0, 7); fx.fill();
+  }
+}
+
+/* sequencer — metronome with the orchestrator double-ring treatment */
+function drawSequencer() {
+  if (!SNAP.sequencer) return;
+  const x = L.sunX + 118, y = L.sunY - 2;
+  const pulse = .5 + .5 * Math.sin(simT * 1.1 + 2);
+  fx.save(); fx.translate(x, y); fx.rotate(simT * .7);
+  fx.strokeStyle = `rgba(255,119,0,${.3 + pulse * .3})`; fx.lineWidth = 1.2;
+  fx.setLineDash([2, 4]); fx.beginPath(); fx.arc(0, 0, 10 + pulse * 2, 0, 7); fx.stroke();
+  fx.rotate(-simT * 1.3);
+  fx.strokeStyle = `rgba(255,119,0,${.16 + pulse * .18})`; fx.setLineDash([2, 7]);
+  fx.beginPath(); fx.arc(0, 0, 16 + pulse * 2, 0, 7); fx.stroke();
+  fx.setLineDash([]); fx.restore();
+  fx.fillStyle = 'rgba(255,150,60,.9)'; fx.beginPath(); fx.arc(x, y, 5, 0, 7); fx.fill();
+  fx.font = '600 8.5px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,150,60,.7)';
+  fx.fillText('SEQUENCER', x - 28, y + 28);
+}
+
+function drawTide() {
+  if (!tide.active) return;
+  const g = fx.createLinearGradient(tide.x - 60, 0, tide.x + 6, 0);
+  g.addColorStop(0, 'rgba(255,184,0,0)');
+  g.addColorStop(.85, 'rgba(255,184,0,.22)');
+  g.addColorStop(1, 'rgba(255,184,0,.55)');
+  fx.fillStyle = g;
+  fx.fillRect(tide.x - 60, L.riverTop - 30, 66, L.riverBottom - L.riverTop + L.shelfH + 40);
+  fx.font = '600 9px "JetBrains Mono"'; fx.fillStyle = 'rgba(255,184,0,.9)';
+  fx.fillText('GOVERNOR', tide.x - 52, L.riverTop - 36);
+}
+
+/* ═══════════ BOTTOM STRIP — hook telemetry trace (operator redesign, D-14) ═══════════
+   A logic-analyzer for the harness: one labeled channel per wired hook (same
+   order + colors as the HOOK BUS rail), a shared 60 s time axis with "now" at
+   the right edge, real event ticks only — no decorative bands. The cyan band
+   on top is aggregate events/s in real units (absorbs the old oscilloscope). */
+const traceC = document.getElementById('trace'), traceX = traceC.getContext('2d');
+const TRACE_WINDOW = 60000;                     // ms of history on the X axis
+const traceEvents = [];                         // {name, t} — wired hooks only
+function recordTrace(name) {
+  traceEvents.push({ name, t: performance.now() });
+  if (traceEvents.length > 4000) traceEvents.splice(0, 500);
+}
+const TRACE_ROWS = HOOKBUS.filter(h => h.wired);
+function sizeAux() {
+  traceC.width = Math.floor(traceC.clientWidth * DPR);
+  traceC.height = Math.floor(traceC.clientHeight * DPR);
+  traceX.setTransform(DPR, 0, 0, DPR, 0, 0);
+}
+function drawTrace() {
+  const w = traceC.clientWidth, h = traceC.clientHeight;
+  traceX.clearRect(0, 0, w, h);
+  const now = performance.now();
+  while (traceEvents.length && traceEvents[0].t < now - TRACE_WINDOW - 1000) traceEvents.shift();
+  const gutter = 128, axisH = 11, bandH = 22, gap = 3;
+  const px0 = gutter, px1 = w - 6, pw = px1 - px0;
+  const rowsY0 = bandH + gap, rowsH = h - rowsY0 - axisH;
+  const rowH = rowsH / TRACE_ROWS.length;
+
+  /* time grid — a gridline every 10 s, pulsing "now" playhead at the right edge */
+  traceX.font = '600 6.5px "JetBrains Mono"'; traceX.textAlign = 'center';
+  for (let s = 10; s < 60; s += 10) {
+    const x = px1 - (s / 60) * pw;
+    traceX.strokeStyle = 'rgba(0,212,255,.07)'; traceX.lineWidth = 1;
+    traceX.beginPath(); traceX.moveTo(x, 2); traceX.lineTo(x, h - axisH + 2); traceX.stroke();
+    traceX.fillStyle = 'rgba(74,90,122,.9)';
+    traceX.fillText('-' + s + 's', x, h - 2);
+  }
+  const nowPulse = .6 + .4 * Math.sin(simT * 4);
+  traceX.strokeStyle = `rgba(0,212,255,${.25 + nowPulse * .3})`; traceX.lineWidth = 1.5;
+  traceX.beginPath(); traceX.moveTo(px1, 2); traceX.lineTo(px1, h - axisH + 2); traceX.stroke();
+  traceX.fillStyle = 'rgba(0,212,255,.8)';
+  traceX.fillText('now', px1 - 4, h - 2);
+  traceX.textAlign = 'left';
+
+  /* aggregate events/s band — real per-second buckets, autoscaled */
+  const SECS = 60, buckets = new Array(SECS).fill(0);
+  for (const e of traceEvents) {
+    const i = Math.floor((now - e.t) / 1000);
+    if (i >= 0 && i < SECS) buckets[SECS - 1 - i]++;
+  }
+  const maxB = Math.max(5, ...buckets);
+  traceX.beginPath();
+  traceX.moveTo(px0, bandH);
+  for (let i = 0; i < SECS; i++) {
+    const x = px0 + (i / (SECS - 1)) * pw;
+    traceX.lineTo(x, bandH - (buckets[i] / maxB) * (bandH - 3));
+  }
+  traceX.lineTo(px1, bandH); traceX.closePath();
+  traceX.fillStyle = 'rgba(0,212,255,.10)'; traceX.fill();
+  traceX.beginPath();
+  for (let i = 0; i < SECS; i++) {
+    const x = px0 + (i / (SECS - 1)) * pw;
+    const y = bandH - (buckets[i] / maxB) * (bandH - 3);
+    i ? traceX.lineTo(x, y) : traceX.moveTo(x, y);
+  }
+  traceX.strokeStyle = 'rgba(0,212,255,.75)'; traceX.lineWidth = 1.3;
+  traceX.shadowColor = 'rgba(0,212,255,.6)'; traceX.shadowBlur = 4;
+  traceX.stroke(); traceX.shadowBlur = 0;
+  traceX.font = '600 7px "JetBrains Mono"';
+  traceX.fillStyle = 'rgba(122,138,170,.9)';
+  traceX.fillText('TOTAL', 4, bandH - 13);
+  traceX.fillStyle = 'rgba(0,212,255,.95)';
+  traceX.fillText(buckets[SECS - 1] + ' ev/s · peak ' + maxB, 4, bandH - 4);
+
+  /* per-hook channels — a dim channel with 0 events is itself information */
+  const counts = {};
+  for (const e of traceEvents) counts[e.name] = (counts[e.name] || 0) + 1;
+  TRACE_ROWS.forEach((hk, r) => {
+    const y0 = rowsY0 + r * rowH, cy = y0 + rowH / 2;
+    const n = counts[hk.name] || 0;
+    const dim = n ? 1 : .38;
+    traceX.strokeStyle = 'rgba(30,38,56,.5)';
+    traceX.beginPath(); traceX.moveTo(px0, y0 + rowH); traceX.lineTo(px1, y0 + rowH); traceX.stroke();
+    // gutter: color chip + hook name + rate over the visible window
+    traceX.globalAlpha = dim;
+    traceX.fillStyle = hk.c;
+    traceX.fillRect(4, cy - 2.5, 5, 5);
+    traceX.font = '600 7px "JetBrains Mono"';
+    traceX.fillStyle = '#bfe9ff';
+    traceX.fillText(hk.name, 13, cy + 2.5);
+    traceX.textAlign = 'right';
+    traceX.fillStyle = n ? '#e8edf8' : '#4a5a7a';
+    traceX.fillText(n + '/m', gutter - 8, cy + 2.5);
+    traceX.textAlign = 'left';
+    traceX.globalAlpha = 1;
+    // faint channel baseline
+    traceX.strokeStyle = hexA(hk.c, .10 + (n ? .08 : 0));
+    traceX.beginPath(); traceX.moveTo(px0, cy); traceX.lineTo(px1, cy); traceX.stroke();
+    // event ticks — 2 px time buckets; bursts stack into taller, brighter marks
+    const bw2 = 2, nb = Math.ceil(pw / bw2), rowBuckets = new Float32Array(nb);
+    for (const e of traceEvents) {
+      if (e.name !== hk.name) continue;
+      const x = px1 - ((now - e.t) / TRACE_WINDOW) * pw;
+      if (x < px0) continue;
+      rowBuckets[Math.min(nb - 1, Math.floor((x - px0) / bw2))]++;
+    }
+    for (let i = 0; i < nb; i++) {
+      const c = rowBuckets[i];
+      if (!c) continue;
+      const th = Math.min(rowH - 2, 2.5 + c * 1.8);
+      traceX.globalAlpha = Math.min(1, .45 + c * .22);
+      traceX.fillStyle = hk.c;
+      traceX.shadowColor = hk.c; traceX.shadowBlur = 3;
+      traceX.fillRect(px0 + i * bw2, cy - th / 2, 1.6, th);
+    }
+    traceX.shadowBlur = 0; traceX.globalAlpha = 1;
+  });
+}
+
+/* ════════════════════════ HUD TICK ════════════════════════ */
+let cpu = SNAP.system.cpuPct || 55, mem = SNAP.system.memPct || 86, swp = EXTRAS.swap.pct;
+let hudLast = 0;
+function hudTick(evm) {
+  const now = performance.now();
+  if (now - hudLast < 500) return;
+  hudLast = now;
+  cpu = clamp(cpu + (SNAP.system.cpuPct - cpu) * .06 + (Math.random() - .5) * 2.4, 8, 97);
+  mem = clamp(mem + (SNAP.system.memPct - mem) * .06 + (Math.random() - .5) * .8, 40, 97);
+  document.getElementById('cpu-fill').style.transform = 'scaleX(' + (cpu / 100).toFixed(3) + ')';
+  document.getElementById('mem-fill').style.transform = 'scaleX(' + (mem / 100).toFixed(3) + ')';
+  document.getElementById('swp-fill').style.transform = 'scaleX(' + (swp / 100).toFixed(3) + ')';
+  document.getElementById('cpuV').textContent = Math.round(cpu) + '%';
+  document.getElementById('memV').textContent = Math.round(mem) + '%';
+  document.getElementById('swpV').textContent = Math.round(swp) + '%';
+  document.getElementById('loadV').textContent = SNAP.system.loadAvg || '—';
+  document.getElementById('evm').textContent = evm;
+  document.getElementById('merges').textContent = mergesToday;
+  document.getElementById('tokens').textContent = fmtTokens(tokensToday);
+  document.getElementById('wipV').textContent = EXTRAS.beads.wip;
+  document.getElementById('blockedV').textContent = EXTRAS.beads.blocked;
+  document.getElementById('readyV').textContent = EXTRAS.beads.ready;
+  document.getElementById('mqV').textContent = S.mergeQ;
+  document.getElementById('costV').textContent = '$' + S.costRate.toFixed(2);
+  const stale = orbs.filter(o => o.state === 'stale');
+  document.getElementById('stale-count').textContent = SNAP.staleTotal || stale.length;
+  document.getElementById('oldest-stale').textContent = stale.length ? fmtAge(Math.max(...stale.map(o => o.staleMin || 40))) : '—';
+  document.getElementById('active-n').textContent = (SNAP.totals ? SNAP.totals.active : orbs.filter(o => o.state === 'active').length);
+  document.getElementById('total-agents').textContent = '· ' + (SNAP.totals ? SNAP.totals.total : 182) + ' total';
+  drawGauge('gauge-cpu', cpu, '#00d4ff');
+  drawGauge('gauge-mem', mem, '#9d4edd');
+  drawGauge('gauge-swp', swp, '#ff4444');
+  document.getElementById('gcpu-val').innerHTML = Math.round(cpu) + '%<small>CPU</small>';
+  document.getElementById('gmem-val').innerHTML = Math.round(mem) + '%<small>MEM</small>';
+  document.getElementById('gswp-val').innerHTML = Math.round(swp) + '%<small>SWP</small>';
+  document.getElementById('gcpu-sub').textContent = 'load ' + (SNAP.system.loadAvg || '—');
+  document.getElementById('gmem-sub').textContent = (SNAP.system.memUsedGB || '—') + ' / ' + (SNAP.system.memTotalGB || '—') + ' GB';
+  document.getElementById('gswp-sub').textContent = EXTRAS.swap.usedGB + ' / ' + EXTRAS.swap.totalGB + ' GB';
+  ecgBuf.push(evm); ecgBuf.shift(); drawECG();
+  if (railOrb) renderRail(); // keep the open rail live as orbs advance
+}
+
+/* mouse state for hover picking */
+const mouse = { x: 0, y: 0, inside: false };
+function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+function fmtTokens(t) { return t >= 1e6 ? (t / 1e6).toFixed(1) + 'M' : Math.round(t / 1e3) + 'k'; }
+
+/* ═══════════ INTERACTION: tooltips / issue rail / help ═══════════ */
+const tooltipEl = document.getElementById('tooltip');
+const tipEl = document.getElementById('tip');
+const railEl = document.getElementById('rail');
+const helpEl = document.getElementById('help');
+let hoverOrb = null, railOrb = null;
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+function trackerUrl(id) {
+  const m = /^PAN-(\d+)$/.exec(id);
+  return m ? `https://github.com/eltmon/overdeck/issues/${m[1]}` : null;
+}
+function dashboardUrl(id) { return `https://overdeck.localhost/issues/${encodeURIComponent(id)}`; }
+function agentIdFor(o, role) {
+  const r = role || o.role, idl = o.id.toLowerCase();
+  if (r === 'plan') return 'planning-' + idl;
+  if (r === 'review') return 'agent-' + idl + '-review';
+  if (r === 'test') return 'agent-' + idl + '-test';
+  if (r === 'strike') return 'strike-' + idl;
+  return 'agent-' + idl;
+}
+function stateStr(o) {
+  if (o.merging) return 'MERGING — comet away';
+  if (o.state === 'stale') return `FROZEN — stale ${fmtAge(o.staleMin)}`;
+  if (o.state === 'shelf') return 'PAUSED — yielded by scheduler';
+  if (o.state === 'failed') return 'MERGE FAILED — wreck';
+  if (o.broken) return '⚠ STACK BROKEN';
+  if (o.waitUntil > simT) return 'WAITING — permission/question';
+  if (o.thinkUntil > simT) return 'THINKING';
+  if (o.frost > .5) return `FROSTING — idle ${fmtAge(o.idleMin)}`;
+  return 'WORKING';
+}
+
+function pickOrb(mx, my) {
+  for (let i = orbs.length - 1; i >= 0; i--) {
+    const o = orbs[i];
+    const r = Math.max(18, o.radius * 1.9);
+    const dx = mx - o.x, dy = my - o.y;
+    if (dx * dx + dy * dy < r * r) return o;
+  }
+  return null;
+}
+
+function chipRow(o) {
+  const rc = ROLE_COLORS[o.role] || '#7a8aaa', pc = PROJECT_RING[o.project] || '#7a8aaa', sc = STAGE_COLORS[o.stage] || '#7a8aaa';
+  const stateTxt = o.state === 'stale' ? 'stale ❄' : o.state === 'shelf' ? 'yielded ⏸' : o.state === 'failed' ? 'merge failed ✗' : 'active';
+  return `<span class="chip" style="color:${sc};border-color:${sc}66;background:${sc}14">${o.stage}</span>
+    <span class="chip" style="color:${rc};border-color:${rc}66;background:${rc}14">${o.role}</span>
+    <span class="chip" style="color:${pc};border-color:${pc}66;background:${pc}14">${o.project}</span>
+    <span class="chip" style="color:var(--gv-text-secondary);border-color:var(--gv-border)">${stateTxt}</span>`;
+}
+
+function showTooltip(o) {
+  const heatEv = Math.round(o.heat * 34);
+  let rows = `<div class="t-id" style="color:${PROJECT_RING[o.project]}">${esc(o.id)}</div>`;
+  if (o.title) rows += `<div class="t-title">${esc(o.title)}</div>`;
+  rows += `<div class="t-chips">${chipRow(o)}</div>`;
+  if (o.model) rows += `<div class="t-row"><span>model</span><b>${esc(o.model)}${o.glyph ? ' · ' + o.glyph : ''}</b></div>`;
+  if (o.harness) rows += `<div class="t-row"><span>harness</span><b>${esc(o.harness)}</b></div>`;
+  rows += `<div class="t-row"><span>state</span><b>${esc(stateStr(o))}</b></div>`;
+  if (o.state === 'active') rows += `<div class="t-row"><span>hook activity</span><b>~${heatEv} ev/min</b></div>`;
+  rows += `<div class="t-row"><span>events fired</span><b>${o.ev}</b></div>`;
+  if (o.frost > .05 && o.state === 'active') rows += `<div class="t-row"><span>frost</span><b>${Math.round(o.frost*100)}%</b></div>`;
+  if (o.state === 'stale') rows += `<div class="t-row"><span>idle for</span><b>❄ ${fmtAge(o.staleMin)}</b></div>`;
+  if (o.yieldReason) rows += `<div class="t-row"><span>yield</span><b>${esc(o.yieldReason)}</b></div>`;
+  if (o.warn) rows += `<div class="t-row"><span>⚠ warning</span><b>${esc(o.warn)}</b></div>`;
+  if (o.convoy) rows += `<div class="t-row"><span>convoy</span><b>${o.convoy.map(s => esc(s.role)).join(' · ')}</b></div>`;
+  if (o.state === 'failed') rows += `<div class="t-row"><span>merge</span><b>failed — needs operator</b></div>`;
+  rows += `<div class="t-hint">click for issue rail →</div>`;
+  tooltipEl.innerHTML = rows;
+  tooltipEl.style.display = 'block';
+  positionTooltip(o);
+}
+function positionTooltip(o) {
+  const tw = tooltipEl.offsetWidth, th = tooltipEl.offsetHeight;
+  let x = o.x + 20, y = o.y - th / 2;
+  if (x + tw > W - 8) x = o.x - tw - 20;
+  y = Math.max(8, Math.min(H - th - 8, y));
+  tooltipEl.style.left = x + 'px';
+  tooltipEl.style.top = y + 'px';
+}
+function hideTooltip() { tooltipEl.style.display = 'none'; }
+
+/* feed-row tooltip (fixed) */
+function showTip(html, x, y) {
+  tipEl.innerHTML = html; tipEl.style.display = 'block';
+  const r = tipEl.getBoundingClientRect();
+  let tx = x + 16, ty = y + 14;
+  if (tx + r.width > innerWidth - 10) tx = x - r.width - 12;
+  if (ty + r.height > innerHeight - 10) ty = y - r.height - 10;
+  tipEl.style.left = tx + 'px'; tipEl.style.top = ty + 'px';
+}
+function hideTip() { tipEl.style.display = 'none'; }
+
+function openRail(o) {
+  railOrb = o;
+  renderRail();
+  railEl.classList.add('open');
+}
+function openRailById(id) {
+  const o = orbs.find(q => q.id === id);
+  if (o) openRail(o);
+}
+function closeRail() { railOrb = null; railEl.classList.remove('open'); }
+
+function renderRail() {
+  if (!railOrb) return;
+  const o = railOrb;
+  const pc = PROJECT_RING[o.project];
+  const stageI = stageIdx(o.stage);
+  const sc = STAGE_COLORS[o.stage];
+  const tUrl = trackerUrl(o.id);
+
+  const stepper = STAGES.map((s, i) => {
+    const cls = i < stageI ? 'done' : i === stageI ? 'now' : '';
+    return `<div class="step ${cls}"><div class="s-dot"></div><div class="s-name">${s}</div></div>${i < STAGES.length - 1 ? '<div class="s-bar"></div>' : ''}`;
+  }).join('');
+
+  const agentCard = (role, id, model, state, extraRows) => {
+    const rc2 = role.startsWith('review:') ? '#ffb800' : (ROLE_COLORS[role] || '#7a8aaa');
+    return `<div class="r-agent"><div class="ra-top">
+      <span class="ra-role" style="color:${rc2};border:1px solid ${rc2}66;background:${rc2}14">${esc(role)}</span>
+      <span class="ra-id">${esc(id)}</span></div>
+      <div class="ra-rows">
+      ${model ? `<span class="ra-row">model <b>${esc(model)}</b></span>` : ''}
+      <span class="ra-row">state <b>${esc(state)}</b></span>
+      ${extraRows || ''}
+      </div></div>`;
+  };
+
+  let agentsHtml = agentCard(o.role, agentIdFor(o), o.model, stateStr(o),
+    `<span class="ra-row">events <b>${o.ev}</b></span><span class="ra-row">lane <b>${o.stage}</b></span>`);
+  if (o.convoy) for (const s of o.convoy) agentsHtml += agentCard('review:' + s.role, agentIdFor(o, 'review') + '-' + s.role, o.model,
+    s.arriving ? 'arriving — spiraling in' : 'in orbit', '');
+
+  const labels = (o.labels || []).map(l => `<span class="chip" style="color:var(--gv-text-secondary);border-color:var(--gv-border)">${esc(l)}</span>`).join('');
+
+  let banners = '';
+  if (o.yieldReason) banners += `<div class="banner" style="background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.3);color:var(--gv-amber)">⏸ ${esc(o.yieldReason)}</div>`;
+  if (o.warn) banners += `<div class="banner" style="background:rgba(255,184,0,.08);border:1px solid rgba(255,184,0,.3);color:var(--gv-amber)">⚠ ${esc(o.warn)}</div>`;
+  if (o.broken) banners += `<div class="banner" style="background:rgba(255,68,68,.08);border:1px solid rgba(255,68,68,.35);color:var(--gv-red)">⚠ workspace stack broken — server exited underneath the agent</div>`;
+  if (o.state === 'failed') banners += `<div class="banner" style="background:rgba(255,45,124,.08);border:1px solid rgba(255,45,124,.35);color:var(--gv-pink)">✗ merge to main failed — pick up the wreck manually</div>`;
+  if (o.state === 'stale') banners += `<div class="banner" style="background:rgba(159,199,255,.06);border:1px solid rgba(159,199,255,.25);color:#9fc7ff">❄ frozen — no hook activity for ${fmtAge(o.staleMin)}. A thaw re-attaches an agent.</div>`;
+
+  const evs = (issueLog[o.id] || []).slice(0, 8).map(e =>
+    `<div class="r-ev"><span class="src" style="color:${FEED_COLORS[e.kind] || 'var(--gv-text-secondary)'}">${esc(e.kind)}</span>
+     <span class="msg">${esc(e.msg)}</span><span class="age">${Math.max(0, Math.round((Date.now() - e.t)/1000))}s</span></div>`).join('')
+    || `<div class="r-empty">no events logged for this issue yet</div>`;
+
+  railEl.innerHTML = `
+    <div class="r-head"><span class="r-id" style="color:${pc}">${esc(o.id)}</span>
+      <span class="r-stage" style="color:${sc};border:1px solid ${sc}66;background:${sc}14">${o.stage}</span>
+      <button class="r-close" title="Close (Esc)">✕</button></div>
+    ${o.title ? `<div class="r-title">${esc(o.title)}</div>` : ''}
+    <div class="r-chips">${chipRow(o)}</div>
+    ${labels ? `<div class="r-chips">${labels}</div>` : ''}
+    <h4>pipeline</h4>
+    <div class="stepper">${stepper}</div>
+    <h4>agents on this issue</h4>
+    ${agentsHtml}
+    <h4>vitals</h4>
+    <div class="stat-grid">
+      <div class="stat"><div class="sv" style="color:var(--gv-blue)">${o.state === 'active' ? '~' + Math.round(o.heat * 34) + '/min' : '—'}</div><div class="sk">hook events</div></div>
+      <div class="stat"><div class="sv" style="color:${o.state === 'stale' ? '#9fc7ff' : 'var(--gv-green)'}">${o.state === 'stale' ? '❄ ' + fmtAge(o.staleMin) : 'live'}</div><div class="sk">freshness</div></div>
+    </div>
+    ${banners}
+    <h4>recent events</h4>
+    <div class="r-evs">${evs}</div>
+    <div class="r-actions">
+      <a class="r-btn" href="${dashboardUrl(o.id)}" target="_blank" rel="noopener">Open in dashboard →</a>
+      ${tUrl ? `<a class="r-btn ghost" href="${tUrl}" target="_blank" rel="noopener">Tracker ↗</a>` : ''}
+    </div>
+    <div class="r-foot">inspect live: <b>pan show ${esc(o.id.toLowerCase())}</b></div>`;
+  railEl.querySelector('.r-close').addEventListener('click', closeRail);
+}
+
+function buildHelp() {
+  const rc = r => `<span class="legend-dot" style="background:${ROLE_COLORS[r]};box-shadow:0 0 6px ${ROLE_COLORS[r]}"></span><span class="legend-lbl">${r}</span>`;
+  const hk = k => `<span class="legend-dot" style="background:${HOOKS[k].color};box-shadow:0 0 6px ${HOOKS[k].color}"></span><span class="legend-lbl">${HOOKS[k].label}</span>`;
+  document.getElementById('help-panel').innerHTML = `
+    <div class="h-head"><span class="h-title">CONFLUENCE — FIELD GUIDE</span>
+      <span class="h-sub">River × Spectrum Deck · everything on this canvas, decoded</span>
+      <button class="h-close" title="Close (Esc)">✕</button></div>
+    <div class="h-grid">
+      <div class="h-card"><h4 style="color:var(--gv-blue)">The River</h4>
+        <p>The pipeline is a luminous canal flowing <b>left → right</b> through stage columns: PLAN · WORK · REVIEW · TEST · VERIFY · MERGE. Scrolling chevrons show flow direction; the number under each stage is its live orb count (MERGE shows its queue depth). A stage-gradient <b>waveform ribbon</b> rides the river — its amplitude is total system event energy. Stage transitions flash a blue <b>gate ring</b> at the column boundary.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Issue Orbs &amp; Model Glyphs</h4>
+        <p>Every glowing orb is one <b>issue</b>. <b>Core color = role</b>; <b>ring = project</b> (cyan overdeck, magenta Mind Your Now); <b>size + glow = activity heat</b>; the <b>letter in the core is the model</b>: S sonnet · G gpt · O opus · F fable · K kimi-k3. Label below shows the id, and the tag line under it the live hook rate or state.</p>
+        <div class="h-demo">${rc('plan')}${rc('work')}${rc('review')}${rc('test')}${rc('ship')}${rc('strike')}${rc('flywheel')}${rc('sequencer')}</div></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Motion</h4>
+        <p>Calm orbs drift gently around their anchor. <b>Hot orbs orbit in frantic little circles</b>. Fading comet-trails show where an orb has been. When an issue advances stage, its orb swims right through a gate flash, leaving a wake.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Hook Sparks</h4>
+        <p>Each burst of sparks is a <b>harness hook event</b> — one per tool call or lifecycle beat. Color tells you the family:</p>
+        <div class="h-demo">${hk('tool_read')}${hk('tool_write')}${hk('tool_exec')}</div>
+        <div class="h-demo">${hk('tool_web')}${hk('tool_agent')}${hk('lifecycle')}</div></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">Agent Micro-States</h4>
+        <p><b>Amber dashed ring</b> = waiting on a permission or question. <b>White inner arc</b> = thinking. <b>Orb contracts + orange ring</b> = context compaction (PreCompact → PostCompact). <b>Rising $</b> = cost events feeding the $/min meter. <b>Red flickering ring + error sparks</b> = the workspace stack broke underneath the agent.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">Review Convoys</h4>
+        <p>An issue in review is a <b>nucleus with orbiting satellites</b>: <b>S</b>ecurity · <b>C</b>orrectness · <b>P</b>erformance · <b>R</b>equirements · <b>Σ</b>ynthesis. An arc flashes when that reviewer posts a verdict. A satellite <b>spiraling in from far orbit</b> is a convoy forming — it settles into orbit when its reviewer session is live.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">The Shelf &amp; Governor Tides</h4>
+        <p>When the preemptive scheduler or memory governor needs a slot, an <b>amber tide sweeps the river</b> and the yielded orb sinks onto the ⏸ SHELF with its reason attached. A green flash marks an agent resumed into the freed slot.</p></div>
+      <div class="h-card"><h4 style="color:#9fc7ff">Frost &amp; The Doldrums</h4>
+        <p>An orb that stops emitting events <b>frosts over in place</b> — colors desaturate to ice, a frost crown grows, snow falls. Fully frozen orbs <b>sink into the ❄ DOLDRUMS</b> with idle-age labels (10h … 24d). Any activity thaws an orb in a burst of steam and floats it back to WORK.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-text-primary)">Merge Portal &amp; Wrecks</h4>
+        <p>The white slit at the right edge is <b>main</b>. An issue reaching MERGE dwells briefly in the queue, then accelerates through the portal as a comet — the burst is the merge landing. <b>✗ blinking pink hulls are merge-failed wrecks</b> awaiting a human tow.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-purple)">Flywheel Sun &amp; Sequencer</h4>
+        <p>The purple sun top-left is the <b>flywheel orchestrator</b>; a ring pulse means it dispatched new work, and moments later a fresh orb enters PLAN from the sun. The double-ringed metronome beside it is the <b>sequencer</b>, evaluating admission priorities.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Conversation Constellation</h4>
+        <p>One twinkling star per live <b>conv-* conversation</b> session — ambient human-agent work happening outside the pipeline river.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-green)">Hook Bus · Dark Fiber</h4>
+        <p>The left rail lists <b>all 21 harness hook events</b>. Wired hooks flash their LED and count every firing. <b>Dotted names are dark fiber</b> — hooks that exist upstream (SubagentStart/Stop, InstructionsLoaded, SessionEnd …) but are not wired into Overdeck yet. Wire one and its LED lights up.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-green)">Hook Telemetry</h4>
+        <p>The bottom strip is a <b>logic-analyzer for the harness</b>: one labeled channel per wired hook (same order and colors as the hook bus), sharing a <b>60-second time axis</b> — the right edge is now. Every tick is a real event; bursts stack taller and brighter; the number on each channel is its rate over the window, and a dim channel means <b>zero events</b> — quiet failure/permission rows are good news. The cyan band on top is <b>aggregate events/s</b> with its 60 s history and peak. Role counts sit to its right.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Top Bar</h4>
+        <p>Clock · <b>events/s</b> (pulses on change) · an <b>ECG of events/min</b> · CPU/MEM/SWAP meters · load · beads <b>WIP/BLOCKED/READY</b> · merge queue depth · <b>$/min spend</b> · merges today · tokens today · ❄ stale count · oldest-idle · active-agents pill · <b>? HELP</b> · fullscreen <b>⛶</b>.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Sidebar</h4>
+        <p>The activity feed narrates events as they fire (dot color = source kind). <b>Hovering a feed row flashes the matching orb</b> on stage and shows the full message; clicking it opens that issue's rail. The donut is the live role mix; gauges are host CPU/MEM/SWAP.</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-amber)">Data Honesty</h4>
+        <p>The <b>cast is real</b> — every orb, stage, convoy, yield, wreck, and idle age is a genuine snapshot captured ${new Date(SNAP.capturedAt).toLocaleString()}. The <b>motion is simulated</b> at the measured ~${SNAP.eventsPerMinute}/min baseline. The production version swaps the simulator for the real hook-event stream (heartbeat ingestion → domain events → /ws/rpc).</p></div>
+      <div class="h-card"><h4 style="color:var(--gv-blue)">Keys &amp; Mouse</h4>
+        <p><kbd>h</kbd> / <kbd>?</kbd> this guide · <kbd>Esc</kbd> close panels · <kbd>f</kbd> fullscreen · <b>hover</b> an orb or feed row for vitals · <b>click</b> either for the issue rail (with live links into the dashboard and tracker).</p></div>
+    </div>
+    <div class="h-foot"><span><kbd>h</kbd>/<kbd>?</kbd> toggle</span><span><kbd>Esc</kbd> close</span><span><kbd>f</kbd> fullscreen</span><span>snapshot ${new Date(SNAP.capturedAt).toLocaleTimeString()}</span><span>confluence = river (PAN-3441) × spectrum deck (PAN-3443)</span></div>`;
+  document.querySelector('#help .h-close').addEventListener('click', () => helpEl.classList.remove('open'));
+}
+function toggleHelp() { helpEl.classList.toggle('open'); }
+
+/* ════════════════════════ BOOT ════════════════════════ */
+function boot() {
+  resize();
+  expectedStale = Math.max(1, SNAP.issues.filter(i => (i.staleMin || 0) > 30).length);
+  expectedShelf = Math.max(1, (SNAP.paused || []).length);
+  for (const iss of SNAP.issues) spawnOrb(iss);
+  for (const p of (SNAP.paused || [])) {
+    const o = spawnOrb({ id: p.id, project: p.project, role: p.role, stage: 'WORK', heat: .15, title: p.title, yieldReason: p.yieldReason, model: p.model, harness: p.harness }, { state: 'shelf' });
+    o.x = o.tx; o.y = L.shelfY;
+  }
+  for (const f of (SNAP.failed || [])) {
+    const o = spawnOrb({ id: f.id, project: f.project, role: 'ship', stage: 'MERGE', heat: .2 }, { state: 'failed' });
+    o.x = o.tx; o.y = o.ty;
+  }
+  window.__orbs = orbs; // debug/test handle
+  drawDonut();
+  buildRolebox();
+  feed('flywheel', 'god view confluence online — watching ' + SNAP.issues.length + ' issues', null);
+  for (const s of (SNAP.seedFeed || [])) feed(s.kind, s.msg, s.id);
+  feed('memory', 'live snapshot ' + new Date(SNAP.capturedAt).toLocaleTimeString(), null);
+  setInterval(() => {
+    const d = new Date();
+    document.getElementById('clock').textContent =
+      String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0') + ':' + String(d.getSeconds()).padStart(2,'0');
+    ageFeed();
+  }, 1000);
+  document.getElementById('fs-btn').addEventListener('click', () => {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.getElementById('app').requestFullscreen();
+    setTimeout(resize, 350);
+  });
+  document.getElementById('help-btn').addEventListener('click', e => { e.stopPropagation(); toggleHelp(); });
+  document.addEventListener('fullscreenchange', () => setTimeout(resize, 120));
+
+  /* interaction wiring */
+  buildHelp();
+  wrap.addEventListener('mousemove', e => {
+    const r = wrap.getBoundingClientRect();
+    mouse.x = e.clientX - r.left; mouse.y = e.clientY - r.top; mouse.inside = true;
+  });
+  wrap.addEventListener('mouseleave', () => {
+    mouse.inside = false; hoverOrb = null; hideTooltip(); wrap.classList.remove('orb-hover');
+  });
+  wrap.addEventListener('click', e => {
+    if (helpEl.classList.contains('open')) return;
+    if (e.target.closest('#rail')) return;
+    const r = wrap.getBoundingClientRect();
+    const hit = pickOrb(e.clientX - r.left, e.clientY - r.top);
+    if (hit) openRail(hit); else closeRail();
+  });
+  /* feed rows: hover = tooltip + flash the matching orb; click = issue rail */
+  feedEl.addEventListener('mousemove', e => {
+    const row = e.target.closest('.feed-item');
+    if (!row) { hideTip(); return; }
+    const iss = row.dataset.issue, kind = row.dataset.kind;
+    const col = FEED_COLORS[kind] || '#7a8aaa';
+    const time = new Date(+row.dataset.t).toLocaleTimeString('en-GB', { hour12: false });
+    showTip(
+      `<div class="t-head"><span class="t-issue">${esc(iss || 'system')}</span>
+       <span class="t-badge" style="color:${col};border:1px solid ${col}">${esc(kind)}</span></div>
+       <div class="t-msg">${esc(row.dataset.msg)}</div>
+       <div class="t-row"><span>logged</span><b>${time}</b></div>` +
+      (iss ? `<div class="t-cta">CLICK FOR ISSUE RAIL →</div>` : ''), e.clientX, e.clientY);
+    if (iss) for (const o of orbs) if (o.id === iss) o.flashT = simT + .8;
+  });
+  feedEl.addEventListener('mouseleave', hideTip);
+  feedEl.addEventListener('click', e => {
+    const row = e.target.closest('.feed-item');
+    if (row && row.dataset.issue) openRailById(row.dataset.issue);
+  });
+  window.addEventListener('keydown', e => {
+    if (e.key === '?' || e.key === 'h') { toggleHelp(); }
+    else if (e.key === 'Escape') { helpEl.classList.remove('open'); closeRail(); }
+    else if (e.key === 'f') { document.getElementById('fs-btn').click(); }
+  });
+  helpEl.addEventListener('click', e => { if (e.target === helpEl) helpEl.classList.remove('open'); });
+  requestAnimationFrame(frame);
+}
+boot();
+</script>
+</body>
+</html>
