@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T17:24:44.020Z",
+  "updated": "2026-08-02T17:35:49.851Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "routes-project-param": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 2469918,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:16:46.618Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -74,16 +66,31 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T02:56:14.269Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 2469918,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:16:46.618Z",
+        "itemId": "routes-project-param",
+        "outcome": "completed",
+        "reason": "Threaded ?project=<key> through resolveOrdersStateRoot in orders.ts and all 10 routes; added registry-resolution + unknown-key tests; typecheck and vitest green",
+        "releasedAt": "2026-08-02T17:35:49.851Z"
       }
     ],
     "statusReasons": {
       "routes-project-param": {
-        "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T02:56:14.269Z"
+        "reason": "Threaded ?project=<key> through resolveOrdersStateRoot in orders.ts and all 10 routes; added registry-resolution + unknown-key tests; typecheck and vitest green",
+        "updatedAt": "2026-08-02T17:35:49.851Z"
       }
     }
   },
   "statusOverrides": {
-    "routes-project-param": "running"
+    "routes-project-param": "completed",
+    "routes-project-param.routes-project-param.ac1": "completed",
+    "routes-project-param.routes-project-param.ac2": "completed",
+    "routes-project-param.routes-project-param.ac3": "completed",
+    "routes-project-param.routes-project-param.ac4": "completed"
   }
 }
