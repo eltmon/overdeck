@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T03:47:48.587Z",
+  "updated": "2026-08-02T03:47:50.619Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -218,7 +218,15 @@
     "aurora-shader": "running"
   },
   "swarm": {
-    "slotAssignments": [],
+    "slotAssignments": [
+      {
+        "slotIndex": 2,
+        "itemId": "aurora-shader",
+        "agentId": "agent-pan-3447-slot-2",
+        "branch": "feature/pan-3447-slot-2",
+        "assignedAt": "2026-08-02T03:47:50.619Z"
+      }
+    ],
     "slotCompletions": {
       "1": {
         "slotIndex": 1,
