@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T05:47:41.254Z",
+  "updated": "2026-08-02T05:51:10.619Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -134,16 +134,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "confluence-data": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 3815604,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T05:45:48.792Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -263,6 +255,17 @@
         "itemId": "aurora-shader",
         "outcome": "completed",
         "releasedAt": "2026-08-02T04:18:26.035Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 3815604,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T05:45:48.792Z",
+        "itemId": "confluence-data",
+        "outcome": "blocked",
+        "reason": "Blocked by hook-stream-shaping: completed state has no hookName support in events, so the data hook cannot preserve hook identity.",
+        "releasedAt": "2026-08-02T05:51:10.618Z"
       }
     ],
     "statusReasons": {
@@ -281,6 +284,10 @@
       "aurora-shader": {
         "reason": "stale claim released (deacon-swarm dead)",
         "updatedAt": "2026-08-02T04:01:57.934Z"
+      },
+      "confluence-data": {
+        "reason": "Blocked by hook-stream-shaping: completed state has no hookName support in events, so the data hook cannot preserve hook identity.",
+        "updatedAt": "2026-08-02T05:51:10.618Z"
       }
     }
   },
@@ -301,7 +308,7 @@
     "aurora-shader.aurora-shader.ac1": "completed",
     "aurora-shader.aurora-shader.ac2": "completed",
     "aurora-shader.aurora-shader.ac3": "completed",
-    "confluence-data": "running"
+    "confluence-data": "blocked"
   },
   "swarm": {
     "slotAssignments": [],
