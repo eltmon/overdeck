@@ -458,10 +458,10 @@
       "tests/unit/lib/pan-dir/record-close-out.test.ts",
       "tests/unit/lib/pipeline-membership-gather.test.ts"
     ],
-    "recordedAt": "2026-08-02T00:53:02.679Z"
+    "recordedAt": "2026-08-02T01:10:51.778Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T01:10:48.285Z",
+  "updated": "2026-08-02T01:10:51.781Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
