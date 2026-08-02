@@ -147,3 +147,92 @@ describe('recordReviewVerdict', () => {
     });
   });
 });
+
+  describe('test-gate reset', () => {
+    it('Given a row with testStatus "passed" and a fresh evidence head, the update carries testStatus "pending"', async () => {
+      const status = reviewStatus({ lastVerifiedCommit: 'b'.repeat(40), testStatus: 'passed' });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+      mocks.execFileAsync.mockResolvedValue({ status: 1 });
+
+      const eventStore = { append: vi.fn() };
+      mocks.getCloisterEventStore.mockReturnValue(eventStore);
+
+      const input: VerdictInput = {
+        verdict: 'passed',
+        writer: 'unsignaled-recovery',
+        evidenceHead: 'c'.repeat(40),
+      };
+
+      await recordReviewVerdict('PAN-3512', input);
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+        'PAN-3512',
+        expect.objectContaining({
+          testStatus: 'pending',
+          testNotes: expect.stringContaining('Verdict re-gated'),
+        }),
+        status,
+      );
+    });
+
+    it('Given a row whose testStatus is already "pending", the update contains no testStatus key', async () => {
+      const status = reviewStatus({ lastVerifiedCommit: 'b'.repeat(40), testStatus: 'pending' });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+      mocks.execFileAsync.mockResolvedValue({ status: 1 });
+
+      const eventStore = { append: vi.fn() };
+      mocks.getCloisterEventStore.mockReturnValue(eventStore);
+
+      const input: VerdictInput = {
+        verdict: 'passed',
+        writer: 'coordinator',
+        evidenceHead: 'c'.repeat(40),
+      };
+
+      await recordReviewVerdict('PAN-3512', input);
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+        'PAN-3512',
+        expect.not.objectContaining({
+          testStatus: expect.anything(),
+        }),
+        status,
+      );
+    });
+
+    it('Given equal evidence and row anchors, the update contains no testStatus key and event reports testGateReset false', async () => {
+      const rowHead = 'b'.repeat(40);
+      const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'passed' });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+
+      const eventStore = { append: vi.fn() };
+      mocks.getCloisterEventStore.mockReturnValue(eventStore);
+
+      const input: VerdictInput = {
+        verdict: 'passed',
+        writer: 'coordinator',
+        evidenceHead: rowHead,
+      };
+
+      await recordReviewVerdict('PAN-3512', input);
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith(
+        'PAN-3512',
+        expect.not.objectContaining({
+          testStatus: expect.anything(),
+        }),
+        status,
+      );
+      expect(eventStore.append).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payload: expect.objectContaining({
+            testGateReset: false,
+          }),
+        }),
+      );
+    });
+  });
+});
