@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T00:30:33.366Z",
+  "updated": "2026-08-02T01:31:21.857Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -164,13 +164,6 @@
   },
   "swarm": {
     "slotAssignments": [
-      {
-        "slotIndex": 1,
-        "itemId": "hook-inventory-contract",
-        "agentId": "agent-pan-3447-slot-1",
-        "branch": "feature/pan-3447-slot-1",
-        "assignedAt": "2026-08-01T22:26:40.647Z"
-      },
       {
         "slotIndex": 2,
         "itemId": "confluence-model",
