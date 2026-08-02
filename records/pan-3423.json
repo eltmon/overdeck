@@ -210,7 +210,7 @@
     "recordedAt": "2026-08-02T21:19:44.181Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T22:01:59.678Z",
+  "updated": "2026-08-02T22:02:53.559Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
@@ -222,13 +222,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:20:50.385Z",
-    "updatedAt": "2026-08-02T22:00:01.957Z",
+    "updatedAt": "2026-08-02T22:02:53.398Z",
     "reviewNotes": "All four reviewers passed; prior correctness, accessibility, labeling, duplicate-consumer, and documentation gaps are resolved.",
     "testNotes": "Automated gates FAILED: typecheck passed; lint FAILED at lint:file-size on src/dashboard/server/routes/workspaces/merge-ops.ts (1913 vs 1912 lines) -- file untouched by this PR, root-caused to branch staleness vs origin/main (ratchet compares against live origin/main tip; branch is 2 commits behind, including a fix that shrank that file), needs main-sync/rebase which is out of test-role scope. PAN-3423 scoped tests all pass: 3 files/32 tests (system-health-attention, SystemHealthPill, no-loss). Full frontend suite: 306 files/2986 tests passed. Full root npm test: 60 files/83 tests failed, all identical 'Hook timed out in 5000ms' on setupOverdeckTestDb() under host load ~30 from concurrent agents, none in this PR's scope; in-scope agent-health.test.ts verified in isolation: 12/12 passed. See .pan/test/result.json for full evidence.",
     "uatNotes": "UAT required (UI redesign of SystemHealthPill popover with visual acceptance criteria: state badge, meter bars, grouped attention rows, chip row, context-notes disclosure, Open/Kill actions, top-consumers bars) but not executed in this pass -- no criterion was observed or proven in a browser. Automated lint gate already fails and blocks merge regardless.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewedAtCommit": "cf1794e72af5f339bb72bffe3cb26f133887620a",
+    "reviewedAtCommit": "ad47a409726baa3babe2009b29284f68a3c62de7",
     "reviewSpawnedAt": "2026-08-02T21:22:42.953Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -315,10 +315,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 140,
-            "output": 37306,
-            "cacheRead": 13297605,
-            "cacheWrite": 229163
+            "input": 144,
+            "output": 38023,
+            "cacheRead": 13758747,
+            "cacheWrite": 231533
           }
         },
         "work": {
@@ -329,9 +329,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 1136512,
-            "output": 89422,
-            "cacheRead": 64887296,
+            "input": 1143680,
+            "output": 91132,
+            "cacheRead": 65734656,
             "cacheWrite": 0
           }
         }
@@ -344,16 +344,16 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20157701,
-          "output": 513499,
-          "cacheRead": 157841408,
+          "input": 20164869,
+          "output": 515209,
+          "cacheRead": 158688768,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 140,
-          "output": 37306,
-          "cacheRead": 13297605,
-          "cacheWrite": 229163
+          "input": 144,
+          "output": 38023,
+          "cacheRead": 13758747,
+          "cacheWrite": 231533
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1118,
@@ -363,8 +363,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 202.6719103,
-        "pricingAsOf": "2026-08-02T22:00:01.982Z"
+        "usd": 203.2880613,
+        "pricingAsOf": "2026-08-02T22:02:53.414Z"
       }
     },
     "merges": [
