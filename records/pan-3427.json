@@ -36,7 +36,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:16:12.152Z",
+  "updated": "2026-08-02T18:22:28.980Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -95,16 +95,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "resolver-first-ready": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 1065080,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:16:12.152Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -182,6 +174,17 @@
         "outcome": "completed",
         "reason": "defaultStartOrderBook now takes the resolved ProjectConfig and calls startFlywheelRun with cwd=resolveProjectPath(project); resolveOrdersStateRoot extended to return projectConfig; 2 new tests cover cross-project start cwd and unchanged default-project behavior",
         "releasedAt": "2026-08-02T18:15:55.270Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 1065080,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:16:12.152Z",
+        "itemId": "resolver-first-ready",
+        "outcome": "completed",
+        "reason": "Added firstReadyBookInQueue(stateRoot) to resolver.ts; advanceQueue now calls it instead of duplicating the index-scan loop; 2 new resolver tests cover queue-order + skip-non-ready and empty/no-ready cases",
+        "releasedAt": "2026-08-02T18:22:28.980Z"
       }
     ],
     "statusReasons": {
@@ -200,6 +203,10 @@
       "routes-start-project-cwd": {
         "reason": "defaultStartOrderBook now takes the resolved ProjectConfig and calls startFlywheelRun with cwd=resolveProjectPath(project); resolveOrdersStateRoot extended to return projectConfig; 2 new tests cover cross-project start cwd and unchanged default-project behavior",
         "updatedAt": "2026-08-02T18:15:55.270Z"
+      },
+      "resolver-first-ready": {
+        "reason": "Added firstReadyBookInQueue(stateRoot) to resolver.ts; advanceQueue now calls it instead of duplicating the index-scan loop; 2 new resolver tests cover queue-order + skip-non-ready and empty/no-ready cases",
+        "updatedAt": "2026-08-02T18:22:28.980Z"
       }
     }
   },
@@ -222,6 +229,8 @@
     "routes-start-project-cwd.routes-start-project-cwd.ac1": "completed",
     "routes-start-project-cwd.routes-start-project-cwd.ac2": "completed",
     "routes-start-project-cwd.routes-start-project-cwd.ac3": "completed",
-    "resolver-first-ready": "running"
+    "resolver-first-ready": "completed",
+    "resolver-first-ready.resolver-first-ready.ac1": "completed",
+    "resolver-first-ready.resolver-first-ready.ac2": "completed"
   }
 }
