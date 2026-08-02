@@ -57,6 +57,7 @@ import {
 import {
   getEnrichedConversationList,
   invalidateConversationFavoritesCache,
+  invalidateConversationListEnrichmentCache,
 } from '../../../lib/overdeck/conversation-list.js';
 import {
   clearPendingConversationControlAcksForTests,
@@ -725,7 +726,9 @@ const patchConversationMoveRoute = HttpRouter.add(
     const body = yield* readJsonBody;
     return yield* Effect.promise(async () => {
       try {
-        const result = await handleConversationMove(name, body);
+        const result = await handleConversationMove(name, body, {
+          invalidateListEnrichmentCache: invalidateConversationListEnrichmentCache,
+        });
         return jsonResponse(result.body, { status: result.status });
       } catch (error: unknown) {
         const msg = error instanceof Error ? error.message : String(error);

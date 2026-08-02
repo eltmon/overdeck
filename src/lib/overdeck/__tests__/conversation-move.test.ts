@@ -22,6 +22,7 @@ vi.mock('../../../dashboard/server/event-store.js', () => ({
 const { handleConversationMove } = await import('../conversation-reads.js');
 const { createConversation, getConversationByName, setConversationClaudeSessionId } = await import('../conversations.js');
 const { sessionFilePath } = await import('../../paths.js');
+const { getEnrichedConversationList, invalidateConversationListEnrichmentCache } = await import('../conversation-list.js');
 
 async function resetDb() {
   const { closeOverdeckDatabaseSync } = await import('../infra.js');
@@ -221,5 +222,33 @@ describe('handleConversationMove', () => {
     expect(after?.claudeSessionId).toBe(before?.claudeSessionId);
     expect(resolvedAfter).toBe(resolvedBefore);
     expect(resolvedAfter).toBe(transcriptPath);
+  });
+
+  it('does not let GET /api/conversations serve a pre-move enrichment settled before the write (AC 19)', async () => {
+    createConversation({
+      name: 'conv-move-cache-ac19',
+      tmuxSession: 'conv-move-cache-ac19',
+      cwd: KRUX_PATH,
+      claudeSessionId: 'sess-move-cache-ac19',
+      title: 'New conversation',
+      harness: 'pi',
+      model: 'glm-5.2',
+    });
+
+    // Warm the 2s enrichment cache with the pre-move row, exactly like a
+    // concurrent poller would moments before the move commits.
+    const before = (await getEnrichedConversationList(500, 0)) as Array<{ name: string; projectKey: string | null }>;
+    expect(before.find((c) => c.name === 'conv-move-cache-ac19')?.projectKey ?? null).toBeNull();
+
+    await handleConversationMove(
+      'conv-move-cache-ac19',
+      { projectKey: 'myn' },
+      { invalidateListEnrichmentCache: invalidateConversationListEnrichmentCache },
+    );
+
+    // Same limit/offset key as above — without the invalidation call this
+    // would still return the settled pre-move promise for up to 2s.
+    const after = (await getEnrichedConversationList(500, 0)) as Array<{ name: string; projectKey: string | null }>;
+    expect(after.find((c) => c.name === 'conv-move-cache-ac19')?.projectKey).toBe('myn');
   });
 });

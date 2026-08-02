@@ -64,6 +64,12 @@ interface ListEnrichmentEntry {
 
 const listEnrichmentInFlight = new Map<string, ListEnrichmentEntry>();
 
+// PAN-1577 — a move writes project_key and must not let the next
+// GET /api/conversations serve an enrichment settled before the write.
+export function invalidateConversationListEnrichmentCache(): void {
+  listEnrichmentInFlight.clear();
+}
+
 export function getEnrichedConversationList(limit: number, offset: number): Promise<readonly unknown[]> {
   const key = `${limit}:${offset}`;
   const now = Date.now();

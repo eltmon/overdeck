@@ -838,6 +838,7 @@ function resolveEffectiveProjectKey(
 export async function handleConversationMove(
   name: string,
   body: Record<string, unknown>,
+  deps: { invalidateListEnrichmentCache?: () => void } = {},
 ): Promise<{ status: number; body: Conversation | { error: string } }> {
   const conv = getConversationByName(name);
   if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
@@ -855,6 +856,7 @@ export async function handleConversationMove(
   }
 
   setConversationProjectKey(name, projectKey);
+  deps.invalidateListEnrichmentCache?.();
   getEventStore().emitOnly({
     type: 'conversation.moved',
     timestamp: new Date().toISOString(),
