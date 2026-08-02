@@ -332,17 +332,17 @@
     "recordedAt": "2026-08-02T17:48:20.362Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T17:48:21.377Z",
+  "updated": "2026-08-02T17:48:24.415Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T17:48:21.375Z",
+    "updatedAt": "2026-08-02T17:48:23.384Z",
     "reviewNotes": "Review role spawn failed: Role run agent-pan-3419-review already running. Use 'pan tell' to message it.",
     "conflictsSince": {
       "sha": "4a88ab9d7d5e70a03f36dbf590055082c5c27f13",
@@ -352,8 +352,8 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewSpawnedAt": "2026-08-02T16:49:51.244Z",
     "reviewRequestedAt": "2026-08-02T17:48:21.375Z",
+    "reviewSpawnedAt": "2026-08-02T16:49:51.244Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/overdeck-remodel/overdeck-schema.ts",
@@ -507,9 +507,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 5540265,
-            "output": 267433,
-            "cacheRead": 158464000,
+            "input": 6248646,
+            "output": 274885,
+            "cacheRead": 164208128,
             "cacheWrite": 0
           }
         }
@@ -522,9 +522,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 31916522,
-          "output": 496609,
-          "cacheRead": 209436672,
+          "input": 32624903,
+          "output": 504061,
+          "cacheRead": 215180800,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -535,8 +535,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 286.3286543,
-        "pricingAsOf": "2026-08-02T16:50:26.324Z"
+        "usd": 292.9661833,
+        "pricingAsOf": "2026-08-02T17:48:23.402Z"
       }
     },
     "merges": [
