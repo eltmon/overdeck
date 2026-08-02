@@ -56,7 +56,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:04:26.676Z",
+  "updated": "2026-08-02T19:04:40.414Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -115,7 +115,7 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 26,
+    "sequence": 27,
     "claims": {},
     "claimHistory": [
       {
@@ -294,8 +294,9 @@
         "updatedAt": "2026-08-02T18:48:06.534Z"
       },
       "frontend-project-picker": {
-        "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T19:04:26.566Z"
+        "reason": "Picker landed in 0d7088a208e (committed from the shared worktree by the now-stopped agent-pan-3427) plus manifest regen in f72cee00220; typecheck green, 49 orders frontend tests pass, all four ACs covered. Prior claim owner agent-pan-3427 is stopped with no tmux session.",
+        "updatedAt": "2026-08-02T19:04:40.414Z",
+        "forced": true
       }
     }
   },
@@ -331,6 +332,10 @@
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac2": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac3": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac4": "completed",
-    "frontend-project-picker": "pending"
+    "frontend-project-picker": "completed",
+    "frontend-project-picker.frontend-project-picker.ac1": "completed",
+    "frontend-project-picker.frontend-project-picker.ac2": "completed",
+    "frontend-project-picker.frontend-project-picker.ac3": "completed",
+    "frontend-project-picker.frontend-project-picker.ac4": "completed"
   }
 }
