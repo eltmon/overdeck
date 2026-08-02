@@ -444,7 +444,7 @@
     "recordedAt": "2026-08-02T01:10:51.778Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T02:45:37.599Z",
+  "updated": "2026-08-02T02:45:40.133Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "passed",
@@ -455,7 +455,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:31:12.761Z",
-    "updatedAt": "2026-08-02T02:24:43.293Z",
+    "updatedAt": "2026-08-02T02:45:40.111Z",
     "reviewNotes": "Role run agent-pan-3396-review already running. Use 'pan tell' to message it.",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD 48b5fba3656807360826f012d5f95ff9d190b8f6 (matches reviewedAtCommit, tree clean). `npm run typecheck` PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). `npm run lint` PASSED clean, exit 0 (all 18+ lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands, lint:ratchet-audit). The prior blocking failure (residue.test.ts: 3 assertion failures in 'returns stepSkipped when no open PRs/MRs found', 'fails on any repository operation errors while preserving partial progress', 'fails when coordinate extraction fails for required repositories') is RESOLVED by the latest commit 48b5fba365 'fix(tests): align residue test assertions with implementation contract'. Re-ran all 7 PAN-3396-scoped test files fresh: `npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts` -> 7 files passed, 152 passed / 1 skipped, 0 failed. Full `npm test` run: 72 files / 122 tests failed, but every failure is a `setupOverdeckTestDb()` beforeEach hook timeout (5000ms) or an unrelated schema-audit.test.ts test timeout, spread across SQLite/workspace/conversations/memory/costs test infrastructure -- none touch this issue's declared files_scope (pipeline-membership.ts, pipeline-membership-gather.ts, dod.ts, types.ts, close.ts, residue.ts, workflows.ts, record.ts, or their test files, all of which passed above). Re-ran 3 of the failing files in isolation (workspace-tables.test.ts, overdeck-test-db.test.ts, schema-audit.test.ts) and they still timed out identically. `uptime` showed load average 24.69/31.03/31.68 on a 24-core box with swap 8.0Gi/8.0Gi (100%) full, confirming severe resource contention from concurrently running agents (32 running per the workspace briefing) rather than a code defect -- this matches the identical failure signature (same hook, same timeout, same unrelated file set) the prior test-agent cycle already attributed to resource contention on this branch. This backend/CLI-only change (membership resolver lens + `pan close --residue`) has no dashboard/frontend surface: PRD NonGoals explicitly state 'Any frontend/dashboard change: bucket vocabulary is unchanged and the DTO already carries bucket/reasons-adjacent state' (drafts/pan-3396.md:247), and all acceptance criteria in the PRD and xBRIEF are vitest/lint commands with no UI wording -- browser UAT is not required and was not attempted.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
@@ -518,7 +518,9 @@
         "blockingCount": 4,
         "recordedAt": "2026-08-01T21:38:03.739Z"
       }
-    ]
+    ],
+    "closedOut": true,
+    "closedOutAt": "2026-08-02T02:45:40.111Z"
   },
   "closeOut": {
     "usage": {
@@ -622,7 +624,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3442"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-02T02:45:40.131Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 293311b07f52f089eed4654a84bd76599720c25a",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3442 MERGED at 2026-08-02T02:23:47Z",
+          "status": "pass",
+          "mergedAt": "2026-08-02T02:23:47Z",
+          "mergeCommit": "02447e81a829f3684af82bdb105799c7b4f6d442"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 02447e81a829f3684af82bdb105799c7b4f6d442",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit ded7b18b contains merge 02447e81",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No .venv found; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Cleaned 8 agent state directories (9 transcript files preserved); No strike branch strike/pan-3396 found; Pruned 250 checkpoint ref(s) for agent-pan-3396, planning-pan-3396, strike-pan-3396; No specialist registry entries for PAN-3396"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "claude-haiku-4-5",
