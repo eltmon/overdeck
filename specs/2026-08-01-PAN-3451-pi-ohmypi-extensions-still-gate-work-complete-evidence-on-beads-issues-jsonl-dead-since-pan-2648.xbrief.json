@@ -4,17 +4,17 @@
     "created": "2026-08-01T22:09:05.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3451: pi/ohmypi extensions still gate work-complete evidence on .beads/issues.jsonl (dead since PAN-2648)",
-    "updated": "2026-08-01T22:15:50.784Z"
+    "updated": "2026-08-02T02:45:46.523Z"
   },
   "plan": {
     "id": "pan-3451",
     "title": "pi/ohmypi extensions still gate work-complete evidence on .beads/issues.jsonl (dead since PAN-2648)",
-    "status": "running",
+    "status": "completed",
     "uid": "90ad9bdb-901a-4e83-9f3e-f611b818934c",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T22:09:05.000Z",
-    "updated": "2026-08-01T22:15:50.784Z",
+    "updated": "2026-08-02T02:45:46.523Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3451",
@@ -333,5 +333,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
