@@ -717,9 +717,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T23:33:17.948Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T23:38Z] test-agent → FAILED — seq 1",
+      "timestamp": "2026-08-02T23:38:27.261Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "test-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-02T23:38:27Z",
+      "markdownBody": "# Test failure\n\ntypecheck: PASS (npm run typecheck, incl. dashboard/frontend type ratchets). lint: FAIL at lint:circular — 'new circular dependencies found: src/lib/cloister/deacon.ts > src/lib/cloister/stall-sweeper.ts > src/lib/cloister/service.ts'. Verified this is NOT a PAN-3410 regression: these three files have zero diff between HEAD (27a14570e), the merge-base with origin/main (d28b8893d), and origin/main's tip itself (all identical, confirmed via git diff). scripts/circular-deps-baseline.txt (also unmodified by this branch) does not contain this cycle, so it is a pre-existing, currently-unbaselined red-main defect introduced by unrelated PAN-3487 stall-sweeper work already on main, inherited via this branch's merge of origin/main. Confirmed main's own CI (run 30763459403 on d28b8893d) is independently red (lint + test jobs failing) for a different reason (lint:slash-commands drift, which this branch already fixed in commit 2d21006b1). Cannot fix per boundaries (no code/config edits permitted). test: full `npm test` reported 70 failed / 13088 passed / 50 skipped, ALL 70 failures are 'Hook timed out in 5000ms' inside setupOverdeckTestDb() beforeEach hooks, in files entirely outside PAN-3410's scope (conversations/embeddings, costs, memory search-scopes, cli conversations commands). Reproduced the same timeouts re-running 3 of those files in isolation; machine was at load average 42 on 24 cores with swap 100% full (uptime/free confirmed) from ~30 concurrently running agents on this host — matches the documented resource-contention flake pattern, not a code regression. All PAN-3410-scoped test files pass cleanly in isolation: tests/unit/dashboard/fonts-local.test.ts, src/lib/__tests__/config-yaml-ui-theme.test.ts, src/lib/__tests__/settings-api.test.ts, tests/lib/settings-api.test.ts (4 files, root vitest, all pass) plus src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts, src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx, src/dashboard/frontend/src/recovery.test.ts (frontend vitest, 24/24 pass), and tests/e2e/styleguide-conformance.spec.ts (6/6 pass). Top-level status is 'failed' per the configured lint gate's literal result, though the failure is demonstrably pre-existing and outside this diff's scope — flagging for operator/pipeline judgment on whether to treat as a red-main blocker rather than a PAN-3410 defect.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3410`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -820,25 +833,25 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T23:33:17.949Z",
+  "updated": "2026-08-02T23:38:27.262Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "skipped",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T23:28:47.858Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed cycle-9 review finding: PUT /api/settings now rejects (400) an explicit ui.theme value that differs from the current on-disk theme, instead of validating it, silently discarding it via honorThemeFromSettings, and reporting misleading success. Echoing back the unchanged theme (the ordinary whole-document round trip) still works; only a genuine attempted change through the wrong endpoint is rejected, pointing the caller at PUT /api/settings/design-language. The dedicated design-language route is untouched.",
+    "updatedAt": "2026-08-02T23:38:26.852Z",
+    "reviewNotes": "All four reviewers passed; the general Settings PUT now rejects theme changes clearly while the dedicated serialized endpoint remains the sole theme writer",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
-    "verificationNotes": "Verification FAILED at test (628162ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n\n ❯ src/components/system-health-ui-no-loss.test.tsx (6 tests | 3 failed) 293ms\n     × keeps every header metric and diagnostic visible by name in redesigned layout 66ms\n     × groups top consumers by kind badge and displays proportional memory bars 15ms\n     × displays attention section with severity dots and grouped agent rows when critical 11ms\n\n Test Files  1 failed | 113 passed (114)\n      Tests  3 failed | 1398 passed (1401)\n   Start at  19:10:53\n   Duration  37.23s (transform 6.18s, setup 16.68s, import 48.63s, tests 35.65s, environment 28.80s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-JLSioo/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Wor\n…(1453 chars elided)…\nanning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n ❯ |root| src/lib/overdec\n...(truncated)",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewedAtCommit": "e5d79827b02c7b7acbde1dc2e197873964317b66",
+    "reviewedAtCommit": "adcbe598d4644f40e394f1907fc36628b9095c87",
     "reviewSpawnedAt": "2026-08-02T23:27:54.581Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -938,6 +951,24 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T18:36:54.913Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "adcbe598d4644f40e394f1907fc36628b9095c87"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "adcbe598d4644f40e394f1907fc36628b9095c87"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "adcbe598d4644f40e394f1907fc36628b9095c87"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "adcbe598d4644f40e394f1907fc36628b9095c87"
+      }
     }
   },
   "closeOut": {
@@ -953,9 +984,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 40612977,
-            "output": 816429,
-            "cacheRead": 181380096,
+            "input": 45898126,
+            "output": 870817,
+            "cacheRead": 191004672,
             "cacheWrite": 0
           }
         },
@@ -984,9 +1015,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 40612977,
-          "output": 816429,
-          "cacheRead": 181380096,
+          "input": 45898126,
+          "output": 870817,
+          "cacheRead": 191004672,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -997,8 +1028,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 523.5934003,
-        "pricingAsOf": "2026-08-02T23:28:47.902Z"
+        "usd": 556.4630733,
+        "pricingAsOf": "2026-08-02T23:38:26.968Z"
       }
     },
     "merges": [
@@ -1007,7 +1038,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
