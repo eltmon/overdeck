@@ -87,9 +87,22 @@
       "timestamp": "2026-08-02T19:40:55.646Z",
       "reason": "end",
       "note": "Fixed the verification-blocking typecheck error: src/cli/commands/parked.ts used a nonexistent ProjectConfig.projectPath field (should be .path). This bug landed directly on main in an unrelated commit and was inherited when this branch rebased onto origin/main; filed as https://github.com/eltmon/overdeck/issues/3504 and fixed the reference here since it was blocking this issue's own verification gate. Full npm run typecheck (root, hooks, evals, dashboard, frontend) now passes clean."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-02T19:50Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-02T19:50:56.596Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-02T19:50:56Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3427\n\n# Review Synthesis — PAN-3427 — 2026-08-02T19:50:05Z\n\n## Verdict: CHANGES REQUESTED — `pan orders start --project` drops the selected project before launch\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/context.json\n- Branch: feature/pan-3427\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427\n- HEAD reviewed: a340937d0157b5084e2bbfa47f670f119adb427e\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/requirements.md | 1 |\n\n## Blocking Findings\n\n### [correctness, requirements] `pan orders start --project` starts from the caller's project — `src/cli/commands/orders.ts:113`\nThe new `--project` option is used only by `stateRootFor()` during the preliminary `requireBook` check. `runOrdersStart()` then calls `defaultStartOrderBook(bookId)`, which invokes `startFlywheelRun({ orders: bookId })` without the selected project's cwd. From another project, the command can validate project B's book and then fail against project A's state root, or start a same-ID book in project A. This is inside the PR diff and directly violates FR-5/NFR-1. Retain the resolved project through launch, pass its primary path as `cwd`, and cover the real cross-project start wiring with a regression test.\n\n### [correctness] Project switching can pair stale books with the new mutation scope — `src/dashboard/frontend/src/pages/OrderBookPage.tsx:62`\n`loadBooks()` applies every response without cancellation or a captured-scope generation check, while `selectProject()` leaves the previous `books` array visible. Overlapping project A and B requests can resolve out of order, leaving A's books rendered while `projectKey` is B; subsequent detail reads and mutations then target B using A's displayed book ID. The affected loading and selection code is inside the PR diff. Clear or hide prior books when switching, ignore or abort superseded list/detail requests, and add a deferred-response regression test that resolves the old project last.\n\n### [performance] Cross-project detail lookup performs an unbounded synchronous filesystem scan in the dashboard request path — `src/dashboard/server/routes/orders.ts:340`\nOn an unscoped `GET /api/orders/:id` miss, the changed route loops over every registered project and synchronously resolves migration state and reads each candidate book. Because the Node dashboard shares one event loop for HTTP and WebSocket work, slow or numerous state roots can stall the whole dashboard. The loop is inside the PR diff. Move the fallback behind an asynchronous orders read-door helper using async state-home/book reads, while scanning sequentially to preserve registry-order first-match behavior.\n\n## Non-blocking Findings\n\n### [security] Cross-project order-book metadata remains unauthenticated — `src/dashboard/server/routes/orders.ts:558`\nThe new selector expands existing unauthenticated order-book GET access from the cwd project to every registered project. A reachable network caller can enumerate campaign names, issue IDs, prerequisites, run IDs, posture attribution, validation state, and brief-overlay paths. The reviewer classified this as advisory because it exposes operational metadata rather than credentials. Authenticate the project-scoped GET routes or explicitly define and test a redacted public projection.\n\n### [performance] Ready-queue scanning reads every historical book file — `src/lib/orders/resolver.ts:103`\n`firstReadyBookInQueue()` reads `index.json` and then opens each book until it finds a ready status, even though the index already contains status. Cross-project completion multiplies that work across all projects. Select the first ready index entry and read only its book, while preserving explicit behavior for an index that references a missing file.\n\n### [requirements] Untraced `pan parked` companion fix — `src/cli/commands/parked.ts:97`\nThe branch changes recovery-trip acknowledgement from the nonexistent `project.projectPath` field to `project.path`. The correction is small and valid, but it is outside PAN-3427's traced requirements; document it as an intentional companion fix or move it to its own change.\n\n## Clean Sub-roles\nNone; security reported one advisory, correctness reported two blockers, performance reported one blocker and one advisory, and requirements reported one blocker plus one advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3427/.pan/review/agent-pan-3427-review-a340937d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3427 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/composer-commands.generated.ts",
@@ -148,21 +161,20 @@
     "recordedAt": "2026-08-02T19:40:48.844Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:44:18.595Z",
+  "updated": "2026-08-02T19:50:56.597Z",
   "pipeline": {
     "issueId": "PAN-3427",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:43:14.270Z",
-    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "updatedAt": "2026-08-02T19:50:55.758Z",
+    "reviewNotes": "pan orders start --project drops the selected project before launch",
     "inspectNotes": "All 4 ACs met. All 10 /api/orders* routes thread projectParam(request); explicit key -> getProjectSync + resolveStateReadHomeSync(project, key).root (FR-1), unknown key throws 'Unknown project: <key>' and errorResult's 400 regex now matches /unknown project/i (FR-2), verified on GET and POST. Absent-param path keeps findProjectByPathSync(cwd) resolution unchanged and only adds the envelope 'project' field (NFR-1); all 4 pre-existing tests inject deps.stateRoot, which returns no project, so they pass unmodified. Production layer is makeOrdersRouteLayer() with no deps, so the deps.stateRoot early return is a test-only seam and cannot suppress the 400 in prod. Reads still via orders/resolver.ts, writes via orders/writer.ts (NFR-2); no execSync in projects.ts/state-read-home.ts/project-key.ts/orders.ts (NFR-3). Non-blocking nit: '?project=' with an empty value 400s as 'Unknown project: ' rather than falling back to cwd - still a 400, no silent misresolution. Flywheel-launches-in-server-cwd on ?project=<other> is out of scope here; owned by bead routes-start-project-cwd.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
-    "reviewRequestedAt": "2026-08-02T19:40:49.916Z",
     "reviewSpawnedAt": "2026-08-02T19:43:14.268Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -220,6 +232,24 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T19:40:48.844Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "a340937d0157b5084e2bbfa47f670f119adb427e"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "a340937d0157b5084e2bbfa47f670f119adb427e"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "a340937d0157b5084e2bbfa47f670f119adb427e"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "a340937d0157b5084e2bbfa47f670f119adb427e"
+      }
     }
   },
   "closeOut": {
@@ -227,9 +257,49 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 16839,
-            "output": 7998,
-            "cacheRead": 131,
+            "input": 30803,
+            "output": 19567,
+            "cacheRead": 3337,
+            "cacheWrite": 0
+          }
+        },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 589708,
+            "output": 14964,
+            "cacheRead": 6453760,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1331612,
+            "output": 19371,
+            "cacheRead": 5253632,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 1805153,
+            "output": 23674,
+            "cacheRead": 3525120,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1109549,
+            "output": 24309,
+            "cacheRead": 5265920,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 1128608,
+            "output": 22852,
+            "cacheRead": 4655104,
             "cacheWrite": 0
           }
         },
@@ -244,9 +314,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 16839,
-          "output": 7998,
-          "cacheRead": 131,
+          "input": 30803,
+          "output": 19567,
+          "cacheRead": 3337,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 5964630,
+          "output": 105170,
+          "cacheRead": 25153536,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -257,8 +333,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 29.6127611,
-        "pricingAsOf": "2026-08-02T19:43:14.282Z"
+        "usd": 75.2399087,
+        "pricingAsOf": "2026-08-02T19:50:55.791Z"
       }
     },
     "merges": [
@@ -267,7 +343,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
