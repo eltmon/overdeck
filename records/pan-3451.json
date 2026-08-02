@@ -88,7 +88,7 @@
     "recordedAt": "2026-08-01T23:25:56.881Z"
   },
   "created": "2026-08-01T21:57:22.641Z",
-  "updated": "2026-08-02T02:45:59.474Z",
+  "updated": "2026-08-02T02:46:01.757Z",
   "pipeline": {
     "issueId": "PAN-3451",
     "reviewStatus": "passed",
@@ -99,7 +99,7 @@
     "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:27:28.497Z",
-    "updatedAt": "2026-08-02T02:24:20.926Z",
+    "updatedAt": "2026-08-02T02:46:01.710Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3451-review",
     "testNotes": "Backend-only change (dashboard route + pi/ohmypi extension internals + docs.HOOKS.md); no UI-facing acceptance criteria. Root: npm run typecheck clean (tsc + hooks + evals + dashboard shrink-only ratchet 57 known/0 new + frontend 0 known/0 new). npm run lint exit 0, all guard sub-checks passed (circular 77 baselined/0 new, ratchet-audit, quarantine-audit 12 entries, file-size, skills, slash-commands, prompts, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, agent-dir-removal, no-coderabbit-merge-gate); only pre-existing unrelated warnings (effect-acp .d.ts import warnings). packages/pi-extension: typecheck clean, vitest 38/38 passed. packages/ohmypi-extension: typecheck clean, vitest 39/39 passed. Targeted new/touched tests all green: tests/unit/dashboard/server/routes/plan-checklist.test.ts, src/lib/work/__tests__/done-preflight-checklist.test.ts, tests/unit/dashboard/routes/agents-no-loss.test.ts (10/10). Acceptance-criteria greps confirmed: no 'issues.jsonl|allIssueBeadsClosed|beadMatchesIssue|isClosedBead|xbriefSatisfied|all beads closed' hits in either extension package; docs/HOOKS.md names the plan-checklist endpoint and checkIncompletePlanItemsPromise gate with no 'beads' residue. git diff of packages/pi-extension/src/index.ts and packages/ohmypi-extension/src/index.ts vs main are hunk-for-hunk identical modulo naming, confirming AC4 (fork parity). Full `npm test` run twice (exit 1 both times): run1 77/13100 tests failed across 70 files, run2 70/13100 across 67 files, 62 files common to both, 8 fixed on rerun, 5 different new ones appeared. Every failure shares one signature -- 'Hook timed out in 5000ms' inside setupOverdeckTestDb()'s beforeEach -- across files entirely disjoint from this PR's declared and actual changed-file scope (workspaces resolver/writer/rebuild/relocate, conversations CLI commands, memory/cost/overdeck-db tests, none touching agents.ts, runtime-events.ts, done-preflight.ts, or the pi/ohmypi packages). System was under heavy contention throughout both runs: load average 29-33 on a 24-core box, swap 100% full, ~93 node processes (other Overdeck agents on the shared machine). Re-running one sampled failing file alone (tests/unit/lib/workspaces/resolver.test.ts) passed cleanly (13/13). The shifting failure set between runs plus scope-disjointness plus isolated-pass confirms this is pre-existing shared-machine CPU/swap contention, not a regression introduced by this branch.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -138,7 +138,9 @@
         "tests/unit/dashboard/server/routes/plan-checklist.test.ts"
       ],
       "recordedAt": "2026-08-01T23:25:56.881Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-02T02:46:01.710Z"
   },
   "closeOut": {
     "usage": {
@@ -222,7 +224,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3458"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-02T02:46:01.753Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at f0e238ac045590f2454520637aa79daed3d47791",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3458 MERGED at 2026-08-02T02:23:48Z",
+          "status": "pass",
+          "mergedAt": "2026-08-02T02:23:48Z",
+          "mergeCommit": "02447e81a829f3684af82bdb105799c7b4f6d442"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 02447e81a829f3684af82bdb105799c7b4f6d442",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit ded7b18b contains merge 02447e81",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Stopped TLDR daemon; Stopped Docker containers; Killed 2 orphaned process(es); Removed git worktree; Cleaned 8 agent state directories (10 transcript files preserved); No strike branch strike/pan-3451 found; Pruned 102 checkpoint ref(s) for agent-pan-3451, planning-pan-3451, strike-pan-3451; No specialist registry entries for PAN-3451"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol",
