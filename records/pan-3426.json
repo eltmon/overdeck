@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:30:14.680Z",
+  "updated": "2026-08-02T17:30:18.558Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -48,16 +48,8 @@
   "model": "claude-haiku-4-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "store-unavailable-finding": {
-        "writerId": "agent-pan-3426",
-        "agentId": "agent-pan-3426",
-        "pid": 3074979,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T17:30:14.680Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3426",
@@ -91,6 +83,17 @@
         "outcome": "completed",
         "reason": "runOrdersStart now calls ensureOrderIssueStore() before book validation. Import added and async flow implemented.",
         "releasedAt": "2026-08-02T17:30:07.166Z"
+      },
+      {
+        "writerId": "agent-pan-3426",
+        "agentId": "agent-pan-3426",
+        "pid": 3074979,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T17:30:14.680Z",
+        "itemId": "store-unavailable-finding",
+        "outcome": "completed",
+        "reason": "Added store-unavailable finding code to OrderBookFindingCode type. validateBookForStart checks orderIssueStoreStatus and blocks with actionable message when store is unavailable.",
+        "releasedAt": "2026-08-02T17:30:18.558Z"
       }
     ],
     "statusReasons": {
@@ -101,6 +104,10 @@
       "cli-start-primes-issue-store": {
         "reason": "runOrdersStart now calls ensureOrderIssueStore() before book validation. Import added and async flow implemented.",
         "updatedAt": "2026-08-02T17:30:07.166Z"
+      },
+      "store-unavailable-finding": {
+        "reason": "Added store-unavailable finding code to OrderBookFindingCode type. validateBookForStart checks orderIssueStoreStatus and blocks with actionable message when store is unavailable.",
+        "updatedAt": "2026-08-02T17:30:18.558Z"
       }
     }
   },
@@ -113,6 +120,9 @@
     "cli-start-primes-issue-store.cli-start-primes-issue-store.ac1": "completed",
     "cli-start-primes-issue-store.cli-start-primes-issue-store.ac2": "completed",
     "cli-start-primes-issue-store.cli-start-primes-issue-store.ac3": "completed",
-    "store-unavailable-finding": "running"
+    "store-unavailable-finding": "completed",
+    "store-unavailable-finding.store-unavailable-finding.ac1": "completed",
+    "store-unavailable-finding.store-unavailable-finding.ac2": "completed",
+    "store-unavailable-finding.store-unavailable-finding.ac3": "completed"
   }
 }
