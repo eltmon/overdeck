@@ -18,6 +18,7 @@ interface OrdersCommandDeps {
   stateRoot?: string;
   now?: () => Date;
   actor?: string;
+  prepareIssueStore?: () => Promise<void>;
   startOrderBook?: (bookId: string) => Promise<{ runId: string }>;
 }
 
@@ -195,7 +196,7 @@ export async function runOrdersMove(
 }
 
 export async function runOrdersStart(bookId: string, deps: OrdersCommandDeps = {}): Promise<{ runId: string }> {
-  await ensureOrderIssueStore();
+  await (deps.prepareIssueStore ?? ensureOrderIssueStore)();
   requireBook(stateRootFor(deps), bookId);
   return (deps.startOrderBook ?? defaultStartOrderBook)(bookId);
 }

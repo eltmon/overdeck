@@ -64,9 +64,8 @@ export const liveOrderIssueLookup: OrderIssueLookup = (issueIds) => {
 };
 
 export async function ensureOrderIssueStore(): Promise<void> {
-  // Lazy require avoids a static lib → dashboard server dependency.
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { startSharedIssueService } = require('../../dashboard/server/services/issue-service-singleton.js') as typeof import('../../dashboard/server/services/issue-service-singleton.js');
+  // Lazy import avoids a static lib → dashboard server dependency.
+  const { startSharedIssueService } = await import('../../dashboard/server/services/issue-service-singleton.js');
   await startSharedIssueService({ skipPolling: true });
 }
 

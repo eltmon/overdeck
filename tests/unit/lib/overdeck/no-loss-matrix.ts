@@ -752,6 +752,10 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/orders/:id/start',                 kind: 'http', disposition: 'WRITE',      door: 'OrdersWriter.start' },
   { surface: 'GET /api/orders/:id/preview-brief',          kind: 'http', disposition: 'READ',       door: 'OrdersResolver.previewBrief' },
 
+  // PAN-3485/PAN-3491: parked-population and pipeline-velocity reads
+  { surface: 'GET /api/parked',                            kind: 'http', disposition: 'READ',       door: 'ParkedResolver.resolveParkedPopulation' },
+  { surface: 'GET /api/velocity',                          kind: 'http', disposition: 'AGGREGATE',  door: 'EventStoreService stage transitions joined with ParkedResolver.resolveParkedPopulation' },
+
   // Pre-existing routes discovered during PAN-1866 audit (were missing from matrix)
   { surface: 'POST /api/agents/:id/restart-fresh',         kind: 'http', disposition: 'WRITE',      door: 'agents route wipes work-agent state and re-spawns on new harness/model; deliberate operator override for harness switch' },
   { surface: 'POST /api/review/:issueId/purge',            kind: 'http', disposition: 'WRITE',      door: 'workspaces route purges all review agents for an issue and resets review status' },

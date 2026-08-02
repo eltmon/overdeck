@@ -83,9 +83,12 @@ describe('pan orders commands', () => {
     const removed = await runOrdersRemove(created.id, 'PAN-1', deps);
     expect(removed.items.map((item) => item.issue)).toEqual(['PAN-3', 'PAN-2']);
 
+    const prepareIssueStore = vi.fn(async () => {});
     const startOrderBook = vi.fn(async () => ({ runId: 'RUN-99' }));
-    await expect(runOrdersStart(created.id, { ...deps, startOrderBook })).resolves.toEqual({ runId: 'RUN-99' });
+    await expect(runOrdersStart(created.id, { ...deps, prepareIssueStore, startOrderBook })).resolves.toEqual({ runId: 'RUN-99' });
+    expect(prepareIssueStore).toHaveBeenCalledOnce();
     expect(startOrderBook).toHaveBeenCalledWith(created.id);
+    expect(prepareIssueStore.mock.invocationCallOrder[0]).toBeLessThan(startOrderBook.mock.invocationCallOrder[0]!);
   });
 
   it('rejects duplicate membership and names the owning non-complete book', async () => {

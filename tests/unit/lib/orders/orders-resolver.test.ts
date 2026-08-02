@@ -9,6 +9,7 @@ import {
   ensureOrderIssueStore,
   orderIssueStoreStatus,
 } from '../../../../src/lib/orders/resolver.js';
+import { startSharedIssueService } from '../../../../src/dashboard/server/services/issue-service-singleton.js';
 
 vi.mock('../../../../src/dashboard/server/services/issue-service-singleton.js', () => ({
   getSharedIssueService: vi.fn(),
@@ -119,8 +120,10 @@ describe('orders resolver', () => {
   });
 
   describe('ensureOrderIssueStore', () => {
-    it('is defined and callable', () => {
-      expect(typeof ensureOrderIssueStore).toBe('function');
+    it('starts the shared issue service without polling', async () => {
+      await ensureOrderIssueStore();
+
+      expect(startSharedIssueService).toHaveBeenCalledWith({ skipPolling: true });
     });
   });
 
