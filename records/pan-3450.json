@@ -76,22 +76,23 @@
     "recordedAt": "2026-08-02T01:40:06.706Z"
   },
   "created": "2026-08-01T21:57:19.885Z",
-  "updated": "2026-08-02T01:47:50.260Z",
+  "updated": "2026-08-02T01:48:48.932Z",
   "pipeline": {
     "issueId": "PAN-3450",
     "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:40:58.038Z",
-    "updatedAt": "2026-08-02T01:47:50.249Z",
+    "updatedAt": "2026-08-02T01:48:48.887Z",
     "reviewNotes": "Stale manifest path traversal can delete files outside the managed sync target",
     "inspectNotes": "All 5 ACs met: pruneStaleManifestEntriesSync (manifest.ts:118-156) deletes+drops hash-matched stale overdeck entries, keeps file/drops entry on hash mismatch (keptModified), skips non-overdeck source, in-source-set, and prefix-excluded entries before any mutation; empty-ancestor cleanup stops at targetBase and a second call returns empty. pruned/keptModified present in all 5 SyncResult/MergeResult constructors (sync.ts:421, harness-skill-sync.ts:50, skills-merge.ts:74/297, workspace-create.ts:310); costs/sync-wal.ts SyncResult is an unrelated local type. npm run typecheck passes clean. 7 tests in tests/unit/lib/manifest-prune.test.ts cover FR-3/FR-4/NFR-1/NFR-2. Notes (non-blocking): afa4051b only compacts declarations to hold sync.ts at 1148 vs its 1149 allowlist cap — letter-not-spirit of the file-size ratchet, an audited allowlist bump citing PAN-3450 would have been the sanctioned path; ancestor-dir loop terminates on string equality with targetBase, so a caller passing a trailing-slash or non-normalized base could walk past it — worth normalizing when the wiring bead lands.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3461",
     "reviewedAtCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40",
+    "lastVerifiedCommit": "c6cac2bee7916c5815c0ef302a600e1de4cc9d40",
     "reviewSpawnedAt": "2026-08-02T01:43:24.517Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -141,9 +142,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 598895,
-            "output": 10016,
-            "cacheRead": 3555840,
+            "input": 601541,
+            "output": 10306,
+            "cacheRead": 3841536,
             "cacheWrite": 0
           }
         },
@@ -181,24 +182,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2771346,
-            "output": 113598,
-            "cacheRead": 61644800,
+            "input": 2811855,
+            "output": 118113,
+            "cacheRead": 65438208,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 8271423,
-          "output": 169534,
-          "cacheRead": 69508096,
+          "input": 8314578,
+          "output": 174339,
+          "cacheRead": 73587200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 81.197183,
-        "pricingAsOf": "2026-08-02T01:47:50.254Z"
+        "usd": 83.59666,
+        "pricingAsOf": "2026-08-02T01:48:48.918Z"
       }
     },
     "merges": [
