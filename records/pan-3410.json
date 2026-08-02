@@ -597,22 +597,9 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-02T22:18:10.996Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T22:23Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-08-02T22:23:13.459Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-02T22:23:13Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3410\n\n# Review Synthesis — PAN-3410 — 2026-08-02T22:22:22Z\n\n## Verdict: CHANGES REQUESTED — the new design-language mutation bypasses dashboard authentication and CSRF protection\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/context.json\n- Branch: feature/pan-3410\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410\n- HEAD reviewed: 4d4c7813e69ba52becd3136d62962d700c90855d\n- Merge base: 93b88ee71e00252c754df95590b169f36e346b6f\n- Cycle number: 6\n- Prior cycle SHA: 27a14570e72c8d856b0e8307d210572afd0f4a0b\n- PR commits: 17\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] New design-language mutation bypasses dashboard authentication and CSRF protection — `src/dashboard/server/routes/settings.ts:941`\nThe new `PUT /api/settings/design-language` route persists `config.yaml` changes without calling `rejectUnsafeDashboardMutationRequest(request)`, and the frontend request omits the established CSRF-bearing `dashboardMutationJsonHeaders()`. Any client that can reach the dashboard HTTP API can change the instance theme without a trusted session, origin, or CSRF token. The route and client request were added after the prior cycle, so this finding is inside both the PR diff and the cycle diff.\n\n### [correctness] Live terminals keep the old design-language font after a theme switch — `src/dashboard/frontend/src/components/XTerminal.tsx:462`\n`XTerminal` resolves `--font-mono` only when constructing the xterm instance. Existing terminals do not subscribe to Ledger/Broadsheet changes or update `terminal.options.fontFamily`, so switching themes leaves an open terminal on the previous font until it is destroyed and remounted. The concrete-font resolution was added after the prior cycle, so this finding is inside both the PR diff and the cycle diff.\n\n### [requirements] The new theme endpoint still does not make settings updates no-loss — `src/lib/settings-api.ts:1460`\n**Scope: in_pr_scope.** The narrow client request removes the browser-held full-document snapshot, but `saveDesignLanguagePromise()` still performs an unlocked full-document read-modify-write through `loadSettingsApi()` and `saveSettingsApi()`. A top-level settings save can interleave between that read and write, causing either the theme or unrelated edits to be silently overwritten; the added test supplies an already-updated snapshot and does not exercise overlapping writes. This code was added specifically after the prior cycle to address FR-7, so the blocker survives the cycle-6 convergence gate.\n\n## Non-blocking Findings\n\n### [performance] Scalar design-language operations still traverse full settings machinery — `src/lib/settings-api.ts:1460`\nThe startup read fetches the complete settings projection, while the narrow theme write still rebuilds and rewrites the full YAML document and runs unrelated analytics synchronization. This is bounded to startup and explicit theme changes, so it remains advisory.\n\n### [correctness] Unlocked full-document lost-update window\nThe correctness review independently identified the same server-side race as the requirements blocker above. It is deduplicated into the higher-severity FR-7 requirements finding rather than counted twice.\n\n## Convergence and Proportionality\nAll three blockers cite lines changed since the prior reviewed SHA, so none is demoted as previously reviewed. The PR contains 17 commits and three blockers, well below the proportionality threshold of 51 blockers.\n\n## Clean Sub-roles\nNone.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/.pan/review/agent-pan-3410-review-4d4c7813/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3410 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
@@ -713,10 +700,10 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T22:23:13.461Z",
+  "updated": "2026-08-02T22:23:15.343Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "pending",
@@ -725,8 +712,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T22:09:05.371Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed review issues: added a dedicated PUT /api/settings/design-language endpoint for the theme write (removes the GET-then-PUT client round trip that could clobber a concurrent settings save, per FR-7 no-loss guarantee); swept remaining hardcoded font-family declarations (boot shell, XTerminal, BacklogDAG) onto the --font-mono/--font-sans token chain, using a resolved computed-style value where xterm needs a concrete string; added a settings-api regression test overlapping a theme save with a concurrent field change.",
+    "updatedAt": "2026-08-02T22:23:12.756Z",
+    "reviewNotes": "New design-language mutation bypasses dashboard authentication and CSRF protection",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
@@ -830,6 +817,24 @@
         "tests/unit/dashboard/fonts-local.test.ts"
       ],
       "recordedAt": "2026-08-02T18:36:54.913Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "4d4c7813e69ba52becd3136d62962d700c90855d"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "4d4c7813e69ba52becd3136d62962d700c90855d"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "4d4c7813e69ba52becd3136d62962d700c90855d"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "4d4c7813e69ba52becd3136d62962d700c90855d"
+      }
     }
   },
   "closeOut": {
@@ -845,9 +850,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 27066393,
-            "output": 591523,
-            "cacheRead": 122030080,
+            "input": 28682227,
+            "output": 670657,
+            "cacheRead": 138357760,
             "cacheWrite": 0
           }
         },
@@ -876,9 +881,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 27066393,
-          "output": 591523,
-          "cacheRead": 122030080,
+          "input": 28682227,
+          "output": 670657,
+          "cacheRead": 138357760,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -889,8 +894,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 397.1746023,
-        "pricingAsOf": "2026-08-02T22:09:05.499Z"
+        "usd": 415.7916323,
+        "pricingAsOf": "2026-08-02T22:23:12.778Z"
       }
     },
     "merges": [
@@ -899,7 +904,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
