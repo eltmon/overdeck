@@ -61,7 +61,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T19:06:50.809Z",
+  "updated": "2026-08-02T19:09:06.800Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -120,14 +120,14 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 28,
+    "sequence": 29,
     "claims": {
       "docs-order-books": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 226662,
+        "writerId": "agent-pan-3427-review-supervisor",
+        "agentId": "agent-pan-3427-review-supervisor",
+        "pid": 385598,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T19:06:50.809Z"
+        "claimedAt": "2026-08-02T19:09:06.799Z"
       }
     },
     "claimHistory": [
@@ -309,6 +309,11 @@
       "frontend-project-picker": {
         "reason": "Picker landed in 0d7088a208e (committed from the shared worktree by the now-stopped agent-pan-3427) plus manifest regen in f72cee00220; typecheck green, 49 orders frontend tests pass, all four ACs covered. Prior claim owner agent-pan-3427 is stopped with no tmux session.",
         "updatedAt": "2026-08-02T19:04:40.414Z",
+        "forced": true
+      },
+      "docs-order-books": {
+        "reason": "Resumed session authoring the docs item; prior owner agent-pan-3427 is stopped",
+        "updatedAt": "2026-08-02T19:09:06.799Z",
         "forced": true
       }
     }
