@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T08:54:38.409Z",
+  "updated": "2026-08-02T08:55:17.314Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 40,
-    "claims": {
-      "topbar-enrichment": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 3335755,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T08:30:34.805Z"
-      }
-    },
+    "sequence": 41,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -353,6 +345,17 @@
         "reason": "Registered slot agent completed and pushed aae69566529. Typecheck, focused RTL tests, and full npm test pass; full lint is blocked only by the pre-existing unbaselined choreography source-introspection test from 4441767915b.",
         "forced": true,
         "releasedAt": "2026-08-02T08:50:54.536Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 3335755,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T08:30:34.805Z",
+        "itemId": "topbar-enrichment",
+        "outcome": "completed",
+        "reason": "Added the ordered FR-19 stat strip, 130-sample/500 ms ECG, change pulse, unavailable-state dashes, shared page-level Confluence subscription, and third SWAP gauge. Full typecheck, full lint, all 33 Confluence tests, and isolated Playwright rendering/control verification pass; commit a7b74e239a9 is pushed.",
+        "releasedAt": "2026-08-02T08:55:17.314Z"
       }
     ],
     "statusReasons": {
@@ -396,6 +399,10 @@
       "issue-rail-link": {
         "reason": "Canvas hit navigation now uses the canonical /issues/<id> deep link; misses are no-ops, and the preview rail markup/CSS is removed. RTL hit/miss tests, all 29 Confluence tests, focused ESLint, and full typecheck pass; commit 6779e02ed6a is pushed.",
         "updatedAt": "2026-08-02T08:30:21.222Z"
+      },
+      "topbar-enrichment": {
+        "reason": "Added the ordered FR-19 stat strip, 130-sample/500 ms ECG, change pulse, unavailable-state dashes, shared page-level Confluence subscription, and third SWAP gauge. Full typecheck, full lint, all 33 Confluence tests, and isolated Playwright rendering/control verification pass; commit a7b74e239a9 is pushed.",
+        "updatedAt": "2026-08-02T08:55:17.314Z"
       }
     }
   },
@@ -439,10 +446,13 @@
     "issue-rail-link": "completed",
     "issue-rail-link.issue-rail-link.ac1": "completed",
     "issue-rail-link.issue-rail-link.ac2": "completed",
-    "topbar-enrichment": "running",
+    "topbar-enrichment": "completed",
     "help-fullscreen.help-fullscreen.ac1": "completed",
     "help-fullscreen.help-fullscreen.ac2": "completed",
-    "help-fullscreen.help-fullscreen.ac3": "completed"
+    "help-fullscreen.help-fullscreen.ac3": "completed",
+    "topbar-enrichment.topbar-enrichment.ac1": "completed",
+    "topbar-enrichment.topbar-enrichment.ac2": "completed",
+    "topbar-enrichment.topbar-enrichment.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
