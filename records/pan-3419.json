@@ -425,7 +425,7 @@
     "recordedAt": "2026-08-02T20:24:43.474Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-02T20:45:34.685Z",
+  "updated": "2026-08-02T20:49:07.519Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "pending",
@@ -437,27 +437,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T20:25:12.668Z",
-    "updatedAt": "2026-08-02T20:45:34.443Z",
+    "updatedAt": "2026-08-02T20:49:05.175Z",
     "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-02T20:45:34.433Z"
-      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
         "detectedAt": "2026-08-02T20:45:34.433Z"
       }
     ],
-    "conflictsSince": {
-      "sha": "5ac62149c3326712f3d279938881aa8941165992",
-      "detectedAt": "2026-08-02T20:43:16.991Z",
-      "paths": [
-        "src/lib/cloister/event-store-provider.ts",
-        "src/lib/cloister/service.ts"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "reviewedAtCommit": "5c151a89e751d37e91d834f25dc9e9ed9c639b3f",
     "reviewSpawnedAt": "2026-08-02T19:44:31.379Z"
@@ -523,9 +510,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7091078,
-            "output": 312029,
-            "cacheRead": 204709376,
+            "input": 7096709,
+            "output": 313150,
+            "cacheRead": 206300160,
             "cacheWrite": 0
           }
         }
@@ -538,9 +525,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 50690649,
-          "output": 767466,
-          "cacheRead": 303405056,
+          "input": 50696280,
+          "output": 768587,
+          "cacheRead": 304995840,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -551,8 +538,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 453.0440523,
-        "pricingAsOf": "2026-08-02T20:45:34.532Z"
+        "usd": 453.9012293,
+        "pricingAsOf": "2026-08-02T20:49:05.196Z"
       }
     },
     "merges": [
