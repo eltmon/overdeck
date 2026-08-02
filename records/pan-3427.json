@@ -56,7 +56,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:54:32.616Z",
+  "updated": "2026-08-02T18:55:22.507Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -115,8 +115,16 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 24,
-    "claims": {},
+    "sequence": 25,
+    "claims": {
+      "frontend-project-picker": {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 3742355,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:55:22.507Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -315,6 +323,7 @@
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac1": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac2": "completed",
     "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac3": "completed",
-    "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac4": "completed"
+    "flywheel-cross-project-continuation.flywheel-cross-project-continuation.ac4": "completed",
+    "frontend-project-picker": "running"
   }
 }
