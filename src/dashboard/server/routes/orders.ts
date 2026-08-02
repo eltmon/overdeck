@@ -21,7 +21,7 @@ import {
   setStatus,
   type NewOrderBookItem,
 } from '../../../lib/orders/writer.js';
-import { findProjectByPathSync, getProjectSync } from '../../../lib/projects.js';
+import { findProjectByPathSync, getProjectSync, listProjectsSync } from '../../../lib/projects.js';
 import { projectKey as resolveCanonicalProjectKey } from '../../../lib/project-key.js';
 import { resolveStateReadHomeSync } from '../../../lib/state-read-home.js';
 import { jsonResponse } from '../http-helpers.js';
@@ -207,13 +207,15 @@ function buildOrdersReadSnapshot(deps: OrdersRouteDeps, projectKey?: string): Or
 }
 
 function enrichedBook(book: OrderBook, deps: OrdersRouteDeps, snapshot?: OrdersReadSnapshot, projectKey?: string) {
-  const stateRoot = snapshot?.stateRoot ?? resolveOrdersStateRoot(deps, projectKey).stateRoot;
+  const resolved = snapshot ?? resolveOrdersStateRoot(deps, projectKey);
+  const stateRoot = resolved.stateRoot;
   const hasPrd = snapshot?.hasPrd ?? deps.hasPrd ?? ((issueId: string) => hasOrderIssuePrd(stateRoot, issueId));
   const issueLookup = snapshot?.issueLookup ?? deps.issueLookup;
   const prerequisiteIds = [...new Set(book.items.flatMap((item) => item.prereqs.map((prereq) => prereq.toUpperCase())))];
   const prerequisiteState = snapshot?.issueState ?? issueLookup?.(prerequisiteIds) ?? new Map();
   return {
     ...book,
+    ...(resolved.project !== undefined ? { project: resolved.project } : {}),
     progress: computeBookProgress(book, issueLookup),
     validation: validateBookForStart(stateRoot, book, {
       issueLookup,
@@ -319,12 +321,20 @@ export async function getOrderPayload(
   deps: OrdersRouteDeps = {},
   projectKey?: string,
 ): Promise<RouteResult> {
-  return routeResult(async () => enrichedBook(
-    requireBook(resolveOrdersStateRoot(deps, projectKey).stateRoot, bookId),
-    deps,
-    undefined,
-    projectKey,
-  ));
+  return routeResult(async () => {
+    const primary = resolveOrdersStateRoot(deps, projectKey);
+    const book = getBook(primary.stateRoot, bookId);
+    if (book) return enrichedBook(book, deps, undefined, projectKey);
+    if (deps.stateRoot || projectKey !== undefined) {
+      throw new Error(`Order book not found: ${bookId}`);
+    }
+    for (const { key, config } of listProjectsSync()) {
+      if (key === primary.project) continue;
+      const scannedBook = getBook(resolveStateReadHomeSync(config, key).root, bookId);
+      if (scannedBook) return enrichedBook(scannedBook, deps, undefined, key);
+    }
+    throw new Error(`Order book not found: ${bookId}`);
+  });
 }
 
 export async function patchOrderPayload(

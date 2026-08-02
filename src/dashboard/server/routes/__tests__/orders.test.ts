@@ -10,9 +10,15 @@ import type { OrderIssueLookup, OrderIssueState } from '../../../../lib/orders/t
 import type { ProjectConfig } from '../../../../lib/projects.js';
 import { makeOrdersRouteLayer } from '../orders.js';
 
-const { mockGetProjectSync, mockFindProjectByPathSync, mockResolveStateReadHomeSync } = vi.hoisted(() => ({
+const {
+  mockGetProjectSync,
+  mockFindProjectByPathSync,
+  mockListProjectsSync,
+  mockResolveStateReadHomeSync,
+} = vi.hoisted(() => ({
   mockGetProjectSync: vi.fn(),
   mockFindProjectByPathSync: vi.fn(),
+  mockListProjectsSync: vi.fn(),
   mockResolveStateReadHomeSync: vi.fn(),
 }));
 
@@ -22,6 +28,7 @@ vi.mock('../../../../lib/projects.js', async (importOriginal) => {
     ...actual,
     getProjectSync: mockGetProjectSync,
     findProjectByPathSync: mockFindProjectByPathSync,
+    listProjectsSync: mockListProjectsSync,
   };
 });
 
@@ -136,6 +143,7 @@ beforeEach(() => {
   _resetInternalTokenCacheForTests();
   mockGetProjectSync.mockReset().mockReturnValue(null);
   mockFindProjectByPathSync.mockReset().mockReturnValue(null);
+  mockListProjectsSync.mockReset().mockReturnValue([]);
   mockResolveStateReadHomeSync.mockReset();
 });
 
@@ -387,5 +395,70 @@ describe('/api/orders routes', () => {
       status: 400,
       body: { error: expect.stringContaining('Unknown project: ghost-project') },
     });
+  });
+
+  it('scans other registered projects when the book is missing from the default state root', async () => {
+    const defaultRoot = gitFixture();
+    const otherRoot = gitFixture();
+    const defaultProject = { path: '/fake/default-project' } as ProjectConfig;
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockListProjectsSync.mockReturnValue([
+      { key: 'default-project', config: defaultProject },
+      { key: 'other-project', config: otherProject },
+    ]);
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === defaultProject ? defaultRoot : otherRoot,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await requestOrdersRoute(layer, '/api/orders?project=other-project', mutation('POST', {
+      id: '2026-07-18-scanned',
+      name: 'Scanned book',
+    }));
+
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-scanned')).resolves.toMatchObject({
+      status: 200,
+      body: { id: '2026-07-18-scanned', project: 'other-project' },
+    });
+  });
+
+  it('returns the same 404 when the book exists in no registered project', async () => {
+    const defaultRoot = gitFixture();
+    const otherRoot = gitFixture();
+    const defaultProject = { path: '/fake/default-project' } as ProjectConfig;
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+
+    mockFindProjectByPathSync.mockReturnValue(defaultProject);
+    mockListProjectsSync.mockReturnValue([
+      { key: 'default-project', config: defaultProject },
+      { key: 'other-project', config: otherProject },
+    ]);
+    mockResolveStateReadHomeSync.mockImplementation((project: ProjectConfig) => ({
+      root: project === defaultProject ? defaultRoot : otherRoot,
+      migrated: true,
+    }));
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere')).resolves.toMatchObject({
+      status: 404,
+      body: { error: 'Order book not found: 2026-07-18-nowhere' },
+    });
+  });
+
+  it('does not scan when ?project= is explicit — a missing book in that project 404s', async () => {
+    const otherRoot = gitFixture();
+    const otherProject = { path: '/fake/other-project' } as ProjectConfig;
+    mockGetProjectSync.mockImplementation((key: string) => (key === 'other-project' ? otherProject : null));
+    mockResolveStateReadHomeSync.mockReturnValue({ root: otherRoot, migrated: true });
+    mockListProjectsSync.mockReturnValue([{ key: 'other-project', config: otherProject }]);
+
+    const layer = makeOrdersRouteLayer({ issueLookup: () => new Map() });
+    await expect(requestOrdersRoute(layer, '/api/orders/2026-07-18-nowhere?project=other-project'))
+      .resolves.toMatchObject({ status: 404, body: { error: 'Order book not found: 2026-07-18-nowhere' } });
+    expect(mockListProjectsSync).not.toHaveBeenCalled();
   });
 });
