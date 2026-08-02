@@ -1029,3 +1029,9 @@ Note this is the THIRD swarm-substrate defect on PAN-3447 alone (3459 policy per
 - **PAN-3462 (deferred deploys never fire) merged + handed off** (`552f6d412a`) — deploys deferred by the gate now actually fire when the window clears, closing the trap that cost two manual reloads and blocked close-outs earlier tonight.
 - PAN-3450's auto-merge schedule was refused: `review status is not readyForMerge` — its review verdict has not re-flipped since the red-window rerun. Correct refusal (the queue guards on canonical state, not on my say-so); it re-enters when the verdict lands.
 - Run tally: **35 issues landed+closed**, plus PAN-3467/3468/3473/3431/3462 now at verifying-on-main.
+
+## RUN-79 tick 65 (2026-08-02 ~05:50Z) — FIVE close-outs drained (36 total); leak fix shows a first positive signal
+
+- **PAN-3467, PAN-3468, PAN-3473, PAN-3431, PAN-3462 all closed out** in one pass (main green past both merge commits; 8-row DoD each, no overrides). **36 issues landed+closed this run.** That drains the entire expedite + red-main + leak + deferred-deploy cluster.
+- **Leak fix first data point at comparable load**: 1426MB @ 18min with **37** sessions, versus the pre-fix 1936MB @ 18min with **31** sessions — more sessions, ~510MB less, inverting the old scaling. Posted to PAN-3431 **explicitly as an early indicator, not closure**: the old signature peaked during a fast attach RAMP (~300MB/min at 42 sessions), and this is steady state. Proof requires a comparable ramp with a flat curve. (Third time today I have had to resist declaring a class closed on one favorable reading — the discipline is holding now.)
+- PAN-3447 still blocked only on the silent quality-lint gate (PAN-3478 struck); swarm intentionally held; `--no-quality-lint` remains the operator's override to authorize.
