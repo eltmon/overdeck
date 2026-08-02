@@ -279,7 +279,7 @@ body::after {
 }
 
 .terminal-output {
-  font-family: 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono), 'SF Mono', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
   font-size: 13px;
   line-height: 1.5;
 }
@@ -342,6 +342,17 @@ body::after {
   }
   .badge-border-info {
     border-color: color-mix(in srgb, var(--info) 32%, transparent);
+  }
+
+  /* Broadsheet badge radius (PAN-3410 D-11) — the one deliberate radius
+     change in the whole revision. Targets any element carrying a
+     badge-bg-* class (the sanctioned badge formula) so existing call
+     sites don't need to be touched individually; two-selector specificity
+     beats the plain .rounded-sm utility without !important. Ledger is
+     untouched — badges keep rounded-sm because this selector never
+     matches outside [data-theme="broadsheet"]. */
+  [data-theme="broadsheet"] [class*="badge-bg-"] {
+    border-radius: var(--radius-md);
   }
   .drawer-gate-border-pass {
     border-color: color-mix(in srgb, var(--success) 32%, transparent);
