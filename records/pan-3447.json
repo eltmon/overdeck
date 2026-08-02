@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T09:11:03.550Z",
+  "updated": "2026-08-02T09:16:56.852Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 42,
-    "claims": {
-      "feed-orb-linking": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 1152854,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T09:11:03.550Z"
-      }
-    },
+    "sequence": 43,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -364,6 +356,17 @@
         "outcome": "completed",
         "reason": "Added the ordered FR-19 stat strip, 130-sample/500 ms ECG, change pulse, unavailable-state dashes, shared page-level Confluence subscription, and third SWAP gauge. Full typecheck, full lint, all 33 Confluence tests, and isolated Playwright rendering/control verification pass; commit a7b74e239a9 is pushed.",
         "releasedAt": "2026-08-02T08:55:17.314Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 1152854,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T09:11:03.550Z",
+        "itemId": "feed-orb-linking",
+        "outcome": "completed",
+        "reason": "Feed rows now expose data-issue wiring, show provenance tooltips, flash matching orbs, and open the real issue drawer; focused tests and typecheck pass",
+        "releasedAt": "2026-08-02T09:16:56.851Z"
       }
     ],
     "statusReasons": {
@@ -413,8 +416,8 @@
         "updatedAt": "2026-08-02T08:55:17.314Z"
       },
       "feed-orb-linking": {
-        "reason": "Implement sidebar feed hover/click linking to Confluence orbs and issue drawer",
-        "updatedAt": "2026-08-02T09:11:03.550Z"
+        "reason": "Feed rows now expose data-issue wiring, show provenance tooltips, flash matching orbs, and open the real issue drawer; focused tests and typecheck pass",
+        "updatedAt": "2026-08-02T09:16:56.851Z"
       }
     }
   },
@@ -465,7 +468,10 @@
     "topbar-enrichment.topbar-enrichment.ac1": "completed",
     "topbar-enrichment.topbar-enrichment.ac2": "completed",
     "topbar-enrichment.topbar-enrichment.ac3": "completed",
-    "feed-orb-linking": "running"
+    "feed-orb-linking": "completed",
+    "feed-orb-linking.feed-orb-linking.ac1": "completed",
+    "feed-orb-linking.feed-orb-linking.ac2": "completed",
+    "feed-orb-linking.feed-orb-linking.ac3": "completed"
   },
   "swarm": {
     "slotAssignments": [],
