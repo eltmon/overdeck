@@ -17,11 +17,19 @@ and status grounded in dashboard state.
   pipeline unit rather than appearing as unrelated work.
 - **Agent micro-states** show waiting, thinking, compaction, cost pulses, stack
   warnings, and merge activity on the orb that owns the work.
-- **The shelf and Doldrums** separate yielded or paused work from stale work.
+- **The shelf and Doldrums** separate yielded or paused work from stalled work.
   Frost accrues gradually from real idle time before an orb settles into the
-  Doldrums; governor tides move yielded work to the shelf.
+  Doldrums; governor tides move yielded work to the shelf. The Doldrums is
+  also the parked population's home (see "The Stall Sweeper" below).
 - **The merge portal and wrecks** show the path into `main`, queued merge depth,
   successful merge motion, and failed merge residue.
+- **The Stall Sweeper** (PAN-3490) renders the parked population and the
+  sweeper's work: parked orbs settle in the Doldrums with orbit-tinted frost
+  and an orbit tag; an ice-blue lantern beam sweeps the band on every real
+  population change, glinting each orb the scan touched; a released orb thaws
+  back into the river; an operator-only release fires a slow-rising signal
+  flare. The 🧹 PARKED top-bar stat is the true census, and VEL/h shows real
+  stage-transition rate.
 - **The Flywheel sun and sequencer** show orchestration activity. The
   conversation constellation above the river shows the live conversation
   count.
@@ -47,6 +55,10 @@ and status grounded in dashboard state.
 | Orbiting satellites | Review convoy members attached to the same issue |
 | Shelf | Paused or scheduler-yielded work that still belongs to the pipeline |
 | Frost / Doldrums | Increasing idle age and work that crossed the stale threshold |
+| Orbit-tinted frost | A parked issue — the frost color names its orbit (amber stuck, orange UAT, pink merge-failed, purple conflicts, ash zombie, ice idle) |
+| Sweeper beam | A real parked-population scan (sweep.scan) crossing the Doldrums |
+| Thaw | A parked orb released by the sweeper (sweep.unparked), returning to the river |
+| Signal flare | A parked orb only a human can release (sweep.escalated) |
 | Portal / wreck | Merge path into `main` and failed merge residue |
 | Flywheel sun / sequencer | Orchestration source and dispatch cadence |
 | Hook bus LED | A real event from a wired harness hook |
@@ -72,8 +84,14 @@ orb language rather than replacing it.
 The river cast comes from the shared dashboard snapshot and Zustand read model.
 `EventRouter` receives the snapshot and subsequent domain events over `/ws/rpc`;
 `useConfluenceData()` derives orbs, hook energy, micro-states, and metadata from
-that same state. Harness heartbeats become domain events before they enter the
-hook stream, so Confluence adds no polling loop for river or hook animation.
+that same state. The parked cast comes from `GET /api/parked` fetched once and
+invalidated only by real `sweep.*` domain events (the sweeper emits `sweep.scan`
+on population change, `sweep.unparked` on release, `sweep.escalated` on
+operator re-surface) — no polling loop and no synthesized motion. Velocity
+(`GET /api/velocity`) refreshes on the inherited 30-second cadence shared with
+the host-health and cost queries. Harness heartbeats become domain events
+before they enter the hook stream, so Confluence adds no polling loop for river
+or hook animation.
 The inherited host-health query and activity-feed REST fallback keep their
 existing polling cadence, but they do not synthesize visual events.
 
