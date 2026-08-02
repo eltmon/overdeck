@@ -444,7 +444,7 @@
     "recordedAt": "2026-08-02T01:10:51.778Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T02:24:46.206Z",
+  "updated": "2026-08-02T02:26:28.730Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "passed",
@@ -625,7 +625,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
