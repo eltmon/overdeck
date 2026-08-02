@@ -41,7 +41,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:32:24.891Z",
+  "updated": "2026-08-02T18:34:33.409Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -100,16 +100,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "cli-queue-verb": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 1449066,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:29:21.832Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -209,6 +201,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T18:27:22.489Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 1449066,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:29:21.832Z",
+        "itemId": "cli-queue-verb",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3427 dead)",
+        "releasedAt": "2026-08-02T18:34:22.496Z"
       }
     ],
     "statusReasons": {
@@ -234,7 +237,7 @@
       },
       "cli-queue-verb": {
         "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T18:27:22.489Z"
+        "updatedAt": "2026-08-02T18:34:22.496Z"
       }
     }
   },
@@ -260,6 +263,6 @@
     "resolver-first-ready": "completed",
     "resolver-first-ready.resolver-first-ready.ac1": "completed",
     "resolver-first-ready.resolver-first-ready.ac2": "completed",
-    "cli-queue-verb": "running"
+    "cli-queue-verb": "pending"
   }
 }
