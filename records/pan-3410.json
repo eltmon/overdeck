@@ -720,20 +720,20 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T22:42:55.522Z",
+  "updated": "2026-08-02T22:43:53.479Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-02T22:41:08.503Z",
-    "reviewNotes": "Verification failed at typecheck — fix and resubmit",
+    "updatedAt": "2026-08-02T22:43:53.397Z",
+    "reviewNotes": "Agent re-review request (1/25): Re-triggering verification: the reported typecheck failure (attempt 2/3) does not reproduce — I ran npm run typecheck fresh on this exact HEAD (e6f38e4ff) and it passes cleanly (tsc --noEmit, hooks, evals, dashboard-types guard 55 known/none new, frontend-types guard 0 known/none new). No code change made; this looks like transient build/resource contention under host load, matching the flake pattern already documented for this issue.",
     "uatNotes": "Built the workspace frontend+server (npm run build, clean) and ran it live for UAT. The project's docker devcontainer UAT stack (pan workspace rebuild PAN-3410 + docker compose up server) came up but its 'server' container crash-loops every ~30s on this host (Error: spawn /home/node/.overdeck/bin/cliproxy ENOENT crashing the whole process via an unhandled child-process error event) — a pre-existing devcontainer-template defect unrelated to PAN-3410, reproduced twice. Fell back to running the built dashboard directly from this workspace on the host per the task instructions: `OVERDECK_HOME=<isolated tmp dir> OVERDECK_DISABLE_DEACON=1 PORT=3016 node dist/dashboard/server.js`, isolated from the live production dashboard (port 3011, untouched) and from real ~/.overdeck state (fresh isolated home, deacon auto-start skipped so no dueling patrols per the single-deacon invariant). Verified via Playwright against this instance, then tore down the host process, the docker containers, and the isolated home directory afterward. Verified: (1) AC-1/FR-1 — boot default is data-theme=broadsheet with body/heading computed font-family resolving to the real self-hosted 'Geist Variable' face (not just a CSS string) and var(--font-mono) starting with Geist Mono Variable; zero external font requests (also covered by fonts-local.test.ts). (2) AC-2/FR-8/D-14 — Settings > Appearance renders the 'Overdeck Theme' two-card picker (Ledger + Broadsheet), each with name, one-line description, and a live mini-specimen (OVERDECK eyebrow + 'Aa' + 'Sample chip') rendered in that card's own theme regardless of the active theme; Broadsheet shown selected by default. Clicking the Ledger card flipped document.documentElement.dataset.theme to 'ledger' and the computed body font to 'DM Sans' immediately with no reload (screenshots captured before/after showing the whole app re-theme, not just the picker); the existing 'Ready to Merge shimmer' toggle still renders and is unaffected (no-loss). (3) AC-2/FR-7/D-14 persistence — the write persisted to the isolated config.yaml as `ui: { theme: ledger }` via PUT /api/settings; a full page reload (not SPA nav) re-applied data-theme=ledger with zero console errors, proving both the pre-paint boot script and the GET-reconcile path. (4) FR-7/ui-theme-config-key.ac3 loud-failure — PUT /api/settings with {\"ui\":{\"theme\":\"notarealtheme\"}} against the running instance returned HTTP 400 with an error naming 'ui.theme' and the allowed values (ledger/broadsheet), not a silent fallback. All exercised acceptance criteria are proven; none were left unverified.",
     "verificationNotes": "Verification FAILED at typecheck (77701ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3410/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m385.66 kB\u001b[22m \u001b[2m│ gzip: 62.29 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 385.66 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3710ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m353.94 kB\u001b[22m \u001b[2m│ gzip: 59.96 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m579.37 kB\u001b[22m \u001b[2m│ gzip: 92.64 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.51 kB\u001b[22m \u001b[2m│ gzip:  5.86 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m815.39 kB\u001b[22m \u001b[2m│ gzip: 79.79 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4081ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (75%)\n  - rolldown-plugin-dts:fake-js (20%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n",
     "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
@@ -853,9 +853,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 29061953,
-            "output": 672679,
-            "cacheRead": 139905024,
+            "input": 31540928,
+            "output": 713330,
+            "cacheRead": 151608320,
             "cacheWrite": 0
           }
         },
@@ -869,10 +869,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 6401,
-            "output": 592932,
-            "cacheRead": 492856882,
-            "cacheWrite": 31153453
+            "input": 6409,
+            "output": 594498,
+            "cacheRead": 495092561,
+            "cacheWrite": 31157907
           }
         }
       },
@@ -884,21 +884,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29061953,
-          "output": 672679,
-          "cacheRead": 139905024,
+          "input": 31540928,
+          "output": 713330,
+          "cacheRead": 151608320,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 6673,
-          "output": 642418,
-          "cacheRead": 529328344,
-          "cacheWrite": 31503876
+          "input": 6681,
+          "output": 643984,
+          "cacheRead": 531564023,
+          "cacheWrite": 31508330
         }
       },
       "costAtCloseOut": {
-        "usd": 426.5075593,
-        "pricingAsOf": "2026-08-02T22:41:08.523Z"
+        "usd": 446.4475593,
+        "pricingAsOf": "2026-08-02T22:43:53.467Z"
       }
     },
     "merges": [
@@ -907,7 +907,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
