@@ -42,7 +42,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T03:23:22.870Z",
+  "updated": "2026-08-02T03:23:28.363Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -52,7 +52,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T03:23:21.902Z",
+    "updatedAt": "2026-08-02T03:23:25.919Z",
     "inspectNotes": "All 4 ACs met in src/dashboard/frontend/src/lib/system-health-attention.ts. AC1: info reasons filtered at all four reason sources (host/admission/services/agents, lines 92-131) and contextNotes covers exactly those same four sources (lines 15-22) — verified against SystemHealthSnapshot in packages/contracts/src/system-health.ts:253-278, which has no fifth reason-bearing field. AC2: agent-domain codes with >1 entry produce one row with agents=[both ids], agentId omitted, sub='2x agents: a, b' truncating at slice(0,2) + '+N more'. AC3: mapPresentationSeverity forces agent.runtime.inactive.stalled to critical and the comparator sorts critical first, then stalled before idle. AC4: healthy snapshot yields [] and summaryLine returns 'All clear - <N> GiB spawn headroom - relay running - 0 stalled agents'. NFR-2 satisfied: pure module, no React import. NON-BLOCKING (outside these ACs, for the component bead or review convoy): (1) reasonLabel line 78-82 returns the literal 'Retry' as the row TITLE for system.health_snapshot.unavailable (severity critical per src/dashboard/server/routes/misc/health.ts:57) and agent.persisted_state.unavailable (severity warning per src/lib/agents/health.ts:171) — both survive the info filter, so a real outage renders a row titled 'Retry'. In SystemHealthPill.tsx:114-117 that string was a suffix of 'Health unavailable - Retry', not a title. (2) Non-agent codes are grouped by code but rendered from entries[0] only, so two services emitting the same code would silently drop all but the first. (3) Grouped rows take severity from entries[0], so a mixed-severity group under one code under-reports. (4) FR-8 names memory percent in the summary line; only the all-clear variant carries headroom and neither non-healthy variant carries memory percent.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewRequestedAt": "2026-08-02T03:23:15.954Z",
@@ -88,24 +88,24 @@
       "byStage": {
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1023,
-            "output": 54363,
-            "cacheRead": 26357559,
-            "cacheWrite": 567543
+            "input": 1035,
+            "output": 54512,
+            "cacheRead": 26593622,
+            "cacheWrite": 567880
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1023,
-          "output": 54363,
-          "cacheRead": 26357559,
-          "cacheWrite": 567543
+          "input": 1035,
+          "output": 54512,
+          "cacheRead": 26593622,
+          "cacheWrite": 567880
         }
       },
       "costAtCloseOut": {
-        "usd": 3.618029,
-        "pricingAsOf": "2026-08-02T03:23:22.282Z"
+        "usd": 3.642814,
+        "pricingAsOf": "2026-08-02T03:23:28.076Z"
       }
     },
     "merges": [
