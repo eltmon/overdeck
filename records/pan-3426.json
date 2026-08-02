@@ -142,7 +142,7 @@
     "recordedAt": "2026-08-02T17:53:32.102Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:56:53.761Z",
+  "updated": "2026-08-02T17:56:58.242Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -154,7 +154,7 @@
     "updatedAt": "2026-08-02T17:56:49.853Z",
     "reviewNotes": "Verification failed at typecheck — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3495",
-    "reviewRequestedAt": "2026-08-02T17:53:33.427Z",
+    "reviewRequestedAt": "2026-08-02T17:56:57.870Z",
     "reviewSpawnedAt": "2026-08-02T17:53:38.210Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -196,7 +196,8 @@
         "tests/unit/lib/orders/orders-resolver.test.ts"
       ],
       "recordedAt": "2026-08-02T17:53:32.102Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-02T17:56:57.870Z"
   },
   "closeOut": {
     "usage": {
