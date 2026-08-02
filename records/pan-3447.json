@@ -66,7 +66,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T06:57:13.950Z",
+  "updated": "2026-08-02T07:42:52.142Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -135,16 +135,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 28,
-    "claims": {
-      "river-canvas": {
-        "writerId": "agent-pan-3447",
-        "agentId": "agent-pan-3447",
-        "pid": 3343697,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T06:57:13.950Z"
-      }
-    },
+    "sequence": 29,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -286,6 +278,17 @@
         "outcome": "completed",
         "reason": "Implemented stable per-issue orbs, five-member review convoys, live hook telemetry with 60s windows/rate decay/energy, micro-states, and HUD metadata fallbacks. Root-cause check found the completed hook-stream prerequisite had not preserved hookName; this commit adds hookName to the existing activity event schema, heartbeat ingestion, and wired hook payloads. Verified npm test -- confluence (13,109 tests green across root/frontend), heartbeat-ingestion (18 green), npm run typecheck, and npm run lint.",
         "releasedAt": "2026-08-02T06:34:31.793Z"
+      },
+      {
+        "writerId": "agent-pan-3447",
+        "agentId": "agent-pan-3447",
+        "pid": 3343697,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T06:57:13.950Z",
+        "itemId": "river-canvas",
+        "outcome": "completed",
+        "reason": "Ported the Confluence mockup engine into RiverCanvas with stacked WebGL/fx/trail canvases, exact draw order, six pipeline lanes and energy waveform, orb/convoy/frost/merge/micro-state rendering, bounded particle/ticker pools, effects API, ResizeObserver DPR<=2 re-anchoring, prop reconciliation, hover/select/fullscreen/help composition wiring, and God View mounting. Verified npm run typecheck, npm run lint, focused Confluence tests (20/20), frontend production build, and isolated Playwright screenshot plus hover/click/help interactions. The repository-wide npm test -- confluence wrapper was attempted twice; all Confluence tests passed directly, while unrelated root DB setup hooks timed out under 10 concurrent Vitest processes (22 failures first run, 5 second run). Commit 5b0690055ae pushed to origin/feature/pan-3447.",
+        "releasedAt": "2026-08-02T07:42:52.142Z"
       }
     ],
     "statusReasons": {
@@ -308,6 +311,10 @@
       "confluence-data": {
         "reason": "Implemented stable per-issue orbs, five-member review convoys, live hook telemetry with 60s windows/rate decay/energy, micro-states, and HUD metadata fallbacks. Root-cause check found the completed hook-stream prerequisite had not preserved hookName; this commit adds hookName to the existing activity event schema, heartbeat ingestion, and wired hook payloads. Verified npm test -- confluence (13,109 tests green across root/frontend), heartbeat-ingestion (18 green), npm run typecheck, and npm run lint.",
         "updatedAt": "2026-08-02T06:34:31.793Z"
+      },
+      "river-canvas": {
+        "reason": "Ported the Confluence mockup engine into RiverCanvas with stacked WebGL/fx/trail canvases, exact draw order, six pipeline lanes and energy waveform, orb/convoy/frost/merge/micro-state rendering, bounded particle/ticker pools, effects API, ResizeObserver DPR<=2 re-anchoring, prop reconciliation, hover/select/fullscreen/help composition wiring, and God View mounting. Verified npm run typecheck, npm run lint, focused Confluence tests (20/20), frontend production build, and isolated Playwright screenshot plus hover/click/help interactions. The repository-wide npm test -- confluence wrapper was attempted twice; all Confluence tests passed directly, while unrelated root DB setup hooks timed out under 10 concurrent Vitest processes (22 failures first run, 5 second run). Commit 5b0690055ae pushed to origin/feature/pan-3447.",
+        "updatedAt": "2026-08-02T07:42:52.142Z"
       }
     }
   },
@@ -333,7 +340,12 @@
     "confluence-data.confluence-data.ac2": "completed",
     "confluence-data.confluence-data.ac3": "completed",
     "confluence-data.confluence-data.ac4": "completed",
-    "river-canvas": "running"
+    "river-canvas": "completed",
+    "river-canvas.river-canvas.ac1": "completed",
+    "river-canvas.river-canvas.ac2": "completed",
+    "river-canvas.river-canvas.ac3": "completed",
+    "river-canvas.river-canvas.ac4": "completed",
+    "river-canvas.river-canvas.ac5": "completed"
   },
   "swarm": {
     "slotAssignments": [],
