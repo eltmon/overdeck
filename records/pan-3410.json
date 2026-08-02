@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T04:03:13.304Z",
+  "updated": "2026-08-02T04:10:52.867Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "skill-rewrite": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 2285061,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T04:03:13.304Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -152,6 +144,17 @@
         "outcome": "completed",
         "reason": "Rewrote design/style-guide/STYLE-GUIDE.md to v2.0: new §2 Themes section (two-theme comparison, ui.theme config, data-theme scoping, Ledger-safe fallbacks table, governance, D-11 unchanged-rules list verbatim), rewrote §3 Typography (both font stacks by CSS variable, self-hosted @font-face replacing the Google Fonts snippet, weight-tier table, display scale, rewritten mono rule), added D-4..D-9 pattern recipes to §8 Components each with a copy-paste recipe + canonical example + Broadsheet-only marker, added the D-10 page-not-modal doctrine to Dialogs/Modals, and documented the Broadsheet badge radius change in §6/§8. All code blocks transcribed verbatim from the actual index.css/index.html implementation, not from memory. Renumbered every subsequent section (old 2-18 -> new 3-19) and fixed both internal 'see Section N' cross-references. scripts/lint-skills.sh green; grep -c Broadsheet=48, Ledger=41.",
         "releasedAt": "2026-08-02T04:02:44.507Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 2285061,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T04:03:13.304Z",
+        "itemId": "skill-rewrite",
+        "outcome": "completed",
+        "reason": "Rewrote sync-sources/dev-skills/pan-style-guide/SKILL.md distilling the v2.0 law file: theme rule (components never branch on data-theme), Ledger typography kept verbatim, new Broadsheet tier table, 5 Broadsheet-only pattern names with one-line rules, page-not-modal doctrine, badge radius note, signal-color/color-restraint sections unchanged (D-11). Fixed the stale 'guide §18' brand-mark cross-ref to §19 and the stale 'DM Sans via Google Fonts' mockup instruction. scripts/lint-skills.sh and npm run lint both green; ran pan sync (completes without error, syncs from the main deployment source so full distribution happens once merged, not from this workspace).",
+        "releasedAt": "2026-08-02T04:10:52.867Z"
       }
     ],
     "statusReasons": {
@@ -182,6 +185,10 @@
       "law-file-rewrite": {
         "reason": "Rewrote design/style-guide/STYLE-GUIDE.md to v2.0: new §2 Themes section (two-theme comparison, ui.theme config, data-theme scoping, Ledger-safe fallbacks table, governance, D-11 unchanged-rules list verbatim), rewrote §3 Typography (both font stacks by CSS variable, self-hosted @font-face replacing the Google Fonts snippet, weight-tier table, display scale, rewritten mono rule), added D-4..D-9 pattern recipes to §8 Components each with a copy-paste recipe + canonical example + Broadsheet-only marker, added the D-10 page-not-modal doctrine to Dialogs/Modals, and documented the Broadsheet badge radius change in §6/§8. All code blocks transcribed verbatim from the actual index.css/index.html implementation, not from memory. Renumbered every subsequent section (old 2-18 -> new 3-19) and fixed both internal 'see Section N' cross-references. scripts/lint-skills.sh green; grep -c Broadsheet=48, Ledger=41.",
         "updatedAt": "2026-08-02T04:02:44.507Z"
+      },
+      "skill-rewrite": {
+        "reason": "Rewrote sync-sources/dev-skills/pan-style-guide/SKILL.md distilling the v2.0 law file: theme rule (components never branch on data-theme), Ledger typography kept verbatim, new Broadsheet tier table, 5 Broadsheet-only pattern names with one-line rules, page-not-modal doctrine, badge radius note, signal-color/color-restraint sections unchanged (D-11). Fixed the stale 'guide §18' brand-mark cross-ref to §19 and the stale 'DM Sans via Google Fonts' mockup instruction. scripts/lint-skills.sh and npm run lint both green; ran pan sync (completes without error, syncs from the main deployment source so full distribution happens once merged, not from this workspace).",
+        "updatedAt": "2026-08-02T04:10:52.867Z"
       }
     }
   },
@@ -221,6 +228,9 @@
     "law-file-rewrite.law-file-rewrite.ac2": "completed",
     "law-file-rewrite.law-file-rewrite.ac3": "completed",
     "law-file-rewrite.law-file-rewrite.ac4": "completed",
-    "skill-rewrite": "running"
+    "skill-rewrite": "completed",
+    "skill-rewrite.skill-rewrite.ac1": "completed",
+    "skill-rewrite.skill-rewrite.ac2": "completed",
+    "skill-rewrite.skill-rewrite.ac3": "completed"
   }
 }
