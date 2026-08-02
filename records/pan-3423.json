@@ -52,7 +52,7 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T19:12:20.949Z",
+  "updated": "2026-08-02T19:30:05.640Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "failed",
@@ -62,10 +62,17 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T19:12:12.667Z",
+    "updatedAt": "2026-08-02T19:30:02.889Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since d28b889 (2 paths): src/dashboard/frontend/src/components/SystemHealthPill.tsx, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+        "detectedAt": "2026-08-02T19:29:34.891Z"
+      }
+    ],
     "conflictsSince": {
-      "sha": "7ac5339817d1893a23bd1fe8f710da6d20578187",
-      "detectedAt": "2026-08-02T19:11:48.679Z",
+      "sha": "d28b8893d9eba336166570587a15114995062a16",
+      "detectedAt": "2026-08-02T19:29:34.891Z",
       "paths": [
         "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
@@ -142,7 +149,7 @@
       },
       "costAtCloseOut": {
         "usd": 48.802447,
-        "pricingAsOf": "2026-08-02T19:12:13.063Z"
+        "pricingAsOf": "2026-08-02T19:30:03.035Z"
       }
     },
     "merges": [
