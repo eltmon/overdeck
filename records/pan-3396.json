@@ -417,19 +417,19 @@
     "recordedAt": "2026-08-01T23:49:58.057Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T00:09:50.679Z",
+  "updated": "2026-08-02T00:10:17.094Z",
   "pipeline": {
     "issueId": "PAN-3396",
     "reviewStatus": "pending",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T23:51:22.770Z",
-    "updatedAt": "2026-08-02T00:09:50.260Z",
+    "updatedAt": "2026-08-02T00:10:16.890Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
-    "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD cd39c67b31 (matches reviewed commit). `npm run typecheck` PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). `npm run lint` PASSED clean on a clean-memory run (exit 0, all 18 lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands) — one earlier attempt OOM'd during the build:cli prelint step under heap pressure (swap was 8.0Gi/8.0Gi full from concurrent agent load) and was a transient resource crash, not a code defect; the rerun after memory freed passed with exit 0. `npm test` FAILED: `npx vitest run tests/unit/lib/lifecycle/residue.test.ts` has 3 real, deterministic assertion failures (reproduced twice, once inside the full suite run and once in isolation) — `returns stepSkipped when no open PRs/MRs found` (expected skipped=true, got false), `fails on any repository operation errors while preserving partial progress` (expected result.details defined, got undefined), and `fails when coordinate extraction fails for required repositories` (expected success/skipped=true, got false). residue.test.ts is explicitly in this PR's own declared files_scope (residue-ceremony xBRIEF item) and is new code added by this branch, not a pre-existing failure. This matches a finding review already flagged (non-blocking there only under its cycle-convergence policy: 'Residue test assertions contradict the helper contract — tests/unit/lib/lifecycle/residue.test.ts:39'), but the test gate evaluates actual pass/fail independent of review's convergence rules. All other PAN-3396-scoped test files pass: `npx vitest run tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts` → 6 files passed, 149 passed / 1 skipped. The full `npm test` run also showed 40 failures across 38 unrelated files (src/lib/workspaces/*, workspace-manager, cli/commands/conversations/*) all failing identically at `beforeEach` with `setupOverdeckTestDb()` hook-timeout (5000ms) — none touch PAN-3396 files_scope; this is consistent with resource contention on a machine running many concurrent agents, not attributable to this branch. This backend/CLI-only change (membership resolver lens + `pan close --residue`) has no dashboard/frontend surface (explicit NonGoal: 'Any frontend/dashboard change'); acceptance criteria are entirely vitest/lint commands with no UI wording, so browser UAT is not required and was not attempted.",
+    "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD 48b5fba3656807360826f012d5f95ff9d190b8f6 (matches reviewedAtCommit, tree clean). npm run typecheck PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). npm run lint PASSED clean, exit 0 (all lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands, lint:ratchet-audit). The prior blocking failure (residue.test.ts: 3 assertion failures) is RESOLVED by the latest commit 48b5fba365 'fix(tests): align residue test assertions with implementation contract'. Re-ran all 7 PAN-3396-scoped test files fresh: npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts -> 7 files passed, 152 passed / 1 skipped, 0 failed. Full npm test run: 72 files / 122 tests failed, but every failure is a setupOverdeckTestDb() beforeEach hook timeout (5000ms) or an unrelated schema-audit.test.ts test timeout, spread across SQLite/workspace/conversations/memory/costs test infrastructure -- none touch this issue's declared files_scope (all of which passed above). Re-ran 3 of the failing files in isolation and they still timed out identically. uptime showed load average 24.69/31.03/31.68 on a 24-core box with swap 8.0Gi/8.0Gi (100%) full, confirming severe resource contention from concurrently running agents (32 running per the workspace briefing) rather than a code defect. This backend/CLI-only change (membership resolver lens + pan close --residue) has no dashboard/frontend surface: PRD NonGoals explicitly state 'Any frontend/dashboard change: bucket vocabulary is unchanged and the DTO already carries bucket/reasons-adjacent state' (drafts/pan-3396.md:247), and all acceptance criteria are vitest/lint commands with no UI wording -- browser UAT is not required and was not attempted.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
     "reviewedAtCommit": "48b5fba3656807360826f012d5f95ff9d190b8f6",
     "reviewRequestedAt": "2026-08-01T23:51:22.770Z",
@@ -587,7 +587,7 @@
       },
       "costAtCloseOut": {
         "usd": 313.6223543,
-        "pricingAsOf": "2026-08-02T00:09:50.391Z"
+        "pricingAsOf": "2026-08-02T00:10:17.017Z"
       }
     },
     "merges": [
