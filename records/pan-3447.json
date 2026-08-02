@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T21:47:21.516Z",
-  "updated": "2026-08-02T03:53:29.182Z",
+  "updated": "2026-08-02T04:01:58.046Z",
   "pipeline": {
     "issueId": "PAN-3447",
     "reviewStatus": "pending",
@@ -84,16 +84,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "aurora-shader": {
-        "writerId": "deacon-swarm",
-        "agentId": null,
-        "pid": 1738421,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T03:53:27.127Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3447",
@@ -192,6 +184,17 @@
         "outcome": "released",
         "reason": "stale claim released (deacon-swarm dead)",
         "releasedAt": "2026-08-02T03:51:07.422Z"
+      },
+      {
+        "writerId": "deacon-swarm",
+        "agentId": null,
+        "pid": 1738421,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:53:27.127Z",
+        "itemId": "aurora-shader",
+        "outcome": "released",
+        "reason": "stale claim released (deacon-swarm dead)",
+        "releasedAt": "2026-08-02T04:01:57.934Z"
       }
     ],
     "statusReasons": {
@@ -209,7 +212,7 @@
       },
       "aurora-shader": {
         "reason": "stale claim released (deacon-swarm dead)",
-        "updatedAt": "2026-08-02T03:51:07.422Z"
+        "updatedAt": "2026-08-02T04:01:57.934Z"
       }
     }
   },
@@ -226,7 +229,7 @@
     "hook-stream-shaping.hook-stream-shaping.ac1": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac2": "completed",
     "hook-stream-shaping.hook-stream-shaping.ac3": "completed",
-    "aurora-shader": "running"
+    "aurora-shader": "pending"
   },
   "swarm": {
     "slotAssignments": [
