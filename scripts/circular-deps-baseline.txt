@@ -54,7 +54,6 @@ src/lib/cloister/conflict-gate.ts > src/lib/review-status.ts > src/lib/cloister/
 src/lib/cloister/deacon-swarm-completion.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/deacon-swarm-gc.ts > src/lib/cloister/deacon-swarm.ts
 src/lib/cloister/deacon-swarm-orphan-gc.ts > src/lib/cloister/deacon-swarm.ts
-src/lib/cloister/deacon.ts > src/lib/cloister/stall-sweeper.ts > src/lib/cloister/service.ts
 src/lib/cloister/feedback-target.ts > src/lib/review-status.ts
 src/lib/cloister/review-agent.ts > src/lib/cloister/review-convoy.ts > src/lib/pipeline-notifier.ts > src/lib/review-status.ts
 src/lib/cloister/review-agent.ts > src/lib/cloister/review-convoy.ts > src/lib/review-status.ts
