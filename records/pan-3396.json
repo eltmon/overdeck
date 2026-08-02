@@ -444,23 +444,23 @@
     "recordedAt": "2026-08-02T01:10:51.778Z"
   },
   "created": "2026-08-01T15:18:03.204Z",
-  "updated": "2026-08-02T01:47:30.288Z",
+  "updated": "2026-08-02T01:51:12.728Z",
   "pipeline": {
     "issueId": "PAN-3396",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T01:31:12.761Z",
-    "updatedAt": "2026-08-02T01:41:26.105Z",
-    "reviewNotes": "Role run agent-pan-3396-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-08-02T01:51:12.625Z",
+    "reviewNotes": "Cycle 11: all findings target unchanged, previously reviewed code; no blocker survives convergence",
     "testNotes": "Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3396, branch feature/pan-3396, HEAD 48b5fba3656807360826f012d5f95ff9d190b8f6 (matches reviewedAtCommit, tree clean). npm run typecheck PASSED clean (tsc + hooks + evals + dashboard/frontend shrink-only ratchets, no new errors). npm run lint PASSED clean, exit 0 (all lint scripts incl. lint:pipeline-membership, lint:file-size, lint:circular, lint:skills, lint:slash-commands, lint:ratchet-audit). The prior blocking failure (residue.test.ts: 3 assertion failures) is RESOLVED by the latest commit 48b5fba365 'fix(tests): align residue test assertions with implementation contract'. Re-ran all 7 PAN-3396-scoped test files fresh: npx vitest run tests/unit/lib/lifecycle/residue.test.ts tests/unit/lib/pan-dir/record-close-out.test.ts tests/unit/lib/lifecycle/workflows.test.ts tests/unit/lib/lifecycle/dod.test.ts tests/cli/commands/close-residue-flag.test.ts src/lib/__tests__/pipeline-membership.test.ts tests/unit/lib/pipeline-membership-gather.test.ts -> 7 files passed, 152 passed / 1 skipped, 0 failed. Full npm test run: 72 files / 122 tests failed, but every failure is a setupOverdeckTestDb() beforeEach hook timeout (5000ms) or an unrelated schema-audit.test.ts test timeout, spread across SQLite/workspace/conversations/memory/costs test infrastructure -- none touch this issue's declared files_scope (all of which passed above). Re-ran 3 of the failing files in isolation and they still timed out identically. uptime showed load average 24.69/31.03/31.68 on a 24-core box with swap 8.0Gi/8.0Gi (100%) full, confirming severe resource contention from concurrently running agents (32 running per the workspace briefing) rather than a code defect. This backend/CLI-only change (membership resolver lens + pan close --residue) has no dashboard/frontend surface: PRD NonGoals explicitly state 'Any frontend/dashboard change: bucket vocabulary is unchanged and the DTO already carries bucket/reasons-adjacent state' (drafts/pan-3396.md:247), and all acceptance criteria are vitest/lint commands with no UI wording -- browser UAT is not required and was not attempted.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3442",
-    "reviewedAtCommit": "48b5fba3656807360826f012d5f95ff9d190b8f6",
+    "reviewedAtCommit": "293311b07f52f089eed4654a84bd76599720c25a",
     "lastVerifiedCommit": "293311b07f52f089eed4654a84bd76599720c25a",
-    "reviewRequestedAt": "2026-08-02T01:31:12.761Z",
     "reviewSpawnedAt": "2026-08-02T01:41:26.104Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -510,6 +510,24 @@
       ],
       "recordedAt": "2026-08-02T01:10:51.778Z"
     },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "293311b07f52f089eed4654a84bd76599720c25a"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "293311b07f52f089eed4654a84bd76599720c25a"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "293311b07f52f089eed4654a84bd76599720c25a"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "293311b07f52f089eed4654a84bd76599720c25a"
+      }
+    },
     "reviewCycleHistory": [
       {
         "cycle": 1,
@@ -532,41 +550,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 36708778,
-            "output": 542855,
-            "cacheRead": 132406272,
+            "input": 37164342,
+            "output": 558676,
+            "cacheRead": 139392000,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1725749,
-            "output": 47260,
-            "cacheRead": 3761152,
+            "input": 3883389,
+            "output": 81709,
+            "cacheRead": 11947520,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 643014,
-            "output": 14259,
-            "cacheRead": 5814784,
+            "input": 2377969,
+            "output": 27157,
+            "cacheRead": 9917952,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 1146221,
-            "output": 17089,
-            "cacheRead": 1974784,
+            "input": 2299800,
+            "output": 49633,
+            "cacheRead": 8808960,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 1036087,
-            "output": 10989,
-            "cacheRead": 1945600,
+            "input": 2002215,
+            "output": 30817,
+            "cacheRead": 6731776,
             "cacheWrite": 0
           }
         },
@@ -595,9 +613,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 41259849,
-          "output": 632452,
-          "cacheRead": 145902592,
+          "input": 47727715,
+          "output": 747992,
+          "cacheRead": 176798208,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -614,8 +632,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 314.4844923,
-        "pricingAsOf": "2026-08-02T01:41:26.375Z"
+        "usd": 365.7378303,
+        "pricingAsOf": "2026-08-02T01:51:12.718Z"
       }
     },
     "merges": [
@@ -624,7 +642,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3396",
