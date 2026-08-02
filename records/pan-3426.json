@@ -92,6 +92,11 @@
       "timestamp": "2026-08-02T17:53:38.527Z",
       "reason": "end",
       "note": "Fix typecheck: remove dashboard taskId field and use itemId in escalation; improve baseline to 55"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-02T17:54:23.184Z"
     }
   ],
   "feedback": [],
@@ -137,7 +142,7 @@
     "recordedAt": "2026-08-02T17:53:32.102Z"
   },
   "created": "2026-08-01T22:28:54.138Z",
-  "updated": "2026-08-02T17:53:45.673Z",
+  "updated": "2026-08-02T17:54:23.246Z",
   "pipeline": {
     "issueId": "PAN-3426",
     "reviewStatus": "pending",
@@ -253,7 +258,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-haiku-4-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 10,
