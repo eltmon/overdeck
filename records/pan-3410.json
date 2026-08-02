@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T04:16:28.346Z",
+  "updated": "2026-08-02T04:46:29.522Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,16 +65,8 @@
     }
   ],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "broadsheet-mechanical-migration": {
-        "writerId": "agent-pan-3410",
-        "agentId": "agent-pan-3410",
-        "pid": 3090922,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T04:16:28.346Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -174,6 +166,17 @@
         "outcome": "completed",
         "reason": "Published configuration/appearance.mdx (Mintlify voice matching context-layers.mdx) documenting the Overdeck Theme setting, ui.theme config key, Settings picker behavior, self-hosted instant theme switch, page-not-modal doctrine, and Broadsheet-only governance in plain operator language. Added to docs.json's Configuration nav group after context-layers. Filed https://github.com/eltmon/overdeck/issues/3469 (NewProjectModal -> page migration follow-up) referencing PAN-3410's PRD and D-10/D-13, and linked it back via a comment on PAN-3410. docs.json parses valid JSON; node scripts/lint-docs.js and npm run lint both green.",
         "releasedAt": "2026-08-02T04:16:14.047Z"
+      },
+      {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 3090922,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T04:16:28.346Z",
+        "itemId": "broadsheet-mechanical-migration",
+        "outcome": "completed",
+        "reason": "Swept all hardcoded DM Sans/SF Mono font-family declarations across the frontend (index.css .terminal-output, recovery.tsx's two crash-overlay styles, KanbanCards.tsx, command-deck.module.css [35+ sites], stage.module.css, decisions.module.css, ContextWindowMeter.module.css, ProjectOverview.tsx, ActivityView/index.tsx) to var(--font-sans)/var(--font-mono), extending beyond the plan's originally-scoped 4 files to satisfy ac1's full-frontend grep. Deliberately left XTerminal.tsx's fontFamily untokenized — its WebGL addon renders glyphs through a canvas atlas that doesn't resolve CSS custom properties, so wiring it would silently break terminal text instead of just changing its look. Added the Broadsheet badge radius as an un-layered [data-theme=broadsheet] [class*=badge-bg-] rule (verified via compiled-CSS inspection that it actually wins over Tailwind's .rounded-sm utility without !important) instead of touching ~30 individual badge call sites. Updated the e2e conformance spec's index.css stub to mirror the real --font-display token wiring. Captured and committed 6 screenshots (sidebar/issue-card/workspace-header × ledger/broadsheet) via a real Vite dev server with wsTransport stubbed (not the conformance-spec's CSS-stripping harness, which would have hidden the very changes being verified) — confirmed visually: Ledger shows byte-identical layout with only glyph-shape variance, Broadsheet shows the intended font + badge-radius changes with no layout breakage. Had to fix a bug in my own capture script first: the mock /api/settings always returned theme:'broadsheet', and reconcileFromServer() (correctly) kept overwriting my test's intended theme back to broadsheet on every navigation — good proof the reconcile wiring from design-language-hook works. typecheck, lint, and the e2e conformance test (6/6) all green.",
+        "releasedAt": "2026-08-02T04:46:29.522Z"
       }
     ],
     "statusReasons": {
@@ -212,6 +215,10 @@
       "user-docs-appearance": {
         "reason": "Published configuration/appearance.mdx (Mintlify voice matching context-layers.mdx) documenting the Overdeck Theme setting, ui.theme config key, Settings picker behavior, self-hosted instant theme switch, page-not-modal doctrine, and Broadsheet-only governance in plain operator language. Added to docs.json's Configuration nav group after context-layers. Filed https://github.com/eltmon/overdeck/issues/3469 (NewProjectModal -> page migration follow-up) referencing PAN-3410's PRD and D-10/D-13, and linked it back via a comment on PAN-3410. docs.json parses valid JSON; node scripts/lint-docs.js and npm run lint both green.",
         "updatedAt": "2026-08-02T04:16:14.047Z"
+      },
+      "broadsheet-mechanical-migration": {
+        "reason": "Swept all hardcoded DM Sans/SF Mono font-family declarations across the frontend (index.css .terminal-output, recovery.tsx's two crash-overlay styles, KanbanCards.tsx, command-deck.module.css [35+ sites], stage.module.css, decisions.module.css, ContextWindowMeter.module.css, ProjectOverview.tsx, ActivityView/index.tsx) to var(--font-sans)/var(--font-mono), extending beyond the plan's originally-scoped 4 files to satisfy ac1's full-frontend grep. Deliberately left XTerminal.tsx's fontFamily untokenized — its WebGL addon renders glyphs through a canvas atlas that doesn't resolve CSS custom properties, so wiring it would silently break terminal text instead of just changing its look. Added the Broadsheet badge radius as an un-layered [data-theme=broadsheet] [class*=badge-bg-] rule (verified via compiled-CSS inspection that it actually wins over Tailwind's .rounded-sm utility without !important) instead of touching ~30 individual badge call sites. Updated the e2e conformance spec's index.css stub to mirror the real --font-display token wiring. Captured and committed 6 screenshots (sidebar/issue-card/workspace-header × ledger/broadsheet) via a real Vite dev server with wsTransport stubbed (not the conformance-spec's CSS-stripping harness, which would have hidden the very changes being verified) — confirmed visually: Ledger shows byte-identical layout with only glyph-shape variance, Broadsheet shows the intended font + badge-radius changes with no layout breakage. Had to fix a bug in my own capture script first: the mock /api/settings always returned theme:'broadsheet', and reconcileFromServer() (correctly) kept overwriting my test's intended theme back to broadsheet on every navigation — good proof the reconcile wiring from design-language-hook works. typecheck, lint, and the e2e conformance test (6/6) all green.",
+        "updatedAt": "2026-08-02T04:46:29.522Z"
       }
     }
   },
@@ -260,6 +267,10 @@
     "user-docs-appearance.user-docs-appearance.ac2": "completed",
     "user-docs-appearance.user-docs-appearance.ac3": "completed",
     "user-docs-appearance.user-docs-appearance.ac4": "completed",
-    "broadsheet-mechanical-migration": "running"
+    "broadsheet-mechanical-migration": "completed",
+    "broadsheet-mechanical-migration.broadsheet-mechanical-migration.ac1": "completed",
+    "broadsheet-mechanical-migration.broadsheet-mechanical-migration.ac2": "completed",
+    "broadsheet-mechanical-migration.broadsheet-mechanical-migration.ac3": "completed",
+    "broadsheet-mechanical-migration.broadsheet-mechanical-migration.ac4": "completed"
   }
 }
