@@ -304,25 +304,27 @@
     "recordedAt": "2026-08-02T23:23:05.476Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T23:51:42.593Z",
+  "updated": "2026-08-02T23:51:45.068Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T23:23:37.464Z",
-    "updatedAt": "2026-08-02T23:51:42.459Z",
-    "reviewNotes": "All four reviewers passed; no PAN-3423 manifest files changed since the prior approved synthesis.",
+    "updatedAt": "2026-08-02T23:51:42.471Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
     "uatNotes": "UAT executed: built workspace dashboard (npm run build:dashboard), ran it isolated on PORT=3423 with OVERDECK_DISABLE_DEACON=1 (never touched the shared host dashboard on 3011), drove it with an isolated Playwright session. Opened the live SystemHealthPill popover (real Warning-state data) and confirmed: state-badge header + relative updated time; bordered summary line; chip row replacing the old tile grid; all 4 vitals tiles rendering real threshold-colored meter bars incl. swap 'historical - not live pressure' label; grouped xN attention row collapsed with no inline Kill/Open (closed-by-default disclosure only); singleton rows with working Open/Kill wiring (verified via source + aria-labels, not clicked, to avoid killing another agent's live session on this shared host); closed-by-default context-notes disclosure; top-consumers kind badges + proportional bars + 'No leaks' header; Escape closes the popover. LEAKED-tag, healthy all-clear variant, and exact FR-3 message text were not re-observed live (system stayed in Warning state) but are covered by passing unit/component tests. Full evidence and screenshot description in .pan/test/result.json. Cleaned up the port-3423 process and scratch files afterward.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
+    "reviewRequestedAt": "2026-08-02T23:23:37.464Z",
     "reviewSpawnedAt": "2026-08-02T23:51:25.274Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -356,24 +358,6 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-02T23:23:05.476Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8"
-      }
     }
   },
   "closeOut": {
@@ -478,7 +462,7 @@
       },
       "costAtCloseOut": {
         "usd": 274.1191823,
-        "pricingAsOf": "2026-08-02T23:51:42.559Z"
+        "pricingAsOf": "2026-08-02T23:51:45.061Z"
       }
     },
     "merges": [
