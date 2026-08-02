@@ -203,10 +203,10 @@
     "recordedAt": "2026-08-02T21:03:43.259Z"
   },
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T21:04:57.890Z",
+  "updated": "2026-08-02T21:05:05.624Z",
   "pipeline": {
     "issueId": "PAN-3427",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "running",
     "inspectStatus": "passed",
@@ -214,7 +214,15 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:04:14.604Z",
-    "updatedAt": "2026-08-02T21:04:20.934Z",
+    "updatedAt": "2026-08-02T21:05:05.067Z",
+    "reviewNotes": "Review role spawn failed: Role run agent-pan-3427-review already running. Use 'pan tell' to message it.",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-02T20:56:36.501Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3506",
     "reviewedAtCommit": "a340937d0157b5084e2bbfa47f670f119adb427e",
     "reviewRequestedAt": "2026-08-02T21:04:14.604Z",
@@ -330,10 +338,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 5762,
-            "output": 202634,
-            "cacheRead": 153044851,
-            "cacheWrite": 7881371
+            "input": 5766,
+            "output": 204012,
+            "cacheRead": 154252834,
+            "cacheWrite": 7884362
           }
         }
       },
@@ -351,15 +359,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5762,
-          "output": 202634,
-          "cacheRead": 153044851,
-          "cacheWrite": 7881371
+          "input": 5766,
+          "output": 204012,
+          "cacheRead": 154252834,
+          "cacheWrite": 7884362
         }
       },
       "costAtCloseOut": {
-        "usd": 98.3773401,
-        "pricingAsOf": "2026-08-02T21:04:27.312Z"
+        "usd": 98.6402021,
+        "pricingAsOf": "2026-08-02T21:05:05.188Z"
       }
     },
     "merges": [
@@ -368,7 +376,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 30,
