@@ -51,7 +51,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T22:30:16.352Z",
-  "updated": "2026-08-02T18:39:11.898Z",
+  "updated": "2026-08-02T18:40:21.872Z",
   "pipeline": {
     "issueId": "PAN-3427",
     "reviewStatus": "pending",
@@ -110,16 +110,8 @@
   "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
-    "sequence": 21,
-    "claims": {
-      "cli-queue-verb": {
-        "writerId": "agent-pan-3427",
-        "agentId": "agent-pan-3427",
-        "pid": 1922345,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-02T18:39:11.898Z"
-      }
-    },
+    "sequence": 22,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3427",
@@ -230,6 +222,18 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3427 dead)",
         "releasedAt": "2026-08-02T18:34:22.496Z"
+      },
+      {
+        "writerId": "agent-pan-3427",
+        "agentId": "agent-pan-3427",
+        "pid": 1922345,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T18:39:11.898Z",
+        "itemId": "cli-queue-verb",
+        "outcome": "completed",
+        "reason": "Resumed session finished the queue verb: implementation, tests, and SKILL.md landed in ffd19079310a; typecheck, orders tests, and lint-skills all green. Prior claim owner agent-pan-3427 is no longer running.",
+        "forced": true,
+        "releasedAt": "2026-08-02T18:40:21.872Z"
       }
     ],
     "statusReasons": {
@@ -254,8 +258,9 @@
         "updatedAt": "2026-08-02T18:22:28.980Z"
       },
       "cli-queue-verb": {
-        "reason": "stale claim released (agent-pan-3427 dead)",
-        "updatedAt": "2026-08-02T18:34:22.496Z"
+        "reason": "Resumed session finished the queue verb: implementation, tests, and SKILL.md landed in ffd19079310a; typecheck, orders tests, and lint-skills all green. Prior claim owner agent-pan-3427 is no longer running.",
+        "updatedAt": "2026-08-02T18:40:21.872Z",
+        "forced": true
       }
     }
   },
@@ -281,6 +286,10 @@
     "resolver-first-ready": "completed",
     "resolver-first-ready.resolver-first-ready.ac1": "completed",
     "resolver-first-ready.resolver-first-ready.ac2": "completed",
-    "cli-queue-verb": "running"
+    "cli-queue-verb": "completed",
+    "cli-queue-verb.cli-queue-verb.ac1": "completed",
+    "cli-queue-verb.cli-queue-verb.ac2": "completed",
+    "cli-queue-verb.cli-queue-verb.ac3": "completed",
+    "cli-queue-verb.cli-queue-verb.ac4": "completed"
   }
 }
