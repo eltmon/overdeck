@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:58:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3396: bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline and offers no disposition path for recordless pre-record-era rows",
-    "updated": "2026-08-01T19:58:46.997Z"
+    "updated": "2026-08-02T02:45:20.942Z"
   },
   "plan": {
     "id": "pan-3396",
     "title": "bug(membership): zombie_pr bucket resurrects closed-out issues as inPipeline and offers no disposition path for recordless pre-record-era rows",
-    "status": "running",
+    "status": "completed",
     "uid": "8ebc9f4d-b06e-4f82-b9f1-2ec63816d682",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T15:58:00.000Z",
-    "updated": "2026-08-01T19:58:46.997Z",
+    "updated": "2026-08-02T02:45:20.942Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3396",
@@ -414,5 +414,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
