@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-02T03:43:24.983Z",
+  "updated": "2026-08-02T03:43:40.595Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "pending",
@@ -65,8 +65,16 @@
     }
   ],
   "tasks": {
-    "sequence": 10,
-    "claims": {},
+    "sequence": 11,
+    "claims": {
+      "appearance-theme-picker": {
+        "writerId": "agent-pan-3410",
+        "agentId": "agent-pan-3410",
+        "pid": 1504331,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-02T03:43:40.595Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3410",
@@ -172,6 +180,7 @@
     "design-language-hook.design-language-hook.ac1": "completed",
     "design-language-hook.design-language-hook.ac2": "completed",
     "design-language-hook.design-language-hook.ac3": "completed",
-    "design-language-hook.design-language-hook.ac4": "completed"
+    "design-language-hook.design-language-hook.ac4": "completed",
+    "appearance-theme-picker": "running"
   }
 }
