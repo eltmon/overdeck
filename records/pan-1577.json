@@ -791,17 +791,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-02T21:16:48.221Z",
+  "updated": "2026-08-02T21:25:28.195Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T21:11:31.378Z",
-    "updatedAt": "2026-08-02T21:11:45.063Z",
+    "updatedAt": "2026-08-02T21:25:28.140Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "7ec1b6ee2146619d8d443475847cdad7e2601550",
@@ -830,9 +830,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 26891136,
-            "output": 333557,
-            "cacheRead": 76896256,
+            "input": 31202605,
+            "output": 376802,
+            "cacheRead": 87727104,
             "cacheWrite": 0
           }
         },
@@ -870,10 +870,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2629,
-            "output": 507306,
-            "cacheRead": 544265117,
-            "cacheWrite": 24749179
+            "input": 2635,
+            "output": 508052,
+            "cacheRead": 545176290,
+            "cacheWrite": 24750348
           }
         }
       },
@@ -891,21 +891,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 38347555,
-          "output": 576540,
-          "cacheRead": 124154368,
+          "input": 42659024,
+          "output": 619785,
+          "cacheRead": 134985216,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2629,
-          "output": 507306,
-          "cacheRead": 544265117,
-          "cacheWrite": 24749179
+          "input": 2635,
+          "output": 508052,
+          "cacheRead": 545176290,
+          "cacheWrite": 24750348
         }
       },
       "costAtCloseOut": {
-        "usd": 449.5620483,
-        "pricingAsOf": "2026-08-02T21:11:45.340Z"
+        "usd": 478.0247963,
+        "pricingAsOf": "2026-08-02T21:25:28.186Z"
       }
     },
     "merges": [
@@ -1096,5 +1096,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
