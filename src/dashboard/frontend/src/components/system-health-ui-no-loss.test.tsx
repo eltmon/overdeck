@@ -287,7 +287,9 @@ describe('system health UI no-loss audit', () => {
     const dialog = screen.getByRole('dialog', { name: 'System health' });
     // Top consumers section with kind badges
     expect(within(dialog).getByText(/Work|Specialist|Container/)).toBeInTheDocument();
-    expect(within(dialog).getByText(/agent-pan-1|specialist-review-agent|container-1/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/agent-pan-1/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/specialist-review-agent/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/container-1/)).toBeInTheDocument();
   });
 
   it('displays attention section with severity dots and grouped agent rows when critical', () => {
@@ -314,7 +316,8 @@ describe('system health UI no-loss audit', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
     // Attention section should exist with agent activity issue
-    expect(within(dialog).getByText(/agent-stalled|activity stalled/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/agent activity stalled/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/agent-stalled · PAN-1/)).toBeInTheDocument();
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {

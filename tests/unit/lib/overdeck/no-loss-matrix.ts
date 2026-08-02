@@ -418,6 +418,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
   { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
 
+  // ── parked.ts (PAN-3485 phase 1) ────────────────────────────────────────────
+  { surface: 'GET /api/parked',                                      kind: 'http', disposition: 'READ',        door: 'resolveParkedPopulation (parked resolver over review_status rows ∪ registered agents)' },
+
+  // ── velocity.ts ───────────────────────────────────────────────────────────
+  { surface: 'GET /api/velocity',                                    kind: 'http', disposition: 'AGGREGATE',   door: 'EventStoreService transitions + resolveParkedPopulation (rolling-window pipeline velocity report)' },
+
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },
   { surface: 'GET /api/remote/workspaces',                                  kind: 'http', disposition: 'RELOCATE',    door: 'Workspace' },

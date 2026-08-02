@@ -439,7 +439,7 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </div>
           </div>
 
-          {attentionItems.length > 0 ? (
+          {attentionItems.length > 0 && (
             <div className="mb-3">
               <div className="space-y-1 rounded-lg border border-border p-2">
                 {attentionItems.map((item) => (
@@ -483,10 +483,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                   </div>
                 </details>
               )}
-            </div>
-          ) : (
-            <div className="mb-3 rounded-lg border border-border p-2 text-xs text-foreground">
-              {summary}
             </div>
           )}
 
