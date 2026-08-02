@@ -22,22 +22,9 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-02T03:44:51.616Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-02T04:02Z] review-agent → CHANGES-REQUESTED — seq 1",
-      "timestamp": "2026-08-02T04:02:25.208Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-02T04:02:25Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3423\n\n# Review Synthesis — PAN-3423 — 2026-08-02T04:20:00Z\n\n## Verdict: CHANGES REQUESTED — attention-row actions derive invalid issue IDs and the redesigned no-loss gate is red\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/context.json\n- Branch: feature/pan-3423\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n- HEAD reviewed: c562dc1093c62689a3c1bc8fb86b14acd40d6458\n- Cycle number: 1\n- Prior cycle SHA: none\n- PR merge base: 50f9d451a5805c7b3faaab0031373c36b08a4303\n- PR commits: 3\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/correctness.md | 3 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/requirements.md | 3 |\n\nAll blocker locations are inside the PR diff. This is cycle 1, so the cycle diff equals the PR diff. The seven raw reviewer blockers do not trigger the proportionality gate because the PR contains three commits and the threshold is nine blockers.\n\n## Blocking Findings\n\n### [correctness, requirements] Attention-row actions open the wrong issue and leave grouped rows without the required action path — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:449`\nThe singleton Open handler reconstructs an issue ID from `agentId` with `replace(/^agent-/, 'PAN-').split('-').slice(0, -1).join('-')`. Agent IDs do not encode canonical issue IDs: `agent-pan-3423` becomes `PAN-pan`, `agent-stalled` becomes `PAN`, and non-PAN projects are hardcoded incorrectly. The attention model already reads each agent's canonical `issueId` but does not carry it onto `AttentionItem`. Grouped agent rows have no action at all, and attention rows do not reuse the required existing kill affordance. Carry the canonical issue ID and actionable target through the attention model, call `openIssue(issueId)` directly, reuse the existing kill flow where required, and define the grouped-row action required by FR-6.\n\n### [requirements] Informational context notes disappear when they are the only health evidence — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:429`\nThe context-note `<details>` disclosure is nested inside `attentionItems.length > 0`. A healthy or info-only snapshot can produce `notes.length > 0` while producing no warning or critical attention items, so the component takes the fallback branch and drops all informational diagnostics. Render the context-note disclosure independently whenever notes exist, while keeping it visually separate from active pressure signals.\n\n### [correctness] The healthy popover renders the same summary twice — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:474`\nThe header always renders `{summary}` at lines 361-363, and the empty-attention fallback renders the identical `{summary}` again. The normal healthy path therefore shows two identical “All clear” cards, and the no-loss test's summary query fails because two elements match. Keep one canonical header summary and remove or replace the duplicate fallback with distinct empty-state content.\n\n### [correctness, requirements] The redesign drops required diagnostics and the changed no-loss suite fails three of six tests — `src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx:217`\nThe changed audit expects retained diagnostic sub-lines (`Load/core 0.20`, `Avail 41 GB`, `4.7% of host RAM`, and `Overcommit 125.0%`) and explicit chip/kind vocabulary, but the changed component no longer renders those four diagnostics, combines the chip copy, and exposes raw lowercase contract values for consumer kinds. The focused frontend command exits 1 with failures in the header-metric, top-consumer, and attention-section tests; several new broad regex queries also match multiple nodes or prove only one member of an alternation. Restore the no-loss information and intended user-facing labels, then make each assertion target one exact semantic element so the audit proves every retained item and action.\n\n### [performance] Top-consumer rendering rescans and reallocates the full list for every row — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:498`\nThe outer row map computes `Math.max(...leakedFirstConsumers.map(c => c.memoryGb), 1)` inside every callback. Rendering `n` consumers performs `n` full scans and allocates `n` temporary arrays, making each popover render O(n²). Compute the maximum once outside the row loop with a single linear pass and reuse it for every memory bar.\n\n## Non-blocking Findings\n\n### [requirements] Whole-feature work outside this PR's manifest\n- `~` `[demoted: whole-feature scope]` FR-3 server inactivity copy cannot be assessed because no server file is in this PR diff.\n- `~` `[demoted: whole-feature scope]` The pure attention-model implementation is outside this PR diff; this cycle reviews only its changed consumer integration.\n- `~` `[demoted: whole-feature scope]` NFR-1 documentation is outside this PR diff and cannot block this cycle.\n\n## Scope Note\nThe requirements reviewer identified three whole-feature items that are not promised by this two-file PR diff. They remain visible above as non-blocking scope notes; only findings classified `Scope: in_pr_scope` contribute to the blocked verdict.\n\n## Clean Sub-roles\n- security — no security blockers or advisories; the changed rendering remains React-escaped and introduces no new privileged request or trust-boundary crossing.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-c562dc10/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3423 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -65,10 +52,10 @@
     "recordedAt": "2026-08-02T03:23:12.679Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-02T04:02:25.208Z",
+  "updated": "2026-08-02T04:02:55.346Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -76,10 +63,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T03:23:52.525Z",
-    "updatedAt": "2026-08-02T03:52:18.473Z",
+    "updatedAt": "2026-08-02T04:02:24.507Z",
+    "reviewNotes": "Attention-row actions derive invalid issue IDs; the no-loss suite is red",
     "inspectNotes": "All 4 ACs met in src/dashboard/frontend/src/lib/system-health-attention.ts. AC1: info reasons filtered at all four reason sources (host/admission/services/agents, lines 92-131) and contextNotes covers exactly those same four sources (lines 15-22) — verified against SystemHealthSnapshot in packages/contracts/src/system-health.ts:253-278, which has no fifth reason-bearing field. AC2: agent-domain codes with >1 entry produce one row with agents=[both ids], agentId omitted, sub='2x agents: a, b' truncating at slice(0,2) + '+N more'. AC3: mapPresentationSeverity forces agent.runtime.inactive.stalled to critical and the comparator sorts critical first, then stalled before idle. AC4: healthy snapshot yields [] and summaryLine returns 'All clear - <N> GiB spawn headroom - relay running - 0 stalled agents'. NFR-2 satisfied: pure module, no React import. NON-BLOCKING (outside these ACs, for the component bead or review convoy): (1) reasonLabel line 78-82 returns the literal 'Retry' as the row TITLE for system.health_snapshot.unavailable (severity critical per src/dashboard/server/routes/misc/health.ts:57) and agent.persisted_state.unavailable (severity warning per src/lib/agents/health.ts:171) — both survive the info filter, so a real outage renders a row titled 'Retry'. In SystemHealthPill.tsx:114-117 that string was a suffix of 'Health unavailable - Retry', not a title. (2) Non-agent codes are grouped by code but rendered from entries[0] only, so two services emitting the same code would silently drop all but the first. (3) Grouped rows take severity from entries[0], so a mixed-severity group under one code under-reports. (4) FR-8 names memory percent in the summary line; only the all-clear variant carries headroom and neither non-healthy variant carries memory percent.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
-    "reviewRequestedAt": "2026-08-02T03:23:52.525Z",
     "reviewSpawnedAt": "2026-08-02T03:52:18.472Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -106,11 +93,69 @@
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
       ],
       "recordedAt": "2026-08-02T03:23:12.679Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "c562dc1093c62689a3c1bc8fb86b14acd40d6458"
+      }
     }
   },
   "closeOut": {
     "usage": {
       "byStage": {
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 344168,
+            "output": 16685,
+            "cacheRead": 3731968,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 707319,
+            "output": 18303,
+            "cacheRead": 3285504,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 579890,
+            "output": 9736,
+            "cacheRead": 1472000,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 1092966,
+            "output": 72428,
+            "cacheRead": 1692160,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 432754,
+            "output": 7520,
+            "cacheRead": 1516032,
+            "cacheWrite": 0
+          }
+        },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
             "input": 1118,
@@ -121,6 +166,12 @@
         }
       },
       "totals": {
+        "openai/gpt-5.6-sol": {
+          "input": 3157097,
+          "output": 124672,
+          "cacheRead": 11697664,
+          "cacheWrite": 0
+        },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1118,
           "output": 57676,
@@ -129,8 +180,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 3.947687,
-        "pricingAsOf": "2026-08-02T03:52:18.507Z"
+        "usd": 29.322164,
+        "pricingAsOf": "2026-08-02T04:02:24.543Z"
       }
     },
     "merges": [
@@ -139,7 +190,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3423",
