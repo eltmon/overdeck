@@ -2,7 +2,7 @@
   "issueId": "PAN-3420",
   "schemaVersion": 2,
   "created": "2026-08-01T15:00:57.590Z",
-  "updated": "2026-08-02T17:02:58.297Z",
+  "updated": "2026-08-02T17:03:29.111Z",
   "pipeline": {
     "issueId": "PAN-3420",
     "reviewStatus": "pending",
@@ -28,14 +28,5 @@
       "timestamp": "2026-08-01T15:07:22.212Z"
     }
   ],
-  "recoveryTrips": [
-    {
-      "issue": "PAN-3420",
-      "recoveryPath": "orphan-proposed-pickup-gate",
-      "obligationGeneration": "proposed",
-      "tripCount": 1,
-      "open": true,
-      "needsYouEmittedAt": "2026-08-01T15:41:43.123Z"
-    }
-  ]
+  "recoveryTrips": []
 }
