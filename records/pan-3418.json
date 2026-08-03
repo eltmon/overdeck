@@ -66,7 +66,7 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:17:18.066Z",
+  "updated": "2026-08-03T02:18:19.295Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "blocked",
@@ -76,15 +76,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z",
-    "updatedAt": "2026-08-03T02:17:18.001Z",
-    "reviewNotes": "Active conversation composers are re-seeded to the global model because the production caller does not pass liveConversation.",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since e884ff6 (1 path): src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "detectedAt": "2026-08-03T02:17:01.763Z"
-      }
-    ],
+    "updatedAt": "2026-08-03T02:18:19.117Z",
     "conflictsSince": {
       "sha": "e884ff6ed2b1d6bc81f876478635ac4a462341f0",
       "detectedAt": "2026-08-03T02:17:01.763Z",
@@ -94,34 +86,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
-    "reviewSpawnedAt": "2026-08-01T16:45:58.719Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
-        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
-      ],
-      "actualChangedFiles": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
-        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
-      ],
-      "recordedAt": "2026-08-01T16:33:34.861Z"
-    }
+    "reviewSpawnedAt": "2026-08-01T16:45:58.719Z"
   },
   "closeOut": {
     "usage": {
@@ -185,7 +150,7 @@
       },
       "costAtCloseOut": {
         "usd": 53.213838,
-        "pricingAsOf": "2026-08-03T02:17:18.013Z"
+        "pricingAsOf": "2026-08-03T02:18:19.259Z"
       }
     },
     "merges": [
