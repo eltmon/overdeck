@@ -855,20 +855,21 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T00:40:55.553Z",
+  "updated": "2026-08-03T00:46:54.770Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
     "testStatus": "testing",
-    "uatStatus": "passed",
+    "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-03T00:39:25.785Z",
+    "updatedAt": "2026-08-03T00:46:54.079Z",
     "testNotes": "HEAD adcbe598d4644f40e394f1907fc36628b9095c87 (matches last review's reviewedAtCommit). install: PASS (bun install --frozen-lockfile, no changes). typecheck: PASS (npm run typecheck — root, hooks, evals, dashboard-types ratchet 55 known/none new, frontend-types ratchet 0 known/none new). frontend-typecheck: PASS (npx tsc --noEmit in src/dashboard/frontend, zero output). lint: PASS (full npm run lint chain, exit 0 — including lint:circular: 77 baselined cycles, no new cycles; the lint:circular failure a prior test-agent cycle reported against deacon.ts>stall-sweeper.ts>service.ts is no longer failing, so that pre-existing red-main defect has since been resolved/baselined upstream). build: PASS (npm run build, vite build clean, dist-externals check passed). server-bundle: PASS (npm run build:dashboard:server:bundle, 615 files bundled, exit 0). test: FAILED — configured gate is 'OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main' for both root and src/dashboard/frontend. Root vitest: all changed-scoped tests passed. Frontend vitest: 1 file / 3 tests failed in src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx (expects a 'Load/core' assertion inside SystemHealthPill's dialog that the component no longer renders). Investigated root cause per repo policy: `git diff origin/main -- src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx src/dashboard/frontend/src/components/SystemHealthPill.tsx` returns zero diff and `git log origin/main..HEAD` for both paths returns zero commits — this branch has not touched either file, so the failure is inherited unchanged from origin/main, not a PAN-3410 regression (matches the identical finding already recorded by the prior test-agent cycle, attributed to unmerged PAN-3423/PR#3466 whose matching test fix hasn't landed). Per task instructions the top-level status reflects the literal configured-gate result regardless of attribution, so status is 'failed' on this required test gate. All PAN-3410-scoped test files (config-yaml-ui-theme, settings-api x2, fonts-local, useDesignLanguage, AppearanceSection, recovery, styleguide-conformance e2e) are unaffected and outside the single failing file.",
+    "uatNotes": "UAT is required: the xBRIEF (Settings → Appearance two-card theme picker with live mini-specimens, data-theme live switching, Broadsheet/Ledger visual parity, screenshot-proof acceptance criteria) and the issue description are unambiguously a browser-verifiable dashboard UI feature. UAT could not run: brought up this workspace's own isolated Docker stack (docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server frontend, per feature-pan-3410's own compose file — host dashboard/Deacon never touched) and the init service failed with the identical tsdown PARSE_ERROR at legacy-routes.ts:259 documented in testNotes, so the workspace server container never started and no build artifact exists to serve the app. No acceptance criterion could be exercised. Torn down the broken server/frontend/init containers after capturing the failure (docker compose down), leaving only the pre-existing idle dev container.",
     "conflictsSince": {
       "sha": "acc4e819be7df18233dbdfd67f2aecdd0340ebe1",
       "detectedAt": "2026-08-03T00:22:37.520Z",
@@ -900,10 +901,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 426,
-            "output": 81975,
-            "cacheRead": 51610273,
-            "cacheWrite": 589823
+            "input": 760,
+            "output": 101837,
+            "cacheRead": 57379593,
+            "cacheWrite": 785855
           }
         },
         "work": {
@@ -929,15 +930,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 7249,
-          "output": 751523,
-          "cacheRead": 655222014,
-          "cacheWrite": 32480098
+          "input": 7583,
+          "output": 771385,
+          "cacheRead": 660991334,
+          "cacheWrite": 32676130
         }
       },
       "costAtCloseOut": {
-        "usd": 597.4779543,
-        "pricingAsOf": "2026-08-03T00:39:25.792Z"
+        "usd": 599.3211883,
+        "pricingAsOf": "2026-08-03T00:46:54.371Z"
       }
     },
     "merges": [
@@ -946,7 +947,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-sonnet-5",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
