@@ -1101,7 +1101,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T03:21:13.320Z",
+  "updated": "2026-08-03T04:48:02.619Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1110,12 +1110,15 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-03T03:20:51.313Z",
-    "reviewNotes": "Approved at 756a77d5: all four reviewers passed with no blocking findings; 26 in-PR requirements implemented.",
-    "testNotes": "All configured gates green at HEAD 756a77d5 (matches reviewedAtCommit): install, typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet), frontend-typecheck, lint (eslint + all 18 sub-lints incl. circular-deps/ratchet-audit/quarantine-audit/skills/slash-commands), build, server-bundle all pass. Test: frontend vitest 174/174 files, 1956/1956 tests passed. Root vitest 741/746 files, 7202/7238 tests passed; 5 files (9 tests, schema-audit/issues/observability) failed with uniform 'Test timed out in 5000ms' under host load (uptime load 18.9-27.2 on 24 cores, ~23 concurrent agents). Root-caused as load, not a defect: reran those 3 files isolated with a longer timeout, all 10 tests passed cleanly in ~19s -- matches this branch's own history of identically root-causing the same flaky pattern 3 prior times.",
-    "uatNotes": "Menu-picker move and native drag-and-drop move both verified end-to-end via isolated Playwright UAT against this workspace's built dist (isolated HOME+OVERDECK_HOME, deacon disabled, throwaway projects/conversations). Menu move: 3-dot -> Move -> project picker (current project disabled) -> select target -> optimistic re-group + toast 'Moved \"<title>\" to <project>'. Drag-drop: dragged row onto sidebar project rail -> immediate optimistic re-group. Both confirmed server-side via GET /api/conversations: projectKey updated to target while cwd stayed pinned to the original path throughout (JSONL/cwd-sacred invariant held).",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-03T04:48:01.447Z",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-08-03T04:48:01.405Z"
+      }
+    ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "756a77d590e9b0095841cebeaea0511cf73f4778",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
@@ -1182,18 +1185,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 734,
-            "output": 146390,
-            "cacheRead": 78601455,
-            "cacheWrite": 1184942
+            "input": 738,
+            "output": 147391,
+            "cacheRead": 79301532,
+            "cacheWrite": 1189948
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3461,
-            "output": 695895,
-            "cacheRead": 699646306,
-            "cacheWrite": 27418081
+            "input": 3465,
+            "output": 696151,
+            "cacheRead": 700841628,
+            "cacheWrite": 27418954
           }
         }
       },
@@ -1217,15 +1220,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4195,
-          "output": 842285,
-          "cacheRead": 778247761,
-          "cacheWrite": 28603023
+          "input": 4203,
+          "output": 843542,
+          "cacheRead": 780143160,
+          "cacheWrite": 28608902
         }
       },
       "costAtCloseOut": {
-        "usd": 758.858521,
-        "pricingAsOf": "2026-08-03T03:20:51.725Z"
+        "usd": 759.264885,
+        "pricingAsOf": "2026-08-03T04:48:01.978Z"
       }
     },
     "merges": [
