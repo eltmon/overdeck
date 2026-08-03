@@ -1182,26 +1182,31 @@
       "timestamp": "2026-08-03T07:10:47.356Z",
       "reason": "end",
       "note": "Re-triggering verification: e2e.test.ts and cost-reconcile-harnesses.integration.test.ts both pass cleanly in isolation; confirmed severe I/O pressure (PSI full avg10=19.26%) causing beforeEach hook timeouts under concurrent load, no code change needed"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T07:11:09.380Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T07:11:08.349Z",
+  "updated": "2026-08-03T07:11:10.579Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T07:11:07.028Z",
+    "updatedAt": "2026-08-03T07:11:08.412Z",
     "reviewNotes": "Verification failed at test",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
     "reviewRequestedAt": "2026-08-03T07:10:22.825Z",
-    "reviewSpawnedAt": "2026-08-03T05:14:36.729Z"
+    "reviewSpawnedAt": "2026-08-03T07:11:08.412Z"
   },
   "closeOut": {
     "usage": {
@@ -1307,7 +1312,7 @@
       },
       "costAtCloseOut": {
         "usd": 855.0692863,
-        "pricingAsOf": "2026-08-03T07:11:07.072Z"
+        "pricingAsOf": "2026-08-03T07:11:10.568Z"
       }
     },
     "merges": [
