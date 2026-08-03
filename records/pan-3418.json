@@ -164,10 +164,10 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T04:56:09.552Z",
+  "updated": "2026-08-03T04:56:14.666Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "pending",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "failed",
@@ -175,8 +175,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T04:55:57.649Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
+    "updatedAt": "2026-08-03T04:55:57.690Z",
+    "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (698360ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418\n\n ❯ |root| tests/unit/lib/harness-resolve.test.ts (8 tests | 2 failed) 340ms\n     × is provider-default-only (PAN-1984): ignores explicit and role; provider config then built-in default wins 294ms (retry x1)\n     × passes the resolved provider-default winner through the harness policy gate 12ms (retry x1)\n ❯ |root| tests/unit/lib/review-status.test.ts (12 tests | 1 failed) 125ms\n     × rejects a review verdict whose evidence HEAD differs from the verified target HEAD 66ms (retry x1)\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\n ❯ |root| tests/unit/lib/agents/spawn-flywheel-provenance.test.ts (5 tests | 1 failed) 28ms\n     × persists the same flywheel run id in spawnRun state 12ms (retry x1)\n ❯ |root| tests/unit/cli/state-migrate-cancellation.test.ts (0 test)\n\n Test Files  42 passed (42)\n      Tests  628 passed (628)\n   Start at  00:50:40\n   Duration  21.39s (transform 5.88s, setup 6.99s, import 32.33s, tests 21.95s, environment 15.36s)\n\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedback delivery\n[specialists/done] review signaling failed for PAN-RAC-HTTP\n\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedbac\n…(4245 chars elided)…\nidating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-aXcEe8/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] sp\n...(truncated)",
     "blockerReasons": [
       {
@@ -331,7 +331,7 @@
       },
       "costAtCloseOut": {
         "usd": 132.9551403,
-        "pricingAsOf": "2026-08-03T04:56:09.442Z"
+        "pricingAsOf": "2026-08-03T04:56:13.172Z"
       }
     },
     "merges": [
