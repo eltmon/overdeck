@@ -1191,7 +1191,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T07:14:29.816Z",
+  "updated": "2026-08-03T07:14:36.605Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1201,7 +1201,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T07:14:28.952Z",
+    "updatedAt": "2026-08-03T07:14:31.110Z",
     "reviewNotes": "Role run agent-pan-1577-review already running. Use 'pan tell' to message it.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
@@ -1312,7 +1312,7 @@
       },
       "costAtCloseOut": {
         "usd": 855.9194343,
-        "pricingAsOf": "2026-08-03T07:14:29.425Z"
+        "pricingAsOf": "2026-08-03T07:14:35.861Z"
       }
     },
     "merges": [
