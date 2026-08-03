@@ -12,11 +12,16 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-08-03T04:43:15.724Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-opus-5",
+      "timestamp": "2026-08-03T05:29:32.590Z"
     }
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T05:19:15.008Z",
+  "updated": "2026-08-03T05:29:32.590Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
