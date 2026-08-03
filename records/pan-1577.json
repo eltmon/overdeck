@@ -887,19 +887,16 @@
       "reason": "feedback",
       "note": "[2026-08-03T00:25Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-03T00:25:58.884Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-03T00:25:58Z",
-      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T00:27:07.168Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T00:27:05.103Z",
+  "updated": "2026-08-03T00:27:07.567Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -909,22 +906,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
-    "updatedAt": "2026-08-03T00:27:05.057Z",
+    "updatedAt": "2026-08-03T00:27:06.014Z",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since acc4e81 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-08-03T00:22:37.520Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "acc4e819be7df18233dbdfd67f2aecdd0340ebe1",
-      "detectedAt": "2026-08-03T00:22:37.520Z",
-      "paths": [
-        "scripts/file-size-allowlist.txt"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-02T23:10:22.124Z",
@@ -1026,7 +1009,7 @@
       },
       "costAtCloseOut": {
         "usd": 549.5952993,
-        "pricingAsOf": "2026-08-03T00:27:05.095Z"
+        "pricingAsOf": "2026-08-03T00:27:07.558Z"
       }
     },
     "merges": [
