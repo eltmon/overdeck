@@ -138,10 +138,10 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T03:28:22.744Z",
+  "updated": "2026-08-03T03:28:31.175Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -149,7 +149,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T03:28:20.205Z",
+    "updatedAt": "2026-08-03T03:28:31.054Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "uatNotes": "Browser UAT not required: no mention of Playwright, UAT, screenshots, or browser flows in the issue body, PRD, PR notes, or xBRIEF continue state. All 5 in-scope acceptance criteria are unit/component-test verifiable and are covered, including src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx, a DOM-level integration test that mounts the real ComposerFooter+ModelPicker tree (no mocking of ModelPicker) and specifically proves the review-cycle-1 blocking defect (live conversation model being re-seeded to the global default) is fixed. The only acceptance criterion needing a running dashboard (FR-6, live-host row repair) is explicitly deferred to post-deploy close-out per its own xBRIEF item (readiness: sequential) and cannot execute before this branch merges and deploys.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -192,6 +193,28 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-03T02:40:57.628Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-72af5dc4/security.md",
+        "atCommit": "72af5dc4c8d93b20cc8e008e278f74d3969cfe97"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-72af5dc4/correctness.md",
+        "atCommit": "72af5dc4c8d93b20cc8e008e278f74d3969cfe97"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-72af5dc4/performance.md",
+        "atCommit": "72af5dc4c8d93b20cc8e008e278f74d3969cfe97"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-72af5dc4/requirements.md",
+        "atCommit": "72af5dc4c8d93b20cc8e008e278f74d3969cfe97"
+      }
     }
   },
   "closeOut": {
@@ -247,10 +270,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 168,
-            "output": 44725,
-            "cacheRead": 15013574,
-            "cacheWrite": 427201
+            "input": 170,
+            "output": 44969,
+            "cacheRead": 15200114,
+            "cacheWrite": 427441
           }
         },
         "work": {
@@ -276,15 +299,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 168,
-          "output": 44725,
-          "cacheRead": 15013574,
-          "cacheWrite": 427201
+          "input": 170,
+          "output": 44969,
+          "cacheRead": 15200114,
+          "cacheWrite": 427441
         }
       },
       "costAtCloseOut": {
-        "usd": 122.8015233,
-        "pricingAsOf": "2026-08-03T03:28:22.730Z"
+        "usd": 122.8418753,
+        "pricingAsOf": "2026-08-03T03:28:31.144Z"
       }
     },
     "merges": [
