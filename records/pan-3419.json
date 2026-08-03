@@ -462,10 +462,10 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-03T05:43:54.143Z",
+  "updated": "2026-08-03T05:46:50.517Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -473,11 +473,30 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T05:37:18.072Z",
+    "updatedAt": "2026-08-03T05:46:50.390Z",
+    "reviewNotes": "Approved; cycle-10 PR delta is allowlist-only and all four reviewers found no blocking regression",
     "uatNotes": "UAT required: acceptance criteria explicitly describe the dashboard Fork/Handoff modal Project select and CommandDeck grouping behavior. Rebuilt (npm run build:dashboard) and restarted the workspace's own isolated peer container (overdeck-feature-pan-3419-server-1, mode=peer, OVERDECK_DISABLE_DEACON=1) to current commit 10aee59c028 (was stale on f9b6b7314) — never touched the host/production dashboard on port 3011, per the test role's host-process boundary. Verified via Playwright against https://feature-pan-3419.overdeck.localhost/: (1) explicit-project-first grouping — conversation with project_key='uat-alpha' and an unrelated cwd (/tmp/uat-isolated-cwd) correctly grouped under the uat-alpha project bucket in the sidebar/CommandDeck, not derived from cwd; (2) cwd-fallback grouping — a conversation with no project_key and cwd=/tmp/uat-beta correctly grouped under uat-beta via cwd containment; (3) opened 'Create summary fork' on the uat-alpha-scoped conversation: the Project <select> rendered with 'Same as source (uat-alpha)' selected by default plus 'uat-alpha' and 'uat-beta' listed — confirms fork-modal-project.ac1/ac2; (4) submitted with the default selection — captured POST /api/conversations/uat-test-source/summary-fork request body omitted projectKey entirely, confirming inherit-by-omission; (5) reopened the modal, selected uat-beta explicitly, submitted — captured request body contained \"projectKey\":\"uat-beta\", confirming fork-modal-project.ac3. Both submissions reached the server correctly and both returned 400 'No session file found for conversation uat-test-source' — expected, since this is a synthetic fixture conversation with a fake session locator and no real transcript to summarize; unrelated to project-key logic and not a criterion under test. (6) `pan handoff --help` and `pan fork --help` both show `--project <key>` with the correct inherit-from-source default description, confirming cli-project-flag.ac4. (7) Docs confirmed present: sync-sources/skills/pan-handoff/SKILL.md, features/conversations.mdx, and sync-sources/rules/handoff-isolate-cwd.md all document --project and its inherit-default behavior. Data-cleanup item (conv 1827 -> mind-your-now) was already completed and verified by the work agent against the canonical host ~/.overdeck runtime DB per the durable record's claimHistory; this isolated peer container's DB is deliberately separate (single-deacon invariant) so it cannot be re-verified from here. Palette-explicit routing (backend-only, no distinct browser-observable surface beyond existing CommandDeck grouping already verified) is covered by its passing unit test (src/dashboard/server/routes/__tests__/palette.test.ts) in the full suite run above.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewSpawnedAt": "2026-08-03T05:37:18.071Z"
+    "reviewSpawnedAt": "2026-08-03T05:37:18.071Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "c892a642022c095b9ca19bd42f2e7ec2d20d7bc6"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "c892a642022c095b9ca19bd42f2e7ec2d20d7bc6"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "c892a642022c095b9ca19bd42f2e7ec2d20d7bc6"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "c892a642022c095b9ca19bd42f2e7ec2d20d7bc6"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -492,9 +511,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 31452755,
-            "output": 257984,
-            "cacheRead": 79275008,
+            "input": 36425545,
+            "output": 286053,
+            "cacheRead": 86024704,
             "cacheWrite": 0
           }
         },
@@ -540,9 +559,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8111147,
-            "output": 339558,
-            "cacheRead": 221871616,
+            "input": 8198200,
+            "output": 360222,
+            "cacheRead": 229900800,
             "cacheWrite": 0
           }
         }
@@ -555,9 +574,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 54997329,
-          "output": 847480,
-          "cacheRead": 341602304,
+          "input": 60057172,
+          "output": 896213,
+          "cacheRead": 356381184,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -568,8 +587,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 502.0893923,
-        "pricingAsOf": "2026-08-03T05:37:22.507Z"
+        "usd": 536.2400373,
+        "pricingAsOf": "2026-08-03T05:46:50.482Z"
       }
     },
     "merges": [
