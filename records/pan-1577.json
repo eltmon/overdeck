@@ -1102,19 +1102,16 @@
       "reason": "feedback",
       "note": "[2026-08-03T04:53Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-03T04:53:22.649Z"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-03T04:53:22Z",
-      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T04:54:01.742Z"
     }
   ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T04:53:59.703Z",
+  "updated": "2026-08-03T04:54:03.378Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1124,22 +1121,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:53:59.652Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 903a865 (2 paths): src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts",
-        "detectedAt": "2026-08-03T04:48:36.083Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "903a865ab5fe0223ba473c3ef5560b6a760f26f4",
-      "detectedAt": "2026-08-03T04:48:36.083Z",
-      "paths": [
-        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-        "src/lib/cloister/review-verdict-writer.ts"
-      ]
-    },
+    "updatedAt": "2026-08-03T04:54:00.515Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewSpawnedAt": "2026-08-03T02:52:06.580Z"
@@ -1248,7 +1230,7 @@
       },
       "costAtCloseOut": {
         "usd": 762.276779,
-        "pricingAsOf": "2026-08-03T04:53:59.697Z"
+        "pricingAsOf": "2026-08-03T04:54:03.371Z"
       }
     },
     "merges": [
