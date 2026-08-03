@@ -1136,7 +1136,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T05:02:02.566Z",
+  "updated": "2026-08-03T05:02:06.472Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1457,5 +1457,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
