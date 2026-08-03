@@ -1191,20 +1191,21 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T07:11:21.217Z",
+  "updated": "2026-08-03T07:11:27.966Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "failed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T07:11:20.985Z",
-    "reviewNotes": "Review role spawn failed: Role run agent-pan-1577-review already running. Use 'pan tell' to message it.",
+    "updatedAt": "2026-08-03T07:11:21.010Z",
+    "reviewNotes": "Failed to spawn review role",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
+    "reviewRequestedAt": "2026-08-03T07:10:22.825Z",
     "reviewSpawnedAt": "2026-08-03T07:11:08.412Z"
   },
   "closeOut": {
@@ -1311,7 +1312,7 @@
       },
       "costAtCloseOut": {
         "usd": 855.2093233,
-        "pricingAsOf": "2026-08-03T07:11:21.161Z"
+        "pricingAsOf": "2026-08-03T07:11:26.529Z"
       }
     },
     "merges": [
