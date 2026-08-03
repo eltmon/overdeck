@@ -152,6 +152,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T05:36Z] review-agent → FAILED — seq 16",
       "timestamp": "2026-08-03T05:36:23.364Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T05:36Z] review-agent → FAILED — seq 17",
+      "timestamp": "2026-08-03T05:36:25.390Z"
     }
   ],
   "feedback": [
@@ -266,6 +271,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-03T05:36:23Z",
       "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3512` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3512`."
+    },
+    {
+      "seq": 17,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T05:36:25Z",
+      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3512`."
     }
   ],
   "scopeDrift": {
@@ -317,7 +329,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T05:36:23.365Z",
+  "updated": "2026-08-03T05:36:25.391Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
