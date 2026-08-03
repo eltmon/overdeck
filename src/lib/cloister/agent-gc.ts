@@ -312,6 +312,7 @@ export async function pruneStoppedAgentsForIssue(
 export async function pruneTerminalStoppedAgents(
   agents: AgentGcRow[] = listAllAgentsSync(),
   deps: AgentGcDeps = defaultAgentGcDeps(),
+  options: { dryRun?: boolean } = {},
 ): Promise<AgentGcResult> {
   const candidates = agents.filter((agent) =>
     agent.phase !== RETAINED_TRANSCRIPTS_PHASE
@@ -335,6 +336,10 @@ export async function pruneTerminalStoppedAgents(
       deps.log?.(`[agent-gc] preserving ${agent.id}: live terminality check failed: ${message}`);
       preserved.push(agent.id);
     }
+  }
+
+  if (options.dryRun) {
+    return { removed: terminal.map((agent) => agent.id), preserved };
   }
 
   const result = await pruneAgentRowsAfterTranscriptCleanup(

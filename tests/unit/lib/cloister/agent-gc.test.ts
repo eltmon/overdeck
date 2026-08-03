@@ -148,6 +148,22 @@ describe('PAN-3513 live terminality confirmation', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining('tracker unavailable'));
   });
 
+  it('resolves live terminality without tombstoning or cleaning during a dry run', async () => {
+    const candidate = agent('agent-pan-2503', 'stopped', 'work');
+    const deps = gcDeps({ isTerminalAgent: vi.fn(() => true) });
+
+    const result = await pruneTerminalStoppedAgents(
+      [candidate],
+      deps,
+      { dryRun: true },
+    );
+
+    expect(result).toEqual({ removed: ['agent-pan-2503'], preserved: [] });
+    expect(deps.writeTombstone).not.toHaveBeenCalled();
+    expect(deps.cleanStateDir).not.toHaveBeenCalled();
+    expect(deps.removeRecord).not.toHaveBeenCalled();
+  });
+
   it('writes and emits the live predicate tombstone before cleanup', async () => {
     const candidate = agent('agent-pan-2503', 'stopped', 'work');
     const deps = terminalityDeps();
