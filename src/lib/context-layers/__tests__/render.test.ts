@@ -77,6 +77,8 @@ describe('userContentOutsideRegion', () => {
 });
 
 describe('stripBeadsManagedRegion', () => {
+  const legacyReadyCommand = ['bd', 'ready'].join(' ');
+
   it('is a no-op when Beads did not install an integration block', () => {
     expect(stripBeadsManagedRegion('# Project\n')).toBe('# Project\n');
   });
@@ -108,6 +110,97 @@ Use Linear for product issues.`);
   it('does not remove unfenced Beads references', () => {
     const existing = '# Rules\nUse bd only for local diagnostics.\n';
     expect(stripBeadsManagedRegion(existing)).toBe(existing);
+  });
+
+  it('removes the unmarked bd-onboard intro, architecture blockquote, and Quick Reference', () => {
+    const existing = `# Agent Instructions
+
+This project uses **bd** (beads) for issue tracking. Run \`bd prime\` for full workflow context.
+
+> **Architecture in one line:** Issues live in a local Dolt database
+> (\`.beads/dolt/\`); cross-machine sync uses \`bd dolt push/pull\`.
+
+## Quick Reference
+
+\`\`\`bash
+${legacyReadyCommand}              # Find available work
+bd close <id>         # Complete work
+\`\`\`
+
+## Non-Interactive Shell Commands
+
+Use \`rm -f\` to avoid prompts.
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe(`# Agent Instructions
+
+## Non-Interactive Shell Commands
+
+Use \`rm -f\` to avoid prompts.`);
+  });
+
+  it('drops the bd-onboard file header when nothing but boilerplate remains', () => {
+    const existing = `# Agent Instructions
+
+This project uses **bd** (beads) for issue tracking. Run \`bd onboard\` to get started.
+
+## Quick Reference
+
+\`\`\`bash
+${legacyReadyCommand}              # Find available work
+bd sync               # Sync with git
+\`\`\`
+
+## Landing the Plane (Session Completion)
+
+1. Update issue status
+2. \`\`\`bash
+   bd sync
+   git push
+   \`\`\`
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe('');
+  });
+
+  it('preserves a user Quick Reference section that has no bd commands', () => {
+    const existing = `# Docs
+
+## Quick Reference
+
+\`\`\`bash
+npm run build
+npm test
+\`\`\`
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe(existing);
+  });
+
+  it('preserves prose that mentions legacy .beads/ paths outside bd-onboard sections', () => {
+    const existing = `# Project rules
+
+Deep-wipe destroys the workspace, including any unused legacy \`.beads/\` data.
+Never run bd sync manually here.
+`;
+    expect(stripBeadsManagedRegion(existing)).toBe(existing);
+  });
+});
+
+describe('applyManagedRegion legacy PANOPTICON region', () => {
+  it('removes the pre-rebrand PANOPTICON region when rewriting the OVERDECK one', () => {
+    const existing = `# User notes
+
+<!-- BEGIN PANOPTICON CONTEXT — managed by \`pan sync\`; edit the layer source, not this region -->
+old rendered content
+<!-- END PANOPTICON CONTEXT -->
+
+${REGION_BEGIN}
+current content
+${REGION_END}
+`;
+    const out = applyManagedRegion(existing, 'fresh content');
+    expect(out).not.toContain('PANOPTICON CONTEXT');
+    expect(out).toContain('# User notes');
+    expect(out).toContain('fresh content');
+    expect(occurrences(out, REGION_BEGIN)).toBe(1);
   });
 });
 

@@ -3,33 +3,42 @@
  *
  * A full-screen dark dashboard with:
  * - Animated top bar with system health and clock
- * - Retired scan area with right sidebar activity feed, agent donut, infra gauges
+ * - Confluence river with hook bus, telemetry, and agent sidebar
  */
 
+import { useCallback, useRef, useState } from 'react';
 import './theme.css';
 
 import { GodViewTopBar } from './TopBar';
-import { GodViewSidebar } from './Sidebar';
+import { GodViewConfluence } from './confluence/GodViewConfluence';
+import { useConfluenceData } from './confluence/useConfluenceData';
 import { useGodViewSocket } from '../../hooks/useGodViewSocket';
-import { useDashboardStore, selectAgents } from '../../lib/store';
-import type { Agent } from '../../types';
 
 export function GodViewPage() {
   useGodViewSocket();
-
-  const agents = useDashboardStore(selectAgents) as unknown as Agent[];
+  const data = useConfluenceData();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const toggleFullscreen = useCallback(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    if (document.fullscreenElement) void document.exitFullscreen?.();
+    else void root.requestFullscreen?.();
+  }, []);
 
   return (
-    <div className="god-view flex flex-col h-full">
-      <GodViewTopBar agents={agents} />
-
-      <div className="flex flex-1 gap-3 px-3 pb-3 pt-2 min-h-0 overflow-hidden">
-        <div className="flex flex-1 min-w-0 min-h-0 items-center justify-center rounded-2xl border border-white/10 bg-black/20 text-sm text-white/50">
-          Agent scan moved to the Agents fleet view.
-        </div>
-
-        <GodViewSidebar agents={agents} />
-      </div>
+    <div ref={rootRef} className="god-view flex flex-col flex-1 min-h-0">
+      <GodViewTopBar
+        data={data}
+        onHelpToggle={() => setHelpOpen((open) => !open)}
+        onFullscreenToggle={toggleFullscreen}
+      />
+      <GodViewConfluence
+        data={data}
+        helpOpen={helpOpen}
+        onHelpOpenChange={setHelpOpen}
+        onToggleFullscreen={toggleFullscreen}
+      />
     </div>
   );
 }

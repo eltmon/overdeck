@@ -19,6 +19,7 @@ import { Effect } from 'effect';
 import { LOGS_DIR, OVERDECK_HOME, packageRoot } from './paths.js';
 import { readPlatformConfigSync } from './platform-lifecycle.js';
 import { ProcessSpawnError } from './errors.js';
+import { readActiveDashboardBundleSync } from './deploy/active-dashboard-bundle.js';
 
 const SUPERVISOR_PID_PATH = join(OVERDECK_HOME, 'supervisor.pid');
 const SUPERVISOR_LOG_PATH = join(LOGS_DIR, 'supervisor.log');
@@ -66,6 +67,10 @@ export function isSupervisorRunningSync(): boolean {
   return pid !== null && isProcessAlive(pid);
 }
 
+export function resolveSupervisorPrimaryRepoRoot(): string {
+  return readActiveDashboardBundleSync()?.repoRoot ?? packageRoot;
+}
+
 export function resolveSupervisorBundle(): string {
   // Always the built bundle (dist/supervisor/server.js) so import resolution
   // works under Node 22. Resolve from packageRoot — robust across every
@@ -110,6 +115,7 @@ export function startSupervisorProcessSync(): void {
 
   const port = getSupervisorPortSync();
   const child = spawn(process.execPath, [bundle], {
+    cwd: resolveSupervisorPrimaryRepoRoot(),
     detached: true,
     stdio: ['ignore', logFd, logFd],
     env: {

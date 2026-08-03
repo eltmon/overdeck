@@ -31,7 +31,11 @@ function shortHarness(harness: NonNullable<Conversation['harness']>): string {
   if (harness === 'claude-code') return 'Claude Code';
   if (harness === 'ohmypi') return 'oh-my-pi';
   if (harness === 'pi') return 'oh-my-pi';
-  return 'Codex';
+  if (harness === 'codex') return 'Codex';
+  if (harness === 'acp') return 'ACP';
+  if (harness === 'kimi-code') return 'Kimi Code';
+  // Unknown future harness — show the raw id rather than a wrong label.
+  return harness;
 }
 
 // ─── WorkingSpinner ───────────────────────────────────────────────────────────

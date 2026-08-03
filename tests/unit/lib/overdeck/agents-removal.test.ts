@@ -96,6 +96,46 @@ describe('canonical agent removal with retained transcripts', () => {
     expect(listAllAgentsSync()).toEqual([]);
   });
 
+  it('preserves session_id on the tombstone row — it is the transcript linkage (PAN-3479)', async () => {
+    const agentId = 'agent-pan-3479-slot-1';
+    const agentsDir = join(testHome, 'agents');
+    const agentDir = join(agentsDir, agentId);
+    const transcriptPath = join(agentDir, 'sessions', 'work.jsonl');
+    mkdirSync(join(agentDir, 'sessions'), { recursive: true });
+    writeFileSync(transcriptPath, '{}\n');
+    const db = getOverdeckDatabaseSync();
+    db.prepare(`
+      INSERT INTO issues (id, stage, updated_at)
+      VALUES (?, ?, ?)
+    `).run('PAN-3479', 'working', Date.now());
+    db.prepare(`
+      INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, session_id, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      agentId,
+      'PAN-3479',
+      'work',
+      'stopped',
+      '/workspaces/feature-pan-3479-slot-1',
+      'claude-code',
+      'gpt-5.6-sol',
+      'c825f47b-2379-417e-9045-5597f9df7690',
+      Date.now(),
+    );
+
+    const cleanup = await removeAgent(agentId);
+
+    expect(cleanup.removedDir).toBe(false);
+    expect(listAllAgentsSync()).toEqual([
+      expect.objectContaining({
+        id: agentId,
+        status: 'stopped',
+        phase: 'retained-transcripts',
+        sessionId: 'c825f47b-2379-417e-9045-5597f9df7690',
+      }),
+    ]);
+  });
+
   it('reconstructs a disk-only review tombstone before deleting state.json', async () => {
     const agentId = 'agent-pan-3357-review-security';
     const agentDir = join(testHome, 'agents', agentId);

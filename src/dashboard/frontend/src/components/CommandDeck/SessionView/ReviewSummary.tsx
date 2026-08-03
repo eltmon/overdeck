@@ -65,9 +65,11 @@ interface ReviewSummaryProps {
   session: SessionNodeType;
   reviewers: readonly SessionNodeType[];
   roundData: RoundData[];
+  /** Workspace path used to resolve relative file references into chips. */
+  cwd?: string;
 }
 
-export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryProps) {
+export function ReviewSummary({ session, reviewers, roundData, cwd }: ReviewSummaryProps) {
   const totalFindings = useMemo(() => {
     let sum = 0;
     const latestSynthesis = session.roundMetadata?.history[session.roundMetadata.history.length - 1];
@@ -200,7 +202,7 @@ export function ReviewSummary({ session, reviewers, roundData }: ReviewSummaryPr
       {synthSummary && (
         <div className={styles.reviewSynthesis}>
           <div className={styles.reviewSynthesisHeading}>Findings</div>
-          <ChatMarkdown text={synthSummary} isStreaming={false} cwd={undefined} />
+          <ChatMarkdown text={synthSummary} isStreaming={false} cwd={cwd} />
         </div>
       )}
 

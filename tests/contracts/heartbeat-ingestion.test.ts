@@ -56,11 +56,33 @@ async function runHeartbeat(body: Record<string, unknown>) {
 }
 
 describe('PAN-800 bodyToEvent + DomainEvent decode', () => {
-  it('new-shape activity → agent.activity_changed', () => {
-    const ev = bodyToEvent(AGENT, { kind: 'activity', activity: 'working', tool: 'Read' }, TS)
+  it('new-shape activity → agent.activity_changed with hook identity', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'activity',
+      activity: 'working',
+      tool: 'Read',
+      hookName: 'PreToolUse',
+    }, TS)
     expect(ev?.['type']).toBe('agent.activity_changed')
+    expect((ev?.['payload'] as Record<string, unknown>)['hookName']).toBe('PreToolUse')
     const decoded = decodeCandidate(ev)!
     expect(decoded._tag).toBe('Success')
+  })
+
+  it('hook_fired → agent.hook_fired without changing activity state', () => {
+    const ev = bodyToEvent(AGENT, {
+      kind: 'hook_fired',
+      hookName: 'Notification',
+      tool: 'Notification',
+    }, TS)
+    const decoded = decodeCandidate(ev)!
+    expect(decoded._tag).toBe('Success')
+    expect((ev as any).type).toBe('agent.hook_fired')
+    expect((ev as any).payload).toMatchObject({
+      agentId: AGENT,
+      hookName: 'Notification',
+      tool: 'Notification',
+    })
   })
 
   it('new-shape thinking_start → agent.thinking_started', () => {

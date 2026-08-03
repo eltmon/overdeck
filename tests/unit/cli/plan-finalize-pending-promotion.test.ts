@@ -165,6 +165,39 @@ describe('plan finalize pending-promotion marker', () => {
     });
   });
 
+  it('finalizes the authored .pan spec when a stored .overdeck draft also exists', async () => {
+    const { root, workspacePath, specPath: storedDraftPath } = createWorkspace();
+    process.env.OVERDECK_HOME = root;
+    const authoredDir = join(workspacePath, '.pan');
+    const authoredPath = join(authoredDir, 'spec.vbrief.json');
+    mkdirSync(authoredDir, { recursive: true });
+    const authoredDoc = JSON.parse(readFileSync(storedDraftPath, 'utf-8'));
+    authoredDoc.plan.title = 'Operator-authored plan';
+    authoredDoc.plan.sequence = 7;
+    authoredDoc.plan.items[0].id = 'operator-authored';
+    writeFileSync(authoredPath, JSON.stringify(authoredDoc, null, 2));
+
+    await planFinalizeCommand({
+      workspace: workspacePath,
+      json: true,
+      prd: false,
+      qualityLint: false,
+      promote: false,
+    });
+
+    expect(JSON.parse(readFileSync(authoredPath, 'utf-8'))).toMatchObject({
+      plan: {
+        title: 'Operator-authored plan',
+        status: 'proposed',
+        sequence: 8,
+        items: [{ id: 'operator-authored' }],
+      },
+    });
+    expect(JSON.parse(readFileSync(storedDraftPath, 'utf-8'))).toMatchObject({
+      plan: { status: 'approved', sequence: 0, items: [{ id: 'marker' }] },
+    });
+  });
+
   it('names the deacon recovery owner in human output while preserving exit code 1', async () => {
     const { root, workspacePath } = createWorkspace();
     process.env.OVERDECK_HOME = root;

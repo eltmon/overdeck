@@ -124,12 +124,16 @@ export function parsePositiveIntEnv(value: string | undefined, fallback: number)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export function readWatchdogConfig(env: NodeJS.ProcessEnv, dashboardApiPort: number): SupervisorWatchdogConfig {
+export function readWatchdogConfig(
+  env: NodeJS.ProcessEnv,
+  dashboardApiPort: number,
+  primaryRepoRoot = process.cwd(),
+): SupervisorWatchdogConfig {
   return {
     enabled: env.OVERDECK_SUPERVISOR_WATCHDOG !== '0',
     dashboardApiPort,
     expectedIdentity: {
-      repoRoot: resolve(process.cwd()),
+      repoRoot: resolve(primaryRepoRoot),
       mode: 'primary',
     },
     pollMs: parsePositiveIntEnv(env.OVERDECK_SUPERVISOR_POLL_MS, 10_000),
@@ -334,6 +338,11 @@ export class SupervisorWatchdog {
       restartEligibleForBootGrace = hardDown;
     }
 
+    if (this.state.gaveUp) {
+      this.state.restartBlockedUntil = null;
+      return;
+    }
+
     if (foreignDashboard) {
       const eviction = await this.evictPortHoldersFn(this.config.dashboardApiPort);
       if (eviction.error) {
@@ -465,13 +474,14 @@ export class SupervisorWatchdog {
       await lock.release();
     }
 
-    // PAN-2219: a restart gives the new server a fresh patrol-grace window.
-    // Without this the pre-restart staleness clock carried over, so each new
-    // boot was killed before boot reconciliation + its first patrol could
-    // complete — restart churn until maxRestarts/gaveUp.
-    this.state.patrolUnhealthySince = null;
-    this.state.hasBecomeHealthy = false;
-    this.state.bootGraceStartedAt = this.now();
+    // PAN-2219: a successful restart gives the new server a fresh patrol-grace
+    // window. A failed spawn did not create a successor, so re-arming grace
+    // there only delays the next recovery attempt and restart-cap enforcement.
+    if (!restartError) {
+      this.state.patrolUnhealthySince = null;
+      this.state.hasBecomeHealthy = false;
+      this.state.bootGraceStartedAt = this.now();
+    }
 
     await Effect.runPromise(writeRestartStatus({
       ts: new Date(startedAt).toISOString(),

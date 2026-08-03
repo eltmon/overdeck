@@ -14,7 +14,7 @@ import {
 } from './boot-reconciliation.js';
 import { bootReconciliationSkipReason } from './boot-reconciliation-predicates.js';
 import { isIssueClosed } from './issue-closed.js';
-import { listAllAgentsSync as listAllAgents } from '../overdeck/agents.js';
+import { listAllAgentsSync as listAllAgents, RETAINED_TRANSCRIPTS_PHASE } from '../overdeck/agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { logDeaconEventSync, logAgentLifecycleSync } from '../persistent-logger.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -31,6 +31,7 @@ import {
   recordAgentFailure,
   resetAgentFailureCount,
   resumeAgent,
+  stopAgent,
   saveAgentState,
   saveAgentStateSync,
   deliverInitialPromptWithRetry,
@@ -48,6 +49,7 @@ import { getDispatchableItems } from '../xbrief/dag.js';
 import type { XBriefItem } from '../xbrief/types.js';
 import { reconcileLiveWorkSpawnPlaceholder } from '../agents/placeholder-reconciliation.js';
 import { consumeConfirmedSessionDetail, queryConfirmedSession } from './confirmed-session-query.js';
+import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 export interface AutoResumeNotifierDeps {
   notifyAgentStopped: (agentId: string) => void;
   notifyAgentStatusChanged: (state: AgentState, previousStatus?: AgentState['status'], hasLiveTmuxSession?: boolean) => void;
@@ -643,6 +645,26 @@ export async function handleAgentStoppedEvent(
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — role=${state.role} (not auto-resumable)`);
     return null;
   }
+  // PAN-3479: tombstoned rows keep their session_id for transcript linkage —
+  // the phase, not a nulled session, is what makes them non-resumable.
+  if (state.phase === RETAINED_TRANSCRIPTS_PHASE) {
+    logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — retired (transcripts retained)`);
+    return null;
+  }
+
+  if (isTerminalSwarmSlotAgent(state)) {
+    if (await Effect.runPromise(sessionExists(agentId))) {
+      try {
+        await Effect.runPromise(stopAgent(agentId));
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reaped — assigned swarm item is terminal`);
+      } catch (err) {
+        logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} reap failed — ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else {
+      logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — assigned swarm item is terminal`);
+    }
+    return null;
+  }
 
   if (getBootReconciliationHeldResumeSet().has(agentId)) {
     logDeaconEventSync(`handleAgentStoppedEvent: ${agentId} skipped — held by boot reconciliation decision`);
@@ -870,6 +892,8 @@ export async function autoResumeStoppedWorkAgents(deps: AutoResumeNotifierDeps):
   const bootReconciliationHoldSet = getBootReconciliationPendingHoldSet();
   const candidates = listAllAgents()
     .filter((agent) => agent.status === 'stopped' && agent.role === 'work')
+    // PAN-3479: retired rows exist only for transcript linkage — never resume.
+    .filter((agent) => agent.phase !== RETAINED_TRANSCRIPTS_PHASE)
     .filter((agent) => !bootReconciliationHoldSet.has(agent.id))
     .map((agent) => agent.id);
 

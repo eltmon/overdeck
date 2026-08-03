@@ -59,6 +59,7 @@ describe('concurrency governor — config + counting', () => {
     vi.doUnmock('../../../src/lib/cloister/config.js');
     vi.doUnmock('../../../src/lib/agents.js');
     vi.doUnmock('../../../src/lib/overdeck/agents.js');
+    vi.doUnmock('../../../src/lib/cloister/swarm-slot-lifecycle.js');
   });
 
   it('falls back to safe defaults when config omits/garbles concurrency', async () => {
@@ -91,6 +92,26 @@ describe('concurrency governor — config + counting', () => {
     }));
     const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
     expect(countRunningAgents()).toEqual({ work: 1, advancing: 2, swarm: 0, total: 3 });
+  });
+
+  it('excludes terminal swarm slots from both the swarm reserve and regular work count', async () => {
+    vi.resetModules();
+    vi.doMock('../../../src/lib/agents.js', () => ({
+      listRunningAgentsSync: () => [
+        { id: 'agent-pan-1', role: 'work', issueId: 'PAN-1', status: 'running', tmuxActive: true },
+        { id: 'agent-pan-2-slot-1', role: 'work', issueId: 'PAN-2', status: 'running', tmuxActive: true },
+      ],
+    }));
+    vi.doMock('../../../src/lib/overdeck/agents.js', () => ({
+      countAgentsByStatus: (status: string) => (status === 'running' ? { work: 2 } : {}),
+    }));
+    vi.doMock('../../../src/lib/cloister/swarm-slot-lifecycle.js', () => ({
+      isTerminalSwarmSlotAgent: (agent: { id: string }) => agent.id === 'agent-pan-2-slot-1',
+    }));
+
+    const { countRunningAgents } = await import('../../../src/lib/cloister/concurrency.js');
+
+    expect(countRunningAgents()).toEqual({ work: 1, advancing: 0, swarm: 0, total: 1 });
   });
 
   it('excludes warm-idle advancing sessions (terminal verdict) from the ceiling (PAN-2579)', async () => {

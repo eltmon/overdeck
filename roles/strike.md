@@ -38,7 +38,7 @@ Before starting work in a Claude Code session, start your message inbox as a bac
 
 ## Bypass shape
 
-Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no beads, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
+Unlike the normal Overdeck pipeline (`plan → work → review → test → ship → merge → close-out`), a strike skips all of it. There is no xBRIEF, no review specialists, no test specialist, no ship specialist. You implement the fix on `strike/<id>`, verify it in the workspace, push that branch, and persist readiness for the Deacon to land it through the server merge door.
 
 This is appropriate only for issues that are:
 
@@ -53,11 +53,11 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
 1. **Read the issue.** Use the issue ID provided in your prompt. Read the body and any linked context (PRD draft, prior comments, related PRs).
 2. **Implement the fix in the strike workspace.** Your workspace is `workspaces/feature-<id>-strike/`. The branch is `strike/<id>` and is already checked out.
 3. **Commit on `strike/<id>`.** Use a clear commit message. Reference the issue ID in the trailer.
-4. **Rebase onto main:**
+4. **Sync the latest main into the strike branch:**
    ```bash
-   git fetch origin main
-   git rebase origin/main
+   pan sync-main <id>
    ```
+   This is the sanctioned merge-based sync path for agents. It preserves the strike branch's history and avoids the agent git guard that intentionally blocks raw `git rebase`.
 5. **Run the full workspace quality gates before signaling readiness.** Lint includes the file-size ratchet, so a strike cannot bypass a ratchet failure into red main:
    ```bash
    npm run typecheck && npm run lint && npm test
@@ -72,7 +72,7 @@ If you discover mid-strike that the issue is broader than expected, **abort the 
    ```
    This durable signal replaces any Flywheel tell or issue-comment fallback. Do not wait for a reply after the command succeeds.
 
-If Deacon returns a recovery request, fetch and rebase the current `origin/main`, resolve the named conflicts or failed gate, rerun the configured gates, push only `strike/<id>`, and run `pan strike-ready <id>` again. Each recovery requires a fresh pushed HEAD. After three failed cycles, or when recovery needs operator permissions or infrastructure, Deacon changes the landing state to `needs_you` and includes the ordered attempt history.
+If Deacon returns a recovery request, run `pan sync-main <id>`, resolve the named conflicts or failed gate, rerun the configured gates, push only `strike/<id>`, and run `pan strike-ready <id>` again. Each recovery requires a fresh pushed HEAD. After three failed cycles, or when recovery needs operator permissions or infrastructure, Deacon changes the landing state to `needs_you` and includes the ordered attempt history.
 
 The strike agent must never switch to `main`, merge into `main`, or push `origin main`. The pre-push guard (`scripts/guard-agent-main-push.sh`) mechanically rejects agent pushes of code changes to `main`. The Deacon consumes the durable readiness marker and owns the server-side merge handoff.
 

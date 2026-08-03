@@ -1,115 +1,159 @@
-import { useEffect, useState } from 'react';
-import { Zap } from 'lucide-react';
-import { useGodViewStore } from '../../hooks/useGodViewSocket';
-import type { Agent } from '../../types';
+import { useEffect, useRef, useState } from 'react';
+import { Maximize2, Zap } from 'lucide-react';
+import { fmtAge, fmtTokens } from './confluence/model';
+import type { ConfluenceData } from './confluence/useConfluenceData';
 
 interface TopBarProps {
-  agents: Agent[];
+  data: ConfluenceData;
+  onHelpToggle: () => void;
+  onFullscreenToggle: () => void;
 }
+
+const ECG_SAMPLE_COUNT = 130;
+const ECG_INTERVAL_MS = 500;
 
 function SystemClock() {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
   }, []);
+  return <span className="confluence-clock gv-mono">{now.toLocaleTimeString('en-US', { hour12: false })}</span>;
+}
+
+export function appendEcgSample(samples: readonly number[], value: number): number[] {
+  return [...samples.slice(-(ECG_SAMPLE_COUNT - 1)), value];
+}
+
+function drawEcg(canvas: HTMLCanvasElement, samples: readonly number[]): void {
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.strokeStyle = 'rgba(57, 255, 20, .2)';
+  context.beginPath();
+  for (let x = 0; x <= canvas.width; x += 10) {
+    context.moveTo(x, 0);
+    context.lineTo(x, canvas.height);
+  }
+  context.stroke();
+
+  const peak = Math.max(5, ...samples);
+  context.strokeStyle = '#39ff14';
+  context.lineWidth = 1.5;
+  context.beginPath();
+  samples.forEach((sample, index) => {
+    const x = samples.length <= 1 ? canvas.width : index / (samples.length - 1) * canvas.width;
+    const y = canvas.height - Math.min(1, sample / peak) * (canvas.height - 3) - 1.5;
+    if (index === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  });
+  context.stroke();
+}
+
+function EventsEcg({ eventsPerMin }: { eventsPerMin: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const valueRef = useRef(eventsPerMin);
+  const samplesRef = useRef<number[]>(Array.from({ length: ECG_SAMPLE_COUNT }, () => 0));
+  valueRef.current = eventsPerMin;
+
+  useEffect(() => {
+    const sample = () => {
+      samplesRef.current = appendEcgSample(samplesRef.current, valueRef.current);
+      if (canvasRef.current) drawEcg(canvasRef.current, samplesRef.current);
+    };
+    sample();
+    const timer = setInterval(sample, ECG_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, []);
+
+  return <canvas ref={canvasRef} className="confluence-ecg" width={130} height={30} aria-label="Events per minute ECG" />;
+}
+
+function Meter({ label, value }: { label: string; value: number | null }) {
+  const bounded = value == null ? 0 : Math.max(0, Math.min(100, value));
   return (
-    <span className="gv-mono text-sm" style={{ color: 'var(--gv-blue)' }}>
-      {now.toLocaleTimeString('en-US', { hour12: false })}
+    <span className="confluence-meter" data-label={label}>
+      <i><b style={{ width: `${bounded}%` }} /></i>
+      <em>{label} {value == null ? '—' : `${Math.round(value)}%`}</em>
     </span>
   );
 }
 
-function HealthSparkline({ label, value, color }: { label: string; value: number; color: string }) {
-  return (
-    <div className="flex flex-col items-center gap-0.5">
-      <div className="flex items-end gap-0.5 h-6">
-        {/* Simple bar representing current value */}
-        <div
-          className="w-12 rounded-sm transition-all duration-500"
-          style={{
-            height: `${Math.max(4, (value / 100) * 24)}px`,
-            backgroundColor: color,
-            opacity: 0.8,
-          }}
-        />
-      </div>
-      <span className="text-[10px]" style={{ color: 'var(--gv-text-secondary)' }}>
-        {label} {Math.round(value)}%
-      </span>
-    </div>
-  );
+function Stat({ label, value, title }: { label: string; value: string | number; title?: string }) {
+  return <span className="confluence-stat" title={title}><em>{label}</em><b>{value}</b></span>;
 }
 
-export function GodViewTopBar({ agents }: TopBarProps) {
-  const systemHealth = useGodViewStore((s) => s.systemHealth);
-  const activeCount = agents.filter((a) => a.status !== 'stopped' && a.status !== 'dead').length;
+export function GodViewTopBar({ data, onHelpToggle, onFullscreenToggle }: TopBarProps) {
+  const { hookStream, meta } = data;
+  const [eventsPop, setEventsPop] = useState(false);
+  const previousEvents = useRef(hookStream.eventsPerSec);
 
+  useEffect(() => {
+    if (previousEvents.current === hookStream.eventsPerSec) return;
+    previousEvents.current = hookStream.eventsPerSec;
+    setEventsPop(true);
+    const timer = setTimeout(() => setEventsPop(false), 220);
+    return () => clearTimeout(timer);
+  }, [hookStream.eventsPerSec]);
+
+  const system = meta.system;
+  const swap = system?.summary.swapUsedPercent ?? null;
+  const load = system?.summary.loadAverage1m ?? null;
+  const beads = meta.beads;
 
   return (
-    <div
-      className="gv-glass flex items-center gap-4 px-4 py-2 shrink-0 mx-3 mt-3 rounded-xl"
-      style={{ borderColor: 'rgba(0, 212, 255, 0.2)' }}
-    >
-      {/* Logo with glow animation */}
-      <div className="flex items-center gap-2 shrink-0">
-        <Zap
-          className="w-5 h-5"
-          style={{
-            color: 'var(--gv-blue)',
-            animation: 'gv-logo-glow 3s ease-in-out infinite',
-          }}
-        />
-        <span
-          className="text-sm font-bold tracking-widest uppercase"
-          style={{ color: 'var(--gv-blue)', fontFamily: 'var(--gv-font-display)' }}
-        >
-          God View
-        </span>
+    <div className="confluence-topbar gv-glass">
+      <div className="confluence-brand">
+        <Zap aria-hidden="true" />
+        <span>God View</span>
       </div>
-
-      <div className="w-px h-5 shrink-0" style={{ backgroundColor: 'var(--gv-border)' }} />
-
-      {/* System Clock */}
       <SystemClock />
-
-      <div className="w-px h-5 shrink-0" style={{ backgroundColor: 'var(--gv-border)' }} />
-
-      {/* Health Sparklines */}
-      {systemHealth && (
-        <div className="flex items-center gap-3">
-          <HealthSparkline label="CPU" value={systemHealth.cpu} color="var(--gv-blue)" />
-          <HealthSparkline label="MEM" value={systemHealth.memPercent} color="var(--gv-purple)" />
-        </div>
-      )}
-
-      <div className="flex-1" />
-
-      {/* Active Agent Badge */}
-      <div
-        className="flex items-center gap-1.5 px-3 py-1 rounded-full"
-        style={{
-          background: 'rgba(57, 255, 20, 0.1)',
-          border: '1px solid rgba(57, 255, 20, 0.3)',
-          animation: activeCount > 0 ? 'gv-pulse 2s ease-in-out infinite' : 'none',
-        }}
+      <Stat label="EV/S" value={hookStream.eventsPerSec.toFixed(1)} />
+      <span className={`confluence-event-pop ${eventsPop ? 'pop' : ''}`} aria-hidden="true" />
+      <span className="confluence-ecg-stat">
+        <EventsEcg eventsPerMin={hookStream.eventsPerMin} />
+        <Stat label="EV/M" value={hookStream.eventsPerMin} />
+      </span>
+      <Stat
+        label="VEL"
+        value={meta.velocity ? `${meta.velocity.transitionsPerHour}/h` : '—'}
+        title={meta.velocity
+          ? `real stage transitions in the last hour — plan ${meta.velocity.byStage['plan'] ?? 0} · work ${meta.velocity.byStage['work'] ?? 0} · review ${meta.velocity.byStage['review'] ?? 0} · test ${meta.velocity.byStage['test'] ?? 0} · verify ${meta.velocity.byStage['verify'] ?? 0} · merge ${meta.velocity.byStage['merge'] ?? 0}`
+          : 'velocity unavailable'}
+      />
+      <span className="confluence-meters">
+        <Meter label="CPU" value={system?.cpu ?? null} />
+        <Meter label="MEM" value={system?.memPercent ?? null} />
+        <Meter label="SWAP" value={swap} />
+      </span>
+      <Stat label="LOAD" value={load == null ? '—' : load.toFixed(2)} />
+      <Stat label="WIP" value={beads?.wip ?? '—'} />
+      <Stat label="BLOCKED" value={beads?.blocked ?? '—'} />
+      <Stat label="READY" value={beads?.ready ?? '—'} />
+      <Stat label="MERGE Q" value={meta.mergeQ} />
+      <Stat label="$/MIN" value={meta.costPerMin == null ? '—' : `$${meta.costPerMin.toFixed(2)}`} />
+      <Stat label="MERGES" value={meta.mergesToday} />
+      <Stat label="TOKENS" value={meta.tokensToday == null ? '—' : fmtTokens(meta.tokensToday)} />
+      <Stat label="❄ STALE" value={meta.staleTotal} />
+      <Stat label="🧹 PARKED" value={meta.parkedTotal ?? '—'} />
+      <Stat label="OLDEST" value={meta.total === 0 ? '—' : fmtAge(meta.oldestIdle)} />
+      <span className={`confluence-active ${meta.active > 0 ? 'on' : ''}`}>{meta.active} active</span>
+      <button
+        type="button"
+        className="confluence-topbar-button"
+        onClick={onHelpToggle}
+        aria-label="Open Confluence field guide"
       >
-        <div
-          className="w-1.5 h-1.5 rounded-full"
-          style={{ backgroundColor: activeCount > 0 ? 'var(--gv-green)' : 'var(--gv-text-dim)' }}
-        />
-        <span
-          className="text-xs font-semibold gv-mono"
-          style={{ color: activeCount > 0 ? 'var(--gv-green)' : 'var(--gv-text-secondary)' }}
-        >
-          {activeCount} active
-        </span>
-      </div>
-
-      {/* Total agents count */}
-      <div className="text-xs" style={{ color: 'var(--gv-text-secondary)' }}>
-        {agents.length} total agents
-      </div>
+        ? HELP
+      </button>
+      <button
+        type="button"
+        className="confluence-topbar-button icon"
+        onClick={onFullscreenToggle}
+        aria-label="Toggle God View fullscreen"
+      >
+        <Maximize2 aria-hidden="true" />
+      </button>
     </div>
   );
 }

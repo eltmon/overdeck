@@ -62,11 +62,24 @@ describe('resolveMarkdownFileLinkMeta', () => {
     },
   );
 
-  it('returns null when cwd is empty for file paths', () => {
+  it('returns null when cwd is empty for relative paths', () => {
     expect(resolveMarkdownFileLinkMeta('src/App.tsx', '')).toBeNull();
     expect(resolveMarkdownFileLinkMeta('src/App.tsx', undefined)).toBeNull();
-    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', '')).toBeNull();
-    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', undefined)).toBeNull();
+  });
+
+  it('resolves absolute paths without a cwd', () => {
+    // Transcript surfaces (session replays, activity views) render without a
+    // cwd; absolute references must still become chips there — otherwise they
+    // fall back to plain browser anchors and right-click goes to Chrome.
+    const expected = {
+      filePath: '/home/eltmon/project/src/App.tsx',
+      targetPath: '/home/eltmon/project/src/App.tsx:12',
+      displayPath: '/home/eltmon/project/src/App.tsx:12',
+      basename: 'App.tsx',
+      line: 12,
+    };
+    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', '')).toEqual(expected);
+    expect(resolveMarkdownFileLinkMeta('/home/eltmon/project/src/App.tsx:12', undefined)).toEqual(expected);
   });
 
   it('resolves Windows absolute paths', () => {
@@ -95,9 +108,13 @@ describe('resolveMarkdownFileLinkMeta', () => {
     ]);
   });
 
-  it('leaves bare file paths as text when cwd is unavailable', () => {
+  it('links bare absolute paths but leaves relative ones as text when cwd is unavailable', () => {
     expect(splitMarkdownTextFileLinks('Open /home/eltmon/project/src/App.tsx:12', undefined)).toEqual([
-      { text: 'Open /home/eltmon/project/src/App.tsx:12' },
+      { text: 'Open ' },
+      { text: '/home/eltmon/project/src/App.tsx:12', href: '/home/eltmon/project/src/App.tsx:12' },
+    ]);
+    expect(splitMarkdownTextFileLinks('Open src/App.tsx:12', undefined)).toEqual([
+      { text: 'Open src/App.tsx:12' },
     ]);
   });
 

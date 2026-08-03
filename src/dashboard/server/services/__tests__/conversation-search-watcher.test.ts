@@ -1,6 +1,10 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { NormalizedConversationSearchConfig } from '../../../../lib/config-yaml.js';
+import { ConversationDirectoryWatcher } from '../conversation-directory-watcher.js';
 import { ConversationSearchWatcher, startConversationSearchWatcher, stopConversationSearchWatcher } from '../conversation-search-watcher.js';
 
 class FakeWatcher {
@@ -159,6 +163,27 @@ describe('conversation search watcher', () => {
 
     expect(startupSignal?.aborted).toBe(true);
     expect(fakeWatcher.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('uses one native recursive subscription per root instead of one watcher per path', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'overdeck-conversation-watch-'));
+    const nested = join(root, 'session', 'subagents');
+    mkdirSync(nested, { recursive: true });
+    for (let index = 0; index < 100; index += 1) {
+      writeFileSync(join(nested, `agent-${index}.jsonl`), '{}\n');
+      writeFileSync(join(nested, `metadata-${index}.json`), '{}\n');
+    }
+
+    const watcher = new ConversationDirectoryWatcher([root]);
+    try {
+      await watcher.ready;
+      expect(watcher.activeSubscriptionCount).toBe(1);
+      await watcher.close();
+      expect(watcher.activeSubscriptionCount).toBe(0);
+    } finally {
+      await watcher.close();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 
   it('does not start while disabled and closes the active watcher on shutdown', async () => {

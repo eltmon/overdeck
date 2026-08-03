@@ -31,9 +31,16 @@ function makeWatchdog(overrides: Partial<{
   logs: string[];
   fetchOk: boolean;
   fetchTimeout: boolean;
+  fetchFn: (input: string, init: { signal: AbortSignal }) => Promise<{
+    ok: boolean;
+    status: number;
+    statusText: string;
+    json?: () => Promise<unknown>;
+  }>;
   healthBody: unknown;
   deaconStatus: unknown;
   spawnOptions: Array<Parameters<SpawnRestart>[0]>;
+  spawnRestart: SpawnRestart;
   config: SupervisorWatchdogConfig;
   evictPortHoldersFn: (port: number) => Promise<{ pids: number[]; error: string | null }>;
 }> = {}): SupervisorWatchdog {
@@ -51,13 +58,13 @@ function makeWatchdog(overrides: Partial<{
     config: overrides.config ?? config,
     now: overrides.now ?? (() => Date.parse('2026-05-17T15:30:00.000Z')),
     log: (msg) => logs.push(msg),
-    spawnRestart: (options) => {
+    spawnRestart: overrides.spawnRestart ?? ((options) => {
       overrides.spawnOptions?.push(options);
       spawns.count += 1;
       return { pid: 1000 + spawns.count, error: null };
-    },
+    }),
     evictPortHoldersFn: overrides.evictPortHoldersFn,
-    fetchFn: async (input) => {
+    fetchFn: overrides.fetchFn ?? (async (input) => {
       if (input.endsWith('/api/deacon/status')) {
         return {
           ok: true,
@@ -75,7 +82,7 @@ function makeWatchdog(overrides: Partial<{
             ...(healthBody === undefined ? {} : { json: async () => healthBody }),
           }
         : { ok: false, status: 503, statusText: 'Service Unavailable' };
-    },
+    }),
   });
 }
 
@@ -601,6 +608,92 @@ describe('SupervisorWatchdog', () => {
     expect(logs.some((msg) => msg.includes('WATCHDOG GIVING UP'))).toBe(true);
   });
 
+  it('does not re-arm boot grace when the restart command fails', async () => {
+    let now = Date.parse('2026-05-17T15:30:00.000Z');
+    let health: 'healthy' | 'foreign' | 'down' = 'healthy';
+    let spawnCount = 0;
+    const watchdog = makeWatchdog({
+      now: () => now,
+      config: {
+        ...config,
+        failThreshold: 1,
+        bootGraceMs: 300_000,
+        expectedIdentity: { repoRoot: '/repo', mode: 'primary' },
+      },
+      fetchFn: async (input) => {
+        if (input.endsWith('/api/deacon/status')) {
+          return {
+            ok: true,
+            status: 200,
+            statusText: 'OK',
+            json: async () => ({
+              isRunning: true,
+              config: { patrolIntervalMs: 60_000 },
+              state: { lastPatrol: new Date(now).toISOString() },
+            }),
+          };
+        }
+        if (health === 'down') return { ok: false, status: 503, statusText: 'Service Unavailable' };
+        return {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          json: async () => ({
+            status: 'ok',
+            repoRoot: health === 'foreign' ? '/other-repo' : '/repo',
+            mode: 'primary',
+          }),
+        };
+      },
+      evictPortHoldersFn: async () => ({ pids: [4242], error: null }),
+      spawnRestart: () => {
+        spawnCount += 1;
+        return { pid: null, error: 'pan restart --dashboard exited 2' };
+      },
+    });
+
+    await watchdog.checkOnce();
+    health = 'foreign';
+    now += 1_000;
+    await watchdog.checkOnce();
+    expect(spawnCount).toBe(1);
+
+    health = 'down';
+    now += 1_000;
+    await watchdog.checkOnce();
+
+    expect(spawnCount).toBe(2);
+    expect(watchdog.status().restartBlockedUntil).toBeNull();
+  });
+
+  it('stops evicting dashboards after the watchdog gives up', async () => {
+    mkdirSync(testHome, { recursive: true });
+    writeFileSync(
+      join(testHome, 'supervisor-watchdog.json'),
+      `${JSON.stringify({ restartAttempts: [], gaveUp: true })}\n`,
+      'utf8',
+    );
+    const spawns = { count: 0 };
+    const evict = vi.fn(async () => ({ pids: [4242], error: null }));
+    const watchdog = makeWatchdog({
+      spawns,
+      fetchOk: true,
+      config: { ...config, expectedIdentity: { repoRoot: '/repo', mode: 'primary' } },
+      healthBody: { status: 'ok', repoRoot: '/other-repo', mode: 'primary' },
+      evictPortHoldersFn: evict,
+    });
+
+    await watchdog.checkOnce();
+
+    expect(evict).not.toHaveBeenCalled();
+    expect(spawns.count).toBe(0);
+    expect(watchdog.status()).toMatchObject({
+      gaveUp: true,
+      restartBlockedReason: 'watchdog previously gave up; manual intervention required',
+      restartBlockedUntil: null,
+    });
+  });
+
   it('skips a locked restart cycle without consuming an attempt', async () => {
     mkdirSync(testHome, { recursive: true });
     writeFileSync(
@@ -644,6 +737,13 @@ describe('SupervisorWatchdog', () => {
   it('parses supervisor boot-grace environment configuration', () => {
     expect(readWatchdogConfig({}, 3011).bootGraceMs).toBe(300_000);
     expect(readWatchdogConfig({ OVERDECK_SUPERVISOR_BOOT_GRACE_MS: '45000' }, 3011).bootGraceMs).toBe(45_000);
+  });
+
+  it('uses the resolved primary checkout for dashboard identity checks', () => {
+    expect(readWatchdogConfig({}, 3011, '/primary/overdeck').expectedIdentity).toEqual({
+      repoRoot: '/primary/overdeck',
+      mode: 'primary',
+    });
   });
 
   it('waits for a restart that completes after a 60s dashboard boot', async () => {

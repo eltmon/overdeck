@@ -44,6 +44,32 @@ export async function writeSwarmFinalizedAt(workspacePath: string, issueId: stri
 }
 
 /**
+ * PAN-3459: persist the issue-level swarm policy mode. An explicit
+ * `pan swarm <id>` start opts the issue into ongoing Deacon coordination;
+ * without a persisted issue-level mode, a global `swarm.mode: off` (the
+ * default) makes every subsequent patrol skip the issue entirely — wave 1
+ * dispatches and the swarm orphans: completed slot branches never merge and
+ * remaining items never dispatch.
+ */
+export async function writeSwarmPolicyMode(
+  workspacePath: string,
+  issueId: string,
+  mode: 'off' | 'auto' | 'always',
+): Promise<void> {
+  const normalizedIssueId = issueId.toUpperCase();
+  await updateIssueRecordForWorkspace(workspacePath, normalizedIssueId, (record) => ({
+    ...record,
+    swarm: {
+      ...(record.swarm ?? {}),
+      policy: {
+        ...(record.swarm?.policy ?? {}),
+        mode,
+      },
+    },
+  }));
+}
+
+/**
  * PAN-2372 WI-3 / FR-4: persist a durable per-slot completion marker keyed by
  * `String(slotIndex)`. Read-modify-write preserves every other record field
  * (statusOverrides, slotAssignments, etc.) — see the byte-identical

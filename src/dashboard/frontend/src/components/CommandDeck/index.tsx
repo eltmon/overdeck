@@ -18,7 +18,7 @@ import { ConversationList, type Conversation } from './ConversationList';
 import { useConversationMutations } from './useConversationMutations';
 import { ForkModal } from './ForkModal';
 import { type ViewMode } from '../chat/ConversationPanel';
-import { ModelPicker, loadStoredHarness, loadStoredModel, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
+import { ModelPicker, loadStoredHarness, loadStoredModel, onKnownModelsSync, saveStoredHarness, saveStoredModel } from '../chat/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Agent, Issue, StartAgentResponse } from '../../types';
 import { useDashboardStore, selectAgents } from '../../lib/store';
@@ -243,6 +243,19 @@ export function CommandDeck({
   const showPlannedBacklog = usePlannedBacklogVisibility((state) => state.showPlannedBacklog);
   const [sidebarModel, setSidebarModel] = useState<string>(loadStoredModel);
   const [sidebarHarness, setSidebarHarness] = useState<Harness>(loadStoredHarness);
+
+  // The mount-time loadStoredModel above runs before the picker's catalog
+  // fetch completes, when only FALLBACK ids are "known" — a stored
+  // catalog-only id (kimi-code/*, OpenRouter favorites) fails isKnownModel
+  // and the composer shows the default instead. Re-derive once the catalog
+  // syncs. Every explicit pick writes localStorage, so re-deriving always
+  // reflects the user's latest choice and can never clobber a manual pick.
+  useEffect(() => onKnownModelsSync(() => {
+    setSidebarModel((current) => {
+      const restored = loadStoredModel();
+      return restored === current ? current : restored;
+    });
+  }), []);
 
   // Per-issue session selection (PAN-830 pan-11sr) — slice keyed by issueId.
   // The tree highlight uses the value for whichever feature is currently active.

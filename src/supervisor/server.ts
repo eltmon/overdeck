@@ -21,6 +21,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { appendFile } from 'node:fs/promises';
 import { readPlatformConfigSync } from '../lib/platform-lifecycle.js';
+import { resolveSupervisorPrimaryRepoRoot } from '../lib/supervisor.js';
 import { readWatchdogConfig, SupervisorWatchdog } from './watchdog.js';
 import { createSupervisorRestartSpawner, resolveBundledPanInvocation } from './restart-spawn.js';
 import { readTtsWatchdogConfig, TtsWatchdog } from './tts-watchdog.js';
@@ -31,7 +32,8 @@ const PAN_INVOCATION = process.env.OVERDECK_PAN_BINARY
   : resolveBundledPanInvocation();
 const LOG_FILE = path.join(os.homedir(), '.overdeck', 'logs', 'supervisor.log');
 const platformConfig = readPlatformConfigSync();
-const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort);
+const primaryRepoRoot = resolveSupervisorPrimaryRepoRoot();
+const watchdogConfig = readWatchdogConfig(process.env, platformConfig.dashboardApiPort, primaryRepoRoot);
 const ttsWatchdogConfig = readTtsWatchdogConfig(process.env);
 
 async function log(msg: string): Promise<void> {
@@ -72,7 +74,7 @@ function sendJson(req: http.IncomingMessage, res: http.ServerResponse, status: n
   res.end(JSON.stringify(body));
 }
 
-const spawnRestart = createSupervisorRestartSpawner({ ...PAN_INVOCATION, log });
+const spawnRestart = createSupervisorRestartSpawner({ ...PAN_INVOCATION, cwd: primaryRepoRoot, log });
 
 const watchdog = new SupervisorWatchdog({
   config: watchdogConfig,

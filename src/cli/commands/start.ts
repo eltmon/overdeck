@@ -698,13 +698,19 @@ async function repairMainBranchWorkspace(workspace: string, normalizedId: string
 /** PAN-2410: --fresh means fresh STAFFING, not just a fresh session. Never
  * inherit the dead agent's recorded model — with no explicit --model the
  * tier/role resolvers run against current config. A plain restart (no
- * --fresh) keeps the recorded staffing, by design. */
+ * --fresh) keeps the recorded staffing, by design.
+ * A `pending-`-prefixed recorded model is a mid-spawn placeholder written
+ * before real model resolution (spawn-helpers/lifecycle-restart); a spawn that
+ * died mid-flight leaves it behind, and inheriting it crashes resolution with
+ * "Unknown model" (same guard resume.ts applies). Treat it as no recorded
+ * model so staffing re-runs. */
 export function resolveSpawnModel(
   explicitModel: string | undefined,
   fresh: boolean | undefined,
   recordedModel: string | undefined,
 ): string | undefined {
-  return explicitModel || (fresh ? undefined : recordedModel);
+  const recorded = recordedModel?.startsWith('pending-') ? undefined : recordedModel;
+  return explicitModel || (fresh ? undefined : recorded);
 }
 
 export async function issueCommand(id: string, options: IssueOptions): Promise<void> {

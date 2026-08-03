@@ -287,7 +287,23 @@ export function getDefaultConversationModelApi(): ModelId | undefined {
 }
 
 const ROLE_NAMES: readonly Role[] = ['plan', 'work', 'review', 'test', 'ship', 'flywheel', 'strike', 'sequencer', 'knowledge'];
-type AvailableModel = { id: ModelId; name: string; costPer1MTokens: number };
+type AvailableModel = {
+  id: ModelId;
+  name: string;
+  costPer1MTokens: number;
+  /**
+   * Kimi-only: which harness family this id launches under. `claude-code` ids
+   * are the Anthropic-compatible route; `kimi-code/*` ids belong to the native
+   * CLI's catalog (also used by the ACP transport). Conversation pickers use
+   * this to render harness-labeled rows and to send the row's harness at
+   * spawn; config panels can ignore it.
+   */
+  harness?: RuntimeName;
+  /** Effort levels the row's harness actually offers (Kimi rows only today). */
+  effortLevels?: readonly string[];
+  /** Display name without any harness suffix — pickers compose row labels from it. */
+  baseName?: string;
+};
 type AvailableModelsApi = Record<'anthropic' | 'openai' | 'google' | 'minimax' | 'zai' | 'kimi' | 'mimo' | 'openrouter' | 'nous' | 'dashscope', AvailableModel[]>;
 const WORKHORSE_SLOTS: readonly WorkhorseSlot[] = ['expensive', 'mid', 'cheap'];
 const MODEL_PROVIDERS = ['anthropic', 'openai', 'google', 'minimax', 'zai', 'kimi', 'mimo', 'openrouter', 'nous', 'dashscope'] as const;
@@ -1272,6 +1288,37 @@ export function validateSettingsApi(settings: ApiSettingsConfig): ValidationResu
 /**
  * Get available models by provider (for model selection UI)
  */
+/**
+ * Annotate Kimi entries with the harness their id space belongs to and the
+ * effort levels that route actually offers (ground truth:
+ * MODEL_CAPABILITIES.effortLevels — the native `kimi` binary's /effort offers
+ * low/high/max for kimi-code/* ids; claude-code's /effort offers all five for
+ * the bare Anthropic-route ids). `kimi-code/*` ids only launch via the native
+ * CLI (kimi-code harness or ACP transport), so the picker-facing `name`
+ * carries the "— Kimi Code CLI" marker wherever the row is shown without
+ * harness context; bare ids are the claude-code route. Keeps flat config
+ * panels honest (two "Kimi K3 (1M)" rows with different validity would be a
+ * trap) while conversation pickers compose their own per-row labels from
+ * baseName.
+ */
+function annotateKimiAvailableModel(modelId: string, entry: AvailableModel, effortLevels: readonly string[] | undefined): AvailableModel {
+  if (modelId.startsWith('kimi-code/')) {
+    return {
+      ...entry,
+      name: `${entry.name} — Kimi Code CLI`,
+      baseName: entry.name,
+      harness: 'kimi-code',
+      effortLevels,
+    };
+  }
+  return {
+    ...entry,
+    baseName: entry.name,
+    harness: 'claude-code',
+    effortLevels,
+  };
+}
+
 export function getAvailableModelsApi(): AvailableModelsApi {
   const result: AvailableModelsApi = {
     anthropic: [],
@@ -1295,36 +1342,37 @@ export function getAvailableModelsApi(): AvailableModelsApi {
     if (capability.displayName.includes('(deprecated)')) continue;
     if (modelId in MODEL_DEPRECATIONS) continue;
     const entry = { id: modelId as ModelId, name: capability.displayName, costPer1MTokens: capability.costPer1MTokens };
+    const annotated = capability.provider === 'kimi' ? annotateKimiAvailableModel(modelId, entry, capability.effortLevels) : entry;
     switch (capability.provider) {
       case 'anthropic':
-        result.anthropic.push(entry);
+        result.anthropic.push(annotated);
         break;
       case 'openai':
-        result.openai.push(entry);
+        result.openai.push(annotated);
         break;
       case 'google':
-        result.google.push(entry);
+        result.google.push(annotated);
         break;
       case 'kimi':
-        result.kimi.push(entry);
+        result.kimi.push(annotated);
         break;
       case 'minimax':
-        result.minimax.push(entry);
+        result.minimax.push(annotated);
         break;
       case 'zai':
-        result.zai.push(entry);
+        result.zai.push(annotated);
         break;
       case 'mimo':
-        result.mimo.push(entry);
+        result.mimo.push(annotated);
         break;
       case 'openrouter':
-        result.openrouter.push(entry);
+        result.openrouter.push(annotated);
         break;
       case 'nous':
-        result.nous.push(entry);
+        result.nous.push(annotated);
         break;
       case 'dashscope':
-        result.dashscope.push(entry);
+        result.dashscope.push(annotated);
         break;
     }
   }

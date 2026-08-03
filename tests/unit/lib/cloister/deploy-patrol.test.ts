@@ -174,6 +174,25 @@ describe('runDeployPatrol', () => {
     expect(ctx.clearQueue).not.toHaveBeenCalled();
   });
 
+  it('reassesses a queued deploy and starts the reload when the gate clears', async () => {
+    const ctx = context();
+    ctx.readQueue.mockResolvedValue(queuedDeploy());
+    ctx.getWindowAssessment
+      .mockResolvedValueOnce({
+        reason: 'Deployment deferred because the post-merge lifecycle is pending.',
+      })
+      .mockResolvedValueOnce({ reason: null });
+
+    await runDeployPatrol(ctx);
+    expect(ctx.spawnReload).not.toHaveBeenCalled();
+
+    await runDeployPatrol(ctx);
+
+    expect(ctx.getWindowAssessment).toHaveBeenCalledTimes(2);
+    expect(ctx.spawnReload).toHaveBeenCalledOnce();
+    expect(ctx.clearQueue).not.toHaveBeenCalled();
+  });
+
   it('escalates one long-queued deploy and persists the escalated flag', async () => {
     const ctx = context();
     let queue = queuedDeploy({ requestedAt: '2026-07-15T11:29:00.000Z' });
@@ -243,6 +262,11 @@ describe('runDeployPatrol', () => {
     expect(ctx.spawnReload).not.toHaveBeenCalled();
     expect(ctx.getWindowAssessment).not.toHaveBeenCalled();
     expect(ctx.clearQueue).not.toHaveBeenCalled();
+    expect(ctx.recordIntent).toHaveBeenCalledWith({
+      requestedBy: 'deploy-patrol',
+      reason: 'Automatic deployment blocked because CI failed.',
+      blockedBy: [],
+    });
   });
 
   it('escalates an overdue queued deploy while CI is blocked', async () => {

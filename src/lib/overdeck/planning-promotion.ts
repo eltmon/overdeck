@@ -13,9 +13,10 @@ import { validateOrigin } from '../../dashboard/server/routes/origin-validation.
 import { getSharedIssueService } from '../../dashboard/server/services/issue-service-singleton.js';
 import { getGitHubConfig } from '../../dashboard/server/services/tracker-config.js';
 import { countPendingAskUserQuestionsForAgent } from '../agent-enrichment.js';
-import { getAgentStateSync, saveAgentStateSync } from '../agents.js';
+import { getAgentStateSync } from '../agents.js';
 import { emitActivityEntrySync, emitActivityTtsSync } from '../activity-logger.js';
 import { createInFlightGuard } from '../cloister/in-flight-guard.js';
+import { saveAgentStateAndEmitEvent } from '../../dashboard/server/services/agent-projection.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from '../internal-token.js';
 import { checkPrdGateSync, promoteWorkspacePrdDraft, asPanSpecDocument, findSpecByIssue, writeSpecDocument, writeSpecForIssue, WORKSPACE_RUNTIME_DIRNAME } from '../pan-dir/index.js';
 import { PENDING_PROMOTION_FILENAME } from '../pan-dir/types.js';
@@ -162,7 +163,7 @@ export async function completePlanningArtifacts(options: {
   const issueLower = issueId.toLowerCase();
   const upperIssueId = issueId.toUpperCase();
   const workspacePlanPath = await Effect.runPromise(Effect.gen(function* () {
-    return (yield* findWorkspaceDraftPlan(workspacePath)) ?? (yield* findPlan(workspacePath));
+    return (yield* findWorkspaceDraftPlan(workspacePath, 'authored-first')) ?? (yield* findPlan(workspacePath));
   }));
   if (!workspacePlanPath) {
     throw new Error(`No workspace xBRIEF found for ${upperIssueId} at ${workspacePath}/.overdeck/spec.vbrief.json`);
@@ -439,6 +440,14 @@ export async function completePlanningAutoSpawnAndKill(options: {
   killSessionImpl?: (sessionName: string) => Promise<void>;
   scheduleKill?: (callback: () => void, delayMs: number) => unknown;
   logError?: (message?: unknown, ...optionalParams: unknown[]) => void;
+  /**
+   * PAN-3338 — fired once the DEFERRED kill (autoSpawn:false path) actually
+   * runs, so the caller can re-project hasLiveTmuxSession after the session
+   * is truly gone. The immediate-kill path (autoSpawn:true) does not need
+   * this: the caller re-checks liveness after this function already resolves,
+   * by which point runKill() below has already been awaited.
+   */
+  onSessionKilled?: () => void | Promise<void>;
 }): Promise<CompletePlanningAutoSpawnResult | null> {
   const autoSpawnResult = await completePlanningAutoSpawn({
     issueId: options.issueId,
@@ -469,7 +478,9 @@ export async function completePlanningAutoSpawnAndKill(options: {
   if (options.autoSpawn) {
     await runKill();
   } else {
-    (options.scheduleKill ?? setTimeout)(() => { void runKill(); }, 1500);
+    (options.scheduleKill ?? setTimeout)(() => {
+      void runKill().finally(() => { void options.onSessionKilled?.(); });
+    }, 1500);
   }
 
   return autoSpawnResult;
@@ -563,17 +574,6 @@ export async function completePlanningForIssue(options: {
     // caller mid-fetch and they would never see their own success response.
     // Keep this name in scope; we schedule the kill at the very end.
 
-    // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead of "Watch Planning"
-    await (async () => {
-      try {
-        const planningState = getAgentStateSync(sessionName);
-        if (planningState) {
-          saveAgentStateSync({ ...planningState, status: 'stopped', stoppedAt: new Date().toISOString() });
-          console.log(`[complete-planning] Marked ${sessionName} as stopped`);
-        }
-      } catch { /* Non-fatal — agent status is cosmetic */ }
-    })();
-
     // Determine project path
     const githubCheck = isGitHubIssue(id);
     const projectPath = resolveIssueProjectPathSync(id);
@@ -618,7 +618,7 @@ export async function completePlanningForIssue(options: {
       }
 
       const workspacePlanPath = await (async () =>
-        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath))) ?? (await Effect.runPromise(findPlan(workspacePath)))
+        (await Effect.runPromise(findWorkspaceDraftPlan(workspacePath, 'authored-first'))) ?? (await Effect.runPromise(findPlan(workspacePath)))
       )();
       if (workspacePlanPath) {
         const workspaceDoc = await Effect.runPromise(readPlan(workspacePlanPath));
@@ -760,6 +760,47 @@ export async function completePlanningForIssue(options: {
       newState = 'Skipped (already in progress)';
     }
 
+    // Mark planning agent as stopped so KanbanBoard shows "Start Agent" instead
+    // of "Watch Planning". Runs only AFTER the PRD gate and spec promotion
+    // succeeded — a rejected finalize leaves the agent running (PAN-3338).
+    //
+    // Routed through the canonical transactional write door
+    // (saveAgentStateAndEmitEvent, PAN-1908) instead of a separate row write
+    // + eventStore.append: that split write let a transient liveness-query or
+    // event-store failure leave the agents-table row stopped with no matching
+    // event, which is exactly the DB/read-model divergence this issue exists
+    // to fix. The write door commits the row upsert and the event append in
+    // one SQLite transaction, so a failure here leaves NEITHER changed —
+    // never a split state — and the outer catch keeps it non-fatal to the
+    // finalize response.
+    //
+    // hasLiveTmuxSession must be honest at the moment it is recorded, and
+    // "the moment" matters: this is called (a) once after the auto-spawn/kill
+    // decision below, by which point the immediate-kill path (autoSpawn:true)
+    // has already awaited the kill, so sessionExists() correctly reports
+    // false; and (b) a second time from onSessionKilled once the DEFERRED
+    // kill (autoSpawn:false) actually runs ~1.5s later, correcting the
+    // liveness flag the enrichment poller can never repair on its own (it
+    // only processes tmux-active agents, so a projection left at
+    // hasLiveTmuxSession:true after the session died would never self-heal).
+    const projectPlanningAgentStopped = async (): Promise<void> => {
+      try {
+        const planningState = getAgentStateSync(sessionName);
+        if (!planningState) return;
+        const previousStatus = planningState.status;
+        const hasLiveTmuxSession = await Effect.runPromise(sessionExists(sessionName));
+        saveAgentStateAndEmitEvent(
+          { ...planningState, status: 'stopped', stoppedAt: planningState.stoppedAt ?? new Date().toISOString() },
+          {
+            type: 'agent.status_changed',
+            timestamp: new Date().toISOString(),
+            payload: { agentId: sessionName, status: 'stopped', previousStatus, hasLiveTmuxSession },
+          },
+        );
+        console.log(`[complete-planning] Marked ${sessionName} as stopped (hasLiveTmuxSession=${hasLiveTmuxSession})`);
+      } catch { /* Non-fatal — agent status is cosmetic, and the write door is transactional so this never leaves a split state */ }
+    };
+
     await Effect.runPromise(eventStore.append({
       type: 'planning.sync',
       timestamp: new Date().toISOString(),
@@ -793,7 +834,16 @@ export async function completePlanningForIssue(options: {
       autoSpawn: effectiveAutoSpawn,
       skipKill,
       sessionName,
+      onSessionKilled: projectPlanningAgentStopped,
     });
+    // Runs AFTER the auto-spawn/kill decision above, not before: on the
+    // immediate-kill path (effectiveAutoSpawn:true, skipKill:false) the kill
+    // has already been awaited inside completePlanningAutoSpawnAndKill, so
+    // sessionExists() below correctly observes the session as dead instead of
+    // recording a liveness snapshot that goes stale the instant the session
+    // is killed (PAN-3338). The deferred-kill path additionally corrects the
+    // projection via onSessionKilled once the delayed kill actually runs.
+    await projectPlanningAgentStopped();
     const autoHandoffFailed = effectiveAutoSpawn && autoSpawnResult?.workAgentSpawned !== true;
     let autoHandoffError: string | undefined;
     if (autoHandoffFailed && autoSpawnResult) {

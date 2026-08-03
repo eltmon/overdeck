@@ -26,12 +26,12 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 
-function cacheKey(cwd: string, path: string): string {
-  return `${cwd}\0${path}`;
+function cacheKey(cwd: string | undefined, path: string): string {
+  return `${cwd ?? ''}\0${path}`;
 }
 
 export function getCachedExists(
-  cwd: string,
+  cwd: string | undefined,
   path: string,
 ): { exists: boolean; kind: FilePathExistsKind } | null {
   const key = cacheKey(cwd, path);
@@ -48,7 +48,7 @@ export function getCachedExists(
 }
 
 export function setCachedExists(
-  cwd: string,
+  cwd: string | undefined,
   path: string,
   exists: boolean,
   kind: FilePathExistsKind,

@@ -238,9 +238,23 @@ export const AgentActivityChangedEvent = Schema.Struct({
     agentId: AgentId,
     activity: Activity,
     currentTool: Schema.optional(Schema.String),
+    hookName: Schema.optional(Schema.String),
   }),
 })
 export type AgentActivityChangedEvent = typeof AgentActivityChangedEvent.Type
+
+/** A registered harness hook fired without implying an agent activity transition. */
+export const AgentHookFiredEvent = Schema.Struct({
+  type: Schema.Literal("agent.hook_fired"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    hookName: Schema.String,
+    tool: Schema.optional(Schema.String),
+  }),
+})
+export type AgentHookFiredEvent = typeof AgentHookFiredEvent.Type
 
 export const AgentThinkingStartedEvent = Schema.Struct({
   type: Schema.Literal("agent.thinking_started"),
@@ -744,6 +758,41 @@ export const ReviewCoordinatorDiedEvent = Schema.Struct({
 })
 export type ReviewCoordinatorDiedEvent = typeof ReviewCoordinatorDiedEvent.Type
 
+/** A terminal review verdict was rejected due to stale evidence. */
+export const ReviewVerdictRejectedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_rejected"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewVerdictRejectedEvent = typeof ReviewVerdictRejectedEvent.Type
+
+/** A terminal review verdict was landed and dispatched with a fresh evidence head. */
+export const ReviewVerdictDispatchedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_dispatched"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    classification: Schema.String,
+    testGateReset: Schema.Boolean,
+  }),
+})
+export type ReviewVerdictDispatchedEvent = typeof ReviewVerdictDispatchedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
@@ -1234,6 +1283,66 @@ export const EmbedProgressEvent = Schema.Struct({
 })
 export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
 
+// ─── Stall Sweeper Events (PAN-3485) ──────────────────────────────────────────
+
+/** The parked population changed — carries the full new population (compact rows). */
+export const SweepScanEvent = Schema.Struct({
+  type: Schema.Literal("sweep.scan"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueCount: Schema.Number,
+    rowCount: Schema.Number,
+    rows: Schema.Array(Schema.Struct({
+      issueId: Schema.String,
+      orbit: Schema.String,
+      parkedAt: Schema.String,
+    })),
+  }),
+})
+export type SweepScanEvent = typeof SweepScanEvent.Type
+
+/** The sweeper took an autonomous action against a parked row. */
+export const SweepActionEvent = Schema.Struct({
+  type: Schema.Literal("sweep.action"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    action: Schema.String,
+    agentId: Schema.optional(Schema.String),
+  }),
+})
+export type SweepActionEvent = typeof SweepActionEvent.Type
+
+/** A parked row was released by the sweeper (the issue re-enters the pipeline). */
+export const SweepUnparkedEvent = Schema.Struct({
+  type: Schema.Literal("sweep.unparked"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    action: Schema.String,
+    agentId: Schema.optional(Schema.String),
+  }),
+})
+export type SweepUnparkedEvent = typeof SweepUnparkedEvent.Type
+
+/** A parked row was (re-)surfaced to the operator — gates respected, TTL re-surface, or exhaustion. */
+export const SweepEscalatedEvent = Schema.Struct({
+  type: Schema.Literal("sweep.escalated"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type SweepEscalatedEvent = typeof SweepEscalatedEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -1253,6 +1362,7 @@ export const DomainEvent = Schema.Union([
   AgentOutputReceivedEvent,
   // PAN-800 runtime events
   AgentActivityChangedEvent,
+  AgentHookFiredEvent,
   AgentThinkingStartedEvent,
   AgentThinkingStoppedEvent,
   AgentWaitingStartedEvent,
@@ -1294,6 +1404,8 @@ export const DomainEvent = Schema.Union([
   ReviewSpecialistTimedOutEvent,
   ReviewCoordinatorStartedEvent,
   ReviewCoordinatorDiedEvent,
+  ReviewVerdictRejectedEvent,
+  ReviewVerdictDispatchedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,
@@ -1331,5 +1443,9 @@ export const DomainEvent = Schema.Union([
   EnrichProgressEvent,
   EnrichCompleteEvent,
   EmbedProgressEvent,
+  SweepScanEvent,
+  SweepActionEvent,
+  SweepUnparkedEvent,
+  SweepEscalatedEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type
