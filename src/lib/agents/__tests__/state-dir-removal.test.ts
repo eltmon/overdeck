@@ -13,7 +13,10 @@ vi.mock('../../paths.js', async (importOriginal) => {
   };
 });
 
-import { removeAgentStateDir } from '../state-dir-removal.js';
+import {
+  listAgentStateFilesForRemoval,
+  removeAgentStateDir,
+} from '../state-dir-removal.js';
 
 let tempRoot: string;
 let outsideDir: string;
@@ -37,6 +40,20 @@ afterEach(() => {
 });
 
 describe('removeAgentStateDir', () => {
+  it('lists only the runtime files cleanup would remove', async () => {
+    const sessionsDir = join(agentDir, 'sessions');
+    mkdirSync(sessionsDir);
+    writeFileSync(join(agentDir, 'state.json'), '{}');
+    writeFileSync(join(sessionsDir, 'session.jsonl'), '{"kept":true}\n');
+    writeFileSync(join(sessionsDir, 'runtime.json'), '{}');
+
+    await expect(listAgentStateFilesForRemoval(agentDir)).resolves.toEqual([
+      'sessions/runtime.json',
+      'state.json',
+    ]);
+    expect(readFileSync(join(sessionsDir, 'session.jsonl'), 'utf8')).toBe('{"kept":true}\n');
+  });
+
   it('removes a dir with no jsonl entirely', async () => {
     mkdirSync(join(agentDir, 'git-guard'));
     writeFileSync(join(agentDir, 'state.json'), '{}');
