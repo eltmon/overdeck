@@ -86,16 +86,16 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:40:57.630Z",
+  "updated": "2026-08-03T02:40:58.901Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:32:38.154Z",
+    "updatedAt": "2026-08-03T02:40:58.899Z",
     "reviewNotes": "[correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
@@ -128,6 +128,39 @@
         "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/requirements.md",
         "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
       }
+    },
+    "reviewRequestedAt": "2026-08-03T02:40:58.899Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "actualChangedFiles": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "recordedAt": "2026-08-03T02:40:57.628Z"
     }
   },
   "closeOut": {
