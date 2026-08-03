@@ -108,18 +108,18 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:49:00.396Z",
+  "updated": "2026-08-03T02:49:03.635Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "passed",
+    "reviewStatus": "failed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T02:48:57.280Z",
-    "reviewNotes": "All four convoy reviewers passed; the prior live-conversation model re-seed blocker is fixed.",
+    "updatedAt": "2026-08-03T02:49:03.562Z",
+    "reviewNotes": "Verification failed at lint",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
@@ -162,24 +162,6 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-03T02:40:57.628Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
-      }
     }
   },
   "closeOut": {
@@ -195,9 +177,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 3267936,
-            "output": 48030,
-            "cacheRead": 10945024,
+            "input": 3273070,
+            "output": 50036,
+            "cacheRead": 11379200,
             "cacheWrite": 0
           }
         },
@@ -250,15 +232,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 7374283,
-          "output": 219630,
-          "cacheRead": 78937088,
+          "input": 7379417,
+          "output": 221636,
+          "cacheRead": 79371264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 82.9301503,
-        "pricingAsOf": "2026-08-03T02:49:00.387Z"
+        "usd": 83.2330883,
+        "pricingAsOf": "2026-08-03T02:49:03.628Z"
       }
     },
     "merges": [
