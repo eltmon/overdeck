@@ -24,7 +24,7 @@ import {
   markAgentRunning,
   saveAgentStateSync,
 } from './agent-state.js';
-import { getLatestSessionIdSync, saveSessionId } from './activity.js';
+import { resolveLatestSessionIdSync, saveSessionId } from './activity.js';
 import { clearAgentSessionPointers } from './session-pointers.js';
 import {
   deliverInitialPromptWithRetry,
@@ -80,7 +80,7 @@ import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
 export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed: string; summarized: boolean }> {
   const normalizedId = normalizeAgentId(agentId);
   const agentState = getAgentStateSync(normalizedId);
-  const sessionId = getLatestSessionIdSync(normalizedId);
+  const sessionId = resolveLatestSessionIdSync(normalizedId).sessionId;
   const issueId = agentState?.issueId || normalizedId.replace(/^agent-/, '').toUpperCase();
 
   let summary: string | null = null;
@@ -214,18 +214,23 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
   }
 
   // Get saved session ID from any available source
-  const sessionId = getLatestSessionIdSync(normalizedId);
+  const sessionResolution = resolveLatestSessionIdSync(normalizedId);
+  const sessionId = sessionResolution.sessionId;
   if (!sessionId) {
-    // PAN-2098: state the concrete reason. ohmypi now resolves from its session
-    // JSONL (see getLatestSessionIdSync); reaching here means no id exists in any
-    // source for this harness, so a fresh start is genuinely the only option.
+    // PAN-2098: state the concrete reason and enumerate the sources actually
+    // checked so the operator can distinguish missing local pointers from a
+    // failed durable-plane/event-store reconstruction.
     const harnessLabel = agentState?.harness ?? 'unknown';
-    const reason = `Cannot resume ${normalizedId} (harness=${harnessLabel}): no resumable session id found — no session.id file, no sessions.json entry, and no recoverable session transcript on disk. Start a fresh agent instead.`;
+    const reason = `Cannot resume ${normalizedId} (harness=${harnessLabel}): no resumable session id found. Checked ${sessionResolution.checked.join(', ')}. Start a fresh agent instead.`;
     logAgentLifecycleSync(normalizedId, `resumeAgent BLOCKED: ${reason}`);
     return {
       success: false,
       error: reason
     };
+  }
+  if (sessionResolution.needsPointerRepair) {
+    saveSessionId(normalizedId, sessionId, 'recovered');
+    logAgentLifecycleSync(normalizedId, `resume pointer reconstructed from durable metadata: sessionId=${sessionId}`);
   }
 
   if (!agentState || !hasWorkspace || isPlaceholder) {
