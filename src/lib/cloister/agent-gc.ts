@@ -199,7 +199,7 @@ async function persistAgentGcTombstone(
     throw new Error(`durable agent plane is unavailable for tombstone ${agent.id}`);
   }
   const flush = await flushAgentPlaneWrites(agent.issueId, agent.id);
-  if (!flush?.committed || flush.pushed !== true) {
+  if (!flush || flush.errored || flush.pushed !== true) {
     throw new Error(
       `durable tombstone push failed for ${agent.id}: ${flush?.reason ?? 'no confirmed state-branch push'}`,
     );
