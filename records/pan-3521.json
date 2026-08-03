@@ -1,19 +1,60 @@
 {
   "issueId": "PAN-3521",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-08-03T05:20:01.081Z",
-  "updated": "2026-08-03T05:20:01.081Z",
+  "updated": "2026-08-03T07:35:38.744Z",
   "pipeline": {
     "issueId": "PAN-3521",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T05:20:01.081Z"
+    "updatedAt": "2026-08-03T07:35:38.702Z",
+    "strikeReadyHead": "481a996397a81fd3ba61f1195fadd4f3ee9b9a9f",
+    "strikeReadyAt": "2026-08-03T07:35:38.701Z",
+    "strikeLandingState": "ready",
+    "strikeRecoveryCount": 0,
+    "strikeLandingAttempts": []
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 490,
+            "output": 200,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "strike": {
+          "openai/gpt-5.6-sol": {
+            "input": 1205342,
+            "output": 54237,
+            "cacheRead": 41881088,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5": {
+          "input": 490,
+          "output": 200,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 1205342,
+          "output": 54237,
+          "cacheRead": 41881088,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 28.595854,
+        "pricingAsOf": "2026-08-03T07:35:38.732Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
