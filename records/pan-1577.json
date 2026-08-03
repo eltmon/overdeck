@@ -1071,7 +1071,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:27:30.155Z",
+  "updated": "2026-08-03T02:27:45.644Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1082,7 +1082,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:26:44.919Z",
-    "updatedAt": "2026-08-03T02:27:30.137Z",
+    "updatedAt": "2026-08-03T02:27:45.371Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -1116,9 +1116,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 59321422,
-            "output": 657494,
-            "cacheRead": 152561152,
+            "input": 59326080,
+            "output": 659526,
+            "cacheRead": 153136640,
             "cacheWrite": 0
           }
         },
@@ -1185,9 +1185,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 70777841,
-          "output": 900477,
-          "cacheRead": 199819264,
+          "input": 70782499,
+          "output": 902509,
+          "cacheRead": 200394752,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1198,8 +1198,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 705.0665094,
-        "pricingAsOf": "2026-08-03T02:27:30.148Z"
+        "usd": 705.4385034,
+        "pricingAsOf": "2026-08-03T02:27:45.491Z"
       }
     },
     "merges": [
