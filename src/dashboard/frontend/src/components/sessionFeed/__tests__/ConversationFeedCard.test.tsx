@@ -69,6 +69,33 @@ describe('ConversationFeedCard', () => {
     expect(screen.getByText('2')).toBeInTheDocument();
   });
 
+  it('renders kimi_code conversations with the Kimi Code label and logo (2026-08-02 harness-labeled rows)', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ agent: 'kimi_code' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('Kimi Code logo')).toBeInTheDocument();
+    expect(screen.getByText('Kimi Code')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Claude Code logo')).not.toBeInTheDocument();
+  });
+
+  it('renders codex conversations with the Codex label and logo', () => {
+    render(
+      <ConversationFeedCard
+        entry={entry({ agent: 'codex' })}
+        onSelect={vi.fn()}
+        now={new Date('2026-05-23T01:05:00.000Z')}
+      />,
+    );
+
+    expect(screen.getByLabelText('Codex logo')).toBeInTheDocument();
+    expect(screen.getByText('Codex')).toBeInTheDocument();
+  });
+
   it('shows relative timestamp in a time element with dateTime set to the ISO timestamp', () => {
     render(
       <ConversationFeedCard

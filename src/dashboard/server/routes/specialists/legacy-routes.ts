@@ -8,6 +8,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
+import { recordReviewVerdict } from '../../../../lib/cloister/review-verdict-writer.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
 import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
@@ -195,6 +196,29 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     switch (specialist) {
       case 'review':
+        // Route through verdict write door (PAN-3512) — snapshot evidence head first
+        // so recordReviewVerdict has the workspace head when it's called.
+        yield* Effect.promise(async () => {
+          try {
+            const project = resolveProjectFromIssueSync(normalizedIssueId);
+            if (project) {
+              const workspacePath = join(
+                project.projectPath,
+                'workspaces',
+                `feature-${normalizedIssueId.toLowerCase()}`,
+              );
+              if (existsSync(workspacePath)) {
+                const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+                const headAnchor = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+                if (headAnchor) {
+                  update.reviewedAtCommit = headAnchor;
+                }
+              }
+            }
+          } catch (err) {
+            // Non-fatal; recordReviewVerdict will proceed without evidenceHead
+          }
+        });
         update.reviewStatus = status === 'passed' ? 'passed' : 'blocked';
         if (notes) update.reviewNotes = notes;
         break;
@@ -229,7 +253,26 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     // Apply the update (triggers side effects like idle state, queue processing)
-    const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
+    // For review verdicts, route through recordReviewVerdict (PAN-3512)
+    let updatedStatus: ReviewStatus;
+    if (specialist === 'review' && (status === 'passed' || status === 'blocked' || status === 'failed')) {
+      const verdictOutcome = yield* Effect.promise(() => recordReviewVerdict(normalizedIssueId, {
+        verdict: status === 'passed' ? 'passed' : status === 'failed' ? 'failed' : 'blocked',
+        notes,
+        evidenceHead: update.reviewedAtCommit,
+        writer: 'coordinator',
+      }));
+      if (!verdictOutcome.landed) {
+        // Verdict was rejected (stale evidence) — return error
+        return jsonResponse(
+          { error: `Verdict rejected: ${verdictOutcome.reason}` },
+          { status: 400 },
+        );
+      }
+      updatedStatus = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+    } else {
+      updatedStatus = setReviewStatusBase(normalizedIssueId, update);
+    }
     if (specialist === 'inspect' && status === 'failed') {
       yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
       // PAN-3078: a blocked verdict must reach the work agent, or it keeps
@@ -485,6 +528,8 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     if (specialist === 'review' && (status === 'failed' || status === 'blocked')) {
+      // Only deliver feedback if this is a coordinator verdict (not handled by CLI/fallback)
+      // The verdict write door has already validated the evidence head
       yield* Effect.promise(async () => {
         try {
           const project = resolveProjectFromIssueSync(normalizedIssueId);

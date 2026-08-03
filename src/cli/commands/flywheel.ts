@@ -332,7 +332,7 @@ export async function startFlywheelRun(
 ): Promise<StartFlywheelRunResult> {
   const cwd = options.cwd ?? await (deps.resolvePrimaryRoot ?? resolvePrimaryWorktreeRoot)(process.cwd());
   const brief = await (deps.requireBrief ?? requireFlywheelBrief)(cwd, options.brief);
-  const orderContext = options.orders ? resolveFlywheelOrderStart(cwd, options.orders, deps) : null;
+  const orderContext = options.orders ? await resolveFlywheelOrderStart(cwd, options.orders, deps) : null;
   const book = orderContext?.book ?? null;
   const overlay = await resolveFlywheelOrderBriefOverlay(cwd, book, deps);
   const runId = await (deps.nextRunId ?? nextFlywheelRunId)();
