@@ -133,20 +133,18 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T03:23:15.449Z",
+  "updated": "2026-08-03T03:28:20.146Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T03:23:15.414Z",
-    "reviewNotes": "Verification failed at lint — fix and resubmit",
-    "testNotes": "Verified HEAD a5380d564a8f2525b09752cf7b8e37d97b30f4ce (matches review-agent-pan-3418-review-a5380d56 synthesis: APPROVED, 0 blocking findings) via isolated throwaway git worktrees, because the assigned workspace had uncommitted, unrelated, actively-changing modifications to src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts and their tests (outside PAN-3418 files_scope and outside `git diff main...HEAD` entirely) throughout this session -- not edited, committed, or discarded per test-role boundaries. Clean-worktree results: `npm run typecheck` PASSES (tsc --noEmit clean; dashboard-types guard 55 known/0 new; frontend-types guard 0 known/0 new). `npm run lint` on the 11 PAN-3418 files_scope paths: 0 errors. Full-repo lint shows 3 pre-existing @typescript-eslint/no-explicit-any errors, confirmed present identically on origin/main (e1d8ee715b1) in the two contaminated files -- pre-existing, unrelated to this issue. Targeted tests for all 5 in-scope xBRIEF items pass: tests/unit/lib/overdeck/{conversation-runtime-empty-model,conversations-empty-model,conversations-model-backfill}.test.ts (7/7) and src/dashboard/frontend .../{ConversationRow,ModelPicker,ComposerFooter.model-picker}.test.tsx (24/24, including the new real-component integration test proving the prior review-blocking live-conversation model bug is fixed). Configured `--changed origin/main` suite: frontend 628/628 pass; root 5374/5412 pass, 11 failures confined to 6 files (review-verdict-writer.test.ts, specialists/done.test.ts, specialists-reviewed-at-commit.test.ts, spawn-flywheel-provenance.test.ts, harness-resolve.test.ts, review-status.test.ts) -- none in PAN-3418's diff or files_scope; spot-check on a clean origin/main worktree reproduces the same failures, confirming pre-existing red-main defect in the PAN-3512/3513 verdict-write-door area, unrelated to this issue. verify-live-data-repair (FR-6) is explicitly out of scope for pre-merge testing per its own xBRIEF narrative (readiness: sequential, post-deploy close-out checkpoint).",
+    "updatedAt": "2026-08-03T03:28:19.660Z",
     "uatNotes": "Browser UAT not required: no mention of Playwright, UAT, screenshots, or browser flows in the issue body, PRD, PR notes, or xBRIEF continue state. All 5 in-scope acceptance criteria are unit/component-test verifiable and are covered, including src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx, a DOM-level integration test that mounts the real ComposerFooter+ModelPicker tree (no mocking of ModelPicker) and specifically proves the review-cycle-1 blocking defect (live conversation model being re-seeded to the global default) is fixed. The only acceptance criterion needing a running dashboard (FR-6, live-host row repair) is explicitly deferred to post-deploy close-out per its own xBRIEF item (readiness: sequential) and cannot execute before this branch merges and deploys.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -157,7 +155,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
     "reviewSpawnedAt": "2026-08-03T03:17:53.345Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -245,10 +242,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 136,
-            "output": 39485,
-            "cacheRead": 12722230,
-            "cacheWrite": 240661
+            "input": 168,
+            "output": 44725,
+            "cacheRead": 15013574,
+            "cacheWrite": 427201
           }
         },
         "work": {
@@ -274,15 +271,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 136,
-          "output": 39485,
-          "cacheRead": 12722230,
-          "cacheWrite": 240661
+          "input": 168,
+          "output": 44725,
+          "cacheRead": 15013574,
+          "cacheWrite": 427201
         }
       },
       "costAtCloseOut": {
-        "usd": 121.82444029999999,
-        "pricingAsOf": "2026-08-03T03:23:15.430Z"
+        "usd": 122.8015233,
+        "pricingAsOf": "2026-08-03T03:28:19.752Z"
       }
     },
     "merges": [
