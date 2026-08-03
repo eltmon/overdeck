@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T04:52:55.111Z",
+  "updated": "2026-08-03T05:07:46.036Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -70,16 +70,8 @@
     }
   ],
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "journal-artifact-memo": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 1778400,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-03T04:51:52.488Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -102,12 +94,27 @@
         "outcome": "completed",
         "reason": "Added src/lib/cloister/verdict-restore.ts (attemptArtifactVerdictRestore + restoreWouldTripHeadGuard) and 20 fixture tests. Deviation: the cited review arm of findVerdictEvidenceHeadMismatch was deleted by PAN-3512 (fd48e3af398, on main); head-anchoring now lives in review-verdict-writer.ts:151-213 and the module documents that. Also registered review.verdict_restore_blocked in packages/contracts/src/events.ts (append() is typed to the DomainEvent union).",
         "releasedAt": "2026-08-03T04:50:15.038Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 1778400,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-03T04:51:52.488Z",
+        "itemId": "journal-artifact-memo",
+        "outcome": "completed",
+        "reason": "Added readMemoizedArtifactVerdict (60s per-issue TTL, explicit now, __resetArtifactVerdictMemo) to synthesis-verdict.ts and a one-directional artifact consult inside review-status-read.ts's existing stale-journal refusal branch. 9 new tests. Verified acyclic imports (strict-ESM runtime concern typecheck misses). Flagged pre-existing red in tests/unit/lib/review-status.test.ts from PAN-3512's fd48e3af398 — not mine, not fixed here.",
+        "releasedAt": "2026-08-03T05:07:46.036Z"
       }
     ],
     "statusReasons": {
       "restore-helper": {
         "reason": "Added src/lib/cloister/verdict-restore.ts (attemptArtifactVerdictRestore + restoreWouldTripHeadGuard) and 20 fixture tests. Deviation: the cited review arm of findVerdictEvidenceHeadMismatch was deleted by PAN-3512 (fd48e3af398, on main); head-anchoring now lives in review-verdict-writer.ts:151-213 and the module documents that. Also registered review.verdict_restore_blocked in packages/contracts/src/events.ts (append() is typed to the DomainEvent union).",
         "updatedAt": "2026-08-03T04:50:15.038Z"
+      },
+      "journal-artifact-memo": {
+        "reason": "Added readMemoizedArtifactVerdict (60s per-issue TTL, explicit now, __resetArtifactVerdictMemo) to synthesis-verdict.ts and a one-directional artifact consult inside review-status-read.ts's existing stale-journal refusal branch. 9 new tests. Verified acyclic imports (strict-ESM runtime concern typecheck misses). Flagged pre-existing red in tests/unit/lib/review-status.test.ts from PAN-3512's fd48e3af398 — not mine, not fixed here.",
+        "updatedAt": "2026-08-03T05:07:46.036Z"
       }
     }
   },
@@ -118,6 +125,10 @@
     "restore-helper.restore-helper.ac3": "completed",
     "restore-helper.restore-helper.ac4": "completed",
     "restore-helper.restore-helper.ac5": "completed",
-    "journal-artifact-memo": "running"
+    "journal-artifact-memo": "completed",
+    "journal-artifact-memo.journal-artifact-memo.ac1": "completed",
+    "journal-artifact-memo.journal-artifact-memo.ac2": "completed",
+    "journal-artifact-memo.journal-artifact-memo.ac3": "completed",
+    "journal-artifact-memo.journal-artifact-memo.ac4": "completed"
   }
 }
