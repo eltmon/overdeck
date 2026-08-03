@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { execFile } = vi.hoisted(() => ({ execFile: vi.fn() }));
 
-vi.mock('node:child_process', () => ({ execFile }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  execFile,
+}));
 
 import { __testInternals } from '../../../src/cli/commands/admin/state-migrate.js';
 
