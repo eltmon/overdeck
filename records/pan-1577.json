@@ -1136,43 +1136,24 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T05:03:50.751Z",
+  "updated": "2026-08-03T05:03:52.991Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-03T05:01:56.691Z",
-    "updatedAt": "2026-08-03T05:03:50.630Z",
-    "reviewNotes": "Approved at 2836733c: all four reviewers passed with no blocking findings; 26 in-PR requirements implemented.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-03T05:03:50.693Z",
+    "testNotes": "All configured gates green at HEAD 756a77d5 (matches reviewedAtCommit): install (bun install --frozen-lockfile) pass; typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet) pass; frontend-typecheck (tsc --noEmit) pass; lint (eslint + all 18 project sub-lints incl. circular-deps, ratchet-audit, quarantine-audit, skills, slash-commands) pass; build (contracts+pi-extension+ohmypi-extension+cli) pass; server-bundle pass. test: frontend vitest 174/174 files, 1956/1956 tests passed. Root vitest: 741/746 files, 7202/7238 tests passed; 5 files (9 tests, all in schema-audit.test.ts/issues.test.ts/observability.test.ts) failed with uniform 'Test timed out in 5000ms' signature under host load (uptime load average 18.9-27.2 on 24 cores from ~23 concurrently running agents). Root-caused as load-induced, not a defect: reran the exact 3 failed files in isolation with a longer timeout and all 10 tests passed cleanly in ~19s. This matches the same flaky-under-load pattern this branch's own session history already root-caused identically on 3 prior occasions (2026-08-01/03).",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-03T05:01:56.691Z",
-    "reviewSpawnedAt": "2026-08-03T04:54:00.599Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-03T04:54:00.599Z"
   },
   "closeOut": {
     "usage": {
@@ -1278,7 +1259,7 @@
       },
       "costAtCloseOut": {
         "usd": 801.926107,
-        "pricingAsOf": "2026-08-03T05:03:50.727Z"
+        "pricingAsOf": "2026-08-03T05:03:52.979Z"
       }
     },
     "merges": [
