@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T04:43:15.724Z",
+  "updated": "2026-08-03T04:43:44.010Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -68,8 +68,16 @@
     }
   ],
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "restore-helper": {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 1602306,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-03T04:43:44.010Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -91,6 +99,6 @@
     }
   },
   "statusOverrides": {
-    "restore-helper": "pending"
+    "restore-helper": "running"
   }
 }
