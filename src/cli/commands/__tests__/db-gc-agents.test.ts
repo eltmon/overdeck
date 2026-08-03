@@ -6,7 +6,10 @@ import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeOverdeckDatabaseSync, getOverdeckDatabaseSync } from '../../../lib/overdeck/infra.js';
-import { listAllAgentsSync } from '../../../lib/overdeck/agents.js';
+import {
+  listAllAgentsSync,
+  removeAgentRecordSync,
+} from '../../../lib/overdeck/agents.js';
 import { registerDbCommands } from '../db.js';
 
 describe('pan admin db gc-agents', () => {
@@ -39,7 +42,19 @@ describe('pan admin db gc-agents', () => {
   async function runGcAgents(args: string[] = []): Promise<void> {
     const program = new Command();
     program.exitOverride();
-    registerDbCommands(program);
+    registerDbCommands(program, {
+      pruneTerminalAgents: vi.fn(async (agents, options) => {
+        const removable = agents.filter((agent) =>
+          agent.status === 'stopped' && agent.issueId !== 'PAN-OPEN');
+        if (!options.dryRun) {
+          for (const agent of removable) {
+            rmSync(join(testHome, 'agents', agent.id), { recursive: true, force: true });
+            removeAgentRecordSync(agent.id);
+          }
+        }
+        return { removed: removable.map((agent) => agent.id), preserved: [] };
+      }),
+    });
     await program.parseAsync(['node', 'test', 'db', 'gc-agents', ...args]);
   }
 
@@ -97,7 +112,7 @@ describe('pan admin db gc-agents', () => {
     // regardless of role or paused/troubled flags (those gate resume, not GC —
     // a terminal issue never resumes). Only live/non-stopped rows and rows on
     // non-terminal issues survive.
-    expect(logs.join('\n')).toContain('Would reap 5 agent(s).');
+    expect(logs.join('\n')).toContain('Would reap 5 agent(s) after live terminality checks.');
     expect(logs.join('\n')).toContain('agent-terminal-1');
     expect(logs.join('\n')).toContain('agent-terminal-2');
     expect(logs.join('\n')).toContain('agent-paused-terminal');
@@ -121,7 +136,7 @@ describe('pan admin db gc-agents', () => {
 
     await runGcAgents();
 
-    expect(logs.join('\n')).toContain('Reaped 5 agent(s); preserved 0 transcript-bearing row(s).');
+    expect(logs.join('\n')).toContain('Reaped 5 agent(s); preserved 0 agent(s).');
     expect(listAllAgentsSync().map((agent) => agent.id).sort()).toEqual([
       'agent-open',
       'agent-running-terminal',
