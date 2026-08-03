@@ -42,6 +42,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T02:32Z] review-agent → CHANGES-REQUESTED — seq 1",
       "timestamp": "2026-08-03T02:32:38.780Z"
+    },
+    {
+      "timestamp": "2026-08-03T02:41:05.063Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -86,7 +91,7 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:40:58.901Z",
+  "updated": "2026-08-03T02:41:05.114Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -95,7 +100,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:40:58.899Z",
+    "updatedAt": "2026-08-03T02:41:05.058Z",
     "reviewNotes": "[correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
@@ -106,30 +111,8 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
-    "reviewSpawnedAt": "2026-08-03T02:31:59.802Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/security.md",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "correctness": {
-        "status": "blocked",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/correctness.md",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/performance.md",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/.pan/review/agent-pan-3418-review-d6db3c77/requirements.md",
-        "atCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b"
-      }
-    },
     "reviewRequestedAt": "2026-08-03T02:40:58.899Z",
+    "reviewSpawnedAt": "2026-08-03T02:31:59.802Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
@@ -216,9 +199,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1548000,
-            "output": 93927,
-            "cacheRead": 52021760,
+            "input": 1639722,
+            "output": 111063,
+            "cacheRead": 59043840,
             "cacheWrite": 0
           }
         }
@@ -231,15 +214,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4286043,
-          "output": 162805,
-          "cacheRead": 62507008,
+          "input": 4377765,
+          "output": 179941,
+          "cacheRead": 69529088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 57.5691603,
-        "pricingAsOf": "2026-08-03T02:32:38.160Z"
+        "usd": 62.0528903,
+        "pricingAsOf": "2026-08-03T02:41:05.102Z"
       }
     },
     "merges": [
