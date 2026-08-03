@@ -79,16 +79,16 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:01:50.584Z",
+  "updated": "2026-08-03T00:02:27.277Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T00:01:48.155Z",
+    "updatedAt": "2026-08-03T00:02:27.144Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewRequestedAt": "2026-08-03T00:01:40.756Z",
     "scopeDrift": {
@@ -145,38 +145,38 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 53222,
-            "output": 15236,
-            "cacheRead": 905,
+            "input": 55249,
+            "output": 17284,
+            "cacheRead": 908,
             "cacheWrite": 0
           }
         },
         "work": {
           "anthropic/claude-haiku-4-5-20251001": {
-            "input": 1464,
-            "output": 69914,
-            "cacheRead": 38014151,
-            "cacheWrite": 1393329
+            "input": 1477,
+            "output": 71127,
+            "cacheRead": 38387652,
+            "cacheWrite": 1395869
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 53222,
-          "output": 15236,
-          "cacheRead": 905,
+          "input": 55249,
+          "output": 17284,
+          "cacheRead": 908,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
-          "input": 1464,
-          "output": 69914,
-          "cacheRead": 38014151,
-          "cacheWrite": 1393329
+          "input": 1477,
+          "output": 71127,
+          "cacheRead": 38387652,
+          "cacheWrite": 1395869
         }
       },
       "costAtCloseOut": {
-        "usd": 6.0236125,
-        "pricingAsOf": "2026-08-03T00:01:50.577Z"
+        "usd": 6.0824828,
+        "pricingAsOf": "2026-08-03T00:02:27.264Z"
       }
     },
     "merges": [
