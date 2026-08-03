@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
+  confirmLiveAgentTerminality,
   pruneStoppedAgentsForIssue,
   pruneTerminalStoppedAgents,
+  type AgentGcTerminalityDeps,
 } from '../../../../src/lib/cloister/agent-gc.js';
 import { RETAINED_TRANSCRIPTS_PHASE } from '../../../../src/lib/overdeck/agents.js';
 import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
@@ -9,6 +11,20 @@ import type { AgentState } from '../../../../src/lib/agents/agent-state.js';
 const agent = (id: string, status: AgentState['status'], role: AgentState['role']): AgentState => ({
   id, issueId: 'PAN-2503', workspace: '/workspace', harness: 'codex', role, model: 'gpt-5.6', status, startedAt: '2026-07-10T00:00:00Z',
 });
+
+function terminalityDeps(
+  overrides: Partial<AgentGcTerminalityDeps> = {},
+): AgentGcTerminalityDeps {
+  return {
+    hasClosedOutFlag: vi.fn(() => true),
+    readTrackerState: vi.fn(async () => 'closed'),
+    hasLiveTmuxSession: vi.fn(async () => false),
+    hasOpenChangeRequest: vi.fn(async () => false),
+    hasInFlightReviewOrTest: vi.fn(() => false),
+    log: vi.fn(),
+    ...overrides,
+  };
+}
 
 describe('PAN-2543 event-driven agent row GC', () => {
   it('prunes stopped rows only after their transcript-preserving cleanup is complete', async () => {
@@ -55,5 +71,95 @@ describe('PAN-2543 event-driven agent row GC', () => {
     expect(result).toEqual({ removed: [], preserved: [] });
     expect(isTerminalAgent).not.toHaveBeenCalled();
     expect(cleanStateDir).not.toHaveBeenCalled();
+  });
+});
+
+describe('PAN-3513 live terminality confirmation', () => {
+  it('preserves a stopped agent when the tracker is open', async () => {
+    const deps = terminalityDeps({ readTrackerState: vi.fn(async () => 'open') });
+
+    await expect(confirmLiveAgentTerminality(
+      agent('agent-pan-2503', 'stopped', 'work'),
+      deps,
+    )).resolves.toBe(false);
+
+    expect(deps.hasLiveTmuxSession).not.toHaveBeenCalled();
+  });
+
+  it('preserves a stopped agent when its tmux session is live', async () => {
+    const deps = terminalityDeps({ hasLiveTmuxSession: vi.fn(async () => true) });
+
+    await expect(confirmLiveAgentTerminality(
+      agent('agent-pan-2503', 'stopped', 'work'),
+      deps,
+    )).resolves.toBe(false);
+
+    expect(deps.hasOpenChangeRequest).not.toHaveBeenCalled();
+  });
+
+  it('preserves a stopped agent when an open PR or MR exists', async () => {
+    const deps = terminalityDeps({ hasOpenChangeRequest: vi.fn(async () => true) });
+
+    await expect(confirmLiveAgentTerminality(
+      agent('agent-pan-2503', 'stopped', 'work'),
+      deps,
+    )).resolves.toBe(false);
+
+    expect(deps.hasInFlightReviewOrTest).not.toHaveBeenCalled();
+  });
+
+  it('preserves a stopped agent when review or test work is in flight', async () => {
+    const deps = terminalityDeps({ hasInFlightReviewOrTest: vi.fn(() => true) });
+
+    await expect(confirmLiveAgentTerminality(
+      agent('agent-pan-2503', 'stopped', 'work'),
+      deps,
+    )).resolves.toBe(false);
+  });
+
+  it('preserves a stopped agent when any live check throws', async () => {
+    const cleanStateDir = vi.fn();
+    const log = vi.fn();
+    const candidate = agent('agent-pan-2503', 'stopped', 'work');
+    const result = await pruneTerminalStoppedAgents([candidate], {
+      agentsDir: '/agents',
+      cleanStateDir,
+      hasRetainedMarker: vi.fn(async () => false),
+      markRetained: vi.fn(async () => {}),
+      removeRecord: vi.fn(),
+      tombstoneRecord: vi.fn(),
+      isTerminalAgent: vi.fn(async () => {
+        throw new Error('tracker unavailable');
+      }),
+      log,
+    });
+
+    expect(result).toEqual({ removed: [], preserved: ['agent-pan-2503'] });
+    expect(cleanStateDir).not.toHaveBeenCalled();
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('tracker unavailable'));
+  });
+
+  it('reaps only after every live check positively clears', async () => {
+    const candidate = agent('agent-pan-2503', 'stopped', 'work');
+    const deps = terminalityDeps();
+    const cleanStateDir = vi.fn(async () => ({
+      removedFiles: 3,
+      preservedTranscripts: 0,
+      removedDir: true,
+    }));
+    const removeRecord = vi.fn();
+    const result = await pruneTerminalStoppedAgents([candidate], {
+      agentsDir: '/agents',
+      cleanStateDir,
+      hasRetainedMarker: vi.fn(async () => false),
+      markRetained: vi.fn(async () => {}),
+      removeRecord,
+      tombstoneRecord: vi.fn(),
+      isTerminalAgent: (row) => confirmLiveAgentTerminality(row, deps),
+    });
+
+    expect(result).toEqual({ removed: ['agent-pan-2503'], preserved: [] });
+    expect(cleanStateDir).toHaveBeenCalledWith('/agents/agent-pan-2503', '/agents');
+    expect(removeRecord).toHaveBeenCalledWith('agent-pan-2503');
   });
 });

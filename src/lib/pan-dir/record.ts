@@ -200,7 +200,7 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   /** PAN-2207: durable tombstone set when deacon recovers a stuck-pending completion; cleared by re-run of `pan done`. */
   panDoneRecoveredAt?: string;
   closedOut?: boolean;
-  closedOutAt?: string;
+  closedOutAt?: string; reopenedAt?: string;
   reviewerVerdicts?: unknown;
   reviewCycleHistory?: unknown;
   updatedAt: string;
