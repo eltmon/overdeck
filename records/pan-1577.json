@@ -1022,6 +1022,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T02:01Z] verification-gate → FAILED — seq 1",
       "timestamp": "2026-08-03T02:01:58.751Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-03T02:01:58.929Z"
     }
   ],
   "feedback": [
@@ -1034,7 +1039,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:01:58.751Z",
+  "updated": "2026-08-03T02:01:58.929Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
