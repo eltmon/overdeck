@@ -1202,11 +1202,31 @@
       "timestamp": "2026-08-03T07:34:38.899Z",
       "reason": "end",
       "note": "Re-triggering verification: infra/schema-audit/observability test failures reproduced clean in isolation (15/15), confirmed severe I/O-contention flakiness (PSI io full avg10=25.25%), no code change needed"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T07:38:00.093Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T07:38:00.116Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T07:38:00.129Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T07:38:00.142Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T07:35:00.247Z",
+  "updated": "2026-08-03T07:38:00.142Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1528,5 +1548,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
