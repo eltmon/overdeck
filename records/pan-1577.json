@@ -927,11 +927,24 @@
       "timestamp": "2026-08-03T00:59:51.472Z",
       "reason": "end",
       "note": "Agent signaled work complete"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T01:01Z] uat-agent → FAILED — seq 2",
+      "timestamp": "2026-08-03T01:01:27.533Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "uat-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T01:01:27Z",
+      "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-1577`."
+    }
+  ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:00:35.554Z",
+  "updated": "2026-08-03T01:01:27.533Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
