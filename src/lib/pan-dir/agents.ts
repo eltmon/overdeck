@@ -22,7 +22,13 @@ import {
 } from '../projects.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
-import { flushAutoCommits, queueAutoCommit, type FlushResult } from './auto-commit.js';
+import {
+  flushAutoCommits,
+  pushPendingStateCommits,
+  queueAutoCommit,
+  reconcileStatePlaneDrift,
+  type FlushResult,
+} from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
 
 export const AGENT_PLANE_DIRNAME = 'agents';
@@ -72,6 +78,17 @@ export interface AgentPlaneRecord {
   lifecycle: AgentPlaneLifecycleEntry[];
   archiveRef: string | null;
   recovered: boolean;
+}
+
+export interface AgentPlaneSeed {
+  id: string;
+  issueId: string;
+  role: Role;
+  workspace: string;
+  harness?: RuntimeName;
+  model?: string;
+  branch?: string;
+  startedAt?: string;
 }
 
 export class AgentPlaneOwnershipError extends Error {
@@ -201,7 +218,7 @@ function writeAgentPlaneRecordAtomicSync(path: string, record: AgentPlaneRecord)
   parseAgentPlaneRecord(readFileSync(path, 'utf-8'), path);
 }
 
-function makeAgentPlaneRecord(state: AgentState, projectKey: string): AgentPlaneRecord {
+function makeAgentPlaneRecord(state: AgentPlaneSeed, projectKey: string): AgentPlaneRecord {
   return {
     version: AGENT_PLANE_VERSION,
     agentId: safeAgentId(state.id),
@@ -233,9 +250,10 @@ function assertAgentPlaneOwnership(record: AgentPlaneRecord): void {
 }
 
 async function updateAgentPlaneRecord(
-  state: AgentState,
+  state: AgentPlaneSeed,
   operation: string,
   mutate: (record: AgentPlaneRecord) => AgentPlaneRecord | null,
+  deferCommit = false,
 ): Promise<boolean> {
   const context = resolveAgentPlaneContext(state.issueId, state.id, operation);
   if (!context) return false;
@@ -267,6 +285,7 @@ async function updateAgentPlaneRecord(
         repoRoot: context.root,
         paths: [context.path],
         subject: `chore(agents): update ${safeAgentId(state.id)} runtime record`,
+        defer: deferCommit,
       });
       return true;
     },
@@ -329,8 +348,61 @@ export function appendAgentPlaneLifecycle(
   }));
 }
 
+export function backfillAgentPlaneRecord(
+  state: AgentPlaneSeed,
+  sessions: AgentPlaneSessionEntry[],
+  recovered: boolean,
+  options: { deferCommit?: boolean } = {},
+): Promise<boolean> {
+  return updateAgentPlaneRecord(state, 'backfill', (current) => {
+    const knownSessionIds = new Set(current.sessions.map((session) => session.id));
+    const missingSessions = sessions.filter((entry) => {
+      const id = entry.id.trim();
+      if (!id || knownSessionIds.has(id)) return false;
+      knownSessionIds.add(id);
+      return true;
+    });
+    const needsSpawnedLifecycle = !current.lifecycle.some((entry) => entry.event === 'spawned');
+    const nextRecovered = current.recovered || recovered;
+    if (missingSessions.length === 0 && !needsSpawnedLifecycle && nextRecovered === current.recovered) {
+      return null;
+    }
+    const spawnedAt = state.startedAt
+      ?? missingSessions[0]?.startedAt
+      ?? new Date().toISOString();
+    return {
+      ...current,
+      sessions: [
+        ...current.sessions,
+        ...missingSessions.map((entry) => ({ ...entry, id: entry.id.trim() })),
+      ],
+      lifecycle: needsSpawnedLifecycle
+        ? [{ at: spawnedAt, event: 'spawned' }, ...current.lifecycle]
+        : current.lifecycle,
+      recovered: nextRecovered,
+    };
+  }, options.deferCommit);
+}
+
 export async function flushAgentPlaneWrites(issueId: string, agentId: string): Promise<FlushResult | null> {
   const context = resolveAgentPlaneContext(issueId, agentId, 'flush');
   if (!context || !existsSync(context.root)) return null;
-  return Effect.runPromise(flushAutoCommits(context.project.path));
+
+  const flushed = await Effect.runPromise(flushAutoCommits(context.project.path));
+  if (flushed.errored || (flushed.committed && flushed.pushed !== true)) return flushed;
+
+  const reconciled = await Effect.runPromise(reconcileStatePlaneDrift(context.project.path));
+  if (reconciled.errored || (reconciled.committed && reconciled.pushed !== true)) {
+    return reconciled;
+  }
+  if (flushed.committed || reconciled.committed) {
+    return { committed: true, pushed: true };
+  }
+
+  const push = await Effect.runPromise(pushPendingStateCommits(context.project.path));
+  return {
+    committed: false,
+    pushed: push?.pushed,
+    reason: push?.reason ?? reconciled.reason ?? flushed.reason,
+  };
 }

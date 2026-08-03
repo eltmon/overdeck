@@ -33,6 +33,7 @@ import {
   AgentPlaneOwnershipError,
   appendAgentPlaneLifecycle,
   appendAgentPlaneSession,
+  backfillAgentPlaneRecord,
   readAgentPlaneRecordSync,
   recordAgentPlaneSpawn,
 } from '../agents.js';
@@ -164,6 +165,39 @@ describe('durable agents plane', () => {
 
     const raw = readFileSync(join(stateRoot, 'agents', `${AGENT_ID}.json`), 'utf-8');
     expect(raw).not.toContain('transcript');
+  });
+
+  it('backfills missing evidence without replacing stronger existing history', async () => {
+    const state = agentState(join(projectPath, 'workspaces', 'feature-pan-3513'));
+    await recordAgentPlaneSpawn(state, 'session-one');
+    await appendAgentPlaneLifecycle(state, {
+      at: '2026-08-02T12:00:00.000Z',
+      event: 'stopped',
+    });
+
+    await expect(backfillAgentPlaneRecord({
+      ...state,
+      workspace: '/weaker/reconstructed/workspace',
+      model: 'weaker-reconstructed-model',
+    }, [
+      { id: 'session-one', startedAt: state.startedAt, reason: 'recovered' },
+      { id: 'recovered-session', startedAt: '2026-08-02T13:00:00.000Z', reason: 'recovered' },
+    ], true)).resolves.toBe(true);
+
+    const record = readAgentPlaneRecordSync(ISSUE_ID, AGENT_ID);
+    expect(record?.launch).toMatchObject({
+      workspace: state.workspace,
+      model: state.model,
+    });
+    expect(record?.sessions).toEqual([
+      { id: 'session-one', startedAt: state.startedAt, reason: 'spawn' },
+      { id: 'recovered-session', startedAt: '2026-08-02T13:00:00.000Z', reason: 'recovered' },
+    ]);
+    expect(record?.lifecycle).toEqual([
+      { at: state.startedAt, event: 'spawned' },
+      { at: '2026-08-02T12:00:00.000Z', event: 'stopped' },
+    ]);
+    expect(record?.recovered).toBe(true);
   });
 
   it('rejects a write from a machine other than the record origin', async () => {
