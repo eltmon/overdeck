@@ -1,0 +1,31 @@
+{
+  "issueId": "PAN-1257",
+  "schemaVersion": 2,
+  "created": "2026-08-03T03:42:04.462Z",
+  "updated": "2026-08-03T03:42:04.462Z",
+  "pipeline": {
+    "issueId": "PAN-1257",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-03T03:42:04.462Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {},
+      "totals": {}
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1257",
+      "recoveryPath": "orphan-proposed-pickup-gate",
+      "obligationGeneration": "proposed",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-03T03:42:04.460Z"
+    }
+  ]
+}
