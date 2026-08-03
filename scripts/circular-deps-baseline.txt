@@ -30,7 +30,6 @@ src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations
 src/dashboard/server/services/conversation-compaction.ts > src/lib/conversations/summary-fork.ts > src/lib/agents.ts > src/lib/agents/resume.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/ohmypi-conversation-parser.ts
 src/dashboard/server/services/conversation-service.ts > src/dashboard/server/services/conversation/activity-summary.ts > src/dashboard/server/services/pi-conversation-parser.ts
-src/lib/activity-logger.ts > src/lib/agents.ts > src/lib/agents/agent-state.ts
 src/lib/agents.ts > src/lib/agents/activity.ts
 src/lib/agents.ts > src/lib/agents/activity.ts > src/lib/runtimes/ohmypi.ts > src/lib/launcher-generator.ts
 src/lib/agents.ts > src/lib/agents/agent-state.ts > src/lib/agents/identity.ts > src/lib/agents/runtime-state.ts

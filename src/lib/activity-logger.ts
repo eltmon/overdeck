@@ -14,8 +14,7 @@
 
 import { randomUUID } from 'crypto';
 import { Effect } from 'effect';
-import type { DomainEvent } from '@overdeck/contracts';
-import type { Role } from './agents.js';
+import type { DomainEvent, Role } from '@overdeck/contracts';
 import { getDashboardApiUrlSync } from './config.js';
 
 export type ActivityLevel = 'info' | 'warn' | 'error' | 'success';

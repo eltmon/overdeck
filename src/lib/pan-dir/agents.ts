@@ -11,9 +11,9 @@ import {
 } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { Role } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
-import type { AgentState, Role } from '../agents/agent-state.js';
 import { getOverdeckHome } from '../paths.js';
 import {
   getProjectSync,
@@ -89,6 +89,7 @@ export interface AgentPlaneSeed {
   model?: string;
   branch?: string;
   startedAt?: string;
+  sessionId?: string;
 }
 
 export class AgentPlaneOwnershipError extends Error {
@@ -301,7 +302,7 @@ function appendSession(
 }
 
 export function recordAgentPlaneSpawn(
-  state: AgentState,
+  state: AgentPlaneSeed,
   sessionId = state.sessionId,
 ): Promise<boolean> {
   const at = state.startedAt || new Date().toISOString();
@@ -324,7 +325,7 @@ export function recordAgentPlaneSpawn(
 }
 
 export function appendAgentPlaneSession(
-  state: AgentState,
+  state: AgentPlaneSeed,
   entry: AgentPlaneSessionEntry,
 ): Promise<boolean> {
   const normalizedId = entry.id.trim();
@@ -339,7 +340,7 @@ export function appendAgentPlaneSession(
 }
 
 export function appendAgentPlaneLifecycle(
-  state: AgentState,
+  state: AgentPlaneSeed,
   entry: AgentPlaneLifecycleEntry,
 ): Promise<boolean> {
   return updateAgentPlaneRecord(state, `${entry.event} lifecycle append`, (current) => ({
