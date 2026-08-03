@@ -197,7 +197,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T05:17:02.772Z",
+  "updated": "2026-08-03T05:17:17.472Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -205,17 +205,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T05:16:17.345Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-03T05:16:17.345Z"
-      }
-    ],
+    "updatedAt": "2026-08-03T05:16:24.665Z",
     "conflictsSince": {
-      "sha": "f9d70087d5ea148968ed5c0f5d72d9ca6a72c867",
-      "detectedAt": "2026-08-03T04:55:45.599Z",
+      "sha": "2a4f6c2521e7e41a6a7ed27e5b1a1a5c2006a284",
+      "detectedAt": "2026-08-03T05:15:57.689Z",
       "paths": [
         "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
         "src/lib/cloister/review-verdict-writer.ts"
@@ -307,7 +300,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.3676167,
-        "pricingAsOf": "2026-08-03T05:16:17.482Z"
+        "pricingAsOf": "2026-08-03T05:17:12.686Z"
       }
     },
     "merges": [
