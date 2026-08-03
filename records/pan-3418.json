@@ -193,7 +193,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T05:00:32.191Z",
+  "updated": "2026-08-03T05:00:34.585Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -204,8 +204,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T05:00:32.163Z",
-    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
+    "updatedAt": "2026-08-03T05:00:34.449Z",
+    "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch; conflict resolver dispatch throttled",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts",
     "blockerReasons": [
       {
@@ -360,7 +360,7 @@
       },
       "costAtCloseOut": {
         "usd": 138.6673193,
-        "pricingAsOf": "2026-08-03T05:00:32.180Z"
+        "pricingAsOf": "2026-08-03T05:00:34.572Z"
       }
     },
     "merges": [
