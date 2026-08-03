@@ -226,18 +226,19 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T06:11:58.316Z",
+  "updated": "2026-08-03T06:27:24.264Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T06:11:58.221Z",
+    "updatedAt": "2026-08-03T06:27:21.069Z",
+    "testNotes": "Verified HEAD 6534b6678fc83923ceecbc09546fd205e563321d (clean local merge of origin/main into feature/pan-3418, no conflict markers) in the assigned workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3418. Required gates from projects.yaml quality_gates: `npm run typecheck` PASSES (root tsc, hooks, evals, dashboard-types guard 55 known/0 new, frontend-types guard 0 known/0 new). `npm run lint` PASSES (all 19 sub-checks incl. file-size, circular-deps, ratchet-audit, quarantine-audit). `npm run build` PASSES (contracts, pi/ohmypi extensions, CLI, dashboard frontend+server bundle, dist-externals lint). `npm run build:dashboard:server:bundle` PASSES standalone. Test gate `OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main` run for root and frontend in parallel per the configured command: frontend 42/42 files, 628/628 tests PASS. Root: 567 files, 3 initially failed (5427/5457 tests, 2 skipped) — all 3 traced and non-blocking: (1)+(2) tests/lib/memory/e2e.test.ts and src/lib/memory/__tests__/backfill.test.ts failed with 'Hook timed out in 5000ms' in beforeEach under concurrent-agent CPU load (30 agents running in this workspace context); both pass cleanly (5/5 tests) when re-run in isolation with --no-file-parallelism, confirming contention flake, not a regression — neither file is in this branch's diff. (3) tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts fails 'writes the HTTP blocked anchor only after feedback delivery' (expected 400 to be 200); reproduced identically on a throwaway git-worktree checkout of clean origin/main (2a4f6c2521e, created and removed from within this workspace per worktree-discipline rules) — confirmed pre-existing red-main defect, not caused by this branch. Also independently confirmed tests/unit/lib/head-anchor-write-sites.test.ts fails identically on that same clean origin/main worktree (2 unlisted reviewedAtCommit write sites in src/dashboard/server/routes/specialists/legacy-routes.ts and src/lib/cloister/review-verdict-writer.ts) — also pre-existing on main, unrelated to PAN-3418's scope. PAN-3418-scoped tests (7/7 files targeted): conversation-runtime-empty-model.test.ts, conversations-empty-model.test.ts, conversations-model-backfill.test.ts all pass, covering all ACs of the 5 in-scope xBRIEF items (server-coerce-empty-fields, db-writes-null-for-empty, widen-backfill-predicate, harness-chip-independent-of-model, picker-reseeds-after-model-list-load). Frontend component tests ConversationRow.test.tsx, ModelPicker.test.tsx, ComposerFooter.model-picker.test.tsx pass within the 628/628 frontend total, including DOM-level assertions that the harness chip renders independently of model and that the picker re-seeds after model-list load. The sixth xBRIEF item verify-live-data-repair is explicitly out of pre-merge scope per its own narrative (readiness: sequential, 'cannot execute before this branch merges and deploys') and is deferred to verify-on-main/close-out. ANOMALY (not part of PAN-3418, left untouched per test-role boundaries): the workspace contains uncommitted, unstaged edits to src/dashboard/server/routes/specialists/legacy-routes.ts, src/lib/cloister/review-verdict-writer.ts, src/lib/cloister/__tests__/review-verdict-writer.test.ts, and tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts, adding a 'deferEvidenceAnchor' option — an apparent incomplete WIP attempt (from an earlier session, not this test run) at fixing the pre-existing head-anchor-write-sites/specialists-reviewed-at-commit failures described above. Even with that uncommitted diff present, both target tests still fail (different assertion signatures: an unlisted-write-site violation, and an invocationCallOrder ordering assertion). This diff is unrelated to PAN-3418's declared file scope, was not made by this test run, and was not committed, edited, or discarded — it should be surfaced to the operator separately as it represents unfinished, unlanded work sitting in this workspace. No code, tests, fixtures, or config were modified during this verification. UAT judged not required: no xBRIEF item declares playwright/browser verify_commands, the PRD draft contains no browser/UAT/manual-verification wording, and every acceptance criterion is stated as an observable unit/component-level Given/When/Then already covered by passing tests including real-DOM component assertions.",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -306,10 +307,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2195,
-            "output": 78900,
-            "cacheRead": 25476533,
-            "cacheWrite": 653652
+            "input": 2229,
+            "output": 93984,
+            "cacheRead": 28818308,
+            "cacheWrite": 691297
           }
         },
         "work": {
@@ -335,15 +336,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2195,
-          "output": 78900,
-          "cacheRead": 25476533,
-          "cacheWrite": 653652
+          "input": 2229,
+          "output": 93984,
+          "cacheRead": 28818308,
+          "cacheWrite": 691297
         }
       },
       "costAtCloseOut": {
-        "usd": 179.3284683,
-        "pricingAsOf": "2026-08-03T06:11:58.303Z"
+        "usd": 180.2418443,
+        "pricingAsOf": "2026-08-03T06:27:21.469Z"
       }
     },
     "merges": [
