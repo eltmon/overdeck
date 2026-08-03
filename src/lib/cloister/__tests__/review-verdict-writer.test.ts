@@ -28,10 +28,22 @@ vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRootsSync: mocks.resolveWorkspaceRepoRootsSync,
 }));
 
-vi.mock('child_process', () => ({
-  exec: vi.fn(),
-  execFileAsync: mocks.execFileAsync,
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: vi.fn((...args: unknown[]) => {
+      const callback = args[args.length - 1] as (error: unknown, stdout?: string, stderr?: string) => void;
+      Promise.resolve(mocks.execFileAsync(...args.slice(0, -1))).then(
+        (result) => {
+          const [stdout, stderr] = Array.isArray(result) ? result : [result ?? '', ''];
+          callback(null, stdout, stderr);
+        },
+        (error) => callback(error),
+      );
+    }),
+  };
+});
 
 import { recordReviewVerdict, type VerdictInput } from '../review-verdict-writer.js';
 
