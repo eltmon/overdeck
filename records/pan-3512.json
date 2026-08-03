@@ -137,7 +137,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:36:09.708Z",
+  "updated": "2026-08-03T00:37:09.727Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -145,7 +145,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T00:36:08.919Z",
+    "updatedAt": "2026-08-03T00:36:38.969Z",
     "reviewNotes": "Stale approvals can still land, the branch does not compile or run its verdict-door tests, and the canonical event contract is incomplete.",
     "blockerReasons": [
       {
@@ -164,25 +164,8 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
-    "reviewSpawnedAt": "2026-08-03T00:29:14.386Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
-      }
-    }
+    "reviewedAtCommit": "bbd19558daddaf94e79a206507b204b34362136a",
+    "reviewSpawnedAt": "2026-08-03T00:29:14.386Z"
   },
   "closeOut": {
     "usage": {
@@ -266,7 +249,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.2090307,
-        "pricingAsOf": "2026-08-03T00:36:08.954Z"
+        "pricingAsOf": "2026-08-03T00:36:38.975Z"
       }
     },
     "merges": [
