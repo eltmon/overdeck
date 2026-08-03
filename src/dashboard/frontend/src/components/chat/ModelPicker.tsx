@@ -125,8 +125,25 @@ function isKnownModel(modelId: string): boolean {
   return knownModelIds.has(modelId);
 }
 
+type KnownModelsListener = () => void;
+const knownModelsListeners = new Set<KnownModelsListener>();
+
+/**
+ * Subscribe to catalog syncs. A composer's initial loadStoredModel runs at
+ * mount, before the available-models fetch completes — at that point only
+ * the FALLBACK ids are "known", so a stored catalog-only id (e.g.
+ * kimi-code/k3, an OpenRouter favorite) fails isKnownModel and the composer
+ * drops to the default. Subscribers re-run loadStoredModel after every sync
+ * so the stored pick restores once the catalog containing it has loaded.
+ */
+export function onKnownModelsSync(listener: KnownModelsListener): () => void {
+  knownModelsListeners.add(listener);
+  return () => { knownModelsListeners.delete(listener); };
+}
+
 function syncKnownModels(groups: readonly ModelGroup[]): void {
   knownModelIds = new Set(groups.flatMap((g) => g.models.map((m) => m.id)));
+  for (const listener of knownModelsListeners) listener();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
