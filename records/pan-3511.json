@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T05:39:53.802Z",
+  "updated": "2026-08-03T05:44:41.897Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
     }
   ],
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "feedback-target-consult": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 3504407,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-03T05:39:53.802Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -140,6 +132,17 @@
         "outcome": "completed",
         "reason": "Retrofitted the inline race-guard block onto attemptArtifactVerdictRestore with a passed-only reader at the call site (behavior-preserving); blocked-by-head-guard now returns instead of resetting to pending. 978 lines before and after (AC4). 4 new cases pin the delegated decision; end-to-end orphan-patrol coverage remains a gap since reconcileReviewStatusOrphan is unexported and untested.",
         "releasedAt": "2026-08-03T05:39:37.031Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 3504407,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-03T05:39:53.802Z",
+        "itemId": "feedback-target-consult",
+        "outcome": "completed",
+        "reason": "Artifact consult now runs before markWorkspaceStuck in surfaceIssueFeedbackNeedsYou; restored and blocked-by-head-guard both skip the mark, no-artifact falls through unchanged. Consult fails toward the stuck mark via its own try/catch (ac4). 5 new tests covering both artifact filenames.",
+        "releasedAt": "2026-08-03T05:44:41.897Z"
       }
     ],
     "statusReasons": {
@@ -154,6 +157,10 @@
       "orphan-restore-adopt": {
         "reason": "Retrofitted the inline race-guard block onto attemptArtifactVerdictRestore with a passed-only reader at the call site (behavior-preserving); blocked-by-head-guard now returns instead of resetting to pending. 978 lines before and after (AC4). 4 new cases pin the delegated decision; end-to-end orphan-patrol coverage remains a gap since reconcileReviewStatusOrphan is unexported and untested.",
         "updatedAt": "2026-08-03T05:39:37.031Z"
+      },
+      "feedback-target-consult": {
+        "reason": "Artifact consult now runs before markWorkspaceStuck in surfaceIssueFeedbackNeedsYou; restored and blocked-by-head-guard both skip the mark, no-artifact falls through unchanged. Consult fails toward the stuck mark via its own try/catch (ac4). 5 new tests covering both artifact filenames.",
+        "updatedAt": "2026-08-03T05:44:41.897Z"
       }
     }
   },
@@ -174,6 +181,10 @@
     "orphan-restore-adopt.orphan-restore-adopt.ac2": "completed",
     "orphan-restore-adopt.orphan-restore-adopt.ac3": "completed",
     "orphan-restore-adopt.orphan-restore-adopt.ac4": "completed",
-    "feedback-target-consult": "running"
+    "feedback-target-consult": "completed",
+    "feedback-target-consult.feedback-target-consult.ac1": "completed",
+    "feedback-target-consult.feedback-target-consult.ac2": "completed",
+    "feedback-target-consult.feedback-target-consult.ac3": "completed",
+    "feedback-target-consult.feedback-target-consult.ac4": "completed"
   }
 }
