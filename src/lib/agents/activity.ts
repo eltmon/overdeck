@@ -14,7 +14,8 @@ import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
 import { FsError } from '../errors.js';
-import { persistCurrentSessionId } from '../session-history.js';
+import { appendAgentPlaneSession } from '../pan-dir/agents.js';
+import { appendSessionIdToHistory, persistCurrentSessionId } from '../session-history.js';
 
 /** Activity log entry (still written by heartbeat-hook as a forensic artifact). */
 export interface ActivityEntry {
@@ -78,6 +79,22 @@ export function getActivity(agentId: string, limit = 100): ActivityEntry[] {
  */
 export function saveSessionId(agentId: string, sessionId: string): void {
   persistCurrentSessionId(agentId, sessionId);
+  appendSessionIdToHistory(agentId, sessionId);
+  const state = getAgentStateSync(agentId);
+  if (!state) {
+    console.warn(`[agents] Could not append durable session ${sessionId} for ${agentId}: agent state is missing`);
+    return;
+  }
+  void appendAgentPlaneSession(state, {
+    id: sessionId,
+    startedAt: new Date().toISOString(),
+    reason: 'rotation',
+  }).catch((error) => {
+    console.warn(
+      `[agents] Could not append durable session ${sessionId} for ${agentId}: `
+      + `${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
 }
 
 /**

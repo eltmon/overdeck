@@ -276,7 +276,7 @@ export function reconcileStatePlaneDrift(
   const stateHome = project ? resolveStateReadHomeSync(project) : null;
   const gitRoot = stateHome?.migrated ? stateHome.root : projectRoot;
   const ownedPaths = stateHome?.migrated
-    ? ['specs', 'records']
+    ? ['specs', 'records', 'agents']
     : ['.pan/specs', '.pan/records'];
 
   return Effect.gen(function* () {
