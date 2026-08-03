@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agentId": "strike-pan-2010",
+  "issueId": "PAN-2010",
+  "projectKey": "panopticon-cli",
+  "role": "strike",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "codex",
+    "model": "gpt-5.5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2010-strike",
+    "branch": null
+  },
+  "sessions": [],
+  "lifecycle": [
+    {
+      "at": "2026-06-23T14:40:10.609Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}

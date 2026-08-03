@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-1990-review",
+  "issueId": "PAN-1990",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": null,
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1990",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "7763c879-dbab-4f51-acbc-4f5e2a5cf6c9",
+      "startedAt": "2026-07-29T05:47:59.963Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-07-29T05:47:59.751Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

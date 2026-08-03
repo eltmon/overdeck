@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-2054-plan",
+  "issueId": "PAN-2054",
+  "projectKey": "panopticon-cli",
+  "role": "plan",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "claude-opus-4-8",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2054",
+    "branch": null
+  },
+  "sessions": [],
+  "lifecycle": [
+    {
+      "at": "2026-06-27T02:50:21.030Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}

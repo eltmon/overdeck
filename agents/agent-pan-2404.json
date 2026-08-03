@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-2404",
+  "issueId": "PAN-2404",
+  "projectKey": "panopticon-cli",
+  "role": "work",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "claude-haiku-4-5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2404",
+    "branch": null
+  },
+  "sessions": [],
+  "lifecycle": [
+    {
+      "at": "2026-07-06T14:46:44.744Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

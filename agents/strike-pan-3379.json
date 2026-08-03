@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "strike-pan-3379",
+  "issueId": "PAN-3379",
+  "projectKey": "panopticon-cli",
+  "role": "strike",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3379-strike",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "45613984-1dc5-4112-8f70-afc11cbbe2e5",
+      "startedAt": "2026-08-01T06:11:28.497Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-01T06:11:27.562Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

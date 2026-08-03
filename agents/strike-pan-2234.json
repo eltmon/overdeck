@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agentId": "strike-pan-2234",
+  "issueId": "PAN-2234",
+  "projectKey": "panopticon-cli",
+  "role": "strike",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "ohmypi",
+    "model": "glm-5.2",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2234-strike",
+    "branch": null
+  },
+  "sessions": [],
+  "lifecycle": [
+    {
+      "at": "2026-07-02T21:55:38.311Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}

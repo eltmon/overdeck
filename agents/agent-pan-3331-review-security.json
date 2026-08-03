@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3331-review-security",
+  "issueId": "PAN-3331",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": null,
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3331",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "8d8cf79e-97b6-4d76-bf64-101460420198",
+      "startedAt": "2026-07-30T22:51:52.956Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-07-30T22:51:52.523Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

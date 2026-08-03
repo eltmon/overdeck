@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "planning-pan-3406",
+  "issueId": "PAN-3406",
+  "projectKey": "panopticon-cli",
+  "role": "plan",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "k3[1m]",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3406",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "ed2998b1-36af-46ac-b1e7-d78f2a0c9150",
+      "startedAt": "2026-08-01T13:20:49.000Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-01T13:20:40.542Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

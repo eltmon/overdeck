@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3362-review-supervisor",
+  "issueId": "PAN-3362",
+  "projectKey": "panopticon-cli",
+  "role": "review",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "claude-opus-5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3362",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "b8982660-3c91-430a-95ef-6990a3fb79f6",
+      "startedAt": "2026-08-01T10:34:41.994Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-01T10:34:41.994Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}

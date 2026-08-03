@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-2882",
+  "issueId": "PAN-2882",
+  "projectKey": "panopticon-cli",
+  "role": "work",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": null,
+    "model": "gpt-5.6-sol",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2882",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "53ed22f4-b952-47c1-9073-a20a75bc0910",
+      "startedAt": "2026-07-28T06:35:07.131Z",
+      "reason": "recovered"
+    },
+    {
+      "id": "b29bb78d-57eb-4b86-8ee8-1ee604ae6e94",
+      "startedAt": "2026-07-28T16:54:31.664Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-07-28T16:54:29.958Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

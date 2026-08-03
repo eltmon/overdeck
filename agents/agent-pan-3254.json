@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-3254",
+  "issueId": "PAN-3254",
+  "projectKey": "panopticon-cli",
+  "role": "work",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": null,
+    "model": "claude-haiku-4-5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3254",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "6728bbdb-2d0a-47ff-bb29-f05638d439a9",
+      "startedAt": "2026-07-29T03:25:52.782Z",
+      "reason": "recovered"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-07-29T03:25:51.387Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": true
+}

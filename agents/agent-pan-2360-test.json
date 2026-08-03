@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "agentId": "agent-pan-2360-test",
+  "issueId": "PAN-2360",
+  "projectKey": "panopticon-cli",
+  "role": "test",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "kimi-k2.7-code",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-2360",
+    "branch": null
+  },
+  "sessions": [],
+  "lifecycle": [
+    {
+      "at": "2026-07-09T01:43:46.153Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
