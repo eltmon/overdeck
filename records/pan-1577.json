@@ -1041,17 +1041,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:02:58.253Z",
+  "updated": "2026-08-03T02:03:01.305Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:02:53.959Z",
+    "updatedAt": "2026-08-03T02:02:54.807Z",
     "reviewNotes": "Verification failed at test",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "verificationNotes": "Verification FAILED at test (818921ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n\n Test Files  174 passed (174)\n      Tests  1954 passed (1954)\n   Start at  21:55:24\n   Duration  54.70s (transform 8.46s, setup 25.57s, import 76.55s, tests 44.91s, environment 44.24s)\n\n ❯ |root| tests/unit/lib/overdeck/bootstrap.test.ts (4 tests | 2 failed) 21826ms\n     × AC1: BootstrapObservabilityLive seeds getSnapshot from resolvers on boot 10944ms (retry x1)\n     × AC2: snapshot sequence advances when EventBus emits — no direct store polling 10878ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-pGaTiK/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep\n…(834 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-tLqkIP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-tLqkIP/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context\n...(truncated)",
@@ -1130,10 +1130,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3331,
-            "output": 673571,
-            "cacheRead": 663048513,
-            "cacheWrite": 26828915
+            "input": 3333,
+            "output": 674064,
+            "cacheRead": 663591182,
+            "cacheWrite": 26829413
           }
         }
       },
@@ -1157,15 +1157,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3611,
-          "output": 731887,
-          "cacheRead": 687316320,
-          "cacheWrite": 27473236
+          "input": 3613,
+          "output": 732380,
+          "cacheRead": 687858989,
+          "cacheWrite": 27473734
         }
       },
       "costAtCloseOut": {
-        "usd": 671.6108184,
-        "pricingAsOf": "2026-08-03T02:02:54.778Z"
+        "usd": 671.7255314,
+        "pricingAsOf": "2026-08-03T02:03:00.951Z"
       }
     },
     "merges": [
@@ -1365,5 +1365,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
