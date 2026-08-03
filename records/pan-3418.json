@@ -205,7 +205,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T05:16:01.193Z",
+  "updated": "2026-08-03T05:16:10.426Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -216,7 +216,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T05:15:51.720Z",
+    "updatedAt": "2026-08-03T05:16:06.068Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts",
     "blockerReasons": [
@@ -227,13 +227,13 @@
       },
       {
         "type": "merge_conflict",
-        "summary": "Conflicts with main since f9d7008 (1 path): src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-        "detectedAt": "2026-08-03T04:55:45.599Z"
+        "summary": "Conflicts with main since 2a4f6c2 (1 path): src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "detectedAt": "2026-08-03T05:15:57.689Z"
       }
     ],
     "conflictsSince": {
-      "sha": "f9d70087d5ea148968ed5c0f5d72d9ca6a72c867",
-      "detectedAt": "2026-08-03T04:55:45.599Z",
+      "sha": "2a4f6c2521e7e41a6a7ed27e5b1a1a5c2006a284",
+      "detectedAt": "2026-08-03T05:15:57.689Z",
       "paths": [
         "src/lib/cloister/__tests__/review-verdict-writer.test.ts"
       ]
@@ -372,7 +372,7 @@
       },
       "costAtCloseOut": {
         "usd": 143.0465163,
-        "pricingAsOf": "2026-08-03T05:16:01.177Z"
+        "pricingAsOf": "2026-08-03T05:16:06.076Z"
       }
     },
     "merges": [
