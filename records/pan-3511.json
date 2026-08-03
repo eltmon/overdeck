@@ -16,18 +16,18 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T04:51:52.488Z",
+  "updated": "2026-08-03T04:52:55.111Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
-    "inspectStatus": "inspecting",
+    "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:51:15.160Z",
-    "inspectNotes": "Inspecting item restore-helper"
+    "updatedAt": "2026-08-03T04:52:48.152Z",
+    "inspectNotes": "All 5 ACs verified against src/lib/cloister/verdict-restore.ts: AC1 restore path writes reviewStatus=artifact.verdict via setReviewStatusSync default dep and returns 'restored' (L183-201), no reviewedAtCommit fabricated when headSha absent; AC2 head-mismatch returns before any write, appends review.verdict_restore_blocked carrying verdict/artifactHead/rowHead (=lastVerifiedCommit, matching the sibling review.verdict_rejected key convention at review-verdict-writer.ts:192) and returns 'blocked-by-head-guard' (L147-180); AC3 routes through emitActivityEntryOnce with an id keyed on issue+artifactHead+rowHead, stable across invocations, and appendOnce provides the dedup (activity-logger.ts:179-201); AC4 absent artifact short-circuits at L143 with zero writes/emits; AC5 stuck flags cleared only when status.stuckReason matches opts.clearStuckReason (L193-198). Event registered in the contracts DomainEvent union. 20/20 tests pass locally. Non-blocking notes: the helper restores any verdict (incl. blocked/failed) rather than gating on 'passed' — deliberate and documented, so the orphan-restore-adopt item must decide whether to keep its existing passed-only gate at the call site; and the guard is intentionally more conservative than the write door's fresh/indeterminate classification."
   },
   "closeOut": {
     "usage": {
@@ -51,7 +51,7 @@
       },
       "costAtCloseOut": {
         "usd": 0.04801930000000001,
-        "pricingAsOf": "2026-08-03T04:51:15.169Z"
+        "pricingAsOf": "2026-08-03T04:52:48.404Z"
       }
     },
     "merges": [],
