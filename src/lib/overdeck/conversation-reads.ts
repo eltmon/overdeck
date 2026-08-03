@@ -68,7 +68,7 @@ export interface ConversationReadResult {
 export interface ConversationReadDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   tmuxSessionExists(sessionName: string): Promise<boolean>;
-  listSessionNames(): Promise<string[]>;
+  listSessionNames(): Promise<readonly string[]>;
   shouldReportUnresolvedLiveSession(conv: Pick<Conversation, 'status' | 'harness'> | null | undefined): boolean;
 }
 

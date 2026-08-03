@@ -258,8 +258,8 @@ export async function doneCommand(
       reviewerVerdicts: update.reviewerVerdicts
         ? Object.entries(update.reviewerVerdicts).map(([subRole, v]) => ({
             reviewer: subRole,
-            verdict: ((v as any)?.status || 'passed') as 'passed' | 'blocked',
-            atCommit: (v as any)?.atCommit,
+            verdict: (v?.status || 'passed') as 'passed' | 'blocked',
+            atCommit: v?.atCommit ? rehydrateHeadAnchor(v.atCommit) : undefined,
           }))
         : undefined,
       evidenceHead,

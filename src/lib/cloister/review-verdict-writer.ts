@@ -10,7 +10,7 @@
  * activity entry; anything else lands and re-gates.
  */
 import { join } from 'path';
-import { execFile } from 'child_process';
+import { execFile, type ExecFileException } from 'child_process';
 import { promisify } from 'util';
 import { parseCompositeSnapshot, formatAnchorShort, type HeadAnchor } from '../git-utils.js';
 import { resolveWorkspaceRepoRootsSync } from '../project-repos.js';
@@ -111,9 +111,9 @@ async function classifyEvidenceAgainstAnchor(
       // evidenceSha is an ancestor — this repo is old
       // but we need ALL repos to be stale to classify as 'stale'
       continue;
-    } catch (err: any) {
+    } catch (err) {
       // Check if this is a non-zero exit (not an ancestor)
-      if (err.code === 1) {
+      if ((err as ExecFileException).code === 1) {
         // evidenceSha is NOT an ancestor — this repo is fresh
         allStale = false;
       } else {

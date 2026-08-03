@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   getCloisterEventStore: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   resolveWorkspaceRepoRootsSync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   execFileAsync: vi.fn(),
 }));
 
@@ -28,8 +29,13 @@ vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRootsSync: mocks.resolveWorkspaceRepoRootsSync,
 }));
 
+vi.mock('../../projects.js', () => ({
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+}));
+
 vi.mock('child_process', () => ({
-  execFileAsync: mocks.execFileAsync,
+  execFile: Object.assign(vi.fn(), { [Symbol.for('nodejs.util.promisify.custom')]: mocks.execFileAsync }),
+  exec: vi.fn(),
 }));
 
 import { recordReviewVerdict, type VerdictInput } from '../review-verdict-writer.js';
@@ -53,6 +59,7 @@ describe('recordReviewVerdict', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCloisterEventStore.mockReturnValue(null);
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/home/eltmon/Projects/overdeck' });
   });
 
   describe('no-evidence path', () => {
@@ -122,7 +129,7 @@ describe('recordReviewVerdict', () => {
   describe('stale evidence path', () => {
     it('Given an evidenceHead that a per-repo `git merge-base --is-ancestor` probe proves is a strict ancestor of the row\'s lastVerifiedCommit, recordReviewVerdict returns { landed: false, reason: "stale-evidence-head" }, makes zero setReviewStatusSync calls, and appends one review.verdict_rejected event', async () => {
       const status = reviewStatus({
-        lastVerifiedCommit: 'b'.repeat(40),
+        lastVerifiedCommit: `main@${'b'.repeat(40)}`,
       });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
@@ -138,7 +145,7 @@ describe('recordReviewVerdict', () => {
       const input: VerdictInput = {
         verdict: 'passed',
         writer: 'fallback',
-        evidenceHead: 'a'.repeat(40),
+        evidenceHead: `main@${'a'.repeat(40)}`,
       };
 
       const result = await recordReviewVerdict('PAN-3512', input);
@@ -162,8 +169,8 @@ describe('recordReviewVerdict', () => {
 
   describe('fresh evidence path', () => {
     it('Given an evidenceHead the probe shows is NOT an ancestor of the row head, recordReviewVerdict lands the verdict with reviewedAtCommit set to that evidenceHead, appends one review.verdict_dispatched event, and returns { landed: true, classification: "dispatched" }', async () => {
-      const rowHead = 'b'.repeat(40);
-      const evidenceHead = 'c'.repeat(40);
+      const rowHead = `main@${'b'.repeat(40)}`;
+      const evidenceHead = `main@${'c'.repeat(40)}`;
       const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'pending' });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);
@@ -172,7 +179,7 @@ describe('recordReviewVerdict', () => {
       ]);
 
       // Mock git merge-base --is-ancestor to return non-zero (not ancestor)
-      mocks.execFileAsync.mockResolvedValue({ status: 1 });
+      mocks.execFileAsync.mockRejectedValue(Object.assign(new Error('not an ancestor'), { code: 1 }));
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
@@ -221,7 +228,7 @@ describe('recordReviewVerdict', () => {
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
         { repoKey: 'main', dir: '/path/to/repo' },
       ]);
-      mocks.execFileAsync.mockResolvedValue({ status: 1 });
+      mocks.execFileAsync.mockRejectedValue(Object.assign(new Error('not an ancestor'), { code: 1 }));
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
@@ -253,7 +260,7 @@ describe('recordReviewVerdict', () => {
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
         { repoKey: 'main', dir: '/path/to/repo' },
       ]);
-      mocks.execFileAsync.mockResolvedValue({ status: 1 });
+      mocks.execFileAsync.mockRejectedValue(Object.assign(new Error('not an ancestor'), { code: 1 }));
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
