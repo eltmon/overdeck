@@ -138,7 +138,7 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T03:44:07.997Z",
+  "updated": "2026-08-03T03:47:25.549Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "passed",
@@ -147,13 +147,16 @@
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T03:44:07.813Z",
-    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
-    "testNotes": "Verified HEAD 72af5dc4c8d93b20cc8e008e278f74d3969cfe97 (clean worktree; merge of origin/main ad37a7f10f1 into feature/pan-3418). npm run typecheck PASSES (tsc --noEmit clean; dashboard-types guard 55 known/0 new; frontend-types guard 0 known/0 new). npm run lint PASSES (all 19 sub-checks, exit 0). Targeted PAN-3418 tests: 7/7 backend + 24/24 frontend pass, covering all 5 in-scope xBRIEF items (server-coerce-empty-fields, db-writes-null-for-empty, widen-backfill-predicate, harness-chip-independent-of-model, picker-reseeds-after-model-list-load), including a real-component DOM integration test proving the prior review-blocking live-conversation-model bug stays fixed. Frontend --changed main: 628/628 pass. Root --changed main run twice; failures were non-deterministic across runs (29 files/30 tests vs 9 files/10 tests, only 3 files common), consistent with CPU-contention flakiness on this heavily-loaded host (25 running agents). Enumerated this branch's true diff vs origin/main via git log origin/main..HEAD (the local main ref was stale): only 13 files are branch-unique -- the 5 declared xBRIEF-scope files plus 4 files from an out-of-scope typing-cleanup commit d07baf7cbd2 (done.ts, review-verdict-writer.ts + tests), unrelated to conversation models. None of the ~35 unique failing test files across both full runs appear in that 13-file list. Spot-checked 8 hook-timeout failures in isolation -- all pass standalone. The 2 consistently-reproducing failures (spawn-flywheel-provenance.test.ts, specialists-reviewed-at-commit.test.ts) were confirmed to fail identically on a clean origin/main throwaway worktree -- pre-existing red-main defects, not caused by this branch. The out-of-scope commit's own tests (review-verdict-writer.test.ts, done.test.ts) pass 21/21. verify-live-data-repair (FR-6) is explicitly deferred to post-deploy close-out per its own xBRIEF item (readiness: sequential).",
-    "uatNotes": "Browser UAT not required: no mention of Playwright, UAT, screenshots, or browser flows in the issue body, PRD, PR notes, or xBRIEF continue state. All 5 in-scope acceptance criteria are unit/component-test verifiable and are covered, including src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx, a DOM-level integration test that mounts the real ComposerFooter+ModelPicker tree (no mocking of ModelPicker) and specifically proves the review-cycle-1 blocking defect (live conversation model being re-seeded to the global default) is fixed. The only acceptance criterion needing a running dashboard (FR-6, live-host row repair) is explicitly deferred to post-deploy close-out per its own xBRIEF item (readiness: sequential) and cannot execute before this branch merges and deploys.",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
+    "updatedAt": "2026-08-03T03:47:25.491Z",
+    "blockerReasons": [
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-03T03:47:25.491Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
       "detectedAt": "2026-08-03T02:23:27.712Z",
@@ -162,39 +165,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewSpawnedAt": "2026-08-03T03:28:20.204Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
-        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
-      ],
-      "actualChangedFiles": [
-        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
-        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
-        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
-        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "src/lib/overdeck/conversation-runtime.ts",
-        "src/lib/overdeck/conversations.ts",
-        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
-        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
-      ],
-      "recordedAt": "2026-08-03T02:40:57.628Z"
-    }
+    "reviewSpawnedAt": "2026-08-03T03:28:20.204Z"
   },
   "closeOut": {
     "usage": {
@@ -249,10 +220,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 252,
-            "output": 65907,
-            "cacheRead": 23735579,
-            "cacheWrite": 478114
+            "input": 254,
+            "output": 66866,
+            "cacheRead": 23973032,
+            "cacheWrite": 479364
           }
         },
         "work": {
@@ -278,15 +249,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 252,
-          "output": 65907,
-          "cacheRead": 23735579,
-          "cacheWrite": 478114
+          "input": 254,
+          "output": 66866,
+          "cacheRead": 23973032,
+          "cacheWrite": 479364
         }
       },
       "costAtCloseOut": {
-        "usd": 124.8852003,
-        "pricingAsOf": "2026-08-03T03:44:07.935Z"
+        "usd": 124.94541029999999,
+        "pricingAsOf": "2026-08-03T03:47:25.540Z"
       }
     },
     "merges": [
