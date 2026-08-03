@@ -193,7 +193,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T04:57:59.879Z",
+  "updated": "2026-08-03T04:58:24.463Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -204,7 +204,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T04:57:56.897Z",
+    "updatedAt": "2026-08-03T04:58:24.413Z",
     "reviewNotes": "Review dispatch deferred: merge conflict with main must be resolved before review dispatch",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts",
     "blockerReasons": [
@@ -331,9 +331,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2288926,
-            "output": 149576,
-            "cacheRead": 93127168,
+            "input": 2668248,
+            "output": 149844,
+            "cacheRead": 93575680,
             "cacheWrite": 0
           }
         }
@@ -346,9 +346,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11615232,
-          "output": 300601,
-          "cacheRead": 120147456,
+          "input": 11994554,
+          "output": 300869,
+          "cacheRead": 120595968,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -359,8 +359,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 133.8344693,
-        "pricingAsOf": "2026-08-03T04:57:59.866Z"
+        "usd": 135.9633753,
+        "pricingAsOf": "2026-08-03T04:58:24.449Z"
       }
     },
     "merges": [
