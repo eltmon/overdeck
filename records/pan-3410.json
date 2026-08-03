@@ -868,11 +868,11 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T01:49:58.484Z",
+  "updated": "2026-08-03T01:50:06.919Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -880,7 +880,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-03T01:49:48.999Z",
+    "updatedAt": "2026-08-03T01:49:52.282Z",
     "testNotes": "HEAD 3c2d55a2192 (merge of origin/main into feature/pan-3410). install: PASS (node_modules already present, workspace-aware). typecheck: FAILED — npm run typecheck: dashboard-types shrink-only ratchet regressed from baseline 55 to 56 errors. New error: src/dashboard/server/routes/specialists/legacy-routes.ts(259,30): TS1308 'await' expressions are only allowed within async functions and at the top levels of modules — 'const verdictOutcome = await recordReviewVerdict(...)' sits inside an Effect.gen generator (function*), not an async function. Root cause verified: this exact bug was introduced by commit fd48e3af398 (PAN-3512, on origin/main) and was already fixed on origin/main by a later commit 6ca777307aa ('fix(dashboard): unwrap bare await in legacy-routes Effect.gen — unbreaks dashboard server build', using 'yield* Effect.promise(() => recordReviewVerdict(...))'). This branch's last merge from main (commit 3c2d55a2192) predates that fix, so feature/pan-3410's HEAD still carries the broken await form while origin/main does not — this is a real, currently-broken build on this branch, not a pre-existing/inherited red-main condition. build: FAILED (npm run build:dashboard:server:bundle — tsdown/rolldown PARSE_ERROR at the same line, reproduced directly on host, no dist emitted). server-bundle: FAILED (same parse error, npm --prefix src/dashboard/server run build). lint: FAILED — npm run lint: 3 pre-existing @typescript-eslint/no-explicit-any errors (src/cli/commands/specialists/done.ts:261-262, src/lib/cloister/review-verdict-writer.ts:114); confirmed identical on origin/main via git show — inherited unchanged, not a PAN-3410 regression, but the configured lint gate is red regardless of attribution. frontend-typecheck and test gates not run: the typecheck/build/server-bundle failures are dispositive for a required gate and I stopped rather than burn a full vitest run against a codebase that cannot build. Per task instructions the top-level status reflects the literal configured-gate result: failed.",
     "uatNotes": "UAT is required: the xBRIEF (Settings → Appearance two-card theme picker with live mini-specimens, data-theme live switching, Broadsheet/Ledger visual parity, screenshot-proof acceptance criteria) and the issue description are unambiguously a browser-verifiable dashboard UI feature. UAT could not run: brought up this workspace's own isolated Docker stack (docker compose -f .devcontainer/docker-compose.devcontainer.yml up -d server frontend, per feature-pan-3410's own compose file — host dashboard/Deacon never touched) and the init service failed with the identical tsdown PARSE_ERROR at legacy-routes.ts:259 documented in testNotes, so the workspace server container never started and no build artifact exists to serve the app. No acceptance criterion could be exercised. Torn down the broken server/frontend/init containers after capturing the failure (docker compose down), leaving only the pre-existing idle dev container.",
     "conflictsSince": {
@@ -951,7 +951,7 @@
       },
       "costAtCloseOut": {
         "usd": 606.2731193,
-        "pricingAsOf": "2026-08-03T01:49:57.217Z"
+        "pricingAsOf": "2026-08-03T01:50:06.725Z"
       }
     },
     "merges": [
