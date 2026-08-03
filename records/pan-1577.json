@@ -1041,7 +1041,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:07:41.994Z",
+  "updated": "2026-08-03T02:08:10.202Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1052,11 +1052,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:06:38.568Z",
-    "updatedAt": "2026-08-03T02:07:39.650Z",
+    "updatedAt": "2026-08-03T02:08:09.690Z",
     "reviewNotes": "Verification failed at test",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
-    "reviewedAtCommit": "579e3701297791631f0bc97e77eec99abc87d18b",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-03T02:06:38.568Z",
     "reviewSpawnedAt": "2026-08-03T02:02:50.925Z"
@@ -1165,7 +1164,7 @@
       },
       "costAtCloseOut": {
         "usd": 672.9953494,
-        "pricingAsOf": "2026-08-03T02:07:41.932Z"
+        "pricingAsOf": "2026-08-03T02:08:09.898Z"
       }
     },
     "merges": [
