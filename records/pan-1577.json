@@ -966,7 +966,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:26:39.739Z",
+  "updated": "2026-08-03T01:34:20.748Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -976,7 +976,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-03T01:20:46.055Z",
     "updatedAt": "2026-08-03T01:23:47.129Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "testNotes": "Automated gates FAILED on current workspace HEAD 8bfbd8bfdc7 (feature/pan-1577 + local sync-main). typecheck: PASS (root tsc, hooks, evals, dashboard-types ratchet 55/55 known, frontend-types ratchet 0 known). lint: PASS (ESLint, skills, slash-commands, prompts, file-size, circular-deps, ratchet-audit, quarantine-audit all clean). build (required gate 'server-bundle'): FAILED -- dashboard server bundle (tsdown/rolldown) parse error: src/dashboard/server/routes/specialists/legacy-routes.ts:259 has a bare `await recordReviewVerdict(...)` inside a non-async Effect.gen generator (should be `yield* Effect.promise(...)`). Root cause: this branch's latest 'Merge remote-tracking branch origin/main' commit pulled in PAN-3512 commit fd48e3af398 at a moment when origin/main's dashboard build was transiently broken; that break was already fixed upstream by origin/main commit 6ca777307aa ('fix(dashboard): unwrap bare await in legacy-routes Effect.gen') but this workspace has not re-synced. Confirmed: `git diff origin/main -- <file>` shows this exact divergence; `git log acc4e819be7..origin/main -- <file>` shows the upstream fix commit. PAN-1577's own changed files (conversations move/CLI/frontend) are unaffected -- typecheck/lint on them is clean and .pan/review/agent-pan-1577-review-8bfbd8bf/synthesis.md is APPROVED with 0 blocking findings across security/correctness/performance/requirements. test: 29/1396 files failed (36/13238 tests): 2 suites fail via the same legacy-routes.ts parse error during vitest transform (specialists-reviewed-at-commit.test.ts, unstick-route.test.ts); 6 failures in tests/cli/commands/specialists/done.test.ts trace to unrelated PAN-3512 review-verdict-writer logic; the remaining ~28 are 'Hook timed out in 5000ms' on setupOverdeckTestDb() under heavy concurrent machine load (24 agents running per session). No failures touch PAN-1577's own files. Also flagging: 3 files carry uncommitted changes unrelated to PAN-1577 (src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts, src/lib/overdeck/conversation-reads.ts), not part of the reviewed/committed HEAD -- out of scope for the test role to commit/revert. Required build gate fails, so overall status is failed regardless of test pass rate.",
