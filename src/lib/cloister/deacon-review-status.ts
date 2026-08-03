@@ -11,6 +11,7 @@ import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 import { readLatestSynthesisVerdict } from './synthesis-verdict.js';
+import { attemptArtifactVerdictRestore } from './verdict-restore.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -570,28 +571,27 @@ async function reconcileReviewStatusOrphan(
       return actions;
     }
     if (!hasPassedReview) {
-      // RACE GUARD (PAN-1577 loop, 2026-08-02): consult the synthesis artifact
-      // of record before declaring this review dead. A just-finished convoy's
-      // synthesis.md lands on disk before the history entry syncs into the
-      // row; resetting here wiped APPROVED verdicts five times in one evening.
-      const artifact = readLatestSynthesisVerdict(issueId);
-      if (artifact?.verdict === 'passed') {
-        const artifactUpdate: Record<string, unknown> = {
-          reviewStatus: 'passed',
-          reviewNotes: artifact.notes,
-          reviewRetryCount: 0,
-          recoveryStartedAt: undefined,
-          ...(artifact.headSha ? { reviewedAtCommit: artifact.headSha } : {}),
-        };
-        if (status.stuckReason === 'review_infrastructure_failure') {
-          artifactUpdate['stuck'] = false;
-          artifactUpdate['stuckReason'] = undefined;
-          artifactUpdate['stuckAt'] = undefined;
-          artifactUpdate['stuckDetails'] = undefined;
-        }
-        setReviewStatusSync(issueId, artifactUpdate);
+      // RACE GUARD (PAN-1577 loop, 2026-08-02): consult the verdict artifact of
+      // record before declaring this review dead. A just-finished reviewer's
+      // artifact lands on disk before the history entry syncs into the row;
+      // resetting wiped APPROVED verdicts five times in one evening. Only a
+      // PASSED artifact short-circuits here, exactly as before the retrofit.
+      const restore = await attemptArtifactVerdictRestore(issueId, {
+        caller: 'orphan-reset',
+        clearStuckReason: 'review_infrastructure_failure',
+        deps: { readArtifact: (id, o) => { const a = readLatestSynthesisVerdict(id, o); return a?.verdict === 'passed' ? a : null; } },
+      });
+      if (restore.outcome === 'restored') {
         actions.push(
           `Restored orphaned review verdict for ${issueId} from the synthesis artifact (race guard — history sync had not landed)`,
+        );
+        return actions;
+      }
+      if (restore.outcome === 'blocked-by-head-guard') {
+        // The artifact proves a review FINISHED — falling through to the reset below is the PAN-1577 wipe by another name.
+        actions.push(
+          `Left orphaned review for ${issueId} untouched: a fresh ${restore.artifact.verdict} artifact at head `
+          + `${restore.artifact.headSha?.slice(0, 8) ?? 'none'} disagrees with the row anchor — reported, not reset`,
         );
         return actions;
       }

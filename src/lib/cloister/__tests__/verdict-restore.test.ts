@@ -259,6 +259,99 @@ describe('attemptArtifactVerdictRestore', () => {
   });
 });
 
+describe('orphan-reset call site (PAN-3511 retrofit)', () => {
+  // The orphan patrol installs a passed-only reader so that ONLY an approved
+  // artifact short-circuits the reset — exactly the behavior the inline block
+  // had before the retrofit. These cases pin that composition.
+  //
+  // Scope note: `reconcileReviewStatusOrphan` is not exported and needs the
+  // whole patrol surface (agents, tmux, status) to drive end-to-end, so this
+  // exercises the decision the call site delegates, not the patrol itself.
+  function orphanDeps(artifact: SynthesisArtifactVerdict | null, status: Record<string, unknown>) {
+    const h = harness({ artifact: null, status });
+    return {
+      ...h,
+      deps: {
+        ...h.deps,
+        readArtifact: () => (artifact?.verdict === 'passed' ? artifact : null),
+      },
+    };
+  }
+
+  it('restores and clears the infra-failure gate on an approved artifact (ac1)', async () => {
+    const h = orphanDeps(passedArtifact(), {
+      reviewStatus: 'reviewing',
+      stuck: true,
+      stuckReason: 'review_infrastructure_failure',
+    });
+
+    const result = await attemptArtifactVerdictRestore(ISSUE, {
+      deps: h.deps,
+      caller: 'orphan-reset',
+      clearStuckReason: 'review_infrastructure_failure',
+    });
+
+    expect(result.outcome).toBe('restored');
+    expect(h.setStatus.mock.calls[0]![1]).toMatchObject({
+      reviewStatus: 'passed',
+      reviewRetryCount: 0,
+      stuck: false,
+      stuckReason: undefined,
+    });
+  });
+
+  it('reports and writes nothing when the approved artifact head disagrees (ac2)', async () => {
+    const h = orphanDeps(passedArtifact({ headSha: 'aaaaaaa1' }), {
+      reviewStatus: 'reviewing',
+      lastVerifiedCommit: 'bbbbbbb2',
+    });
+
+    const result = await attemptArtifactVerdictRestore(ISSUE, {
+      deps: h.deps,
+      caller: 'orphan-reset',
+      clearStuckReason: 'review_infrastructure_failure',
+    });
+
+    // The call site returns on this outcome rather than falling through to the
+    // pending reset — the artifact proves a review finished.
+    expect(result.outcome).toBe('blocked-by-head-guard');
+    expect(h.setStatus).not.toHaveBeenCalled();
+    expect(h.emitEvent.mock.calls[0]![0]).toBe('review.verdict_restore_blocked');
+    expect(h.emitEvent.mock.calls[0]![1]).toMatchObject({ caller: 'orphan-reset' });
+  });
+
+  it.each(['blocked', 'failed'] as const)(
+    'falls through to the retry reset on a %s artifact, as before the retrofit (ac3)',
+    async (verdict) => {
+      const h = orphanDeps({ verdict, mtimeMs: 999_000 }, { reviewStatus: 'reviewing' });
+
+      const result = await attemptArtifactVerdictRestore(ISSUE, {
+        deps: h.deps,
+        caller: 'orphan-reset',
+        clearStuckReason: 'review_infrastructure_failure',
+      });
+
+      // 'no-artifact' is what lets the call site run its unchanged pending
+      // reset — a non-approved artifact must not short-circuit the patrol.
+      expect(result).toEqual({ outcome: 'no-artifact' });
+      expect(h.setStatus).not.toHaveBeenCalled();
+      expect(h.emitEvent).not.toHaveBeenCalled();
+    },
+  );
+
+  it('falls through to the retry reset when no artifact exists at all (ac3)', async () => {
+    const h = orphanDeps(null, { reviewStatus: 'reviewing' });
+
+    const result = await attemptArtifactVerdictRestore(ISSUE, {
+      deps: h.deps,
+      caller: 'orphan-reset',
+    });
+
+    expect(result).toEqual({ outcome: 'no-artifact' });
+    expect(h.setStatus).not.toHaveBeenCalled();
+  });
+});
+
 describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H5/NFR-2)', () => {
   let workspacePath: string;
 
