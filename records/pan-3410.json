@@ -855,11 +855,11 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T00:38:36.982Z",
+  "updated": "2026-08-03T00:38:39.851Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -867,9 +867,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-03T00:38:36.762Z",
-    "reviewNotes": "All four reviewers passed; the merge-from-main refresh preserves the approved theme behavior and only adjusts the PR file-size allowlist against the new base",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-03T00:38:36.817Z",
+    "testNotes": "HEAD adcbe598d4644f40e394f1907fc36628b9095c87 (matches last review's reviewedAtCommit). install: PASS (bun install --frozen-lockfile, no changes). typecheck: PASS (npm run typecheck — root, hooks, evals, dashboard-types ratchet 55 known/none new, frontend-types ratchet 0 known/none new). frontend-typecheck: PASS (npx tsc --noEmit in src/dashboard/frontend, zero output). lint: PASS (full npm run lint chain, exit 0 — including lint:circular: 77 baselined cycles, no new cycles; the lint:circular failure a prior test-agent cycle reported against deacon.ts>stall-sweeper.ts>service.ts is no longer failing, so that pre-existing red-main defect has since been resolved/baselined upstream). build: PASS (npm run build, vite build clean, dist-externals check passed). server-bundle: PASS (npm run build:dashboard:server:bundle, 615 files bundled, exit 0). test: FAILED — configured gate is 'OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main' for both root and src/dashboard/frontend. Root vitest: all changed-scoped tests passed. Frontend vitest: 1 file / 3 tests failed in src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx (expects a 'Load/core' assertion inside SystemHealthPill's dialog that the component no longer renders). Investigated root cause per repo policy: `git diff origin/main -- src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx src/dashboard/frontend/src/components/SystemHealthPill.tsx` returns zero diff and `git log origin/main..HEAD` for both paths returns zero commits — this branch has not touched either file, so the failure is inherited unchanged from origin/main, not a PAN-3410 regression (matches the identical finding already recorded by the prior test-agent cycle, attributed to unmerged PAN-3423/PR#3466 whose matching test fix hasn't landed). Per task instructions the top-level status reflects the literal configured-gate result regardless of attribution, so status is 'failed' on this required test gate. All PAN-3410-scoped test files (config-yaml-ui-theme, settings-api x2, fonts-local, useDesignLanguage, AppearanceSection, recovery, styleguide-conformance e2e) are unaffected and outside the single failing file.",
     "conflictsSince": {
       "sha": "acc4e819be7df18233dbdfd67f2aecdd0340ebe1",
       "detectedAt": "2026-08-03T00:22:37.520Z",
@@ -878,25 +877,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewSpawnedAt": "2026-08-03T00:33:21.922Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "3c2d55a2192ce6a9a1b328141574b468b9d62312"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "3c2d55a2192ce6a9a1b328141574b468b9d62312"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "3c2d55a2192ce6a9a1b328141574b468b9d62312"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "3c2d55a2192ce6a9a1b328141574b468b9d62312"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-03T00:33:21.922Z"
   },
   "closeOut": {
     "usage": {
@@ -956,7 +937,7 @@
       },
       "costAtCloseOut": {
         "usd": 597.2629793,
-        "pricingAsOf": "2026-08-03T00:38:36.893Z"
+        "pricingAsOf": "2026-08-03T00:38:39.842Z"
       }
     },
     "merges": [
