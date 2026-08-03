@@ -1137,11 +1137,31 @@
       "timestamp": "2026-08-03T05:15:38.387Z",
       "reason": "end",
       "note": "Re-triggering verification: build reproduced clean locally (exit 0, zero errors) at the same commit, confirmed CPU-load-induced transient build flake (load 24-27), no code change needed"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T05:19:30.557Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T05:19:30.605Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T05:19:30.639Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T05:19:30.674Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T05:16:36.451Z",
+  "updated": "2026-08-03T05:19:30.674Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1468,5 +1488,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
