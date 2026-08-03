@@ -40,9 +40,9 @@ export interface AgentPlaneSessionEntry {
 export interface AgentPlaneTombstonePredicate {
   closedOutFlag: boolean;
   trackerState: string;
-  liveTmux: boolean;
-  openChangeRequest: boolean;
-  inFlightReviewOrTest: boolean;
+  liveTmux: boolean | null;
+  openChangeRequest: boolean | null;
+  inFlightReviewOrTest: boolean | null;
 }
 
 export interface AgentPlaneLifecycleEntry {
