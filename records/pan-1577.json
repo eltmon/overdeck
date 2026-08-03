@@ -1041,7 +1041,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:19:31.126Z",
+  "updated": "2026-08-03T02:22:09.545Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1052,26 +1052,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:06:38.568Z",
-    "updatedAt": "2026-08-03T02:19:29.934Z",
+    "updatedAt": "2026-08-03T02:22:09.478Z",
     "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-03T02:19:29.933Z"
-      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
         "detectedAt": "2026-08-03T02:19:29.933Z"
       }
     ],
-    "conflictsSince": {
-      "sha": "e884ff6ed2b1d6bc81f876478635ac4a462341f0",
-      "detectedAt": "2026-08-03T02:17:01.763Z",
-      "paths": [
-        "scripts/file-size-allowlist.txt"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewSpawnedAt": "2026-08-03T02:02:50.925Z"
@@ -1145,10 +1133,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3363,
-            "output": 681351,
-            "cacheRead": 671855026,
-            "cacheWrite": 26848218
+            "input": 3383,
+            "output": 683822,
+            "cacheRead": 677496937,
+            "cacheWrite": 26852809
           }
         }
       },
@@ -1172,15 +1160,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3781,
-          "output": 764466,
-          "cacheRead": 714184435,
-          "cacheWrite": 27602103
+          "input": 3801,
+          "output": 766937,
+          "cacheRead": 719826346,
+          "cacheWrite": 27606694
         }
       },
       "costAtCloseOut": {
-        "usd": 677.6327424,
-        "pricingAsOf": "2026-08-03T02:19:30.030Z"
+        "usd": 678.7973524,
+        "pricingAsOf": "2026-08-03T02:22:09.511Z"
       }
     },
     "merges": [
