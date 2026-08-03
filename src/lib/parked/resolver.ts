@@ -40,6 +40,9 @@ import { shouldSkipReviewStatus } from '../cloister/stuck-remediation.js';
 import { isIssueClosed } from '../cloister/issue-closed.js';
 import { readIssueRecord } from '../pan-dir/record.js';
 import { getProjectSync, resolveProjectFromIssueSync } from '../projects.js';
+import { existsSync } from 'fs';
+import { join } from 'path';
+import { getOverdeckHome } from '../paths.js';
 
 export const PARKED_ORBITS = [
   'stuck-flag',
@@ -185,6 +188,20 @@ function isoOr(ts: string | number | null | undefined, fallback: number): string
 }
 
 /**
+ * `pan done` marks the work agent stoppedByUser as an auto-resume suppressor
+ * (done.ts:439/:869 — finished, don't idle-revive; the PAN-2668 completed-
+ * handoff exception is the sanctioned rework path). That is a NORMAL lifecycle
+ * completion, not an operator park — reporting it as an operator gate makes
+ * the sweeper escalate false gates every TTL (observed on PAN-3512 at
+ * 00:02:26Z, self-cleared 80s later by the rework resume). A completed
+ * handoff marker means finished, not parked.
+ */
+export function hasCompletedHandoffMarker(agentId: string): boolean {
+  const dir = join(getOverdeckHome(), 'agents', agentId);
+  return existsSync(join(dir, 'completed')) || existsSync(join(dir, 'completed.processed'));
+}
+
+/**
  * Agent rows occasionally carry a bare numeric issue id ("2156") where every
  * other surface keys "PAN-2156" — without normalization the issue loses its
  * review-status row and trip enrichment. Uppercase always; for bare numerics
@@ -275,7 +292,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
         const at = isoOr(agent.troubledAt, s.now);
         if (at < row.parkedAt) row.parkedAt = at;
         gateRows.set('troubled', row);
-      } else if (agent.stoppedByUser === true && agent.status !== 'running') {
+      } else if (agent.stoppedByUser === true && agent.status !== 'running' && !hasCompletedHandoffMarker(agent.id)) {
         const row = gateRows.get('stopped-by-user') ?? { parkedAt: isoOr(agent.stoppedAt, s.now), agentIds: [], reason: '', unpark: '' };
         row.agentIds.push(agent.id);
         const at = isoOr(agent.stoppedAt, s.now);

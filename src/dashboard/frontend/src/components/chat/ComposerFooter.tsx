@@ -19,6 +19,7 @@ import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical';
 import { ComposerPromptEditor, loadDraft } from './ComposerPromptEditor';
 import { VoiceWidget } from './VoiceWidget';
 import { ModelPicker, MODEL_EFFORT_SUPPORT, saveStoredHarness, saveStoredModel } from './ModelPicker';
+import { pickerEffortLevels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { getDefaultConversationModel } from './defaultConversationModel';
 import { modelSupportsImages, findModelDef } from '../Settings/modelCatalog';
@@ -695,7 +696,7 @@ export function ComposerFooter({
             </span>
           )}
           <div className={styles.composerToolbarDivider} />
-          <EffortPicker value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive} availableLevels={MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
+          <EffortPicker value={effort} onChange={handleEffortChange} disabled={!conversation.sessionAlive} availableLevels={pickerEffortLevels(model) ?? MODEL_EFFORT_SUPPORT[model as keyof typeof MODEL_EFFORT_SUPPORT]} />
 
           {piConversation && !agentId && (
             <>

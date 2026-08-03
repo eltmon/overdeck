@@ -1139,3 +1139,64 @@ describe('getAvailableModelsApi — MODEL_DEPRECATIONS filter (PAN-1122 follow-u
     vi.resetModules();
   });
 });
+
+describe('getAvailableModelsApi — Kimi harness annotations (2026-08-02 harness-labeled rows)', () => {
+  // The model picker renders one row per (model, harness) launch route. The
+  // API marks each Kimi id with the harness family its id space belongs to —
+  // bare ids are the claude-code route, kimi-code/* ids are the native CLI
+  // catalog (shared with ACP) — plus the effort levels that route offers, and
+  // suffixes native names so flat config panels never show two identical
+  // "Kimi K3 (1M)" rows with different launch validity.
+  it('annotates kimi entries with harness, effort levels, and a CLI-marked name for native ids', async () => {
+    vi.resetModules();
+    vi.doMock('../model-capabilities.js', () => ({
+      MODEL_CAPABILITIES: {
+        'k3': { provider: 'kimi', displayName: 'Kimi K3 (256K)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'k3[1m]': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'] },
+        'kimi-code/k3': { provider: 'kimi', displayName: 'Kimi K3 (1M)', costPer1MTokens: 9, effortLevels: ['low', 'high', 'max'] },
+        'kimi-code/kimi-for-coding': { provider: 'kimi', displayName: 'Kimi K2.7 Coding', costPer1MTokens: 2.5, effortLevels: ['low', 'high', 'max'] },
+        'gpt-5.5': { provider: 'openai', displayName: 'GPT-5.5', costPer1MTokens: 1 },
+      },
+      MODEL_DEPRECATIONS: {},
+      getModelCapability: vi.fn(),
+      getModelCapabilitySync: vi.fn(),
+      hasModelCapability: () => true,
+      hasModelCapabilitySync: () => true,
+      resolveModelId: (modelId: string) => modelId,
+      resolveModelIdSync: (modelId: string) => modelId,
+    }));
+
+    const { getAvailableModelsApi } = await import('../settings-api.js');
+    const kimi = getAvailableModelsApi().kimi;
+
+    const bare = kimi.find((m) => m.id === 'k3[1m]');
+    expect(bare).toMatchObject({
+      name: 'Kimi K3 (1M)',
+      baseName: 'Kimi K3 (1M)',
+      harness: 'claude-code',
+      effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
+    });
+
+    const native = kimi.find((m) => m.id === 'kimi-code/k3');
+    expect(native).toMatchObject({
+      name: 'Kimi K3 (1M) — Kimi Code CLI',
+      baseName: 'Kimi K3 (1M)',
+      harness: 'kimi-code',
+      effortLevels: ['low', 'high', 'max'],
+    });
+
+    const coding = kimi.find((m) => m.id === 'kimi-code/kimi-for-coding');
+    expect(coding?.name).toBe('Kimi K2.7 Coding — Kimi Code CLI');
+    expect(coding?.harness).toBe('kimi-code');
+
+    // No entry may carry the retired "(native)" marker.
+    expect(kimi.some((m) => m.name.includes('(native)'))).toBe(false);
+
+    // Non-kimi providers stay unannotated.
+    const openai = getAvailableModelsApi().openai;
+    expect(openai[0]).not.toHaveProperty('harness');
+
+    vi.doUnmock('../model-capabilities.js');
+    vi.resetModules();
+  });
+});
