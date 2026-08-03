@@ -22,11 +22,64 @@
       "reason": "resume",
       "agentModel": "claude-haiku-4-5",
       "timestamp": "2026-08-02T23:45:18.192Z"
+    },
+    {
+      "timestamp": "2026-08-03T00:01:45.118Z",
+      "reason": "end",
+      "note": "Core verdict write door implementation complete: door module, domain events, guard retirement, merge-gate lock, docs, quick-signal CLI migration, coordinator HTTP migration. Remaining 4 verdict-routing migrations (fallback, orphan-restore, unsignaled, infra-bypass) require same pattern: call recordReviewVerdict before setReviewStatusSync, condition feedback delivery/killSession on landed outcome."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/deacon-review-unsignaled.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/review-verdict-guards.ts"
+    ],
+    "declaredScope": [
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-allowlist.txt",
+      "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+      "src/cli/commands/specialists/done.ts",
+      "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+      "src/dashboard/server/routes/specialists/legacy-routes.ts",
+      "src/lib/__tests__/review-verdict-guards.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+      "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+      "src/lib/cloister/deacon-review-signals.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/deacon-review-unsignaled.ts",
+      "src/lib/cloister/deacon.ts",
+      "src/lib/cloister/review-verdict-writer.ts",
+      "src/lib/review-verdict-guards.ts"
+    ],
+    "actualChangedFiles": [
+      "packages/contracts/src/events.ts",
+      "src/lib/__tests__/review-verdict-guards.test.ts",
+      "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+      "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+      "src/lib/cloister/review-verdict-writer.ts"
+    ],
+    "recordedAt": "2026-08-03T00:01:37.570Z"
+  },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:01:40.759Z",
+  "updated": "2026-08-03T00:01:45.172Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -35,7 +88,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T00:01:40.756Z",
+    "updatedAt": "2026-08-03T00:01:45.113Z",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
     "reviewRequestedAt": "2026-08-03T00:01:40.756Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -84,35 +138,50 @@
         "src/lib/cloister/review-verdict-writer.ts"
       ],
       "recordedAt": "2026-08-03T00:01:37.570Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3514"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 8670,
-            "output": 200,
-            "cacheRead": 55,
+            "input": 53222,
+            "output": 15236,
+            "cacheRead": 905,
             "cacheWrite": 0
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 1464,
+            "output": 69914,
+            "cacheRead": 38014151,
+            "cacheWrite": 1393329
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 8670,
-          "output": 200,
-          "cacheRead": 55,
+          "input": 53222,
+          "output": 15236,
+          "cacheRead": 905,
           "cacheWrite": 0
+        },
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 1464,
+          "output": 69914,
+          "cacheRead": 38014151,
+          "cacheWrite": 1393329
         }
       },
       "costAtCloseOut": {
-        "usd": 0.0096755,
-        "pricingAsOf": "2026-08-02T23:03:08.945Z"
+        "usd": 6.0236125,
+        "pricingAsOf": "2026-08-03T00:01:45.157Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3514"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -276,53 +345,5 @@
     "retire-review-arm.retire-review-arm.ac4": "completed",
     "migrate-fallback": "pending",
     "docs-write-door": "pending"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
-      "src/cli/commands/specialists/done.ts",
-      "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
-      "src/dashboard/server/routes/specialists/legacy-routes.ts",
-      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
-      "src/lib/cloister/deacon-review-signals.ts",
-      "src/lib/cloister/deacon-review-status.ts",
-      "src/lib/cloister/deacon-review-unsignaled.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/review-verdict-guards.ts"
-    ],
-    "declaredScope": [
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "packages/contracts/src/events.ts",
-      "scripts/file-size-allowlist.txt",
-      "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
-      "src/cli/commands/specialists/done.ts",
-      "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
-      "src/dashboard/server/routes/specialists/legacy-routes.ts",
-      "src/lib/__tests__/review-verdict-guards.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
-      "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-      "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
-      "src/lib/cloister/deacon-review-signals.ts",
-      "src/lib/cloister/deacon-review-status.ts",
-      "src/lib/cloister/deacon-review-unsignaled.ts",
-      "src/lib/cloister/deacon.ts",
-      "src/lib/cloister/review-verdict-writer.ts",
-      "src/lib/review-verdict-guards.ts"
-    ],
-    "actualChangedFiles": [
-      "packages/contracts/src/events.ts",
-      "src/lib/__tests__/review-verdict-guards.test.ts",
-      "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-      "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
-      "src/lib/cloister/review-verdict-writer.ts"
-    ],
-    "recordedAt": "2026-08-03T00:01:37.570Z"
   }
 }
