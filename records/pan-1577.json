@@ -1101,7 +1101,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T04:48:36.112Z",
+  "updated": "2026-08-03T04:48:41.666Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1111,14 +1111,22 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:48:36.080Z",
+    "updatedAt": "2026-08-03T04:48:41.613Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-03T04:48:01.405Z"
+        "summary": "Conflicts with main since 903a865 (2 paths): src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts",
+        "detectedAt": "2026-08-03T04:48:36.083Z"
       }
     ],
+    "conflictsSince": {
+      "sha": "903a865ab5fe0223ba473c3ef5560b6a760f26f4",
+      "detectedAt": "2026-08-03T04:48:36.083Z",
+      "paths": [
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/review-verdict-writer.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "756a77d590e9b0095841cebeaea0511cf73f4778",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
@@ -1228,7 +1236,7 @@
       },
       "costAtCloseOut": {
         "usd": 759.264885,
-        "pricingAsOf": "2026-08-03T04:48:36.102Z"
+        "pricingAsOf": "2026-08-03T04:48:41.641Z"
       }
     },
     "merges": [
