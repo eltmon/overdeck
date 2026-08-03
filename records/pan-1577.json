@@ -1157,11 +1157,16 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-03T05:19:30.674Z"
+    },
+    {
+      "timestamp": "2026-08-03T06:03:27.272Z",
+      "reason": "end",
+      "note": "Resolved third sync-main file-size-allowlist conflict (lifecycle-restart.ts + conversations.ts growth counts)"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T06:03:23.349Z",
+  "updated": "2026-08-03T06:03:27.372Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1171,8 +1176,20 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T06:03:23.344Z",
+    "updatedAt": "2026-08-03T06:03:27.244Z",
     "uatNotes": "UAT required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and hazard H7. Built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance (OVERDECK_HOME=/tmp/pan-1577-uat-home, PORT=13011, OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) rather than touching the production dashboard on port 3011, which belongs to a different checkout and is out of scope to hijack. Seeded two synthetic conversations through the canonical write door (createConversation() in src/lib/overdeck/conversations.ts) under two real registered projects (panopticon-cli, mind-your-now). Drove both flows with Playwright MCP: (1) Menu-based move -- 3-dot 'More actions' -> 'Move' expands a submenu listing registered projects with the conversation's current project disabled; selected panopticon-cli, got toast 'Moved \"PAN-1577 UAT source conversation B\" to panopticon-cli', GET /api/conversations confirmed projectKey=panopticon-cli with cwd unchanged (/home/eltmon/Projects/myn), and the conversation disappeared from mind-your-now's list and appeared in panopticon-cli's list on navigation. (2) Native HTML5 drag-and-drop -- dragged a conversation row (confirmed draggable=true, cursor:grab) onto the mind-your-now sidebar project node; got toast 'Moved \"PAN-1577 UAT source conversation A\" to mind-your-now', GET /api/conversations confirmed projectKey=mind-your-now with cwd unchanged (/home/eltmon/Projects/overdeck). (3) No-op check (ac3) -- dropped a conversation onto its own current project (panopticon-cli); no toast fired and GET /api/conversations confirmed zero state change. All acceptance criteria for menu-move and drag-drop-move items verified, and hazard H1 (JSONL/cwd never touched by a move) confirmed via API for both moves. Isolated instance and seeded data torn down after verification; production dashboard on 3011 was never touched.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-08-03T05:54:54.251Z"
+      },
+      {
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-03T05:54:54.251Z"
+      }
+    ],
     "conflictsSince": {
       "sha": "2a4f6c2521e7e41a6a7ed27e5b1a1a5c2006a284",
       "detectedAt": "2026-08-03T05:15:57.689Z",
@@ -1254,10 +1271,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3597,
-            "output": 718057,
-            "cacheRead": 741463711,
-            "cacheWrite": 28068041
+            "input": 3603,
+            "output": 718591,
+            "cacheRead": 743409746,
+            "cacheWrite": 28069702
           }
         }
       },
@@ -1281,15 +1298,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4643,
-          "output": 913129,
-          "cacheRead": 856808251,
-          "cacheWrite": 29566436
+          "input": 4649,
+          "output": 913663,
+          "cacheRead": 858754286,
+          "cacheWrite": 29568097
         }
       },
       "costAtCloseOut": {
-        "usd": 846.1646253,
-        "pricingAsOf": "2026-08-03T06:02:22.506Z"
+        "usd": 846.5633373,
+        "pricingAsOf": "2026-08-03T06:03:27.324Z"
       }
     },
     "merges": [
@@ -1489,5 +1506,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
