@@ -1161,18 +1161,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T05:55:30.727Z",
+  "updated": "2026-08-03T06:02:17.467Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T05:55:30.703Z",
-    "testNotes": "Automated gates at HEAD 1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef: typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet) PASS. lint (eslint + all 18 sub-lints incl. circular-deps, ratchet-audit, quarantine-audit, skills, slash-commands, file-size) PASS clean on a controlled rerun; two transient failures (skill-CLI flake, build:cli heap OOM) traced to this machine's extreme concurrent load (uptime load average 28-37 across ~40 tmux sessions, swap saturated) and confirmed non-defects by isolating and rerunning the failing step successfully. Root vitest: 1403 files total, 53 failed / 1347 passed / 3 skipped, 13184/13294 tests passed. All 53 failures share one signature -- 'Hook timed out in 5000ms' inside beforeEach setupOverdeckTestDb() -- except one (operator-interventions.test.ts AC3, whose own last commit message documents it as a known 409-flakes-to-500 flake, unrelated to this branch's diff). Confirmed load-induced: reran a 17-file diverse sample spanning conversations/memory/workspaces/merge-sync/schema-audit/agents-state-db (including src/cli/commands/conversations/__tests__/move.test.ts, the file most relevant to this branch) with --testTimeout=30000 --hookTimeout=30000 -- all passed cleanly with 3-7s actual runtime, well inside the extended window, and zero code changes. Frontend vitest (full suite, not just the 4 files package.json's npm test targets): 307/307 files, 3013/3013 tests passed clean.",
+    "updatedAt": "2026-08-03T06:02:17.314Z",
     "uatNotes": "UAT required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and hazard H7. Built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance (OVERDECK_HOME=/tmp/pan-1577-uat-home, PORT=13011, OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) rather than touching the production dashboard on port 3011, which belongs to a different checkout and is out of scope to hijack. Seeded two synthetic conversations through the canonical write door (createConversation() in src/lib/overdeck/conversations.ts) under two real registered projects (panopticon-cli, mind-your-now). Drove both flows with Playwright MCP: (1) Menu-based move -- 3-dot 'More actions' -> 'Move' expands a submenu listing registered projects with the conversation's current project disabled; selected panopticon-cli, got toast 'Moved \"PAN-1577 UAT source conversation B\" to panopticon-cli', GET /api/conversations confirmed projectKey=panopticon-cli with cwd unchanged (/home/eltmon/Projects/myn), and the conversation disappeared from mind-your-now's list and appeared in panopticon-cli's list on navigation. (2) Native HTML5 drag-and-drop -- dragged a conversation row (confirmed draggable=true, cursor:grab) onto the mind-your-now sidebar project node; got toast 'Moved \"PAN-1577 UAT source conversation A\" to mind-your-now', GET /api/conversations confirmed projectKey=mind-your-now with cwd unchanged (/home/eltmon/Projects/overdeck). (3) No-op check (ac3) -- dropped a conversation onto its own current project (panopticon-cli); no toast fired and GET /api/conversations confirmed zero state change. All acceptance criteria for menu-move and drag-drop-move items verified, and hazard H1 (JSONL/cwd never touched by a move) confirmed via API for both moves. Isolated instance and seeded data torn down after verification; production dashboard on 3011 was never touched.",
     "blockerReasons": [
       {
@@ -1194,7 +1193,6 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
-    "reviewedAtCommit": "1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewSpawnedAt": "2026-08-03T05:14:36.729Z"
   },
@@ -1267,10 +1265,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3575,
-            "output": 715855,
-            "cacheRead": 734361693,
-            "cacheWrite": 28063593
+            "input": 3597,
+            "output": 718057,
+            "cacheRead": 741463711,
+            "cacheWrite": 28068041
           }
         }
       },
@@ -1294,15 +1292,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4621,
-          "output": 910927,
-          "cacheRead": 849706233,
-          "cacheWrite": 29561988
+          "input": 4643,
+          "output": 913129,
+          "cacheRead": 856808251,
+          "cacheWrite": 29566436
         }
       },
       "costAtCloseOut": {
-        "usd": 844.7110373,
-        "pricingAsOf": "2026-08-03T05:55:30.720Z"
+        "usd": 846.1646253,
+        "pricingAsOf": "2026-08-03T06:02:17.411Z"
       }
     },
     "merges": [
