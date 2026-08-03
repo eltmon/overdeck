@@ -916,22 +916,44 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T00:30:56.778Z",
+  "updated": "2026-08-03T00:37:55.628Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
-    "updatedAt": "2026-08-03T00:27:06.029Z",
+    "updatedAt": "2026-08-03T00:37:55.519Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-02T23:10:22.124Z",
-    "reviewSpawnedAt": "2026-08-03T00:27:06.029Z"
+    "reviewSpawnedAt": "2026-08-03T00:27:06.029Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/security.md",
+        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/correctness.md",
+        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/performance.md",
+        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/requirements.md",
+        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -954,9 +976,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 41618670,
-            "output": 453095,
-            "cacheRead": 106020864,
+            "input": 46267093,
+            "output": 509073,
+            "cacheRead": 115938816,
             "cacheWrite": 0
           }
         },
@@ -994,10 +1016,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 2919,
-            "output": 564436,
-            "cacheRead": 576967419,
-            "cacheWrite": 25203096
+            "input": 2999,
+            "output": 580947,
+            "cacheRead": 590023889,
+            "cacheWrite": 25241427
           }
         }
       },
@@ -1015,21 +1037,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 53075089,
-          "output": 696078,
-          "cacheRead": 153278976,
+          "input": 57723512,
+          "output": 752056,
+          "cacheRead": 163196928,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2919,
-          "output": 564436,
-          "cacheRead": 576967419,
-          "cacheWrite": 25203096
+          "input": 2999,
+          "output": 580947,
+          "cacheRead": 590023889,
+          "cacheWrite": 25241427
         }
       },
       "costAtCloseOut": {
-        "usd": 549.5952993,
-        "pricingAsOf": "2026-08-03T00:27:11.476Z"
+        "usd": 582.3481223,
+        "pricingAsOf": "2026-08-03T00:37:55.601Z"
       }
     },
     "merges": [
@@ -1220,5 +1242,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
