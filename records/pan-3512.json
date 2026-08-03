@@ -173,7 +173,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T04:53:24.868Z",
+  "updated": "2026-08-03T04:56:41.267Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -181,24 +181,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:48:56.728Z",
+    "updatedAt": "2026-08-03T04:56:05.475Z",
     "reviewNotes": "Stale approvals can still land, the branch does not compile or run its verdict-door tests, and the canonical event contract is incomplete.",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-03T00:23:14.126Z"
-      },
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 903a865 (1 path): src/lib/cloister/review-verdict-writer.ts",
-        "detectedAt": "2026-08-03T04:48:36.083Z"
-      }
-    ],
     "conflictsSince": {
-      "sha": "903a865ab5fe0223ba473c3ef5560b6a760f26f4",
-      "detectedAt": "2026-08-03T04:48:36.083Z",
+      "sha": "f9d70087d5ea148968ed5c0f5d72d9ca6a72c867",
+      "detectedAt": "2026-08-03T04:55:45.599Z",
       "paths": [
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
         "src/lib/cloister/review-verdict-writer.ts"
       ]
     },
@@ -288,7 +277,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.3676167,
-        "pricingAsOf": "2026-08-03T04:48:56.736Z"
+        "pricingAsOf": "2026-08-03T04:56:41.255Z"
       }
     },
     "merges": [
