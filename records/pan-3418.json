@@ -108,17 +108,17 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:49:06.622Z",
+  "updated": "2026-08-03T02:49:11.729Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "pending",
-    "testStatus": "pending",
+    "reviewStatus": "failed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T02:49:03.583Z",
+    "updatedAt": "2026-08-03T02:49:11.702Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
@@ -240,7 +240,7 @@
       },
       "costAtCloseOut": {
         "usd": 83.2350543,
-        "pricingAsOf": "2026-08-03T02:49:06.616Z"
+        "pricingAsOf": "2026-08-03T02:49:11.714Z"
       }
     },
     "merges": [
