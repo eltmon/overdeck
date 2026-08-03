@@ -931,17 +931,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:00:10.018Z",
+  "updated": "2026-08-03T01:00:35.554Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T01:00:05.166Z",
+    "updatedAt": "2026-08-03T01:00:35.437Z",
     "reviewNotes": "Verification failed at typecheck",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "verificationNotes": "Verification FAILED at typecheck (59032ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m388.10 kB\u001b[22m \u001b[2m│ gzip: 62.66 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 388.10 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3626ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m356.07 kB\u001b[22m \u001b[2m│ gzip: 60.29 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m582.73 kB\u001b[22m \u001b[2m│ gzip: 93.04 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 49.05 kB\u001b[22m \u001b[2m│ gzip:  5.91 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m826.44 kB\u001b[22m \u001b[2m│ gzip: 80.66 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.81 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4024ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (64%)\n  - rolldown-plugin-dts:fake-js (28%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ stale baseline: 54 errors but baselined at 55 — run: bash scripts/lint-dashboard-types.sh --update\n",
@@ -1019,10 +1019,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3127,
-            "output": 620832,
-            "cacheRead": 614536655,
-            "cacheWrite": 25699875
+            "input": 3131,
+            "output": 621319,
+            "cacheRead": 615381081,
+            "cacheWrite": 25702732
           }
         }
       },
@@ -1046,15 +1046,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3241,
-          "output": 648173,
-          "cacheRead": 624635766,
-          "cacheWrite": 25927194
+          "input": 3245,
+          "output": 648660,
+          "cacheRead": 625480192,
+          "cacheWrite": 25930051
         }
       },
       "costAtCloseOut": {
-        "usd": 591.6595838,
-        "pricingAsOf": "2026-08-03T01:00:09.909Z"
+        "usd": 591.8404898,
+        "pricingAsOf": "2026-08-03T01:00:35.535Z"
       }
     },
     "merges": [
