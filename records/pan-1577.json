@@ -961,21 +961,21 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:13:15.787Z",
+  "updated": "2026-08-03T01:19:19.808Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T01:13:15.751Z",
+    "updatedAt": "2026-08-03T01:19:19.668Z",
     "reviewNotes": "Verification failed at typecheck",
     "testNotes": "Automated gates FAILED on current workspace HEAD 8bfbd8bfdc7 (feature/pan-1577 + local sync-main). typecheck: PASS (root tsc, hooks, evals, dashboard-types ratchet 55/55 known, frontend-types ratchet 0 known). lint: PASS (ESLint, skills, slash-commands, prompts, file-size, circular-deps, ratchet-audit, quarantine-audit all clean). build (required gate 'server-bundle'): FAILED -- dashboard server bundle (tsdown/rolldown) parse error: src/dashboard/server/routes/specialists/legacy-routes.ts:259 has a bare `await recordReviewVerdict(...)` inside a non-async Effect.gen generator (should be `yield* Effect.promise(...)`). Root cause: this branch's latest 'Merge remote-tracking branch origin/main' commit pulled in PAN-3512 commit fd48e3af398 at a moment when origin/main's dashboard build was transiently broken; that break was already fixed upstream by origin/main commit 6ca777307aa ('fix(dashboard): unwrap bare await in legacy-routes Effect.gen') but this workspace has not re-synced. Confirmed: `git diff origin/main -- <file>` shows this exact divergence; `git log acc4e819be7..origin/main -- <file>` shows the upstream fix commit. PAN-1577's own changed files (conversations move/CLI/frontend) are unaffected -- typecheck/lint on them is clean and .pan/review/agent-pan-1577-review-8bfbd8bf/synthesis.md is APPROVED with 0 blocking findings across security/correctness/performance/requirements. test: 29/1396 files failed (36/13238 tests): 2 suites fail via the same legacy-routes.ts parse error during vitest transform (specialists-reviewed-at-commit.test.ts, unstick-route.test.ts); 6 failures in tests/cli/commands/specialists/done.test.ts trace to unrelated PAN-3512 review-verdict-writer logic; the remaining ~28 are 'Hook timed out in 5000ms' on setupOverdeckTestDb() under heavy concurrent machine load (24 agents running per session). No failures touch PAN-1577's own files. Also flagging: 3 files carry uncommitted changes unrelated to PAN-1577 (src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts, src/lib/overdeck/conversation-reads.ts), not part of the reviewed/committed HEAD -- out of scope for the test role to commit/revert. Required build gate fails, so overall status is failed regardless of test pass rate.",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
-    "verificationNotes": "Verification FAILED at typecheck (59032ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m388.10 kB\u001b[22m \u001b[2m│ gzip: 62.66 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 388.10 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3626ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m356.07 kB\u001b[22m \u001b[2m│ gzip: 60.29 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m582.73 kB\u001b[22m \u001b[2m│ gzip: 93.04 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 49.05 kB\u001b[22m \u001b[2m│ gzip:  5.91 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m826.44 kB\u001b[22m \u001b[2m│ gzip: 80.66 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.81 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4024ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\n\n> @overdeck/core@0.48.0 typecheck:hooks\n> tsc --noEmit -p tsconfig.hooks.json\n\n\n> @overdeck/core@0.48.0 typecheck:evals\n> tsc --noEmit -p tsconfig.evals.json\n\n\n> @overdeck/core@0.48.0 typecheck:dashboard\n> bash scripts/lint-dashboard-types.sh\n\n\n--- stderr ---\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugin `tsdown:deps`. See https://rolldown.rs/options/checks#plugintimings for more details.\n\n\u001b[33m[PLUGIN_TIMINGS] Warning:\u001b[0m Your build spent significant time in plugins. Here is a breakdown:\n  - rolldown-plugin-dts:generate (64%)\n  - rolldown-plugin-dts:fake-js (28%)\nSee https://rolldown.rs/options/checks#plugintimings for more details.\n\n✖ stale baseline: 54 errors but baselined at 55 — run: bash scripts/lint-dashboard-types.sh --update\n",
+    "verificationNotes": "Verification FAILED at test (832803ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/harness-resolve.test.ts (8 tests | 2 failed) 267ms\n     × is provider-default-only (PAN-1984): ignores explicit and role; provider config then built-in default wins 222ms (retry x1)\n     × passes the resolved provider-default winner through the harness policy gate 10ms (retry x1)\n ❯ |root| tests/unit/lib/review-status.test.ts (12 tests | 1 failed) 185ms\n     × rejects a review verdict whose evidence HEAD differs from the verified target HEAD 108ms (retry x1)\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedback delivery\n[specialists/done] review signaling failed for PAN-RAC-HTTP\n\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedback delivery\n[specialists/done] review signaling failed for PAN-RAC-HTTP\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts (12 tests | 1 failed) 4111ms\n     × writes the HTTP blocked anchor only after feedback delivery 110ms (retry x1)\n ❯ |root| tests/cli/commands/specialists/done.test.ts (12 tests | 6 failed) 51ms\n     × allows review to signal blocked status 24ms (retry x1)\n     × anchors a blocked verdict after feedback delivery 3ms (retry x1)\n     × preserves a blocked verdict when the post-feedback HEAD snapshot fails 4ms (retry x1)\n     × delivers synthesis feedback when review signals failed status 2ms (retry x1)\n     × does not deliver feedback when review passes 4ms (retry x1)\n     × PAN-2524: persists the verdict before a hanging feedback delivery times out 4ms (retry x1)\n\n Test Files  174 passed (174)\n      Te\n…(4974 chars elided)…\nut | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId on a failed verdict too\n[specialists/done] inspect signaling failed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId on a failed verdict too\n[specialists/done] inspect signaling failed for PAN-2724\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (4 tests | 2 failed) 75ms\n     × checkpoints the exact structured itemId regardless of notes wording 31ms (retry x1)\n     × checkpoint\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "77cd6a72099c608f296e2201441011d42ce1cbf1",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
@@ -1043,18 +1043,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 114,
-            "output": 27341,
-            "cacheRead": 10099111,
-            "cacheWrite": 227319
+            "input": 148,
+            "output": 31519,
+            "cacheRead": 12427809,
+            "cacheWrite": 404159
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3135,
-            "output": 621875,
-            "cacheRead": 616231413,
-            "cacheWrite": 25703968
+            "input": 3149,
+            "output": 624544,
+            "cacheRead": 619226598,
+            "cacheWrite": 25710239
           }
         }
       },
@@ -1078,15 +1078,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3249,
-          "output": 649216,
-          "cacheRead": 626330524,
-          "cacheWrite": 25931287
+          "input": 3297,
+          "output": 656063,
+          "cacheRead": 631654407,
+          "cacheWrite": 26114398
         }
       },
       "costAtCloseOut": {
-        "usd": 625.6784371,
-        "pricingAsOf": "2026-08-03T01:13:15.770Z"
+        "usd": 627.2695591,
+        "pricingAsOf": "2026-08-03T01:19:19.745Z"
       }
     },
     "merges": [
