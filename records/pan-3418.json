@@ -159,17 +159,17 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T04:39:03.823Z",
+  "updated": "2026-08-03T04:39:04.827Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "passed",
-    "testStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:23:57.371Z",
+    "updatedAt": "2026-08-03T04:39:04.825Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -185,7 +185,48 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewSpawnedAt": "2026-08-03T03:28:20.204Z"
+    "reviewSpawnedAt": "2026-08-03T03:28:20.204Z",
+    "reviewRequestedAt": "2026-08-03T04:39:04.825Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/review-verdict-writer.ts",
+        "tests/cli/commands/specialists/done.test.ts"
+      ],
+      "declaredScopeUntouched": [],
+      "declaredScope": [
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "actualChangedFiles": [
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/frontend/src/components/CommandDeck/ConversationRow.tsx",
+        "src/dashboard/frontend/src/components/CommandDeck/__tests__/ConversationRow.test.tsx",
+        "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
+        "src/dashboard/frontend/src/components/chat/ModelPicker.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx",
+        "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/review-verdict-writer.ts",
+        "src/lib/overdeck/conversation-runtime.ts",
+        "src/lib/overdeck/conversations.ts",
+        "tests/cli/commands/specialists/done.test.ts",
+        "tests/unit/lib/overdeck/conversation-runtime-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-empty-model.test.ts",
+        "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
+      ],
+      "recordedAt": "2026-08-03T04:39:03.821Z"
+    }
   },
   "closeOut": {
     "usage": {
