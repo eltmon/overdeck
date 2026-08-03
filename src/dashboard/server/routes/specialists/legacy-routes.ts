@@ -256,12 +256,12 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     // For review verdicts, route through recordReviewVerdict (PAN-3512)
     let updatedStatus: ReviewStatus;
     if (specialist === 'review' && (status === 'passed' || status === 'blocked' || status === 'failed')) {
-      const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
+      const verdictOutcome = yield* Effect.promise(() => recordReviewVerdict(normalizedIssueId, {
         verdict: status === 'passed' ? 'passed' : status === 'failed' ? 'failed' : 'blocked',
         notes,
         evidenceHead: update.reviewedAtCommit,
         writer: 'coordinator',
-      });
+      }));
       if (!verdictOutcome.landed) {
         // Verdict was rejected (stale evidence) — return error
         return jsonResponse(
