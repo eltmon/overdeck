@@ -66,24 +66,17 @@
     "recordedAt": "2026-08-01T16:33:34.861Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:23:37.716Z",
+  "updated": "2026-08-03T02:27:32.649Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-01T16:35:49.792Z",
-    "updatedAt": "2026-08-03T02:23:37.673Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since e1d8ee7 (1 path): src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx",
-        "detectedAt": "2026-08-03T02:23:27.712Z"
-      }
-    ],
+    "updatedAt": "2026-08-03T02:27:30.976Z",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
       "detectedAt": "2026-08-03T02:23:27.712Z",
@@ -91,9 +84,7 @@
         "src/dashboard/frontend/src/components/chat/__tests__/ModelPicker.test.tsx"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
-    "reviewSpawnedAt": "2026-08-01T16:45:58.719Z"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3428"
   },
   "closeOut": {
     "usage": {
@@ -157,7 +148,7 @@
       },
       "costAtCloseOut": {
         "usd": 53.213838,
-        "pricingAsOf": "2026-08-03T02:23:37.692Z"
+        "pricingAsOf": "2026-08-03T02:27:30.989Z"
       }
     },
     "merges": [
