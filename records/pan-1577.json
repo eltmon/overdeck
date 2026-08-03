@@ -886,41 +886,25 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T00:08:14.255Z",
+  "updated": "2026-08-03T00:08:16.542Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
+    "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
-    "updatedAt": "2026-08-03T00:08:14.164Z",
-    "reviewNotes": "All four reviewers passed; no blocking findings survive PR-scope and cycle-12 convergence gates",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-03T00:08:14.174Z",
+    "reviewNotes": "Verification failed at test",
+    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewSpawnedAt": "2026-08-02T23:50:00.656Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6"
-      }
-    }
+    "reviewRequestedAt": "2026-08-02T23:10:22.124Z",
+    "reviewSpawnedAt": "2026-08-02T23:50:00.656Z"
   },
   "closeOut": {
     "usage": {
@@ -1018,7 +1002,7 @@
       },
       "costAtCloseOut": {
         "usd": 546.8958743,
-        "pricingAsOf": "2026-08-03T00:08:14.237Z"
+        "pricingAsOf": "2026-08-03T00:08:16.536Z"
       }
     },
     "merges": [
