@@ -108,19 +108,19 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:48:58.252Z",
+  "updated": "2026-08-03T02:49:00.396Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T02:48:57.014Z",
-    "reviewNotes": "[correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`",
-    "verificationNotes": "Verification FAILED at lint (28093ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/src/cli/commands/specialists/done.ts\n  261:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n  262:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/src/lib/cloister/review-verdict-writer.ts\n  114:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n✖ 3 problems (3 errors, 0 warnings)\n\n",
+    "updatedAt": "2026-08-03T02:48:57.280Z",
+    "reviewNotes": "All four convoy reviewers passed; the prior live-conversation model re-seed blocker is fixed.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
       "detectedAt": "2026-08-03T02:23:27.712Z",
@@ -130,7 +130,6 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
     "reviewedAtCommit": "d6db3c77b436875078d9ab3c63d01b981fa1fd1b",
-    "reviewRequestedAt": "2026-08-03T02:42:21.556Z",
     "reviewSpawnedAt": "2026-08-03T02:44:40.086Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -163,6 +162,24 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-03T02:40:57.628Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "a5380d564a8f2525b09752cf7b8e37d97b30f4ce"
+      }
     }
   },
   "closeOut": {
@@ -241,7 +258,7 @@
       },
       "costAtCloseOut": {
         "usd": 82.9301503,
-        "pricingAsOf": "2026-08-03T02:48:57.086Z"
+        "pricingAsOf": "2026-08-03T02:49:00.387Z"
       }
     },
     "merges": [
@@ -250,7 +267,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "workModel": "gpt-5.6-sol",
   "tasks": {
