@@ -226,18 +226,18 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T06:04:39.508Z",
+  "updated": "2026-08-03T06:04:53.984Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T06:04:36.748Z",
+    "updatedAt": "2026-08-03T06:04:53.947Z",
     "testNotes": "Verified HEAD 72af5dc4c8d93b20cc8e008e278f74d3969cfe97 (clean worktree; merge of origin/main ad37a7f10f1 into feature/pan-3418) in the assigned workspace. `npm run typecheck` PASSES (tsc --noEmit clean; dashboard-types guard 55 known/0 new; frontend-types guard 0 known/0 new). `npm run lint` PASSES (all 19 sub-checks, exit 0, including file-size, circular-deps, ratchet-audit, quarantine-audit). Targeted PAN-3418 tests: 7/7 backend (conversation-runtime-empty-model, conversations-empty-model, conversations-model-backfill) and 24/24 frontend (ConversationRow, ModelPicker, ComposerFooter.model-picker, including a real-component DOM integration test proving the prior review-blocking live-conversation-model bug stays fixed) all pass, covering all 5 in-scope xBRIEF items (server-coerce-empty-fields, db-writes-null-for-empty, widen-backfill-predicate, harness-chip-independent-of-model, picker-reseeds-after-model-list-load). `--changed main` suite: frontend 628/628 pass. Root `--changed main` run twice; failures were non-deterministic across runs (29 files/30 tests first run, 9 files/10 tests second run, only 3 files common to both), consistent with CPU-contention flakiness on this heavily-loaded host (25 running agents). Precisely enumerated this branch's true diff vs origin/main via `git log origin/main..HEAD` (excludes stale local main ref, which lagged origin by many commits): only 13 files are branch-unique, the 5 declared xBRIEF-scope files plus 4 out-of-scope files from an earlier out-of-scope commit d07baf7cbd2 (src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts, and their two test files — typing cleanup, unrelated to conversation models). None of the ~35 unique failing test files across both full runs appear in that 13-file list. Spot-checked 8 hook-timeout failures in isolation (search-scopes, workspace-capture, conversation-workspace-linkage, target-search, review-status-sync, workspace-lifecycle-rows, jsonl, show) — all pass standalone, confirming environmental flakiness. The 2 consistently-reproducing failures (spawn-flywheel-provenance.test.ts, specialists-reviewed-at-commit.test.ts) were confirmed to fail identically on a clean origin/main (ad37a7f10f1) throwaway worktree — pre-existing red-main defects (verdict-write-door / spawn-guard areas), not caused by this branch. review-verdict-writer.test.ts and done.test.ts (the out-of-scope commit's own tests) pass (21/21). verify-live-data-repair (FR-6) is explicitly out of scope for pre-merge testing per its own xBRIEF narrative (readiness: sequential, deferred to post-deploy close-out).",
     "blockerReasons": [
       {
@@ -254,17 +254,17 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 1262,
-            "output": 600,
+            "input": 2228,
+            "output": 800,
             "cacheRead": 963,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10384385,
-            "output": 132634,
-            "cacheRead": 31084032,
+            "input": 10386597,
+            "output": 132910,
+            "cacheRead": 31320576,
             "cacheWrite": 0
           }
         },
@@ -319,15 +319,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 1262,
-          "output": 600,
+          "input": 2228,
+          "output": 800,
           "cacheRead": 963,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16228755,
-          "output": 382623,
-          "cacheRead": 158078464,
+          "input": 16230967,
+          "output": 382899,
+          "cacheRead": 158315008,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -338,8 +338,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 178.3282483,
-        "pricingAsOf": "2026-08-03T06:04:39.491Z"
+        "usd": 178.4678263,
+        "pricingAsOf": "2026-08-03T06:04:53.961Z"
       }
     },
     "merges": [
