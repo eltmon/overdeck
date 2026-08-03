@@ -1071,7 +1071,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:34:45.689Z",
+  "updated": "2026-08-03T02:36:11.512Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1082,19 +1082,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:26:44.919Z",
-    "updatedAt": "2026-08-03T02:31:43.509Z",
-    "testNotes": "At HEAD 579e3701 (matches review's reviewedAtCommit). typecheck: PASS (root tsc, hooks, evals, dashboard-types ratchet 54/54 known, frontend-types 0/0 known). lint: PASS (ESLint + all 19 sub-lints: skills, slash-commands, prompts, file-size, circular-deps 77 baselined, ratchet-audit, quarantine-audit, etc). test (npm test / vitest): FAILS on ONE deterministic, pre-existing regression: tests/unit/lib/head-anchor-write-sites.test.ts > 'locks every documented write occurrence and source expression' -- AssertionError: expected [] but got 2 unlocked reviewedAtCommit write sites (src/dashboard/server/routes/specialists/legacy-routes.ts, src/lib/cloister/review-verdict-writer.ts). Root-caused: both files are BYTE-IDENTICAL between this branch and the main merge-base (42e0e3f7fc3); PAN-1577's only diff to review-verdict-writer.ts is unrelated `: any` type cleanup nowhere near the flagged write site. This exact failure also fails deterministically on main's own CI (run 30775727625, commit 42e0e3f7fc3) and on this PR's CI (run 30777201070, commit 579e3701, identical stack trace) -- introduced by PAN-3512's verdict-door work landing on main, not by this branch. Cannot be fixed within PAN-1577's diff (no-edit boundary + files are main-owned). Separately, a full local `npm test` run under this machine's severe ambient load (uptime load avg ~20 on 24 cores from ~20 concurrently-running unrelated agents; CPU PSI some avg10=27%; swap 97% full) produced ~38 files / 43 tests failing, ALL with 'Hook timed out in 5000ms' on the shared setupOverdeckTestDb() beforeEach -- zero overlap with any file touched by this PR's diff. Verified as load noise, not a regression: (1) the same 5 representative failing files pass 43/43 clean when rerun in isolation; (2) even the 38-file failing set drops to 11 failures when rerun with reduced worker concurrency (--maxWorkers=2), and those 2 residual failures are pure timing (observability.test.ts, timestamp-units.test.ts) that also intermittently pass; (3) GitHub CI (clean runner, no ambient contention) shows only the ONE head-anchor-write-sites failure -- 1380 files / 13128 tests passed cleanly there. Bottom line: automated gates fail solely due to a pre-existing main-inherited defect unrelated to and unfixable within this branch's diff; no evidence of a regression caused by PAN-1577's own changes.",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-03T02:24:15.726Z"
-      }
-    ],
+    "updatedAt": "2026-08-03T02:36:10.981Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "06f33f0837ec0d7ed1f6a496d4184d5543f9b236",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T02:26:44.919Z",
     "reviewSpawnedAt": "2026-08-03T02:22:09.520Z"
   },
   "closeOut": {
@@ -1158,18 +1149,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 418,
-            "output": 83115,
-            "cacheRead": 42329409,
-            "cacheWrite": 753885
+            "input": 434,
+            "output": 86972,
+            "cacheRead": 43429076,
+            "cacheWrite": 801192
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3399,
-            "output": 685500,
-            "cacheRead": 682050295,
-            "cacheWrite": 26858584
+            "input": 3411,
+            "output": 687754,
+            "cacheRead": 684957541,
+            "cacheWrite": 27397357
           }
         }
       },
@@ -1193,15 +1184,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3817,
-          "output": 768615,
-          "cacheRead": 724379704,
-          "cacheWrite": 27612469
+          "input": 3845,
+          "output": 774726,
+          "cacheRead": 728386617,
+          "cacheWrite": 28198549
         }
       },
       "costAtCloseOut": {
-        "usd": 709.7893877,
-        "pricingAsOf": "2026-08-03T02:31:43.518Z"
+        "usd": 712.1171367,
+        "pricingAsOf": "2026-08-03T02:36:11.139Z"
       }
     },
     "merges": [
@@ -1401,5 +1392,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
