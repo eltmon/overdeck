@@ -142,11 +142,15 @@ describe('xBRIEF state migration', () => {
     expect(log.mock.calls.flat().join('\n')).toContain('.vbrief.json ->');
   });
 
-  it('keeps both state migration subcommands registered', () => {
+  it('keeps all state migration subcommands registered', () => {
     const program = new Command();
     registerStateMigrationCommand(program);
 
     const state = program.commands.find((command) => command.name() === 'state');
-    expect(state?.commands.map((command) => command.name())).toEqual(['migrate', 'migrate-xbrief']);
+    expect(state?.commands.map((command) => command.name())).toEqual([
+      'migrate',
+      'migrate-xbrief',
+      'backfill-agents',
+    ]);
   });
 });

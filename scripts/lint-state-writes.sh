@@ -9,6 +9,7 @@
 #   - src/lib/pan-dir/records.ts       — record builder / backfill
 #   - src/lib/pan-dir/specs.ts         — immutable plan single-writer (PAN-1124)
 #   - src/lib/pan-dir/auto-commit.ts   — commit fan-in helper
+#   - src/lib/pan-dir/agents.ts        — durable per-agent runtime metadata
 #   - src/lib/pan-dir/fs-lock.ts       — record lock ownership metadata
 #   - src/lib/pan-dir/drafts.ts        — PRD drafts (human/agent narrative)
 #   - src/lib/pan-dir/context.ts       — context-layer config
@@ -37,6 +38,7 @@ PAN_DIR_APPROVED=(
   ':!src/lib/pan-dir/records.ts'
   ':!src/lib/pan-dir/specs.ts'
   ':!src/lib/pan-dir/auto-commit.ts'
+  ':!src/lib/pan-dir/agents.ts'
   ':!src/lib/pan-dir/fs-lock.ts'
   ':!src/lib/pan-dir/drafts.ts'
   ':!src/lib/pan-dir/context.ts'

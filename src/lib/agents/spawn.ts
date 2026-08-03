@@ -15,6 +15,7 @@ import { generateFixedPointPromptSync, checkHookSync, initHookSync } from '../ho
 import { generateLauncherScriptSync } from '../launcher-generator.js';
 import { getProviderForModelSync, setupCredentialFileAuthSync, clearCredentialFileAuthSync } from '../providers.js';
 import { resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import { recordAgentPlaneSpawn } from '../pan-dir/agents.js';
 import { shouldPreservePipelineVerdicts } from '../cloister/verdict-preservation.js';
 import { resolveHarness } from '../harness-resolve.js';
 import { prepareHarnessLaunch } from '../harness-binary.js';
@@ -89,7 +90,6 @@ import {
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
 const execAsync = promisify(exec);
-
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
 
@@ -371,7 +371,7 @@ async function spawnRunWithoutConsentClaim(
       sessionId = rawSessionId;
     }
   }
-
+  await recordAgentPlaneSpawn(state, rawSessionId);
   // PAN-1557: interactive convoy wiring is already present in the initial
   // AgentState saved before launch, so the Stop-hook can always deliver
   // REVIEWER_READY even if a later running-state cache write is contended.
@@ -628,7 +628,7 @@ async function spawnAgentWithoutConsentClaim(
   const supervisorLaunch = await prepareSupervisorForFreshLaunch(agentId, options, state);
 
   saveAgentStateSync(state);
-
+  await recordAgentPlaneSpawn(state);
   // Transition issue tracker to "in progress" immediately so Linear reflects reality
   // while workspace setup continues. Best-effort, don't block agent spawn.
   // Only for work agents, not planning/specialist agents.
