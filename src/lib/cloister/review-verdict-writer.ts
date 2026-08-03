@@ -30,7 +30,7 @@ export type ReviewVerdict = 'passed' | 'blocked' | 'failed';
 export interface VerdictInput {
   verdict: ReviewVerdict;
   notes?: string;
-  reviewerVerdicts?: ReviewStatus['reviewerVerdicts'];
+  reviewerVerdicts?: Array<{ reviewer: string; verdict: ReviewVerdict; atCommit?: HeadAnchor }>;
   evidenceHead?: HeadAnchor;
   extra?: Record<string, unknown>;
   runId?: string;
@@ -39,16 +39,24 @@ export interface VerdictInput {
 
 export type VerdictOutcome = { landed: true; classification: 'no-evidence' | 'anchor-match' | 'dispatched' } | { landed: false; reason: string };
 
+// ─── Private: Helpers ─────────────────────────────────────────────────────────
+
+function convertReviewerVerdicts(
+  array?: Array<{ reviewer: string; verdict: ReviewVerdict; atCommit?: string }>,
+): Partial<Record<string, { status: 'passed' | 'blocked'; atCommit?: string }>> | undefined {
+  if (!array) return undefined;
+  const result: Record<string, { status: 'passed' | 'blocked'; atCommit?: string }> = {};
+  for (const item of array) {
+    if (item.verdict === 'passed' || item.verdict === 'blocked') {
+      result[item.reviewer] = { status: item.verdict, ...(item.atCommit ? { atCommit: item.atCommit } : {}) };
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 // ─── Private: Head Classification ─────────────────────────────────────────────
 
 type EvidenceClassification = 'no-evidence' | 'anchor-match' | 'stale' | 'fresh' | 'indeterminate';
-
-function isNonAncestorExit(error: unknown): boolean {
-  return typeof error === 'object'
-    && error !== null
-    && 'code' in error
-    && error.code === 1;
-}
 
 async function classifyEvidenceAgainstAnchor(
   issueId: string,
@@ -56,15 +64,16 @@ async function classifyEvidenceAgainstAnchor(
   evidenceHead: HeadAnchor | string,
   rowHead: HeadAnchor | string,
 ): Promise<EvidenceClassification> {
+  // Parse both anchors to get per-repo SHAs
   const evidenceMap = parseCompositeSnapshot(evidenceHead);
   const rowMap = parseCompositeSnapshot(rowHead);
-  const evidenceIsComposite = evidenceMap.size > 0;
-  const rowIsComposite = rowMap.size > 0;
 
-  if (evidenceIsComposite !== rowIsComposite) {
+  // If shapes differ (bare vs composite), classify as indeterminate
+  if ((evidenceMap.size === 0) !== (rowMap.size === 0) || (evidenceMap.size === 0 && rowMap.size === 0 && evidenceHead !== rowHead)) {
     return 'indeterminate';
   }
 
+  // Resolve workspace repo roots
   let repoRoots: Array<{ repoKey: string; dir: string }>;
   try {
     repoRoots = resolveWorkspaceRepoRootsSync(issueId, workspacePath);
@@ -72,45 +81,43 @@ async function classifyEvidenceAgainstAnchor(
     return 'indeterminate';
   }
 
-  let comparisons: Array<{ dir: string; evidenceSha: string; rowSha: string }>;
-  if (!evidenceIsComposite) {
-    if (repoRoots.length !== 1) {
-      return 'indeterminate';
-    }
-    comparisons = [{
-      dir: repoRoots[0]!.dir,
-      evidenceSha: evidenceHead,
-      rowSha: rowHead,
-    }];
-  } else {
-    const rootMap = new Map(repoRoots.map(root => [root.repoKey, root.dir]));
-    if (evidenceMap.size !== rowMap.size || ![...evidenceMap.keys()].every(key => rowMap.has(key))) {
-      return 'indeterminate';
-    }
+  // Build a map of repoKey -> root for quick lookup
+  const rootMap = new Map(repoRoots.map(r => [r.repoKey, r.dir]));
 
-    comparisons = [];
-    for (const [repoKey, evidenceSha] of evidenceMap) {
-      const rowSha = rowMap.get(repoKey);
-      const dir = rootMap.get(repoKey);
-      if (!rowSha || !dir) {
-        return 'indeterminate';
-      }
-      comparisons.push({ dir, evidenceSha, rowSha });
-    }
+  // If repo key set differs, classify as indeterminate
+  if (evidenceMap.size !== rowMap.size || ![...evidenceMap.keys()].every(k => rowMap.has(k))) {
+    return 'indeterminate';
   }
 
+  // For each repo, run `git merge-base --is-ancestor evidenceSha rowSha`
   let allStale = true;
-  for (const comparison of comparisons) {
+  for (const [repoKey, evidenceSha] of evidenceMap) {
+    const rowSha = rowMap.get(repoKey);
+    if (!rowSha) {
+      return 'indeterminate';
+    }
+
+    const root = rootMap.get(repoKey);
+    if (!root) {
+      return 'indeterminate';
+    }
+
     try {
-      await execFileAsync(
-        'git',
-        ['merge-base', '--is-ancestor', comparison.evidenceSha, comparison.rowSha],
-        { cwd: comparison.dir, timeout: 10_000 },
-      );
-    } catch (error: unknown) {
-      if (isNonAncestorExit(error)) {
+      await execFileAsync('git', ['merge-base', '--is-ancestor', evidenceSha, rowSha], {
+        cwd: root,
+        timeout: 10_000,
+      });
+      // If git merge-base succeeds (exit 0), evidenceSha is an ancestor of rowSha
+      // evidenceSha is an ancestor — this repo is old
+      // but we need ALL repos to be stale to classify as 'stale'
+      continue;
+    } catch (err: unknown) {
+      // Check if this is a non-zero exit (not an ancestor)
+      if ((err as { code?: number }).code === 1) {
+        // evidenceSha is NOT an ancestor — this repo is fresh
         allStale = false;
       } else {
+        // Non-clean exec failure (timeout, unreadable repo, etc.)
         return 'indeterminate';
       }
     }
@@ -130,13 +137,8 @@ async function classifyEvidenceAgainstAnchor(
 export async function recordReviewVerdict(issueId: string, input: VerdictInput): Promise<VerdictOutcome> {
   const status = getReviewStatusSync(issueId);
   if (!status) {
-    setReviewStatusSync(issueId, {
-      reviewStatus: input.verdict,
-      reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
-      ...(input.extra ? { ...input.extra } : {}),
-    });
-    return { landed: true, classification: 'no-evidence' };
+    // Issue not found; return a rejection to be safe
+    return { landed: false, reason: 'issue-not-found' };
   }
 
   // Resolve workspace path
@@ -150,7 +152,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
+      ...(input.reviewerVerdicts ? { reviewerVerdicts: convertReviewerVerdicts(input.reviewerVerdicts) } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
@@ -162,7 +164,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
+      ...(input.reviewerVerdicts ? { reviewerVerdicts: convertReviewerVerdicts(input.reviewerVerdicts) } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
@@ -216,7 +218,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     reviewStatus: input.verdict,
     reviewNotes: input.notes,
     ...(input.evidenceHead ? { reviewedAtCommit: input.evidenceHead as HeadAnchor } : {}),
-    ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
+    ...(input.reviewerVerdicts ? { reviewerVerdicts: convertReviewerVerdicts(input.reviewerVerdicts) } : {}),
     ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
     ...(input.extra ? { ...input.extra } : {}),
   };

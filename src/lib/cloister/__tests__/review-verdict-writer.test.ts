@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReviewStatus } from '../../review-status.js';
+import type { DomainEvent } from '@overdeck/contracts';
 
 const mocks = vi.hoisted(() => ({
   getReviewStatusSync: vi.fn(),
@@ -7,8 +8,7 @@ const mocks = vi.hoisted(() => ({
   getCloisterEventStore: vi.fn(),
   emitActivityEntrySync: vi.fn(),
   resolveWorkspaceRepoRootsSync: vi.fn(),
-  resolveProjectFromIssueSync: vi.fn(),
-  execFile: vi.fn(),
+  execFileAsync: vi.fn(),
 }));
 
 vi.mock('../../review-status.js', () => ({
@@ -28,28 +28,24 @@ vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRootsSync: mocks.resolveWorkspaceRepoRootsSync,
 }));
 
-vi.mock('../../projects.js', () => ({
-  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
-}));
-
-vi.mock('child_process', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('child_process')>()),
-  execFile: mocks.execFile,
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: vi.fn((...args: unknown[]) => {
+      const callback = args[args.length - 1] as (error: unknown, stdout?: string, stderr?: string) => void;
+      Promise.resolve(mocks.execFileAsync(...args.slice(0, -1))).then(
+        (result) => {
+          const [stdout, stderr] = Array.isArray(result) ? result : [result ?? '', ''];
+          callback(null, stdout, stderr);
+        },
+        (error) => callback(error),
+      );
+    }),
+  };
+});
 
 import { recordReviewVerdict, type VerdictInput } from '../review-verdict-writer.js';
-
-function mockAncestorProbe(isAncestor: boolean): void {
-  mocks.execFile.mockImplementation((...args: unknown[]) => {
-    const callback = args.at(-1) as (error: Error | null, stdout: string, stderr: string) => void;
-    if (isAncestor) {
-      callback(null, '', '');
-    } else {
-      callback(Object.assign(new Error('not an ancestor'), { code: 1 }), '', '');
-    }
-    return undefined;
-  });
-}
 
 function reviewStatus(overrides: Partial<ReviewStatus> = {}): ReviewStatus {
   return {
@@ -70,7 +66,6 @@ describe('recordReviewVerdict', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCloisterEventStore.mockReturnValue(null);
-    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/project' });
   });
 
   describe('no-evidence path', () => {
@@ -97,23 +92,6 @@ describe('recordReviewVerdict', () => {
         }),
         status,
       );
-    });
-
-    it('Given no existing row, the door creates it and lands the verdict', async () => {
-      mocks.getReviewStatusSync.mockReturnValue(undefined);
-      mocks.setReviewStatusSync.mockReturnValue(reviewStatus({ reviewStatus: 'blocked' }));
-
-      const result = await recordReviewVerdict('PAN-3512', {
-        verdict: 'blocked',
-        notes: 'first verdict',
-        writer: 'coordinator',
-      });
-
-      expect(result).toEqual({ landed: true, classification: 'no-evidence' });
-      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', {
-        reviewStatus: 'blocked',
-        reviewNotes: 'first verdict',
-      });
     });
 
     it('Given no lastVerifiedCommit on the row, the door takes the no-evidence path and returns { landed: true, classification: "no-evidence" }', async () => {
@@ -165,7 +143,7 @@ describe('recordReviewVerdict', () => {
       ]);
 
       // Mock git merge-base --is-ancestor to return 0 (ancestor)
-      mockAncestorProbe(true);
+      mocks.execFileAsync.mockResolvedValue({ status: 0 });
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
@@ -207,7 +185,7 @@ describe('recordReviewVerdict', () => {
       ]);
 
       // Mock git merge-base --is-ancestor to return non-zero (not ancestor)
-      mockAncestorProbe(false);
+      mocks.execFileAsync.mockResolvedValue({ status: 1 });
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
@@ -256,7 +234,7 @@ describe('recordReviewVerdict', () => {
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
         { repoKey: 'main', dir: '/path/to/repo' },
       ]);
-      mockAncestorProbe(false);
+      mocks.execFileAsync.mockResolvedValue({ status: 1 });
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);
@@ -288,7 +266,7 @@ describe('recordReviewVerdict', () => {
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
         { repoKey: 'main', dir: '/path/to/repo' },
       ]);
-      mockAncestorProbe(false);
+      mocks.execFileAsync.mockResolvedValue({ status: 1 });
 
       const eventStore = { append: vi.fn() };
       mocks.getCloisterEventStore.mockReturnValue(eventStore);

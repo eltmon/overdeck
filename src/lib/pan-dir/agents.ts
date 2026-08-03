@@ -11,9 +11,29 @@ import {
 } from 'node:fs';
 import { hostname } from 'node:os';
 import { dirname, join } from 'node:path';
-import type { Role } from '@overdeck/contracts';
 import { Effect } from 'effect';
 
+import type { Role } from '../agents/role.js';
+
+/**
+ * Structural view of the agent runtime state this door needs. Declared here
+ * (not imported from agents/agent-state.ts) so this module stays a leaf in the
+ * module graph — agent-state.ts calls back into this door, and an import edge
+ * in both directions is a lint:circular violation. Structural typing accepts
+ * AgentState at call sites with no casts; if the canonical Role union grows,
+ * assignability fails loudly here.
+ */
+export interface AgentPlaneAgentState {
+  id: string;
+  issueId: string;
+  role: Role;
+  workspace: string;
+  harness?: RuntimeName;
+  model?: string;
+  branch?: string;
+  startedAt?: string;
+  sessionId?: string;
+}
 import { getOverdeckHome } from '../paths.js';
 import {
   getProjectSync,
@@ -89,7 +109,6 @@ export interface AgentPlaneSeed {
   model?: string;
   branch?: string;
   startedAt?: string;
-  sessionId?: string;
 }
 
 export class AgentPlaneOwnershipError extends Error {
@@ -302,7 +321,7 @@ function appendSession(
 }
 
 export function recordAgentPlaneSpawn(
-  state: AgentPlaneSeed,
+  state: AgentPlaneAgentState,
   sessionId = state.sessionId,
 ): Promise<boolean> {
   const at = state.startedAt || new Date().toISOString();
@@ -325,7 +344,7 @@ export function recordAgentPlaneSpawn(
 }
 
 export function appendAgentPlaneSession(
-  state: AgentPlaneSeed,
+  state: AgentPlaneAgentState,
   entry: AgentPlaneSessionEntry,
 ): Promise<boolean> {
   const normalizedId = entry.id.trim();
@@ -340,7 +359,7 @@ export function appendAgentPlaneSession(
 }
 
 export function appendAgentPlaneLifecycle(
-  state: AgentPlaneSeed,
+  state: AgentPlaneAgentState,
   entry: AgentPlaneLifecycleEntry,
 ): Promise<boolean> {
   return updateAgentPlaneRecord(state, `${entry.event} lifecycle append`, (current) => ({

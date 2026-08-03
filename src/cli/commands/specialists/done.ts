@@ -255,15 +255,17 @@ export async function doneCommand(
     const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
       verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
       notes: options.notes,
-      reviewerVerdicts: update.reviewerVerdicts,
+      reviewerVerdicts: update.reviewerVerdicts
+        ? Object.entries(update.reviewerVerdicts).map(([subRole, v]) => ({
+            reviewer: subRole,
+            verdict: (v?.status || 'passed') as 'passed' | 'blocked',
+            atCommit: v?.atCommit ? rehydrateHeadAnchor(v.atCommit) : undefined,
+          }))
+        : undefined,
       evidenceHead,
       extra: {
-        ...(update.verificationStatus !== undefined
-          ? { verificationStatus: update.verificationStatus }
-          : {}),
-        ...(update.verificationNotes !== undefined
-          ? { verificationNotes: update.verificationNotes }
-          : {}),
+        verificationStatus: update.verificationStatus,
+        verificationNotes: update.verificationNotes,
       },
       runId: options.runId,
       writer: 'quick-signal',
