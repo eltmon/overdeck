@@ -11,7 +11,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T04:33:38.574Z",
+  "updated": "2026-08-03T04:42:25.503Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -63,18 +63,29 @@
     }
   ],
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "restore-helper": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3511",
         "agentId": "agent-pan-3511",
         "pid": 1157534,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-03T04:33:38.574Z"
+        "claimedAt": "2026-08-03T04:33:38.574Z",
+        "itemId": "restore-helper",
+        "outcome": "released",
+        "reason": "stale claim released (agent-pan-3511 dead)",
+        "releasedAt": "2026-08-03T04:42:25.439Z"
+      }
+    ],
+    "statusReasons": {
+      "restore-helper": {
+        "reason": "stale claim released (agent-pan-3511 dead)",
+        "updatedAt": "2026-08-03T04:42:25.439Z"
       }
     }
   },
   "statusOverrides": {
-    "restore-helper": "running"
+    "restore-helper": "pending"
   }
 }
