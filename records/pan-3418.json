@@ -226,7 +226,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T06:02:01.259Z",
+  "updated": "2026-08-03T06:03:51.980Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "reviewing",
@@ -237,13 +237,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T06:02:00.378Z",
+    "updatedAt": "2026-08-03T06:03:46.843Z",
     "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-03T06:02:00.356Z"
-      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
@@ -266,9 +261,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10339988,
-            "output": 125731,
-            "cacheRead": 28486144,
+            "input": 10368249,
+            "output": 128924,
+            "cacheRead": 30392832,
             "cacheWrite": 0
           }
         },
@@ -314,9 +309,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3386185,
-            "output": 191171,
-            "cacheRead": 119182336,
+            "input": 3388921,
+            "output": 191954,
+            "cacheRead": 119610880,
             "cacheWrite": 0
           }
         }
@@ -329,9 +324,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16181622,
-          "output": 374937,
-          "cacheRead": 155052032,
+          "input": 16212619,
+          "output": 378913,
+          "cacheRead": 157387264,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -342,8 +337,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 176.3487873,
-        "pricingAsOf": "2026-08-03T06:02:00.615Z"
+        "usd": 177.7906683,
+        "pricingAsOf": "2026-08-03T06:03:46.854Z"
       }
     },
     "merges": [
