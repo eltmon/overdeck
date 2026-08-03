@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T05:30:33.189Z",
+  "updated": "2026-08-03T05:39:37.031Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -75,16 +75,8 @@
     }
   ],
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "orphan-restore-adopt": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 3213848,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-03T05:30:33.188Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -129,6 +121,17 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3511 dead)",
         "releasedAt": "2026-08-03T05:19:14.562Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 3213848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-03T05:30:33.188Z",
+        "itemId": "orphan-restore-adopt",
+        "outcome": "completed",
+        "reason": "Retrofitted the inline race-guard block onto attemptArtifactVerdictRestore with a passed-only reader at the call site (behavior-preserving); blocked-by-head-guard now returns instead of resetting to pending. 978 lines before and after (AC4). 4 new cases pin the delegated decision; end-to-end orphan-patrol coverage remains a gap since reconcileReviewStatusOrphan is unexported and untested.",
+        "releasedAt": "2026-08-03T05:39:37.031Z"
       }
     ],
     "statusReasons": {
@@ -141,8 +144,8 @@
         "updatedAt": "2026-08-03T05:07:46.036Z"
       },
       "orphan-restore-adopt": {
-        "reason": "stale claim released (agent-pan-3511 dead)",
-        "updatedAt": "2026-08-03T05:19:14.562Z"
+        "reason": "Retrofitted the inline race-guard block onto attemptArtifactVerdictRestore with a passed-only reader at the call site (behavior-preserving); blocked-by-head-guard now returns instead of resetting to pending. 978 lines before and after (AC4). 4 new cases pin the delegated decision; end-to-end orphan-patrol coverage remains a gap since reconcileReviewStatusOrphan is unexported and untested.",
+        "updatedAt": "2026-08-03T05:39:37.031Z"
       }
     }
   },
@@ -158,6 +161,10 @@
     "journal-artifact-memo.journal-artifact-memo.ac2": "completed",
     "journal-artifact-memo.journal-artifact-memo.ac3": "completed",
     "journal-artifact-memo.journal-artifact-memo.ac4": "completed",
-    "orphan-restore-adopt": "running"
+    "orphan-restore-adopt": "completed",
+    "orphan-restore-adopt.orphan-restore-adopt.ac1": "completed",
+    "orphan-restore-adopt.orphan-restore-adopt.ac2": "completed",
+    "orphan-restore-adopt.orphan-restore-adopt.ac3": "completed",
+    "orphan-restore-adopt.orphan-restore-adopt.ac4": "completed"
   }
 }
