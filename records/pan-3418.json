@@ -201,7 +201,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T05:39:16.510Z",
+  "updated": "2026-08-03T05:52:02.897Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -212,12 +212,17 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-03T05:36:45.068Z",
+    "updatedAt": "2026-08-03T05:51:58.635Z",
     "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Merge conflict with target branch",
+        "detectedAt": "2026-08-03T05:51:58.634Z"
+      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-08-03T05:16:15.876Z"
+        "detectedAt": "2026-08-03T05:51:58.634Z"
       }
     ],
     "conflictsSince": {
@@ -243,9 +248,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 6870857,
-            "output": 92990,
-            "cacheRead": 19636736,
+            "input": 8378273,
+            "output": 105038,
+            "cacheRead": 22554624,
             "cacheWrite": 0
           }
         },
@@ -291,9 +296,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2956708,
-            "output": 169991,
-            "cacheRead": 109020672,
+            "input": 3386185,
+            "output": 191171,
+            "cacheRead": 119182336,
             "cacheWrite": 0
           }
         }
@@ -306,9 +311,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12283014,
-          "output": 321016,
-          "cacheRead": 136040960,
+          "input": 14219907,
+          "output": 354244,
+          "cacheRead": 149120512,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -319,8 +324,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 145.7325813,
-        "pricingAsOf": "2026-08-03T05:36:45.092Z"
+        "usd": 162.9536623,
+        "pricingAsOf": "2026-08-03T05:51:59.417Z"
       }
     },
     "merges": [
