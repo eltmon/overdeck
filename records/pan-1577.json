@@ -1014,18 +1014,18 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:42:18.544Z",
+  "updated": "2026-08-03T01:42:36.481Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "failed",
     "testStatus": "testing",
     "uatStatus": "failed",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T01:37:45.866Z",
-    "updatedAt": "2026-08-03T01:42:13.119Z",
+    "updatedAt": "2026-08-03T01:42:36.449Z",
     "reviewNotes": "Verification failed at test",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "verificationNotes": "Verification FAILED at test (877869ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 2 failed) 28386ms\n     × replays gap-fill events from the events transport 11908ms (retry x1)\n     × fails replay with SnapshotRequired when the requested offset predates retained events 11925ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 2 failed) 28541ms\n     × ignores extra tables and columns and succeeds in query-only mode 11921ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 12120ms (retry x1)\n\n Test Files  174 passed (174)\n      Tests  1954 passed (1954)\n   Start at  21:34:49\n   Duration  48.56s (transform 6.81s, setup 23.65s, import 66.63s, tests 39.25s, environment 40.45s)\n\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 17637ms\n     × resolves Db as a Drizzle-over-node-sqlite service 12188ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-F3AEtT/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0\n…(1464 chars elided)…\nting workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-HYaMVV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] Spawning agent...\n[prep] spawn\n[prep] spawn\n...(truncated)",
@@ -1096,18 +1096,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 218,
-            "output": 42329,
-            "cacheRead": 18672499,
-            "cacheWrite": 591065
+            "input": 222,
+            "output": 42714,
+            "cacheRead": 18975758,
+            "cacheWrite": 592150
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3303,
-            "output": 669855,
-            "cacheRead": 656557398,
-            "cacheWrite": 25807683
+            "input": 3309,
+            "output": 670387,
+            "cacheRead": 657650295,
+            "cacheWrite": 26310365
           }
         }
       },
@@ -1131,15 +1131,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3521,
-          "output": 712184,
-          "cacheRead": 675229897,
-          "cacheWrite": 26398748
+          "input": 3531,
+          "output": 713101,
+          "cacheRead": 676626053,
+          "cacheWrite": 26902515
         }
       },
       "costAtCloseOut": {
-        "usd": 666.3101034,
-        "pricingAsOf": "2026-08-03T01:42:18.521Z"
+        "usd": 667.8579434,
+        "pricingAsOf": "2026-08-03T01:42:36.471Z"
       }
     },
     "merges": [
