@@ -108,18 +108,19 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:45:10.790Z",
+  "updated": "2026-08-03T02:48:57.164Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T02:44:40.087Z",
+    "updatedAt": "2026-08-03T02:48:57.014Z",
     "reviewNotes": "[correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`",
+    "verificationNotes": "Verification FAILED at lint (28093ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/src/cli/commands/specialists/done.ts\n  261:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n  262:29  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n/home/eltmon/Projects/overdeck/workspaces/feature-pan-3418/src/lib/cloister/review-verdict-writer.ts\n  114:19  error  Unexpected any. Specify a different type  @typescript-eslint/no-explicit-any\n\n✖ 3 problems (3 errors, 0 warnings)\n\n",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
       "detectedAt": "2026-08-03T02:23:27.712Z",
@@ -177,9 +178,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 282594,
-            "output": 10843,
-            "cacheRead": 3101696,
+            "input": 3267936,
+            "output": 48030,
+            "cacheRead": 10945024,
             "cacheWrite": 0
           }
         },
@@ -232,15 +233,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4388941,
-          "output": 182443,
-          "cacheRead": 71093760,
+          "input": 7374283,
+          "output": 219630,
+          "cacheRead": 78937088,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 62.9661663,
-        "pricingAsOf": "2026-08-03T02:44:40.125Z"
+        "usd": 82.9301503,
+        "pricingAsOf": "2026-08-03T02:48:57.086Z"
       }
     },
     "merges": [
