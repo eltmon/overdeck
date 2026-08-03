@@ -727,6 +727,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T00:26Z] review-agent → FAILED — seq 3",
       "timestamp": "2026-08-03T00:26:04.998Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T00:33:56.931Z"
     }
   ],
   "feedback": [],
@@ -830,7 +835,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T00:33:23.997Z",
+  "updated": "2026-08-03T00:33:56.962Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "reviewing",
@@ -920,7 +925,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
