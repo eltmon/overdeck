@@ -111,9 +111,9 @@ async function classifyEvidenceAgainstAnchor(
       // evidenceSha is an ancestor — this repo is old
       // but we need ALL repos to be stale to classify as 'stale'
       continue;
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Check if this is a non-zero exit (not an ancestor)
-      if (err.code === 1) {
+      if ((err as { code?: number }).code === 1) {
         // evidenceSha is NOT an ancestor — this repo is fresh
         allStale = false;
       } else {

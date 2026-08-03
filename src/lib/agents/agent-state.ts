@@ -15,8 +15,10 @@ import { appendAgentPlaneLifecycle } from '../pan-dir/agents.js';
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
+import { isRole } from './role.js';
+import type { Role } from './role.js';
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
+export type { Role } from './role.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -241,9 +243,7 @@ export async function wipeAgentStateDirs(
   return { removed: targets, path: dirPath };
 }
 
-export function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer' || value === 'knowledge';
-}
+export { isRole } from './role.js';
 
 function cleanAgentState(raw: AgentState): AgentState {
   return {

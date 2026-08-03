@@ -29,6 +29,7 @@ vi.mock('../../project-repos.js', () => ({
 }));
 
 vi.mock('child_process', () => ({
+  exec: vi.fn(),
   execFileAsync: mocks.execFileAsync,
 }));
 
