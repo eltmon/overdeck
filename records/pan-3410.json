@@ -757,6 +757,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T00:48Z] uat-agent → FAILED — seq 3",
       "timestamp": "2026-08-03T00:48:26.907Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T02:28Z] review-agent → FAILED — seq 8",
+      "timestamp": "2026-08-03T02:28:51.653Z"
     }
   ],
   "feedback": [
@@ -766,6 +771,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-03T00:48:26Z",
       "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-3410`."
+    },
+    {
+      "seq": 8,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T02:28:51Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3410` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3410`."
     }
   ],
   "scopeDrift": {
@@ -868,7 +880,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T01:50:20.326Z",
+  "updated": "2026-08-03T02:28:51.653Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
