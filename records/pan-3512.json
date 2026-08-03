@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:01:37.572Z",
+  "updated": "2026-08-03T00:01:40.759Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "pending",
@@ -35,7 +35,57 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-02T23:03:08.911Z"
+    "updatedAt": "2026-08-03T00:01:40.756Z",
+    "reviewRequestedAt": "2026-08-03T00:01:40.756Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [],
+      "declaredScopeUntouched": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "scripts/file-size-allowlist.txt",
+        "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-status.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/review-verdict-guards.ts"
+      ],
+      "declaredScope": [
+        "docs/REVIEW-AGENT-ARCHITECTURE.md",
+        "packages/contracts/src/events.ts",
+        "scripts/file-size-allowlist.txt",
+        "src/cli/commands/__tests__/specialists-done-verdict-door.test.ts",
+        "src/cli/commands/specialists/done.ts",
+        "src/dashboard/server/routes/specialists/__tests__/legacy-routes-verdict-door.test.ts",
+        "src/dashboard/server/routes/specialists/legacy-routes.ts",
+        "src/lib/__tests__/review-verdict-guards.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-signals-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-status-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/deacon-review-unsignaled-verdict-door.test.ts",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+        "src/lib/cloister/deacon-review-signals.ts",
+        "src/lib/cloister/deacon-review-status.ts",
+        "src/lib/cloister/deacon-review-unsignaled.ts",
+        "src/lib/cloister/deacon.ts",
+        "src/lib/cloister/review-verdict-writer.ts",
+        "src/lib/review-verdict-guards.ts"
+      ],
+      "actualChangedFiles": [
+        "packages/contracts/src/events.ts",
+        "src/lib/__tests__/review-verdict-guards.test.ts",
+        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
+        "src/lib/cloister/__tests__/verdict-write-door-merge-gate.test.ts",
+        "src/lib/cloister/review-verdict-writer.ts"
+      ],
+      "recordedAt": "2026-08-03T00:01:37.570Z"
+    },
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3514"
   },
   "closeOut": {
     "usage": {
