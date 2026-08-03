@@ -72,9 +72,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-03T00:30:16.998Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T00:36Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-03T00:36:09.707Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-03T00:36:09Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3512\n\n# Review Synthesis — PAN-3512 — 2026-08-03T00:40:00Z\n\n## Verdict: CHANGES REQUESTED — stale approvals can still land, the branch does not compile or run its verdict-door tests, and the canonical event contract is incomplete\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/context.json\n- Branch: feature/pan-3512\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512\n- HEAD reviewed: bbd19558daddaf94e79a206507b204b34362136a\n- Cycle number: 2\n- Prior cycle SHA: bfac4ec27f7e15cc5953f79167d5d152cb100dfe\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/correctness.md | 8 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/requirements.md | 3 |\n\n## Blocking Findings\n\n### [security, correctness, requirements] Bare-SHA evidence mismatches always land as indeterminate — `src/lib/cloister/review-verdict-writer.ts:55`\n`parseCompositeSnapshot()` returns an empty map for ordinary bare commit SHAs, and the classifier immediately returns `indeterminate` whenever two bare anchors differ. The landing path accepts indeterminate evidence, so an approval from an older commit can be recorded against a newer tested head and later satisfy the merge gate. Resolve the single repository root for bare/bare anchors, prove ancestry with `git merge-base --is-ancestor`, and add a stale bare-SHA regression case.\n\n### [correctness] The verdict door imports three symbols that its source modules do not export — `src/lib/cloister/review-verdict-writer.ts:13`\n`child_process` does not export `execFileAsync`, `review-status-reconcile.js` does not export `ReviewStatusUpdate`, and `workspace-anchor-drift.js` does not export `HeadAnchor`. The branch fails typecheck, and the invalid runtime ESM import prevents the module from loading. Import `execFile` and promisify it, and import the two types from their canonical exporting modules.\n\n### [correctness, requirements] The door rejects the existing `failed` terminal review verdict — `src/lib/cloister/review-verdict-writer.ts:27`\n`ReviewVerdict` permits only `passed | blocked`, while both migrated production callers pass a terminal status that includes `failed`. The quick-signal caller already fails typecheck at this boundary, and the coordinator contract is equally incompatible. Support the canonical terminal `failed` status in the door while keeping reviewer-level sub-role verdicts limited to passed/blocked.\n\n### [correctness] The ancestry command contract misclassifies both Git exit outcomes — `src/lib/cloister/review-verdict-writer.ts:89`\nA promisified `execFile` success resolves without `result.status`, while `git merge-base --is-ancestor` exit code 1 rejects. The current code treats a proven ancestor as fresh and a proven non-ancestor as indeterminate. Treat a resolved call as ancestor, classify only error code 1 as non-ancestor, and reserve indeterminate for actual execution failures.\n\n### [correctness, requirements] The new verdict events are absent from the canonical `DomainEvent` union — `packages/contracts/src/events.ts:1348`\nThe schemas are declared but this PR removes them from the exported union consumed by `CloisterEventStore.append`. The branch fails typecheck and canonical event replay cannot decode either audit event. Restore both schemas to the union and preserve contract-level decode coverage.\n\n### [correctness] `reviewerVerdicts` has the wrong persisted shape — `src/lib/cloister/review-verdict-writer.ts:32`\nThe door accepts an array with `{ reviewer, verdict }`, but review status stores a map keyed by sub-role with `{ status, atCommit, findingsPath }`. Passing the array through breaks selective re-review, carried-forward evidence, and uniform anchor detection. Type the input from `ReviewStatus['reviewerVerdicts']`, remove caller-side map-to-array conversion, and persist the keyed map unchanged.\n\n### [correctness] The anchor-match path does not stamp `reviewedAtCommit` — `src/lib/cloister/review-verdict-writer.ts:145`\nEqual evidence and row anchors prove the reviewed commit, but the update omits that anchor. A passed row can retain a stale or missing `reviewedAtCommit`, weakening post-review drift checks. Stamp the matched evidence head and add a case starting from a stale or absent reviewed anchor.\n\n### [correctness] The verdict-writer test file has an unmatched suite closure — `src/lib/cloister/__tests__/review-verdict-writer.test.ts:149`\nThe outer suite closes before the test-gate-reset block and closes again at the end, so Vitest fails to parse the file and executes none of the verdict-door cases. Fix the suite boundary and run the focused test file successfully.\n\n## Non-blocking Findings\n\n### [performance] Bound polyrepo ancestry checks with limited concurrency — `src/lib/cloister/review-verdict-writer.ts:76`\nThe independent repository probes run serially, so a composite-anchor verdict can wait up to roughly the sum of all repository timeouts. This is a low-frequency asynchronous path and does not block the Node event loop, so bounded concurrency of two to four workers is advisory.\n\n### [requirements] [demoted: whole-feature scope] Fallback migration remains outside this PR — `src/lib/cloister/deacon-review-signals.ts:230`\nThe fallback still writes directly and kills its parent unconditionally, but the file is outside the PR diff. Under the mandatory scope gate, this xBRIEF gap cannot block this five-file review cycle.\n\n### [requirements] [demoted: whole-feature scope] Orphan-restore, unsignaled-recovery, and infra-bypass migrations remain outside this PR\nThe required production writer tags have no migrated call sites, but their files are outside the PR diff. They remain visible as whole-feature gaps and are non-blocking for this cycle.\n\n### [requirements] [demoted: pre-existing] Quick-signal, coordinator, and architecture documentation exist outside the current diff\nThose pre-existing implementations are not independently relitigated. Their incompatibility with the changed writer is covered by the in-scope `failed` verdict contract blocker above.\n\n## Scope Note\nFour xBRIEF migration items are classified as whole-feature scope because their production files are outside this PR's five-file diff. They remain incomplete requirements, but the review role's mandatory PR-scope gate makes them advisory rather than blockers in this cycle.\n\n## Clean Sub-roles\nNone; performance reported only a non-blocking advisory.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-bbd19558/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3512 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -124,16 +137,16 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:30:16.999Z",
+  "updated": "2026-08-03T00:36:09.708Z",
   "pipeline": {
     "issueId": "PAN-3512",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
-    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T00:29:14.387Z",
+    "updatedAt": "2026-08-03T00:36:08.919Z",
+    "reviewNotes": "Stale approvals can still land, the branch does not compile or run its verdict-door tests, and the canonical event contract is incomplete.",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -151,24 +164,42 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
-    "reviewSpawnedAt": "2026-08-03T00:29:14.386Z"
+    "reviewSpawnedAt": "2026-08-03T00:29:14.386Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "bbd19558daddaf94e79a206507b204b34362136a"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 101369,
-            "output": 49777,
-            "cacheRead": 34511,
+            "input": 102052,
+            "output": 51825,
+            "cacheRead": 34627,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 223316,
-            "output": 16117,
-            "cacheRead": 2281984,
+            "input": 3574850,
+            "output": 99427,
+            "cacheRead": 12647424,
             "cacheWrite": 0
           }
         },
@@ -215,15 +246,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 101369,
-          "output": 49777,
-          "cacheRead": 34511,
+          "input": 102052,
+          "output": 51825,
+          "cacheRead": 34627,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 2170255,
-          "output": 72108,
-          "cacheRead": 10036224,
+          "input": 5521789,
+          "output": 155418,
+          "cacheRead": 20401664,
           "cacheWrite": 0
         },
         "anthropic/claude-haiku-4-5-20251001": {
@@ -234,8 +265,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 26.7584061,
-        "pricingAsOf": "2026-08-03T00:29:15.907Z"
+        "usd": 51.2090307,
+        "pricingAsOf": "2026-08-03T00:36:08.954Z"
       }
     },
     "merges": [
@@ -244,7 +275,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "claude-haiku-4-5",
   "recoveryTrips": [
     {
       "issue": "PAN-3512",
