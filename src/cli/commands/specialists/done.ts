@@ -21,6 +21,8 @@ import {
   type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
 import type { HeadAnchor } from '../../../lib/git-utils.js';
+import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
+import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -174,12 +176,6 @@ export async function doneCommand(
         // readyForMerge. A human passing review assumes responsibility for the gate.
         update.verificationStatus = 'passed';
         update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
-        console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Test agent can now proceed'));
-      } else if (options.status === 'blocked') {
-        console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
-      } else {
-        console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
       }
       break;
 
@@ -241,11 +237,71 @@ export async function doneCommand(
       break;
   }
 
-  const status = setReviewStatusSync(normalizedIssueId, update);
+  let status = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+
+  // For review verdicts, route through the verdict write door (PAN-3512)
+  // when there's an evidence head (passed verdict with reviewers, or any blocked/failed verdict).
+  if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
+    let evidenceHead: HeadAnchor | undefined;
+    if (update.reviewedAtCommit) {
+      evidenceHead = update.reviewedAtCommit;
+    } else if (update.reviewerVerdicts) {
+      const firstVerdict = Object.values(update.reviewerVerdicts)[0];
+      if (firstVerdict?.atCommit) {
+        evidenceHead = rehydrateHeadAnchor(firstVerdict.atCommit);
+      }
+    }
+
+    const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
+      verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
+      notes: options.notes,
+      reviewerVerdicts: update.reviewerVerdicts
+        ? Object.entries(update.reviewerVerdicts).map(([subRole, v]) => ({
+            reviewer: subRole,
+            verdict: ((v as any)?.status || 'passed') as 'passed' | 'blocked',
+            atCommit: (v as any)?.atCommit,
+          }))
+        : undefined,
+      evidenceHead,
+      extra: {
+        verificationStatus: update.verificationStatus,
+        verificationNotes: update.verificationNotes,
+      },
+      runId: options.runId,
+      writer: 'quick-signal',
+    });
+
+    if (!verdictOutcome.landed) {
+      // Verdict was rejected (stale evidence) — report it and exit non-zero
+      console.error(chalk.red(`Review verdict rejected: ${verdictOutcome.reason}`));
+      return exitCli(1);
+    }
+
+    const updatedStatus = getReviewStatusSync(normalizedIssueId);
+    if (updatedStatus) status = updatedStatus;
+
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    } else if (options.status === 'blocked') {
+      console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
+    } else {
+      console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
+    }
+  } else if (specialist === 'review') {
+    // No evidence head (skipped verdict) — use setReviewStatusSync
+    status = setReviewStatusSync(normalizedIssueId, update);
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    }
+  } else {
+    status = setReviewStatusSync(normalizedIssueId, update);
+  }
 
   if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
-    // PAN-2518: the verdict is already durable (setReviewStatusSync above). Feedback
-    // delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
+    // PAN-2518: the verdict is already durable (recordReviewVerdict or setReviewStatusSync above).
+    // Feedback delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
     // shells out to network + tmux, any of which can STALL. `pan admin specialists
     // done` is run from inside the review agent's own session, so a hung delivery
     // leaves that agent waiting on a never-returning command and the issue stalls
@@ -256,9 +312,9 @@ export async function doneCommand(
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
       const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
-        verdict: options.status,
+        verdict: options.status as 'blocked' | 'failed',
         notes: options.notes,
-        prUrl: status.prUrl,
+        prUrl: status?.prUrl || undefined,
         ...(options.runId ? { runId: options.runId } : {}),
       }));
       let timer: ReturnType<typeof setTimeout> | undefined;
