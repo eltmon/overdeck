@@ -97,6 +97,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-03T03:18:16.227Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T03:28:21.593Z"
     }
   ],
   "feedback": [],
@@ -133,10 +138,10 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T03:28:20.146Z",
+  "updated": "2026-08-03T03:28:22.744Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -144,7 +149,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
-    "updatedAt": "2026-08-03T03:28:19.660Z",
+    "updatedAt": "2026-08-03T03:28:20.205Z",
     "uatNotes": "Browser UAT not required: no mention of Playwright, UAT, screenshots, or browser flows in the issue body, PRD, PR notes, or xBRIEF continue state. All 5 in-scope acceptance criteria are unit/component-test verifiable and are covered, including src/dashboard/frontend/src/components/chat/__tests__/ComposerFooter.model-picker.test.tsx, a DOM-level integration test that mounts the real ComposerFooter+ModelPicker tree (no mocking of ModelPicker) and specifically proves the review-cycle-1 blocking defect (live conversation model being re-seeded to the global default) is fixed. The only acceptance criterion needing a running dashboard (FR-6, live-host row repair) is explicitly deferred to post-deploy close-out per its own xBRIEF item (readiness: sequential) and cannot execute before this branch merges and deploys.",
     "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "conflictsSince": {
@@ -155,7 +160,7 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewSpawnedAt": "2026-08-03T03:17:53.345Z",
+    "reviewSpawnedAt": "2026-08-03T03:28:20.204Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "src/dashboard/frontend/src/components/chat/ComposerFooter.tsx",
@@ -279,7 +284,7 @@
       },
       "costAtCloseOut": {
         "usd": 122.8015233,
-        "pricingAsOf": "2026-08-03T03:28:19.752Z"
+        "pricingAsOf": "2026-08-03T03:28:22.730Z"
       }
     },
     "merges": [
