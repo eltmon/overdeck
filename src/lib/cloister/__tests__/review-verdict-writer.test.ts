@@ -37,22 +37,26 @@ vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return {
     ...actual,
-    execFile: (...args: unknown[]) => {
+    execFile: vi.fn((...args: unknown[]) => {
       const callback = args.at(-1);
       if (typeof callback !== 'function') throw new Error('execFile callback is required');
-      const done = callback as (error: Error | null, stdout: string, stderr: string) => void;
-      void mocks.execFileAsync(...args.slice(0, -1)).then(
-        (result: { status?: number }) => {
-          if (result.status === 1) {
-            done(Object.assign(new Error('not an ancestor'), { code: 1 }), '', '');
-          } else {
-            done(null, '', '');
+      const done = callback as (error: unknown, stdout?: string, stderr?: string) => void;
+      void Promise.resolve(mocks.execFileAsync(...args.slice(0, -1))).then(
+        (result: unknown) => {
+          if (typeof result === 'object' && result !== null && 'status' in result) {
+            if (result.status === 1) {
+              done(Object.assign(new Error('not an ancestor'), { code: 1 }), '', '');
+            } else {
+              done(null, '', '');
+            }
+            return;
           }
+          const [stdout, stderr] = Array.isArray(result) ? result : [result ?? '', ''];
+          done(null, typeof stdout === 'string' ? stdout : '', typeof stderr === 'string' ? stderr : '');
         },
-        (error: unknown) => done(error instanceof Error ? error : new Error(String(error)), '', ''),
+        (error: unknown) => done(error),
       );
-      return {};
-    },
+    }),
   };
 });
 
