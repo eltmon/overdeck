@@ -445,7 +445,7 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-03T05:19:49.285Z",
+  "updated": "2026-08-03T05:20:43.299Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
@@ -456,7 +456,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T05:18:12.420Z",
+    "updatedAt": "2026-08-03T05:20:39.010Z",
     "reviewNotes": "Approved; cycle-9 PR delta is allowlist-only and all four reviewers found no blocking regression",
     "testNotes": "typecheck: PASS (root+hooks+evals+dashboard+frontend ratchets, no new errors). lint: PASS (eslint + all guard scripts: skills, slash-commands, prompts, file-size, circular-deps, ratchet-audit, quarantine-audit, state-writes/paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal). test: CI=true npx vitest run — 1376 files passed / 3 skipped, 13077 tests passed / 50 skipped, 4 failed. All 4 failures are 5000ms timeouts in tests/unit/lib/overdeck/{bootstrap,issues,observability}.test.ts — none touch PR-scoped files. Confirmed environmental: host load average was 27-31 on a 24-core machine with swap at 7.7/8GB during the run (concurrent-agent contention, a documented pattern on this machine); re-running the same 3 files in isolation with --testTimeout=30000 --hookTimeout=30000 passed all 10/10 tests cleanly, proving these are timing flakes, not logic regressions.",
     "uatNotes": "UAT required: acceptance criteria explicitly describe the dashboard Fork/Handoff modal Project select and CommandDeck grouping behavior. Rebuilt (npm run build:dashboard) and restarted the workspace's own isolated peer container (overdeck-feature-pan-3419-server-1, mode=peer, OVERDECK_DISABLE_DEACON=1) to current commit 10aee59c028 (was stale on f9b6b7314) — never touched the host/production dashboard on port 3011, per the test role's host-process boundary. Verified via Playwright against https://feature-pan-3419.overdeck.localhost/: (1) explicit-project-first grouping — conversation with project_key='uat-alpha' and an unrelated cwd (/tmp/uat-isolated-cwd) correctly grouped under the uat-alpha project bucket in the sidebar/CommandDeck, not derived from cwd; (2) cwd-fallback grouping — a conversation with no project_key and cwd=/tmp/uat-beta correctly grouped under uat-beta via cwd containment; (3) opened 'Create summary fork' on the uat-alpha-scoped conversation: the Project <select> rendered with 'Same as source (uat-alpha)' selected by default plus 'uat-alpha' and 'uat-beta' listed — confirms fork-modal-project.ac1/ac2; (4) submitted with the default selection — captured POST /api/conversations/uat-test-source/summary-fork request body omitted projectKey entirely, confirming inherit-by-omission; (5) reopened the modal, selected uat-beta explicitly, submitted — captured request body contained \"projectKey\":\"uat-beta\", confirming fork-modal-project.ac3. Both submissions reached the server correctly and both returned 400 'No session file found for conversation uat-test-source' — expected, since this is a synthetic fixture conversation with a fake session locator and no real transcript to summarize; unrelated to project-key logic and not a criterion under test. (6) `pan handoff --help` and `pan fork --help` both show `--project <key>` with the correct inherit-from-source default description, confirming cli-project-flag.ac4. (7) Docs confirmed present: sync-sources/skills/pan-handoff/SKILL.md, features/conversations.mdx, and sync-sources/rules/handoff-isolate-cwd.md all document --project and its inherit-default behavior. Data-cleanup item (conv 1827 -> mind-your-now) was already completed and verified by the work agent against the canonical host ~/.overdeck runtime DB per the durable record's claimHistory; this isolated peer container's DB is deliberately separate (single-deacon invariant) so it cannot be re-verified from here. Palette-explicit routing (backend-only, no distinct browser-observable surface beyond existing CommandDeck grouping already verified) is covered by its passing unit test (src/dashboard/server/routes/__tests__/palette.test.ts) in the full suite run above.",
@@ -540,9 +540,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 7824782,
-            "output": 316038,
-            "cacheRead": 210689536,
+            "input": 7828820,
+            "output": 316778,
+            "cacheRead": 211633664,
             "cacheWrite": 0
           }
         }
@@ -555,9 +555,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 54710964,
-          "output": 823960,
-          "cacheRead": 330420224,
+          "input": 54715002,
+          "output": 824700,
+          "cacheRead": 331364352,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -568,8 +568,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 494.3609273,
-        "pricingAsOf": "2026-08-03T05:18:17.093Z"
+        "usd": 494.8753813,
+        "pricingAsOf": "2026-08-03T05:20:42.387Z"
       }
     },
     "merges": [
