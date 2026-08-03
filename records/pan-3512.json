@@ -117,6 +117,11 @@
       "reason": "feedback",
       "note": "[2026-08-03T05:20Z] review-agent → FAILED — seq 9",
       "timestamp": "2026-08-03T05:20:09.983Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T05:23Z] review-agent → FAILED — seq 10",
+      "timestamp": "2026-08-03T05:23:02.598Z"
     }
   ],
   "feedback": [
@@ -182,6 +187,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-03T05:20:09Z",
       "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3512` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3512`."
+    },
+    {
+      "seq": 10,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T05:23:02Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3512` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3512`."
     }
   ],
   "scopeDrift": {
@@ -233,7 +245,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T05:20:09.983Z",
+  "updated": "2026-08-03T05:23:02.599Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
