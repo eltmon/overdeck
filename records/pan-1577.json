@@ -1206,7 +1206,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T07:34:38.983Z",
+  "updated": "2026-08-03T07:34:50.204Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1216,7 +1216,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T07:34:38.894Z",
+    "updatedAt": "2026-08-03T07:34:41.579Z",
     "reviewNotes": "Verification failed at test",
     "verificationNotes": "Verification FAILED at test (823546ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n\n Test Files  174 passed (174)\n      Tests  1956 passed (1956)\n   Start at  03:26:25\n   Duration  38.83s (transform 5.75s, setup 18.03s, import 52.50s, tests 35.25s, environment 30.08s)\n\n ❯ |root| tests/unit/lib/overdeck/infra.test.ts (7 tests | 1 failed) 16111ms\n     × emits, reads, and streams events through EventBusLive 11077ms (retry x1)\n ❯ |root| src/lib/overdeck/__tests__/schema-audit.test.ts (4 tests | 3 failed) 33782ms\n     × reports exactly one missing index and column 11345ms (retry x1)\n     × ignores extra tables and columns and succeeds in query-only mode 10761ms (retry x1)\n     × warns for each missing artifact at startup without repairing the schema 11670ms (retry x1)\n ❯ |root| tests/unit/lib/overdeck/observability.test.ts (4 tests | 2 failed) 26975ms\n     × subscribes to domain events emitted through EventBus 10662ms (retry x1)\n     × replays gap-fill events from the events transport 11618ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-brxrn7/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s ela\n…(1294 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-X1DmcF/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-X1DmcF/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
@@ -1328,7 +1328,7 @@
       },
       "costAtCloseOut": {
         "usd": 863.2237793,
-        "pricingAsOf": "2026-08-03T07:34:38.957Z"
+        "pricingAsOf": "2026-08-03T07:34:50.194Z"
       }
     },
     "merges": [
