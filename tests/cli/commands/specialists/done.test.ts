@@ -4,6 +4,9 @@ import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
 const {
   mockSetReviewStatus,
+  mockGetReviewStatus,
+  mockRecordReviewVerdict,
+  currentReviewStatus,
   mockDeliverReviewVerdictFeedback,
   mockResolveProject,
   mockReadWorkspacePlan,
@@ -13,6 +16,9 @@ const {
   mockVerdictFallbackPath,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
+  mockGetReviewStatus: vi.fn(),
+  mockRecordReviewVerdict: vi.fn(),
+  currentReviewStatus: { value: null as Record<string, unknown> | null },
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
@@ -28,10 +34,14 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     setReviewStatus: mockSetReviewStatus,
     setReviewStatusSync: mockSetReviewStatus,
-    getReviewStatus: vi.fn(),
-    getReviewStatusSync: vi.fn(),
+    getReviewStatus: mockGetReviewStatus,
+    getReviewStatusSync: mockGetReviewStatus,
   };
 });
+
+vi.mock('../../../../src/lib/cloister/review-verdict-writer.js', () => ({
+  recordReviewVerdict: mockRecordReviewVerdict,
+}));
 
 vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
   deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
@@ -73,16 +83,33 @@ describe('specialists done command', () => {
     mockVerdictFallbackPath.mockReturnValue(
       '/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json',
     );
+    currentReviewStatus.value = {
+      issueId: 'PAN-1059',
+      reviewStatus: 'pending',
+      testStatus: 'pending',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+    };
+    mockGetReviewStatus.mockImplementation(() => currentReviewStatus.value);
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
-      return {
-        issueId: 'PAN-1059',
-        reviewStatus: 'blocked',
-        testStatus: 'pending',
-        updatedAt: new Date().toISOString(),
-        readyForMerge: false,
-        prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
-        ...update,
-      };
+      currentReviewStatus.value = { ...currentReviewStatus.value, ...update };
+      return currentReviewStatus.value;
+    });
+    mockRecordReviewVerdict.mockImplementation(async (
+      issueId: string,
+      input: {
+        verdict: 'passed' | 'blocked' | 'failed';
+        notes?: string;
+        extra?: Record<string, unknown>;
+      },
+    ) => {
+      mockSetReviewStatus(issueId, {
+        reviewStatus: input.verdict,
+        reviewNotes: input.notes,
+        ...input.extra,
+      });
+      return { landed: true, classification: 'no-evidence' };
     });
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
@@ -197,7 +224,6 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'passed',
       reviewNotes: 'approved',
-      reviewedAtCommit: undefined,
       verificationStatus: 'passed',
       verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
     });

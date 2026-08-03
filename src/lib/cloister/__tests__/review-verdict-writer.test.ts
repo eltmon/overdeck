@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   setReviewStatusSync: vi.fn(),
   getCloisterEventStore: vi.fn(),
   emitActivityEntrySync: vi.fn(),
+  resolveProjectFromIssueSync: vi.fn(),
   resolveWorkspaceRepoRootsSync: vi.fn(),
   execFileAsync: vi.fn(),
 }));
@@ -24,13 +25,36 @@ vi.mock('../../activity-logger.js', () => ({
   emitActivityEntrySync: mocks.emitActivityEntrySync,
 }));
 
+vi.mock('../../projects.js', () => ({
+  resolveProjectFromIssueSync: mocks.resolveProjectFromIssueSync,
+}));
+
 vi.mock('../../project-repos.js', () => ({
   resolveWorkspaceRepoRootsSync: mocks.resolveWorkspaceRepoRootsSync,
 }));
 
-vi.mock('child_process', () => ({
-  execFileAsync: mocks.execFileAsync,
-}));
+vi.mock('child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('child_process')>();
+  return {
+    ...actual,
+    execFile: (...args: unknown[]) => {
+      const callback = args.at(-1);
+      if (typeof callback !== 'function') throw new Error('execFile callback is required');
+      const done = callback as (error: Error | null, stdout: string, stderr: string) => void;
+      void mocks.execFileAsync(...args.slice(0, -1)).then(
+        (result: { status?: number }) => {
+          if (result.status === 1) {
+            done(Object.assign(new Error('not an ancestor'), { code: 1 }), '', '');
+          } else {
+            done(null, '', '');
+          }
+        },
+        (error: unknown) => done(error instanceof Error ? error : new Error(String(error)), '', ''),
+      );
+      return {};
+    },
+  };
+});
 
 import { recordReviewVerdict, type VerdictInput } from '../review-verdict-writer.js';
 
@@ -53,6 +77,7 @@ describe('recordReviewVerdict', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getCloisterEventStore.mockReturnValue(null);
+    mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath: '/project' });
   });
 
   describe('no-evidence path', () => {
@@ -122,7 +147,7 @@ describe('recordReviewVerdict', () => {
   describe('stale evidence path', () => {
     it('Given an evidenceHead that a per-repo `git merge-base --is-ancestor` probe proves is a strict ancestor of the row\'s lastVerifiedCommit, recordReviewVerdict returns { landed: false, reason: "stale-evidence-head" }, makes zero setReviewStatusSync calls, and appends one review.verdict_rejected event', async () => {
       const status = reviewStatus({
-        lastVerifiedCommit: 'b'.repeat(40),
+        lastVerifiedCommit: `main@${'b'.repeat(40)}`,
       });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.resolveWorkspaceRepoRootsSync.mockReturnValue([
@@ -138,7 +163,7 @@ describe('recordReviewVerdict', () => {
       const input: VerdictInput = {
         verdict: 'passed',
         writer: 'fallback',
-        evidenceHead: 'a'.repeat(40),
+        evidenceHead: `main@${'a'.repeat(40)}`,
       };
 
       const result = await recordReviewVerdict('PAN-3512', input);
@@ -162,8 +187,8 @@ describe('recordReviewVerdict', () => {
 
   describe('fresh evidence path', () => {
     it('Given an evidenceHead the probe shows is NOT an ancestor of the row head, recordReviewVerdict lands the verdict with reviewedAtCommit set to that evidenceHead, appends one review.verdict_dispatched event, and returns { landed: true, classification: "dispatched" }', async () => {
-      const rowHead = 'b'.repeat(40);
-      const evidenceHead = 'c'.repeat(40);
+      const rowHead = `main@${'b'.repeat(40)}`;
+      const evidenceHead = `main@${'c'.repeat(40)}`;
       const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'pending' });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);
@@ -213,8 +238,8 @@ describe('recordReviewVerdict', () => {
 
   describe('test-gate reset', () => {
     it('Given a row with testStatus "passed" and a fresh evidence head, the update passed to setReviewStatusSync carries testStatus "pending" and a testNotes string naming both shortened head anchors and the writer', async () => {
-      const rowHead = 'b'.repeat(40);
-      const evidenceHead = 'c'.repeat(40);
+      const rowHead = `main@${'b'.repeat(40)}`;
+      const evidenceHead = `main@${'c'.repeat(40)}`;
       const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'passed' });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);
@@ -245,8 +270,8 @@ describe('recordReviewVerdict', () => {
     });
 
     it('Given a row whose testStatus is already "pending", the update passed to setReviewStatusSync contains no testStatus key', async () => {
-      const rowHead = 'b'.repeat(40);
-      const evidenceHead = 'c'.repeat(40);
+      const rowHead = `main@${'b'.repeat(40)}`;
+      const evidenceHead = `main@${'c'.repeat(40)}`;
       const status = reviewStatus({ lastVerifiedCommit: rowHead, testStatus: 'pending' });
       mocks.getReviewStatusSync.mockReturnValue(status);
       mocks.setReviewStatusSync.mockReturnValue(status);

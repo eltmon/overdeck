@@ -256,11 +256,11 @@ export async function doneCommand(
       verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
       notes: options.notes,
       reviewerVerdicts: update.reviewerVerdicts
-        ? Object.entries(update.reviewerVerdicts).map(([subRole, v]) => ({
+        ? Object.entries(update.reviewerVerdicts).flatMap(([subRole, verdict]) => verdict ? [{
             reviewer: subRole,
-            verdict: ((v as any)?.status || 'passed') as 'passed' | 'blocked',
-            atCommit: (v as any)?.atCommit,
-          }))
+            verdict: verdict.status,
+            atCommit: verdict.atCommit ? rehydrateHeadAnchor(verdict.atCommit) : undefined,
+          }] : [])
         : undefined,
       evidenceHead,
       extra: {
