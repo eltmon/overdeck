@@ -108,6 +108,7 @@ export function projectPipeline(
     readyForMerge: status?.readyForMerge ?? false,
     closedOut: existing?.closedOut,
     closedOutAt: existing?.closedOutAt,
+    reopenedAt: existing?.reopenedAt,
     // PAN-2587: the tombstone lives only in the record — a rebuild that projects
     // from ReviewStatus (which has no such field) must not erase it, or the
     // orphaned-completions patrol re-arms the same issue forever (36x on PAN-399).

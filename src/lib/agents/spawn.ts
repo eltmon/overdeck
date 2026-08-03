@@ -63,7 +63,7 @@ import {
   runAgentId,
   transitionIssueToInProgress,
   withSpawnTimeMemoryContext,
-  assertWorkspaceStackHealthyForSpawn,
+  prepareWorkspaceForAgentSpawn,
   type SpawnOptions,
   type SpawnRunOptions,
 } from './spawn-prep.js';
@@ -190,7 +190,7 @@ async function spawnRunWithoutConsentClaim(
     const { killSession } = await import('../tmux.js');
     await Effect.runPromise(killSession(agentId)).catch(() => {});
   }
-  await assertWorkspaceStackHealthyForSpawn(issueId, role, options.allowHost, workspace);
+  await prepareWorkspaceForAgentSpawn(issueId, role, options.allowHost, workspace);
   initHookSync(agentId);
 
   const resolvedHarness: RuntimeName = await resolveHarness({
@@ -561,7 +561,7 @@ async function spawnAgentWithoutConsentClaim(
     throw new Error(`Agent ${agentId} already running. Use 'pan tell' to message it.`);
   }
 
-  await assertWorkspaceStackHealthyForSpawn(options.issueId, role, options.allowHost, options.workspace);
+  await prepareWorkspaceForAgentSpawn(options.issueId, role, options.allowHost, options.workspace);
 
   // Initialize hook for this agent (FPP support)
   initHookSync(agentId);

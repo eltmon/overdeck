@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ModelPicker } from '../ModelPicker';
+import { ModelPicker, loadStoredModel, onKnownModelsSync } from '../ModelPicker';
 
 vi.mock('sonner', () => ({
   toast: { message: vi.fn() },
@@ -527,5 +527,35 @@ describe('chat ModelPicker Kimi harness-labeled rows (2026-08-02)', () => {
     );
 
     expect(await screen.findByRole('button', { name: /Kimi K3 \(1M\) — ACP \(Kimi Code\)/ })).toBeInTheDocument();
+  });
+
+  it('notifies catalog-sync subscribers so a stored catalog-only model restores after load', async () => {
+    installKimiFetchMock();
+    // The composer stores the picked id in localStorage. At mount (before the
+    // catalog fetch resolves) kimi-code/k3 is not a FALLBACK id, so the
+    // composer's initial loadStoredModel falls back to the default — the
+    // re-derive on catalog sync is what restores the user's pick.
+    localStorage.setItem('conv-composer-model', 'kimi-code/k3');
+    const restored: string[] = [];
+    const unsubscribe = onKnownModelsSync(() => restored.push(loadStoredModel()));
+
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+
+    await waitFor(() => expect(restored.length).toBeGreaterThan(0));
+    expect(restored[restored.length - 1]).toBe('kimi-code/k3');
+    unsubscribe();
+  });
+
+  it('keeps the default when the stored model is absent from the synced catalog', async () => {
+    installKimiFetchMock();
+    localStorage.setItem('conv-composer-model', 'kimi-code/removed-from-catalog');
+    const restored: string[] = [];
+    const unsubscribe = onKnownModelsSync(() => restored.push(loadStoredModel('claude-fable-5')));
+
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+
+    await waitFor(() => expect(restored.length).toBeGreaterThan(0));
+    expect(restored[restored.length - 1]).toBe('claude-fable-5');
+    unsubscribe();
   });
 });
