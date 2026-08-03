@@ -1021,10 +1021,10 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:51:05.018Z",
+  "updated": "2026-08-03T01:51:17.014Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "pending",
@@ -1032,14 +1032,35 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T01:44:08.741Z",
-    "updatedAt": "2026-08-03T01:51:03.480Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-08-03T01:51:16.829Z",
+    "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "579e3701297791631f0bc97e77eec99abc87d18b",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T01:44:08.741Z",
-    "reviewSpawnedAt": "2026-08-03T01:51:03.479Z"
+    "reviewSpawnedAt": "2026-08-03T01:51:03.479Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-579e3701/security.md",
+        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
+      },
+      "correctness": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-579e3701/correctness.md",
+        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
+      },
+      "performance": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-579e3701/performance.md",
+        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
+      },
+      "requirements": {
+        "status": "passed",
+        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-579e3701/requirements.md",
+        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -1145,7 +1166,7 @@
       },
       "costAtCloseOut": {
         "usd": 669.1720764,
-        "pricingAsOf": "2026-08-03T01:51:03.523Z"
+        "pricingAsOf": "2026-08-03T01:51:16.956Z"
       }
     },
     "merges": [
@@ -1336,5 +1357,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
