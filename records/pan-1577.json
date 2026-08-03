@@ -916,44 +916,22 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T00:37:55.628Z",
+  "updated": "2026-08-03T00:38:08.414Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
-    "updatedAt": "2026-08-03T00:37:55.519Z",
+    "updatedAt": "2026-08-03T00:38:08.394Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewSpawnedAt": "2026-08-03T00:27:06.029Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/security.md",
-        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/correctness.md",
-        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/performance.md",
-        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/.pan/review/agent-pan-1577-review-8bfbd8bf/requirements.md",
-        "atCommit": "8bfbd8bfdc7957dee82212afa5afae3b20a675d5"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-03T00:27:06.029Z"
   },
   "closeOut": {
     "usage": {
@@ -968,9 +946,9 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 2629,
-            "output": 200,
-            "cacheRead": 3,
+            "input": 3540,
+            "output": 400,
+            "cacheRead": 58,
             "cacheWrite": 0
           }
         },
@@ -1031,9 +1009,9 @@
           "cacheWrite": 120026
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 2629,
-          "output": 200,
-          "cacheRead": 3,
+          "input": 3540,
+          "output": 400,
+          "cacheRead": 58,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -1050,8 +1028,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 582.3481223,
-        "pricingAsOf": "2026-08-03T00:37:55.601Z"
+        "usd": 582.3500388,
+        "pricingAsOf": "2026-08-03T00:38:08.404Z"
       }
     },
     "merges": [
