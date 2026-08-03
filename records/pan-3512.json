@@ -92,7 +92,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:10:12.382Z",
+  "updated": "2026-08-03T00:10:16.648Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -101,10 +101,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T00:10:09.781Z",
+    "updatedAt": "2026-08-03T00:10:16.636Z",
     "reviewNotes": "Stale bare-SHA approvals can land, the branch does not compile or run its new tests, and required writer migrations are absent.",
     "verificationNotes": "Verification FAILED at typecheck (38336ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m386.93 kB\u001b[22m \u001b[2m│ gzip: 62.47 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 386.93 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5970ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m354.97 kB\u001b[22m \u001b[2m│ gzip: 60.11 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m581.11 kB\u001b[22m \u001b[2m│ gzip: 92.85 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.69 kB\u001b[22m \u001b[2m│ gzip:  5.88 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m816.85 kB\u001b[22m \u001b[2m│ gzip: 79.97 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m6544ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/lib/cloister/review-verdict-writer.ts(13,10): error TS2724: '\"child_process\"' has no exported member named 'execFileAsync'. Did you mean 'execFileSync'?\nsrc/lib/cloister/review-verdict-writer.ts(20,29): error TS2724: '\"../review-status-reconcile.js\"' has no exported member named 'ReviewStatusUpdate'. Did you mean 'ReviewStatus'?\nsrc/lib/cloister/review-verdict-writer.ts(21,15): error TS2459: Module '\"../workspace-anchor-drift.js\"' declares 'HeadAnchor' locally, but it is not exported.\nsrc/lib/cloister/review-verdict-writer.ts(169,9): error TS2322: Type '\"review.verdict_rejected\"' is not assignable to type '\"review.approved\" | \"test.passed\" | \"system.heartbeat\" | \"beads.freshness_changed\" | \"agent.created\" | \"agent.enrichment_changed\" | \"agent.started\" | \"agent.stopped\" | \"agent.heartbeat_dead\" | ... 87 more ... | \"sweep.escalated\"'.\nsrc/lib/cloister/review-verdict-writer.ts(174,11): error TS2353: Object literal may only specify known properties, and 'writer' does not exist in type '{ readonly ts: number; } | { readonly projectKey: string; readonly localHead: string; readonly lastSyncedAt: string; } | { readonly agentId: string; readonly issueId: string; readonly agent: { readonly id: string; ... 38 more ...; readonly runtimeSnapshotSequence?: number | undefined; }; readonly workspaceId?: strin...'.\nsrc/lib/cloister/review-verdict\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3514",
+    "reviewedAtCommit": "bfac4ec27f7e15cc5953f79167d5d152cb100dfe",
     "reviewSpawnedAt": "2026-08-03T00:03:31.621Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -153,24 +154,6 @@
         "src/lib/cloister/review-verdict-writer.ts"
       ],
       "recordedAt": "2026-08-03T00:01:37.570Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "bfac4ec27f7e15cc5953f79167d5d152cb100dfe"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "bfac4ec27f7e15cc5953f79167d5d152cb100dfe"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "bfac4ec27f7e15cc5953f79167d5d152cb100dfe"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "bfac4ec27f7e15cc5953f79167d5d152cb100dfe"
-      }
     }
   },
   "closeOut": {
@@ -255,7 +238,7 @@
       },
       "costAtCloseOut": {
         "usd": 24.3509374,
-        "pricingAsOf": "2026-08-03T00:10:09.816Z"
+        "pricingAsOf": "2026-08-03T00:10:16.641Z"
       }
     },
     "merges": [
