@@ -1012,11 +1012,16 @@
       "reason": "feedback",
       "note": "[2026-08-03T01:43Z] review-agent → FAILED — seq 2",
       "timestamp": "2026-08-03T01:43:47.220Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T01:51:04.973Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:51:03.558Z",
+  "updated": "2026-08-03T01:51:05.018Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
@@ -1331,5 +1336,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5"
+  "model": "gpt-5.6-sol"
 }
