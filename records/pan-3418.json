@@ -91,7 +91,7 @@
     "recordedAt": "2026-08-03T02:40:57.628Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T02:42:22.233Z",
+  "updated": "2026-08-03T02:42:25.859Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -100,7 +100,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:41:09.380Z",
+    "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z",
+    "updatedAt": "2026-08-03T02:42:22.225Z",
     "reviewNotes": "[correctness] Active conversation composers are re-seeded to the global model — `src/dashboard/frontend/src/components/chat/ModelPicker.tsx:279`",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
@@ -144,8 +145,7 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-03T02:40:57.628Z"
-    },
-    "panDoneRecoveredAt": "2026-08-03T02:42:21.556Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -200,9 +200,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1639722,
-            "output": 111063,
-            "cacheRead": 59043840,
+            "input": 1650898,
+            "output": 113565,
+            "cacheRead": 60608512,
             "cacheWrite": 0
           }
         }
@@ -215,15 +215,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 4377765,
-          "output": 179941,
-          "cacheRead": 69529088,
+          "input": 4388941,
+          "output": 182443,
+          "cacheRead": 71093760,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 62.0528903,
-        "pricingAsOf": "2026-08-03T02:41:09.514Z"
+        "usd": 62.9661663,
+        "pricingAsOf": "2026-08-03T02:42:25.853Z"
       }
     },
     "merges": [
