@@ -1021,7 +1021,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:55:42.482Z",
+  "updated": "2026-08-03T01:56:06.493Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1174,7 +1174,16 @@
     ],
     "ranOn": "eltmon-z790"
   },
-  "recoveryTrips": [],
+  "recoveryTrips": [
+    {
+      "issue": "PAN-1577",
+      "recoveryPath": "unsignaled-test-verdict",
+      "obligationGeneration": 1785721288780,
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-03T01:56:06.490Z"
+    }
+  ],
   "tasks": {
     "sequence": 18,
     "claims": {},
