@@ -100,3 +100,37 @@ export function readLatestSynthesisVerdict(
     mtimeMs: latest.mtimeMs,
   };
 }
+
+/**
+ * Memoized artifact read for callers on a hot path (PAN-3511).
+ *
+ * `resolveJournalReconciledReviewStatusSync` runs on EVERY `getReviewStatusSync`
+ * call in the system, so it cannot afford a directory walk per read. This wraps
+ * the reader in a short per-issue TTL: a caller that consults the artifact on a
+ * rare branch pays at most one filesystem scan per issue per minute, and the
+ * common path pays nothing because it never calls this at all.
+ *
+ * A null result is memoized too — an issue with no artifact is the common case,
+ * and re-scanning for an absent file every read is exactly the cost this avoids.
+ */
+export const ARTIFACT_VERDICT_MEMO_TTL_MS = 60_000;
+
+const artifactVerdictMemo = new Map<string, { value: SynthesisArtifactVerdict | null; checkedAt: number }>();
+
+export function readMemoizedArtifactVerdict(
+  issueId: string,
+  options: { now?: number; workspacePath?: string } = {},
+): SynthesisArtifactVerdict | null {
+  const now = options.now ?? Date.now();
+  const cached = artifactVerdictMemo.get(issueId);
+  if (cached && now - cached.checkedAt < ARTIFACT_VERDICT_MEMO_TTL_MS) return cached.value;
+
+  const value = readLatestSynthesisVerdict(issueId, { now, ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}) });
+  artifactVerdictMemo.set(issueId, { value, checkedAt: now });
+  return value;
+}
+
+/** Test seam — module-level memo state leaks across tests in a file otherwise. */
+export function __resetArtifactVerdictMemo(): void {
+  artifactVerdictMemo.clear();
+}
