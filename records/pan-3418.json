@@ -164,7 +164,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-03T04:39:33.766Z",
+  "updated": "2026-08-03T04:39:38.344Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -174,14 +174,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:39:28.258Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-03T03:47:25.491Z"
-      }
-    ],
+    "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
+    "updatedAt": "2026-08-03T04:39:33.110Z",
     "conflictsSince": {
       "sha": "e1d8ee715b137bb55cebe13c8f1d8805481538dc",
       "detectedAt": "2026-08-03T02:23:27.712Z",
@@ -231,8 +225,7 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-03T04:39:03.821Z"
-    },
-    "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -295,9 +288,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2269681,
-            "output": 147832,
-            "cacheRead": 89903616,
+            "input": 2275083,
+            "output": 148166,
+            "cacheRead": 90702336,
             "cacheWrite": 0
           }
         }
@@ -310,9 +303,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 11595987,
-          "output": 298857,
-          "cacheRead": 116923904,
+          "input": 11601389,
+          "output": 299191,
+          "cacheRead": 117722624,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -323,8 +316,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 132.0741483,
-        "pricingAsOf": "2026-08-03T04:39:30.535Z"
+        "usd": 132.5105383,
+        "pricingAsOf": "2026-08-03T04:39:38.335Z"
       }
     },
     "merges": [
