@@ -289,6 +289,49 @@ describe('auto-commit', () => {
     }
   });
 
+  it('holds deferred writes for one explicit batch flush', async () => {
+    vi.useFakeTimers();
+    try {
+      mkdirSync(join(tmp, '.pan', 'records'), { recursive: true });
+      const firstPath = join(tmp, '.pan', 'records', 'pan-deferred-first.json');
+      const secondPath = join(tmp, '.pan', 'records', 'pan-deferred-second.json');
+      writeFileSync(firstPath, '{"writer":"first"}');
+      writeFileSync(secondPath, '{"writer":"second"}');
+
+      queueAutoCommit({
+        projectRoot: tmp,
+        paths: [firstPath],
+        subject: 'chore(state): deferred first',
+        defer: true,
+      });
+      await Promise.resolve();
+      queueAutoCommit({
+        projectRoot: tmp,
+        paths: [secondPath],
+        subject: 'chore(state): deferred second',
+        defer: true,
+      });
+
+      expect(vi.getTimerCount()).toBe(0);
+      expect(__testInternals.getActiveFlush(tmp)).toBeUndefined();
+      vi.useRealTimers();
+
+      const result = await Effect.runPromise(flushAutoCommits(tmp));
+
+      expect(result.committed).toBe(true);
+      const committed = execSync('git show --name-only --format= HEAD', {
+        cwd: tmp,
+        encoding: 'utf-8',
+      });
+      expect(committed).toContain('.pan/records/pan-deferred-first.json');
+      expect(committed).toContain('.pan/records/pan-deferred-second.json');
+      expect(execSync('git log --oneline', { cwd: tmp, encoding: 'utf-8' })
+        .split('\n').filter(Boolean)).toHaveLength(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it.effect('is a no-op when the staged diff is empty', () =>
     Effect.gen(function* () {
       mkdirSync(join(tmp, '.pan', 'continues'), { recursive: true });

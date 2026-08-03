@@ -241,8 +241,11 @@ describe('sweepTranscriptRetention', () => {
     const gcDeps = {
       agentsDir,
       cleanStateDir,
+      listFilesToRemove: vi.fn(async () => []),
       hasRetainedMarker: hasRetainedTranscriptsMarker,
       markRetained: markRetainedTranscripts,
+      writeTombstone: vi.fn(async () => {}),
+      emitPruneEvent: vi.fn(),
       removeRecord,
       tombstoneRecord: vi.fn(),
       isTerminalAgent: vi.fn(() => true),

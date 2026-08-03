@@ -20,6 +20,7 @@ export const STATE_BRANCH_PATHS = [
   'backlog/',
   'notes/',
   'memory/',
+  'agents/',
 ] as const;
 
 export type StateBranchPath = typeof STATE_BRANCH_PATHS[number];

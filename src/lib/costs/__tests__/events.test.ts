@@ -6,7 +6,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { existsSync, mkdirSync, writeFileSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { appendCostEventSync, deduplicateEventsSync, readEventsSync, CostEvent } from '../events.js';
+import {
+  appendCostEventSync,
+  CostEvent,
+  deduplicateEventsSync,
+  getLastEventMetadataSync,
+  readEventsFromByteOffsetSync,
+  readEventsFromLineSync,
+  readEventsSync,
+  tailEventsSync,
+} from '../events.js';
 
 let TEST_ROOT: string;
 const originalHome = process.env.HOME;
@@ -23,6 +32,10 @@ afterEach(() => {
     rmSync(TEST_ROOT, { recursive: true, force: true });
   }
 });
+
+function eventsFile(): string {
+  return join(TEST_ROOT, '.overdeck', 'costs', 'events.jsonl');
+}
 
 function makeEvent(overrides: Partial<CostEvent> = {}): CostEvent {
   return {
@@ -41,6 +54,63 @@ function makeEvent(overrides: Partial<CostEvent> = {}): CostEvent {
     ...overrides,
   };
 }
+
+describe('bounded event readers', () => {
+  it('filters and limits while scanning the log', () => {
+    appendCostEventSync(makeEvent({ issueId: 'PAN-1', provider: 'anthropic' }));
+    appendCostEventSync(makeEvent({ issueId: 'PAN-2', provider: 'openai' }));
+    appendCostEventSync(makeEvent({ issueId: 'PAN-1', provider: 'anthropic', input: 2000 }));
+
+    expect(readEventsSync({ issueId: 'pan-1', offset: 1, limit: 1 })).toMatchObject([
+      { issueId: 'PAN-1', input: 2000 },
+    ]);
+    expect(tailEventsSync(2).map((event) => event.issueId)).toEqual(['PAN-2', 'PAN-1']);
+    expect(readEventsSync({ offset: -1 }).map((event) => event.input)).toEqual([2000]);
+    expect(readEventsSync({ limit: -1 }).map((event) => event.issueId)).toEqual(['PAN-1', 'PAN-2']);
+  });
+
+  it('tracks line and byte cursors across appended events', () => {
+    appendCostEventSync(makeEvent({ issueId: 'PAN-1' }));
+    const first = getLastEventMetadataSync();
+
+    appendCostEventSync(makeEvent({ issueId: 'PAN-2' }));
+    const delta = readEventsFromByteOffsetSync(first.byteOffset);
+    const fromLine = readEventsFromLineSync(first.lastEventLine);
+
+    expect(first.lastEventLine).toBe(1);
+    expect(first.byteOffset).toBeGreaterThan(0);
+    expect(delta.events.map((event) => event.issueId)).toEqual(['PAN-2']);
+    expect(delta.linesRead).toBe(1);
+    expect(delta.newOffset).toBeGreaterThan(first.byteOffset);
+    expect(fromLine.events.map((event) => event.issueId)).toEqual(['PAN-2']);
+    expect(fromLine.newLine).toBe(2);
+  });
+
+  it('does not advance the byte cursor past a partial append', () => {
+    appendCostEventSync(makeEvent({ issueId: 'PAN-1' }));
+    const first = getLastEventMetadataSync();
+    const partial = JSON.stringify(makeEvent({ issueId: 'PAN-2' }));
+    writeFileSync(eventsFile(), partial, { flag: 'a' });
+
+    const incomplete = readEventsFromByteOffsetSync(first.byteOffset);
+    expect(incomplete.events).toEqual([]);
+    expect(incomplete.newOffset).toBe(first.byteOffset);
+
+    writeFileSync(eventsFile(), '\n', { flag: 'a' });
+    const complete = readEventsFromByteOffsetSync(first.byteOffset);
+    expect(complete.events.map((event) => event.issueId)).toEqual(['PAN-2']);
+  });
+
+  it('handles an event larger than the read chunk without truncating UTF-8', () => {
+    const event = { ...makeEvent({ issueId: 'PAN-LARGE' }), detail: 'é'.repeat(40_000) };
+    writeFileSync(eventsFile(), `${JSON.stringify(event)}\n`);
+
+    const [read] = readEventsSync();
+    expect(read.issueId).toBe('PAN-LARGE');
+    expect((read as CostEvent & { detail: string }).detail).toBe(event.detail);
+    expect(getLastEventMetadataSync().byteOffset).toBe(Buffer.byteLength(`${JSON.stringify(event)}\n`));
+  });
+});
 
 describe('deduplicateEvents', () => {
   it('should return 0 when no events file exists', () => {
