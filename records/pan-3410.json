@@ -833,7 +833,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T00:22:49.726Z",
+  "updated": "2026-08-03T00:23:16.616Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
@@ -845,17 +845,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-03T00:22:49.702Z",
-    "reviewNotes": "All four reviewers passed; the general Settings PUT now rejects theme changes clearly while the dedicated serialized endpoint remains the sole theme writer",
-    "testNotes": "HEAD adcbe598d4644f40e394f1907fc36628b9095c87 (matches last review's reviewedAtCommit). install: PASS (bun install --frozen-lockfile, no changes). typecheck: PASS (npm run typecheck — root, hooks, evals, dashboard-types ratchet 55 known/none new, frontend-types ratchet 0 known/none new). frontend-typecheck: PASS (npx tsc --noEmit in src/dashboard/frontend, zero output). lint: PASS (full npm run lint chain, exit 0 — including lint:circular: 77 baselined cycles, no new cycles; the lint:circular failure a prior test-agent cycle reported against deacon.ts>stall-sweeper.ts>service.ts is no longer failing, so that pre-existing red-main defect has since been resolved/baselined upstream). build: PASS (npm run build, vite build clean, dist-externals check passed). server-bundle: PASS (npm run build:dashboard:server:bundle, 615 files bundled, exit 0). test: FAILED — configured gate is 'OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main' for both root and src/dashboard/frontend. Root vitest: all changed-scoped tests passed. Frontend vitest: 1 file / 3 tests failed in src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx (expects a 'Load/core' assertion inside SystemHealthPill's dialog that the component no longer renders). Investigated root cause per repo policy: `git diff origin/main -- src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx src/dashboard/frontend/src/components/SystemHealthPill.tsx` returns zero diff and `git log origin/main..HEAD` for both paths returns zero commits — this branch has not touched either file, so the failure is inherited unchanged from origin/main, not a PAN-3410 regression (matches the identical finding already recorded by the prior test-agent cycle, attributed to unmerged PAN-3423/PR#3466 whose matching test fix hasn't landed). Per task instructions the top-level status reflects the literal configured-gate result regardless of attribution, so status is 'failed' on this required test gate. All PAN-3410-scoped test files (config-yaml-ui-theme, settings-api x2, fonts-local, useDesignLanguage, AppearanceSection, recovery, styleguide-conformance e2e) are unaffected and outside the single failing file.",
-    "uatNotes": "Issue is a pure dashboard UI/theming feature (Settings Appearance picker, live theme switching, font system, page-not-modal doctrine) — UAT required. Built and ran the workspace dist (npm run build + build:dashboard:server:bundle, both above) as an isolated instance: OVERDECK_HOME pointed at a fresh scratch dir, OVERDECK_DISABLE_DEACON=1 (single-deacon invariant), PORT=3016, detached via setsid so it survived the invoking shell. No other workspace-built dashboard was found running (only the production dashboard on 3011 + its deacon/supervisor, both left untouched and verified healthy — HTTP 200 — before and after). Verified with Playwright against this isolated instance, then killed it and removed the scratch OVERDECK_HOME. Findings: (1) design-language-hook.ac1 / theme-token-scope.ac2 — fresh load: document.documentElement.dataset.theme='broadsheet' before/at mount, body computed font-family starts with the real self-hosted 'Geist Variable' face, --font-mono starts with 'Geist Mono Variable'. (2) appearance-theme-picker.ac1 — Settings > Appearance renders the 'Overdeck Theme' two-card picker: Ledger ('The classic dense monitoring style') and Broadsheet ('The new editorial style...'), each with its own live mini-specimen (Overdeck / Aa / Sample chip); Broadsheet card has aria-pressed=true by default. (3) appearance-theme-picker.ac2/ac3 + design-language-hook.ac2 — clicking the Ledger card flipped dataset.theme to 'ledger' and body font to 'DM Sans' immediately with zero console errors/warnings and no page reload (theme-token-scope.ac1); the Ledger card then showed the selected treatment (border-foreground/40 bg-muted, aria-pressed=true) and Broadsheet showed unselected (border-border bg-background/60, aria-pressed=false). (4) design-language-hook.ac3 / persistence — a real full-page navigation reload (not SPA) re-applied dataset.theme='ledger' and the DM Sans font pre-paint, proving both the boot script and the server round trip. (5) appearance-theme-picker.ac4 — the pre-existing 'Ready to Merge shimmer' toggle still renders (aria-checked=true), confirming no-loss. (6) ui-theme-config-key.ac1/ac3 + settings-api-ui-theme.ac1/ac3 via direct HTTP against the running instance: GET /api/settings defaults ui.theme to 'broadsheet'; PUT /api/settings {ui:{theme:'notarealtheme'}} -> HTTP 400 'ui.theme must be ledger or broadsheet'. (7) Cycle-9 fix specifically verified: PUT /api/settings {ui:{theme:'ledger'}} (a genuine change attempt through the general endpoint, current on-disk theme was 'broadsheet') -> HTTP 400 'ui.theme cannot be changed through PUT /api/settings — use PUT /api/settings/design-language instead', and a follow-up GET confirmed the theme was NOT silently changed — exactly the contract cycle 9 added. A whole-document PUT echoing back the unchanged theme still succeeded (200, no-loss for the sibling openInEditorCommand field), confirming the ordinary round trip is unaffected. Non-blocking, pre-existing, out-of-scope observation: PUT /api/settings itself has no dashboard-auth check at all (unlike the dedicated /api/settings/design-language route, which correctly 401'd an unauthenticated curl); confirmed via `git diff origin/main -- src/dashboard/server/routes/settings.ts` region that this route is byte-identical to origin/main's putSettingsRoute, so it predates and is unrelated to PAN-3410 — not fixed per the no-code-edits boundary, flagging only as an aside. All exercised acceptance criteria were proven; none were left unverified. testStatus above is 'failed' only for the unrelated inherited SystemHealthPill test; every UAT-exercised behavior of this issue passed cleanly.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
-    "inspectNotes": "All 4 ACs verified. AC-1: body->var(--font-sans)=DM Sans at :root; sidebar wordmark (Sidebar.tsx:542 font-display) -> tailwind display -> var(--font-display)=Space Grotesk. AC-2: [data-theme=broadsheet] overrides to Geist Variable / Geist Mono Variable-first, and @font-face family names match exactly (index.css:7,15) so it resolves to a real self-hosted face, not just a computed string. AC-3: fallbacks are exactly text-xl/text-lg/text-xs + font-medium; broadsheet overrides win on specificity (0,2,0) vs (0,1,0) inside the same components layer; values match style-guide-v2.html (clamp(3rem,7vw,4.5rem)=48-72px, 2.5rem=40px, 11px/500/.12em/uppercase). AC-4: no !important, no hex in the diff, all three tailwind.config fontFamily entries consume the vars. Safelist entry is correct for tailwind 3.4 - @layer components rules are pruned by class-candidate match. Non-blocking notes for broadsheet-mechanical-migration: ReviewSummary.tsx:176 uses bare var(--font-mono) which was previously undefined (silently inherited body font) and now resolves to mono - a fix, but a visible render change; .terminal-output (index.css:282) and #pan-boot (index.html:29) still hardcode font stacks and remain un-themed.",
+    "updatedAt": "2026-08-03T00:23:14.335Z",
     "blockerReasons": [
       {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since acc4e81 (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-08-03T00:22:37.520Z"
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-03T00:23:14.335Z"
       }
     ],
     "conflictsSince": {
@@ -867,106 +862,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
     "reviewedAtCommit": "adcbe598d4644f40e394f1907fc36628b9095c87",
-    "reviewSpawnedAt": "2026-08-02T23:27:54.581Z",
-    "scopeDrift": {
-      "outsideDeclaredScope": [
-        "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/issue-card-ledger.png",
-        "design/style-guide/screenshots/pan-3410/sidebar-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/sidebar-ledger.png",
-        "design/style-guide/screenshots/pan-3410/workspace-header-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/workspace-header-ledger.png",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/src/components/CommandDeck/ActivityView/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css",
-        "src/dashboard/frontend/src/components/chat/ContextWindowMeter.module.css",
-        "src/dashboard/frontend/src/components/styles/decisions.module.css",
-        "tests/lib/settings-api.test.ts"
-      ],
-      "declaredScopeUntouched": [],
-      "declaredScope": [
-        "configuration/appearance.mdx",
-        "design/style-guide/STYLE-GUIDE.md",
-        "docs.json",
-        "src/dashboard/frontend/index.html",
-        "src/dashboard/frontend/public/fonts/DMSans-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/Geist-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/GeistMono-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/OFL-*.txt",
-        "src/dashboard/frontend/public/fonts/SpaceGrotesk-Variable.woff2",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
-        "src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/AppearanceSection.tsx",
-        "src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts",
-        "src/dashboard/frontend/src/hooks/useDesignLanguage.ts",
-        "src/dashboard/frontend/src/index.css",
-        "src/dashboard/frontend/src/main.tsx",
-        "src/dashboard/frontend/src/recovery.test.ts",
-        "src/dashboard/frontend/src/recovery.tsx",
-        "src/dashboard/frontend/tailwind.config.js",
-        "src/lib/__tests__/config-yaml-ui-theme.test.ts",
-        "src/lib/__tests__/settings-api.test.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/settings-api.ts",
-        "sync-sources/dev-skills/pan-style-guide/SKILL.md",
-        "tests/e2e/styleguide-conformance.spec.ts",
-        "tests/unit/dashboard/fonts-local.test.ts"
-      ],
-      "actualChangedFiles": [
-        "configuration/appearance.mdx",
-        "design/style-guide/STYLE-GUIDE.md",
-        "design/style-guide/screenshots/pan-3410/issue-card-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/issue-card-ledger.png",
-        "design/style-guide/screenshots/pan-3410/sidebar-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/sidebar-ledger.png",
-        "design/style-guide/screenshots/pan-3410/workspace-header-broadsheet.png",
-        "design/style-guide/screenshots/pan-3410/workspace-header-ledger.png",
-        "docs.json",
-        "scripts/file-size-allowlist.txt",
-        "src/dashboard/frontend/index.html",
-        "src/dashboard/frontend/public/fonts/DMSans-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/Geist-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/GeistMono-Variable.woff2",
-        "src/dashboard/frontend/public/fonts/OFL-DMSans.txt",
-        "src/dashboard/frontend/public/fonts/OFL-Geist.txt",
-        "src/dashboard/frontend/public/fonts/OFL-GeistMono.txt",
-        "src/dashboard/frontend/public/fonts/OFL-SpaceGrotesk.txt",
-        "src/dashboard/frontend/public/fonts/SpaceGrotesk-Variable.woff2",
-        "src/dashboard/frontend/src/components/CommandDeck/ActivityView/index.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/ProjectOverview.tsx",
-        "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-        "src/dashboard/frontend/src/components/KanbanBoard/cards/KanbanCards.tsx",
-        "src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx",
-        "src/dashboard/frontend/src/components/Settings/sections/AppearanceSection.tsx",
-        "src/dashboard/frontend/src/components/Stage/panes/EditorPane.tsx",
-        "src/dashboard/frontend/src/components/Stage/stage.module.css",
-        "src/dashboard/frontend/src/components/chat/ContextWindowMeter.module.css",
-        "src/dashboard/frontend/src/components/styles/decisions.module.css",
-        "src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts",
-        "src/dashboard/frontend/src/hooks/useDesignLanguage.ts",
-        "src/dashboard/frontend/src/index.css",
-        "src/dashboard/frontend/src/main.tsx",
-        "src/dashboard/frontend/src/recovery.test.ts",
-        "src/dashboard/frontend/src/recovery.tsx",
-        "src/dashboard/frontend/tailwind.config.js",
-        "src/lib/__tests__/config-yaml-ui-theme.test.ts",
-        "src/lib/__tests__/settings-api.test.ts",
-        "src/lib/config-yaml/defaults.ts",
-        "src/lib/config-yaml/merge.ts",
-        "src/lib/config-yaml/schema.ts",
-        "src/lib/settings-api.ts",
-        "sync-sources/dev-skills/pan-style-guide/SKILL.md",
-        "tests/e2e/styleguide-conformance.spec.ts",
-        "tests/lib/settings-api.test.ts",
-        "tests/unit/dashboard/fonts-local.test.ts"
-      ],
-      "recordedAt": "2026-08-02T18:36:54.913Z"
-    }
+    "reviewSpawnedAt": "2026-08-02T23:27:54.581Z"
   },
   "closeOut": {
     "usage": {
@@ -997,10 +893,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 6633,
-            "output": 647948,
-            "cacheRead": 563543370,
-            "cacheWrite": 31843090
+            "input": 6651,
+            "output": 649250,
+            "cacheRead": 569481928,
+            "cacheWrite": 31846672
           }
         }
       },
@@ -1018,15 +914,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 7059,
-          "output": 729923,
-          "cacheRead": 615153643,
-          "cacheWrite": 32432913
+          "input": 7077,
+          "output": 731225,
+          "cacheRead": 621092201,
+          "cacheWrite": 32436495
         }
       },
       "costAtCloseOut": {
-        "usd": 562.6891943,
-        "pricingAsOf": "2026-08-03T00:22:49.713Z"
+        "usd": 563.8989173,
+        "pricingAsOf": "2026-08-03T00:23:14.357Z"
       }
     },
     "merges": [
