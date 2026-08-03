@@ -962,26 +962,31 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-03T01:23:26.295Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-03T01:34:38.060Z"
     }
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:34:36.135Z",
+  "updated": "2026-08-03T01:34:38.394Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "failed",
     "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T01:34:35.672Z",
+    "updatedAt": "2026-08-03T01:34:36.184Z",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "verificationNotes": "Verification FAILED at test (832803ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n ❯ |root| tests/unit/lib/harness-resolve.test.ts (8 tests | 2 failed) 267ms\n     × is provider-default-only (PAN-1984): ignores explicit and role; provider config then built-in default wins 222ms (retry x1)\n     × passes the resolved provider-default winner through the harness policy gate 10ms (retry x1)\n ❯ |root| tests/unit/lib/review-status.test.ts (12 tests | 1 failed) 185ms\n     × rejects a review verdict whose evidence HEAD differs from the verified target HEAD 108ms (retry x1)\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedback delivery\n[specialists/done] review signaling failed for PAN-RAC-HTTP\n\nstdout | tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts > reviewedAtCommit DB persistence (specialists/done snapshot layer) > writes the HTTP blocked anchor only after feedback delivery\n[specialists/done] review signaling failed for PAN-RAC-HTTP\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts (12 tests | 1 failed) 4111ms\n     × writes the HTTP blocked anchor only after feedback delivery 110ms (retry x1)\n ❯ |root| tests/cli/commands/specialists/done.test.ts (12 tests | 6 failed) 51ms\n     × allows review to signal blocked status 24ms (retry x1)\n     × anchors a blocked verdict after feedback delivery 3ms (retry x1)\n     × preserves a blocked verdict when the post-feedback HEAD snapshot fails 4ms (retry x1)\n     × delivers synthesis feedback when review signals failed status 2ms (retry x1)\n     × does not deliver feedback when review passes 4ms (retry x1)\n     × PAN-2524: persists the verdict before a hanging feedback delivery times out 4ms (retry x1)\n\n Test Files  174 passed (174)\n      Te\n…(4974 chars elided)…\nut | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId regardless of notes wording\n[specialists/done] inspect signaling passed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId on a failed verdict too\n[specialists/done] inspect signaling failed for PAN-2724\n\nstdout | tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts > POST /api/specialists/done inspect item attribution > checkpoints the exact structured itemId on a failed verdict too\n[specialists/done] inspect signaling failed for PAN-2724\n\n ❯ |root| tests/unit/dashboard/server/routes/specialists-inspect-item.test.ts (4 tests | 2 failed) 75ms\n     × checkpoints the exact structured itemId regardless of notes wording 31ms (retry x1)\n     × checkpoint\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewSpawnedAt": "2026-08-03T01:23:24.952Z"
+    "reviewSpawnedAt": "2026-08-03T01:34:36.183Z"
   },
   "closeOut": {
     "usage": {
@@ -1087,7 +1092,7 @@
       },
       "costAtCloseOut": {
         "usd": 635.8129881,
-        "pricingAsOf": "2026-08-03T01:34:35.742Z"
+        "pricingAsOf": "2026-08-03T01:34:38.384Z"
       }
     },
     "merges": [
