@@ -1,0 +1,629 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-03T04:26:51.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3511: Every recovery path must read the synthesis artifact before acting on a review row — the verdict-of-record contract (READ SIDE)",
+    "updated": "2026-08-03T04:31:03.245Z"
+  },
+  "plan": {
+    "id": "pan-3511",
+    "title": "Every recovery path must read the synthesis artifact before acting on a review row — the verdict-of-record contract",
+    "status": "proposed",
+    "uid": "f85d7351-3402-4a6a-a073-edaa40bc1ba5",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-03T04:26:51.000Z",
+    "updated": "2026-08-03T04:31:03.245Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3511",
+        "label": "PAN-3511",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3512",
+        "label": "PAN-3512 — the write-side sibling",
+        "type": "issue"
+      },
+      {
+        "uri": "https://github.com/eltmon/overdeck/blob/overdeck-state/drafts/pan-3511.md",
+        "label": "PRD (overdeck-state)",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "cloister",
+      "review-pipeline",
+      "recovery",
+      "verdict-of-record",
+      "pan-1577"
+    ],
+    "narratives": {
+      "Problem": "The pipeline's recovery machinery mutates the review_status row from four independent directions — the deacon orphan reset, two stuck-marking paths (feedback-target delivery failure and the review-infrastructure breaker), the stall sweeper's stuck re-drive, and the journal reconcile — and each reads different evidence at a different lag. None consults the one durable verdict of record: the reviewer's own artifact, .pan/review/<runId>/synthesis.md for a convoy or review.md for a quick self-review. A reviewer writes that artifact seconds to minutes before its verdict syncs into the row, so any recovery firing inside that window sees a dead-looking review and wipes an APPROVED verdict to pending. PAN-1577 lost five passed reviews to this in one evening on 2026-08-02. 'Passed review but never merges' has recurred for months because each previous fix guarded exactly one path.",
+      "Proposal": "Make the artifact the verdict of record at every read-side decision point. A shared helper in a new src/lib/cloister/verdict-restore.ts reads the freshest artifact through the already-landed readLatestSynthesisVerdict door, decides whether a restore may be written, and either writes it through setReviewStatusSync or — when the existing head-mismatch guard would reject the write — skips it and emits review.verdict_restore_blocked plus a once-per-condition activity entry naming the artifact verdict, its head, and the row's stale anchor. Every recovery site then calls that one helper before it marks, resets, or re-drives: the already-landed orphan reset is retrofitted onto it, the feedback-delivery stuck path and both review-infrastructure breaker trips consult it before markWorkspaceStuck, and the sweeper's stuck-flag orbit consults it before any clear or re-drive. The journal reconcile gets the same rule without paying for it on the hot read path: a per-issue memoized artifact check, ~60s TTL, consulted only where the resolver is already about to refuse a stale journal replay.",
+      "NonGoals": "- Do NOT build the verdict write door (recordReviewVerdict) or src/lib/cloister/review-verdict-writer.ts — that is PAN-3512.\n- Do NOT change dispatch-not-drop semantics: a fresh-head verdict still does not land through the guard in this issue, it only becomes visible.\n- Do NOT modify src/lib/review-verdict-guards.ts; both the review arm and the test arm at :56-63 stay exactly as they are.\n- Do NOT make the deacon fallback's killSession conditional (deacon-review-signals.ts:247) — that is PAN-3512's WI-4.\n- Do NOT reimplement WI-1 (93b88ee71e0) or WI-2 (0bc2b444e23); both are already landed on this branch.\n- Do NOT add a filesystem artifact scan to resolveJournalReconciledReviewStatusSync's common path or to any per-read code path.\n- Do NOT resolve the roles/review.md mode-banner drift (banner says the convoy is disabled, code runs convoys); this plan only records it as a follow-up.\n- Do NOT approve on missing evidence: an absent artifact means 'no evidence', never 'passed', and every touched path keeps its current behavior when the reader returns null.\n- Do NOT claim the merge-gate outcome (AC-PROD as originally worded) as this issue's evidence; a guard-rejected restore stays rejected until PAN-3512.",
+      "Notes": "Landed already on feature/pan-3511 — do not redo: 93b88ee71e0 (orphan reset restores from the artifact) and 0bc2b444e23 (the reader honors quick-mode review.md, not only convoy synthesis.md). File-size ratchets bind two files: src/lib/cloister/deacon-review-status.ts is at 978/1000 and src/lib/review-status.ts sits at EXACTLY its allowlisted 1034 (PAN-3253). Repo rules that intersect this work: no execSync anywhere server-reachable, fake timers for any TTL/delay test, async tmux primitives only."
+    },
+    "autoDecisions": [
+      {
+        "summary": "A restore that the head-mismatch guard would reject is predicted, skipped, and surfaced via review.verdict_restore_blocked — not evaded by dropping reviewedAtCommit, and not forced by anchoring to the row's own lastVerifiedCommit.",
+        "rationale": "Dropping the anchor lands a terminal 'passed' with no head evidence, which is precisely the loophole rejectVerdictEvidenceHeadMismatch exists to close; anchoring to the row's stale commit writes a claim about what the reviewer read that is false, corrupting the next cycle's reviewersToRerun skip logic that WI-1's anchoring was added to feed. Surfacing converts a silent loss into an attributable one, which is the whole read-side thesis, and PAN-3512's write door is the sanctioned place to make such a verdict actually land."
+      },
+      {
+        "summary": "AC-PROD is restated as the read-side observable (a restore lands or emits review.verdict_restore_blocked, never silently no-ops) rather than the original merge-gate outcome.",
+        "rationale": "The original wording ('PAN-1577's next verdict reaches testStatus testing|passed with zero manual intervention') is not satisfiable by the read side alone on the convoy path, because a guard-rejected restore stays rejected until PAN-3512 lands the write door. Grading this issue against a criterion only its sibling can close would block a correct diff."
+      },
+      {
+        "summary": "The two review-infrastructure breaker trips at deacon-review-status.ts:378 and :621 are one plan item with an acceptance criterion per site.",
+        "rationale": "They are mechanically identical markWorkspaceStuck(issueId, 'review_infrastructure_failure', …) calls in the same file guarded by the same REVIEW_INFRA_BREAKER_THRESHOLD, so splitting them would produce two diffs a reviewer must cross-reference while doubling the pressure on that file's 978/1000 ratchet."
+      },
+      {
+        "summary": "The WI-7 memo lives in src/lib/cloister/synthesis-verdict.ts rather than in the new restore module.",
+        "rationale": "It is a read concern belonging beside readLatestSynthesisVerdict, and it keeps review-status-read.ts importing a reader module rather than a restore module. The import direction was verified acyclic during planning: synthesis-verdict.ts pulls only ../projects.js (no review-status import) and ./review-verdict-report.js (fs only), so no cycle reaches the Node-22 dist boot path."
+      }
+    ],
+    "items": [
+      {
+        "id": "restore-helper",
+        "title": "Add the shared artifact-restore helper that predicts the head-mismatch rejection",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3511",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "orphan-restore-adopt",
+            "feedback-target-consult",
+            "infra-breaker-consult",
+            "sweeper-consult"
+          ],
+          "files_scope": [
+            "src/lib/cloister/verdict-restore.ts",
+            "src/lib/cloister/__tests__/verdict-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verdict-restore.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/cloister/__tests__/verdict-restore.test.ts passes with cases for: fresh passed artifact with no head evidence, fresh passed artifact whose head matches lastVerifiedCommit, fresh passed artifact whose head differs from a set lastVerifiedCommit, and no artifact at all",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "NFR-4",
+            "AC-READ-GUARD"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/verdict-restore.ts exporting `attemptArtifactVerdictRestore(issueId, opts)` — the single read-side decision point every recovery path will call. Behavior, in order: (1) read the freshest artifact through the already-landed `readLatestSynthesisVerdict(issueId, { now, workspacePath })` from ./synthesis-verdict.js; if it returns null, return `{ outcome: 'no-artifact' }` and write nothing. (2) Read the row via `getReviewStatusSync`. (3) Predict whether `rejectVerdictEvidenceHeadMismatch` would reject the restore, using a small exported pure function `restoreWouldTripHeadGuard({ artifactHead, lastVerifiedCommit })` that returns true only when BOTH are non-empty strings and they differ — this mirrors the review arm of findVerdictEvidenceHeadMismatch at src/lib/review-verdict-guards.ts:42-54, which fires on a terminal reviewStatus carrying a reviewedAtCommit that differs from status.lastVerifiedCommit. Keeping the prediction in one exported pure function gives a future guard change exactly one place to land. (4) If it would trip, write NOTHING; append a `review.verdict_restore_blocked` domain event via `getCloisterEventStore()?.append({ type, timestamp, payload })` (the same shape stall-sweeper.ts:99-109 uses) carrying issueId, the artifact verdict, artifactHead, and the row's lastVerifiedCommit; emit ONE activity entry through `emitActivityEntryOnce` from ../activity-logger.js (as deacon-verdict-fallback-sweep.ts:251 does, NOT emitActivityEntrySync — these run in a ~60s patrol and would otherwise repeat forever) naming the artifact verdict, its head, the stale anchor, and PAN-3512 as the path that will make it land; return `{ outcome: 'blocked-by-head-guard', artifact }`. (5) Otherwise write the restore through `setReviewStatusSync(issueId, { reviewStatus: artifact.verdict, reviewNotes: artifact.notes, reviewRetryCount: 0, recoveryStartedAt: undefined, ...(artifact.headSha ? { reviewedAtCommit: artifact.headSha } : {}) })`, additionally clearing stuck/stuckReason/stuckAt/stuckDetails when `opts.clearStuckReason` matches the row's current stuckReason, and return `{ outcome: 'restored', artifact }`. Accept injectable deps (readArtifact, getStatus, setStatus, emitEvent, emitActivity, now) with real defaults so every downstream fixture can drive it without touching disk. This item adds NO call sites — it is the contract the next four items adopt. Do NOT build recordReviewVerdict or any write door here; restores go through setReviewStatusSync, exactly as the already-landed restore at deacon-review-status.ts:594 does."
+        },
+        "items": [
+          {
+            "id": "restore-helper.ac1",
+            "title": "Given a fresh passed artifact carrying no head evidence and a row in 'reviewing', when attemptArtifactVerdictRestore runs, then it calls setReviewStatusSync with reviewStatus 'passed' and returns outcome 'restored'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-helper.ac2",
+            "title": "Given a fresh passed artifact whose headSha differs from a non-empty row lastVerifiedCommit, when the helper runs, then it calls setReviewStatusSync zero times, appends a review.verdict_restore_blocked event carrying the artifact verdict, artifactHead and lastVerifiedCommit, and returns outcome 'blocked-by-head-guard'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-helper.ac3",
+            "title": "Given a blocked restore condition that persists across two consecutive helper invocations, when the helper runs twice, then the activity entry is emitted through emitActivityEntryOnce so the operator feed receives it once rather than once per patrol",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-helper.ac4",
+            "title": "Given readLatestSynthesisVerdict returns null, when the helper runs, then it writes nothing, emits nothing, and returns outcome 'no-artifact' — an absent artifact produces no approval",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "restore-helper.ac5",
+            "title": "Given a fresh passed artifact and opts.clearStuckReason matching the row's stuckReason, when the helper restores, then the setReviewStatusSync update also sets stuck false and clears stuckReason, stuckAt and stuckDetails",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "orphan-restore-adopt",
+        "title": "Route the landed orphan-reset restore through the shared helper",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "refactor",
+          "issueLabel": "pan-3511",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-status.ts",
+            "src/lib/cloister/__tests__/verdict-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verdict-restore.test.ts",
+            "wc -l src/lib/cloister/deacon-review-status.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verdict-restore.test.ts passes including the orphan-path case",
+            "wc -l reports src/lib/cloister/deacon-review-status.ts at or below 1000 lines, or scripts/file-size-allowlist.txt carries a matching '# PAN-3511' row in the same commit",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-1",
+            "AC-READ-GUARD"
+          ]
+        },
+        "narrative": {
+          "Action": "Replace the inline race-guard restore block landed by 93b88ee71e0 at src/lib/cloister/deacon-review-status.ts:573-596 (the `if (!hasPassedReview)` branch that calls readLatestSynthesisVerdict and then setReviewStatusSync with the artifactUpdate object) with a single call to attemptArtifactVerdictRestore(issueId, { clearStuckReason: 'review_infrastructure_failure' }). Keep the existing actions.push sentence for the restored case so the deacon log reads the same, and add a distinct actions.push sentence for the blocked-by-head-guard case that names the artifact verdict and the stale anchor. On outcome 'restored' and 'blocked-by-head-guard' the function returns actions exactly as it does today (a blocked restore must NOT fall through into the pending reset that follows — the artifact proves a review finished, so resetting it to pending is the PAN-1577 wipe by another name). On 'no-artifact' the existing pending-reset path runs unchanged. This is a behavior-preserving retrofit plus the AC-READ-GUARD emit: it must not change what the orphan patrol does when the restore is writable. Note the file is at 978 of its 1000-line ratchet — this change should SHRINK it, since roughly 24 inline lines collapse into a call plus two log sentences; confirm with wc -l before committing."
+        },
+        "items": [
+          {
+            "id": "orphan-restore-adopt.ac1",
+            "title": "Given the orphan patrol reaches the no-passed-review branch with a fresh passed artifact whose head is writable, when it runs, then the row is restored to passed exactly as before the retrofit and the deacon action sentence still names the synthesis-artifact race guard",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-restore-adopt.ac2",
+            "title": "Given a fresh passed artifact whose head would trip the head-mismatch guard, when the orphan patrol runs, then it emits review.verdict_restore_blocked and returns without resetting the row to pending",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-restore-adopt.ac3",
+            "title": "Given no artifact exists, when the orphan patrol runs, then it resets the row to pending and increments reviewRetryCount exactly as it does today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "orphan-restore-adopt.ac4",
+            "title": "Given the retrofit is committed, when wc -l runs against src/lib/cloister/deacon-review-status.ts, then it reports no more lines than before the change",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "feedback-target-consult",
+        "title": "Consult the artifact before marking a feedback-delivery failure stuck",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3511",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/feedback-target.ts",
+            "src/lib/cloister/__tests__/feedback-target.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/feedback-target.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "feedback-target.test.ts passes with new cases for a fresh passed synthesis.md artifact and a fresh passed quick-mode review.md artifact",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In surfaceIssueFeedbackNeedsYou at src/lib/cloister/feedback-target.ts:260-273, call attemptArtifactVerdictRestore(issueId, { clearStuckReason: FEEDBACK_DELIVERY_STUCK_REASON }) BEFORE the markWorkspaceStuck call at :267. When the outcome is 'restored', return without marking stuck and log that the review finished and only its feedback delivery failed — a review that produced a verdict is not stuck, and the existing delivery machinery retries without needing the flag. When the outcome is 'blocked-by-head-guard', still skip the stuck mark (the artifact proves the review finished) and let the helper's emitted event carry the reason. When the outcome is 'no-artifact', fall through to the existing markWorkspaceStuck call with its current arguments, unchanged. Keep the whole consult inside the existing try/catch so a reader failure can never prevent the stuck mark that protects delivery today. Tests use the existing vi.hoisted mock harness in feedback-target.test.ts and must cover BOTH artifact filenames (.pan/review/<run>/synthesis.md and .pan/review/<run>/review.md), because quick self-review is the fleet default and a synthesis-only fixture would miss it."
+        },
+        "items": [
+          {
+            "id": "feedback-target-consult.ac1",
+            "title": "Given a fresh passed synthesis.md artifact and a feedback delivery failure, when surfaceIssueFeedbackNeedsYou runs, then markWorkspaceStuck is called zero times and the row is restored to passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-target-consult.ac2",
+            "title": "Given a fresh passed quick-mode review.md artifact and a feedback delivery failure, when surfaceIssueFeedbackNeedsYou runs, then markWorkspaceStuck is called zero times and the row is restored to passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-target-consult.ac3",
+            "title": "Given no artifact on disk, when surfaceIssueFeedbackNeedsYou runs, then it calls markWorkspaceStuck with FEEDBACK_DELIVERY_STUCK_REASON and the same details payload it passes today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "feedback-target-consult.ac4",
+            "title": "Given the artifact reader throws, when surfaceIssueFeedbackNeedsYou runs, then it still calls markWorkspaceStuck rather than propagating the error",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "infra-breaker-consult",
+        "title": "Consult the artifact before both review-infrastructure breaker trips",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3511",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-status.ts",
+            "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
+            "wc -l src/lib/cloister/deacon-review-status.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "verdict-restore-breaker.test.ts passes with one case per breaker site",
+            "wc -l reports src/lib/cloister/deacon-review-status.ts at or below 1000 lines, or scripts/file-size-allowlist.txt carries a matching '# PAN-3511' row in the same commit",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Both review-infrastructure breaker trips in src/lib/cloister/deacon-review-status.ts mark a row stuck once reviewRetryCount crosses REVIEW_INFRA_BREAKER_THRESHOLD: the first at :378 inside handleReviewCoordinatorDied, the second at :621 inside the orphan re-dispatch path. In each, call attemptArtifactVerdictRestore(issueId, { clearStuckReason: 'review_infrastructure_failure' }) BEFORE markWorkspaceStuck. On 'restored', push an action sentence saying the breaker was superseded by the artifact verdict and return without marking stuck — retries exhausted while a verdict already exists on disk means the recovery was chasing a review that had already finished. On 'blocked-by-head-guard', also skip the stuck mark and let the helper's event carry the reason. On 'no-artifact', run the existing markWorkspaceStuck call unchanged, including its details payload and its surrounding try/catch at :620-630. These are two mechanically identical call sites in one file, so they land as one commit with one acceptance criterion each. Keep the added lines minimal — the file is at 978 of its 1000-line ratchet and this item does not have the retrofit's line savings to spend."
+        },
+        "items": [
+          {
+            "id": "infra-breaker-consult.ac1",
+            "title": "Given retries have crossed the breaker threshold in handleReviewCoordinatorDied and a fresh passed artifact exists, when the patrol runs, then markWorkspaceStuck is called zero times and the row is restored to passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infra-breaker-consult.ac2",
+            "title": "Given retries have crossed the breaker threshold in the orphan re-dispatch path and a fresh passed artifact exists, when the patrol runs, then markWorkspaceStuck is called zero times and the row is restored to passed",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infra-breaker-consult.ac3",
+            "title": "Given no artifact on disk at either breaker site, when the patrol runs, then it marks the row stuck with reason review_infrastructure_failure and the same details payload it passes today",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "infra-breaker-consult.ac4",
+            "title": "Given a fresh passed quick-mode review.md artifact at either breaker site, when the patrol runs, then the row is restored to passed — proving the consult is not blind to the fleet's default review mode",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweeper-consult",
+        "title": "Consult the artifact in the sweeper's stuck-flag orbit before any clear or re-drive",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3511",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/stall-sweeper.ts",
+            "src/lib/cloister/__tests__/stall-sweeper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/cloister/__tests__/stall-sweeper.test.ts",
+            "npm run lint",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "stall-sweeper.test.ts passes with at least 19 cases (the existing 17 plus the passed-artifact and blocked-artifact cases)",
+            "lint completes without errors, including lint:park-exits",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/stall-sweeper.ts `case 'stuck-flag':` (opens at :350), consult the artifact FIRST — before the review_infrastructure_failure branch at :351-358, before the feedback_delivery_needs_you / verification_stuck re-drive at :359-370, and before the operator-owned resurface at :372-378. Ordering matters: consulting later would let a passed artifact still send a rework message to the work agent before the restore short-circuits. On a fresh passed artifact, restore through attemptArtifactVerdictRestore, call actions.clearStuck(issueId), emit sweep.unparked with action 'verdict-restored', push an act() sentence, and return true WITHOUT calling resumeWorkAgentWithFeedback or dispatchReview — no message reaches the agent. On a fresh blocked or failed artifact, keep the existing re-drive but use artifact.notes as the feedback body in place of the generic 'Address the pending feedback in .pan/feedback' text, so the agent receives the actual blocker rather than a pointer. On no artifact, every existing branch behaves exactly as it does today. Add the artifact reader and the restore to StallSweeperDeps (the optional-dep-with-real-default pattern already used for dispatchReview, clearStuck and emitEvent at :84-89 and :173-180) so the existing harness in stall-sweeper.test.ts can inject them and assert that calls.message stayed empty on the passed path. Fake timers are already the norm in that suite — keep TTL and cooldown assertions on advanceTimersByTimeAsync."
+        },
+        "items": [
+          {
+            "id": "sweeper-consult.ac1",
+            "title": "Given a stuck-flag row and a fresh passed artifact, when the sweeper patrol runs, then it clears the stuck flag, emits sweep.unparked, and sends zero messages to the work agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-consult.ac2",
+            "title": "Given a stuck-flag row and a fresh blocked artifact, when the sweeper patrol runs, then it re-drives the work agent with feedback text containing the artifact's blocker rather than the generic pending-feedback pointer",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-consult.ac3",
+            "title": "Given a stuck-flag row with stuckReason review_infrastructure_failure and no artifact, when the sweeper patrol runs, then it clears the flag and re-dispatches review exactly as the existing test at stall-sweeper.test.ts:131 asserts",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-consult.ac4",
+            "title": "Given the suite is run after this change, when npx vitest run stall-sweeper.test.ts completes, then it reports at least 19 passing cases",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "journal-artifact-memo",
+        "title": "Let a corroborating artifact lift a stale-journal refusal, memoized off the hot read path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3511",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "foundationFor": [
+            "contract-docs"
+          ],
+          "files_scope": [
+            "src/lib/cloister/synthesis-verdict.ts",
+            "src/lib/review-status-read.ts",
+            "src/lib/__tests__/review-status-read-artifact.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/review-status-read-artifact.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "review-status-read-artifact.test.ts passes, including a case proving a second read inside the TTL performs no additional stat",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Two changes, both sized by the cost decision that the resolver is the hot read path. (1) In src/lib/cloister/synthesis-verdict.ts add `readMemoizedArtifactVerdict(issueId, options)` wrapping readLatestSynthesisVerdict behind a module-level Map<string, { value, checkedAt }> with a 60_000 ms TTL, plus an exported `__resetArtifactVerdictMemo()` for tests. Thread an explicit `now` through so the TTL is testable under fake timers and never depends on wall-clock drift. (2) In src/lib/review-status-read.ts, inside resolveJournalReconciledReviewStatusSync, consult readMemoizedArtifactVerdict ONLY in the branch where staleSnapshot is non-null — the branch at :38-46 that today logs 'Refusing stale journal verdict replay' and returns dbStatus. When a fresh artifact carries the SAME terminal verdict the journal is trying to replay, the journal is not stale after all: the artifact independently corroborates it, so proceed to reconcileJournalIntoCacheSync instead of refusing, and log that the artifact lifted the refusal. When the artifact is absent, or disagrees with the journal's verdict, the existing refusal stands unchanged. This is deliberately one-directional — the artifact can only lift a refusal the resolver was already making, never invent an approval — which is what keeps NFR-4 true. Because the consult sits behind an already-rare branch and is memoized per issue, the common read path performs zero filesystem work and a refusing path performs at most one stat per issue per minute. Do NOT add any artifact read to the common path, and do NOT edit src/lib/review-status.ts, which sits at exactly its allowlisted 1034 lines."
+        },
+        "items": [
+          {
+            "id": "journal-artifact-memo.ac1",
+            "title": "Given a journal replay the resolver would refuse as stale and a fresh artifact carrying the same terminal verdict, when getReviewStatusSync resolves, then it reconciles the journal into the row instead of refusing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-artifact-memo.ac2",
+            "title": "Given a journal replay the resolver would refuse and an artifact whose verdict disagrees, when getReviewStatusSync resolves, then it still refuses the replay and returns the db row unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-artifact-memo.ac3",
+            "title": "Given two resolves for the same issue inside the 60s TTL under fake timers, when the second runs, then the artifact reader is invoked exactly once across both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "journal-artifact-memo.ac4",
+            "title": "Given a resolve on the common path where staleVerdictSnapshotAgainstLiveCycle returns null, when it completes, then the artifact reader is invoked zero times",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "contract-docs",
+        "title": "Document the verdict-of-record contract and the sweeper's artifact consult",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-03T04:26:51.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3511",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "docs/PARKED-POPULATION.md",
+            "roles/review.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -c 'verdict of record' docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "git grep -c reports at least 1 occurrence of 'verdict of record' in docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "lint completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Add a 'Verdict of record' section to docs/REVIEW-AGENT-ARCHITECTURE.md stating the four clauses — the artifact is the verdict; one verdict write door (marked as PAN-3512's scope, not shipped here); every recovery path reads the artifact before acting; guards surface rather than destroy — and the two-mode table comparing convoy and quick self-review across artifact filename (synthesis.md vs review.md), blocked vocabulary (CHANGES REQUESTED in both), verdict writer, dead-agent recovery (fallback synthesis vs none), and head evidence (reviewerVerdicts plus context.json vs usually none). Name the read door readLatestSynthesisVerdict and the restore helper attemptArtifactVerdictRestore, list the five recovery sites that now consult it, and state the rule for future guard authors: a new review recovery path reads the artifact before it marks, resets, or re-drives, and a guard that refuses a verdict emits the reason rather than dropping it silently. Record the AC-READ-GUARD limitation explicitly — a restore whose artifact head differs from a stale lastVerifiedCommit is surfaced, not landed, until PAN-3512's write door ships. Add one line to docs/PARKED-POPULATION.md noting that the sweeper's stuck-flag orbit consults the verdict artifact first and restores instead of re-driving when the artifact says passed. In roles/review.md, add a short note that the mode banner claiming the convoy is disabled is stale relative to the code, which runs convoys, and that reconciling the mode policy is a separate follow-up not addressed by this issue."
+        },
+        "items": [
+          {
+            "id": "contract-docs.ac1",
+            "title": "Given docs/REVIEW-AGENT-ARCHITECTURE.md after this change, when a reader opens it, then it states all four contract clauses and marks the write-door clause as PAN-3512's scope rather than shipped",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-docs.ac2",
+            "title": "Given the same file, when a reader looks for mode differences, then it presents a table naming synthesis.md for convoy and review.md for quick self-review across artifact, verdict writer, dead-agent recovery, and head evidence",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-docs.ac3",
+            "title": "Given docs/PARKED-POPULATION.md after this change, when a reader reaches the stuck-flag orbit description, then it states that the sweeper consults the verdict artifact and restores instead of re-driving on a passed artifact",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contract-docs.ac4",
+            "title": "Given roles/review.md after this change, when a reader reaches the mode banner, then it carries a note that the banner is stale relative to the code and that mode policy is a separate follow-up",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "restore-helper",
+        "to": "orphan-restore-adopt",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-helper",
+        "to": "feedback-target-consult",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-helper",
+        "to": "infra-breaker-consult",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-helper",
+        "to": "sweeper-consult",
+        "type": "blocks"
+      },
+      {
+        "from": "orphan-restore-adopt",
+        "to": "infra-breaker-consult",
+        "type": "blocks"
+      },
+      {
+        "from": "restore-helper",
+        "to": "contract-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "sweeper-consult",
+        "to": "contract-docs",
+        "type": "blocks"
+      },
+      {
+        "from": "journal-artifact-memo",
+        "to": "contract-docs",
+        "type": "blocks"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-03-PAN-3511-every-recovery-path-must-read-the-synthesis-artifact-before-acting-on-a-review-row-the-verdict-of-record-contract.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
