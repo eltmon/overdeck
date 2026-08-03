@@ -722,6 +722,11 @@
       "reason": "feedback",
       "note": "[2026-08-02T23:38Z] test-agent → FAILED — seq 1",
       "timestamp": "2026-08-02T23:38:27.261Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T00:26Z] review-agent → FAILED — seq 3",
+      "timestamp": "2026-08-03T00:26:04.998Z"
     }
   ],
   "feedback": [
@@ -731,6 +736,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-02T23:38:27Z",
       "markdownBody": "# Test failure\n\ntypecheck: PASS (npm run typecheck, incl. dashboard/frontend type ratchets). lint: FAIL at lint:circular — 'new circular dependencies found: src/lib/cloister/deacon.ts > src/lib/cloister/stall-sweeper.ts > src/lib/cloister/service.ts'. Verified this is NOT a PAN-3410 regression: these three files have zero diff between HEAD (27a14570e), the merge-base with origin/main (d28b8893d), and origin/main's tip itself (all identical, confirmed via git diff). scripts/circular-deps-baseline.txt (also unmodified by this branch) does not contain this cycle, so it is a pre-existing, currently-unbaselined red-main defect introduced by unrelated PAN-3487 stall-sweeper work already on main, inherited via this branch's merge of origin/main. Confirmed main's own CI (run 30763459403 on d28b8893d) is independently red (lint + test jobs failing) for a different reason (lint:slash-commands drift, which this branch already fixed in commit 2d21006b1). Cannot fix per boundaries (no code/config edits permitted). test: full `npm test` reported 70 failed / 13088 passed / 50 skipped, ALL 70 failures are 'Hook timed out in 5000ms' inside setupOverdeckTestDb() beforeEach hooks, in files entirely outside PAN-3410's scope (conversations/embeddings, costs, memory search-scopes, cli conversations commands). Reproduced the same timeouts re-running 3 of those files in isolation; machine was at load average 42 on 24 cores with swap 100% full (uptime/free confirmed) from ~30 concurrently running agents on this host — matches the documented resource-contention flake pattern, not a code regression. All PAN-3410-scoped test files pass cleanly in isolation: tests/unit/dashboard/fonts-local.test.ts, src/lib/__tests__/config-yaml-ui-theme.test.ts, src/lib/__tests__/settings-api.test.ts, tests/lib/settings-api.test.ts (4 files, root vitest, all pass) plus src/dashboard/frontend/src/hooks/__tests__/useDesignLanguage.test.ts, src/dashboard/frontend/src/components/Settings/__tests__/AppearanceSection.test.tsx, src/dashboard/frontend/src/recovery.test.ts (frontend vitest, 24/24 pass), and tests/e2e/styleguide-conformance.spec.ts (6/6 pass). Top-level status is 'failed' per the configured lint gate's literal result, though the failure is demonstrably pre-existing and outside this diff's scope — flagging for operator/pipeline judgment on whether to treat as a red-main blocker rather than a PAN-3410 defect.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3410`."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T00:26:04Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3410` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3410`."
     }
   ],
   "scopeDrift": {
@@ -833,7 +845,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-03T00:23:16.616Z",
+  "updated": "2026-08-03T00:26:04.998Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
