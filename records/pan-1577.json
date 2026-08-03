@@ -1071,18 +1071,19 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:36:11.512Z",
+  "updated": "2026-08-03T02:45:22.233Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "testing",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T02:26:44.919Z",
-    "updatedAt": "2026-08-03T02:36:10.981Z",
+    "updatedAt": "2026-08-03T02:45:22.071Z",
+    "verificationNotes": "Verification FAILED at test (804384ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\n ❯ |root| tests/unit/lib/agents/spawn-flywheel-provenance.test.ts (5 tests | 1 failed) 18ms\n     × persists the same flywheel run id in spawnRun state 7ms (retry x1)\n\n Test Files  174 passed (174)\n      Tests  1956 passed (1956)\n   Start at  22:38:39\n   Duration  47.81s (transform 6.87s, setup 21.92s, import 63.40s, tests 44.64s, environment 38.03s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SPDPcF/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing \n…(1164 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-YERu0E/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-YERu0E/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "06f33f0837ec0d7ed1f6a496d4184d5543f9b236",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
@@ -1149,10 +1150,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 434,
-            "output": 86972,
-            "cacheRead": 43429076,
-            "cacheWrite": 801192
+            "input": 438,
+            "output": 87403,
+            "cacheRead": 43757884,
+            "cacheWrite": 812072
           }
         },
         "work": {
@@ -1184,15 +1185,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3845,
-          "output": 774726,
-          "cacheRead": 728386617,
-          "cacheWrite": 28198549
+          "input": 3849,
+          "output": 775157,
+          "cacheRead": 728715425,
+          "cacheWrite": 28209429
         }
       },
       "costAtCloseOut": {
-        "usd": 712.1171367,
-        "pricingAsOf": "2026-08-03T02:36:11.139Z"
+        "usd": 712.2144167,
+        "pricingAsOf": "2026-08-03T02:45:22.158Z"
       }
     },
     "merges": [
