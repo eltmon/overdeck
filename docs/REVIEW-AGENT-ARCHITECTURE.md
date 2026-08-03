@@ -137,6 +137,42 @@ before resurrection or escalation, so `feedback_delivery_needs_you` means no
 eligible live registered session was found rather than that only the canonical
 tmux name was checked.
 
+### Verdict write door (`recordReviewVerdict`) — PAN-3512
+
+**Single source of truth for terminal review verdict writes.** Every call site that
+records a final verdict (`passed` or `blocked`) routes through `recordReviewVerdict()` in
+`src/lib/cloister/review-verdict-writer.ts`. The door enforces **dispatch-not-drop
+semantics**: a terminal review verdict whose evidence head disagrees with the row's
+`lastVerifiedCommit` is never silently discarded. Provably-stale evidence is rejected
+with a `review.verdict_rejected` domain event and an activity entry; anything else
+lands and re-gates.
+
+**Evidence classification.** When evidence heads differ, the door classifies the
+evidence by running per-repo `git merge-base --is-ancestor` probes (polyrepo-aware via
+`resolveWorkspaceRepoRootsSync()` and `parseCompositeSnapshot()`):
+
+- **Stale:** all sub-repos' evidence heads are strict ancestors of their row heads.
+  Verdict is rejected with `review.verdict_rejected` event; no status update.
+- **Fresh:** at least one sub-repo's evidence head is NOT an ancestor of its row head.
+  Verdict lands with `reviewedAtCommit` set to the evidence head.
+- **Indeterminate:** shape mismatch (composite vs bare), repo-key disagreement, or
+  git probe timeout/failure. Verdict lands conservatively.
+
+**Test-gate reset.** When evidence heads differ and the row's `testStatus` is
+`passed` or `skipped`, the update sets `testStatus` to `pending` with a `testNotes`
+string naming both shortened head anchors and the writer tag. This prevents stale
+test results from blocking merge and forces re-verification at the new head.
+
+**Writer tags** identify the source of the verdict: `coordinator` (synthesis parent),
+`fallback` (deacon sweep), `quick-signal` (quick-mode self-review), `orphan-restore`
+(recovered from disk), `sweeper-restore` (post-merge verification), `unsignaled-recovery`
+(reconcile unapplied), `infra-bypass` (review infrastructure failure). Both emitted
+domain events carry the writer tag for audit trail and reactive dispatch.
+
+**Merge-gate regression protection:** the test-gate reset ensures `readyForMerge`
+cannot become true at unverified heads, locking the merge gate until post-review
+verification runs at the new head.
+
 ---
 
 ## Polyrepo workspaces (PAN-2948)
