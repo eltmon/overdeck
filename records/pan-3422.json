@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-01T15:30:57.389Z",
-  "updated": "2026-08-01T23:08:46.841Z",
+  "updated": "2026-08-03T03:09:32.551Z",
   "pipeline": {
     "issueId": "PAN-3422",
     "reviewStatus": "pending",
@@ -12,9 +12,8 @@
     "mergeStep": "merged",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "closedOut": true,
-    "closedOutAt": "2026-08-01T17:30:39.775Z",
-    "updatedAt": "2026-08-01T23:08:41.969Z"
+    "updatedAt": "2026-08-03T03:09:32.547Z",
+    "reopenedAt": "2026-08-03T03:09:32.547Z"
   },
   "closeOut": {
     "usage": {
