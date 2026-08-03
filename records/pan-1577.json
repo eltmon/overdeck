@@ -996,18 +996,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:41:11.676Z",
+  "updated": "2026-08-03T01:41:28.798Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "uatStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T01:37:45.866Z",
-    "updatedAt": "2026-08-03T01:41:11.592Z",
+    "updatedAt": "2026-08-03T01:41:28.780Z",
     "reviewNotes": "Approved at 579e3701: all four reviewers passed with no blocking findings; cycle diff test repairs pass.",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -1015,25 +1015,7 @@
     "reviewedAtCommit": "579e3701297791631f0bc97e77eec99abc87d18b",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-03T01:37:45.866Z",
-    "reviewSpawnedAt": "2026-08-03T01:34:36.183Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "579e3701297791631f0bc97e77eec99abc87d18b"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-03T01:34:36.183Z"
   },
   "closeOut": {
     "usage": {
@@ -1048,17 +1030,17 @@
         },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 4503,
-            "output": 600,
-            "cacheRead": 61,
+            "input": 5466,
+            "output": 800,
+            "cacheRead": 64,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 55528273,
-            "output": 602662,
-            "cacheRead": 142010880,
+            "input": 55533773,
+            "output": 605142,
+            "cacheRead": 142924288,
             "cacheWrite": 0
           }
         },
@@ -1119,15 +1101,15 @@
           "cacheWrite": 120026
         },
         "anthropic/claude-haiku-4-5": {
-          "input": 4503,
-          "output": 600,
-          "cacheRead": 61,
+          "input": 5466,
+          "output": 800,
+          "cacheRead": 64,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 66984692,
-          "output": 845645,
-          "cacheRead": 189268992,
+          "input": 66990192,
+          "output": 848125,
+          "cacheRead": 190182400,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1138,8 +1120,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 664.9598801,
-        "pricingAsOf": "2026-08-03T01:41:11.647Z"
+        "usd": 665.5204474,
+        "pricingAsOf": "2026-08-03T01:41:28.789Z"
       }
     },
     "merges": [
