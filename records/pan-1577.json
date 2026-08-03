@@ -961,18 +961,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T01:20:53.491Z",
+  "updated": "2026-08-03T01:23:24.998Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "testing",
     "uatStatus": "failed",
-    "verificationStatus": "failed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T01:20:46.055Z",
-    "updatedAt": "2026-08-03T01:20:49.220Z",
+    "updatedAt": "2026-08-03T01:23:24.954Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "Automated gates FAILED on current workspace HEAD 8bfbd8bfdc7 (feature/pan-1577 + local sync-main). typecheck: PASS (root tsc, hooks, evals, dashboard-types ratchet 55/55 known, frontend-types ratchet 0 known). lint: PASS (ESLint, skills, slash-commands, prompts, file-size, circular-deps, ratchet-audit, quarantine-audit all clean). build (required gate 'server-bundle'): FAILED -- dashboard server bundle (tsdown/rolldown) parse error: src/dashboard/server/routes/specialists/legacy-routes.ts:259 has a bare `await recordReviewVerdict(...)` inside a non-async Effect.gen generator (should be `yield* Effect.promise(...)`). Root cause: this branch's latest 'Merge remote-tracking branch origin/main' commit pulled in PAN-3512 commit fd48e3af398 at a moment when origin/main's dashboard build was transiently broken; that break was already fixed upstream by origin/main commit 6ca777307aa ('fix(dashboard): unwrap bare await in legacy-routes Effect.gen') but this workspace has not re-synced. Confirmed: `git diff origin/main -- <file>` shows this exact divergence; `git log acc4e819be7..origin/main -- <file>` shows the upstream fix commit. PAN-1577's own changed files (conversations move/CLI/frontend) are unaffected -- typecheck/lint on them is clean and .pan/review/agent-pan-1577-review-8bfbd8bf/synthesis.md is APPROVED with 0 blocking findings across security/correctness/performance/requirements. test: 29/1396 files failed (36/13238 tests): 2 suites fail via the same legacy-routes.ts parse error during vitest transform (specialists-reviewed-at-commit.test.ts, unstick-route.test.ts); 6 failures in tests/cli/commands/specialists/done.test.ts trace to unrelated PAN-3512 review-verdict-writer logic; the remaining ~28 are 'Hook timed out in 5000ms' on setupOverdeckTestDb() under heavy concurrent machine load (24 agents running per session). No failures touch PAN-1577's own files. Also flagging: 3 files carry uncommitted changes unrelated to PAN-1577 (src/cli/commands/specialists/done.ts, src/lib/cloister/review-verdict-writer.ts, src/lib/overdeck/conversation-reads.ts), not part of the reviewed/committed HEAD -- out of scope for the test role to commit/revert. Required build gate fails, so overall status is failed regardless of test pass rate.",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
@@ -981,7 +981,7 @@
     "reviewedAtCommit": "77cd6a72099c608f296e2201441011d42ce1cbf1",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
     "reviewRequestedAt": "2026-08-03T01:20:46.055Z",
-    "reviewSpawnedAt": "2026-08-03T01:02:54.340Z"
+    "reviewSpawnedAt": "2026-08-03T01:23:24.952Z"
   },
   "closeOut": {
     "usage": {
@@ -1044,18 +1044,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 154,
-            "output": 32314,
-            "cacheRead": 12967811,
-            "cacheWrite": 418513
+            "input": 158,
+            "output": 33347,
+            "cacheRead": 13350384,
+            "cacheWrite": 419038
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3167,
-            "output": 628621,
-            "cacheRead": 623153339,
-            "cacheWrite": 25720999
+            "input": 3205,
+            "output": 643275,
+            "cacheRead": 631904767,
+            "cacheWrite": 25749839
           }
         }
       },
@@ -1079,15 +1079,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3321,
-          "output": 660935,
-          "cacheRead": 636121150,
-          "cacheWrite": 26139512
+          "input": 3363,
+          "output": 676622,
+          "cacheRead": 645255151,
+          "cacheWrite": 26168877
         }
       },
       "costAtCloseOut": {
-        "usd": 628.2744611,
-        "pricingAsOf": "2026-08-03T01:20:53.131Z"
+        "usd": 630.3316281,
+        "pricingAsOf": "2026-08-03T01:23:24.972Z"
       }
     },
     "merges": [
