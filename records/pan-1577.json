@@ -1101,18 +1101,20 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T03:01:04.826Z",
+  "updated": "2026-08-03T03:21:13.320Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "testing",
+    "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": false,
-    "updatedAt": "2026-08-03T03:00:57.311Z",
+    "readyForMerge": true,
+    "updatedAt": "2026-08-03T03:20:51.313Z",
     "reviewNotes": "Approved at 756a77d5: all four reviewers passed with no blocking findings; 26 in-PR requirements implemented.",
+    "testNotes": "All configured gates green at HEAD 756a77d5 (matches reviewedAtCommit): install, typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet), frontend-typecheck, lint (eslint + all 18 sub-lints incl. circular-deps/ratchet-audit/quarantine-audit/skills/slash-commands), build, server-bundle all pass. Test: frontend vitest 174/174 files, 1956/1956 tests passed. Root vitest 741/746 files, 7202/7238 tests passed; 5 files (9 tests, schema-audit/issues/observability) failed with uniform 'Test timed out in 5000ms' under host load (uptime load 18.9-27.2 on 24 cores, ~23 concurrent agents). Root-caused as load, not a defect: reran those 3 files isolated with a longer timeout, all 10 tests passed cleanly in ~19s -- matches this branch's own history of identically root-causing the same flaky pattern 3 prior times.",
+    "uatNotes": "Menu-picker move and native drag-and-drop move both verified end-to-end via isolated Playwright UAT against this workspace's built dist (isolated HOME+OVERDECK_HOME, deacon disabled, throwaway projects/conversations). Menu move: 3-dot -> Move -> project picker (current project disabled) -> select target -> optimistic re-group + toast 'Moved \"<title>\" to <project>'. Drag-drop: dragged row onto sidebar project rail -> immediate optimistic re-group. Both confirmed server-side via GET /api/conversations: projectKey updated to target while cwd stayed pinned to the original path throughout (JSONL/cwd-sacred invariant held).",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "756a77d590e9b0095841cebeaea0511cf73f4778",
@@ -1180,18 +1182,18 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 464,
-            "output": 92953,
-            "cacheRead": 46201490,
-            "cacheWrite": 835809
+            "input": 734,
+            "output": 146390,
+            "cacheRead": 78601455,
+            "cacheWrite": 1184942
           }
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3451,
-            "output": 694920,
-            "cacheRead": 696669767,
-            "cacheWrite": 27415410
+            "input": 3461,
+            "output": 695895,
+            "cacheRead": 699646306,
+            "cacheWrite": 27418081
           }
         }
       },
@@ -1215,15 +1217,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3915,
-          "output": 787873,
-          "cacheRead": 742871257,
-          "cacheWrite": 28251219
+          "input": 4195,
+          "output": 842285,
+          "cacheRead": 778247761,
+          "cacheWrite": 28603023
         }
       },
       "costAtCloseOut": {
-        "usd": 750.359026,
-        "pricingAsOf": "2026-08-03T03:00:57.330Z"
+        "usd": 758.858521,
+        "pricingAsOf": "2026-08-03T03:20:51.725Z"
       }
     },
     "merges": [
@@ -1423,5 +1425,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
