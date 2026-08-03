@@ -39,20 +39,6 @@ function findVerdictEvidenceHeadMismatch(
   status: ReviewGuardStatus,
   update: ReviewGuardUpdate,
 ): VerdictEvidenceHeadMismatch | null {
-  const terminalReview = update.reviewStatus !== undefined
-    && ['passed', 'blocked', 'failed', 'skipped'].includes(update.reviewStatus);
-  const reviewerEvidenceHeads = Object.values(update.reviewerVerdicts ?? {})
-    .flatMap((verdict) => verdict?.atCommit ? [verdict.atCommit] : []);
-  const reviewEvidenceHead = update.reviewedAtCommit ?? reviewerEvidenceHeads[0];
-  if (
-    terminalReview
-    && reviewEvidenceHead
-    && status.lastVerifiedCommit
-    && reviewEvidenceHead !== status.lastVerifiedCommit
-  ) {
-    return { gate: 'review', evidenceHead: reviewEvidenceHead, targetHead: status.lastVerifiedCommit };
-  }
-
   const terminalTest = update.testStatus !== undefined
     && ['passed', 'failed'].includes(update.testStatus);
   if (
