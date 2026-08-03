@@ -1166,7 +1166,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T06:03:59.657Z",
+  "updated": "2026-08-03T06:06:03.358Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1176,11 +1176,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T06:03:46.316Z",
-    "uatNotes": "UAT required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and hazard H7. Built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance (OVERDECK_HOME=/tmp/pan-1577-uat-home, PORT=13011, OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) rather than touching the production dashboard on port 3011, which belongs to a different checkout and is out of scope to hijack. Seeded two synthetic conversations through the canonical write door (createConversation() in src/lib/overdeck/conversations.ts) under two real registered projects (panopticon-cli, mind-your-now). Drove both flows with Playwright MCP: (1) Menu-based move -- 3-dot 'More actions' -> 'Move' expands a submenu listing registered projects with the conversation's current project disabled; selected panopticon-cli, got toast 'Moved \"PAN-1577 UAT source conversation B\" to panopticon-cli', GET /api/conversations confirmed projectKey=panopticon-cli with cwd unchanged (/home/eltmon/Projects/myn), and the conversation disappeared from mind-your-now's list and appeared in panopticon-cli's list on navigation. (2) Native HTML5 drag-and-drop -- dragged a conversation row (confirmed draggable=true, cursor:grab) onto the mind-your-now sidebar project node; got toast 'Moved \"PAN-1577 UAT source conversation A\" to mind-your-now', GET /api/conversations confirmed projectKey=mind-your-now with cwd unchanged (/home/eltmon/Projects/overdeck). (3) No-op check (ac3) -- dropped a conversation onto its own current project (panopticon-cli); no toast fired and GET /api/conversations confirmed zero state change. All acceptance criteria for menu-move and drag-drop-move items verified, and hazard H1 (JSONL/cwd never touched by a move) confirmed via API for both moves. Isolated instance and seeded data torn down after verification; production dashboard on 3011 was never touched.",
+    "updatedAt": "2026-08-03T06:05:57.922Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T06:03:23.344Z",
     "reviewSpawnedAt": "2026-08-03T05:14:36.729Z"
   },
   "closeOut": {
@@ -1252,10 +1250,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3607,
-            "output": 718916,
-            "cacheRead": 744709564,
-            "cacheWrite": 28070502
+            "input": 3609,
+            "output": 719149,
+            "cacheRead": 745360123,
+            "cacheWrite": 28071010
           }
         }
       },
@@ -1279,15 +1277,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 4653,
-          "output": 913988,
-          "cacheRead": 860054104,
-          "cacheWrite": 29568897
+          "input": 4655,
+          "output": 914221,
+          "cacheRead": 860704663,
+          "cacheWrite": 29569405
         }
       },
       "costAtCloseOut": {
-        "usd": 846.8285593,
-        "pricingAsOf": "2026-08-03T06:03:54.764Z"
+        "usd": 846.9622753,
+        "pricingAsOf": "2026-08-03T06:06:01.914Z"
       }
     },
     "merges": [
