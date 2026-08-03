@@ -1041,7 +1041,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:03:47.143Z",
+  "updated": "2026-08-03T02:03:50.892Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1051,13 +1051,13 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:03:46.506Z",
+    "updatedAt": "2026-08-03T02:03:47.471Z",
     "reviewNotes": "Verification failed at test",
     "uatNotes": "UAT is required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and the issue's UI acceptance criteria for drag-and-drop and the 3-dot/right-click Move menu. UAT could not be run: the workspace-built dashboard (`npm run build:dashboard:server:bundle` -> dist/dashboard/server.js) fails to build for the reason described in `notes`, and no dist/dashboard/server.js exists in this workspace to serve. Per the verification instructions, UAT must run against a dashboard built and run from this workspace, not main, so a main-checkout dashboard was not substituted. The UAT criterion is therefore unproven.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "579e3701297791631f0bc97e77eec99abc87d18b",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T02:02:47.341Z",
+    "reviewRequestedAt": "2026-08-03T02:03:46.939Z",
     "reviewSpawnedAt": "2026-08-03T02:02:50.925Z"
   },
   "closeOut": {
@@ -1121,10 +1121,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 286,
-            "output": 61357,
-            "cacheRead": 24903383,
-            "cacheWrite": 657870
+            "input": 288,
+            "output": 61572,
+            "cacheRead": 25121479,
+            "cacheWrite": 658586
           }
         },
         "work": {
@@ -1156,15 +1156,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3623,
-          "output": 735812,
-          "cacheRead": 689581823,
-          "cacheWrite": 27488598
+          "input": 3625,
+          "output": 736027,
+          "cacheRead": 689799919,
+          "cacheWrite": 27489314
         }
       },
       "costAtCloseOut": {
-        "usd": 672.1415984,
-        "pricingAsOf": "2026-08-03T02:03:46.857Z"
+        "usd": 672.1891614,
+        "pricingAsOf": "2026-08-03T02:03:50.244Z"
       }
     },
     "merges": [
