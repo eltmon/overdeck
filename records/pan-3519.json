@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3519",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T04:53Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-03T04:53:23.055Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 1,
@@ -11,68 +18,43 @@
     }
   ],
   "created": "2026-08-03T03:14:04.598Z",
-  "updated": "2026-08-03T04:53:23.055Z",
+  "updated": "2026-08-03T04:55:45.004Z",
   "pipeline": {
     "issueId": "PAN-3519",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T04:49:43.582Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 903a865 (5 paths): src/cli/commands/specialists/done.ts, src/lib/activity-logger.ts, src/lib/cloister/__tests__/review-verdict-writer.test.ts, …",
-        "detectedAt": "2026-08-03T04:48:36.083Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "903a865ab5fe0223ba473c3ef5560b6a760f26f4",
-      "detectedAt": "2026-08-03T04:48:36.083Z",
-      "paths": [
-        "src/cli/commands/specialists/done.ts",
-        "src/lib/activity-logger.ts",
-        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-        "src/lib/cloister/review-verdict-writer.ts",
-        "src/lib/pan-dir/agents.ts"
-      ]
-    }
+    "updatedAt": "2026-08-03T04:55:44.980Z"
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1403008,
-            "output": 89127,
-            "cacheRead": 48913408,
+            "input": 1488810,
+            "output": 104911,
+            "cacheRead": 55725056,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-sol": {
-          "input": 1403008,
-          "output": 89127,
-          "cacheRead": 48913408,
+          "input": 1488810,
+          "output": 104911,
+          "cacheRead": 55725056,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 34.145554,
-        "pricingAsOf": "2026-08-03T04:49:43.589Z"
+        "usd": 38.453908,
+        "pricingAsOf": "2026-08-03T04:55:44.992Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-03T04:53Z] review-agent → FAILED — seq 1",
-      "timestamp": "2026-08-03T04:53:23.055Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
