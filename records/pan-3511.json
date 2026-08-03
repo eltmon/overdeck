@@ -21,7 +21,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-03T05:29:32.590Z",
+  "updated": "2026-08-03T05:30:33.189Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -75,8 +75,16 @@
     }
   ],
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "orphan-restore-adopt": {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 3213848,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-03T05:30:33.188Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -150,6 +158,6 @@
     "journal-artifact-memo.journal-artifact-memo.ac2": "completed",
     "journal-artifact-memo.journal-artifact-memo.ac3": "completed",
     "journal-artifact-memo.journal-artifact-memo.ac4": "completed",
-    "orphan-restore-adopt": "pending"
+    "orphan-restore-adopt": "running"
   }
 }
