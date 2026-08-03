@@ -916,7 +916,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T00:42:25.323Z",
+  "updated": "2026-08-03T00:52:07.401Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -925,7 +925,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-02T23:10:22.124Z",
     "updatedAt": "2026-08-03T00:38:08.394Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
