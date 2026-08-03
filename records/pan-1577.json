@@ -1101,24 +1101,41 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T02:56:41.222Z",
+  "updated": "2026-08-03T03:00:42.519Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T02:52:06.582Z",
-    "reviewNotes": "Verification failed at test",
-    "verificationNotes": "Verification FAILED at test (804384ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-1577\n\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\nstdout | tests/unit/lib/agents/spawn-flywheel-provenance.test.ts > spawn flywheel provenance > persists the same flywheel run id in spawnRun state\n[spawn] PAN-3111 has no configured project; no close-out record was checked\n\n ❯ |root| tests/unit/lib/agents/spawn-flywheel-provenance.test.ts (5 tests | 1 failed) 18ms\n     × persists the same flywheel run id in spawnRun state 7ms (retry x1)\n\n Test Files  174 passed (174)\n      Tests  1956 passed (1956)\n   Start at  22:38:39\n   Duration  47.81s (transform 6.87s, setup 21.92s, import 63.40s, tests 44.64s, environment 38.03s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-SPDPcF/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing \n…(1164 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-YERu0E/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-YERu0E/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
+    "updatedAt": "2026-08-03T03:00:42.034Z",
+    "reviewNotes": "Approved at 756a77d5: all four reviewers passed with no blocking findings; 26 in-PR requirements implemented.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
-    "reviewedAtCommit": "06f33f0837ec0d7ed1f6a496d4184d5543f9b236",
+    "reviewedAtCommit": "756a77d590e9b0095841cebeaea0511cf73f4778",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T02:51:37.226Z",
-    "reviewSpawnedAt": "2026-08-03T02:52:06.580Z"
+    "reviewSpawnedAt": "2026-08-03T02:52:06.580Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "756a77d590e9b0095841cebeaea0511cf73f4778"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "756a77d590e9b0095841cebeaea0511cf73f4778"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "756a77d590e9b0095841cebeaea0511cf73f4778"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "756a77d590e9b0095841cebeaea0511cf73f4778"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -1141,9 +1158,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 59395037,
-            "output": 679922,
-            "cacheRead": 159921152,
+            "input": 65063429,
+            "output": 722807,
+            "cacheRead": 170421760,
             "cacheWrite": 0
           }
         },
@@ -1181,10 +1198,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 446,
-            "output": 88389,
-            "cacheRead": 44479437,
-            "cacheWrite": 824031
+            "input": 464,
+            "output": 92953,
+            "cacheRead": 46201490,
+            "cacheWrite": 835809
           }
         },
         "work": {
@@ -1210,21 +1227,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 70851456,
-          "output": 922905,
-          "cacheRead": 207179264,
+          "input": 76519848,
+          "output": 965790,
+          "cacheRead": 217679872,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 3897,
-          "output": 783309,
-          "cacheRead": 741149204,
-          "cacheWrite": 28239441
+          "input": 3915,
+          "output": 787873,
+          "cacheRead": 742871257,
+          "cacheWrite": 28251219
         }
       },
       "costAtCloseOut": {
-        "usd": 714.8578187,
-        "pricingAsOf": "2026-08-03T02:52:06.670Z"
+        "usd": 750.1561667,
+        "pricingAsOf": "2026-08-03T03:00:42.227Z"
       }
     },
     "merges": [
@@ -1424,5 +1441,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
