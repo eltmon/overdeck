@@ -1161,17 +1161,17 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-03T06:03:16.842Z",
+  "updated": "2026-08-03T06:03:23.349Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T06:02:21.316Z",
+    "updatedAt": "2026-08-03T06:03:23.344Z",
     "uatNotes": "UAT required per xBRIEF item drag-drop-move.ac4 ('Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end') and hazard H7. Built the dashboard from this workspace (npm run build:dashboard) and ran it as an isolated peer instance (OVERDECK_HOME=/tmp/pan-1577-uat-home, PORT=13011, OVERDECK_DISABLE_DEACON=1, OVERDECK_NO_RESUME=1) rather than touching the production dashboard on port 3011, which belongs to a different checkout and is out of scope to hijack. Seeded two synthetic conversations through the canonical write door (createConversation() in src/lib/overdeck/conversations.ts) under two real registered projects (panopticon-cli, mind-your-now). Drove both flows with Playwright MCP: (1) Menu-based move -- 3-dot 'More actions' -> 'Move' expands a submenu listing registered projects with the conversation's current project disabled; selected panopticon-cli, got toast 'Moved \"PAN-1577 UAT source conversation B\" to panopticon-cli', GET /api/conversations confirmed projectKey=panopticon-cli with cwd unchanged (/home/eltmon/Projects/myn), and the conversation disappeared from mind-your-now's list and appeared in panopticon-cli's list on navigation. (2) Native HTML5 drag-and-drop -- dragged a conversation row (confirmed draggable=true, cursor:grab) onto the mind-your-now sidebar project node; got toast 'Moved \"PAN-1577 UAT source conversation A\" to mind-your-now', GET /api/conversations confirmed projectKey=mind-your-now with cwd unchanged (/home/eltmon/Projects/overdeck). (3) No-op check (ac3) -- dropped a conversation onto its own current project (panopticon-cli); no toast fired and GET /api/conversations confirmed zero state change. All acceptance criteria for menu-move and drag-drop-move items verified, and hazard H1 (JSONL/cwd never touched by a move) confirmed via API for both moves. Isolated instance and seeded data torn down after verification; production dashboard on 3011 was never touched.",
     "conflictsSince": {
       "sha": "2a4f6c2521e7e41a6a7ed27e5b1a1a5c2006a284",
@@ -1182,7 +1182,7 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "49c8a092572394ec396814cd2ef136aee4f4b6d6",
-    "reviewRequestedAt": "2026-08-03T06:02:17.918Z",
+    "reviewRequestedAt": "2026-08-03T06:03:23.344Z",
     "reviewSpawnedAt": "2026-08-03T05:14:36.729Z"
   },
   "closeOut": {
