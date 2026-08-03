@@ -27,9 +27,22 @@
       "timestamp": "2026-08-03T00:01:45.118Z",
       "reason": "end",
       "note": "Core verdict write door implementation complete: door module, domain events, guard retirement, merge-gate lock, docs, quick-signal CLI migration, coordinator HTTP migration. Remaining 4 verdict-routing migrations (fallback, orphan-restore, unsignaled, infra-bypass) require same pattern: call recordReviewVerdict before setReviewStatusSync, condition feedback delivery/killSession on landed outcome."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-03T00:03Z] verification-gate → FAILED — seq 1",
+      "timestamp": "2026-08-03T00:03:36.247Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "verification-gate",
+      "outcome": "failed",
+      "timestamp": "2026-08-03T00:03:36Z",
+      "markdownBody": "VERIFICATION FAILED for PAN-3512 (attempt 1/3):\n\nFailed check: typecheck\n\nVerification FAILED at typecheck (38336ms):\n\n\n> @overdeck/core@0.48.0 pretypecheck\n> npm run build:contracts\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m386.93 kB\u001b[22m \u001b[2m│ gzip: 62.47 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 386.93 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m5970ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m354.97 kB\u001b[22m \u001b[2m│ gzip: 60.11 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m581.11 kB\u001b[22m \u001b[2m│ gzip: 92.85 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.69 kB\u001b[22m \u001b[2m│ gzip:  5.88 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m816.85 kB\u001b[22m \u001b[2m│ gzip: 79.97 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.80 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m6544ms\u001b[39m\n\n> @overdeck/core@0.48.0 typecheck\n> tsc --noEmit && npm run typecheck:hooks && npm run typecheck:evals && npm run typecheck:dashboard && npm run typecheck:frontend\n\nsrc/lib/cloister/review-verdict-writer.ts(13,10): error TS2724: '\"child_process\"' has no exported member named 'execFileAsync'. Did you mean 'execFileSync'?\nsrc/lib/cloister/review-verdict-writer.ts(20,29): error TS2724: '\"../review-status-reconcile.js\"' has no exported member named 'ReviewStatusUpdate'. Did you mean 'ReviewStatus'?\nsrc/lib/cloister/review-verdict-writer.ts(21,15): error TS2459: Module '\"../workspace-anchor-drift.js\"' declares 'HeadAnchor' locally, but it is not exported.\nsrc/lib/cloister/review-verdict-writer.ts(169,9): error TS2322: Type '\"review.verdict_rejected\"' is not assignable to type '\"review.approved\" | \"test.passed\" | \"system.heartbeat\" | \"beads.freshness_changed\" | \"agent.created\" | \"agent.enrichment_changed\" | \"agent.started\" | \"agent.stopped\" | \"agent.heartbeat_dead\" | ... 87 more ... | \"sweep.escalated\"'.\nsrc/lib/cloister/review-verdict-writer.ts(174,11): error TS2353: Object literal may only specify known properties, and 'writer' does not exist in type '{ readonly ts: number; } | { readonly projectKey: string; readonly localHead: string; readonly lastSyncedAt: string; } | { readonly agentId: string; readonly issueId: string; readonly agent: { readonly id: string; ... 38 more ...; readonly runtimeSnapshotSequence?: number | undefined; }; readonly workspaceId?: strin...'.\nsrc/lib/cloister/review-verdict\n...(truncated)\n\n## REQUIRED: Fix the failing check, push, and request a new review\n\n1. Read the error output above carefully\n2. Fix the code causing the failure\n3. Run the failing check locally to verify it passes\n4. Commit every change\n5. Invoke the /rebase-and-submit skill for PAN-3512 — this is an atomic task. Because verification already ran once (a PR exists), the skill will push your branch and run `pan review request PAN-3512 -m \"Fixed typecheck\"` for you. NEVER curl `/api/review/...` or any dashboard endpoint — `pan review request` is the only supported re-entry point.\n\nThe command can run for several minutes. A yielded exec result or background-terminal notice means it is still running, not that it succeeded. Poll the same terminal until it exits, inspect the real exit code, then confirm `pan show PAN-3512` or `pan review pending` shows the issue re-entered review. Do NOT stop between steps or after pushing; stop only after exit code 0 and the observed pipeline state change."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -79,7 +92,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-03T00:03:33.101Z",
+  "updated": "2026-08-03T00:03:36.251Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "reviewing",
