@@ -3,7 +3,7 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-18T01:46:29.372Z",
-  "updated": "2026-08-03T03:40:14.220Z",
+  "updated": "2026-08-03T03:48:20.588Z",
   "pipeline": {
     "issueId": "PAN-2869",
     "reviewStatus": "pending",
@@ -96,6 +96,14 @@
       "tripCount": 1,
       "open": true,
       "needsYouEmittedAt": "2026-08-01T21:48:29.851Z"
+    },
+    {
+      "issue": "PAN-2869",
+      "recoveryPath": "dead-end-rebuild",
+      "obligationGeneration": "2026-08-03T03:40:14.088Z",
+      "tripCount": 1,
+      "open": true,
+      "needsYouEmittedAt": "2026-08-03T03:48:20.586Z"
     }
   ]
 }
