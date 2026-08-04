@@ -3,19 +3,28 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-03T05:20:01.081Z",
-  "updated": "2026-08-04T17:34:25.447Z",
+  "updated": "2026-08-04T17:34:27.696Z",
   "pipeline": {
     "issueId": "PAN-3521",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T17:34:15.163Z",
+    "updatedAt": "2026-08-04T17:34:15.212Z",
+    "mergeNotes": "Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))",
     "strikeReadyHead": "481a996397a81fd3ba61f1195fadd4f3ee9b9a9f",
     "strikeReadyAt": "2026-08-03T07:35:38.701Z",
-    "strikeLandingState": "landing",
-    "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingState": "needs_you",
+    "strikeRecoveryCount": 1,
+    "strikeLandingAttempts": [
+      {
+        "timestamp": "2026-08-04T17:34:15.211Z",
+        "strikeHead": "481a996397a81fd3ba61f1195fadd4f3ee9b9a9f",
+        "mainHead": "534828d51baafac0178caf7468544c06edfff550",
+        "outcome": "failed",
+        "detail": "Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))"
+      }
+    ]
   },
   "closeOut": {
     "usage": {
@@ -53,7 +62,7 @@
       },
       "costAtCloseOut": {
         "usd": 28.805742,
-        "pricingAsOf": "2026-08-04T17:34:15.167Z"
+        "pricingAsOf": "2026-08-04T17:34:27.689Z"
       }
     },
     "merges": [],
