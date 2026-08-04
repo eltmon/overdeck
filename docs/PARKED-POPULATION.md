@@ -33,7 +33,7 @@ release.
 
 | # | Orbit | Detection (read doors only) | Release |
 | --- | --- | --- | --- |
-| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | sweeper: resume-with-feedback or review re-dispatch (flavor-dependent) |
+| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | sweeper: artifact consult first (PAN-3511), else resume-with-feedback or review re-dispatch (flavor-dependent) |
 | 2 | `needs-you` | open recovery trip in the per-issue permanent record | operator answers; sweeper re-surfaces on TTL |
 | 3 | `deacon-ignored` | `review_status.deaconIgnored` | operator clears the flag; sweeper re-surfaces on TTL |
 | 4 | `operator-gate` | agent `paused` (not yield) / `troubled` / `stoppedByUser` | `pan unpause` / `pan untroubled` / `pan start` — operator-only; re-surfaced on TTL |
@@ -43,6 +43,15 @@ release.
 | 8 | `zombie-session` | live agent + merged/closed issue | sweeper: doctrine-sanctioned reap |
 | 9 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | sweeper: nudge → stop if nothing moves in 90m |
 | 10 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+
+The `stuck-flag` orbit consults the **verdict of record** before every branch it
+owns: on a fresh passed artifact the sweeper restores the verdict, clears the
+stuck flag, and emits `sweep.unparked` with action `verdict-restored` *without
+sending the work agent anything*, because the review it would have re-driven had
+already finished. On a blocked or failed artifact the re-drive stands, but the
+feedback body carries the reviewer's actual blocker instead of a pointer at
+`.pan/feedback`. With no artifact, every branch behaves exactly as before. See
+"Verdict of record" in `docs/REVIEW-AGENT-ARCHITECTURE.md`.
 
 A **scheduler yield** (`yieldedByScheduler`) is NOT a park — it is
 self-clearing. **Warm-idle on a pipeline-owned issue** (PAN-2579) is NOT a

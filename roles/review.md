@@ -39,6 +39,17 @@ hooks:
 
 > ## ⚡ CURRENT MODE: SELF-REVIEW (PAN-1981 — quick path to production)
 >
+> **⚠️ This banner is stale relative to the code (noted PAN-3511).** Mode is
+> resolved at spawn time by `resolveReviewMode()` in
+> `src/lib/cloister/review-agent.ts`, which reads the per-issue record override
+> first and then `roles.review.mode` from config — it does not read this banner.
+> When that resolves to `full`, a convoy really is spawned and the synthesis
+> instructions further down are the ones that apply. **Trust your spawn prompt over
+> this banner:** if it names sub-reviewer output files, you are the synthesis
+> parent; if it does not, you are the sole reviewer described below. Reconciling
+> the banner with the resolved mode is a separate follow-up — PAN-3511 documented
+> the discrepancy but deliberately did not change review-mode policy.
+>
 > **The convoy is disabled. There are NO sub-reviewers and NO synthesis wait.**
 > Ignore every "STANDBY / wait for the four convoy reviewers / read their output
 > files / synthesize" instruction in this file below — none of it applies right now.
