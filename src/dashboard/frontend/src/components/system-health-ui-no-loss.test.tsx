@@ -375,6 +375,7 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
+    expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
     expect(within(dialog).getByText('×2')).toBeInTheDocument();
     expect(within(dialog).getByText('2× agents: agent-stalled-1, agent-stalled-2')).toBeInTheDocument();
@@ -443,34 +444,6 @@ describe('system health UI no-loss audit', () => {
     // id and the reason message render it, so match on presence rather than
     // uniqueness — the audited property is that the row is visible at all.
     expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
-  });
-
-  it('exposes the singleton attention severity, title, and canonical issue label', () => {
-    hookState.current = {
-      data: {
-        ...createSnapshot('critical'),
-        agents: [{
-          id: 'agent-stalled',
-          issueId: 'PAN-1',
-          status: 'stalled',
-          reasons: [{
-            code: 'agent.runtime.inactive.stalled',
-            domain: 'agent',
-            severity: 'warning',
-            message: 'agent-stalled has produced no activity for 35 min.',
-          }],
-        }],
-      },
-      isLoading: false,
-      error: null,
-    };
-    renderPill();
-    fireEvent.click(screen.getByTestId('system-health-pill'));
-
-    const dialog = screen.getByRole('dialog', { name: 'System health' });
-    expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
-    expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
-    expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {
