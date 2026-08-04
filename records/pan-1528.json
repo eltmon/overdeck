@@ -1,0 +1,45 @@
+{
+  "issueId": "PAN-1528",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "claude-opus-4-8",
+  "pipeline": {
+    "issueId": "PAN-1528",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-04T13:05:51.352Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "plan": {
+          "anthropic/claude-opus-4-8": {
+            "input": 15566,
+            "output": 10910,
+            "cacheRead": 1529163,
+            "cacheWrite": 110420
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-opus-4-8": {
+          "input": 15566,
+          "output": 10910,
+          "cacheRead": 1529163,
+          "cacheWrite": 110420
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 1.805287,
+        "pricingAsOf": "2026-08-04T13:05:51.352Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-08-04T13:05:51.357Z",
+  "updated": "2026-08-04T13:05:51.357Z"
+}
