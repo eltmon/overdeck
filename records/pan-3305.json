@@ -3,43 +3,16 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-07-30T08:08:59.522Z",
-  "updated": "2026-08-01T11:18:08.502Z",
+  "updated": "2026-08-04T13:08:53.456Z",
   "pipeline": {
     "issueId": "PAN-3305",
-    "reviewStatus": "passed",
-    "testStatus": "skipped",
-    "verificationStatus": "passed",
-    "mergeStatus": "merged",
-    "mergeStep": "merged",
-    "releaseStatus": "skipped",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-01T11:18:08.475Z",
-    "testNotes": "Strike path: no test specialist is dispatched for strikes by design (PAN-3067)",
-    "lastVerifiedCommit": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
-    "strikeReadyHead": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
-    "strikeReadyAt": "2026-07-30T08:46:56.838Z",
-    "strikeLandingState": "recovering",
-    "strikeRecoveryCount": 1,
-    "strikeTransportRetryCount": 1,
-    "strikeNextAttemptAt": "2026-07-30T08:53:19.012Z",
-    "strikeLandingAttempts": [
-      {
-        "timestamp": "2026-07-30T08:52:19.012Z",
-        "strikeHead": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
-        "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
-        "outcome": "transport-failed",
-        "detail": "Strike merge request failed: fetch failed"
-      },
-      {
-        "timestamp": "2026-07-30T09:00:35.071Z",
-        "strikeHead": "12f4ef98a3a5d163664396ea7b3b54790a25baab",
-        "mainHead": "5a40cca9ff0e8e0193c75bfba3416a4c84af9e0d",
-        "outcome": "failed",
-        "detail": "GitHub PR #3316 has failing required checks on HEAD 12f4ef98. Fix CI before merging — see https://github.com/eltmon/overdeck/pull/3316 for details."
-      }
-    ],
     "closedOut": true,
-    "closedOutAt": "2026-08-01T11:18:08.475Z"
+    "closedOutAt": "2026-08-01T11:18:08.475Z",
+    "updatedAt": "2026-08-04T13:08:53.452Z"
   },
   "closeOut": {
     "usage": {
