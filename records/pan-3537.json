@@ -102,18 +102,18 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T09:51:37.911Z",
+  "updated": "2026-08-04T10:28:14.929Z",
   "pipeline": {
     "issueId": "PAN-3537",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T09:51:37.901Z",
-    "reviewNotes": "CI state is not anchored to the authoritative default-branch head",
+    "updatedAt": "2026-08-04T10:28:14.891Z",
+    "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
     "reviewedAtCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342",
@@ -190,9 +190,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 335540,
-            "output": 5165,
-            "cacheRead": 2316800,
+            "input": 340414,
+            "output": 8293,
+            "cacheRead": 2785792,
             "cacheWrite": 0
           }
         },
@@ -238,9 +238,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1845004,
-            "output": 95993,
-            "cacheRead": 55397376,
+            "input": 2793445,
+            "output": 213691,
+            "cacheRead": 95222784,
             "cacheWrite": 0
           }
         }
@@ -253,15 +253,15 @@
           "cacheWrite": 50046
         },
         "openai/gpt-5.6-sol": {
-          "input": 6681925,
-          "output": 211963,
-          "cacheRead": 69719040,
+          "input": 7635240,
+          "output": 332789,
+          "cacheRead": 110013440,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 99.629014,
-        "pricingAsOf": "2026-08-04T09:51:37.905Z"
+        "usd": 128.167569,
+        "pricingAsOf": "2026-08-04T10:28:14.909Z"
       }
     },
     "merges": [
