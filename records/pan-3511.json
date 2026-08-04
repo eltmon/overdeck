@@ -499,10 +499,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T22:55:09.530Z",
+  "updated": "2026-08-04T23:01:06.055Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
@@ -510,20 +510,39 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T22:54:43.250Z",
+    "updatedAt": "2026-08-04T23:01:06.017Z",
+    "reviewNotes": "Dashboard restarts invalidate active review attestation authority",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
     "lastVerifiedCommit": "a9b929918604303a61ec22b0189528eb8928c778",
-    "reviewSpawnedAt": "2026-08-04T22:54:43.249Z"
+    "reviewSpawnedAt": "2026-08-04T22:54:43.249Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 71857,
-            "output": 20905,
-            "cacheRead": 6945,
+            "input": 97856,
+            "output": 38698,
+            "cacheRead": 16755,
             "cacheWrite": 0
           }
         },
@@ -533,6 +552,12 @@
             "output": 141065,
             "cacheRead": 40822272,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 763122,
+            "output": 18881,
+            "cacheRead": 9840640,
+            "cacheWrite": 0
           }
         },
         "review.correctness": {
@@ -540,6 +565,12 @@
             "input": 4120130,
             "output": 158597,
             "cacheRead": 30438400,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 719160,
+            "output": 33884,
+            "cacheRead": 4784640,
             "cacheWrite": 0
           }
         },
@@ -549,6 +580,12 @@
             "output": 79627,
             "cacheRead": 14260224,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 747856,
+            "output": 29103,
+            "cacheRead": 3977216,
+            "cacheWrite": 0
           }
         },
         "review.requirements": {
@@ -557,6 +594,12 @@
             "output": 74384,
             "cacheRead": 6928384,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 857321,
+            "output": 43298,
+            "cacheRead": 6558208,
+            "cacheWrite": 0
           }
         },
         "review.security": {
@@ -564,6 +607,12 @@
             "input": 3223165,
             "output": 155711,
             "cacheRead": 21727744,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 610267,
+            "output": 27886,
+            "cacheRead": 5216256,
             "cacheWrite": 0
           }
         },
@@ -578,9 +627,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 71857,
-          "output": 20905,
-          "cacheRead": 6945,
+          "input": 97856,
+          "output": 38698,
+          "cacheRead": 16755,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -588,11 +637,17 @@
           "output": 959411,
           "cacheRead": 290455040,
           "cacheWrite": 0
+        },
+        "openai/gpt-5.6-terra": {
+          "input": 3697726,
+          "output": 153052,
+          "cacheRead": 30376960,
+          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 280.3187615,
-        "pricingAsOf": "2026-08-04T22:54:44.413Z"
+        "usd": 299.5690865,
+        "pricingAsOf": "2026-08-04T23:01:06.045Z"
       }
     },
     "merges": [
@@ -601,7 +656,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
