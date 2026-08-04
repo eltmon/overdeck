@@ -68,9 +68,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-04T17:51:42.925Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T18:55Z] uat-agent → FAILED — seq 2",
+      "timestamp": "2026-08-04T18:55:26.435Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "uat-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T18:55:26Z",
+      "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-3537`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -129,7 +142,7 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T18:52:30.945Z",
+  "updated": "2026-08-04T18:55:26.436Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
