@@ -946,7 +946,7 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
     }
 
     // --fresh drops the saved session and, since PAN-3150, cycles a live one
-    // itself. See start-fresh-session.ts for the full contract.
+    // itself. The helper runs the lifecycle guard before wiping the state dir.
     if (options.fresh) {
       const fresh = await prepareFreshWorkAgentSession(id, { force: options.force });
       for (const line of fresh.messages) console.log(chalk.dim(line));
@@ -954,18 +954,13 @@ export async function issueCommand(id: string, options: IssueOptions): Promise<v
         console.error(chalk.red(fresh.error));
         return exitCli(1);
       }
-    }
-
-    // Refuse fresh start when a resumable session still exists after the
-    // --fresh wipe. (The wipe above should have cleared it, but guard
-    // belt-and-suspenders.) Users must choose resume, `pan start --fresh`,
-    // or reset-session explicitly.
-    // Users must choose resume, `pan start --fresh`, or reset-session explicitly.
-    try {
-      assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
-    } catch (error) {
-      if (workspacePath || isRemote) {
-        throw error;
+    } else {
+      try {
+        assertCanStartFreshSync(id, { allowPausedForce: shouldClearPauseBeforeSpawn });
+      } catch (error) {
+        if (workspacePath || isRemote) {
+          throw error;
+        }
       }
     }
 

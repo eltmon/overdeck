@@ -203,7 +203,7 @@ export const PROVIDERS: Record<ProviderName, ProviderConfig> = {
     defaultHarness: 'ohmypi',
     baseUrl: getOpenAICompatibleProxyBaseUrl('dashscope'),
     authType: 'static',
-    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'],
+    models: ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'],
     haikuModel: 'qwen3-plus',
     tierModels: { opus: 'qwen3-max', sonnet: 'qwen3-coder-plus', haiku: 'qwen3-plus' },
     tested: false,
@@ -395,7 +395,7 @@ export function getProviderForModelSync(modelId: ModelId | string): ProviderConf
   if (['qwen/qwen3.6-plus'].includes(modelId)) {
     return PROVIDERS.nous;
   }
-  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'].includes(modelId)) {
+  if (['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'].includes(modelId)) {
     return PROVIDERS.dashscope;
   }
   // PAN-1837: native kimi-code CLI model aliases are namespaced `kimi-code/<alias>`
@@ -730,6 +730,10 @@ export function piProviderForModel(modelId: string): string | undefined {
       return 'xiaomi';
     case 'xai':
       return 'xai';
+    case 'dashscope':
+      // Not in omp's bundled catalog — provisioned into the omp user
+      // registry (~/.omp/agent/models.json) by ohmypi-models.ts at spawn.
+      return 'dashscope';
     default:
       return undefined;
   }

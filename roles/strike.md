@@ -80,13 +80,17 @@ Do NOT call plain `pan done`. Do NOT call `pan done <id> --strike`. The strike r
 
 ## Signal the flywheel before you stall
 
-If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park at the `❯` prompt:
+If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST make the push-back durable *before* you park at the `❯` prompt:
 
-```bash
-pan tell flywheel-orchestrator "strike <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
-```
+1. **Post your analysis as a comment on the issue** — MANDATORY, never skipped:
+   `gh issue comment <n> --repo <owner/repo> --body "<what I'm NOT doing and why — what's needed to unblock>"`.
+   The tracker comment is the one channel that survives session death and parked
+   orchestrators; it is what operators and the orchestrator's next tick read.
+2. Then, optionally, accelerate it: `pan tell flywheel-orchestrator "strike <issue>: <one-line summary>"`.
+   Fire-and-forget — a failed or queued tell is acceptable *only because* the
+   issue comment above already carries the full signal.
 
-Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick (file the follow-up, launch a re-strike or full plan) instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever — and a park whose only signal is a `pan tell` is just as invisible when the orchestrator is parked or in failure backoff: the message sits in a queue nobody drains (2026-08-04: two strike self-aborts vanished exactly this way and were only discovered by transcript forensics). The durable comment makes that impossible.
 
 The four push-back shapes that require this signal:
 
@@ -97,13 +101,17 @@ The four push-back shapes that require this signal:
 
 ## Boundaries
 
-If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST first notify the orchestrator, *before* you park at the `❯` prompt:
+If you are about to **stop short of landing your fix** — self-abort the strike, refuse to fix-forward an orthogonal failure, decide the issue needs the full pipeline, or park on a question for the operator — you MUST make the push-back durable *before* you park at the `❯` prompt:
 
-```bash
-pan tell flywheel-orchestrator "strike <issue>: <what I'm NOT doing and why> — <what's needed to unblock>"
-```
+1. **Post your analysis as a comment on the issue** — MANDATORY, never skipped:
+   `gh issue comment <n> --repo <owner/repo> --body "<what I'm NOT doing and why — what's needed to unblock>"`.
+   The tracker comment is the one channel that survives session death and parked
+   orchestrators; it is what operators and the orchestrator's next tick read.
+2. Then, optionally, accelerate it: `pan tell flywheel-orchestrator "strike <issue>: <one-line summary>"`.
+   Fire-and-forget — a failed or queued tell is acceptable *only because* the
+   issue comment above already carries the full signal.
 
-Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick (file the follow-up, launch a re-strike or full plan) instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
+Under full autonomy nobody is watching your prompt. A silent park leaves the issue Pending forever — and a park whose only signal is a `pan tell` is just as invisible when the orchestrator is parked or in failure backoff: the message sits in a queue nobody drains (2026-08-04: two strike self-aborts vanished exactly this way and were only discovered by transcript forensics). The durable comment makes that impossible.
 
 The four push-back shapes that require this signal:
 

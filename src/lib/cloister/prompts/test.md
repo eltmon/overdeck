@@ -39,15 +39,17 @@ optional:
 {{#TLDR_AVAILABLE}}
 ## TLDR: Efficient Failure Diagnosis
 
-You have access to TLDR MCP tools for diagnosing failures without reading every related file in full:
-- `tldr_context <file>` — summarize failing tests, fixtures, helpers, or implementation files
-- `tldr_structure <directory>` — understand test and source layout around a failing suite
-- `tldr_semantic <query>` — find where an acceptance criterion or failing behavior is implemented
-- `tldr_calls <function> <file>` — trace callers around a function named in a failure
-- `tldr_impact <function> <file>` — understand downstream effects before attributing a regression
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-Use TLDR to narrow the investigation, then use full Reads for exact failure evidence and the code paths you cite in test notes.
-
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
 ## Test Suites
 

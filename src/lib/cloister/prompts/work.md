@@ -138,58 +138,17 @@ The only acceptable interaction with a subagent's tmux session from inside the w
 {{#TLDR_AVAILABLE}}
 ## TLDR: Token-Efficient Code Analysis
 
-**You have access to TLDR MCP tools for analyzing code without reading full files.**
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-This dramatically reduces token consumption and lets you understand codebases faster.
-
-### Available TLDR Tools
-
-- **`tldr_context <file>`** - Get file structure, exports, imports, key functions (500-1,200 tokens vs 10-25k for full read)
-- **`tldr_structure <directory>`** - Understand directory layout and relationships
-- **`tldr_calls <function> <file>`** - See what calls this function (call graph analysis)
-- **`tldr_impact <function> <file>`** - See what this function calls (impact analysis)
-- **`tldr_semantic <query>`** - Find code by natural language description
-
-### When to Use TLDR
-
-Use TLDR first for:
-- Understanding file structure before editing
-- Finding where a feature is implemented
-- Understanding cross-file dependencies
-- Exploring unfamiliar code
-- Searching for code by description
-
-Read full file when:
-- You need to edit specific lines (TLDR gives context, then read to edit)
-- Debugging syntax errors (need exact line content)
-- Reviewing exact implementation details
-
-### Example Workflow
-
-```
-1. Agent needs to understand auth.ts
-   → tldr_context src/auth.ts                    # 1,200 tokens - see structure
-   → Understand exports, imports, key functions
-   → Only read full file if editing specific code
-
-2. Agent needs to find where JWT is validated
-   → tldr_semantic "JWT token validation"       # Find relevant files
-   → tldr_context <matched-files>                # Understand each file
-   → Read only the specific function to edit
-
-3. Agent needs to understand impact of changing login()
-   → tldr_impact login src/auth.ts              # See what login() calls
-   → tldr_calls login src/auth.ts               # See what calls login()
-   → Understand full dependency chain without reading all files
-```
-
-### Token Savings
-
-- **Without TLDR:** Read 20 files × 15k tokens = 300k tokens (exhausts context)
-- **With TLDR:** Analyze 20 files × 800 tokens = 16k tokens (94% reduction)
-
-**Use TLDR liberally.** It's designed for this workflow and will dramatically extend how much work you can do per session.
-
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
 
 {{#STITCH_DESIGNS}}
