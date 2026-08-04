@@ -1284,7 +1284,15 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   // in the background. Show a "Starting..." placeholder instead of the orphaned empty state.
   const isSpawning = !conversation.sessionAlive && !conversation.endedAt && !isSpawnFailed && !isForking;
   const isDiscovering = streamMessagesEnabled && data?.discovering === true && messages.length === 0;
-  const isFirstMessage = !isLoading && !isDiscovering && messages.length === 0 && conversation.sessionAlive;
+  // Zero chat messages ≠ zero activity for agent sessions (PAN-3544). Since
+  // the CLIProxy 7.2 upgrade (2026-08-03) GPT-harness sessions emit only
+  // thinking/tool_use blocks — no assistant text blocks — and every user entry
+  // in a work-agent transcript is a filtered hook injection, so the workLog
+  // carries the entire visible timeline. Gating the empty states on messages
+  // alone rendered "How can I help you?" over a live agent 250 tool calls deep
+  // (agent-pan-3511, 2026-08-04).
+  const hasTimelineActivity = messages.length > 0 || workLog.length > 0;
+  const isFirstMessage = !isLoading && !isDiscovering && !hasTimelineActivity && conversation.sessionAlive;
   // A failed /messages fetch leaves `data` undefined — that is NOT the same as a
   // successful empty response. Rendering it as "no saved history" (the old
   // behavior) falsely tells the user their history is gone, e.g. during a
@@ -1293,7 +1301,7 @@ function ConversationView({ conversation, onResume, onArchive, resumePending, re
   const messagesFetchFailed =
     !isLoading && !isDiscovering && !streamMessagesEnabled && data == null &&
     !isSpawning && !isSpawnFailed && !isForking;
-  const isOrphaned = !isLoading && !isDiscovering && data != null && messages.length === 0 && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
+  const isOrphaned = !isLoading && !isDiscovering && data != null && !hasTimelineActivity && !conversation.sessionAlive && !isSpawnFailed && !isSpawning;
 
   // Spin unless truly idle: idle = last message is a completed assistant turn (completedAt set).
   // Note: `completedAt` is reliably set server-side for all terminal stop reasons via
