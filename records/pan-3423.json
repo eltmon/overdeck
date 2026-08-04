@@ -340,7 +340,7 @@
     "recordedAt": "2026-08-04T18:13:32.819Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T18:14:30.441Z",
+  "updated": "2026-08-04T18:14:33.444Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -351,7 +351,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:14:30.332Z",
+    "updatedAt": "2026-08-04T18:14:32.556Z",
     "reviewNotes": "Changed no-loss audit still leaves named UI acceptance criteria unproved",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7",
@@ -492,7 +492,7 @@
       },
       "costAtCloseOut": {
         "usd": 311.6730903,
-        "pricingAsOf": "2026-08-04T18:14:30.412Z"
+        "pricingAsOf": "2026-08-04T18:14:33.435Z"
       }
     },
     "merges": [
