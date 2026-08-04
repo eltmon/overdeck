@@ -304,7 +304,7 @@
     "recordedAt": "2026-08-02T23:23:05.476Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T17:37:44.562Z",
+  "updated": "2026-08-04T17:39:32.340Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
@@ -315,14 +315,22 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T17:35:47.538Z",
+    "updatedAt": "2026-08-04T17:39:32.322Z",
     "blockerReasons": [
       {
         "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-04T15:28:31.856Z"
+        "summary": "Conflicts with main since 534828d (2 paths): src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+        "detectedAt": "2026-08-04T17:35:47.540Z"
       }
     ],
+    "conflictsSince": {
+      "sha": "534828d51baafac0178caf7468544c06edfff550",
+      "detectedAt": "2026-08-04T17:35:47.540Z",
+      "paths": [
+        "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
+        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
@@ -395,9 +403,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 2079092,
-            "output": 127743,
-            "cacheRead": 90726912,
+            "input": 2366286,
+            "output": 146234,
+            "cacheRead": 96219648,
             "cacheWrite": 0
           }
         }
@@ -410,9 +418,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29124232,
-          "output": 616503,
-          "cacheRead": 202975232,
+          "input": 29411426,
+          "output": 634994,
+          "cacheRead": 208467968,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -429,8 +437,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 275.6928443,
-        "pricingAsOf": "2026-08-04T17:35:47.556Z"
+        "usd": 280.4299123,
+        "pricingAsOf": "2026-08-04T17:39:32.329Z"
       }
     },
     "merges": [
