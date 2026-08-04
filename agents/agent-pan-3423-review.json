@@ -29,11 +29,20 @@
       "id": "945e490e-7d6b-4a16-977f-751130511c39",
       "startedAt": "2026-08-02T18:28:35.000Z",
       "reason": "recovered"
+    },
+    {
+      "id": "e2d3699e-7bda-45e1-bbd1-b7c18202cb35",
+      "startedAt": "2026-08-04T17:53:46.175Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
     {
       "at": "2026-08-02T19:40:54.668Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-04T17:53:46.175Z",
       "event": "spawned"
     }
   ],
