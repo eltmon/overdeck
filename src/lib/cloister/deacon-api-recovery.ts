@@ -2,7 +2,7 @@ import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { emitActivityEntrySync } from '../activity-logger.js';
 import { getAgentRuntimeStateSync, getAgentStateSync, saveAgentRuntimeState, saveAgentStateSync, setAgentPausedSync } from '../agents.js';
-import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
+import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { sessionFilePath } from '../paths.js';
 import { getReviewStatusSync } from '../review-status.js';
@@ -176,15 +176,21 @@ export async function checkApiErrorAgents(): Promise<string[]> {
     if (!tmuxOutput.trim()) continue;
 
     const agentState = getAgentStateSync(sessionName);
-    if (agentState?.harness === 'codex') {
-      // PAN-2285: a revoked refresh token surfaces ONLY in the live pane (never
-      // in the rollout JSONL) and leaves the agent looking "running" while it
-      // 401-loops. Trip the troubled gate so it stops silently sitting, and
-      // persist the burn flag in agent state — this patrol runs in the deacon
-      // CHILD process, so the flag must cross to the dashboard server (banner
-      // endpoint + spawn gate) through the shared agents table, not module
-      // memory. Do NOT auto-kill or auto-respawn — the shared token family is
-      // dead until re-auth.
+    // PAN-2285: a revoked refresh token surfaces ONLY in the live pane (never
+    // in the rollout JSONL) and leaves the agent looking "running" while it
+    // 401-loops. Trip the troubled gate so it stops silently sitting, and
+    // persist the burn flag in agent state — this patrol runs in the deacon
+    // CHILD process, so the flag must cross to the dashboard server (banner
+    // endpoint + spawn gate) through the shared agents table, not module
+    // memory. Do NOT auto-kill or auto-respawn — the shared token family is
+    // dead until re-auth.
+    //
+    // PAN-3528: this check used to live inside the `harness === 'codex'` branch
+    // below, so an openai-provider model routed through CLIProxy under
+    // claude-code — the standing GPT routing on machines that set
+    // `openai.harness: claude-code` — was never scanned, even though it burns on
+    // the very same credential.
+    if (agentState && isCodexAuthRouted(agentState.harness, agentState.model)) {
       if (paneShowsCodexAuthBurn(tmuxOutput)) {
         const newlyFlagged = applyCodexAuthBurnFlag(agentState);
         if (newlyFlagged) {
@@ -199,6 +205,8 @@ export async function checkApiErrorAgents(): Promise<string[]> {
         }
         continue;
       }
+    }
+    if (agentState?.harness === 'codex') {
       if (paneShowsModelSwitch(tmuxOutput, agentState.model)) {
         const reason = `needs-you: live Codex pane indicates a model switch from launch model ${agentState.model}`;
         setAgentPausedSync(sessionName, reason, true);
