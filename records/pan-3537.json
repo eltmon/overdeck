@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:41:33.915Z",
+  "updated": "2026-08-04T08:51:08.622Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "webhook-observation": {
-        "writerId": "agent-pan-3537",
-        "agentId": "agent-pan-3537",
-        "pid": 4104155,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T08:41:33.915Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3537",
@@ -131,6 +123,17 @@
         "outcome": "completed",
         "reason": "Exported appendDomainEventAsync through the shared event-store provider with settled success/failure semantics and unit coverage.",
         "releasedAt": "2026-08-04T08:41:24.179Z"
+      },
+      {
+        "writerId": "agent-pan-3537",
+        "agentId": "agent-pan-3537",
+        "pid": 4104155,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T08:41:33.915Z",
+        "itemId": "webhook-observation",
+        "outcome": "completed",
+        "reason": "Mapped default-branch GitHub Actions check_suite payloads to project CI observations before PR-only guards, preserving merge-gate behavior and adding pure and handler tests.",
+        "releasedAt": "2026-08-04T08:51:08.622Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +144,10 @@
       "emit-door": {
         "reason": "Exported appendDomainEventAsync through the shared event-store provider with settled success/failure semantics and unit coverage.",
         "updatedAt": "2026-08-04T08:41:24.179Z"
+      },
+      "webhook-observation": {
+        "reason": "Mapped default-branch GitHub Actions check_suite payloads to project CI observations before PR-only guards, preserving merge-gate behavior and adding pure and handler tests.",
+        "updatedAt": "2026-08-04T08:51:08.622Z"
       }
     }
   },
@@ -155,6 +162,10 @@
     "emit-door.emit-door.ac1": "completed",
     "emit-door.emit-door.ac2": "completed",
     "emit-door.emit-door.ac3": "completed",
-    "webhook-observation": "running"
+    "webhook-observation": "completed",
+    "webhook-observation.webhook-observation.ac1": "completed",
+    "webhook-observation.webhook-observation.ac2": "completed",
+    "webhook-observation.webhook-observation.ac3": "completed",
+    "webhook-observation.webhook-observation.ac4": "completed"
   }
 }
