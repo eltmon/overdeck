@@ -957,26 +957,19 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-04T17:37:02.311Z",
+  "updated": "2026-08-04T17:37:34.137Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "passed",
-    "testStatus": "failed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-04T17:36:32.722Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-04T17:36:32.722Z"
-      }
-    ],
+    "updatedAt": "2026-08-04T17:37:34.110Z",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -984,8 +977,7 @@
         "scripts/file-size-allowlist.txt"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewSpawnedAt": "2026-08-03T00:33:21.922Z"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3475"
   },
   "closeOut": {
     "usage": {
@@ -1045,7 +1037,7 @@
       },
       "costAtCloseOut": {
         "usd": 622.4622483,
-        "pricingAsOf": "2026-08-04T17:36:32.742Z"
+        "pricingAsOf": "2026-08-04T17:37:34.127Z"
       }
     },
     "merges": [
@@ -1054,7 +1046,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 20,
