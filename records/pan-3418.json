@@ -187,14 +187,17 @@
       "reason": "feedback",
       "note": "[2026-08-04T17:46Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-04T17:46:42.878Z"
-    },
-    {
-      "reason": "resume",
-      "agentModel": "gpt-5.6-sol",
-      "timestamp": "2026-08-04T18:02:03.083Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T17:46:42Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3418` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3418`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/specialists/done.ts",
@@ -236,7 +239,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-04T18:02:03.084Z",
+  "updated": "2026-08-04T18:02:06.750Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -247,30 +250,14 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-04T17:57:24.017Z",
+    "updatedAt": "2026-08-04T18:02:01.520Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
         "detectedAt": "2026-08-04T17:55:00.608Z"
-      },
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 67c640e (5 paths): src/cli/commands/specialists/done.ts, src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts, …",
-        "detectedAt": "2026-08-04T17:57:03.149Z"
       }
     ],
-    "conflictsSince": {
-      "sha": "67c640e5aa7307242c7b258ce68465e95c4a0270",
-      "detectedAt": "2026-08-04T17:57:03.149Z",
-      "paths": [
-        "src/cli/commands/specialists/done.ts",
-        "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
-        "src/lib/cloister/review-verdict-writer.ts",
-        "tests/cli/commands/specialists/done.test.ts",
-        "tests/unit/lib/harness-resolve.test.ts"
-      ]
-    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428"
   },
   "closeOut": {
@@ -334,9 +321,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 3881233,
-            "output": 232004,
-            "cacheRead": 132809216,
+            "input": 3893375,
+            "output": 233495,
+            "cacheRead": 133766144,
             "cacheWrite": 0
           }
         }
@@ -349,9 +336,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16723279,
-          "output": 422949,
-          "cacheRead": 171513344,
+          "input": 16735421,
+          "output": 424440,
+          "cacheRead": 172470272,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -362,8 +349,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 190.6154863,
-        "pricingAsOf": "2026-08-04T17:57:24.078Z"
+        "usd": 191.1993903,
+        "pricingAsOf": "2026-08-04T18:02:01.558Z"
       }
     },
     "merges": [
