@@ -22,11 +22,60 @@
       "reason": "resume",
       "agentModel": "claude-opus-5",
       "timestamp": "2026-08-04T00:50:01.604Z"
+    },
+    {
+      "timestamp": "2026-08-04T01:54:55.753Z",
+      "reason": "end",
+      "note": "ANOMALIES FIRST\n\n1. I introduced an import cycle and fixed it in the same branch. The feedback-target consult (af3a9fc3095) made verdict-restore.ts part of a loop: review-status.ts reaches up into cloister/feedback-target.ts, which now calls the restore door, and the door imported review-status back. `npm run lint`'s circular guard caught six new cycles; Node's strict ESM would have rejected them at dashboard boot. Fixed by removing the edge entirely — verdict-restore now declares the two row fields it reads and the update it writes structurally, and getStatus/setStatus are required deps each caller lends from its own import. madge counts type-only and dynamic imports alike, so nothing short of removing the edge worked. Earlier items only ran eslint on changed files, which is why this surfaced late; full `npm run lint` is the gate that catches it.\n\n2. Full-suite flakes, not regressions. Two `npm test` runs produced DISJOINT failure sets (3 files, then 12). Every failure is `Hook timed out in 5000ms` inside setupOverdeckTestDb, against the global hookTimeout: 5000 in vitest.config.ts. All pass in isolation, and none of the failing suites import any module I changed. Worth an issue: DB-setup hooks exceed a 5s global hook timeout under parallel load.\n\n3. deacon-review-status.ts grew 978 (origin/main) to 1005, carried by a PAN-3511 row in scripts/file-size-allowlist.txt. It crossed the ratchet twice: +23 for the breaker consult, +4 for the lent accessors.\n\n4. roles/review.md's banner is factually wrong and I documented rather than fixed it. It says \"The convoy is disabled\", but resolveReviewMode() reads roles.review.mode, and the operator's live config sets `mode: full` — convoys really run. I verified this against the resolved config rather than assuming. Reconciling mode policy is a separate follow-up; I added a warning telling reviewers to trust their spawn prompt over the banner.\n\n5. Two plan citations were stale and I did NOT propagate them. The plan said restoreWouldTripHeadGuard should mirror findVerdictEvidenceHeadMismatch's review arm — PAN-3512 (fd48e3af398) had already deleted that arm. The plan also described PAN-3512's write door as unshipped; it is shipped. I implemented per the ACs and decision D3 and documented the live locations.\n\n6. The HeadAnchor write-site inventory carried a stale entry for the artifact stamp under deacon-review-status.ts, where it no longer lives. Re-registered at its real home, and renamed restoreWouldTripHeadGuard's row parameter (lastVerifiedCommit -> rowHead) so a READ stops registering as a write in an inventory whose job is to be truthful about writes.\n\n7. Follow-ups noted during inspection, not fixed here: the resolver suite mocks readMemoizedArtifactVerdict itself, so reverting to the unmemoized reader would leave those tests green; and artifactVerdictMemo is an unbounded Map with no eviction.\n\nWHAT SHIPPED\n\nThe verdict-of-record contract: a reviewer's artifact lands on disk seconds to minutes before the verdict syncs into the row, and every recovery path that read only the row could wipe an APPROVED verdict inside that window (PAN-1577 lost five in one evening). attemptArtifactVerdictRestore in src/lib/cloister/verdict-restore.ts is now the single read-side decision point, and five recovery sites consult it before they mark, reset, or re-drive: the deacon orphan reset, both review-infrastructure breaker trips, the feedback-delivery stuck mark, the stall sweeper's stuck-flag orbit, and the stale-journal refusal in review-status-read.ts.\n\nThe one-directional rule holds everywhere: an absent artifact is \"no evidence\", never \"approve\", so every caller keeps its exact prior behavior on no-artifact, and each consult fails toward the protection it replaced. A restore the head guard blocks is surfaced through a review.verdict_restore_blocked event plus one de-duplicated activity entry rather than dropped — the guard is deliberately stricter than PAN-3512's write door, which is the thing that lands those.\n\nBoth artifact shapes are covered throughout, driven by real files through the real reader rather than a mocked one, because quick self-review (review.md, blocked vocabulary \"CHANGES REQUESTED\") is the fleet default and a synthesis.md-only reader would be blind to most production reviews.\n\nVERIFICATION\n\nTypecheck, full `npm run lint` (including circular, file-size, park-exits, prompt-trailer, ratchet audit), and the targeted suites are all green: 82 tests across the five PAN-3511 suites, 23 in stall-sweeper (17 pre-existing unchanged, 6 new), 11 in the new breaker suite. A 673-file regression sweep over cloister/lib/tests-unit/tests-lib passed 6891 tests with zero failures. I also synced main in mid-issue, which cleared the pre-existing PAN-3512 reds this branch had inherited."
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [
+      "packages/contracts/src/events.ts",
+      "scripts/file-size-allowlist.txt",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "docs/PARKED-POPULATION.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "roles/review.md",
+      "src/lib/__tests__/review-status-read-artifact.test.ts",
+      "src/lib/cloister/__tests__/feedback-target.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
+      "src/lib/cloister/__tests__/verdict-restore.test.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/synthesis-verdict.ts",
+      "src/lib/cloister/verdict-restore.ts",
+      "src/lib/review-status-read.ts"
+    ],
+    "actualChangedFiles": [
+      "docs/PARKED-POPULATION.md",
+      "docs/REVIEW-AGENT-ARCHITECTURE.md",
+      "packages/contracts/src/events.ts",
+      "roles/review.md",
+      "scripts/file-size-allowlist.txt",
+      "src/lib/__tests__/review-status-read-artifact.test.ts",
+      "src/lib/cloister/__tests__/feedback-target.test.ts",
+      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
+      "src/lib/cloister/__tests__/verdict-restore.test.ts",
+      "src/lib/cloister/deacon-review-status.ts",
+      "src/lib/cloister/feedback-target.ts",
+      "src/lib/cloister/stall-sweeper.ts",
+      "src/lib/cloister/synthesis-verdict.ts",
+      "src/lib/cloister/verdict-restore.ts",
+      "src/lib/review-status-read.ts",
+      "tests/unit/lib/head-anchor-write-sites.test.ts"
+    ],
+    "recordedAt": "2026-08-04T01:54:48.211Z"
+  },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T01:54:51.463Z",
+  "updated": "2026-08-04T01:54:55.833Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -36,8 +85,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T01:54:51.461Z",
+    "updatedAt": "2026-08-04T01:54:55.749Z",
     "inspectNotes": "All 4 ACs verified against src/lib/review-status-read.ts:39-70 and src/lib/cloister/synthesis-verdict.ts:104-131. AC1: the consult sits inside the if(staleSnapshot) refusal branch and returns reconcileJournalIntoCacheSync when artifact.verdict === journal.durable.reviewStatus (L56-63); because artifact.verdict is only passed/blocked/failed, a non-terminal journal verdict can never match, so the lift is terminal-only as specified. AC2: a disagreeing or null artifact falls through to the unchanged console.warn refusal and returns dbStatus (L64-70) — the consult is strictly one-directional and cannot invent approval. AC3: the resolver calls readMemoizedArtifactVerdict(issueId) with no options, so it uses Date.now() and the 60s TTL memo serves the second resolve from cache, invoking readLatestSynthesisVerdict once; the memo also caches null so absence does not re-scan. AC4: the consult is unreachable when staleSnapshot is null and when there is no journal — zero filesystem work on the common read path, asserted by two fixtures. Import direction confirmed acyclic by walking synthesis-verdict.ts's transitive local imports: no path back into review-status(-read), which matters because strict ESM rejects cycles at dashboard boot where typecheck would not. 9/9 tests pass locally. Non-blocking notes: (1) AC3's literal scenario — two resolves under fake timers — is proven at the memo boundary via explicit-now plus artifact deletion rather than at the resolver, and because the resolver suite mocks readMemoizedArtifactVerdict, nothing currently locks the resolver to the MEMOIZED variant; swapping it back to readLatestSynthesisVerdict would leave every test green while restoring a per-read directory walk on a hot path. Worth an assertion at the resolver level in a follow-up. (2) artifactVerdictMemo is an unbounded Map keyed by issueId with no eviction, so entries accumulate for the life of the dashboard process — bounded by issue count and tiny, but it never shrinks. (3) The memo key ignores workspacePath, which is safe today because the only production caller passes none, but a future caller passing a distinct workspacePath for the same issue would be served the other path's cached value.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewRequestedAt": "2026-08-04T01:54:51.461Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -82,8 +132,7 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-04T01:54:48.211Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3529"
+    }
   },
   "closeOut": {
     "usage": {
@@ -107,10 +156,12 @@
       },
       "costAtCloseOut": {
         "usd": 0.04801930000000001,
-        "pricingAsOf": "2026-08-03T05:09:10.584Z"
+        "pricingAsOf": "2026-08-04T01:54:55.781Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3529"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -297,49 +348,5 @@
     "contract-docs.contract-docs.ac2": "completed",
     "contract-docs.contract-docs.ac3": "completed",
     "contract-docs.contract-docs.ac4": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [
-      "packages/contracts/src/events.ts",
-      "scripts/file-size-allowlist.txt",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "docs/PARKED-POPULATION.md",
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "roles/review.md",
-      "src/lib/__tests__/review-status-read-artifact.test.ts",
-      "src/lib/cloister/__tests__/feedback-target.test.ts",
-      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
-      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
-      "src/lib/cloister/__tests__/verdict-restore.test.ts",
-      "src/lib/cloister/deacon-review-status.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/cloister/stall-sweeper.ts",
-      "src/lib/cloister/synthesis-verdict.ts",
-      "src/lib/cloister/verdict-restore.ts",
-      "src/lib/review-status-read.ts"
-    ],
-    "actualChangedFiles": [
-      "docs/PARKED-POPULATION.md",
-      "docs/REVIEW-AGENT-ARCHITECTURE.md",
-      "packages/contracts/src/events.ts",
-      "roles/review.md",
-      "scripts/file-size-allowlist.txt",
-      "src/lib/__tests__/review-status-read-artifact.test.ts",
-      "src/lib/cloister/__tests__/feedback-target.test.ts",
-      "src/lib/cloister/__tests__/stall-sweeper.test.ts",
-      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
-      "src/lib/cloister/__tests__/verdict-restore.test.ts",
-      "src/lib/cloister/deacon-review-status.ts",
-      "src/lib/cloister/feedback-target.ts",
-      "src/lib/cloister/stall-sweeper.ts",
-      "src/lib/cloister/synthesis-verdict.ts",
-      "src/lib/cloister/verdict-restore.ts",
-      "src/lib/review-status-read.ts",
-      "tests/unit/lib/head-anchor-write-sites.test.ts"
-    ],
-    "recordedAt": "2026-08-04T01:54:48.211Z"
   }
 }
