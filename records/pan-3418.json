@@ -182,9 +182,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-03T05:53:25.517Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T17:46Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-04T17:46:42.878Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T17:46:42Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3418` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3418`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/specialists/done.ts",
@@ -226,7 +239,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-04T17:38:32.634Z",
+  "updated": "2026-08-04T17:46:42.878Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
