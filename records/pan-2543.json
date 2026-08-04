@@ -1,19 +1,41 @@
 {
   "issueId": "PAN-2543",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-08-03T03:42:53.308Z",
-  "updated": "2026-08-03T05:35:13.566Z",
+  "updated": "2026-08-04T13:05:55.965Z",
   "pipeline": {
     "issueId": "PAN-2543",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "updatedAt": "2026-08-03T03:42:53.308Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "plan": {
+          "anthropic/claude-fable-5": {
+            "input": 14718,
+            "output": 55467,
+            "cacheRead": 3659251,
+            "cacheWrite": 181762
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 14718,
+          "output": 55467,
+          "cacheRead": 3659251,
+          "cacheWrite": 181762
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 8.851809,
+        "pricingAsOf": "2026-08-04T13:05:55.958Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
@@ -27,5 +49,7 @@
       "open": true,
       "needsYouEmittedAt": "2026-08-03T03:42:53.306Z"
     }
-  ]
+  ],
+  "harness": "claude-code",
+  "model": "claude-fable-5"
 }
