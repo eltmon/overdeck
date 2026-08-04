@@ -3,6 +3,9 @@
  * One test per orbit, plus the overlap rules (yield ≠ park, warm-idle ≠ park,
  * idle-running is the orbit of last resort) and population-level sort/dedup.
  */
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   classifyParked,
@@ -235,5 +238,19 @@ describe('orchestrator idle exemption (first-night flywheel kill)', () => {
       const rows = classifyParked(signals({ reviewStatus: baseStatus({}), liveAgents: idleAgent }));
       expect(rows, `role ${role} must never be idle-running`).toHaveLength(0);
     }
+  });
+});
+
+describe('completed-handoff is not an operator park (pan done suppression)', () => {
+  it('a stoppedByUser agent WITH a completed marker never reports operator-gate', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'agents-dir-'));
+    mkdirSync(join(dir, 'agents', 'agent-pan-9'), { recursive: true });
+    writeFileSync(join(dir, 'agents', 'agent-pan-9', 'completed'), '');
+    process.env.OVERDECK_HOME = dir;
+    const rows = classifyParked(signals({
+      agents: [baseAgent({ id: 'agent-pan-9', stoppedByUser: true, status: 'stopped', stoppedAt: new Date(NOW - HOUR).toISOString() })],
+    }));
+    expect(rows).toHaveLength(0);
+    rmSync(dir, { recursive: true, force: true });
   });
 });

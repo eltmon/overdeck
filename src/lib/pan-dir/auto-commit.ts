@@ -50,7 +50,7 @@ function parsePositiveInteger(value: string | undefined, fallback: number): numb
 interface QueuedCommit {
   paths: Set<string>;
   subjects: string[];
-  timer: NodeJS.Timeout;
+  timer: NodeJS.Timeout | null;
   /** PAN-1908: git checkout to commit into (defaults to projectRoot). */
   repoRoot?: string;
   expectedBranch: string;
@@ -226,6 +226,8 @@ export function queueAutoCommit(opts: {
   paths: string[];
   subject: string;
   repoRoot?: string;
+  /** Keep the batch pending until an explicit flush. */
+  defer?: boolean;
 }): void {
   const { projectRoot, paths, subject } = opts;
   let { repoRoot } = opts;
@@ -253,12 +255,15 @@ export function queueAutoCommit(opts: {
     existing.subjects.push(subject);
     existing.repoRoot ??= repoRoot;
     if (expectedBranch === STATE_BRANCH) existing.expectedBranch = STATE_BRANCH;
+    if (!opts.defer && !existing.timer) {
+      existing.timer = setTimeout(() => void flushInner(projectRoot), 0);
+    }
     return;
   }
   pending.set(projectRoot, {
     paths: new Set(paths),
     subjects: [subject],
-    timer: setTimeout(() => void flushInner(projectRoot), 0),
+    timer: opts.defer ? null : setTimeout(() => void flushInner(projectRoot), 0),
     repoRoot,
     expectedBranch,
   });
@@ -276,7 +281,7 @@ export function reconcileStatePlaneDrift(
   const stateHome = project ? resolveStateReadHomeSync(project) : null;
   const gitRoot = stateHome?.migrated ? stateHome.root : projectRoot;
   const ownedPaths = stateHome?.migrated
-    ? ['specs', 'records']
+    ? ['specs', 'records', 'agents']
     : ['.pan/specs', '.pan/records'];
 
   return Effect.gen(function* () {
@@ -342,7 +347,7 @@ function flushPromise(
 
   for (const [queuedProjectRoot, batch] of pending) {
     if ((batch.repoRoot ?? queuedProjectRoot) !== gitRoot) continue;
-    clearTimeout(batch.timer);
+    if (batch.timer) clearTimeout(batch.timer);
     const started = flushInner(queuedProjectRoot);
     if (started) matching.add(started);
   }
@@ -859,7 +864,7 @@ export const __testInternals = {
    * repository cannot race a running git process.
    */
   settleAllFlushes: async (): Promise<void> => {
-    for (const batch of pending.values()) clearTimeout(batch.timer);
+    for (const batch of pending.values()) if (batch.timer) clearTimeout(batch.timer);
     pending.clear();
     await Promise.allSettled([...active.values()].map((flush) => flush.promise));
   },

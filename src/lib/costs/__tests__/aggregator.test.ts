@@ -37,15 +37,34 @@ afterEach(() => {
   }
 });
 
+function makeCostEvent(overrides: Partial<CostEvent> = {}): CostEvent {
+  return {
+    ts: new Date().toISOString(),
+    type: 'cost',
+    agentId: 'agent-1',
+    issueId: 'TEST-1',
+    sessionType: 'implementation',
+    provider: 'anthropic',
+    model: 'claude-sonnet-4',
+    input: 1000,
+    output: 500,
+    cacheRead: 0,
+    cacheWrite: 0,
+    cost: 0.01,
+    ...overrides,
+  };
+}
+
 describe('Aggregator Cache Management', () => {
   describe('Cache Loading and Saving', () => {
     it('should create empty cache if none exists', () => {
       const cache = loadCacheSync();
 
-      expect(cache.version).toBe(3);
+      expect(cache.version).toBe(4);
       expect(cache.status).toBe('live');
       expect(cache.issues).toEqual({});
       expect(cache.lastEventLine).toBe(0);
+      expect(cache.lastEventByteOffset).toBe(0);
     });
 
     it('should save and load cache', () => {
@@ -88,7 +107,7 @@ describe('Aggregator Cache Management', () => {
       const cache = loadCacheSync();
 
       // Should create new cache with correct version
-      expect(cache.version).toBe(3);
+      expect(cache.version).toBe(4);
       expect(cache.issues).toEqual({});
     });
   });
@@ -407,6 +426,20 @@ describe('Aggregator Cache Management', () => {
       const issueData = getCostsForIssueSync('TEST-10');
       expect(issueData).toBeDefined();
       expect(issueData?.totalCost).toBeCloseTo(0.01, 6);
+    });
+
+    it('should advance the byte cursor using only appended events', () => {
+      appendCostEventSync(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.01 }));
+      expect(getCostsForIssueSync('TEST-DELTA')?.totalCost).toBeCloseTo(0.01, 6);
+      const first = loadCacheSync();
+
+      appendCostEventSync(makeCostEvent({ issueId: 'TEST-DELTA', cost: 0.02 }));
+      expect(getCostsForIssueSync('TEST-DELTA')?.totalCost).toBeCloseTo(0.03, 6);
+      const second = loadCacheSync();
+
+      expect(first.lastEventLine).toBe(1);
+      expect(second.lastEventLine).toBe(2);
+      expect(second.lastEventByteOffset).toBeGreaterThan(first.lastEventByteOffset);
     });
 
     it('should handle case-insensitive issue lookup', () => {

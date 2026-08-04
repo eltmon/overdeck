@@ -15,7 +15,7 @@ import {
 } from '../state-plane.js';
 
 describe('STATE_BRANCH_PATHS', () => {
-  it('enumerates exactly the ten flat overdeck-state root directories', () => {
+  it('enumerates exactly the eleven flat overdeck-state root directories', () => {
     expect(STATE_BRANCH_PATHS).toEqual([
       'records/',
       'continues/',
@@ -27,6 +27,7 @@ describe('STATE_BRANCH_PATHS', () => {
       'backlog/',
       'notes/',
       'memory/',
+      'agents/',
     ]);
   });
 

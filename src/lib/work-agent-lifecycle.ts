@@ -9,6 +9,10 @@ import { sessionExistsSync, sessionExists } from './tmux.js';
 export type WorkAgentOperation = 'start' | 'resume' | 'restart_with_context' | 'reset_session';
 export type WorkAgentRecommendedAction = 'start' | 'resume' | 'restart_with_context' | 'reset_session' | 'none';
 
+function sessionResetRequiredReason(agentId: string, agentOrIssueId: string): string {
+  return `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or run 'pan reset-session ${agentOrIssueId}' before starting a new session.`;
+}
+
 export interface WorkAgentLifecycleState {
   agentId: string;
   hasAgentState: boolean;
@@ -86,7 +90,13 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  // handedOff exempts fresh-start (PAN-3543): a completed-handoff agent has
+  // "nothing to resume" by design (PAN-3334), so gating --fresh behind a
+  // resumable-session reset leaves NO forward path — pan start, --fresh, and
+  // reset-session all refused while the refusal message recommended --fresh
+  // (observed blocking PAN-3511's rework after a blocked verdict; the durable
+  // agents plane reconstructs the session pointer past reset-session, PAN-3541).
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed) && !handedOff;
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -115,7 +125,7 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+    reason = sessionResetRequiredReason(agentId, agentOrIssueId);
   } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
@@ -185,7 +195,13 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  // handedOff exempts fresh-start (PAN-3543): a completed-handoff agent has
+  // "nothing to resume" by design (PAN-3334), so gating --fresh behind a
+  // resumable-session reset leaves NO forward path — pan start, --fresh, and
+  // reset-session all refused while the refusal message recommended --fresh
+  // (observed blocking PAN-3511's rework after a blocked verdict; the durable
+  // agents plane reconstructs the session pointer past reset-session, PAN-3541).
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed) && !handedOff;
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -214,7 +230,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+    reason = sessionResetRequiredReason(agentId, agentOrIssueId);
   } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
@@ -261,6 +277,7 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
 
 interface StartFreshOptions {
   allowPausedForce?: boolean;
+  allowLiveSessionReplacement?: boolean;
 }
 
 export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFreshOptions = {}): WorkAgentLifecycleState {
@@ -268,7 +285,11 @@ export function assertCanStartFreshSync(agentOrIssueId: string, options: StartFr
   const pausedForceOverride = options.allowPausedForce === true
     && lifecycle.requiresSessionResetBeforeFreshStart
     && getAgentStateSync(lifecycle.agentId)?.paused === true;
-  if (!lifecycle.canStartFresh && !pausedForceOverride) {
+  const liveSessionReplacement = options.allowLiveSessionReplacement === true && lifecycle.isRunning;
+  if (liveSessionReplacement && lifecycle.canResetSession) {
+    throw new Error(sessionResetRequiredReason(lifecycle.agentId, agentOrIssueId));
+  }
+  if (!lifecycle.canStartFresh && !pausedForceOverride && !liveSessionReplacement) {
     throw new Error(lifecycle.reason || `Cannot start fresh for ${lifecycle.agentId}`);
   }
   return lifecycle;

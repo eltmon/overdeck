@@ -217,6 +217,7 @@ vi.mock('../chat/ModelPicker', () => ({
   saveStoredModel: () => {},
   loadStoredHarness: () => 'claude-code',
   saveStoredHarness: () => {},
+  onKnownModelsSync: () => () => {},
 }));
 
 vi.mock('../../lib/store', () => ({
