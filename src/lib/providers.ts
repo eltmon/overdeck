@@ -730,6 +730,10 @@ export function piProviderForModel(modelId: string): string | undefined {
       return 'xiaomi';
     case 'xai':
       return 'xai';
+    case 'dashscope':
+      // Not in omp's bundled catalog — provisioned into the omp user
+      // registry (~/.omp/agent/models.json) by ohmypi-models.ts at spawn.
+      return 'dashscope';
     default:
       return undefined;
   }
