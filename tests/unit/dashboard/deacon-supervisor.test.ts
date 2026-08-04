@@ -34,6 +34,7 @@ describe('deacon supervisor', () => {
       scriptPath: '/dist/dashboard/deacon.js',
       env: {
         OVERDECK_DISABLE_DEACON: '1',
+        OVERDECK_REVIEW_ATTESTATION_KEY: 'host-only-key',
         API_PORT: '3999',
       },
       readState: () => ({ running: false }),
@@ -45,6 +46,7 @@ describe('deacon supervisor', () => {
       env: expect.objectContaining({
         API_PORT: '3999',
         OVERDECK_INTERNAL_DASHBOARD_URL: 'http://127.0.0.1:3999',
+        OVERDECK_REVIEW_ATTESTATION_KEY: 'host-only-key',
       }),
       stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
     }));

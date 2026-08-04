@@ -109,7 +109,6 @@ export interface ArtifactVerdictRestoreOptions {
   workspacePath?: string;
   /** Test/recovery injection for the active host-recorded run provenance. */
   reviewRunId?: string;
-  reviewArtifactCapability?: string;
   /** Reuse a caller-selected immutable snapshot instead of re-reading the filesystem. */
   selectedArtifact?: SynthesisArtifactVerdict;
   /** getStatus/setStatus are required — see VerdictRestoreRow for why. */
@@ -158,7 +157,6 @@ export async function attemptArtifactVerdictRestore(
     now: deps.now(),
     ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}),
     ...(options.reviewRunId ? { reviewRunId: options.reviewRunId } : {}),
-    ...(options.reviewArtifactCapability ? { reviewArtifactCapability: options.reviewArtifactCapability } : {}),
   });
   // An absent artifact is "no evidence", never "approve" — the caller keeps its
   // existing behavior untouched.

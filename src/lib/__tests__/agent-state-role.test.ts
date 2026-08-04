@@ -37,6 +37,7 @@ describe('AgentState role persistence', () => {
     tempHome = mkdtempSync(join(tmpdir(), 'pan-agent-role-'));
     process.env.OVERDECK_HOME = tempHome;
     process.env.OVERDECK_AGENT_STARTED_BY = 'test:agent-state-role';
+    process.env.OVERDECK_REVIEW_ATTESTATION_KEY = 'test-review-attestation-key-0000000000000000';
   });
 
   afterEach(() => {
@@ -61,6 +62,7 @@ describe('AgentState role persistence', () => {
     vi.doUnmock('../harness-resolve.js');
     delete process.env.OVERDECK_HOME;
     delete process.env.OVERDECK_AGENT_STARTED_BY;
+    delete process.env.OVERDECK_REVIEW_ATTESTATION_KEY;
     rmSync(tempHome, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
   });
 
@@ -821,6 +823,7 @@ describe('AgentState role persistence', () => {
         startedAt: '2026-07-19T00:00:00.000Z',
         startedBy: 'reactive-lifecycle',
         sessionId: 'missing-session',
+        reviewRunId: 'agent-pan-2895-review-deadbeef-att1',
       } as any);
       const agentDir = join(tempHome, 'agents', agentId);
       writeFileSync(join(agentDir, 'session.id'), 'missing-session');
@@ -925,6 +928,7 @@ describe('AgentState role persistence', () => {
       model: 'claude-sonnet-4-6',
       status: 'stopped',
       startedAt: '2026-06-23T00:00:00.000Z',
+      reviewRunId: 'agent-pan-2009-review-deadbeef-att1',
     } as any);
     writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-pi-session');
 
@@ -1018,6 +1022,7 @@ describe('AgentState role persistence', () => {
       model: 'claude-sonnet-4-6',
       status: 'starting', // <-- the stuck state from the bug report
       startedAt: '2026-06-23T00:00:00.000Z',
+      reviewRunId: 'agent-pan-2031-review-deadbeef-att1',
     } as any);
     writeFileSync(join(tempHome, 'agents', agentId, 'session.id'), 'dead-session');
 

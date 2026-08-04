@@ -11,7 +11,7 @@
  * default). A suite that only exercised synthesis.md would be blind to the
  * default mode, which is the exact blindness 0bc2b444e23 fixed in the reader.
  */
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -23,12 +23,11 @@ import {
 } from '../verdict-restore.js';
 import { restoreWouldTripHeadGuard } from '../verdict-head-guard.js';
 import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
-import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
-import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
+import { VERDICT_REPORT_FILENAMES, type VerdictReportFilename } from '../review-verdict-report.js';
+import { installTestReviewAttestationKey, writeAttestedReviewArtifact } from './review-artifact-test-helpers.js';
 
 const ISSUE = 'PAN-3511';
-const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1';
-const REVIEW_CAPABILITY = 'host-issued-capability';
+const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1-att1';
 
 interface Harness {
   deps: Partial<ArtifactVerdictRestoreDeps>;
@@ -359,6 +358,7 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
   let workspacePath: string;
 
   beforeEach(() => {
+    installTestReviewAttestationKey();
     workspacePath = mkdtempSync(join(tmpdir(), 'pan3511-verdict-restore-'));
   });
 
@@ -367,35 +367,30 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     vi.useRealTimers();
   });
 
-  function writeArtifact(filename: string, body: string, headSha?: string): void {
-    const runDir = join(workspacePath, '.pan', 'review', REVIEW_RUN_ID);
-    mkdirSync(runDir, { recursive: true });
-    writeFileSync(
-      join(runDir, filename),
-      `${reviewArtifactCapabilityMarker(REVIEW_CAPABILITY)}\n${body}`,
-      'utf-8',
-    );
-    writeFileSync(join(runDir, 'context.json'), JSON.stringify({
+  function writeArtifact(filename: VerdictReportFilename, body: string, headSha?: string): void {
+    writeAttestedReviewArtifact({
+      workspacePath,
       issueId: ISSUE,
       runId: REVIEW_RUN_ID,
+      filename,
+      body,
       ...(headSha ? { headSha } : {}),
-    }), 'utf-8');
+    });
   }
 
   // Both supported shapes, driven through the DEFAULT reader (no readArtifact
   // injection) so the module's real disk path is exercised for each filename.
   it.each(VERDICT_REPORT_FILENAMES)('restores an approved %s written by the reviewer', async (filename) => {
-    // Quick self-review (review.md) carries no context.json in practice, so the
-    // no-head-evidence path — the one most production restores take — is
-    // exercised for that shape.
-    const headSha = filename === 'synthesis.md' ? 'abc1234' : undefined;
-    writeArtifact(filename, '## Verdict: APPROVED\n\n## Summary\nEverything checks out cleanly here.\n', headSha);
+    writeArtifact(
+      filename,
+      '## Verdict: APPROVED\n\n## Summary\nEverything checks out cleanly here.\n',
+      'a'.repeat(40),
+    );
 
     const setStatus = vi.fn();
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
       reviewRunId: REVIEW_RUN_ID,
-      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,
@@ -417,7 +412,6 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
       reviewRunId: REVIEW_RUN_ID,
-      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,
@@ -445,7 +439,6 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
       reviewRunId: REVIEW_RUN_ID,
-      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,

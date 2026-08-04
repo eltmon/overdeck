@@ -112,6 +112,7 @@ import { purgeReviewAgentsForIssue, spawnReviewRoleForIssue } from '../review-ag
 describe('spawnReviewRoleForIssue', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env.OVERDECK_REVIEW_ATTESTATION_KEY = 'review-agent-test-key-material-1234567890';
     mocks.exec.mockImplementation((command: string, options: unknown, callback?: (error: Error | null, result: { stdout: string; stderr: string }) => void) => {
       const cb = typeof options === 'function' ? options : callback;
       const stdout = command.includes('rev-parse') ? 'abc12345\n' : '';
@@ -221,7 +222,7 @@ describe('spawnReviewRoleForIssue', () => {
 
   it('keeps a live review session whose run identity matches current HEAD', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345-deadbeef-att1' });
 
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
@@ -239,12 +240,12 @@ describe('spawnReviewRoleForIssue', () => {
 
   it('re-dispatches a finished convoy when synthesis exists and a newer request is pending', async () => {
     const workspace = '/tmp/pan-review-finished-convoy';
-    const reviewDir = `${workspace}/.pan/review/agent-pan-1194-review-abc12345`;
+    const reviewDir = `${workspace}/.pan/review/agent-pan-1194-review-abc12345-deadbeef-att1`;
     const { mkdir, writeFile } = await import('fs/promises');
     await mkdir(reviewDir, { recursive: true });
     await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345-deadbeef-att1' });
     mocks.getReviewStatus.mockReturnValue({
       reviewStatus: 'pending',
       reviewRequestedAt: '2026-07-15T19:00:00.000Z',

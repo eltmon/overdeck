@@ -64,6 +64,15 @@ vi.mock('../../../../src/lib/cloister/review-context.js', () => ({
   formatTier1Summary: vi.fn(() => ''),
 }));
 
+vi.mock('../../../../src/lib/cloister/review-artifact-attestation.js', () => ({
+  attestReviewContextManifest: vi.fn(),
+}));
+
+vi.mock('../../../../src/lib/review-attestation-key.js', async (importOriginal) => ({
+  ...((await importOriginal()) as typeof import('../../../../src/lib/review-attestation-key.js')),
+  createReviewAgentAttestationToken: vi.fn(() => 'test-review-token'),
+}));
+
 vi.mock('../../../../src/lib/cloister/feedback-writer.js', () => ({
   archiveFeedbackFiles: vi.fn(() => Effect.succeed(undefined)),
 }));

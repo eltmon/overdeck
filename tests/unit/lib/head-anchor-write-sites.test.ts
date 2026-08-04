@@ -34,6 +34,7 @@ function allow(
 // are deliberately excluded, while the full-array comparison preserves counts.
 const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'update.reviewedAtCommit = workspaceHead', 'Producer-fed passed review verdict CLI stamp.'),
+  allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'reviewedAtCommit: attestedEvidenceHead', 'Host-attested active-run review evidence carried into the verdict write.'),
   allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed blocked review verdict CLI stamp after feedback delivery.'),
   allow('src/dashboard/server/read-model.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit || undefined', 'Read-model projection of persisted status.'),
   allow('src/dashboard/server/routes/specialists/legacy-routes.ts', 'reviewedAtCommit', 'reviewedAtCommit: headAnchor', 'Producer-fed passed legacy review verdict stamp.'),

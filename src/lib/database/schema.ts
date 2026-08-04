@@ -461,7 +461,7 @@ export function initSchema(db: SqliteDatabase): void {
       flywheel_run_id TEXT, started_by TEXT,
       role_run_head TEXT,
       review_sub_role TEXT,
-      review_run_id TEXT, review_artifact_capability TEXT,
+      review_run_id TEXT,
       review_synthesis_agent_id TEXT,
       review_output_path TEXT,
       review_deadline_at TEXT,

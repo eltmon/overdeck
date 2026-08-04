@@ -43,7 +43,6 @@ type OverdeckAgentRow = {
   cost_so_far: number | null;
   review_sub_role: string | null;
   review_run_id: string | null;
-  review_artifact_capability: string | null;
   review_synthesis_agent_id: string | null;
   review_output_path: string | null;
   review_deadline_at: number | null;
@@ -101,7 +100,6 @@ export const AGENT_COLUMNS_FOR_DB = [
   'cost_so_far',
   'review_sub_role',
   'review_run_id',
-  'review_artifact_capability',
   'review_synthesis_agent_id',
   'review_output_path',
   'review_deadline_at',
@@ -183,7 +181,6 @@ function overdeckRowToAgentState(row: OverdeckAgentRow): AgentState {
     costSoFar: row.cost_so_far ?? undefined,
     reviewSubRole: row.review_sub_role ?? undefined,
     reviewRunId: row.review_run_id ?? undefined,
-    reviewArtifactCapability: row.review_artifact_capability ?? undefined,
     reviewSynthesisAgentId: row.review_synthesis_agent_id ?? undefined,
     reviewOutputPath: row.review_output_path ?? undefined,
     reviewDeadlineAt: isoFromMillis(row.review_deadline_at),
@@ -243,7 +240,6 @@ export function stateToOverdeckParamsForDb(state: AgentState, updatedAt: number)
     state.costSoFar ?? null,
     state.reviewSubRole ?? null,
     state.reviewRunId ?? null,
-    state.reviewArtifactCapability ?? null,
     state.reviewSynthesisAgentId ?? null,
     state.reviewOutputPath ?? null,
     millisFromIso(state.reviewDeadlineAt),

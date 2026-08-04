@@ -58,7 +58,6 @@ describe('agents-table discovery columns (PAN-2585)', () => {
         status: 'running',
         startedAt: '2026-07-12T02:00:00.000Z',
         reviewRunId: 'agent-pan-9999-review-abcd1234',
-        reviewArtifactCapability: 'host-issued-capability',
         startedBy: 'flywheel:RUN-71',
         reviewDiscoveryPending: true,
         reviewContextManifestPath: '/tmp/ws/.pan/review/run/context.json',
@@ -72,11 +71,9 @@ describe('agents-table discovery columns (PAN-2585)', () => {
       const readBack = getOverdeckAgentStateSync('agent-pan-9999-review');
       expect(readBack).not.toBeNull();
       expect(readBack?.startedBy).toBe('flywheel:RUN-71');
-      expect(readBack?.reviewArtifactCapability).toBe('host-issued-capability');
       expect(getReviewArtifactProvenanceSync(state.id)).toEqual({
         workspace: '/tmp/ws',
         reviewRunId: 'agent-pan-9999-review-abcd1234',
-        reviewArtifactCapability: 'host-issued-capability',
       });
       expect(readBack?.reviewDiscoveryPending).toBe(true);
       expect(readBack?.reviewContextManifestPath).toBe('/tmp/ws/.pan/review/run/context.json');

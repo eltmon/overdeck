@@ -5,7 +5,7 @@
  * call in the system, so the artifact consult must be one-directional, guarded
  * by the reviewed HEAD, and free on the common path.
  */
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -13,7 +13,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resolveJournalReconciledReviewStatusSync, type ReviewStatusReadHooks } from '../review-status-read.js';
 import { readMemoizedArtifactVerdict } from '../cloister/synthesis-verdict.js';
-import { reviewArtifactCapabilityMarker } from '../cloister/review-artifact-capability.js';
+import {
+  installTestReviewAttestationKey,
+  writeAttestedReviewArtifact,
+} from '../cloister/__tests__/review-artifact-test-helpers.js';
 import { readJournalStatusSync } from '../overdeck/review-status-record-sync.js';
 import { reconcileJournalIntoCacheSync } from '../review-status-reconcile.js';
 import { staleVerdictSnapshotAgainstLiveCycle } from '../pan-dir/pipeline-verdict-merge.js';
@@ -30,8 +33,7 @@ vi.mock('../review-status-reconcile.js', () => ({ reconcileJournalIntoCacheSync:
 vi.mock('../pan-dir/pipeline-verdict-merge.js', () => ({ staleVerdictSnapshotAgainstLiveCycle: vi.fn() }));
 
 const ISSUE = 'PAN-3511';
-const RUN_ID = 'agent-pan-3511-review-run-1';
-const CAPABILITY = 'host-issued-capability';
+const RUN_ID = 'agent-pan-3511-review-run-1-att1';
 const RECONCILED = { reviewStatus: 'passed', updatedAt: '2026-08-03T01:00:00.000Z' };
 
 const readArtifact = vi.mocked(readMemoizedArtifactVerdict);
@@ -142,25 +144,23 @@ describe('readMemoizedArtifactVerdict — freshness and capacity', () => {
   let real: typeof import('../cloister/synthesis-verdict.js');
 
   function artifactOptions(now: number, issueId = ISSUE, workspace = workspacePath) {
-    const runId = `agent-${issueId.toLowerCase()}-review-run-1`;
-    return {
-      now,
-      workspacePath: workspace,
-      reviewRunId: runId,
-      reviewArtifactCapability: CAPABILITY,
-    };
+    const runId = `agent-${issueId.toLowerCase()}-review-run-1-att1`;
+    return { now, workspacePath: workspace, reviewRunId: runId };
   }
 
   function writeArtifact(issueId: string, workspace: string, body = '## Verdict: APPROVED\n'): string {
-    const runId = `agent-${issueId.toLowerCase()}-review-run-1`;
-    const runDir = join(workspace, '.pan', 'review', runId);
-    mkdirSync(runDir, { recursive: true });
-    writeFileSync(join(runDir, 'synthesis.md'), `${reviewArtifactCapabilityMarker(CAPABILITY)}\n${body}`, 'utf-8');
-    writeFileSync(join(runDir, 'context.json'), JSON.stringify({ issueId, runId }), 'utf-8');
-    return runDir;
+    const runId = `agent-${issueId.toLowerCase()}-review-run-1-att1`;
+    return writeAttestedReviewArtifact({
+      workspacePath: workspace,
+      issueId,
+      runId,
+      filename: 'synthesis.md',
+      body,
+    });
   }
 
   beforeEach(async () => {
+    installTestReviewAttestationKey();
     real = await vi.importActual<typeof import('../cloister/synthesis-verdict.js')>(
       '../cloister/synthesis-verdict.js',
     );
@@ -183,12 +183,15 @@ describe('readMemoizedArtifactVerdict — freshness and capacity', () => {
     expect(cached?.verdict).toBe('passed');
   });
 
-  it('re-scans once the memo TTL expires', () => {
+  it('keeps verified evidence cached beyond the one-minute null-entry TTL', () => {
     const now = Date.now();
     expect(real.readMemoizedArtifactVerdict(ISSUE, artifactOptions(now))?.verdict).toBe('passed');
     rmSync(join(workspacePath, '.pan'), { recursive: true, force: true });
 
-    expect(real.readMemoizedArtifactVerdict(ISSUE, artifactOptions(now + real.ARTIFACT_VERDICT_MEMO_TTL_MS))).toBeNull();
+    expect(real.readMemoizedArtifactVerdict(
+      ISSUE,
+      artifactOptions(now + real.ARTIFACT_VERDICT_MEMO_TTL_MS),
+    )?.verdict).toBe('passed');
   });
 
   it('expires a non-null memo entry at the artifact freshness boundary', () => {

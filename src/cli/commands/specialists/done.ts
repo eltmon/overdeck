@@ -23,6 +23,7 @@ import {
 import type { HeadAnchor } from '../../../lib/git-utils.js';
 import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
 import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
+import { REVIEW_ATTESTATION_TOKEN_ENV } from '../../../lib/review-attestation-key.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -69,6 +70,35 @@ export async function doneCommand(
   if (options.uatStatus && (specialist !== 'test' || !['passed', 'failed'].includes(options.uatStatus))) {
     console.error(chalk.red('--uat-status applies only to test verdicts and must be passed or failed'));
     return exitCli(1);
+  }
+
+  let attestedEvidenceHead: HeadAnchor | undefined;
+  const callerAgentId = process.env.OVERDECK_AGENT_ID;
+  if (specialist === 'review' && callerAgentId) {
+    const expectedReviewAgentId = `agent-${normalizedIssueId.toLowerCase()}-review`;
+    const token = process.env[REVIEW_ATTESTATION_TOKEN_ENV];
+    if (callerAgentId !== expectedReviewAgentId || !options.runId || !token) {
+      throw new Error('Review-agent completion requires the active review identity, --run-id, and a host-issued attestation token');
+    }
+    const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+    const response = await fetch(`${baseUrl}/api/specialists/review-artifact/attest`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-overdeck-review-attestation-token': token,
+      },
+      body: JSON.stringify({
+        issueId: normalizedIssueId,
+        runId: options.runId,
+        verdict: options.status,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not attest review artifact (${response.status}): ${await response.text()}`);
+    }
+    const attested = await response.json() as { reviewedHead?: string };
+    if (!attested.reviewedHead) throw new Error('Host-attested review artifact did not include a reviewed HEAD');
+    attestedEvidenceHead = rehydrateHeadAnchor(attested.reviewedHead);
   }
 
   if (specialist === 'inspect') {
@@ -143,8 +173,8 @@ export async function doneCommand(
       // its reviewedAtCommit anchor is recorded by a second best-effort write after
       // feedback delivery below (PAN-2524, PAN-3148).
       if (options.status === 'passed' || update.reviewerVerdicts) {
-        let workspaceHead: HeadAnchor | undefined;
-        try {
+        let workspaceHead = attestedEvidenceHead;
+        if (!workspaceHead) try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
           const { existsSync } = await import('node:fs');
           const { join } = await import('node:path');
@@ -242,7 +272,7 @@ export async function doneCommand(
   // For review verdicts, route through the verdict write door (PAN-3512)
   // when there's an evidence head (passed verdict with reviewers, or any blocked/failed verdict).
   if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
-    let evidenceHead: HeadAnchor | undefined;
+    let evidenceHead = attestedEvidenceHead;
     if (update.reviewedAtCommit) {
       evidenceHead = update.reviewedAtCommit;
     } else if (update.reviewerVerdicts) {
@@ -258,6 +288,7 @@ export async function doneCommand(
       reviewerVerdicts: update.reviewerVerdicts,
       evidenceHead,
       extra: {
+        ...(attestedEvidenceHead ? { reviewedAtCommit: attestedEvidenceHead } : {}),
         ...(update.verificationStatus !== undefined
           ? { verificationStatus: update.verificationStatus }
           : {}),
@@ -337,7 +368,7 @@ export async function doneCommand(
   // detecting the rework commit that should trigger a fresh review. Keep this as
   // a second, best-effort write after the durable verdict and feedback delivery;
   // folding the git probe into the first write would reopen PAN-2524's stall.
-  if (specialist === 'review' && options.status === 'blocked') {
+  if (specialist === 'review' && options.status === 'blocked' && !attestedEvidenceHead) {
     try {
       const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
       const { existsSync } = await import('node:fs');

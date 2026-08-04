@@ -8,7 +8,10 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
+import { attestReviewReport } from '../../../../lib/cloister/review-artifact-attestation.js';
 import { recordReviewVerdict } from '../../../../lib/cloister/review-verdict-writer.js';
+import { getReviewArtifactProvenanceSync } from '../../../../lib/overdeck/agent-review-provenance.js';
+import { verifyReviewAgentAttestationToken } from '../../../../lib/review-attestation-key.js';
 import type { HeadAnchor } from '../../../../lib/git-utils.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
@@ -106,6 +109,59 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
       results,
       reviewStatusesReset,
     });
+  })),
+);
+
+// ─── Route: POST /api/specialists/review-artifact/attest ─────────────────────
+
+const REVIEW_ATTESTATION_TOKEN_HEADER = 'x-overdeck-review-attestation-token';
+
+const postReviewArtifactAttestRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/review-artifact/attest',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readJsonBody;
+    const { issueId, runId, verdict } = body as {
+      issueId?: string;
+      runId?: string;
+      verdict?: 'passed' | 'blocked' | 'failed';
+    };
+    if (!issueId || !runId || !verdict || !['passed', 'blocked', 'failed'].includes(verdict)) {
+      return jsonResponse({ error: 'issueId, runId, and a valid verdict are required' }, { status: 400 });
+    }
+
+    const normalizedIssueId = issueId.toUpperCase();
+    const reviewAgentId = `agent-${normalizedIssueId.toLowerCase()}-review`;
+    const token = request.headers[REVIEW_ATTESTATION_TOKEN_HEADER];
+    if (typeof token !== 'string' || !verifyReviewAgentAttestationToken(reviewAgentId, runId, token)) {
+      return jsonResponse({ error: 'Invalid review artifact attestation token' }, { status: 401 });
+    }
+
+    const provenance = getReviewArtifactProvenanceSync(reviewAgentId);
+    if (!provenance || provenance.reviewRunId !== runId) {
+      return jsonResponse({ error: 'Review run is not the active host-recorded run' }, { status: 409 });
+    }
+
+    try {
+      const attested = attestReviewReport({
+        issueId: normalizedIssueId,
+        runId,
+        workspacePath: provenance.workspace,
+        expectedVerdict: verdict,
+      });
+      return jsonResponse({
+        success: true,
+        filename: attested.filename,
+        verdict: attested.verdict,
+        reviewedHead: attested.reviewedHead,
+      });
+    } catch (err) {
+      return jsonResponse(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 409 },
+      );
+    }
   })),
 );
 
@@ -884,6 +940,7 @@ export const specialistsLegacyRouteLayer = Layer.mergeAll(
   getSpecialistsRoute,
   getSpecialistsProjectsRoute,
   postSpecialistsResetAllRoute,
+  postReviewArtifactAttestRoute,
   postSpecialistsDoneRoute,
   postSpecialistsLogsCleanupAllRoute,
   postSpecialistWakeRoute,

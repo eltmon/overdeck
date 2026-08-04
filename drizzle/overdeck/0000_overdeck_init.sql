@@ -37,7 +37,6 @@ CREATE TABLE `agents` (
 	`cost_so_far` real,
 	`review_sub_role` text,
 	`review_run_id` text,
-	`review_artifact_capability` text,
 	`review_synthesis_agent_id` text,
 	`review_output_path` text,
 	`review_deadline_at` integer,
