@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:39:20.950Z",
+  "updated": "2026-08-04T08:41:24.179Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "emit-door": {
-        "writerId": "agent-pan-3537",
-        "agentId": "agent-pan-3537",
-        "pid": 4079189,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T08:39:20.949Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3537",
@@ -120,12 +112,27 @@
         "outcome": "completed",
         "reason": "Added the shared project.ci_suite_observed schema, per-project CI snapshot reduction, derivation helper, snapshot hydration, and reducer tests.",
         "releasedAt": "2026-08-04T08:37:36.462Z"
+      },
+      {
+        "writerId": "agent-pan-3537",
+        "agentId": "agent-pan-3537",
+        "pid": 4079189,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T08:39:20.949Z",
+        "itemId": "emit-door",
+        "outcome": "completed",
+        "reason": "Exported appendDomainEventAsync through the shared event-store provider with settled success/failure semantics and unit coverage.",
+        "releasedAt": "2026-08-04T08:41:24.179Z"
       }
     ],
     "statusReasons": {
       "contracts-event-and-reducer": {
         "reason": "Added the shared project.ci_suite_observed schema, per-project CI snapshot reduction, derivation helper, snapshot hydration, and reducer tests.",
         "updatedAt": "2026-08-04T08:37:36.462Z"
+      },
+      "emit-door": {
+        "reason": "Exported appendDomainEventAsync through the shared event-store provider with settled success/failure semantics and unit coverage.",
+        "updatedAt": "2026-08-04T08:41:24.179Z"
       }
     }
   },
@@ -136,6 +143,9 @@
     "contracts-event-and-reducer.contracts-event-and-reducer.ac3": "completed",
     "contracts-event-and-reducer.contracts-event-and-reducer.ac4": "completed",
     "contracts-event-and-reducer.contracts-event-and-reducer.ac5": "completed",
-    "emit-door": "running"
+    "emit-door": "completed",
+    "emit-door.emit-door.ac1": "completed",
+    "emit-door.emit-door.ac2": "completed",
+    "emit-door.emit-door.ac3": "completed"
   }
 }
