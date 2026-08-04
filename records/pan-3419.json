@@ -502,7 +502,7 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-04T18:00:34.553Z",
+  "updated": "2026-08-04T18:57:08.178Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
@@ -513,8 +513,9 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:00:34.534Z",
+    "updatedAt": "2026-08-04T18:57:07.940Z",
     "reviewNotes": "Approved; two palette performance findings are real but unchanged since cycle 10 and non-promotable under cycle-11 convergence",
+    "uatNotes": "UAT required: this issue changes observable dashboard behavior (Fork/Handoff modal Project select, CommandDeck grouping, command-palette routing -- FR-6/7/8 of the PRD). Built and ran the workspace's own dashboard as a 'peer' instance (mode=peer, buildBranch=feature/pan-3419, buildCommit=3b7b8927148) on a non-host port (never touched the shared primary dashboard on :3011 -- src/dashboard/server/config.ts:78-121 explicitly guards against a workspace checkout binding the host port, citing PAN-2322 where UAT agents hijacked :3011 in the past). Drove it with Playwright MCP: (1) FR-6/FR-9 -- navigated to the mind-your-now project deck and found conv 1827 ('Launching Overdeck planning system fixes', branch hoff-agent-surface) correctly grouped there despite its cwd (/home/eltmon/Projects/hoff-agent-surface) being outside every registered project path -- confirms the explicit-first grouping fix and the conv-1827 backfill both landed. (2) FR-7 -- opened conv 1827's 'Create summary fork' menu; the Fork/Handoff modal renders a Project <select> defaulted to 'Same as source (mind-your-now)' followed by every registered project (panopticon-cli, mind-your-now, auricle, myn-cli, papers-please, lexerra, krux, pan-tts, eltmon-stream, eltmon-video, tindra, puzzdom); verified the select is interactive (chose krux, selection updated) and persists across all three fork intents (Fresh summary / Agent handoff / Exact copy); cancelled without submitting to avoid spawning a real billed conversation. (3) FR-8 -- opened the command palette (/) on the fresh session, searched conv 1827's content, found the hit, and clicked it: navigated cleanly to /conv/20260801-2fc7 with no console errors; cross-checked palette.ts source to confirm toPaletteConversationHit computes hit.projectKey via explicit-first resolution (conversation.projectKey else cwd-encoded fallback) which is exactly what onOpenConversationHit uses for routing, while hit.projectId (the raw JSONL-dir label shown in the hit's pill) is deliberately left untouched per AC1's 'despite a foreign projectId' wording -- matches the passing palette.test.ts. Zero console errors or warnings across the entire session (checked after every interaction). Did not click 'Continue' on the fork modal (would spawn a real $90/1M Claude Fable 5 conversation) and did not restart the shared host dashboard -- both would have been disproportionate/unauthorized for a UI verification. Cleaned up the peer dashboard processes after UAT.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
@@ -581,17 +582,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2727,
-            "output": 280229,
-            "cacheRead": 123640214,
-            "cacheWrite": 2687039
+            "input": 3099,
+            "output": 374666,
+            "cacheRead": 170204328,
+            "cacheWrite": 3040365
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8809521,
-            "output": 389352,
-            "cacheRead": 243674624,
+            "input": 9819348,
+            "output": 443789,
+            "cacheRead": 293485056,
             "cacheWrite": 0
           }
         }
@@ -604,21 +605,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 65366773,
-          "output": 1106588,
-          "cacheRead": 404347904,
+          "input": 66376600,
+          "output": 1161025,
+          "cacheRead": 454158336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2727,
-          "output": 280229,
-          "cacheRead": 123640214,
-          "cacheWrite": 2687039
+          "input": 3099,
+          "output": 374666,
+          "cacheRead": 170204328,
+          "cacheWrite": 3040365
         }
       },
       "costAtCloseOut": {
-        "usd": 596.4740936,
-        "pricingAsOf": "2026-08-04T18:00:34.543Z"
+        "usd": 639.2028146,
+        "pricingAsOf": "2026-08-04T18:57:07.983Z"
       }
     },
     "merges": [
