@@ -99,20 +99,19 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T17:44:16.852Z",
+  "updated": "2026-08-04T17:44:23.798Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T17:43:59.343Z",
+    "updatedAt": "2026-08-04T17:44:00.071Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
-    "verificationNotes": "The supervised verification worker stopped before recording a result; verification re-runs on the next cycle.",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
     "reviewedAtCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342",
@@ -261,7 +260,7 @@
       },
       "costAtCloseOut": {
         "usd": 130.575359,
-        "pricingAsOf": "2026-08-04T17:43:59.410Z"
+        "pricingAsOf": "2026-08-04T17:44:20.932Z"
       }
     },
     "merges": [
