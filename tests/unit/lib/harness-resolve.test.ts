@@ -69,21 +69,18 @@ describe('resolveHarness', () => {
     warnSpy.mockRestore();
   });
 
-  it('honors an explicit pick, ignores role defaults, and otherwise uses provider defaults (PAN-1984)', async () => {
+  it('uses an explicit pick before provider defaults while ignoring the role harness', async () => {
     const { resolveHarness } = await loadSubject();
 
-    // An explicit per-spawn harness is an operator choice and wins. The legacy
-    // per-role harness remains ignored when no explicit pick is present.
     setConfig({ roles: { work: { harness: 'ohmypi' } }, providerHarnesses: { openai: 'codex' } });
     await expect(resolveHarness({ explicit: 'claude-code', role: 'work', model: 'gpt-5.5' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ role: 'work', model: 'gpt-5.5' })).resolves.toBe('codex');
 
-    // Explicit still wins over a different configured provider default.
     setConfig({ providerHarnesses: { openai: 'ohmypi' } });
     await expect(resolveHarness({ explicit: 'claude-code', model: 'gpt-5.5' })).resolves.toBe('claude-code');
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('ohmypi');
 
-    // No config → built-in provider default.
+    // No explicit pick or config → built-in provider default.
     setConfig({});
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('codex');
   });
@@ -107,13 +104,11 @@ describe('resolveHarness', () => {
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
-  it('passes the explicit winner through the harness policy gate', async () => {
+  it('passes an explicit harness winner through the harness policy gate', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('subscription');
     mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'blocked' });
     const { resolveHarness } = await loadSubject();
 
-    // Explicit picks are honored but remain policy-gated and fail loudly rather
-    // than silently rerouting to the provider default.
     await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
     expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription');

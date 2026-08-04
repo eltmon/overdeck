@@ -59,7 +59,12 @@ describe('tiered crews mapping', () => {
     const imported = importCrews(liveConfig);
     expect(crewLabel(imported.crews[0])).toBe('Kimi K2.7 Code');
     expect(crewLabel(imported.crews[1])).toBe('4-model mix');
-    expect(blendedCost(imported.crews[1])).toBeCloseTo(6.525);
+    // Weighted over modelCatalog costs: haiku 1x10 + sonnet 6x40 + terra 7x30
+    // + gemini 7x20 = 600 over weight 100. Was 6.525 while terra was priced
+    // 8.75; PAN-3388 repriced it to 7 for the 272K billing tier and left this
+    // literal behind. The catalog is the source of truth for price — this
+    // asserts the blending math, so it tracks the catalog.
+    expect(blendedCost(imported.crews[1])).toBeCloseTo(6);
     expect(blendedCost({ id: 'unknown', model: 'missing', harness: 'ohmypi' })).toBeNull();
   });
 

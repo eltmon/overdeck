@@ -322,7 +322,7 @@ function buildStoppedAgentLifecycle(
     reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or run 'pan reset-session ${agentOrIssueId}' before starting a new session.`;
   } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
