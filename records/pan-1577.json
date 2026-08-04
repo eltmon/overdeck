@@ -1244,7 +1244,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T17:34:37.603Z",
+  "updated": "2026-08-04T17:34:40.293Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1255,9 +1255,8 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T17:34:32.614Z",
+    "updatedAt": "2026-08-04T17:34:32.887Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-allowlist.txt\n  - src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts\n  - src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts\n  - tests/cli/commands/specialists/done.test.ts\n  - tests/unit/cli/state-migrate-cancellation.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n  - tests/unit/lib/agents/spawn-flywheel-provenance.test.ts\n  - tests/unit/lib/harness-resolve.test.ts\n  - tests/unit/lib/review-status.test.ts",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
     "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
@@ -1367,7 +1366,7 @@
       },
       "costAtCloseOut": {
         "usd": 892.5201033,
-        "pricingAsOf": "2026-08-04T17:34:37.599Z"
+        "pricingAsOf": "2026-08-04T17:34:40.283Z"
       }
     },
     "merges": [
