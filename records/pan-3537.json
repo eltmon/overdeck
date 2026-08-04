@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:51:17.976Z",
+  "updated": "2026-08-04T08:55:07.893Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "rest-fill": {
-        "writerId": "agent-pan-3537",
-        "agentId": "agent-pan-3537",
-        "pid": 76956,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T08:51:17.976Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3537",
@@ -142,6 +134,17 @@
         "outcome": "completed",
         "reason": "Mapped default-branch GitHub Actions check_suite payloads to project CI observations before PR-only guards, preserving merge-gate behavior and adding pure and handler tests.",
         "releasedAt": "2026-08-04T08:51:08.622Z"
+      },
+      {
+        "writerId": "agent-pan-3537",
+        "agentId": "agent-pan-3537",
+        "pid": 76956,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T08:51:17.976Z",
+        "itemId": "rest-fill",
+        "outcome": "completed",
+        "reason": "Added a gh-api Actions run fill that groups runs by newest head SHA, emits shared CI observations, tolerates missing repos/auth failures, and is fully dependency-injected for tests.",
+        "releasedAt": "2026-08-04T08:55:07.892Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +159,10 @@
       "webhook-observation": {
         "reason": "Mapped default-branch GitHub Actions check_suite payloads to project CI observations before PR-only guards, preserving merge-gate behavior and adding pure and handler tests.",
         "updatedAt": "2026-08-04T08:51:08.622Z"
+      },
+      "rest-fill": {
+        "reason": "Added a gh-api Actions run fill that groups runs by newest head SHA, emits shared CI observations, tolerates missing repos/auth failures, and is fully dependency-injected for tests.",
+        "updatedAt": "2026-08-04T08:55:07.892Z"
       }
     }
   },
@@ -175,6 +182,10 @@
     "webhook-observation.webhook-observation.ac2": "completed",
     "webhook-observation.webhook-observation.ac3": "completed",
     "webhook-observation.webhook-observation.ac4": "completed",
-    "rest-fill": "running"
+    "rest-fill": "completed",
+    "rest-fill.rest-fill.ac1": "completed",
+    "rest-fill.rest-fill.ac2": "completed",
+    "rest-fill.rest-fill.ac3": "completed",
+    "rest-fill.rest-fill.ac4": "completed"
   }
 }
