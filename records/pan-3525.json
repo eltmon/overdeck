@@ -3,19 +3,22 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-04T01:18:51.052Z",
-  "updated": "2026-08-04T03:11:09.921Z",
+  "updated": "2026-08-04T06:22:50.885Z",
   "pipeline": {
     "issueId": "PAN-3525",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T03:11:09.885Z",
+    "updatedAt": "2026-08-04T06:22:50.866Z",
     "strikeReadyHead": "5e935ab4dbab874c65148998a0cdcd657e2de22a",
     "strikeReadyAt": "2026-08-04T03:11:09.884Z",
     "strikeLandingState": "ready",
     "strikeRecoveryCount": 0,
-    "strikeLandingAttempts": []
+    "strikeLandingAttempts": [],
+    "closedOut": true,
+    "closedOutAt": "2026-08-04T06:22:50.866Z",
+    "mergeStatus": "merged"
   },
   "closeOut": {
     "usage": {
@@ -43,7 +46,111 @@
       }
     },
     "merges": [],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-04T06:22:50.885Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-review",
+            "by": "conv-20260804-4112",
+            "at": "2026-08-04T06:22:39.042Z"
+          }
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: pending",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-tests",
+            "by": "conv-20260804-4112",
+            "at": "2026-08-04T06:22:39.042Z"
+          }
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: missing",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-verification",
+            "by": "conv-20260804-4112",
+            "at": "2026-08-04T06:22:39.042Z"
+          }
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "All commits merged to main; Remote branch fully merged; Superseded feature/pan-3525 residual: Feature branch is absent; positive merge evidence is required; PR state unknown",
+          "status": "pass"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: todo; no running work/planning agents",
+          "status": "miss",
+          "acceptedBy": {
+            "flag": "--accept-post-merge",
+            "by": "conv-20260804-4112",
+            "at": "2026-08-04T06:22:39.042Z"
+          }
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "no merge commit resolvable — verified-on-main has no durable marker (see DoD row 6)",
+          "status": "skip"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "verified-on-main skipped — no merge commit resolvable, so deploy build-ancestry has no durable anchor either (same landing class as DoD row 6 skip)",
+          "status": "skip"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; Removed git worktree; Cleaned 1 agent state directory (2 transcript files preserved); Deleted local branch strike/pan-3525; Deleted remote branch strike/pan-3525; Pruned 72 checkpoint ref(s) for agent-pan-3525, planning-pan-3525, strike-pan-3525; No specialist registry entries for PAN-3525"
+        }
+      ],
+      "accepted": [
+        "review",
+        "tests",
+        "verification",
+        "post-merge"
+      ]
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-sol"
