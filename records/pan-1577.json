@@ -1301,18 +1301,18 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T18:56:01.573Z",
+  "updated": "2026-08-04T18:56:11.719Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z",
-    "updatedAt": "2026-08-04T18:55:56.355Z",
+    "updatedAt": "2026-08-04T18:56:11.707Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "testNotes": "Automated gates at HEAD 12695191097 (feature/pan-1577): install (bun install --frozen-lockfile) PASS. typecheck (root tsc, hooks, evals, dashboard-ratchet 54 known/0 new, frontend-ratchet 0 known/0 new) PASS clean. lint (eslint + all 18 sub-lints: effect, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 76 baselined/0 new, ratchet-audit, quarantine-audit) PASS clean. build (frontend Vite build + dist-externals check) PASS. server-bundle (dashboard server tsdown bundle) PASS. test: frontend vitest --changed origin/main: 173/173 files, 1952/1952 tests passed clean. Root vitest --changed origin/main: 749/750 files passed (1 file failed), 7264/7265 tests passed, 20 skipped. The single failure (cost-reconcile-harnesses.integration.test.ts, 'Hook timed out in 5000ms' in beforeEach setupOverdeckTestDb) is in a file NOT touched by this branch's 35-file diff (confirmed via git diff origin/main --name-only) and reproduced clean in isolation (1/1 passed, 5.9s) while system load average was 31 -- load-induced hook timeout, not a regression. PAN-1577 diff scope confirmed: 35 files spanning packages/contracts/src/events.ts, src/cli/commands/conversations/{index,move}.ts + tests, src/dashboard/frontend/src/components/CommandDeck/{ConversationActionMenu,ConversationList,ConversationRow,index,projectsData,useConversationMutations}.tsx/ts + tests, src/lib/overdeck/conversations.ts, matching the xBRIEF's 8 completed items. NOTE: this branch is 26 commits behind the current origin/main tip and a fresh sync-main attempt at 2026-08-04T17:57:03Z detected 10 conflicting paths (recorded in the pipeline record's blockerReasons) -- that is a merge/sync concern for the work/review roles (test role boundaries forbid editing code or syncing main), reported here for visibility; it does not affect the correctness of the automated-gate or UAT results above, which were run against the actual committed HEAD.",
     "uatNotes": "Built this branch's dashboard (npm run build + build:dashboard:server:bundle) and ran it as an isolated instance on port 3211 with a throwaway OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1 -- did NOT touch or restart the live production dashboard on :3011 (which is actively orchestrating 30+ running agents). Registered two throwaway git-backed projects (UAT Proj A, UAT Proj B) and seeded one test conversation (cwd under UAT Proj A) directly via createConversation() in src/lib/overdeck/conversations.ts against the isolated DB. Drove both move surfaces via Playwright against http://127.0.0.1:3211: (1) Menu-picker move: opened the 3-dot 'More actions' menu on the conversation row, clicked Move, confirmed the project-picker submenu showed 'UAT Proj A' disabled (current project) and 'UAT Proj B' selectable, clicked UAT Proj B -- got a visible 'Moved \"UAT Move Test Conversation\" to UAT Proj B' toast, UAT Proj A's Command Deck immediately showed 'No conversations yet' (live re-group, no refresh), and GET /api/conversations confirmed server-side projectKey='uat-proj-b' while cwd remained pinned to the original uat-proj-a path (JSONL/cwd hazard H1 verified untouched). (2) Native drag-and-drop: navigated to UAT Proj B's Command Deck, dragged the conversation row onto the 'UAT Proj A' sidebar rail item, and confirmed UAT Proj B's Command Deck flipped to 'No conversations yet' with server-side projectKey='uat-proj-a' and cwd still unchanged. Both flows exercised drag-drop-move.ac4's required end-to-end verification with real UI interaction plus server-side confirmation, matching AC1-AC3 of both menu-move and drag-drop-move xBRIEF items. Screenshots captured (after-menu-move.png, after-drag-drop.png). Isolated UAT dashboard instance was stopped after verification.",
@@ -1343,9 +1343,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 84310044,
-            "output": 888628,
-            "cacheRead": 213070848,
+            "input": 84317368,
+            "output": 892386,
+            "cacheRead": 213761024,
             "cacheWrite": 0
           }
         },
@@ -1412,9 +1412,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 98619849,
-          "output": 1263154,
-          "cacheRead": 298251264,
+          "input": 98627173,
+          "output": 1266912,
+          "cacheRead": 298941440,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1425,8 +1425,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 968.4684196,
-        "pricingAsOf": "2026-08-04T18:56:01.568Z"
+        "usd": 968.9628676,
+        "pricingAsOf": "2026-08-04T18:56:11.714Z"
       }
     },
     "merges": [
