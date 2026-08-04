@@ -27,6 +27,7 @@ const mockIsGitHubAppConfigured = vi.fn();
 const mockGetPullRequestState = vi.fn();
 const mockExecFile = vi.fn();
 const mockPostMergeLifecycle = vi.fn();
+const mockAppendDomainEventAsync = vi.fn(async () => true);
 let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -65,6 +66,20 @@ vi.mock('../../../src/lib/cloister/merge-agent.js', () => ({
 
 vi.mock('../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: () => ({ projectPath: '/tmp/test-project' }),
+  listProjectsSync: () => [{
+    key: 'test-project',
+    config: {
+      name: 'Test Project',
+      path: '/tmp/test-project',
+      github_repo: 'test-owner/test-repo',
+      workspace: { default_branch: 'main' },
+    },
+  }],
+}));
+
+vi.mock('../../../src/lib/activity-logger.js', () => ({
+  appendDomainEventAsync: (...args: Parameters<typeof mockAppendDomainEventAsync>) =>
+    mockAppendDomainEventAsync(...args),
 }));
 
 vi.mock('../../../src/lib/github-app.js', () => ({
@@ -149,6 +164,36 @@ describe('handleCheckSuite', () => {
       },
     })));
 
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('appends a project CI observation for a default-branch suite with no pull requests', async () => {
+    await Effect.runPromise(handleCheckSuite(makePayload({
+      check_suite: {
+        id: 42,
+        status: 'in_progress',
+        conclusion: null,
+        head_branch: 'main',
+        head_sha: 'abc123',
+        app: { slug: 'github-actions' },
+        pull_requests: [],
+      },
+    })));
+
+    expect(mockAppendDomainEventAsync).toHaveBeenCalledTimes(1);
+    expect(mockAppendDomainEventAsync).toHaveBeenCalledWith({
+      type: 'project.ci_suite_observed',
+      timestamp: expect.any(String),
+      payload: expect.objectContaining({
+        projectKey: 'test-project',
+        repo: 'test-owner/test-repo',
+        branch: 'main',
+        headSha: 'abc123',
+        suiteId: '42',
+        status: 'in_progress',
+        conclusion: null,
+      }),
+    });
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 

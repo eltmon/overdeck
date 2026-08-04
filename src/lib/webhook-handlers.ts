@@ -14,6 +14,8 @@ import { relayCiFailureFeedback } from './cloister/ci-failure-feedback.js';
 import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cooldown.js';
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
+import { appendDomainEventAsync } from './activity-logger.js';
+import { observationFromCheckSuite } from './ci/project-ci-observation.js';
 
 export { ADVISORY_CHECK_NAMES, isAdvisoryCheckName };
 
@@ -30,8 +32,12 @@ export interface WebhookPayload {
     merged?: boolean;
   };
   check_suite?: {
+    id?: number;
     status?: string;
     conclusion?: string | null;
+    head_branch?: string;
+    head_sha?: string;
+    app?: { slug?: string };
     pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
   check_run?: {
@@ -313,6 +319,18 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
     console.warn(`[webhook] Merge state reconciliation failed for ${issueId}:`, err);
   }
 }async function handleCheckSuitePromise(payload: WebhookPayload): Promise<void> {
+  // PAN-3537: a push to the default branch produces a check suite with an empty
+  // pull_requests array. Record it for the Command Deck CI chip, then fall
+  // through to the existing PR-scoped merge-gate logic.
+  const observation = observationFromCheckSuite(payload, new Date().toISOString());
+  if (observation) {
+    await appendDomainEventAsync({
+      type: 'project.ci_suite_observed',
+      timestamp: observation.observedAt,
+      payload: observation,
+    });
+  }
+
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;
   const suite = payload.check_suite;
   if (!suite) return;
