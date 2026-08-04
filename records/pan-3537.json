@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:55:18.359Z",
+  "updated": "2026-08-04T08:59:01.463Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -99,16 +99,8 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "boot-and-refill": {
-        "writerId": "agent-pan-3537",
-        "agentId": "agent-pan-3537",
-        "pid": 182956,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T08:55:18.359Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3537",
@@ -153,6 +145,17 @@
         "outcome": "completed",
         "reason": "Added a gh-api Actions run fill that groups runs by newest head SHA, emits shared CI observations, tolerates missing repos/auth failures, and is fully dependency-injected for tests.",
         "releasedAt": "2026-08-04T08:55:07.892Z"
+      },
+      {
+        "writerId": "agent-pan-3537",
+        "agentId": "agent-pan-3537",
+        "pid": 182956,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T08:55:18.359Z",
+        "itemId": "boot-and-refill",
+        "outcome": "completed",
+        "reason": "Started the project CI fill at dashboard boot, scheduled a non-blocking 15-minute repair interval, tested it with fake timers, and boot-tested the built server on isolated port 49137.",
+        "releasedAt": "2026-08-04T08:59:01.463Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +174,10 @@
       "rest-fill": {
         "reason": "Added a gh-api Actions run fill that groups runs by newest head SHA, emits shared CI observations, tolerates missing repos/auth failures, and is fully dependency-injected for tests.",
         "updatedAt": "2026-08-04T08:55:07.892Z"
+      },
+      "boot-and-refill": {
+        "reason": "Started the project CI fill at dashboard boot, scheduled a non-blocking 15-minute repair interval, tested it with fake timers, and boot-tested the built server on isolated port 49137.",
+        "updatedAt": "2026-08-04T08:59:01.463Z"
       }
     }
   },
@@ -195,6 +202,9 @@
     "rest-fill.rest-fill.ac2": "completed",
     "rest-fill.rest-fill.ac3": "completed",
     "rest-fill.rest-fill.ac4": "completed",
-    "boot-and-refill": "running"
+    "boot-and-refill": "completed",
+    "boot-and-refill.boot-and-refill.ac1": "completed",
+    "boot-and-refill.boot-and-refill.ac2": "completed",
+    "boot-and-refill.boot-and-refill.ac3": "completed"
   }
 }
