@@ -3,17 +3,17 @@
   "schemaVersion": 2,
   "feedback": [],
   "created": "2026-08-04T18:27:40.886Z",
-  "updated": "2026-08-04T20:06:16.538Z",
+  "updated": "2026-08-04T20:06:24.846Z",
   "pipeline": {
     "issueId": "PAN-3523",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
-    "mergeStatus": "failed",
-    "mergeStep": "squash-merging",
+    "mergeStatus": "merging",
+    "mergeStep": "validating-pr",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T20:03:32.178Z",
+    "updatedAt": "2026-08-04T20:06:24.802Z",
     "mergeNotes": "github merge failed: GitHub API GET /repos/eltmon/overdeck/pulls/3548 failed: 403 {\n\t\"message\": \"API rate limit exceeded for installation ID 144090266. If you reach out to GitHub Support for help, please include the request ID 9AD8:9F9CD:DC0A21:2DF5DBF:6A724593 and timestamp 2026-08-04 20:03:31 UTC. For more on scraping GitHub and how it may affect your rights, please review our Terms of Service (https:\\/\\/docs.github.com\\/en\\/site-policy\\/github-terms\\/github-terms-of-service)\",\n\t\"documentation_url\": \"https://docs.github.com/en/rest/using-the-rest-api/getting-started-with-the-rest-api#rate-limiting\",\n\t\"status\": \"403\"\n}\n",
     "lastVerifiedCommit": "a69924b9932a70815582cb1891654b0338ac2535",
     "strikeReadyHead": "a69924b9932a70815582cb1891654b0338ac2535",
@@ -54,7 +54,7 @@
       },
       "costAtCloseOut": {
         "usd": 12.736769,
-        "pricingAsOf": "2026-08-04T20:06:16.529Z"
+        "pricingAsOf": "2026-08-04T20:06:24.838Z"
       }
     },
     "merges": [],
