@@ -34,6 +34,11 @@
       "id": "4e43ec6f-76f1-4997-ba56-57da995e60dd",
       "startedAt": "2026-08-03T04:43:09.850Z",
       "reason": "rotation"
+    },
+    {
+      "id": "b13cb0aa-a3d5-45a9-b67d-35f0aeb087b1",
+      "startedAt": "2026-08-04T18:02:44.902Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
@@ -44,6 +49,10 @@
     {
       "at": "2026-08-03T04:38:54.962Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-04T18:02:44.902Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
