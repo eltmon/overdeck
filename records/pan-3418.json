@@ -264,7 +264,7 @@
     "recordedAt": "2026-08-04T18:22:51.745Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-04T18:26:33.099Z",
+  "updated": "2026-08-04T18:29:49.322Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "pending",
@@ -276,7 +276,7 @@
     "readyForMerge": false,
     "updatedAt": "2026-08-04T18:26:32.053Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewRequestedAt": "2026-08-04T18:22:53.014Z",
+    "reviewRequestedAt": "2026-08-04T18:29:48.357Z",
     "reviewSpawnedAt": "2026-08-04T18:02:01.579Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -317,7 +317,8 @@
         "tests/unit/lib/overdeck/conversations-model-backfill.test.ts"
       ],
       "recordedAt": "2026-08-04T18:22:51.745Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-04T18:29:48.357Z"
   },
   "closeOut": {
     "usage": {
