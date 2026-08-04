@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:39:05.463Z",
+  "updated": "2026-08-04T08:39:20.950Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -99,8 +99,16 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 2,
-    "claims": {},
+    "sequence": 3,
+    "claims": {
+      "emit-door": {
+        "writerId": "agent-pan-3537",
+        "agentId": "agent-pan-3537",
+        "pid": 4079189,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T08:39:20.949Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3537",
@@ -127,6 +135,7 @@
     "contracts-event-and-reducer.contracts-event-and-reducer.ac2": "completed",
     "contracts-event-and-reducer.contracts-event-and-reducer.ac3": "completed",
     "contracts-event-and-reducer.contracts-event-and-reducer.ac4": "completed",
-    "contracts-event-and-reducer.contracts-event-and-reducer.ac5": "completed"
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac5": "completed",
+    "emit-door": "running"
   }
 }
