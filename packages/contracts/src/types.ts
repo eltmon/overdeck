@@ -520,6 +520,25 @@ export const EmbedProgressSnapshot = Schema.Struct({
 })
 export type EmbedProgressSnapshot = typeof EmbedProgressSnapshot.Type
 
+export const ProjectCiSuite = Schema.Struct({
+  status: Schema.String,
+  conclusion: Schema.NullOr(Schema.String),
+  htmlUrl: Schema.optional(Schema.String),
+})
+export type ProjectCiSuite = typeof ProjectCiSuite.Type
+
+export const ProjectCiSnapshot = Schema.Struct({
+  projectKey: Schema.String,
+  repo: Schema.String,
+  branch: Schema.String,
+  headSha: Schema.String,
+  /** suiteId → suite. Only GitHub Actions suites ever appear here. */
+  suites: Schema.Record(Schema.String, ProjectCiSuite),
+  /** Newest `observedAt` folded into this record. */
+  updatedAt: Schema.String,
+})
+export type ProjectCiSnapshot = typeof ProjectCiSnapshot.Type
+
 // ─── Dashboard Snapshot ──────────────────────────────────────────────────────
 
 export const DashboardSnapshot = Schema.Struct({
@@ -537,6 +556,7 @@ export const DashboardSnapshot = Schema.Struct({
   enrichStats: Schema.optional(Schema.NullOr(EnrichStatsSnapshot)),
   enrichProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EnrichProgressSnapshot)),
   embedProgressBySessionId: Schema.optional(Schema.Record(Schema.String, EmbedProgressSnapshot)),
+  ciByProjectKey: Schema.optional(Schema.Record(Schema.String, ProjectCiSnapshot)),
   timestamp: Schema.String,
 })
 export type DashboardSnapshot = typeof DashboardSnapshot.Type

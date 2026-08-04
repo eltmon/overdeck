@@ -47,6 +47,40 @@ export const BeadsFreshnessChangedEvent = Schema.Struct({
 })
 export type BeadsFreshnessChangedEvent = typeof BeadsFreshnessChangedEvent.Type
 
+/**
+ * One GitHub Actions check suite observed on a project's default branch
+ * (PAN-3537).
+ *
+ * Emitted from two places, deliberately with the same shape:
+ *   1. the `check_suite` webhook handler, for live updates; and
+ *   2. the boot/periodic REST fill, which seeds and repairs the record.
+ *
+ * `suiteId` is the check suite id — for GitHub Actions that is one suite per
+ * workflow run, so the per-SHA suite set is the set of workflow runs for that
+ * commit. `htmlUrl` is present only on REST-sourced observations; the webhook
+ * payload does not carry one.
+ *
+ * The aggregate this feeds is `ReadModelState.ciByProjectKey`, a disposable
+ * cache rebuilt from REST on every boot — there is no durable CI store.
+ */
+export const ProjectCiSuiteObservedEvent = Schema.Struct({
+  type: Schema.Literal("project.ci_suite_observed"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    projectKey: Schema.String,
+    repo: Schema.String,
+    branch: Schema.String,
+    headSha: Schema.String,
+    suiteId: Schema.String,
+    status: Schema.String,
+    conclusion: Schema.NullOr(Schema.String),
+    htmlUrl: Schema.optional(Schema.String),
+    observedAt: Schema.String,
+  }),
+})
+export type ProjectCiSuiteObservedEvent = typeof ProjectCiSuiteObservedEvent.Type
+
 // ─── Agent Events ─────────────────────────────────────────────────────────────
 
 /** Replaces socket.io `agents:changed` (event: 'started') */
@@ -1349,6 +1383,7 @@ export type SweepEscalatedEvent = typeof SweepEscalatedEvent.Type
 export const DomainEvent = Schema.Union([
   SystemHeartbeatEvent,
   BeadsFreshnessChangedEvent,
+  ProjectCiSuiteObservedEvent,
   AgentCreatedEvent,
   AgentEnrichmentChangedEvent,
   AgentStartedEvent,
