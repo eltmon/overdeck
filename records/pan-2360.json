@@ -48,8 +48,8 @@
     ],
     "recordedAt": "2026-07-09T01:44:49.883Z"
   },
-  "harness": "codex",
-  "model": "gpt-5.5",
+  "harness": "claude-code",
+  "model": "kimi-k2.7-code",
   "statusOverrides": {
     "update-roles-doc": "completed",
     "update-roles-doc.ac1": "completed",
@@ -67,6 +67,7 @@
     "testStatus": "passed",
     "verificationStatus": "passed",
     "mergeStatus": "merged",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "updatedAt": "2026-07-09T04:10:29.310Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2523",
@@ -131,7 +132,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.993898,
-        "pricingAsOf": "2026-07-09T04:10:29.469Z"
+        "pricingAsOf": "2026-08-04T13:05:18.334Z"
       }
     },
     "merges": [
@@ -140,5 +141,5 @@
     "ranOn": "eltmon-z790"
   },
   "created": "2026-07-09T01:43:45.217Z",
-  "updated": "2026-07-09T04:10:29.469Z"
+  "updated": "2026-08-04T13:05:18.338Z"
 }
