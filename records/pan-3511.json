@@ -502,7 +502,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T22:52:30.731Z",
+  "updated": "2026-08-04T22:52:35.221Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -513,30 +513,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T22:52:05.189Z",
+    "updatedAt": "2026-08-04T22:52:35.209Z",
     "reviewNotes": "All four convoy reviewers timed out without producing usable reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
+    "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
     "lastVerifiedCommit": "a9b929918604303a61ec22b0189528eb8928c778",
-    "reviewSpawnedAt": "2026-08-04T22:48:55.736Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-04T22:48:55.736Z"
   },
   "closeOut": {
     "usage": {
@@ -614,7 +596,7 @@
       },
       "costAtCloseOut": {
         "usd": 279.9746705,
-        "pricingAsOf": "2026-08-04T22:52:05.213Z"
+        "pricingAsOf": "2026-08-04T22:52:35.215Z"
       }
     },
     "merges": [
