@@ -362,23 +362,24 @@
     "recordedAt": "2026-08-04T18:13:32.819Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T18:31:21.232Z",
+  "updated": "2026-08-04T18:31:24.413Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:31:17.849Z",
-    "reviewNotes": "Prior no-loss blocker is resolved; remaining requirements findings are unchanged and non-promotable",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
+    "updatedAt": "2026-08-04T18:31:17.892Z",
+    "reviewNotes": "Changed no-loss audit still leaves named UI acceptance criteria unproved",
+    "testNotes": "Automated gates on feature/pan-3423 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend guards all clean). npm run lint FAILED at lint:file-size: 'src/dashboard/server/routes/workspaces/merge-ops.ts is 1913 lines (allowed 1912)'. Root-caused: this file is untouched by PAN-3423 (git diff origin/main...HEAD --stat -- merge-ops.ts is empty; last touched by branch at fdcbcad2647, PAN-3328/#3348). origin/main advanced 2 commits past this branch's last main-merge (merge-base 5ac62149c3), including #3509 which shrank merge-ops.ts; the ratchet script compares against the live origin/main tip, so this branch's untouched copy now reads as 'grown' relative to a newer main it hasn't synced. This is branch staleness, not a defect introduced by this PR, but the configured lint gate genuinely fails as run and a main-sync/rebase is outside the test role's boundaries (no edit/commit/merge). Scoped PAN-3423 tests all pass: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention -> 3 files / 32 tests passed. Full frontend suite (src/dashboard/frontend) -> 306 files / 2986 tests passed. Full root-level `npm test` completed: 60 files / 83 tests failed, ALL with the identical signature 'Error: Hook timed out in 5000ms' inside beforeEach(() => odb = setupOverdeckTestDb()) -- a DB-fixture-setup timeout under heavy host contention (load average ~30 from ~17 concurrent Overdeck agents/workspaces on this machine at the time), not an assertion or logic failure, and none of the 60 failing files are in this PR's declared scope (tests/unit/lib/workspaces/*, src/cli/commands/conversations/__tests__/*, etc.). The in-scope file src/lib/agents/__tests__/agent-health.test.ts (FR-3, this PR's server-side change) was verified separately in isolation: 1 file / 12 tests PASSED in 152ms. Top-level status is failed on the lint gate alone, per the configured automated gates (typecheck, lint, test); the lint failure is unrelated to this PR's diff but blocks merge as configured.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
+    "reviewRequestedAt": "2026-08-04T18:13:45.679Z",
     "reviewSpawnedAt": "2026-08-04T18:20:49.020Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -410,24 +411,6 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-04T18:13:32.819Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c"
-      }
     }
   },
   "closeOut": {
@@ -435,8 +418,8 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 2275,
-            "output": 400,
+            "input": 3241,
+            "output": 600,
             "cacheRead": 3,
             "cacheWrite": 0
           }
@@ -506,8 +489,8 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 2275,
-          "output": 400,
+          "input": 3241,
+          "output": 600,
           "cacheRead": 3,
           "cacheWrite": 0
         },
@@ -531,8 +514,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 335.1165963,
-        "pricingAsOf": "2026-08-04T18:31:17.984Z"
+        "usd": 335.1185623,
+        "pricingAsOf": "2026-08-04T18:31:24.402Z"
       }
     },
     "merges": [
