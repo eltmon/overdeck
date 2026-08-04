@@ -99,7 +99,7 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T17:32:30.466Z",
+  "updated": "2026-08-04T17:33:54.943Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -172,7 +172,9 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-04T09:26:27.202Z"
-    }
+    },
+    "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
+    "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z"
   },
   "closeOut": {
     "usage": {
