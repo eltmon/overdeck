@@ -21,19 +21,77 @@
     }
   ],
   "feedback": [],
+  "scopeDrift": {
+    "outsideDeclaredScope": [],
+    "declaredScopeUntouched": [],
+    "declaredScope": [
+      "CLAUDE.md",
+      "docs/EXTERNAL-EVENT-STREAM.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/project-ci.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectCiChip.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectCiChip.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/lib/store.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/read-model.ts",
+      "src/lib/__tests__/activity-logger.test.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/ci/project-ci-observation.ts",
+      "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+      "src/lib/overdeck/project-ci-fill.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/ci/project-ci-observation.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "actualChangedFiles": [
+      "CLAUDE.md",
+      "docs/EXTERNAL-EVENT-STREAM.md",
+      "packages/contracts/src/event-reducers.ts",
+      "packages/contracts/src/events.ts",
+      "packages/contracts/src/index.ts",
+      "packages/contracts/src/project-ci.ts",
+      "packages/contracts/src/types.ts",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectCiChip.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectCiChip.test.tsx",
+      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+      "src/dashboard/frontend/src/lib/store.ts",
+      "src/dashboard/server/main.ts",
+      "src/dashboard/server/read-model.ts",
+      "src/lib/__tests__/activity-logger.test.ts",
+      "src/lib/activity-logger.ts",
+      "src/lib/ci/project-ci-observation.ts",
+      "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+      "src/lib/overdeck/project-ci-fill.ts",
+      "src/lib/webhook-handlers.ts",
+      "tests/dashboard/event-reducers.test.ts",
+      "tests/unit/lib/ci/project-ci-observation.test.ts",
+      "tests/unit/lib/webhook-handlers.test.ts"
+    ],
+    "recordedAt": "2026-08-04T09:26:27.202Z"
+  },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T09:26:30.101Z",
+  "updated": "2026-08-04T09:26:32.030Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T09:26:30.099Z",
+    "updatedAt": "2026-08-04T09:26:31.852Z",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
     "reviewRequestedAt": "2026-08-04T09:26:30.099Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -91,8 +149,7 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-04T09:26:27.202Z"
-    },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3542"
+    }
   },
   "closeOut": {
     "usage": {
@@ -115,9 +172,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 712335,
-            "output": 22609,
-            "cacheRead": 10305024,
+            "input": 1823458,
+            "output": 93951,
+            "cacheRead": 54022144,
             "cacheWrite": 0
           }
         }
@@ -130,18 +187,20 @@
           "cacheWrite": 50046
         },
         "openai/gpt-5.6-sol": {
-          "input": 1019150,
-          "output": 27757,
-          "cacheRead": 12461568,
+          "input": 2130273,
+          "output": 99099,
+          "cacheRead": 56178688,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 37.160223,
-        "pricingAsOf": "2026-08-04T08:39:05.395Z"
+        "usd": 66.714658,
+        "pricingAsOf": "2026-08-04T09:26:31.865Z"
       }
     },
-    "merges": [],
+    "merges": [
+      "https://github.com/eltmon/overdeck/pull/3542"
+    ],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
@@ -309,62 +368,5 @@
     "docs.docs.ac1": "completed",
     "docs.docs.ac2": "completed",
     "docs.docs.ac3": "completed"
-  },
-  "scopeDrift": {
-    "outsideDeclaredScope": [],
-    "declaredScopeUntouched": [],
-    "declaredScope": [
-      "CLAUDE.md",
-      "docs/EXTERNAL-EVENT-STREAM.md",
-      "packages/contracts/src/event-reducers.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/index.ts",
-      "packages/contracts/src/project-ci.ts",
-      "packages/contracts/src/types.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectCiChip.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectCiChip.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/lib/store.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/read-model.ts",
-      "src/lib/__tests__/activity-logger.test.ts",
-      "src/lib/activity-logger.ts",
-      "src/lib/ci/project-ci-observation.ts",
-      "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
-      "src/lib/overdeck/project-ci-fill.ts",
-      "src/lib/webhook-handlers.ts",
-      "tests/dashboard/event-reducers.test.ts",
-      "tests/unit/lib/ci/project-ci-observation.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
-    ],
-    "actualChangedFiles": [
-      "CLAUDE.md",
-      "docs/EXTERNAL-EVENT-STREAM.md",
-      "packages/contracts/src/event-reducers.ts",
-      "packages/contracts/src/events.ts",
-      "packages/contracts/src/index.ts",
-      "packages/contracts/src/project-ci.ts",
-      "packages/contracts/src/types.ts",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectCiChip.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectCiChip.test.tsx",
-      "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
-      "src/dashboard/frontend/src/lib/store.ts",
-      "src/dashboard/server/main.ts",
-      "src/dashboard/server/read-model.ts",
-      "src/lib/__tests__/activity-logger.test.ts",
-      "src/lib/activity-logger.ts",
-      "src/lib/ci/project-ci-observation.ts",
-      "src/lib/overdeck/__tests__/project-ci-fill.test.ts",
-      "src/lib/overdeck/project-ci-fill.ts",
-      "src/lib/webhook-handlers.ts",
-      "tests/dashboard/event-reducers.test.ts",
-      "tests/unit/lib/ci/project-ci-observation.test.ts",
-      "tests/unit/lib/webhook-handlers.test.ts"
-    ],
-    "recordedAt": "2026-08-04T09:26:27.202Z"
   }
 }
