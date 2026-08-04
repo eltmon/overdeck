@@ -384,15 +384,7 @@
       "timestamp": "2026-08-04T17:46:48.944Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T17:46:48Z",
-      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3419` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3419`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/overdeck-remodel/overdeck-schema.ts",
@@ -485,10 +477,10 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-04T17:46:48.944Z",
+  "updated": "2026-08-04T17:49:33.645Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "pending",
@@ -496,7 +488,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T17:39:12.763Z",
+    "updatedAt": "2026-08-04T17:49:33.580Z",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -506,7 +498,8 @@
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3435"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
+    "reviewSpawnedAt": "2026-08-04T17:49:33.579Z"
   },
   "closeOut": {
     "usage": {
@@ -561,17 +554,17 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2627,
-            "output": 248146,
-            "cacheRead": 113639641,
-            "cacheWrite": 2624066
+            "input": 2635,
+            "output": 250140,
+            "cacheRead": 114319661,
+            "cacheWrite": 2631956
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 8424911,
-            "output": 372053,
-            "cacheRead": 235758080,
+            "input": 8747111,
+            "output": 384360,
+            "cacheRead": 239784448,
             "cacheWrite": 0
           }
         }
@@ -584,21 +577,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 60286777,
-          "output": 908288,
-          "cacheRead": 362513920,
+          "input": 60608977,
+          "output": 920595,
+          "cacheRead": 366540288,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2627,
-          "output": 248146,
-          "cacheRead": 113639641,
-          "cacheWrite": 2624066
+          "input": 2635,
+          "output": 250140,
+          "cacheRead": 114319661,
+          "cacheWrite": 2631956
         }
       },
       "costAtCloseOut": {
-        "usd": 541.7275796,
-        "pricingAsOf": "2026-08-04T17:39:12.784Z"
+        "usd": 545.8966586,
+        "pricingAsOf": "2026-08-04T17:49:33.618Z"
       }
     },
     "merges": [
