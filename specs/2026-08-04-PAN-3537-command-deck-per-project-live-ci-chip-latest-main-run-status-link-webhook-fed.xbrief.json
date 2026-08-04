@@ -1,0 +1,702 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-04T08:15:24.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3537: Command Deck: per-project live CI chip — latest main run status + link, webhook-fed",
+    "updated": "2026-08-04T08:19:50.904Z"
+  },
+  "plan": {
+    "id": "pan-3537",
+    "title": "Command Deck: per-project live CI chip — latest main run status + link, webhook-fed",
+    "status": "proposed",
+    "uid": "b8a72560-8f6a-4981-998d-519e391a269b",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-04T08:15:24.000Z",
+    "updated": "2026-08-04T08:19:50.904Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3537",
+        "label": "PAN-3537",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3537.md",
+        "label": "PRD draft",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "command-deck",
+      "ci",
+      "webhooks",
+      "contracts",
+      "read-model",
+      "frontend"
+    ],
+    "metadata": {
+      "sizeJustification": "24 files, under the 25-file limit. The subsystem count reads 7 only because the first-two-path-segments heuristic counts two individual documentation files — docs/EXTERNAL-EVENT-STREAM.md and CLAUDE.md — as separate subsystems. The real breadth is six: contracts, src/lib, dashboard server, dashboard frontend, tests, docs. The work is one vertical slice that cannot ship in halves: a server-side CI record with no chip renders nothing for the operator, and a chip with no record has nothing to render, so splitting into sibling issues would ship a partial feature in violation of the deliver-complete-features rule. The eight items are already decomposed to one focused change each and are independently reviewable.",
+      "canonicalFilename": "2026-08-04-PAN-3537-command-deck-per-project-live-ci-chip-latest-main-run-status-link-webhook-fed.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The Command Deck never says whether a project's default branch is green, so the operator leaves the dashboard for GitHub to find out. Overdeck already receives check_suite webhooks for every tracked repo but discards the ones that matter: src/lib/webhook-handlers.ts:319 returns early when check_suite.pull_requests is empty, which is exactly the shape of a push to main.",
+      "Proposal": "Stop dropping default-branch check_suite events. Map the event's repository to a registered project, emit one new domain event (project.ci_suite_observed) per GitHub Actions suite, and let a shared reducer aggregate those observations into a per-project record inside the existing read model (ReadModelState.ciByProjectKey). A boot-time REST fill via gh api emits the same event shape so the record is correct before the first webhook, and a 15-minute refill repairs dropped deliveries. The frontend reads the record with a Zustand selector and renders a compact chip in the project header linking to that commit's checks on GitHub. No new store, no frontend polling, no new WebSocket channel. Full verified design in .pan/drafts/PAN-3537.md.",
+      "NonGoals": "- Feature-branch or PR CI state — default branch only; per-PR CI is surfaced elsewhere.\n- Changing the GitHub App's event subscription or permissions (explicitly forbidden by the issue).\n- Per-job check_run granularity in the chip; suite-level completed/total is the live feed.\n- A CI panel, run history, or run list anywhere else (God View, Stage, release panel). The chip is the only new surface.\n- Any durable persistence of CI state — the record is disposable cache rebuilt from REST on every boot.\n- Any frontend polling loop, refetch interval, or new WebSocket channel.\n- Re-running or cancelling workflows from the dashboard.\n- GitLab CI. Only projects with github_repo get a chip."
+    },
+    "autoDecisions": [
+      {
+        "summary": "The REST fill uses `gh api`, not src/lib/github-app.ts",
+        "rationale": "Verified live: the overdeck-agent App's permissions are checks/contents/metadata/pull_requests/statuses — there is no `actions` scope, so an installation token 403s on GET /repos/{repo}/actions/runs. `gh api` is the operator-token mechanism src/lib/overdeck/project-pipelines.ts:99-106 already uses for the release panel, and it was verified returning 200 for repos/eltmon/overdeck/actions/runs?branch=main."
+      },
+      {
+        "summary": "Only check suites whose app.slug is `github-actions` feed the record",
+        "rationale": "A real main commit (7fe22a07 on eltmon/overdeck) has 7 check suites; 4 belong to vercel, mintlify, github-pages and posthog and sit in `queued` indefinitely. Aggregating them would pin the chip at 'in progress' forever. Mirrors the advisory-filter precedent in src/lib/advisory-checks.ts."
+      },
+      {
+        "summary": "The record is keyed by head SHA and aggregates every Actions suite for that SHA",
+        "rationale": "One push to main produced two workflow runs with distinct check_suite_ids (no-planning-on-main success, CI in_progress). Picking whichever run the API returns first would let a trivial guard workflow paint the chip green while CI is failing."
+      },
+      {
+        "summary": "One event type (project.ci_suite_observed) serves both the webhook and the REST fill",
+        "rationale": "Both express the same fact — a suite was observed in a state at a time — so one reducer case and one staleness rule cover both. Two event types would mean two merge policies that must be kept consistent by hand."
+      },
+      {
+        "summary": "When the head SHA changes, the newer observedAt wins and resets the suite set",
+        "rationale": "Commit ordering is not derivable from a check_suite payload, and resolving it would cost an extra API call per event. Observation recency is the only tiebreak available in-payload, and it is what a live status chip actually wants."
+      },
+      {
+        "summary": "`failure` outranks `in_progress` when deriving chip state",
+        "rationale": "A known-red workflow should read red the moment it is known, not after unrelated workflows finish settling."
+      },
+      {
+        "summary": "`success` renders muted-foreground, not emerald",
+        "rationale": "Style guide v1.2 colour restraint caps a data-dense row at one colored signal, and a permanently green chip on every project row all day is decoration rather than signal. Colour is reserved for in_progress (--info, machine working) and failure (--destructive, broken)."
+      },
+      {
+        "summary": "The chip is absent when the read model holds no record for the project key",
+        "rationale": "Satisfies the issue's 'no dead chrome' requirement without plumbing extra project config to the frontend: the fill only creates records for projects whose repo it can actually read."
+      },
+      {
+        "summary": "A 15-minute server-side refill supplements the boot fill",
+        "rationale": "Webhooks arrive over a smee relay and can be dropped; with a boot-only fill a long-running dashboard would show stale CI indefinitely. The refill is server-side, so the issue's no-frontend-polling requirement is untouched."
+      },
+      {
+        "summary": "The new event is promoted to the public external-stream catalog",
+        "rationale": "'Is main green' is exactly the signal a third-party sidecar wants, and docs/EXTERNAL-EVENT-STREAM.md requires the promoting PR to add the catalog row in the same change."
+      }
+    ],
+    "items": [
+      {
+        "id": "contracts-event-and-reducer",
+        "title": "Add the project.ci_suite_observed event, ProjectCiSnapshot state, and deriveProjectCi helper to contracts",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "api",
+          "issueLabel": "pan-3537",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "foundationFor": [
+            "webhook-observation",
+            "rest-fill",
+            "ci-chip-component",
+            "wire-chip-into-project-node",
+            "docs"
+          ],
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "packages/contracts/src/types.ts",
+            "packages/contracts/src/event-reducers.ts",
+            "packages/contracts/src/project-ci.ts",
+            "packages/contracts/src/index.ts",
+            "src/dashboard/server/read-model.ts",
+            "tests/dashboard/event-reducers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run build:contracts",
+            "npx vitest run tests/dashboard/event-reducers.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "packages/contracts/dist rebuilds without errors",
+            "tests/dashboard/event-reducers.test.ts passes including the new project.ci_suite_observed cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "FR-7",
+            "FR-4",
+            "NFR-4",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.1-6.5. Add ProjectCiSuiteObservedEvent to packages/contracts/src/events.ts (next to BeadsFreshnessChangedEvent at line 38) with the JSDoc block given in PRD 6.1, and register it in the DomainEvent union at line 1349. Add ProjectCiSuite and ProjectCiSnapshot schemas to packages/contracts/src/types.ts before DashboardSnapshot (line 525), and add the optional ciByProjectKey field to DashboardSnapshot. In packages/contracts/src/event-reducers.ts add ciByProjectKey to ReadModelState (after embedProgressBySessionId), to INITIAL_READ_MODEL_STATE, to syncSnapshot, and add the applyEvent case exactly as written in PRD 6.3 (create / same-SHA merge / newer-SHA replace / older-SHA drop). Create packages/contracts/src/project-ci.ts exporting ProjectCiState, DerivedProjectCi and deriveProjectCi per PRD 6.4, re-exported from index.ts. Finally add `ciByProjectKey: state.ciByProjectKey` to buildSnapshot() in src/dashboard/server/read-model.ts (line 410-447) so a fresh page load carries the record. Failure outranks in_progress in the derivation; the failed-conclusion set mirrors FAILING_CHECK_CONCLUSIONS at src/lib/webhook-handlers.ts:196."
+        },
+        "items": [
+          {
+            "id": "contracts-event-and-reducer.ac1",
+            "title": "Given a record whose suites include one failed and one in_progress suite, When deriveProjectCi runs, Then it returns state 'failure'",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-event-and-reducer.ac2",
+            "title": "Given an existing record for head SHA A, When applyEvent receives an observation for the same SHA with a new suite id, Then the result preserves the existing suites and adds the new one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-event-and-reducer.ac3",
+            "title": "Given an existing record for head SHA A, When applyEvent receives an observation for SHA B with a later observedAt, Then the result replaces suites with only the B suite; when observedAt is earlier the record is returned unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-event-and-reducer.ac4",
+            "title": "Given a DashboardSnapshot carrying ciByProjectKey, When syncSnapshot runs, Then state.ciByProjectKey equals the snapshot value; when the field is absent the prior value is preserved",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "contracts-event-and-reducer.ac5",
+            "title": "Given a record with exactly one suite carrying an htmlUrl, When deriveProjectCi runs, Then href is that htmlUrl; with two or more suites href is https://github.com/<repo>/commit/<headSha>/checks",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "emit-door",
+        "title": "Export appendDomainEventAsync from activity-logger so src/lib code can append arbitrary domain events",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/activity-logger.ts",
+            "src/lib/__tests__/activity-logger.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/__tests__/activity-logger.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/activity-logger.test.ts passes including the new appendDomainEventAsync cases",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.6. Add an exported async appendDomainEventAsync(event: Omit<DomainEvent,'sequence'>): Promise<boolean> to src/lib/activity-logger.ts next to emitActivityEntryDurable (line 129). It resolves the already-wired provider through the existing private getActivityEventStore() accessor, calls store.appendAsync(event), returns true on success, and returns false without throwing when no provider is wired or the append rejects. Do NOT move or rewire the provider itself — src/dashboard/server/event-store.ts:697 and src/dashboard/server/deacon-main.ts:72 already set it and that boot path must not change. Include the JSDoc from PRD 6.6 explaining the shared provider."
+        },
+        "items": [
+          {
+            "id": "emit-door.ac1",
+            "title": "Given no event-store provider is wired, When appendDomainEventAsync is called, Then it resolves false and throws nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-door.ac2",
+            "title": "Given a stub provider, When appendDomainEventAsync is called, Then the stub's appendAsync receives the event verbatim and the call resolves true",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "emit-door.ac3",
+            "title": "Given a provider whose appendAsync rejects, When appendDomainEventAsync is called, Then it resolves false and the rejection does not propagate",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "webhook-observation",
+        "title": "Emit a CI observation from default-branch check_suite webhooks",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/ci/project-ci-observation.ts",
+            "src/lib/webhook-handlers.ts",
+            "tests/unit/lib/ci/project-ci-observation.test.ts",
+            "tests/unit/lib/webhook-handlers.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run tests/unit/lib/ci/project-ci-observation.test.ts tests/unit/lib/webhook-handlers.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "both named test files pass, including the five null cases and the merge-gate-untouched case",
+            "typecheck completes without errors",
+            "lint reports no new findings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "FR-5",
+            "FR-6"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.7. Create src/lib/ci/project-ci-observation.ts exporting the pure resolveProjectForRepo(fullName, projects) and observationFromCheckSuite(payload, now, projects) functions; both take the project list as an injectable parameter defaulting to listProjectsSync() (src/lib/projects.ts:546) so tests need no config on disk. The default branch is config.workspace?.default_branch ?? 'main' (src/lib/projects.ts:54). observationFromCheckSuite returns null for: unregistered repo, missing check_suite, app.slug other than 'github-actions', head_branch other than the project default branch, and missing head_sha or id. Then in src/lib/webhook-handlers.ts extend the check_suite member of WebhookPayload (line 32-36) with id, head_branch, head_sha and app.slug, and insert the observation emit at the top of handleCheckSuitePromise (line 315) BEFORE the existing isTrackedRepositorySync and pull_requests guards — the project registry, not the App tracked-repo allowlist, decides project mapping. Emit via appendDomainEventAsync from the emit-door item. Leave every existing merge-gate line below untouched."
+        },
+        "items": [
+          {
+            "id": "webhook-observation.ac1",
+            "title": "Given a check_suite payload whose app.slug is 'vercel', or whose head_branch is not the project default branch, or whose repository maps to no project, When observationFromCheckSuite runs, Then it returns null for each case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-observation.ac2",
+            "title": "Given a github-actions check_suite on the project default branch, When observationFromCheckSuite runs, Then it returns an observation carrying projectKey, repo, branch, headSha, stringified suiteId, status and conclusion",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-observation.ac3",
+            "title": "Given a default-branch check_suite payload with an empty pull_requests array, When handleCheckSuite runs, Then exactly one project.ci_suite_observed event is appended and setReviewStatus is never called",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "webhook-observation.ac4",
+            "title": "Given the existing PR-scoped check_suite fixtures in tests/unit/lib/webhook-handlers.test.ts, When handleCheckSuite runs, Then their blockerReasons assertions still pass unchanged",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "rest-fill",
+        "title": "Add the gh-api REST fill that seeds CI observations per project",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/overdeck/project-ci-fill.ts",
+            "src/lib/overdeck/__tests__/project-ci-fill.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+            "npm run typecheck",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "src/lib/overdeck/__tests__/project-ci-fill.test.ts passes with a stubbed ghApi and no network access",
+            "typecheck completes without errors",
+            "lint reports no new findings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-2",
+            "NFR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.8. Create src/lib/overdeck/project-ci-fill.ts modelled on src/lib/overdeck/project-pipelines.ts — same promisify(execFile) shape (line 29) and the same injectable GhApi type (line 97-106), never execSync. Export fillProjectCiObservations(project, deps) which returns [] when github_repo is unset, calls repos/<repo>/actions/runs?branch=<default>&per_page=20, takes workflow_runs[0].head_sha as the current SHA, keeps only runs with that head_sha, and maps each to an observation with suiteId String(run.check_suite_id), status run.status, conclusion run.conclusion, htmlUrl run.html_url and observedAt run.updated_at. Using run.updated_at rather than wall-clock is deliberate: it makes a fill lose to a fresher webhook under the reducer's staleness rule instead of stomping it. Also export fillAllProjectCi(deps) which iterates listProjectsSync() projects with a github_repo, appends every observation through the injectable append (defaulting to appendDomainEventAsync), and returns the count appended. Any gh failure yields [] for that project so the chip simply does not render."
+        },
+        "items": [
+          {
+            "id": "rest-fill.ac1",
+            "title": "Given a stubbed ghApi returning three runs — two sharing the newest head_sha and one older — When fillProjectCiObservations runs, Then it returns exactly two observations, each carrying the run's html_url and stringified check_suite_id",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-fill.ac2",
+            "title": "Given a stubbed ghApi that rejects, When fillProjectCiObservations runs, Then it returns an empty array and throws nothing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-fill.ac3",
+            "title": "Given a project whose config has no github_repo, When fillProjectCiObservations runs, Then it returns an empty array without calling ghApi",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "rest-fill.ac4",
+            "title": "Given two projects with github_repo and a stubbed append, When fillAllProjectCi runs, Then append receives one project.ci_suite_observed event per kept run and the returned count equals that number",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "boot-and-refill",
+        "title": "Run the CI fill at dashboard boot and repair it every 15 minutes",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/server/main.ts",
+            "src/lib/overdeck/__tests__/project-ci-fill.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npx vitest run src/lib/overdeck/__tests__/project-ci-fill.test.ts",
+            "npm run typecheck",
+            "npm run build:dashboard:server"
+          ],
+          "expected_outputs": [
+            "the refill interval test passes using vi.useFakeTimers and vi.advanceTimersByTimeAsync",
+            "typecheck completes without errors",
+            "dist/dashboard/server.js builds without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4",
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.9. In src/dashboard/server/main.ts, immediately after the existing `void reconcileStaleGitHubBlockers()` block at line 747, call fillAllProjectCi() with a catch that warns, then schedule a 15-minute setInterval that calls it again and .unref()s the timer so it never holds the process open. Export the interval scheduling as a small named function from src/lib/overdeck/project-ci-fill.ts (for example startProjectCiRefill(intervalMs, deps)) so it can be tested without booting the server. The interval test MUST use vi.useFakeTimers() plus vi.advanceTimersByTimeAsync(15 * 60 * 1000) — a real wall-clock wait is banned by the repo's fake-timer rule. This is a dashboard boot-path change: it must be runtime-boot-tested against a throwaway instance, never hot-patched onto the live server."
+        },
+        "items": [
+          {
+            "id": "boot-and-refill.ac1",
+            "title": "Given fake timers and a stubbed fill, When startProjectCiRefill is called and timers advance 15 minutes, Then the fill has been invoked a second time",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-and-refill.ac2",
+            "title": "Given a fill that rejects, When the boot call and a scheduled tick both run, Then neither rejection propagates and the interval continues firing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "boot-and-refill.ac3",
+            "title": "Given the scheduled interval, When it is created, Then unref() is applied so the timer does not keep the Node process alive",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "ci-chip-component",
+        "title": "Add the ProjectCiChip component, store selector, and chip styles",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectCiChip.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/__tests__/ProjectCiChip.test.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/styles/command-deck.module.css",
+            "src/dashboard/frontend/src/lib/store.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- ProjectCiChip",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ProjectCiChip.test.tsx passes for the absent, queued, in_progress, success and failure states",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.10. Add selectProjectCi(projectKey) to src/dashboard/frontend/src/lib/store.ts next to selectScanProgress (line 624). Create ProjectCiChip.tsx exactly as sketched in the PRD: it returns null when no record exists, calls deriveProjectCi from @overdeck/contracts, renders a <span role=\"link\" tabIndex={0} data-testid=\"project-ci-chip\" data-ci-state={state}> with label 'CI' for success, 'CI ✗' for failure and 'CI <completed>/<total>' otherwise, and opens the derived href with window.open(href, '_blank', 'noopener,noreferrer') from both onClick and Enter/Space, always calling e.stopPropagation() first. Colour map: queued and success var(--muted-foreground), in_progress var(--info), failure var(--destructive) — emerald is deliberately not used, per the style guide's one-colored-signal-per-row rule. Add the .projectCiChip class next to .featureCount (command-deck.module.css line 280) using var(--font-mono), 11px, font-weight 400, no background, no border, no border-radius: this is a text affordance, not a badge. No hardcoded hex, no slate-*, no font-bold/semibold, no rounded-full."
+        },
+        "items": [
+          {
+            "id": "ci-chip-component.ac1",
+            "title": "Given a store with no record for the project key, When ProjectCiChip renders, Then it produces no DOM output",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-chip-component.ac2",
+            "title": "Given a record with one failed suite among three, When ProjectCiChip renders, Then the element carries data-ci-state=\"failure\" and colour var(--destructive)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-chip-component.ac3",
+            "title": "Given a record with one in_progress suite and two completed successes, When ProjectCiChip renders, Then it shows the text 'CI 2/3' with data-ci-state=\"in_progress\" and colour var(--info)",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-chip-component.ac4",
+            "title": "Given a multi-suite record, When the chip is clicked, Then window.open receives https://github.com/<repo>/commit/<headSha>/checks with '_blank'; given a single REST-sourced suite it receives that run's html_url",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "ci-chip-component.ac5",
+            "title": "Given the rendered chip, When its class is inspected, Then the stylesheet rule uses var(--font-mono) with no border-radius, no background and no hardcoded hex colour",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-chip-into-project-node",
+        "title": "Render the CI chip in the Command Deck project header",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "frontend",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.tsx",
+            "src/dashboard/frontend/src/components/CommandDeck/ProjectTree/ProjectNode.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm --prefix src/dashboard/frontend run test -- ProjectNode",
+            "npm run typecheck:frontend"
+          ],
+          "expected_outputs": [
+            "ProjectNode.test.tsx passes including the chip-present and chip-absent cases",
+            "frontend typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD section 6.10 'Wiring'. In ProjectNode.tsx render <ProjectCiChip projectKey={projectKey} /> immediately after the feature-count span at line 352; projectKey is already a prop (line 83). Do not introduce an <a href> — the surrounding element is a <button className={styles.projectHeader}> at line 305 and nesting an anchor inside a button is invalid HTML; the chip's role=\"link\" span with stopPropagation is the same pattern the existing projectAddConvBtn uses at line 353-366. Add tests proving the chip appears for a project key with a record, is absent for one without, and that clicking it does not fire the project-selection handler."
+        },
+        "items": [
+          {
+            "id": "wire-chip-into-project-node.ac1",
+            "title": "Given a store record for the project key, When ProjectNode renders, Then an element with data-testid=\"project-ci-chip\" appears inside the project header",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-chip-into-project-node.ac2",
+            "title": "Given no store record for the project key, When ProjectNode renders, Then no element with data-testid=\"project-ci-chip\" exists",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-chip-into-project-node.ac3",
+            "title": "Given a rendered chip, When it is clicked, Then onSelectProject is not invoked and the header markup contains no anchor element",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs",
+        "title": "Document the CI chip event, catalog row, and read-model path",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-04T08:15:24.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3537",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/EXTERNAL-EVENT-STREAM.md",
+            "CLAUDE.md",
+            "packages/contracts/src/events.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'project.ci_suite_observed' docs/EXTERNAL-EVENT-STREAM.md CLAUDE.md packages/contracts/src/events.ts",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "grep finds the event name in all three files",
+            "lint reports no new findings"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "Follow PRD sections 6.1 and 10 item 8. Confirm the JSDoc block on ProjectCiSuiteObservedEvent in packages/contracts/src/events.ts states both emit sites, what suiteId means for GitHub Actions, that htmlUrl is REST-only, and that the aggregate is disposable cache. Add a row to the Public Event Catalog table in docs/EXTERNAL-EVENT-STREAM.md (line 89-106) for project.ci_suite_observed, marked replayable, with payload highlights projectKey, repo, headSha, suiteId, status, conclusion — the doc's own stability policy at line 107 requires the promoting PR to add the row. Add a short 'Project CI chip' section to CLAUDE.md near the Dashboard Server Architecture section stating the webhook -> project.ci_suite_observed -> read model -> /ws/rpc -> chip path, that only github-actions app suites on the default branch feed it, and that the record is disposable cache rebuilt by the boot REST fill through gh api because the GitHub App has no actions permission."
+        },
+        "items": [
+          {
+            "id": "docs.ac1",
+            "title": "docs/EXTERNAL-EVENT-STREAM.md's Public Event Catalog table contains a project.ci_suite_observed row naming projectKey, headSha, status and conclusion as payload highlights",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac2",
+            "title": "Given CLAUDE.md after this item, When its Dashboard Server Architecture area is read, Then it contains a Project CI chip section stating that the record is disposable cache rebuilt by the boot REST fill and that only github-actions suites on the default branch feed it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs.ac3",
+            "title": "Given the ProjectCiSuiteObservedEvent schema in packages/contracts/src/events.ts, When its JSDoc is read, Then it names both emit sites and states that htmlUrl is present only on REST-sourced observations",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "contracts-event-and-reducer",
+        "to": "webhook-observation",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-event-and-reducer",
+        "to": "rest-fill",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-event-and-reducer",
+        "to": "ci-chip-component",
+        "type": "blocks"
+      },
+      {
+        "from": "contracts-event-and-reducer",
+        "to": "docs",
+        "type": "blocks"
+      },
+      {
+        "from": "emit-door",
+        "to": "webhook-observation",
+        "type": "blocks"
+      },
+      {
+        "from": "emit-door",
+        "to": "rest-fill",
+        "type": "blocks"
+      },
+      {
+        "from": "rest-fill",
+        "to": "boot-and-refill",
+        "type": "blocks"
+      },
+      {
+        "from": "ci-chip-component",
+        "to": "wire-chip-into-project-node",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
