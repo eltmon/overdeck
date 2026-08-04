@@ -97,7 +97,7 @@ function humanizeInactivity(ms: number): string {
     return `${Math.round(minutes)} min`;
   }
   const hours = minutes / 60;
-  if (hours < 48) {
+  if (hours < 72) {
     return `${Math.round(hours)} h`;
   }
   const days = hours / 24;

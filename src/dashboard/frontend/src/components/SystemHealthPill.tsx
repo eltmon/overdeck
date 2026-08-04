@@ -22,6 +22,7 @@ import { useKillAgent } from '../hooks/useKillAgent';
 import {
   buildAttentionItems,
   contextNotes,
+  reasonLabel,
   summaryLine,
   type AttentionAgentTarget,
 } from '../lib/system-health-attention';
@@ -97,50 +98,10 @@ function healthReasons(data: SystemHealthSnapshot): HealthReason[] {
   ];
 }
 
-function reasonLabel(data: SystemHealthSnapshot, reasons: readonly HealthReason[]): string | null {
+function firstReasonLabel(data: SystemHealthSnapshot, reasons: readonly HealthReason[]): string | null {
   for (const reason of reasons) {
-    switch (reason.code) {
-      case 'admission.memory_available.soft':
-        return 'spawn headroom tight';
-      case 'admission.memory_available.blocked':
-        return data.admission.availableMemoryBytes == null
-          ? 'spawn admission blocked'
-          : `${formatBytes(data.admission.availableMemoryBytes)} available`;
-      case 'host.linux.psi_some.warning':
-      case 'host.linux.psi_full.critical':
-      case 'host.darwin.memory_pressure.warning':
-      case 'host.darwin.memory_pressure.critical':
-        return 'memory pressure detected';
-      case 'host.linux.swap_activity.warning':
-      case 'host.linux.swap_activity.critical':
-        return reason.observed == null
-          ? 'swap activity detected'
-          : `${formatBytes(reason.observed)} swap activity/min`;
-      case 'host.linux.inotify_watches.warning':
-        return 'file-watcher budget low';
-      case 'host.linux.inotify_watches.critical':
-        return 'file-watcher budget exhausted';
-      case 'agent.context.saturated':
-        return 'agent context exhausted';
-      case 'agent.tmux.missing':
-        return 'agent session missing';
-      case 'agent.kickoff.not_delivered':
-        return 'agent kickoff stalled';
-      case 'agent.runtime.inactive.warning':
-      case 'agent.runtime.inactive.stalled':
-        return 'agent activity stalled';
-      case 'service.smee_relay.stopped':
-        return 'webhook relay stopped';
-      case 'service.smee_relay.unavailable':
-        return 'webhook relay unavailable';
-      case 'system.health_snapshot.unavailable':
-      case 'host.current_pressure.unavailable':
-      case 'host.sampler.collection_failed':
-      case 'agent.persisted_state.unavailable':
-        return 'Retry';
-      default:
-        break;
-    }
+    const label = reasonLabel(data, reason);
+    if (label) return label;
   }
   return null;
 }
@@ -154,9 +115,9 @@ function healthCopy(data: SystemHealthSnapshot, reasons: readonly HealthReason[]
         ? 'Healthy'
         : `Healthy · ${formatBytes(data.admission.availableMemoryBytes)} available`;
     case 'warning':
-      return `Warning · ${reasonLabel(data, reasons) ?? 'attention required'}`;
+      return `Warning · ${firstReasonLabel(data, reasons) ?? 'attention required'}`;
     case 'critical':
-      return `Critical · ${reasonLabel(data, reasons) ?? 'action required'}`;
+      return `Critical · ${firstReasonLabel(data, reasons) ?? 'action required'}`;
     case 'unavailable':
       return 'Health unavailable · Retry';
   }
@@ -379,6 +340,26 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
   }
 
   const relay = data.services.find((service) => service.id === 'smee-relay' || service.id === 'webhook-relay');
+  const relayStatus = relay?.status ?? data.summary.smeeRelay.status;
+  const relayConfigured = relayStatus !== 'not_configured'
+    && (data.summary.smeeRelay.configured || relay !== undefined);
+  const relayPresentation = !relayConfigured
+    ? {
+        label: 'Not configured',
+        classes: 'border-border bg-muted/40',
+        dotClass: 'bg-muted-foreground',
+      }
+    : relayStatus === 'running'
+      ? {
+          label: 'Running',
+          classes: 'border-success/40 bg-success/10',
+          dotClass: 'bg-success',
+        }
+      : {
+          label: relayStatus === 'unavailable' ? 'Unavailable' : 'Stopped',
+          classes: 'border-destructive/50 bg-destructive/10',
+          dotClass: 'bg-destructive',
+        };
 
   return (
     <div ref={wrapperRef} className="relative">
@@ -527,10 +508,10 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <span className="text-muted-foreground">Containers</span>
               <span>{data.summary.containerCount}</span>
             </div>
-            <div role="group" className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`} aria-label={`Webhook relay: ${relay?.status === 'running' ? 'Running' : 'Stopped'}`}>
-              <span className={`inline-block h-2 w-2 rounded-full ${relay?.status === 'running' ? 'bg-success' : 'bg-warning'}`}></span>
+            <div role="group" className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relayPresentation.classes}`} aria-label={`Webhook relay: ${relayPresentation.label}`}>
+              <span aria-hidden="true" className={`inline-block h-2 w-2 rounded-full ${relayPresentation.dotClass}`} />
               <span className="text-muted-foreground">Webhook relay</span>
-              <span>{relay?.status === 'running' ? 'Running' : 'Stopped'}</span>
+              <span>{relayPresentation.label}</span>
             </div>
           </div>
 
@@ -539,8 +520,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="space-y-1 rounded-lg border border-border p-2">
                 {attentionItems.map((item) => {
                   const singletonTarget = item.targets.length === 1 ? item.targets[0] : undefined;
-                  const groupedTargetsAreActionable = item.targets.length > 1
-                    && item.targets.some(target => target.issueId || target.killConsumer);
 
                   return (
                     <div key={`${item.code}-${item.agents.join(',')}`} className="text-xs">
@@ -563,25 +542,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                           />
                         )}
                       </div>
-                      {groupedTargetsAreActionable && (
-                        <details className="ml-4 mt-1 cursor-pointer">
-                          <summary className="text-muted-foreground hover:text-foreground">
-                            Actions for {item.targets.length} agents
-                          </summary>
-                          <div className="mt-1 space-y-1 border-l border-border pl-2">
-                            {item.targets.map(target => (
-                              <div key={target.agentId} className="flex items-center justify-between gap-2">
-                                <span className="truncate text-muted-foreground">{target.agentId}</span>
-                                <AttentionTargetActions
-                                  target={target}
-                                  onOpen={openAttentionIssue}
-                                  onSelectLeaked={() => setHighlightLeakedOnly(true)}
-                                />
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      )}
                     </div>
                   );
                 })}

@@ -224,13 +224,9 @@ describe('system health UI no-loss audit', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
 
-    // Summary line (new header box). getAllBy*: summaryLine() renders one
-    // string into a leaf div inside a bordered wrapper whose only child it is,
-    // so the wrapper's textContent matches identically — two nodes, one
-    // affordance. Anchoring cannot separate them; presence is the audited
-    // property, and getBy* would fail on the nesting, not on a loss.
-    expect(within(dialog).getAllByText(/^All clear .* spawn headroom .* relay running .* 0 stalled agents$/).length)
-      .toBeGreaterThan(0);
+    expect(within(dialog).getByText(
+      'All clear · memory at 35.9% · 41 GB spawn headroom · relay running · 0 stalled agents · 0 idle agents · 0 context notes',
+    )).toBeInTheDocument();
 
     const stateBadge = within(dialog).getByRole('status', { name: 'healthy system health' });
     expect(stateBadge).toHaveTextContent('healthy');
@@ -241,7 +237,7 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByRole('group', { name: 'Containers: 1' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Webhook relay: Running' })).toBeInTheDocument();
 
-    // Vitals tiles (4x2 grid with meter bars, replaces old 8-tile grid)
+    // Vitals tiles (2x2 grid with meter bars, replaces old 8-tile grid)
     expect(within(dialog).getByText('CPU')).toBeInTheDocument();
     expect(within(dialog).getByText('12.5%')).toBeInTheDocument();
     expect(within(dialog).getByText('Load/core 0.20')).toBeInTheDocument();
@@ -255,6 +251,64 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('50.0%')).toBeInTheDocument();
     expect(within(dialog).getByText('Overcommit 125.0%')).toBeInTheDocument();
     expect(within(dialog).getByText('No leaks')).toBeInTheDocument();
+  });
+
+  it.each([
+    {
+      label: 'Running',
+      status: 'running' as const,
+      configured: true,
+      running: true,
+      groupClass: 'bg-success/10',
+      dotClass: 'bg-success',
+    },
+    {
+      label: 'Unavailable',
+      status: 'unavailable' as const,
+      configured: true,
+      running: false,
+      groupClass: 'bg-destructive/10',
+      dotClass: 'bg-destructive',
+    },
+    {
+      label: 'Not configured',
+      status: 'not_configured' as const,
+      configured: false,
+      running: false,
+      groupClass: 'bg-muted/40',
+      dotClass: 'bg-muted-foreground',
+    },
+  ])('distinguishes the relay $label state', ({ label, status, configured, running, groupClass, dotClass }) => {
+    const snapshot = createSnapshot();
+    hookState.current = {
+      data: {
+        ...snapshot,
+        services: status === 'not_configured'
+          ? []
+          : [{
+              ...snapshot.services[0]!,
+              status,
+              message: label,
+            }],
+        summary: {
+          ...snapshot.summary,
+          smeeRelay: {
+            configured,
+            running,
+            status: status === 'unavailable' ? 'unknown' : status,
+            message: label,
+          },
+        },
+      },
+      isLoading: false,
+      error: null,
+    };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const relay = screen.getByRole('group', { name: `Webhook relay: ${label}` });
+    expect(relay).toHaveClass(groupClass);
+    expect(relay.querySelector('span[aria-hidden="true"]')).toHaveClass(dotClass);
   });
 
   it('maps vital meter boundaries and distinguishes zero from unavailable', () => {
@@ -391,7 +445,7 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByRole('meter', { name: 'container-1 memory share: 50.0%' })).toBeInTheDocument();
   });
 
-  it('groups agent attention rows and exposes each canonical Open and Kill action', async () => {
+  it('keeps grouped agent attention rows informational without Open or Kill actions', () => {
     const snapshot = createSnapshot('critical');
     hookState.current = {
       data: {
@@ -454,14 +508,13 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('×2')).toBeInTheDocument();
     expect(within(dialog).getByText('2× agents: agent-stalled-1, agent-stalled-2')).toBeInTheDocument();
 
-    const groupedActions = within(dialog).getByText('Actions for 2 agents').closest('details')!;
-    fireEvent.click(within(groupedActions).getByText('Actions for 2 agents'));
-    fireEvent.click(within(groupedActions).getByTitle('Kill agent-stalled-1'));
-    expect(mockConfirmAndKill).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(within(groupedActions).getByRole('button', { name: 'Open PAN-2' }));
-    expect(mockOpenIssue).toHaveBeenCalledWith('PAN-2');
-    expect(screen.queryByRole('dialog', { name: 'System health' })).not.toBeInTheDocument();
+    const groupedRow = within(dialog)
+      .getByText('2× agents: agent-stalled-1, agent-stalled-2')
+      .closest('.text-xs')!;
+    expect(within(groupedRow).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(groupedRow).queryByText('Actions for 2 agents')).not.toBeInTheDocument();
+    expect(mockConfirmAndKill).not.toHaveBeenCalled();
+    expect(mockOpenIssue).not.toHaveBeenCalled();
   });
 
   it('keeps context notes visible when no active attention items exist', () => {
@@ -491,10 +544,11 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('No active pressure signals.')).toBeInTheDocument();
   });
 
-  it('displays attention severity and the singleton agent row when critical', () => {
+  it('shows singleton identity, duration, Open, and Kill actions when critical', () => {
+    const snapshot = createSnapshot('critical');
     hookState.current = {
       data: {
-        ...createSnapshot('critical'),
+        ...snapshot,
         agents: [{
           id: 'agent-stalled',
           issueId: 'PAN-1',
@@ -506,6 +560,18 @@ describe('system health UI no-loss audit', () => {
             message: 'agent-stalled has produced no activity for 35 min.',
           }],
         }],
+        topConsumers: [
+          ...snapshot.topConsumers,
+          {
+            id: 'agent-stalled',
+            label: 'agent-stalled',
+            type: 'agent',
+            memoryBytes: GIB,
+            memoryGb: 1,
+            issueId: 'PAN-1',
+            killTarget: { kind: 'agent', agentId: 'agent-stalled' },
+          },
+        ],
       },
       isLoading: false,
       error: null,
@@ -514,10 +580,10 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Attention section should exist with agent activity issue. Both the agent
-    // id and the reason message render it, so match on presence rather than
-    // uniqueness — the audited property is that the row is visible at all.
-    expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
+    const attentionRow = within(dialog).getByText('no activity for 35 min.').closest('.text-xs')!;
+    expect(within(attentionRow).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
+    expect(within(attentionRow).getByRole('button', { name: 'Open PAN-1' })).toBeInTheDocument();
+    expect(within(attentionRow).getByTitle('Kill agent-stalled')).toBeInTheDocument();
   });
 
   it('emits one critical transition event and makes leaked-first focus reversible', () => {

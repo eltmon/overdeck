@@ -242,32 +242,32 @@ describe('classifyAgentHealth', () => {
       message: 'agent-test-20min has produced no activity for 20 min.',
     });
 
-    // <48 hour case: 47 hours renders as 'N h' format
+    // Named AC case: 2946 minutes rounds to 49 hours.
     const hoursInactive = classifyAgentHealth(input({
-      agentId: 'agent-test-47hrs',
+      agentId: 'agent-test-2946min',
       persisted: {
         status: 'available',
         value: {
           role: 'work',
           status: 'running',
           startedAt: '2026-07-13T00:00:00.000Z',
-          lastActivity: '2026-07-14T13:00:00.000Z',
+          lastActivity: '2026-07-14T10:54:00.000Z',
           kickoffDelivered: true,
         },
       },
       runtime: {
         state: 'active',
-        lastActivity: '2026-07-14T13:00:00.000Z',
+        lastActivity: '2026-07-14T10:54:00.000Z',
       },
-      liveSessions: new Set(['agent-test-47hrs']),
+      liveSessions: new Set(['agent-test-2946min']),
       nowMs: NOW, // 2026-07-16T12:00:00.000Z
     }));
     expect(hoursInactive.reasons[0]).toMatchObject({
       code: 'agent.runtime.inactive.stalled',
-      message: 'agent-test-47hrs has produced no activity for 47 h.',
+      message: 'agent-test-2946min has produced no activity for 49 h.',
     });
 
-    // >=48 hour case: 72+ hours renders as 'N d' format
+    // >=72 hour case renders as 'N d' format.
     const multiDays = classifyAgentHealth(input({
       agentId: 'agent-test-3d',
       persisted: {

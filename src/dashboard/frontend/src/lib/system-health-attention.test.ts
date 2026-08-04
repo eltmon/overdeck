@@ -25,13 +25,6 @@ function createSnapshot(
         }]
       : [];
 
-  const infoReason = [{
-    code: 'host.current_pressure.unavailable',
-    domain: 'host' as const,
-    severity: 'info' as const,
-    message: 'Current pressure sampling unavailable.',
-  }];
-
   return {
     version: 2,
     state,
@@ -40,7 +33,7 @@ function createSnapshot(
     host: {
       state,
       platform: 'linux',
-      reasons: state === 'info_only' ? infoReason : hostReason,
+      reasons: hostReason,
       metrics: {
         cpuPercent: 12.5,
         loadAverage1m: 1.2,
@@ -227,6 +220,24 @@ describe('system-health-attention', () => {
       expect(item.agentId).toBeUndefined();
     });
 
+    it('truncates grouped agent names after two and reports the remaining count', () => {
+      const agents = ['agent-1', 'agent-2', 'agent-3', 'agent-4'].map((id, index) => ({
+        id,
+        issueId: `PAN-${index + 1}`,
+        status: 'stalled' as const,
+        reasons: [{
+          code: 'agent.runtime.inactive.warning',
+          domain: 'agent' as const,
+          severity: 'warning' as const,
+          message: `${id} has produced no activity for ${20 + index} min.`,
+        }],
+      }));
+
+      const item = buildAttentionItems(createSnapshot('healthy', { agents }))[0];
+
+      expect(item?.sub).toBe('4× agents: agent-1, agent-2 +2 more');
+    });
+
     it('carries the canonical issue and matching kill consumer for a singleton agent', () => {
       const snapshot = createSnapshot('healthy', {
         agents: [
@@ -258,12 +269,36 @@ describe('system-health-attention', () => {
       expect(items[0]).toMatchObject({
         severity: 'critical',
         code: 'agent.runtime.inactive.stalled',
+        title: 'agent-stalled · PAN-1',
+        sub: 'no activity for 35 min.',
         agentId: 'agent-stalled',
         issueId: 'PAN-1',
       });
       expect(items[0]?.killConsumer?.killTarget).toEqual({
         kind: 'agent',
         agentId: 'agent-stalled',
+      });
+    });
+
+    it('keeps a singleton warning duration under the canonical agent and issue title', () => {
+      const snapshot = createSnapshot('healthy', {
+        agents: [{
+          id: 'agent-idle',
+          issueId: 'PAN-2',
+          status: 'warning',
+          reasons: [{
+            code: 'agent.runtime.inactive.warning',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'agent-idle has produced no activity for 53 min.',
+          }],
+        }],
+      });
+
+      expect(buildAttentionItems(snapshot)[0]).toMatchObject({
+        severity: 'warning',
+        title: 'agent-idle · PAN-2',
+        sub: 'no activity for 53 min.',
       });
     });
 
@@ -430,29 +465,59 @@ describe('system-health-attention', () => {
   });
 
   describe('summaryLine', () => {
-    it('returns an empty items array and summaryLine returns the all-clear variant', () => {
+    it('returns the complete all-clear operational context', () => {
       const snapshot = createSnapshot('healthy');
       const items = buildAttentionItems(snapshot);
-      const line = summaryLine(snapshot, items);
 
       expect(items).toHaveLength(0);
-      expect(line).toContain('All clear');
-      expect(line).toContain('spawn headroom');
-      expect(line).toContain('relay running');
-      expect(line).toContain('0 stalled agents');
+      expect(summaryLine(snapshot, items)).toBe(
+        'All clear · memory at 35.9% · 41 GB spawn headroom · relay running · 0 stalled agents · 0 idle agents · 0 context notes',
+      );
     });
 
-    it('describes warning state with count', () => {
-      const snapshot = createSnapshot('warning');
-      const items = buildAttentionItems(snapshot);
-      const line = summaryLine(snapshot, items);
-
-      expect(line).toContain('Attention needed');
-      expect(line).toContain('warning');
-    });
-
-    it('describes critical state with stalled agent count', () => {
+    it('describes warnings with idle agents, memory, headroom, and context notes', () => {
+      const base = createSnapshot('healthy');
       const snapshot = createSnapshot('healthy', {
+        host: {
+          ...base.host,
+          reasons: [{
+            code: 'host.current_pressure.unavailable',
+            domain: 'host',
+            severity: 'info',
+            message: 'Current pressure sampling unavailable.',
+          }],
+        },
+        agents: ['agent-idle-1', 'agent-idle-2'].map((id, index) => ({
+          id,
+          issueId: `PAN-${index + 1}`,
+          status: 'warning' as const,
+          reasons: [{
+            code: 'agent.runtime.inactive.warning',
+            domain: 'agent' as const,
+            severity: 'warning' as const,
+            message: `${id} has produced no activity for 53 min.`,
+          }],
+        })),
+      });
+      const items = buildAttentionItems(snapshot);
+
+      expect(summaryLine(snapshot, items)).toBe(
+        'Attention needed: 1 warning · 0 stalled agents · 2 idle agents · memory at 35.9% · 41 GB spawn headroom · 1 context note',
+      );
+    });
+
+    it('describes critical state with stalled agents and complete operational context', () => {
+      const base = createSnapshot('healthy');
+      const snapshot = createSnapshot('healthy', {
+        host: {
+          ...base.host,
+          reasons: [{
+            code: 'host.current_pressure.unavailable',
+            domain: 'host',
+            severity: 'info',
+            message: 'Current pressure sampling unavailable.',
+          }],
+        },
         agents: [
           {
             id: 'agent-stalled-1',
@@ -462,7 +527,7 @@ describe('system-health-attention', () => {
               code: 'agent.runtime.inactive.stalled',
               domain: 'agent',
               severity: 'warning',
-              message: 'Stalled 1',
+              message: 'agent-stalled-1 has produced no activity for 49 h.',
             }],
           },
           {
@@ -473,17 +538,16 @@ describe('system-health-attention', () => {
               code: 'agent.runtime.inactive.stalled',
               domain: 'agent',
               severity: 'warning',
-              message: 'Stalled 2',
+              message: 'agent-stalled-2 has produced no activity for 49 h.',
             }],
           },
         ],
       });
-
       const items = buildAttentionItems(snapshot);
-      const line = summaryLine(snapshot, items);
 
-      expect(line).toContain('Action required');
-      expect(line).toContain('2 stalled agents');
+      expect(summaryLine(snapshot, items)).toBe(
+        'Action required: 1 critical issue · 2 stalled agents · 0 idle agents · memory at 35.9% · 41 GB spawn headroom · 1 context note',
+      );
     });
   });
 });
