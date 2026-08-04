@@ -39,6 +39,9 @@ vi.mock('../../agents/agent-state.js', () => ({
   clearAgentPausedSync: agentState.clearPaused,
   clearAgentTroubledSync: agentState.clearTroubled,
 }));
+vi.mock('../../overdeck/agent-review-provenance.js', () => ({
+  getReviewArtifactProvenanceSync: (id: string) => agentState.states.get(id) ?? null,
+}));
 
 const resume = vi.hoisted(() => ({
   resumeAgent: vi.fn(),
@@ -70,6 +73,7 @@ import { join } from 'node:path';
 
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from '../feedback-target.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
+import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
 import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -196,15 +200,26 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
 
 describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the stuck mark (PAN-3511)', () => {
   const ISSUE = 'PAN-9999';
+  const REVIEW_RUN_ID = 'agent-pan-9999-review-run-1';
+  const REVIEW_ARTIFACT_CAPABILITY = 'host-issued-capability';
   let projectPath: string;
   let workspacePath: string;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
     filesystem.existingPaths.clear();
+    agentState.states.clear();
     reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing' });
+    const { __resetArtifactVerdictMemo } = await import('../synthesis-verdict.js');
+    __resetArtifactVerdictMemo();
     projectPath = mkdtempSync(join(tmpdir(), 'pan3511-feedback-'));
     workspacePath = join(projectPath, 'workspaces', `feature-${ISSUE.toLowerCase()}`);
+    agentState.states.set(`agent-${ISSUE.toLowerCase()}-review`, {
+      id: `agent-${ISSUE.toLowerCase()}-review`,
+      workspace: workspacePath,
+      reviewRunId: REVIEW_RUN_ID,
+      reviewArtifactCapability: REVIEW_ARTIFACT_CAPABILITY,
+    });
     vi.mocked(resolveProjectFromIssueSync).mockReturnValue({ projectKey: 'test', projectPath } as never);
   });
 
@@ -212,12 +227,21 @@ describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the st
     rmSync(projectPath, { recursive: true, force: true });
   });
 
-  /** Write a real artifact and register it with the suite's existsSync mock. */
-  function writeArtifact(filename: string, body: string): void {
-    const runDir = join(workspacePath, '.pan', 'review', 'run-1');
+  /** Write a host-bound artifact and register it with the suite's existsSync mock. */
+  function writeArtifact(filename: string, body: string, headSha?: string): void {
+    const runDir = join(workspacePath, '.pan', 'review', REVIEW_RUN_ID);
     mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, 'context.json'),
+      JSON.stringify({ issueId: ISSUE, runId: REVIEW_RUN_ID, ...(headSha ? { headSha } : {}) }),
+      'utf-8',
+    );
     const path = join(runDir, filename);
-    writeFileSync(path, body, 'utf-8');
+    writeFileSync(
+      path,
+      `${reviewArtifactCapabilityMarker(REVIEW_ARTIFACT_CAPABILITY)}\n${body}`,
+      'utf-8',
+    );
     filesystem.existingPaths.add(path);
   }
 
@@ -264,12 +288,7 @@ describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the st
     // blocked-by-head-guard writes nothing, but the artifact proves a verdict
     // exists, so the stuck mark would strand a finished review.
     reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing', lastVerifiedCommit: 'bbbbbbb2' });
-    const runDir = join(workspacePath, '.pan', 'review', 'run-1');
-    mkdirSync(runDir, { recursive: true });
-    const path = join(runDir, 'synthesis.md');
-    writeFileSync(path, '## Verdict: APPROVED\n', 'utf-8');
-    filesystem.existingPaths.add(path);
-    writeFileSync(join(runDir, 'context.json'), JSON.stringify({ headSha: 'aaaaaaa1' }), 'utf-8');
+    writeArtifact('synthesis.md', '## Verdict: APPROVED\n', 'aaaaaaa1');
 
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {});
 

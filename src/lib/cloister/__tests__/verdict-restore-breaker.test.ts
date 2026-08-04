@@ -16,12 +16,14 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
 import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
 import type { ReviewStatus } from '../../review-status.js';
 
 const mocks = vi.hoisted(() => ({
   loadReviewStatuses: vi.fn(),
   getReviewStatusSync: vi.fn(),
+  getAgentStateSync: vi.fn(),
   setReviewStatusSync: vi.fn(),
   markWorkspaceStuck: vi.fn(),
   resolveProjectFromIssueSync: vi.fn(),
@@ -48,10 +50,16 @@ vi.mock('../../projects.js', () => ({
 vi.mock('../issue-closed.js', () => ({ isIssueClosed: mocks.isIssueClosed }));
 
 vi.mock('../../agents.js', () => ({
-  getAgentStateSync: vi.fn(() => null),
+  getAgentStateSync: mocks.getAgentStateSync,
   getAgentRuntimeStateSync: vi.fn(() => null),
   listRunningAgents: vi.fn(() => Effect.succeed([])),
   spawnRun: vi.fn(),
+}));
+vi.mock('../../agents/agent-state.js', () => ({
+  getAgentStateSync: mocks.getAgentStateSync,
+}));
+vi.mock('../../overdeck/agent-review-provenance.js', () => ({
+  getReviewArtifactProvenanceSync: mocks.getAgentStateSync,
 }));
 
 vi.mock('../../overdeck/agents.js', () => ({ listAllAgentsSync: vi.fn(() => []) }));
@@ -109,6 +117,8 @@ vi.mock('../deacon-nudge-log.js', () => ({ recordDeaconNudge: vi.fn() }));
 vi.mock('../event-store-provider.js', () => ({ getCloisterEventStore: vi.fn(() => null) }));
 
 const ISSUE = 'PAN-3511';
+const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1';
+const REVIEW_ARTIFACT_CAPABILITY = 'host-issued-capability';
 const BREAKER_THRESHOLD = 3;
 
 let projectPath: string;
@@ -117,11 +127,20 @@ function workspacePath(): string {
   return join(projectPath, 'workspaces', `feature-${ISSUE.toLowerCase()}`);
 }
 
-/** Writes a real reviewer artifact where the real reader will find it. */
+/** Writes a host-bound reviewer artifact where the real reader will find it. */
 function writeArtifact(filename: string, body: string): void {
-  const runDir = join(workspacePath(), '.pan', 'review', 'run-1');
+  const runDir = join(workspacePath(), '.pan', 'review', REVIEW_RUN_ID);
   mkdirSync(runDir, { recursive: true });
-  writeFileSync(join(runDir, filename), body, 'utf-8');
+  writeFileSync(
+    join(runDir, 'context.json'),
+    JSON.stringify({ issueId: ISSUE, runId: REVIEW_RUN_ID }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(runDir, filename),
+    `${reviewArtifactCapabilityMarker(REVIEW_ARTIFACT_CAPABILITY)}\n${body}`,
+    'utf-8',
+  );
 }
 
 const APPROVED = '## Verdict: APPROVED\n\n## Summary\nNo blocking findings in this pass.\n';
@@ -152,6 +171,12 @@ beforeEach(async () => {
   mocks.isIssueClosed.mockResolvedValue(false);
   mocks.emitActivityEntryOnce.mockResolvedValue('appended');
   mocks.getReviewStatusSync.mockReturnValue(status());
+  mocks.getAgentStateSync.mockReturnValue({
+    id: `agent-${ISSUE.toLowerCase()}-review`,
+    workspace: workspacePath(),
+    reviewRunId: REVIEW_RUN_ID,
+    reviewArtifactCapability: REVIEW_ARTIFACT_CAPABILITY,
+  });
   mocks.loadReviewStatuses.mockReturnValue({});
   // The memo would otherwise carry one test's artifact into the next.
   const { __resetArtifactVerdictMemo } = await import('../synthesis-verdict.js');

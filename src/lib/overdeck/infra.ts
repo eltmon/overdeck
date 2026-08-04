@@ -54,6 +54,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'conflicts_since' },
     { table: 'agents', column: 'yielded_by_scheduler' },
     { table: 'agents', column: 'review_discovery_pending' },
+    { table: 'agents', column: 'review_artifact_capability' },
     { table: 'agents', column: 'review_context_manifest_path' },
     { table: 'agents', column: 'review_discovery_ready_at' },
     { table: 'agents', column: 'review_convoy_forked_at' },
@@ -192,6 +193,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // PAN-2585: PAN-1862 discovery-fork state — was state.json-only (write-only under
   // the DB-first reader), which blinded the discovery-ready signal and its backstop.
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer');
+  // PAN-3511: host-issued capability binds verdict recovery to the active review run.
+  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_artifact_capability` text');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer');

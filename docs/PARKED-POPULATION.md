@@ -45,13 +45,16 @@ release.
 | 10 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
 
 The `stuck-flag` orbit consults the **verdict of record** before every branch it
-owns: on a fresh passed artifact the sweeper restores the verdict, clears the
-stuck flag, and emits `sweep.unparked` with action `verdict-restored` *without
-sending the work agent anything*, because the review it would have re-driven had
-already finished. On a blocked or failed artifact the re-drive stands, but the
+owns. A fresh passed artifact restores the verdict and clears the stuck flag only
+when its reviewed HEAD matches the row's live HEAD (or one side has no anchor).
+A non-empty mismatch remains parked, emits `review.verdict_restore_blocked`, and
+does not re-drive the work agent, because the artifact proves that review
+finished but cannot authorize a verdict on another revision. A permitted restore
+emits `sweep.unparked` with action `verdict-restored` without sending the work
+agent anything. On a blocked or failed artifact the re-drive stands, but the
 feedback body carries the reviewer's actual blocker instead of a pointer at
-`.pan/feedback`. With no artifact, every branch behaves exactly as before. See
-"Verdict of record" in `docs/REVIEW-AGENT-ARCHITECTURE.md`.
+`.pan/feedback`. With no trusted artifact, every branch behaves exactly as
+before. See "Verdict of record" in `docs/REVIEW-AGENT-ARCHITECTURE.md`.
 
 A **scheduler yield** (`yieldedByScheduler`) is NOT a park — it is
 self-clearing. **Warm-idle on a pipeline-owned issue** (PAN-2579) is NOT a

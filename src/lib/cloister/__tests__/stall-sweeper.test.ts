@@ -64,6 +64,7 @@ interface Harness {
     resetMerge: string[];
     feedbackBodies: string[];
     restore: string[];
+    restoreArtifacts: SynthesisArtifactVerdict[];
     events: { type: string; payload: Record<string, unknown> }[];
     activity: { level: string; issueId?: string; message: string }[];
   };
@@ -80,7 +81,7 @@ function harness(
 ): Harness {
   const calls: Harness['calls'] = {
     spawn: [], stop: [], message: [], feedback: [], review: [], clearStuck: [], resetMerge: [], events: [], activity: [],
-    feedbackBodies: [], restore: [],
+    feedbackBodies: [], restore: [], restoreArtifacts: [],
   };
   const live = new Set(opts.liveAgents ?? []);
   const artifact = opts.artifact ?? null;
@@ -101,11 +102,12 @@ function harness(
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
     readArtifact: () => artifact,
-    restoreVerdict: async (issueId) => {
+    restoreVerdict: async (issueId, selectedArtifact) => {
       calls.restore.push(issueId);
+      calls.restoreArtifacts.push(selectedArtifact);
       const outcome = opts.restoreOutcome ?? 'restored';
-      if (outcome === 'no-artifact' || !artifact) return { outcome: 'no-artifact' };
-      return { outcome, artifact };
+      if (outcome === 'no-artifact') return { outcome: 'no-artifact' };
+      return { outcome, artifact: selectedArtifact };
     },
   };
   return { deps, calls };
@@ -177,15 +179,17 @@ describe('runStallSweeperPatrol — per-orbit actions', () => {
     // A reviewer that already approved must never be re-driven. The consult runs
     // ahead of every branch, so no rework text reaches the agent and no fresh
     // review is dispatched over a verdict that already exists.
+    const artifact = { verdict: 'passed', runId: 'agent-pan-1-review-run', mtimeMs: NOW - 60_000 } as const;
     const { deps, calls } = harness(
       [parkedRow({ orbit: 'stuck-flag', details: { stuckReason } })],
-      { artifact: { verdict: 'passed', mtimeMs: NOW - 60_000 }, liveAgents: ['agent-pan-1'] },
+      { artifact, liveAgents: ['agent-pan-1'] },
     );
     const actions = await runStallSweeperPatrol(deps);
 
     expect(calls.message).toEqual([]);
     expect(calls.spawn).toEqual([]);
     expect(calls.review).toEqual([]);
+    expect(calls.restoreArtifacts).toEqual([artifact]);
     expect(calls.clearStuck).toEqual(['PAN-1']);
     expect(calls.events.some((e) => e.type === 'sweep.unparked' && e.payload['action'] === 'verdict-restored')).toBe(true);
     expect(actions.some((a) => a.includes('fresh passed review artifact'))).toBe(true);

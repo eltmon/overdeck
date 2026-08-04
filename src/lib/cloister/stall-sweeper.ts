@@ -91,7 +91,7 @@ export interface StallSweeperDeps {
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
   /** PAN-3511: the verdict of record, consulted before any stuck-flag action. */
   readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
-  restoreVerdict?: (issueId: string) => Promise<ArtifactVerdictRestoreResult>;
+  restoreVerdict?: (issueId: string, artifact: SynthesisArtifactVerdict) => Promise<ArtifactVerdictRestoreResult>;
 }
 
 interface ScanOutcome {
@@ -187,8 +187,9 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   // and re-stat'ing the same run dirs each pass buys nothing.
   const readArtifact = deps.readArtifact ?? ((issueId: string) => readMemoizedArtifactVerdict(issueId));
   const restoreVerdict = deps.restoreVerdict
-    ?? ((issueId: string) => attemptArtifactVerdictRestore(issueId, {
+    ?? ((issueId: string, artifact: SynthesisArtifactVerdict) => attemptArtifactVerdictRestore(issueId, {
       caller: 'stall-sweeper',
+      selectedArtifact: artifact,
       // The restore door owns no review-status import (cycle) — we lend it ours.
       deps: {
         getStatus: getReviewStatusSync,
@@ -272,7 +273,7 @@ interface SweepActions {
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
   readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
-  restoreVerdict: (issueId: string) => Promise<ArtifactVerdictRestoreResult>;
+  restoreVerdict: (issueId: string, artifact: SynthesisArtifactVerdict) => Promise<ArtifactVerdictRestoreResult>;
 }
 
 async function resumeWorkAgentWithFeedback(
@@ -376,10 +377,10 @@ async function sweepRow(
       // restore short-circuited, which is the wipe this issue exists to stop.
       const artifact = actions.readArtifact(issueId);
       if (artifact?.verdict === 'passed') {
-        const restore = await actions.restoreVerdict(issueId);
+        const restore = await actions.restoreVerdict(issueId, artifact);
         if (restore.outcome === 'restored') {
           actions.clearStuck(issueId);
-          actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'verdict-restored', verdict: artifact.verdict });
+          actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'verdict-restored', verdict: restore.artifact.verdict });
           act(`sweeper restored ${issueId} from a fresh passed review artifact and cleared the stuck flag — the review had already finished, so no message was sent to the work agent`);
           return true;
         }

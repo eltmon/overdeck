@@ -19,13 +19,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   attemptArtifactVerdictRestore,
-  restoreWouldTripHeadGuard,
   type ArtifactVerdictRestoreDeps,
 } from '../verdict-restore.js';
+import { restoreWouldTripHeadGuard } from '../verdict-head-guard.js';
 import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
 import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
+import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
 
 const ISSUE = 'PAN-3511';
+const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1';
+const REVIEW_CAPABILITY = 'host-issued-capability';
 
 interface Harness {
   deps: Partial<ArtifactVerdictRestoreDeps>;
@@ -57,7 +60,7 @@ function harness(options: {
 }
 
 function passedArtifact(overrides: Partial<SynthesisArtifactVerdict> = {}): SynthesisArtifactVerdict {
-  return { verdict: 'passed', notes: 'All four lenses approved.', mtimeMs: 999_000, ...overrides };
+  return { verdict: 'passed', notes: 'All four lenses approved.', runId: REVIEW_RUN_ID, mtimeMs: 999_000, ...overrides };
 }
 
 describe('restoreWouldTripHeadGuard', () => {
@@ -365,12 +368,18 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
   });
 
   function writeArtifact(filename: string, body: string, headSha?: string): void {
-    const runDir = join(workspacePath, '.pan', 'review', 'run-1');
+    const runDir = join(workspacePath, '.pan', 'review', REVIEW_RUN_ID);
     mkdirSync(runDir, { recursive: true });
-    writeFileSync(join(runDir, filename), body, 'utf-8');
-    if (headSha) {
-      writeFileSync(join(runDir, 'context.json'), JSON.stringify({ headSha }), 'utf-8');
-    }
+    writeFileSync(
+      join(runDir, filename),
+      `${reviewArtifactCapabilityMarker(REVIEW_CAPABILITY)}\n${body}`,
+      'utf-8',
+    );
+    writeFileSync(join(runDir, 'context.json'), JSON.stringify({
+      issueId: ISSUE,
+      runId: REVIEW_RUN_ID,
+      ...(headSha ? { headSha } : {}),
+    }), 'utf-8');
   }
 
   // Both supported shapes, driven through the DEFAULT reader (no readArtifact
@@ -385,6 +394,8 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     const setStatus = vi.fn();
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
+      reviewRunId: REVIEW_RUN_ID,
+      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,
@@ -405,6 +416,8 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     const setStatus = vi.fn();
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
+      reviewRunId: REVIEW_RUN_ID,
+      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,
@@ -431,6 +444,8 @@ describe('attemptArtifactVerdictRestore — real reader, both artifact shapes (H
     const setStatus = vi.fn();
     const result = await attemptArtifactVerdictRestore(ISSUE, {
       workspacePath,
+      reviewRunId: REVIEW_RUN_ID,
+      reviewArtifactCapability: REVIEW_CAPABILITY,
       deps: {
         getStatus: () => ({ reviewStatus: 'reviewing' }) as never,
         setStatus,

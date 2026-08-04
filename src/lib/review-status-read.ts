@@ -6,6 +6,7 @@ import {
 } from './review-status-reconcile.js';
 import { staleVerdictSnapshotAgainstLiveCycle } from './pan-dir/pipeline-verdict-merge.js';
 import { readMemoizedArtifactVerdict } from './cloister/synthesis-verdict.js';
+import { restoreWouldTripHeadGuard } from './cloister/verdict-head-guard.js';
 
 export interface ReviewStatusReadHooks extends ReviewStatusReconcileHooks {
   deleteStatus(issueId: string): void;
@@ -53,7 +54,11 @@ export function resolveJournalReconciledReviewStatusSync(
       const artifact = typeof journalVerdict === 'string'
         ? readMemoizedArtifactVerdict(issueId)
         : null;
-      if (artifact && artifact.verdict === journalVerdict) {
+      const artifactHeadMismatch = artifact && restoreWouldTripHeadGuard({
+        artifactHead: artifact.headSha,
+        rowHead: dbStatus?.lastVerifiedCommit,
+      });
+      if (artifact && artifact.verdict === journalVerdict && !artifactHeadMismatch) {
         console.log(
           `[review-status] Artifact lifted the stale-journal refusal for ${issueId}: `
           + `a fresh ${artifact.verdict} review artifact corroborates the journal verdict, `

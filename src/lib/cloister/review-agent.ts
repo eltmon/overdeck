@@ -37,7 +37,7 @@
  */
 
 import { exec } from 'child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'fs';
 import { mkdir, readFile, rm, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
@@ -57,6 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
+import { reviewArtifactCapabilityMarker } from './review-artifact-capability.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
@@ -117,10 +118,8 @@ function buildReviewRolePrompt(opts: {
   workspace: string;
   branch: string;
   prUrl?: string;
-  runId: string;
-  reviewDir: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
+  runId: string; reviewDir: string; reviewArtifactCapability: string;
+  contextManifestPath?: string; tier1Summary?: string;
   /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
   inScopeSubRoles?: ReviewSubRole[];
   /** PAN-1862 (FR-9): sub-roles whose passed verdicts are carried forward this cycle. */
@@ -209,6 +208,7 @@ function buildReviewRolePrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
+    `The synthesis file's FIRST line MUST be exactly: ${reviewArtifactCapabilityMarker(opts.reviewArtifactCapability)} — this host-issued capability binds recovery to this review run; never omit or alter it.`,
     '',
     opts.tier1Summary
       ? [
@@ -259,10 +259,8 @@ function buildSelfReviewPrompt(opts: {
   workspace: string;
   branch: string;
   prUrl?: string;
-  runId: string;
-  reviewDir: string;
-  contextManifestPath?: string;
-  tier1Summary?: string;
+  runId: string; reviewDir: string; reviewArtifactCapability: string;
+  contextManifestPath?: string; tier1Summary?: string;
 }): string {
   const reviewReportPath = selfReviewReportPath(opts.reviewDir);
   const prompt = [
@@ -281,6 +279,7 @@ function buildSelfReviewPrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Review output file: ${reviewReportPath}`,
+    `The review file's FIRST line MUST be exactly: ${reviewArtifactCapabilityMarker(opts.reviewArtifactCapability)} — this host-issued capability binds recovery to this review run; never omit or alter it.`,
     '',
     opts.tier1Summary
       ? [
@@ -570,6 +569,7 @@ async function spawnReviewRoleForIssuePromise(
     const runId = head8 !== 'unknown'
       ? `agent-${opts.issueId.toLowerCase()}-review-${head8}`
       : `agent-${opts.issueId.toLowerCase()}-review`;
+    const reviewArtifactCapability = randomUUID();
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
     let tier1Summary: string | undefined;
@@ -625,8 +625,8 @@ async function spawnReviewRoleForIssuePromise(
       && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? modelDefaultHarness ?? 'claude-code') === 'claude-code';
 
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
-      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, reviewArtifactCapability, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
+      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, reviewArtifactCapability, contextManifestPath, tier1Summary });
 
     // PAN-1862: in discovery-fork mode the convoy is NOT spawned here — the parent
     // signals discovery-ready and handleReviewDiscoveryReady launches (and forks)
@@ -693,7 +693,7 @@ async function spawnReviewRoleForIssuePromise(
           // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
           const resumed = getAgentStateSync(reviewAgentId);
           if (resumed) {
-            resumed.reviewRunId = runId;
+            resumed.reviewRunId = runId; resumed.reviewArtifactCapability = reviewArtifactCapability;
             // PAN-2584: arm the parent's liveness deadline for this cycle.
             resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
             await Effect.runPromise(saveAgentState(resumed));
@@ -743,7 +743,7 @@ async function spawnReviewRoleForIssuePromise(
     // guard above can tell a genuinely-running review (runId matches current
     // HEAD) from a finished-but-idle leftover (runId from an older HEAD) — see
     // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
-    run.reviewRunId = runId;
+    run.reviewRunId = runId; run.reviewArtifactCapability = reviewArtifactCapability;
     // PAN-2584: arm the parent's liveness deadline for this cycle.
     run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
     try {
