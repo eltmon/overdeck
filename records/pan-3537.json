@@ -248,6 +248,11 @@
       "reason": "feedback",
       "note": "[2026-08-04T23:26Z] uat-agent → FAILED — seq 37",
       "timestamp": "2026-08-04T23:26:40.967Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T23:33Z] uat-agent → FAILED — seq 38",
+      "timestamp": "2026-08-04T23:33:43.974Z"
     }
   ],
   "feedback": [
@@ -502,6 +507,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-04T23:26:40Z",
       "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-3537`."
+    },
+    {
+      "seq": 38,
+      "specialist": "uat-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T23:33:43Z",
+      "markdownBody": "## UAT Failure — Rework Required\n\nUAT failed — see the UAT panel for details\n\nFix the failing acceptance criteria, commit, push, and run `pan done PAN-3537`."
     }
   ],
   "scopeDrift": {
@@ -562,7 +574,7 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T23:26:40.967Z",
+  "updated": "2026-08-04T23:33:43.974Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
