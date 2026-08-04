@@ -90,7 +90,13 @@ export function getWorkAgentLifecycleStateSync(agentOrIssueId: string): WorkAgen
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  // handedOff exempts fresh-start (PAN-3543): a completed-handoff agent has
+  // "nothing to resume" by design (PAN-3334), so gating --fresh behind a
+  // resumable-session reset leaves NO forward path — pan start, --fresh, and
+  // reset-session all refused while the refusal message recommended --fresh
+  // (observed blocking PAN-3511's rework after a blocked verdict; the durable
+  // agents plane reconstructs the session pointer past reset-session, PAN-3541).
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed) && !handedOff;
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
@@ -189,7 +195,13 @@ async function getWorkAgentLifecycleStateSnapshot(agentOrIssueId: string): Promi
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
   );
-  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed);
+  // handedOff exempts fresh-start (PAN-3543): a completed-handoff agent has
+  // "nothing to resume" by design (PAN-3334), so gating --fresh behind a
+  // resumable-session reset leaves NO forward path — pan start, --fresh, and
+  // reset-session all refused while the refusal message recommended --fresh
+  // (observed blocking PAN-3511's rework after a blocked verdict; the durable
+  // agents plane reconstructs the session pointer past reset-session, PAN-3541).
+  const requiresSessionResetBeforeFreshStart = hasSavedSession && hasResumableTranscript && !hasLiveTmuxSession && hasResumableBackingState && (isStopped || isCrashed) && !handedOff;
 
   let recommendedAction: WorkAgentRecommendedAction = 'start';
   let reason: string | undefined;
