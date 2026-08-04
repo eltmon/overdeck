@@ -1264,20 +1264,20 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T17:46:30.764Z",
+  "updated": "2026-08-04T17:57:00.084Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "skipped",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T17:36:33.375Z",
-    "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-allowlist.txt\n  - src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts\n  - src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts\n  - tests/cli/commands/specialists/done.test.ts\n  - tests/unit/cli/state-migrate-cancellation.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n  - tests/unit/lib/agents/spawn-flywheel-provenance.test.ts\n  - tests/unit/lib/harness-resolve.test.ts\n  - tests/unit/lib/review-status.test.ts",
+    "updatedAt": "2026-08-04T17:56:59.980Z",
+    "reviewNotes": "Approved: no blocking findings; all 26 in-PR requirements are implemented",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -1296,8 +1296,21 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
-    "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
-    "reviewSpawnedAt": "2026-08-04T17:36:33.374Z"
+    "reviewSpawnedAt": "2026-08-04T17:36:33.374Z",
+    "reviewerVerdicts": {
+      "correctness": {
+        "status": "passed",
+        "atCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -1320,9 +1333,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 81885377,
-            "output": 844123,
-            "cacheRead": 198418944,
+            "input": 82577595,
+            "output": 862075,
+            "cacheRead": 206185472,
             "cacheWrite": 0
           }
         },
@@ -1389,9 +1402,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 93341796,
-          "output": 1087106,
-          "cacheRead": 245677056,
+          "input": 94034014,
+          "output": 1105058,
+          "cacheRead": 253443584,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1402,8 +1415,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 892.5201033,
-        "pricingAsOf": "2026-08-04T17:36:34.017Z"
+        "usd": 900.4030173,
+        "pricingAsOf": "2026-08-04T17:57:00.070Z"
       }
     },
     "merges": [
@@ -1603,5 +1616,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
