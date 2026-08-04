@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T00:50:01.605Z",
+  "updated": "2026-08-04T00:55:26.121Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -80,8 +80,16 @@
     }
   ],
   "tasks": {
-    "sequence": 14,
-    "claims": {},
+    "sequence": 15,
+    "claims": {
+      "infra-breaker-consult": {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 879907,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T00:55:26.121Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -206,6 +214,6 @@
     "feedback-target-consult.feedback-target-consult.ac2": "completed",
     "feedback-target-consult.feedback-target-consult.ac3": "completed",
     "feedback-target-consult.feedback-target-consult.ac4": "completed",
-    "infra-breaker-consult": "pending"
+    "infra-breaker-consult": "running"
   }
 }
