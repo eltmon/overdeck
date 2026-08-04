@@ -37,12 +37,14 @@ import {
   type ParkedOrbit,
   type ParkedRow,
 } from '../parked/resolver.js';
-import { clearWorkspaceStuck, dispatchReviewHostSide, setReviewStatusSync } from '../review-status.js';
+import { clearWorkspaceStuck, dispatchReviewHostSide, getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { sessionExistsSync } from '../tmux.js';
 import { decideAutonomousRedrive } from './redrive-gate.js';
 import { writeFeedbackFile } from './feedback-writer.js';
 import { spawnWorkAgentThroughAgentsEndpoint } from './work-agent-start.js';
 import { getCloisterEventStore } from './event-store-provider.js';
+import { readMemoizedArtifactVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
+import { attemptArtifactVerdictRestore, type ArtifactVerdictRestoreResult } from './verdict-restore.js';
 import {
   clearSweeperRowState,
   readSweeperRowState,
@@ -87,6 +89,9 @@ export interface StallSweeperDeps {
   isAgentLive?: (agentId: string) => boolean;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
+  /** PAN-3511: the verdict of record, consulted before any stuck-flag action. */
+  readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
+  restoreVerdict?: (issueId: string) => Promise<ArtifactVerdictRestoreResult>;
 }
 
 interface ScanOutcome {
@@ -178,6 +183,18 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
+  // Memoized: the patrol walks the whole parked population every deacon cycle,
+  // and re-stat'ing the same run dirs each pass buys nothing.
+  const readArtifact = deps.readArtifact ?? ((issueId: string) => readMemoizedArtifactVerdict(issueId));
+  const restoreVerdict = deps.restoreVerdict
+    ?? ((issueId: string) => attemptArtifactVerdictRestore(issueId, {
+      caller: 'stall-sweeper',
+      // The restore door owns no review-status import (cycle) — we lend it ours.
+      deps: {
+        getStatus: getReviewStatusSync,
+        setStatus: (id, update) => { setReviewStatusSync(id, update); },
+      },
+    }));
 
   const rows = await resolveRows();
   const outcome: ScanOutcome = { actions: [], escalations: [] };
@@ -230,6 +247,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 
     const acted = await sweepRow(row, state, now, {
       spawn, stop, message, writeFeedback, dispatchReview, clearStuck, resetMerge, isAgentLive, emitActivity, emitEvent,
+      readArtifact, restoreVerdict,
     }, outcome);
     if (acted) {
       recordAction(issueId, orbit, state, now);
@@ -253,6 +271,8 @@ interface SweepActions {
   isAgentLive: (agentId: string) => boolean;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
+  readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
+  restoreVerdict: (issueId: string) => Promise<ArtifactVerdictRestoreResult>;
 }
 
 async function resumeWorkAgentWithFeedback(
@@ -349,6 +369,26 @@ async function sweepRow(
 
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
+
+      // PAN-3511: the verdict of record is consulted BEFORE every branch below.
+      // Ordering is the whole point — consulting after the re-drive would let a
+      // passed artifact still push a rework message at the work agent before the
+      // restore short-circuited, which is the wipe this issue exists to stop.
+      const artifact = actions.readArtifact(issueId);
+      if (artifact?.verdict === 'passed') {
+        const restore = await actions.restoreVerdict(issueId);
+        if (restore.outcome === 'restored') {
+          actions.clearStuck(issueId);
+          actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'verdict-restored', verdict: artifact.verdict });
+          act(`sweeper restored ${issueId} from a fresh passed review artifact and cleared the stuck flag — the review had already finished, so no message was sent to the work agent`);
+          return true;
+        }
+        // Blocked by the head guard: the artifact still proves a review FINISHED,
+        // so re-driving is the same mistake. The restore door already reported it.
+        outcome.actions.push(`sweeper: ${issueId} left parked — a fresh passed artifact could not be restored (${restore.outcome})`);
+        return false;
+      }
+
       if (reason === 'review_infrastructure_failure') {
         actions.clearStuck(issueId);
         await actions.dispatchReview(issueId);
@@ -358,7 +398,12 @@ async function sweepRow(
       }
       if (reason === 'feedback_delivery_needs_you' || reason === 'verification_stuck') {
         const summary = reason === 'verification_stuck' ? `Verification exhausted for ${issueId}` : `Review/test feedback delivery for ${issueId}`;
-        const result = await resumeWorkAgentWithFeedback(row, 'rework', summary, `## Pipeline Rework Required\n\n${row.parkReason}.\n\nAddress the pending feedback in \`.pan/feedback\`, commit, push, and run \`pan done ${issueId}\`.`, actions);
+        // A blocked/failed artifact holds the reviewer's actual blocker. Hand the
+        // agent that text instead of a pointer at a directory it has to go read.
+        const body = artifact?.notes
+          ? `## Pipeline Rework Required\n\n${row.parkReason}.\n\nThe review verdict of record says:\n\n> ${artifact.notes}\n\nAddress it, commit, push, and run \`pan done ${issueId}\`.`
+          : `## Pipeline Rework Required\n\n${row.parkReason}.\n\nAddress the pending feedback in \`.pan/feedback\`, commit, push, and run \`pan done ${issueId}\`.`;
+        const result = await resumeWorkAgentWithFeedback(row, 'rework', summary, body, actions);
         if (!result.ok) {
           outcome.actions.push(`sweeper: ${issueId} stuck re-drive ${result.note}`);
           return false;

@@ -36,6 +36,8 @@ import {
 } from '../stall-sweeper.js';
 import { readSweeperRowState, writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
 import type { ParkedRow } from '../../parked/resolver.js';
+import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
+import type { ArtifactVerdictRestoreResult } from '../verdict-restore.js';
 
 function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
   return {
@@ -60,29 +62,51 @@ interface Harness {
     review: string[];
     clearStuck: string[];
     resetMerge: string[];
+    feedbackBodies: string[];
+    restore: string[];
     events: { type: string; payload: Record<string, unknown> }[];
     activity: { level: string; issueId?: string; message: string }[];
   };
 }
 
-function harness(rows: ParkedRow[], opts: { liveAgents?: string[] } = {}): Harness {
+function harness(
+  rows: ParkedRow[],
+  opts: {
+    liveAgents?: string[];
+    /** PAN-3511: the verdict of record the sweeper will find, if any. */
+    artifact?: SynthesisArtifactVerdict | null;
+    restoreOutcome?: ArtifactVerdictRestoreResult['outcome'];
+  } = {},
+): Harness {
   const calls: Harness['calls'] = {
     spawn: [], stop: [], message: [], feedback: [], review: [], clearStuck: [], resetMerge: [], events: [], activity: [],
+    feedbackBodies: [], restore: [],
   };
   const live = new Set(opts.liveAgents ?? []);
+  const artifact = opts.artifact ?? null;
   const deps: StallSweeperDeps = {
     now: NOW,
     resolveRows: async () => rows,
     spawnWorkAgent: async (issueId) => { calls.spawn.push(issueId); return { spawned: true }; },
     stopAgent: async (agentId) => { calls.stop.push(agentId); },
     messageAgent: async (agentId, text) => { calls.message.push(`${agentId}::${text}`); return { delivered: true, queuedToMail: false }; },
-    writeFeedback: async (issueId, stage, summary) => { calls.feedback.push(`${issueId}::${stage}::${summary}`); },
+    writeFeedback: async (issueId, stage, summary, markdownBody) => {
+      calls.feedback.push(`${issueId}::${stage}::${summary}`);
+      calls.feedbackBodies.push(markdownBody);
+    },
     dispatchReview: async (issueId) => { calls.review.push(issueId); },
     clearStuck: (issueId) => { calls.clearStuck.push(issueId); },
     resetMergeForEvaluation: (issueId) => { calls.resetMerge.push(issueId); },
     isAgentLive: (agentId) => live.has(agentId),
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
+    readArtifact: () => artifact,
+    restoreVerdict: async (issueId) => {
+      calls.restore.push(issueId);
+      const outcome = opts.restoreOutcome ?? 'restored';
+      if (outcome === 'no-artifact' || !artifact) return { outcome: 'no-artifact' };
+      return { outcome, artifact };
+    },
   };
   return { deps, calls };
 }
@@ -142,6 +166,67 @@ describe('runStallSweeperPatrol — per-orbit actions', () => {
     expect(calls.feedback[0]).toContain('PAN-1::rework');
     expect(calls.spawn).toEqual(['PAN-1']);
     expect(calls.clearStuck).toEqual(['PAN-1']);
+  });
+
+  // PAN-3511 — the verdict of record outranks the stuck flag.
+  it.each([
+    'review_infrastructure_failure',
+    'feedback_delivery_needs_you',
+    'verification_stuck',
+  ])('stuck-flag %s + a fresh PASSED artifact: unparks silently, zero messages (ac1)', async (stuckReason) => {
+    // A reviewer that already approved must never be re-driven. The consult runs
+    // ahead of every branch, so no rework text reaches the agent and no fresh
+    // review is dispatched over a verdict that already exists.
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason } })],
+      { artifact: { verdict: 'passed', mtimeMs: NOW - 60_000 }, liveAgents: ['agent-pan-1'] },
+    );
+    const actions = await runStallSweeperPatrol(deps);
+
+    expect(calls.message).toEqual([]);
+    expect(calls.spawn).toEqual([]);
+    expect(calls.review).toEqual([]);
+    expect(calls.clearStuck).toEqual(['PAN-1']);
+    expect(calls.events.some((e) => e.type === 'sweep.unparked' && e.payload['action'] === 'verdict-restored')).toBe(true);
+    expect(actions.some((a) => a.includes('fresh passed review artifact'))).toBe(true);
+  });
+
+  it('stuck-flag + a PASSED artifact the head guard blocks: stays parked, still zero messages (ac1)', async () => {
+    // The restore door reports the mismatch itself; the sweeper must not treat a
+    // failed restore as licence to re-drive a review that demonstrably finished.
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'verification_stuck' } })],
+      { artifact: { verdict: 'passed', headSha: 'aaaaaaa1', mtimeMs: NOW - 60_000 }, restoreOutcome: 'blocked-by-head-guard' },
+    );
+    await runStallSweeperPatrol(deps);
+
+    expect(calls.message).toEqual([]);
+    expect(calls.spawn).toEqual([]);
+    expect(calls.clearStuck).toEqual([]);
+    expect(calls.events.some((e) => e.type === 'sweep.unparked')).toBe(false);
+  });
+
+  it('stuck-flag + a fresh BLOCKED artifact: re-drives with the reviewer blocker, not a directory pointer (ac2)', async () => {
+    const { deps, calls } = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
+      { artifact: { verdict: 'blocked', notes: 'null deref in the parser', mtimeMs: NOW - 60_000 } },
+    );
+    await runStallSweeperPatrol(deps);
+
+    expect(calls.spawn).toEqual(['PAN-1']);
+    expect(calls.clearStuck).toEqual(['PAN-1']);
+    expect(calls.feedbackBodies[0]).toContain('null deref in the parser');
+    expect(calls.feedbackBodies[0]).not.toContain('Address the pending feedback in');
+  });
+
+  it('stuck-flag + NO artifact: the rework body keeps its pending-feedback pointer (ac3)', async () => {
+    // The one-directional rule — an absent artifact changes nothing.
+    const { deps, calls } = harness([parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'verification_stuck' } })]);
+    await runStallSweeperPatrol(deps);
+
+    expect(calls.restore).toEqual([]);
+    expect(calls.spawn).toEqual(['PAN-1']);
+    expect(calls.feedbackBodies[0]).toContain('Address the pending feedback in `.pan/feedback`');
   });
 
   it('conflicts: resumes the work agent with conflict-resolution feedback', async () => {

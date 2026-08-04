@@ -42,10 +42,36 @@
  */
 import { rehydrateHeadAnchor } from '../git-utils.js';
 import { emitActivityEntryOnce, type ActivityEmitOutcome, type EmitActivityOptions } from '../activity-logger.js';
-import { getReviewStatusSync, setReviewStatusSync, type ReviewStatusUpdate } from '../review-status.js';
-import type { ReviewStatus } from '../review-status-reconcile.js';
 import { getCloisterEventStore } from './event-store-provider.js';
 import { readLatestSynthesisVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
+
+/**
+ * The row fields this door reads, and the update it writes, declared
+ * structurally on purpose. `review-status.ts` reaches up into
+ * `cloister/feedback-target.ts`, which now calls this door — so importing the
+ * review-status types or accessors here would close an import cycle that Node's
+ * strict ESM rejects at runtime. Callers supply the accessors from their own
+ * review-status import instead, which also states the honest contract: this
+ * module is a decision function over injected state access, not a store client.
+ */
+export interface VerdictRestoreRow {
+  lastVerifiedCommit?: string | undefined;
+  stuckReason?: string | undefined;
+}
+
+export interface VerdictRestoreUpdate {
+  reviewStatus: SynthesisArtifactVerdict['verdict'];
+  reviewNotes: string | undefined;
+  reviewRetryCount: number;
+  recoveryStartedAt: undefined;
+  // Branded HeadAnchor, sourced from git-utils — which is outside the cycle, so
+  // the door can still be precise about the one anchor it writes.
+  reviewedAtCommit?: ReturnType<typeof rehydrateHeadAnchor>;
+  stuck?: boolean;
+  stuckReason?: undefined;
+  stuckAt?: undefined;
+  stuckDetails?: undefined;
+}
 
 export type ArtifactVerdictRestoreOutcome = 'no-artifact' | 'blocked-by-head-guard' | 'restored';
 
@@ -60,8 +86,8 @@ export interface ArtifactVerdictRestoreDeps {
     issueId: string,
     options: { now?: number; workspacePath?: string },
   ): SynthesisArtifactVerdict | null;
-  getStatus(issueId: string): ReviewStatus | null;
-  setStatus(issueId: string, update: ReviewStatusUpdate): void;
+  getStatus(issueId: string): VerdictRestoreRow | null;
+  setStatus(issueId: string, update: VerdictRestoreUpdate): void;
   emitEvent(type: string, payload: Record<string, unknown>): void;
   emitActivity(options: EmitActivityOptions & { id: string }): Promise<ActivityEmitOutcome>;
   now(): number;
@@ -76,7 +102,9 @@ export interface ArtifactVerdictRestoreOptions {
   /** Recovery path attempting the restore — recorded on the blocked event. */
   caller?: string;
   workspacePath?: string;
-  deps?: Partial<ArtifactVerdictRestoreDeps>;
+  /** getStatus/setStatus are required — see VerdictRestoreRow for why. */
+  deps: Pick<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'>
+  & Partial<Omit<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'>>;
 }
 
 /**
@@ -117,10 +145,8 @@ function defaultEmitEvent(type: string, payload: Record<string, unknown>): void 
   }
 }
 
-const DEFAULT_DEPS: ArtifactVerdictRestoreDeps = {
+const DEFAULT_DEPS: Omit<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'> = {
   readArtifact: readLatestSynthesisVerdict,
-  getStatus: getReviewStatusSync,
-  setStatus: (issueId, update) => { setReviewStatusSync(issueId, update); },
   emitEvent: defaultEmitEvent,
   // Called through rather than bound, so importing this module does not force
   // every transitive importer's test to mock an export only the blocked path uses.
@@ -137,7 +163,7 @@ const DEFAULT_DEPS: ArtifactVerdictRestoreDeps = {
  */
 export async function attemptArtifactVerdictRestore(
   issueId: string,
-  options: ArtifactVerdictRestoreOptions = {},
+  options: ArtifactVerdictRestoreOptions,
 ): Promise<ArtifactVerdictRestoreResult> {
   const deps: ArtifactVerdictRestoreDeps = { ...DEFAULT_DEPS, ...options.deps };
 
@@ -187,7 +213,7 @@ export async function attemptArtifactVerdictRestore(
     return { outcome: 'blocked-by-head-guard', artifact };
   }
 
-  const update: ReviewStatusUpdate = {
+  const update: VerdictRestoreUpdate = {
     reviewStatus: artifact.verdict,
     reviewNotes: artifact.notes,
     reviewRetryCount: 0,

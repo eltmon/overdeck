@@ -275,9 +275,16 @@ export async function surfaceIssueFeedbackNeedsYou(
     const restore = await (async () => {
       try {
         const { attemptArtifactVerdictRestore } = await import('./verdict-restore.js');
+        const { getReviewStatusSync, setReviewStatusSync } = await import('../review-status.js');
         return await attemptArtifactVerdictRestore(issueId, {
           caller: 'feedback-target',
           clearStuckReason: FEEDBACK_DELIVERY_STUCK_REASON,
+          // The restore door owns no review-status import (it would close an
+          // import cycle through this very module) — we lend it ours.
+          deps: {
+            getStatus: getReviewStatusSync,
+            setStatus: (id, update) => { setReviewStatusSync(id, update); },
+          },
         });
       } catch (err) {
         console.warn(

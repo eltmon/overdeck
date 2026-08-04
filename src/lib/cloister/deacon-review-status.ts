@@ -340,17 +340,21 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
   return false;
 }
 
+/** PAN-3511: the restore door owns no review-status import (cycle) — callers lend it theirs. */
+const reviewStatusRowAccess = { getStatus: getReviewStatusSync, setStatus: (id: string, u: ReviewStatusUpdate) => { setReviewStatusSync(id, u); } };
+
 /**
- * PAN-3511: retries exhausted while a verdict already sits on disk means recovery
- * was chasing a review that had already FINISHED, so tripping the breaker would
- * strand it behind an operator gate. True means the caller must skip its stuck
- * mark. Fails toward the mark — a reader error returns false so today's protection survives.
+ * PAN-3511: retries exhausted while a verdict already sits on disk means recovery was
+ * chasing a review that had already FINISHED, so tripping the breaker would strand it
+ * behind an operator gate. True means the caller must skip its stuck mark. Fails toward
+ * the mark — a reader error returns false so today's protection survives.
  */
 async function artifactSupersededBreaker(issueId: string, actions: string[]): Promise<boolean> {
   try {
     const restore = await attemptArtifactVerdictRestore(issueId, {
       caller: 'review-infra-breaker',
       clearStuckReason: 'review_infrastructure_failure',
+      deps: reviewStatusRowAccess,
     });
     if (restore.outcome === 'no-artifact') return false;
     actions.push(`Review-infra breaker for ${issueId} superseded by a fresh ${restore.artifact.verdict} artifact (${restore.outcome})`);
@@ -601,7 +605,7 @@ async function reconcileReviewStatusOrphan(
       const restore = await attemptArtifactVerdictRestore(issueId, {
         caller: 'orphan-reset',
         clearStuckReason: 'review_infrastructure_failure',
-        deps: { readArtifact: (id, o) => { const a = readLatestSynthesisVerdict(id, o); return a?.verdict === 'passed' ? a : null; } },
+        deps: { ...reviewStatusRowAccess, readArtifact: (id, o) => { const a = readLatestSynthesisVerdict(id, o); return a?.verdict === 'passed' ? a : null; } },
       });
       if (restore.outcome === 'restored') {
         actions.push(
