@@ -306,7 +306,6 @@
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/parked.ts",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
     "declaredScopeUntouched": [
@@ -327,17 +326,16 @@
     "actualChangedFiles": [
       "docs/RESOURCE-GOVERNOR.md",
       "src/cli/commands/parked.ts",
-      "src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts",
       "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
       "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
       "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
       "src/dashboard/frontend/src/lib/system-health-attention.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
-    "recordedAt": "2026-08-02T23:23:05.476Z"
+    "recordedAt": "2026-08-04T18:13:32.819Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T18:13:12.805Z",
+  "updated": "2026-08-04T18:13:32.820Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "blocked",
