@@ -167,7 +167,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T15:21:32.768Z",
+  "updated": "2026-08-04T15:21:38.811Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -177,29 +177,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T15:21:31.965Z",
+    "updatedAt": "2026-08-04T15:21:38.802Z",
     "reviewNotes": "Persisted artifact capability is forgeable; existing DB upgrades, feedback-delivery gates, and polyrepo head anchors are also broken",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
+    "reviewedAtCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
     "lastVerifiedCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
-    "reviewSpawnedAt": "2026-08-04T15:09:06.690Z",
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438"
-      }
-    }
+    "reviewSpawnedAt": "2026-08-04T15:09:06.690Z"
   },
   "closeOut": {
     "usage": {
@@ -277,7 +260,7 @@
       },
       "costAtCloseOut": {
         "usd": 137.8432386,
-        "pricingAsOf": "2026-08-04T15:21:31.986Z"
+        "pricingAsOf": "2026-08-04T15:21:38.806Z"
       }
     },
     "merges": [
