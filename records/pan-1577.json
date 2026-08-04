@@ -1298,7 +1298,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T18:21:24.237Z",
+  "updated": "2026-08-04T18:24:36.797Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1309,9 +1309,10 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z",
-    "updatedAt": "2026-08-04T18:21:18.541Z",
+    "updatedAt": "2026-08-04T18:24:36.764Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "testNotes": "Automated gates at HEAD 1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef: typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet) PASS. lint (eslint + all 18 sub-lints incl. circular-deps, ratchet-audit, quarantine-audit, skills, slash-commands, file-size) PASS clean on a controlled rerun; two transient failures (skill-CLI flake, build:cli heap OOM) traced to this machine's extreme concurrent load (uptime load average 28-37 across ~40 tmux sessions, swap saturated) and confirmed non-defects by isolating and rerunning the failing step successfully. Root vitest: 1403 files total, 53 failed / 1347 passed / 3 skipped, 13184/13294 tests passed. All 53 failures share one signature -- 'Hook timed out in 5000ms' inside beforeEach setupOverdeckTestDb() -- except one (operator-interventions.test.ts AC3, whose own last commit message documents it as a known 409-flakes-to-500 flake, unrelated to this branch's diff). Confirmed load-induced: reran a 17-file diverse sample spanning conversations/memory/workspaces/merge-sync/schema-audit/agents-state-db (including src/cli/commands/conversations/__tests__/move.test.ts, the file most relevant to this branch) with --testTimeout=30000 --hookTimeout=30000 -- all passed cleanly with 3-7s actual runtime, well inside the extended window, and zero code changes. Frontend vitest (full suite, not just the 4 files package.json's npm test targets): 307/307 files, 3013/3013 tests passed clean.",
+    "uatNotes": "Built this branch's dashboard (npm run build + build:dashboard:server:bundle) and ran it as an isolated instance on port 3211 with a throwaway OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1 -- did NOT touch or restart the live production dashboard on :3011 (which is actively orchestrating 30+ running agents). Registered two throwaway git-backed projects (UAT Proj A, UAT Proj B) and seeded one test conversation (cwd under UAT Proj A) directly via createConversation() in src/lib/overdeck/conversations.ts against the isolated DB. Drove both move surfaces via Playwright against http://127.0.0.1:3211: (1) Menu-picker move: opened the 3-dot 'More actions' menu on the conversation row, clicked Move, confirmed the project-picker submenu showed 'UAT Proj A' disabled (current project) and 'UAT Proj B' selectable, clicked UAT Proj B -- got a visible 'Moved \"UAT Move Test Conversation\" to UAT Proj B' toast, UAT Proj A's Command Deck immediately showed 'No conversations yet' (live re-group, no refresh), and GET /api/conversations confirmed server-side projectKey='uat-proj-b' while cwd remained pinned to the original uat-proj-a path (JSONL/cwd hazard H1 verified untouched). (2) Native drag-and-drop: navigated to UAT Proj B's Command Deck, dragged the conversation row onto the 'UAT Proj A' sidebar rail item, and confirmed UAT Proj B's Command Deck flipped to 'No conversations yet' with server-side projectKey='uat-proj-a' and cwd still unchanged. Both flows exercised drag-drop-move.ac4's required end-to-end verification with real UI interaction plus server-side confirmation, matching AC1-AC3 of both menu-move and drag-drop-move xBRIEF items. Screenshots captured (after-menu-move.png, after-drag-drop.png). Isolated UAT dashboard instance was stopped after verification.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
     "reviewRequestedAt": "2026-08-04T18:21:17.510Z",
@@ -1378,10 +1379,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1208,
-            "output": 225905,
-            "cacheRead": 131456021,
-            "cacheWrite": 1738746
+            "input": 1224,
+            "output": 231108,
+            "cacheRead": 133583234,
+            "cacheWrite": 1753929
           }
         },
         "work": {
@@ -1413,15 +1414,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5073,
-          "output": 989733,
-          "cacheRead": 964708030,
-          "cacheWrite": 32538423
+          "input": 5089,
+          "output": 994936,
+          "cacheRead": 966835243,
+          "cacheWrite": 32553606
         }
       },
       "costAtCloseOut": {
-        "usd": 917.4718493,
-        "pricingAsOf": "2026-08-04T18:21:24.229Z"
+        "usd": 917.9873123,
+        "pricingAsOf": "2026-08-04T18:24:36.787Z"
       }
     },
     "merges": [
