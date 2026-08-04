@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "agentId": "strike-pan-3528",
+  "issueId": "PAN-3528",
+  "projectKey": "panopticon-cli",
+  "role": "strike",
+  "origin": {
+    "machineId": "eltmon-z790",
+    "overdeckHome": "/home/eltmon/.overdeck"
+  },
+  "launch": {
+    "harness": "claude-code",
+    "model": "claude-opus-5",
+    "workspace": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3528-strike",
+    "branch": null
+  },
+  "sessions": [
+    {
+      "id": "abbe38fd-8f12-41d0-a738-ba656b45f9fc",
+      "startedAt": "2026-08-04T01:36:06.464Z",
+      "reason": "spawn"
+    }
+  ],
+  "lifecycle": [
+    {
+      "at": "2026-08-04T01:36:06.464Z",
+      "event": "spawned"
+    }
+  ],
+  "archiveRef": null,
+  "recovered": false
+}
