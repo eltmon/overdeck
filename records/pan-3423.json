@@ -335,23 +335,55 @@
     "recordedAt": "2026-08-04T18:13:32.819Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T18:13:32.820Z",
+  "updated": "2026-08-04T18:13:35.023Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:02:25.891Z",
+    "updatedAt": "2026-08-04T18:13:35.020Z",
     "reviewNotes": "Changed no-loss audit still leaves named UI acceptance criteria unproved",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
-    "reviewSpawnedAt": "2026-08-04T17:52:36.890Z"
+    "reviewSpawnedAt": "2026-08-04T17:52:36.890Z",
+    "reviewRequestedAt": "2026-08-04T18:13:35.020Z",
+    "scopeDrift": {
+      "outsideDeclaredScope": [
+        "src/cli/commands/parked.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ],
+      "declaredScopeUntouched": [
+        "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+        "src/lib/agents/__tests__/agent-health.test.ts",
+        "src/lib/agents/health.ts"
+      ],
+      "declaredScope": [
+        "docs/RESOURCE-GOVERNOR.md",
+        "src/dashboard/frontend/src/components/SystemHealthPill.test.tsx",
+        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+        "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+        "src/dashboard/frontend/src/lib/system-health-attention.ts",
+        "src/lib/agents/__tests__/agent-health.test.ts",
+        "src/lib/agents/health.ts"
+      ],
+      "actualChangedFiles": [
+        "docs/RESOURCE-GOVERNOR.md",
+        "src/cli/commands/parked.ts",
+        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+        "src/dashboard/frontend/src/lib/system-health-attention.test.ts",
+        "src/dashboard/frontend/src/lib/system-health-attention.ts",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ],
+      "recordedAt": "2026-08-04T18:13:32.819Z"
+    }
   },
   "closeOut": {
     "usage": {
