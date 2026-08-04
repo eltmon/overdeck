@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T01:17:09.371Z",
+  "updated": "2026-08-04T01:33:54.357Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -80,16 +80,8 @@
     }
   ],
   "tasks": {
-    "sequence": 17,
-    "claims": {
-      "sweeper-consult": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 1267287,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T01:17:09.371Z"
-      }
-    },
+    "sequence": 18,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -177,6 +169,16 @@
         "itemId": "infra-breaker-consult",
         "outcome": "completed",
         "releasedAt": "2026-08-04T01:13:54.536Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 1267287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T01:17:09.371Z",
+        "itemId": "sweeper-consult",
+        "outcome": "completed",
+        "releasedAt": "2026-08-04T01:33:54.357Z"
       }
     ],
     "statusReasons": {
@@ -229,6 +231,10 @@
     "infra-breaker-consult.infra-breaker-consult.ac2": "completed",
     "infra-breaker-consult.infra-breaker-consult.ac3": "completed",
     "infra-breaker-consult.infra-breaker-consult.ac4": "completed",
-    "sweeper-consult": "running"
+    "sweeper-consult": "completed",
+    "sweeper-consult.sweeper-consult.ac1": "completed",
+    "sweeper-consult.sweeper-consult.ac2": "completed",
+    "sweeper-consult.sweeper-consult.ac3": "completed",
+    "sweeper-consult.sweeper-consult.ac4": "completed"
   }
 }
