@@ -517,7 +517,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T23:07:20.042Z",
+  "updated": "2026-08-04T23:08:09.877Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -528,7 +528,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T23:01:36.041Z",
+    "updatedAt": "2026-08-04T23:08:09.869Z",
     "reviewNotes": "Dashboard restarts invalidate active review attestation authority",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
@@ -540,9 +540,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 97856,
-            "output": 38698,
-            "cacheRead": 16755,
+            "input": 102982,
+            "output": 41606,
+            "cacheRead": 20659,
             "cacheWrite": 0
           }
         },
@@ -554,9 +554,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 763122,
-            "output": 18881,
-            "cacheRead": 9840640,
+            "input": 1165064,
+            "output": 22153,
+            "cacheRead": 10234880,
             "cacheWrite": 0
           }
         },
@@ -627,9 +627,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 97856,
-          "output": 38698,
-          "cacheRead": 16755,
+          "input": 102982,
+          "output": 41606,
+          "cacheRead": 20659,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -639,15 +639,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 3697726,
-          "output": 153052,
-          "cacheRead": 30376960,
+          "input": 4099668,
+          "output": 156324,
+          "cacheRead": 30771200,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 299.5690865,
-        "pricingAsOf": "2026-08-04T23:01:36.048Z"
+        "usd": 300.7416389,
+        "pricingAsOf": "2026-08-04T23:08:09.873Z"
       }
     },
     "merges": [
@@ -656,7 +656,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
