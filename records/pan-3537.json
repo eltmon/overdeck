@@ -23,9 +23,22 @@
       "timestamp": "2026-08-04T09:26:33.523Z",
       "reason": "end",
       "note": "Anomalies: none. Added live default-branch GitHub Actions aggregation through the shared event/reducer path, boot and 15-minute REST repair, and a compact Command Deck project-row CI chip. Verified full typecheck, lint, 13,351 tests, isolated Node 22 boot, and Playwright rendering; branch is clean and fully pushed."
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T09:51Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-04T09:51:10.995Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-04T09:51:10Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3537\n\n# Review Synthesis — PAN-3537 — 2026-08-04T10:00:00Z\n\n## Verdict: CHANGES REQUESTED — CI state is not anchored to the authoritative default-branch head\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/context.json\n- Branch: feature/3537\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537\n- HEAD reviewed: 7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/correctness.md | 2 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/requirements.md | 2 |\n\n## Blocking Findings\n\n### [correctness, requirements] CI state is not anchored to the authoritative default-branch head — `src/lib/overdeck/project-ci-fill.ts:50`, `src/lib/ci/project-ci-observation.ts:44`, `packages/contracts/src/event-reducers.ts:687`\nThe REST fill treats the newest returned workflow run as the branch tip, so a new default-branch commit with no matching Actions run leaves the previous commit displayed indefinitely. The webhook path accepts any suite whose `head_branch` matches the configured branch, and the reducer uses local observation arrival time to order different SHAs, so a delayed suite event from a superseded commit can replace the current commit and resist later repair. Resolve the actual default-branch head independently, represent the no-suite case explicitly, and allow cross-SHA replacement only when the observation is verified against that authoritative head.\n\n### [requirements] The REST repair does not guarantee all suites for the selected SHA — `src/lib/overdeck/project-ci-fill.ts:46`\nThe repair requests only `per_page=20` and does not paginate. A commit with more than 20 workflow runs is seeded as an incomplete suite set, so the chip can undercount workflows or report success while an omitted workflow is queued, running, or failed. Resolve the branch-head SHA first and collect the complete Actions run set for that SHA before publishing the replacement projection.\n\n### [performance] The periodic repair persists and broadcasts unchanged observations forever — `src/lib/overdeck/project-ci-fill.ts:82`\nEvery 15-minute refill appends every fetched observation even when the commit, status, conclusion, and URL are unchanged. Each append creates persistent event-store work, WebSocket traffic, reducer work, and frontend updates, so database and replay volume grow with dashboard uptime rather than actual CI transitions. Make repair idempotent after the unconditional boot seed and add a test proving a second identical refill emits zero events.\n\n## Non-blocking Findings\n\n### [correctness] Same-SHA observations can regress an individual suite — `packages/contracts/src/event-reducers.ts:675`\nThe reducer unconditionally overwrites a suite on the same SHA without retaining a per-suite causal timestamp, so delayed observations can move a completed suite back to queued or in-progress. Carry and compare the suite update timestamp before replacing the suite entry.\n\n### [performance] Prevent overlapping full-project refill sweeps — `src/lib/overdeck/project-ci-fill.ts:109`\nThe interval starts a new fire-and-forget sweep even if the previous sweep is still running. Add a single-flight guard or schedule the next run after completion so a large or slow project registry cannot create concurrent refill sweeps.\n\n### [performance] Avoid synchronous project-registry lookup on every check-suite webhook — `src/lib/ci/project-ci-observation.ts:19`\nThe webhook path calls `listProjectsSync()` before the existing tracked-repository return, adding synchronous registry work to every check-suite delivery. Use the existing project-config invalidation mechanism to maintain a repository-to-project lookup outside the request hot path.\n\n## Clean Sub-roles\n\n- Security found no vulnerabilities or advisories in the webhook trust boundary, `gh` invocation, event folding, or chip navigation/rendering.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/.pan/review/agent-pan-3537-review-7f50cf98/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3537 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [],
@@ -84,7 +97,7 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T09:51:10.231Z",
+  "updated": "2026-08-04T09:51:10.996Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "blocked",
