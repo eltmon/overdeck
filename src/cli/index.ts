@@ -60,7 +60,7 @@ import { tellCommand } from './commands/tell.js';
 import { answerCommand } from './commands/answer.js';
 import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
-import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
+import { registerResetToPlannedCommand } from './commands/reset-to-planned.js'; import { registerResetSessionCommand } from './commands/reset-session.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js'; import { registerUnstickCommand } from './commands/unstick.js';
@@ -402,7 +402,7 @@ program
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-registerResetToPlannedCommand(program);
+registerResetToPlannedCommand(program); registerResetSessionCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')

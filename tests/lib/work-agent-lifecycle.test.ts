@@ -65,6 +65,8 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.canStartFresh).toBe(false);
     expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(true);
     expect(lifecycle.recommendedAction).toBe('resume');
+    expect(lifecycle.reason).toContain(`pan reset-session ${agentId}`);
+    expect(lifecycle.reason).not.toContain('--fresh');
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
