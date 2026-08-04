@@ -298,6 +298,14 @@ describe('system health UI no-loss audit', () => {
     // getBy* would fail on the section being MORE populated, not less.
     expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
     expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
+  });
+
+  it('exposes each consumer kind badge and proportional memory meter accessibly', () => {
+    hookState.current = { data: createSnapshot('critical'), isLoading: false, error: null };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Agent' })).toBeInTheDocument();
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Specialist' })).toBeInTheDocument();
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Container' })).toBeInTheDocument();
@@ -435,6 +443,31 @@ describe('system health UI no-loss audit', () => {
     // id and the reason message render it, so match on presence rather than
     // uniqueness — the audited property is that the row is visible at all.
     expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
+  });
+
+  it('exposes the singleton attention severity, title, and canonical issue label', () => {
+    hookState.current = {
+      data: {
+        ...createSnapshot('critical'),
+        agents: [{
+          id: 'agent-stalled',
+          issueId: 'PAN-1',
+          status: 'stalled',
+          reasons: [{
+            code: 'agent.runtime.inactive.stalled',
+            domain: 'agent',
+            severity: 'warning',
+            message: 'agent-stalled has produced no activity for 35 min.',
+          }],
+        }],
+      },
+      isLoading: false,
+      error: null,
+    };
+    renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    const dialog = screen.getByRole('dialog', { name: 'System health' });
     expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
     expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
