@@ -327,6 +327,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-04T18:31:18.220Z"
+    },
+    {
+      "timestamp": "2026-08-04T18:51:51.388Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [],
@@ -362,7 +367,7 @@
     "recordedAt": "2026-08-04T18:51:45.736Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T18:51:46.750Z",
+  "updated": "2026-08-04T18:51:51.453Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -373,13 +378,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:51:46.748Z",
+    "updatedAt": "2026-08-04T18:51:51.381Z",
     "reviewNotes": "Verification failed at build",
     "testNotes": "Automated gates on feature/pan-3423 (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423): npm run typecheck PASSED (root, hooks, evals, dashboard, frontend guards all clean). npm run lint FAILED at lint:file-size: 'src/dashboard/server/routes/workspaces/merge-ops.ts is 1913 lines (allowed 1912)'. Root-caused: this file is untouched by PAN-3423 (git diff origin/main...HEAD --stat -- merge-ops.ts is empty; last touched by branch at fdcbcad2647, PAN-3328/#3348). origin/main advanced 2 commits past this branch's last main-merge (merge-base 5ac62149c3), including #3509 which shrank merge-ops.ts; the ratchet script compares against the live origin/main tip, so this branch's untouched copy now reads as 'grown' relative to a newer main it hasn't synced. This is branch staleness, not a defect introduced by this PR, but the configured lint gate genuinely fails as run and a main-sync/rebase is outside the test role's boundaries (no edit/commit/merge). Scoped PAN-3423 tests all pass: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention -> 3 files / 32 tests passed. Full frontend suite (src/dashboard/frontend) -> 306 files / 2986 tests passed. Full root-level `npm test` completed: 60 files / 83 tests failed, ALL with the identical signature 'Error: Hook timed out in 5000ms' inside beforeEach(() => odb = setupOverdeckTestDb()) -- a DB-fixture-setup timeout under heavy host contention (load average ~30 from ~17 concurrent Overdeck agents/workspaces on this machine at the time), not an assertion or logic failure, and none of the 60 failing files are in this PR's declared scope (tests/unit/lib/workspaces/*, src/cli/commands/conversations/__tests__/*, etc.). The in-scope file src/lib/agents/__tests__/agent-health.test.ts (FR-3, this PR's server-side change) was verified separately in isolation: 1 file / 12 tests PASSED in 152ms. Top-level status is failed on the lint gate alone, per the configured automated gates (typecheck, lint, test); the lint failure is unrelated to this PR's diff but blocks merge as configured.",
     "verificationNotes": "Verification FAILED at build (420377ms):\n\n\n> @overdeck/core@0.48.0 build\n> npm run build:contracts && npm run build:pi-extension && npm run build:ohmypi-extension && npm run build:cli && node scripts/build-post-cli.mjs\n\n\n> @overdeck/core@0.48.0 build:contracts\n> node scripts/fs-helper.mjs rmrf packages/contracts/dist && npm --prefix ./packages/contracts run build\n\n\n> @overdeck/contracts@0.48.0 build\n> cross-env NODE_OPTIONS=--max-old-space-size=16384 tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/packages/contracts/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.cjs\u001b[22m  \u001b[2m387.86 kB\u001b[22m \u001b[2m│ gzip: 62.60 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[33m[CJS]\u001b[39m 1 files, total: 387.86 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m3922ms\u001b[39m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.mjs\u001b[22m       \u001b[2m355.90 kB\u001b[22m \u001b[2m│ gzip: 60.24 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.mjs.map   \u001b[2m582.38 kB\u001b[22m \u001b[2m│ gzip: 93.00 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22mindex.d.ts.map  \u001b[2m 48.87 kB\u001b[22m \u001b[2m│ gzip:  5.87 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m      \u001b[2m823.92 kB\u001b[22m \u001b[2m│ gzip: 80.48 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[34m[ESM]\u001b[39m 4 files, total: 1.81 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4408ms\u001b[39m\n\n> @overdeck/core@0.48.0 build:pi-extension\n> npm --prefix ./packages/pi-extension run build\n\n\n> @overdeck/pi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[3\n…(218643 chars elided)…\n190.05 kB │ gzip:    18.07 kB │ map:    255.14 kB\n../../../dist/dashboard/public/assets/chunk-CSCIHK7Q-BnyS1BnJ.js                            224.84 kB │ gzip:    35.15 kB │ map:    536.96 kB\n../../../dist/dashboard/public/assets/katex-CaPXO6Cc.js                                     256.70 kB │ gzip:    76.92 kB │ map:    922.63 kB\n../../../dist/dashboard/public/assets/wolfram-Dn23U3bT.js                                   262.38 kB │ gzip:    77.63 kB │ map:    279.65 kB\n../../../dist/dashboard/public/assets/chunk-BO2N2NFS-BcpFMcdG.js                            323.83 kB │ gzip:    99.99 kB │ map:    932.91 kB\n../../../dist/dashboard/public/assets/cytoscape.esm-CgPZ79mq.js                             434.29 kB │ gzip:   137.57 kB │ map:  1,683.82 kB\n../../../dist/dashboard/public/assets/chunk-K2UTITRG-CopEAH22.js                            532.63 kB │ gzip:   178.94 kB │ map:  1,244.29 kB\n../../../dist/dashboard/public/assets/prod-B_U40C3I.js                   \n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "reviewedAtCommit": "5e2735f1597e06cc2434e504ab2105799fa9ca0c",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
+    "reviewRequestedAt": "2026-08-04T18:51:46.748Z",
     "reviewSpawnedAt": "2026-08-04T18:20:49.020Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -411,8 +417,7 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-04T18:51:45.736Z"
-    },
-    "reviewRequestedAt": "2026-08-04T18:51:46.748Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -467,10 +472,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 262,
-            "output": 71258,
-            "cacheRead": 27268356,
-            "cacheWrite": 469730
+            "input": 378,
+            "output": 79093,
+            "cacheRead": 32205895,
+            "cacheWrite": 502096
           }
         },
         "work": {
@@ -481,9 +486,9 @@
             "cacheWrite": 677817
           },
           "openai/gpt-5.6-sol": {
-            "input": 2878903,
-            "output": 194813,
-            "cacheRead": 117861888,
+            "input": 2965837,
+            "output": 205481,
+            "cacheRead": 126667776,
             "cacheWrite": 0
           }
         }
@@ -496,16 +501,16 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 35840216,
-          "output": 803750,
-          "cacheRead": 254522880,
+          "input": 35927150,
+          "output": 814418,
+          "cacheRead": 263328768,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 262,
-          "output": 71258,
-          "cacheRead": 27268356,
-          "cacheWrite": 469730
+          "input": 378,
+          "output": 79093,
+          "cacheRead": 32205895,
+          "cacheWrite": 502096
         },
         "anthropic/claude-haiku-4-5-20251001": {
           "input": 1118,
@@ -515,8 +520,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 341.8700553,
-        "pricingAsOf": "2026-08-04T18:47:55.787Z"
+        "usd": 348.1747173,
+        "pricingAsOf": "2026-08-04T18:51:51.419Z"
       }
     },
     "merges": [
