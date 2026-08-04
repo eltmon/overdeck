@@ -224,8 +224,13 @@ describe('system health UI no-loss audit', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
 
-    // Summary line (new header box)
-    expect(within(dialog).getAllByText(/All clear.*spawn headroom.*relay running.*0 stalled/)).toHaveLength(1);
+    // Summary line (new header box). getAllBy*: summaryLine() renders one
+    // string into a leaf div inside a bordered wrapper whose only child it is,
+    // so the wrapper's textContent matches identically — two nodes, one
+    // affordance. Anchoring cannot separate them; presence is the audited
+    // property, and getBy* would fail on the nesting, not on a loss.
+    expect(within(dialog).getAllByText(/^All clear .* spawn headroom .* relay running .* 0 stalled agents$/).length)
+      .toBeGreaterThan(0);
 
     // Chip row (new top status row, replaces old 8-tile status grid)
     expect(within(dialog).getByRole('img', { name: 'healthy system health' })).toBeInTheDocument();
@@ -288,6 +293,10 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
+    // The broad assertions preserve the no-loss audit's content-presence gate;
+    // the role assertions below prove each redesigned kind badge has a home.
+    expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
+    expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Agent' })).toBeInTheDocument();
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Specialist' })).toBeInTheDocument();
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Container' })).toBeInTheDocument();
@@ -421,6 +430,9 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
+    // Both the agent id and reason message may match; presence is the no-loss
+    // property, while the exact assertions below verify the redesigned row.
+    expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
     expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
     expect(within(dialog).getByText('agent-stalled · PAN-1')).toBeInTheDocument();
