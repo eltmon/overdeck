@@ -1,0 +1,67 @@
+{
+  "issueId": "PAN-2404",
+  "schemaVersion": 2,
+  "feedback": [],
+  "harness": "claude-code",
+  "model": "claude-haiku-4-5",
+  "pipeline": {
+    "issueId": "PAN-2404",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "releaseStatus": "pending",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-04T13:05:11.595Z"
+  },
+  "closeOut": {
+    "usage": {
+      "byStage": {
+        "implementation": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 0,
+            "output": 148,
+            "cacheRead": 106803,
+            "cacheWrite": 974
+          }
+        },
+        "memory-extraction": {
+          "cliproxy/gpt-5.4-mini": {
+            "input": 6628,
+            "output": 181,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          }
+        },
+        "work": {
+          "anthropic/claude-haiku-4-5-20251001": {
+            "input": 71,
+            "output": 7219,
+            "cacheRead": 2663033,
+            "cacheWrite": 205723
+          }
+        }
+      },
+      "totals": {
+        "anthropic/claude-haiku-4-5-20251001": {
+          "input": 71,
+          "output": 7367,
+          "cacheRead": 2769836,
+          "cacheWrite": 206697
+        },
+        "cliproxy/gpt-5.4-mini": {
+          "input": 6628,
+          "output": 181,
+          "cacheRead": 0,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 0.572262,
+        "pricingAsOf": "2026-08-04T13:05:11.595Z"
+      }
+    },
+    "merges": [],
+    "ranOn": "eltmon-z790"
+  },
+  "created": "2026-08-04T13:05:11.600Z",
+  "updated": "2026-08-04T13:05:11.600Z"
+}
