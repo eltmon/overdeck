@@ -1,19 +1,53 @@
 {
   "issueId": "PAN-2743",
   "schemaVersion": 2,
+  "feedback": [],
   "created": "2026-07-15T18:45:29.279Z",
-  "updated": "2026-07-15T18:45:29.279Z",
+  "updated": "2026-08-04T13:06:32.869Z",
   "pipeline": {
     "issueId": "PAN-2743",
     "reviewStatus": "pending",
     "testStatus": "pending",
+    "releaseStatus": "pending",
     "readyForMerge": false,
     "updatedAt": "2026-07-15T18:45:29.279Z"
   },
   "closeOut": {
     "usage": {
-      "byStage": {},
-      "totals": {}
+      "byStage": {
+        "codex": {
+          "openai/codex-auto-review": {
+            "input": 950997,
+            "output": 3642,
+            "cacheRead": 779136,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-sol": {
+            "input": 17089008,
+            "output": 23155,
+            "cacheRead": 16618496,
+            "cacheWrite": 0
+          }
+        }
+      },
+      "totals": {
+        "openai/codex-auto-review": {
+          "input": 950997,
+          "output": 3642,
+          "cacheRead": 779136,
+          "cacheWrite": 0
+        },
+        "openai/gpt-5.6-sol": {
+          "input": 17089008,
+          "output": 23155,
+          "cacheRead": 16618496,
+          "cacheWrite": 0
+        }
+      },
+      "costAtCloseOut": {
+        "usd": 11.356458,
+        "pricingAsOf": "2026-08-04T13:06:32.864Z"
+      }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
