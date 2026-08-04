@@ -1292,6 +1292,28 @@ export const MODEL_CAPABILITIES: Record<CapabilityModelId, ModelCapability> = {
     notes: 'Canonical DashScope ID verified from Qwen Cloud docs on 2026-05-22. Routed direct to Alibaba DashScope (Singapore intl / ap-southeast-1) via DASHSCOPE_API_KEY. Pricing placeholder pending Alibaba intl endpoint pricing.',
   },
 
+  'qwen3.8-max': {
+    model: 'qwen3.8-max',
+    provider: 'dashscope',
+    displayName: 'Qwen3.8 Max (DashScope)',
+    costPer1MTokens: 0,
+    contextWindow: 1048576,
+    skills: {
+      'code-generation': 97,
+      'code-review': 95,
+      debugging: 95,
+      planning: 96,
+      documentation: 93,
+      testing: 93,
+      security: 91,
+      performance: 91,
+      synthesis: 96,
+      speed: 68,
+      'context-length': 99,
+    },
+    notes: 'Canonical DashScope ID verified from Alibaba Cloud Model Studio docs on 2026-08-03. Preview release (2.4T MoE, always-on thinking, 1M-class context); free 1M-token Model Studio quota (90 days) on the Singapore intl endpoint (ap-southeast-1) via DASHSCOPE_API_KEY. Reported pay-as-you-go pricing $2/M in, $6/M out — cost placeholder until intl pricing is confirmed.',
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // XAI (GROK) MODELS
   // ═══════════════════════════════════════════════════════════════════════════

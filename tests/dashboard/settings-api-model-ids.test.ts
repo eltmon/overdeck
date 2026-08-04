@@ -8,5 +8,6 @@ describe('settings API test model IDs', () => {
     expect(MODEL_API_IDS['qwen3-coder-plus']?.apiModel).toBe('qwen3-coder-plus');
     expect(MODEL_API_IDS['qwen3-plus']?.apiModel).toBe('qwen3-plus');
     expect(MODEL_API_IDS['qwen3.7-max']?.apiModel).toBe('qwen3.7-max');
+    expect(MODEL_API_IDS['qwen3.8-max']?.apiModel).toBe('qwen3.8-max');
   });
 });

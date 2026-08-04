@@ -155,6 +155,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'qwen3-coder-plus': { apiModel: 'qwen3-coder-plus' },
   'qwen3-plus': { apiModel: 'qwen3-plus' },
   'qwen3.7-max': { apiModel: 'qwen3.7-max' },
+  'qwen3.8-max': { apiModel: 'qwen3.8-max' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -714,7 +715,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'];
+              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
