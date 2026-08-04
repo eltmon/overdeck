@@ -1249,24 +1249,9 @@
       "timestamp": "2026-08-04T17:35:54.143Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T17:33:59Z",
-      "markdownBody": "VERIFICATION FAILED for PAN-1577 (attempt 1/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-allowlist.txt\n  - src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts\n  - src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts\n  - tests/cli/commands/specialists/done.test.ts\n  - tests/unit/cli/state-migrate-cancellation.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n  - tests/unit/lib/agents/spawn-flywheel-provenance.test.ts\n  - tests/unit/lib/harness-resolve.test.ts\n  - tests/unit/lib/review-status.test.ts\n\n## REQUIRED: Resolve merge conflicts BEFORE resubmitting\n\n1. Run: `git fetch origin main && git merge origin/main`\n2. Resolve all conflicts in the listed files\n3. Run the project's build and tests to verify nothing broke\n4. Commit and push ALL changes\n\nAfter fixing:\n1. Run the project's build and tests\n2. Commit and push ALL changes\n3. ONLY THEN resubmit: pan review request PAN-1577 -m \"Fixed sync-target-branch\"\n\nDo NOT resubmit until all repos sync cleanly and tests pass."
-    },
-    {
-      "seq": 3,
-      "specialist": "verification-gate",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T17:35:33Z",
-      "markdownBody": "VERIFICATION STUCK for PAN-1577 (attempt 3/3):\n\nFailed check: sync-target-branch\n\nSync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-allowlist.txt\n  - src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts\n  - src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts\n  - tests/cli/commands/specialists/done.test.ts\n  - tests/unit/cli/state-migrate-cancellation.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n  - tests/unit/lib/agents/spawn-flywheel-provenance.test.ts\n  - tests/unit/lib/harness-resolve.test.ts\n  - tests/unit/lib/review-status.test.ts\n\n## NEEDS-YOU: Verification stuck\n\nAutomatic verification paused after repeated failures so it does not keep spending cycles on the same failing gate.\n\nFix every reported failure, commit and push the corrections, then run `pan done PAN-1577 -c \"<summary>\"`. That command resets verification and returns the latest commit to the normal review, test, and merge pipeline. If you cannot complete the fixes, report the concrete blocker for operator help."
-    }
-  ],
+  "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T17:36:32.046Z",
+  "updated": "2026-08-04T17:36:33.318Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
