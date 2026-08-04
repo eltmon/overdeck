@@ -12,7 +12,7 @@ const STATE_COLOR: Record<ProjectCiState, string> = {
 
 export function ProjectCiChip({ projectKey }: { projectKey: string }) {
   const record = useDashboardStore(selectProjectCi(projectKey));
-  if (!record) return null;
+  if (!record || Object.keys(record.suites).length === 0) return null;
 
   const { state, completed, total, href } = deriveProjectCi(record);
   const label = state === 'success' ? 'CI' : state === 'failure' ? 'CI ✗' : `CI ${completed}/${total}`;

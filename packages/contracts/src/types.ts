@@ -524,6 +524,8 @@ export const ProjectCiSuite = Schema.Struct({
   status: Schema.String,
   conclusion: Schema.NullOr(Schema.String),
   htmlUrl: Schema.optional(Schema.String),
+  /** GitHub's suite/run update time, used to reject delayed same-SHA events. */
+  observedAt: Schema.optional(Schema.String),
 })
 export type ProjectCiSuite = typeof ProjectCiSuite.Type
 

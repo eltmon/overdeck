@@ -46,6 +46,13 @@ describe('ProjectCiChip', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('renders nothing when the authoritative head has no Actions suites', () => {
+    seed(record({ suites: {} }));
+    const { container } = render(<ProjectCiChip projectKey={PROJECT_KEY} />);
+
+    expect(container).toBeEmptyDOMElement();
+  });
+
   it.each([
     {
       name: 'queued',

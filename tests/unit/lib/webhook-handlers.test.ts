@@ -28,6 +28,7 @@ const mockGetPullRequestState = vi.fn();
 const mockExecFile = vi.fn();
 const mockPostMergeLifecycle = vi.fn();
 const mockAppendDomainEventAsync = vi.fn(async () => true);
+const mockResolveDefaultBranchHead = vi.fn(async () => 'abc123');
 let ghPrViewStdout = '';
 
 vi.mock('../../../src/lib/review-status.js', () => ({
@@ -82,6 +83,10 @@ vi.mock('../../../src/lib/activity-logger.js', () => ({
     mockAppendDomainEventAsync(...args),
 }));
 
+vi.mock('../../../src/lib/ci/project-ci-github.js', () => ({
+  resolveDefaultBranchHead: (...args: unknown[]) => mockResolveDefaultBranchHead(...args),
+}));
+
 vi.mock('../../../src/lib/github-app.js', () => ({
   isGitHubAppConfigured: () => mockIsGitHubAppConfigured(),
   getPullRequestState: (owner: string, repo: string, number: number) =>
@@ -96,6 +101,7 @@ beforeEach(() => {
   mockGetReviewStatus.mockReturnValue(null);
   mockSetReviewStatus.mockReturnValue(undefined);
   mockLoadReviewStatuses.mockReturnValue({});
+  mockResolveDefaultBranchHead.mockResolvedValue('abc123');
 });
 
 afterEach(() => {
@@ -192,9 +198,28 @@ describe('handleCheckSuite', () => {
         suiteId: '42',
         status: 'in_progress',
         conclusion: null,
+        authoritativeHead: true,
       }),
     });
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
+  });
+
+  it('does not append a delayed suite for a superseded default-branch commit', async () => {
+    mockResolveDefaultBranchHead.mockResolvedValue('new-head');
+
+    await Effect.runPromise(handleCheckSuite(makePayload({
+      check_suite: {
+        id: 42,
+        status: 'completed',
+        conclusion: 'failure',
+        head_branch: 'main',
+        head_sha: 'old-head',
+        app: { slug: 'github-actions' },
+        pull_requests: [],
+      },
+    })));
+
+    expect(mockAppendDomainEventAsync).not.toHaveBeenCalled();
   });
 
   it('matches non-PAN project prefixes (MIN, KRUX, AUR, MYN)', async () => {

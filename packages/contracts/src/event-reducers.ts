@@ -664,30 +664,39 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     case 'project.ci_suite_observed': {
       const p = event.payload
       const existing = state.ciByProjectKey[p.projectKey]
-      const suite = { status: p.status, conclusion: p.conclusion, htmlUrl: p.htmlUrl }
+      const suite = {
+        status: p.status,
+        conclusion: p.conclusion,
+        htmlUrl: p.htmlUrl,
+        observedAt: p.observedAt,
+      }
 
       let next: ProjectCiSnapshot
       if (!existing) {
+        if (p.authoritativeHead !== true) {
+          return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+        }
         next = {
           projectKey: p.projectKey, repo: p.repo, branch: p.branch, headSha: p.headSha,
           suites: { [p.suiteId]: suite }, updatedAt: p.observedAt,
         }
       } else if (existing.headSha === p.headSha) {
-        // Same commit: merge the suite in, advance updatedAt monotonically.
+        const existingSuite = existing.suites[p.suiteId]
+        const existingSuiteObservedAt = existingSuite?.observedAt ?? existing.updatedAt
+        if (existingSuite && p.observedAt < existingSuiteObservedAt) {
+          return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+        }
         next = {
           ...existing,
           suites: { ...existing.suites, [p.suiteId]: suite },
           updatedAt: p.observedAt > existing.updatedAt ? p.observedAt : existing.updatedAt,
         }
-      } else if (p.observedAt >= existing.updatedAt) {
-        // Newer commit wins and resets the suite set — commit ordering is not
-        // available from the payload, so observation recency is the tiebreak.
+      } else if (p.authoritativeHead === true && p.observedAt >= existing.updatedAt) {
         next = {
           projectKey: p.projectKey, repo: p.repo, branch: p.branch, headSha: p.headSha,
           suites: { [p.suiteId]: suite }, updatedAt: p.observedAt,
         }
       } else {
-        // A late event for an older commit. Drop it.
         return { ...state, sequence: Math.max(state.sequence, event.sequence) }
       }
 
@@ -695,6 +704,30 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
         ...state,
         sequence: Math.max(state.sequence, event.sequence),
         ciByProjectKey: { ...state.ciByProjectKey, [p.projectKey]: next },
+      }
+    }
+
+    case 'project.ci_head_observed': {
+      const p = event.payload
+      const existing = state.ciByProjectKey[p.projectKey]
+      if (existing && p.observedAt < existing.updatedAt) {
+        return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+      }
+
+      return {
+        ...state,
+        sequence: Math.max(state.sequence, event.sequence),
+        ciByProjectKey: {
+          ...state.ciByProjectKey,
+          [p.projectKey]: {
+            projectKey: p.projectKey,
+            repo: p.repo,
+            branch: p.branch,
+            headSha: p.headSha,
+            suites: p.suites,
+            updatedAt: p.observedAt,
+          },
+        },
       }
     }
 

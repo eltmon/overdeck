@@ -15,7 +15,11 @@ import { isInGraphQLCooldown, noteGraphQLRateLimit } from './github-graphql-cool
 import { bumpIssuePrTabCacheGeneration } from '../dashboard/server/services/pr-tab-cache.js';
 import { ADVISORY_CHECK_NAMES, isAdvisoryCheckName } from './advisory-checks.js';
 import { appendDomainEventAsync } from './activity-logger.js';
-import { observationFromCheckSuite } from './ci/project-ci-observation.js';
+import {
+  observationFromCheckSuite,
+  resolveProjectForRepo,
+} from './ci/project-ci-observation.js';
+import { resolveDefaultBranchHead } from './ci/project-ci-github.js';
 
 export { ADVISORY_CHECK_NAMES, isAdvisoryCheckName };
 
@@ -37,6 +41,7 @@ export interface WebhookPayload {
     conclusion?: string | null;
     head_branch?: string;
     head_sha?: string;
+    updated_at?: string;
     app?: { slug?: string };
     pull_requests?: Array<{ number: number; head: { ref: string; sha?: string } }>;
   };
@@ -322,13 +327,36 @@ export async function refreshMergeStateFromGitHub(issueId: string, repo: string,
   // PAN-3537: a push to the default branch produces a check suite with an empty
   // pull_requests array. Record it for the Command Deck CI chip, then fall
   // through to the existing PR-scoped merge-gate logic.
-  const observation = observationFromCheckSuite(payload, new Date().toISOString());
-  if (observation) {
-    await appendDomainEventAsync({
-      type: 'project.ci_suite_observed',
-      timestamp: observation.observedAt,
-      payload: observation,
-    });
+  const project = resolveProjectForRepo(payload.repository?.full_name);
+  const projectSuite = payload.check_suite;
+  if (
+    project
+    && projectSuite?.app?.slug === 'github-actions'
+    && projectSuite.head_branch === project.branch
+    && projectSuite.head_sha
+    && projectSuite.id != null
+  ) {
+    try {
+      const authoritativeHead = await resolveDefaultBranchHead(
+        project.repo,
+        project.branch,
+      );
+      const observation = observationFromCheckSuite(
+        payload,
+        new Date().toISOString(),
+        undefined,
+        authoritativeHead,
+      );
+      if (observation) {
+        await appendDomainEventAsync({
+          type: 'project.ci_suite_observed',
+          timestamp: observation.observedAt,
+          payload: observation,
+        });
+      }
+    } catch (error) {
+      console.warn('[webhook] Could not verify project CI branch head:', error);
+    }
   }
 
   if (!isTrackedRepositorySync(payload.repository?.full_name)) return;

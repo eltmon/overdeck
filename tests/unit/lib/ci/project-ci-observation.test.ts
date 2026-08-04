@@ -54,11 +54,46 @@ describe('observationFromCheckSuite', () => {
     ['missing suite id', payload({ check_suite: { ...payload().check_suite!, id: undefined } })],
     ['unregistered repository', payload({ repository: { full_name: 'eltmon/unknown' } })],
   ])('returns null for %s', (_name, webhookPayload) => {
-    expect(observationFromCheckSuite(webhookPayload, '2026-08-04T08:00:00.000Z', projects)).toBeNull();
+    expect(observationFromCheckSuite(
+      webhookPayload,
+      '2026-08-04T08:00:00.000Z',
+      projects,
+      'abc123',
+    )).toBeNull();
+  });
+
+  it('rejects a suite that is not for the authoritative branch head', () => {
+    expect(observationFromCheckSuite(
+      payload(),
+      '2026-08-04T08:00:00.000Z',
+      projects,
+      'newer-sha',
+    )).toBeNull();
+  });
+
+  it('uses the suite update time instead of webhook arrival time', () => {
+    const webhookPayload = payload({
+      check_suite: {
+        ...payload().check_suite!,
+        updated_at: '2026-08-04T07:55:00.000Z',
+      },
+    });
+
+    expect(observationFromCheckSuite(
+      webhookPayload,
+      '2026-08-04T08:00:00.000Z',
+      projects,
+      'abc123',
+    )?.observedAt).toBe('2026-08-04T07:55:00.000Z');
   });
 
   it('maps a default-branch GitHub Actions suite to an observation', () => {
-    expect(observationFromCheckSuite(payload(), '2026-08-04T08:00:00.000Z', projects)).toEqual({
+    expect(observationFromCheckSuite(
+      payload(),
+      '2026-08-04T08:00:00.000Z',
+      projects,
+      'abc123',
+    )).toEqual({
       projectKey: 'overdeck',
       repo: 'eltmon/overdeck',
       branch: 'main',
@@ -67,6 +102,7 @@ describe('observationFromCheckSuite', () => {
       status: 'in_progress',
       conclusion: null,
       observedAt: '2026-08-04T08:00:00.000Z',
+      authoritativeHead: true,
     });
   });
 });
