@@ -32,6 +32,7 @@ import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
+import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
@@ -485,7 +486,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'dashscope': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'qwen3-max') : 'qwen3-max';
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/chat/completions`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -709,7 +710,7 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'dashscope': {
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/models`, {
               headers: { 'Authorization': `Bearer ${apiKey}` },
             });
             if (resp.ok) {
