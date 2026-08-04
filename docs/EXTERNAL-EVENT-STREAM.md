@@ -100,6 +100,7 @@ External subscribers may only depend on events in the **public catalog**. Events
 | `workspace.created`              | Workspace provisioned                        | `issueId`, `path` |
 | `workspace.destroyed`            | Workspace torn down                          | `issueId` |
 | `issue.status_changed`           | Tracker status transition                    | `issueId`, `from`, `to` |
+| `project.ci_suite_observed`      | GitHub Actions suite observed on a project's default branch | yes | `projectKey`, `repo`, `branch`, `headSha`, `suiteId`, `status`, `conclusion`, `htmlUrl?`, `observedAt` |
 | `dashboard.lifecycle_started`    | Dashboard restarting                         | `reason`, `trigger` |
 | `dashboard.lifecycle_completed`  | Dashboard restart finished                   | `reason`, `durationMs` |
 | `dashboard.lifecycle_failed`     | Dashboard restart failed                     | `reason`, `error` |

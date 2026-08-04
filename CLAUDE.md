@@ -378,6 +378,16 @@ The dashboard server uses **Effect.js** for HTTP routes and structured RPC, plus
 - `WsTransport.ts` — Effect-based RPC client with auto-reconnection
 - Store: Zustand with shared reducers from `@overdeck/contracts`
 
+**Project CI chip:** Command Deck project rows derive their compact GitHub Actions state
+from `ReadModelState.ciByProjectKey`. The `project.ci_suite_observed` event is emitted by
+the `check_suite` webhook for live updates and by `startProjectCiRefill()` at boot and
+every 15 minutes for repair. Both sources aggregate all GitHub Actions suites for the
+latest default-branch SHA through the shared contracts reducer; third-party suites are
+excluded, and status precedence is failure → in progress → queued → success. The state
+travels through the existing `/ws/rpc` snapshot/event path into Zustand, with no frontend
+polling or durable CI store. A single workflow links to its Actions run when REST supplied
+the URL; multiple workflows link to the commit checks page.
+
 **Issue views:** Rail, cockpit, and console issue surfaces share the kit documented in
 `docs/ISSUE-VIEW.md`. Route new issue sections through `IssueViewModel`, the shared
 components, and `DENSITY_SECTIONS`; update the inventory and real `data-section`
