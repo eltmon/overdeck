@@ -167,18 +167,18 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T15:21:38.811Z",
+  "updated": "2026-08-04T16:51:34.407Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T15:21:38.802Z",
-    "reviewNotes": "Persisted artifact capability is forgeable; existing DB upgrades, feedback-delivery gates, and polyrepo head anchors are also broken",
+    "updatedAt": "2026-08-04T16:51:34.370Z",
+    "reviewNotes": "Agent re-review request (2/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
     "lastVerifiedCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
@@ -197,9 +197,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 2333195,
-            "output": 68520,
-            "cacheRead": 19191808,
+            "input": 2339445,
+            "output": 74774,
+            "cacheRead": 20218368,
             "cacheWrite": 0
           }
         },
@@ -237,9 +237,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 1299988,
-            "output": 136586,
-            "cacheRead": 71708160,
+            "input": 2966732,
+            "output": 349653,
+            "cacheRead": 175232512,
             "cacheWrite": 0
           }
         }
@@ -252,15 +252,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 12119030,
-          "output": 446072,
-          "cacheRead": 127471104,
+          "input": 13792024,
+          "output": 665393,
+          "cacheRead": 232022016,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 137.8432386,
-        "pricingAsOf": "2026-08-04T15:21:38.806Z"
+        "usd": 205.0632946,
+        "pricingAsOf": "2026-08-04T16:51:34.401Z"
       }
     },
     "merges": [
