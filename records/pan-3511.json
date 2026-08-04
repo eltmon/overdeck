@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T01:34:00.386Z",
+  "updated": "2026-08-04T01:37:55.494Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -80,16 +80,8 @@
     }
   ],
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "contract-docs": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 1558737,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T01:34:00.386Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -187,6 +179,16 @@
         "itemId": "sweeper-consult",
         "outcome": "completed",
         "releasedAt": "2026-08-04T01:33:54.357Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 1558737,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T01:34:00.386Z",
+        "itemId": "contract-docs",
+        "outcome": "completed",
+        "releasedAt": "2026-08-04T01:37:55.493Z"
       }
     ],
     "statusReasons": {
@@ -244,6 +246,10 @@
     "sweeper-consult.sweeper-consult.ac2": "completed",
     "sweeper-consult.sweeper-consult.ac3": "completed",
     "sweeper-consult.sweeper-consult.ac4": "completed",
-    "contract-docs": "running"
+    "contract-docs": "completed",
+    "contract-docs.contract-docs.ac1": "completed",
+    "contract-docs.contract-docs.ac2": "completed",
+    "contract-docs.contract-docs.ac3": "completed",
+    "contract-docs.contract-docs.ac4": "completed"
   }
 }
