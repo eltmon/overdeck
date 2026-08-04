@@ -284,6 +284,14 @@ async function updateAgentPlaneRecord(
     {
       writerId: `agent-plane:${safeAgentId(state.id)}`,
       recordPath: context.path,
+      // Patient retries (PAN-3513 append gap, 2026-08-04): the default ~1s
+      // window loses to any competing state-door writer that holds the
+      // per-issue lock through its git commit+push (several seconds). These
+      // plane writes are durability-critical fire-and-forget appends with no
+      // latency requirement — a dropped write is a permanently lost session
+      // pointer (observed: 12 real sessions, 1 on the plane; 12 dropped
+      // appends in one log window). Wait out the writer instead.
+      retryDelaysMs: [250, 500, 1000, 2000, 4000, 8000, 8000],
     },
     async () => {
       const existing = readAgentPlaneRecordAtPath(context.path);
