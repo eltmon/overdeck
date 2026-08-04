@@ -84,21 +84,21 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T09:46:13.917Z",
+  "updated": "2026-08-04T09:51:10.231Z",
   "pipeline": {
     "issueId": "PAN-3537",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T09:46:12.657Z",
+    "updatedAt": "2026-08-04T09:51:10.200Z",
+    "reviewNotes": "CI state is not anchored to the authoritative default-branch head",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
     "lastVerifiedCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342",
-    "reviewRequestedAt": "2026-08-04T09:26:30.099Z",
     "reviewSpawnedAt": "2026-08-04T09:46:12.656Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -156,6 +156,24 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-04T09:26:27.202Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342"
+      }
     }
   },
   "closeOut": {
@@ -167,6 +185,46 @@
             "output": 39207,
             "cacheRead": 22414156,
             "cacheWrite": 50046
+          }
+        },
+        "review": {
+          "openai/gpt-5.6-sol": {
+            "input": 335540,
+            "output": 5165,
+            "cacheRead": 2316800,
+            "cacheWrite": 0
+          }
+        },
+        "review.correctness": {
+          "openai/gpt-5.6-sol": {
+            "input": 1838543,
+            "output": 24322,
+            "cacheRead": 2983424,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 826536,
+            "output": 32977,
+            "cacheRead": 4523008,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 597249,
+            "output": 41165,
+            "cacheRead": 948736,
+            "cacheWrite": 0
+          }
+        },
+        "review.security": {
+          "openai/gpt-5.6-sol": {
+            "input": 932238,
+            "output": 7193,
+            "cacheRead": 1393152,
+            "cacheWrite": 0
           }
         },
         "strike": {
@@ -194,15 +252,15 @@
           "cacheWrite": 50046
         },
         "openai/gpt-5.6-sol": {
-          "input": 2151819,
-          "output": 101141,
-          "cacheRead": 57553920,
+          "input": 6681925,
+          "output": 211963,
+          "cacheRead": 69719040,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 67.571264,
-        "pricingAsOf": "2026-08-04T09:46:12.802Z"
+        "usd": 99.629014,
+        "pricingAsOf": "2026-08-04T09:51:10.221Z"
       }
     },
     "merges": [
