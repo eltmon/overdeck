@@ -1247,11 +1247,24 @@
       "reason": "resume",
       "agentModel": "claude-sonnet-5",
       "timestamp": "2026-08-04T17:35:54.143Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T17:46Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-04T17:46:30.764Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T17:46:30Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-1577` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-1577`."
+    }
+  ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T17:37:42.659Z",
+  "updated": "2026-08-04T17:46:30.764Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "reviewing",
