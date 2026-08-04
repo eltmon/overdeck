@@ -85,13 +85,18 @@ export interface ArtifactVerdictRestoreOptions {
  * with no head evidence (the common quick-self-review shape, which carries no
  * context.json) cannot trip it, and neither can a row that has never recorded a
  * verified commit.
+ *
+ * The row side is named `rowHead`, not `lastVerifiedCommit`: this reads an
+ * anchor to predict a rejection, and the HeadAnchor write-site inventory in
+ * tests/unit/lib/head-anchor-write-sites.test.ts should not carry a read as if
+ * it were a persistence write.
  */
 export function restoreWouldTripHeadGuard(input: {
   artifactHead?: string | undefined;
-  lastVerifiedCommit?: string | undefined;
+  rowHead?: string | undefined;
 }): boolean {
   const artifactHead = input.artifactHead;
-  const rowHead = input.lastVerifiedCommit;
+  const rowHead = input.rowHead;
   if (typeof artifactHead !== 'string' || artifactHead.length === 0) return false;
   if (typeof rowHead !== 'string' || rowHead.length === 0) return false;
   return artifactHead !== rowHead;
@@ -117,7 +122,9 @@ const DEFAULT_DEPS: ArtifactVerdictRestoreDeps = {
   getStatus: getReviewStatusSync,
   setStatus: (issueId, update) => { setReviewStatusSync(issueId, update); },
   emitEvent: defaultEmitEvent,
-  emitActivity: emitActivityEntryOnce,
+  // Called through rather than bound, so importing this module does not force
+  // every transitive importer's test to mock an export only the blocked path uses.
+  emitActivity: (options) => emitActivityEntryOnce(options),
   now: () => Date.now(),
 };
 
@@ -146,7 +153,7 @@ export async function attemptArtifactVerdictRestore(
 
   if (restoreWouldTripHeadGuard({
     artifactHead: artifact.headSha,
-    lastVerifiedCommit: status?.lastVerifiedCommit,
+    rowHead: status?.lastVerifiedCommit,
   })) {
     const artifactHead = artifact.headSha as string;
     const rowHead = status?.lastVerifiedCommit as string;

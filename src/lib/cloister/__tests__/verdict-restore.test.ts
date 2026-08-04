@@ -63,21 +63,21 @@ function passedArtifact(overrides: Partial<SynthesisArtifactVerdict> = {}): Synt
 describe('restoreWouldTripHeadGuard', () => {
   it('does not trip when the artifact carries no head evidence', () => {
     // The common quick-self-review shape: review.md with no context.json.
-    expect(restoreWouldTripHeadGuard({ lastVerifiedCommit: 'abc1234' })).toBe(false);
-    expect(restoreWouldTripHeadGuard({ artifactHead: '', lastVerifiedCommit: 'abc1234' })).toBe(false);
+    expect(restoreWouldTripHeadGuard({ rowHead: 'abc1234' })).toBe(false);
+    expect(restoreWouldTripHeadGuard({ artifactHead: '', rowHead: 'abc1234' })).toBe(false);
   });
 
   it('does not trip when the row has never recorded a verified commit', () => {
     expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234' })).toBe(false);
-    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', lastVerifiedCommit: '' })).toBe(false);
+    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', rowHead: '' })).toBe(false);
   });
 
   it('does not trip when both heads agree', () => {
-    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', lastVerifiedCommit: 'abc1234' })).toBe(false);
+    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', rowHead: 'abc1234' })).toBe(false);
   });
 
   it('trips only when both heads are present and differ', () => {
-    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', lastVerifiedCommit: 'def5678' })).toBe(true);
+    expect(restoreWouldTripHeadGuard({ artifactHead: 'abc1234', rowHead: 'def5678' })).toBe(true);
   });
 });
 

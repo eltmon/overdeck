@@ -341,6 +341,27 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
 }
 
 /**
+ * PAN-3511: retries exhausted while a verdict already sits on disk means recovery
+ * was chasing a review that had already FINISHED, so tripping the breaker would
+ * strand it behind an operator gate. True means the caller must skip its stuck
+ * mark. Fails toward the mark — a reader error returns false so today's protection survives.
+ */
+async function artifactSupersededBreaker(issueId: string, actions: string[]): Promise<boolean> {
+  try {
+    const restore = await attemptArtifactVerdictRestore(issueId, {
+      caller: 'review-infra-breaker',
+      clearStuckReason: 'review_infrastructure_failure',
+    });
+    if (restore.outcome === 'no-artifact') return false;
+    actions.push(`Review-infra breaker for ${issueId} superseded by a fresh ${restore.artifact.verdict} artifact (${restore.outcome})`);
+    return true;
+  } catch (err) {
+    console.warn(`[deacon] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    return false;
+  }
+}
+
+/**
  * PAN-1908: react to review.coordinator.died by resetting the issue to a
  * pending review state and re-dispatching the review role. No review-status
  * DB scan — operates on the single issue ID from the event.
@@ -376,6 +397,7 @@ export async function handleReviewCoordinatorDied(
   }
 
   if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
+    if (await artifactSupersededBreaker(issueId, actions)) return actions;
     markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
       reviewRetryCount: status.reviewRetryCount ?? 0,
       recoveryStartedAt: status.recoveryStartedAt,
@@ -618,6 +640,7 @@ async function reconcileReviewStatusOrphan(
   ) {
     if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
       try {
+        if (await artifactSupersededBreaker(issueId, actions)) return actions;
         markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
           reviewRetryCount: status.reviewRetryCount ?? 0,
           recoveryStartedAt: status.recoveryStartedAt,
