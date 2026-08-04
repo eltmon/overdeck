@@ -553,7 +553,12 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
           sessionId,
           message: effectiveMessage,
           caller: 'resumeAgent:auto-continue',
-          deliveryMethod: resilientDeliveryMethod(agentState.deliveryMethod),
+          // A relaunched Claude work/strike agent owns a fresh supervisor socket;
+          // require that verified PTY path instead of silently falling back to a
+          // tmux paste whose compaction summary can masquerade as prompt landing.
+          deliveryMethod: supervisorLaunch.useSupervisor
+            ? 'supervisor'
+            : resilientDeliveryMethod(agentState.deliveryMethod),
         });
         messageDelivered = delivery.delivered;
         if (delivery.delivered && resumeMessage.redeliveringKickoff) markKickoffRedelivered(agentState);
@@ -563,6 +568,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
       } else {
         console.error('Claude SessionStart hook did not fire during resume, continue prompt not sent');
       }
+    }
+
+    if (!messageDelivered) {
+      await Effect.runPromise(killSession(normalizedId)).catch(() => undefined);
+      const error = `Resume continue prompt did not become a confirmed turn for ${normalizedId}`;
+      logAgentLifecycleSync(normalizedId, `resumeAgent FAILED: ${error}`);
+      return { success: false, messageDelivered: false, error };
     }
 
     const resumedAt = new Date().toISOString();
