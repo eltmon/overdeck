@@ -293,8 +293,9 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // The broad assertions preserve the no-loss audit's content-presence gate;
-    // the role assertions below prove each redesigned kind badge has a home.
+    // Top consumers section with kind badges. getAllBy*: the audit asks whether
+    // these are still displayed, and several consumer rows legitimately match —
+    // getBy* would fail on the section being MORE populated, not less.
     expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
     expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
     expect(within(dialog).getByRole('note', { name: 'Consumer kind: Agent' })).toBeInTheDocument();
@@ -430,8 +431,9 @@ describe('system health UI no-loss audit', () => {
     fireEvent.click(screen.getByTestId('system-health-pill'));
 
     const dialog = screen.getByRole('dialog', { name: 'System health' });
-    // Both the agent id and reason message may match; presence is the no-loss
-    // property, while the exact assertions below verify the redesigned row.
+    // Attention section should exist with agent activity issue. Both the agent
+    // id and the reason message render it, so match on presence rather than
+    // uniqueness — the audited property is that the row is visible at all.
     expect(within(dialog).getAllByText(/agent-stalled|activity stalled/).length).toBeGreaterThan(0);
     expect(within(dialog).getAllByRole('img', { name: 'critical attention' }).length).toBeGreaterThan(0);
     expect(within(dialog).getByText('agent activity stalled')).toBeInTheDocument();
