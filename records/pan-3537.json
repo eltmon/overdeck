@@ -129,25 +129,24 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T17:51:42.925Z",
+  "updated": "2026-08-04T18:02:14.539Z",
   "pipeline": {
     "issueId": "PAN-3537",
-    "reviewStatus": "pending",
+    "reviewStatus": "passed",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T17:50:35.732Z",
-    "reviewNotes": "Verification failed at lint — fix and resubmit",
-    "verificationNotes": "Verification FAILED at lint (147557ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(1938 chars elided)…\n34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/packages/pi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34mℹ\u001b[39m tsconfig: \u001b[34mtsconfig.json\u001b[39m\n\u001b[34mℹ\u001b[39m Build start\n\u001b[34mℹ\u001b[39m Cleaning 2 files\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[1mindex.js\u001b[22m    \u001b[2m25.32 kB\u001b[22m \u001b[2m│ gzip: 6.75 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mindex.d.ts\u001b[22m\u001b[39m  \u001b[2m 6.06 kB\u001b[22m \u001b[2m│ gzip: 1.59 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 2 files, total: 31.38 kB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m579ms\u001b[39m\n\n> @overdeck/core@0.48.0 build:ohmypi-extension\n> npm --prefix ./packages/ohmypi-extension run build\n\n\n> @overdeck/ohmypi-extension@0.0.1 build\n> tsdown\n\n\u001b[34mℹ\u001b[39m \u001b[34mtsdown v0.21.10\u001b[39m powered by \u001b[38;2;255;126;23mrolldown v1.0.0-rc.17\u001b[39m\n\u001b[34mℹ\u001b[39m config file: \u001b[4m/home/eltmon/Projects/overdeck/workspaces/feature-pan-3537/packages/ohmypi-extension/tsdown.config.ts\u001b[24m \n\u001b[34mℹ\u001b[39m entry: \u001b[34msrc/index.ts\u001b[39m\n\u001b[34m\n...(truncated)",
+    "updatedAt": "2026-08-04T18:02:13.176Z",
+    "reviewNotes": "Approved after cycle-3 convergence gate; no project-CI files changed since the prior cycle",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3542",
-    "reviewedAtCommit": "7f50cf98abc23fb0d3c3c0b277f8d63ce6fd4342",
+    "reviewedAtCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6",
     "lastVerifiedCommit": "d1c8fa519d4b22349eb665c6bc28e4e3182a9550",
-    "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
     "reviewSpawnedAt": "2026-08-04T17:47:44.486Z",
     "scopeDrift": {
       "outsideDeclaredScope": [],
@@ -205,6 +204,24 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-04T09:26:27.202Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
+      }
     }
   },
   "closeOut": {
@@ -220,41 +237,41 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1118260,
-            "output": 16947,
-            "cacheRead": 4607488,
+            "input": 1257481,
+            "output": 31264,
+            "cacheRead": 10242048,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-sol": {
-            "input": 1838543,
-            "output": 24322,
-            "cacheRead": 2983424,
+            "input": 2341442,
+            "output": 75646,
+            "cacheRead": 12392960,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 826536,
-            "output": 32977,
-            "cacheRead": 4523008,
+            "input": 1184086,
+            "output": 68274,
+            "cacheRead": 9377792,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 597249,
-            "output": 41165,
-            "cacheRead": 948736,
+            "input": 1105507,
+            "output": 78578,
+            "cacheRead": 6842368,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 932238,
-            "output": 7193,
-            "cacheRead": 1393152,
+            "input": 1786199,
+            "output": 25574,
+            "cacheRead": 4431360,
             "cacheWrite": 0
           }
         },
@@ -268,9 +285,9 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2794607,
-            "output": 213899,
-            "cacheRead": 95418368,
+            "input": 3030232,
+            "output": 218318,
+            "cacheRead": 97193472,
             "cacheWrite": 0
           }
         }
@@ -283,15 +300,15 @@
           "cacheWrite": 50046
         },
         "openai/gpt-5.6-sol": {
-          "input": 8414248,
-          "output": 341651,
-          "cacheRead": 112030720,
+          "input": 11011762,
+          "output": 502802,
+          "cacheRead": 142636544,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 133.337109,
-        "pricingAsOf": "2026-08-04T17:50:35.768Z"
+        "usd": 166.462121,
+        "pricingAsOf": "2026-08-04T18:02:13.229Z"
       }
     },
     "merges": [
