@@ -69,21 +69,17 @@ describe('resolveHarness', () => {
     warnSpy.mockRestore();
   });
 
-  it('is role-ignoring, explicit-honoring (PAN-1984 + the 2026-08-02 explicit-pick refinement): role never wins; explicit wins over provider config; provider config then built-in default wins absent explicit', async () => {
+  it('uses an explicit pick before provider defaults while ignoring the role harness', async () => {
     const { resolveHarness } = await loadSubject();
 
-    // The per-role harness is always ignored. An explicit pick wins over the
-    // per-provider configured default.
     setConfig({ roles: { work: { harness: 'ohmypi' } }, providerHarnesses: { openai: 'codex' } });
     await expect(resolveHarness({ explicit: 'claude-code', role: 'work', model: 'gpt-5.5' })).resolves.toBe('claude-code');
-    // Without explicit, the per-provider configured default (openai → codex) wins.
     await expect(resolveHarness({ role: 'work', model: 'gpt-5.5' })).resolves.toBe('codex');
 
-    // A different per-provider default still loses to any explicit input.
     setConfig({ providerHarnesses: { openai: 'ohmypi' } });
     await expect(resolveHarness({ explicit: 'claude-code', model: 'gpt-5.5' })).resolves.toBe('claude-code');
 
-    // No config, no explicit → built-in provider default.
+    // No explicit pick or config → built-in provider default.
     setConfig({});
     await expect(resolveHarness({ model: 'gpt-5.5' })).resolves.toBe('codex');
   });
@@ -107,14 +103,11 @@ describe('resolveHarness', () => {
     expect(mocks.resolveHarnessBinary).not.toHaveBeenCalled();
   });
 
-  it('passes the resolved explicit winner through the harness policy gate', async () => {
+  it('passes an explicit harness winner through the harness policy gate', async () => {
     mocks.getProviderAuthMode.mockResolvedValue('subscription');
     mocks.canUseHarnessSync.mockReturnValue({ allowed: false, reason: 'blocked' });
     const { resolveHarness } = await loadSubject();
 
-    // explicit 'ohmypi' is honored over claude-sonnet-4-6's provider default
-    // (claude-code); the gate denies it, and an explicit pick refuses to
-    // silently reroute to the provider default, so resolution throws.
     await expect(resolveHarness({ explicit: 'ohmypi', model: 'claude-sonnet-4-6' })).rejects.toThrow('blocked');
 
     expect(mocks.canUseHarnessSync).toHaveBeenCalledWith('ohmypi', 'claude-sonnet-4-6', 'subscription');

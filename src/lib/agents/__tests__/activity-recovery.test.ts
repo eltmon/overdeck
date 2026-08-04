@@ -1,8 +1,11 @@
+import { Effect } from 'effect';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AgentState } from '../agent-state.js';
 import {
+  getLatestSessionId,
   resolveClaudeSessionRecoverySync,
+  resolveLatestSessionIdSync,
   type ClaudeSessionRecoveryDeps,
 } from '../activity.js';
 
@@ -29,6 +32,34 @@ function deps(overrides: Partial<ClaudeSessionRecoveryDeps> = {}): ClaudeSession
 }
 
 describe('Claude session reconstruction fallback', () => {
+  it('keeps sync and async resolution aligned for a durable-plane-only session', async () => {
+    const recoveryDeps = deps({
+      getAgentState: () => agentState,
+      readAgentPlaneRecord: () => ({
+        version: 1,
+        agentId: agentState.id,
+        issueId: agentState.issueId,
+        projectKey: 'myn',
+        role: 'work',
+        origin: { machineId: 'origin', overdeckHome: '/home/origin/.overdeck' },
+        launch: { harness: 'claude-code', model: 'claude-opus-5', workspace: agentState.workspace, branch: 'feature/min-839' },
+        sessions: [
+          { id: 'durable-only-session', startedAt: '2026-08-01T11:00:00.000Z', reason: 'spawn' },
+        ],
+        lifecycle: [],
+        archiveRef: null,
+        recovered: false,
+      }),
+      transcriptExists: (_workspace, sessionId) => sessionId === 'durable-only-session',
+    });
+
+    const syncSessionId = resolveLatestSessionIdSync(agentState.id, recoveryDeps).sessionId;
+    const asyncSessionId = await Effect.runPromise(getLatestSessionId(agentState.id, recoveryDeps));
+
+    expect(syncSessionId).toBe('durable-only-session');
+    expect(asyncSessionId).toBe(syncSessionId);
+  });
+
   it('uses the freshest agents-plane session that has a local transcript', () => {
     const result = resolveClaudeSessionRecoverySync(agentState.id, agentState, deps({
       readAgentPlaneRecord: () => ({

@@ -37,7 +37,6 @@ vi.mock('../../../../src/lib/agents/spawn-prep.js', async (importOriginal) => ({
   // assertWorkspaceStackHealthyForSpawn), not assertWorkspaceStackHealthyForSpawn directly —
   // mocking only the inner function doesn't intercept it (same-module internal call).
   prepareWorkspaceForAgentSpawn: vi.fn(async () => undefined),
-  assertWorkspaceStackHealthyForSpawn: vi.fn(async () => undefined),
 }));
 
 vi.mock('../../../../src/lib/tmux.js', async () => {

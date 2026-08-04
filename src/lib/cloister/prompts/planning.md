@@ -172,15 +172,17 @@ If the issue will require browser-based verification, encode that expectation cl
 {{#TLDR_AVAILABLE}}
 ### TLDR: Token-Efficient Code Discovery
 
-You have access to TLDR MCP tools for broad codebase discovery without reading full files first. Prefer these summaries during exploration, then use full Reads only when you need exact implementation details for the xBRIEF:
-- `tldr_context <file>` — summarize a candidate file's structure, imports, exports, and key functions
-- `tldr_structure <directory>` — understand a subsystem layout before choosing files to inspect
-- `tldr_semantic <query>` — find code by behavior or concept when the affected files are unknown
-- `tldr_calls <function> <file>` — identify callers that may constrain the plan
-- `tldr_impact <function> <file>` — see what a function touches before defining task boundaries or hazards
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-Use TLDR first for discovery breadth, and reserve full Reads for authoritative details you will encode into decisions, hazards, acceptance criteria, or task descriptions.
-
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
 ### Task Granularity — Decompose Aggressively
 

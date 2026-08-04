@@ -31,12 +31,18 @@ case "$EXT_LOWER" in
     ;;
 esac
 
-# Find project root (where .venv lives)
+# Find project root (where .venv lives). Stop at the file's own repo boundary
+# (.git entry — worktrees have a .git *file*): a checkout without its own venv
+# must NOT attribute dirty files to an enclosing checkout, whose index cannot
+# resolve this file's relative paths (PAN-3534).
 PROJECT_DIR=""
 DIR="$(dirname "$FILE_PATH")"
 while [ "$DIR" != "/" ]; do
   if [ -d "$DIR/.venv" ]; then
     PROJECT_DIR="$DIR"
+    break
+  fi
+  if [ -e "$DIR/.git" ]; then
     break
   fi
   DIR=$(dirname "$DIR")
@@ -57,15 +63,22 @@ echo "$REL_PATH" >> "$DIRTY_FILE" 2>/dev/null || true
 # Count dirty files (fast line count)
 DIRTY_COUNT=$(wc -l < "$DIRTY_FILE" 2>/dev/null || echo 0)
 
-# Trigger background re-warm after 10 edits (keeps index reasonably fresh)
+# Trigger background re-warm after 10 edits (keeps index reasonably fresh).
+# flock dedup (PAN-3534): warms were observed stacking 4-deep because neither
+# this hook nor `tldr warm` holds any lock. The lock must cover the warm's
+# full duration, so no --background (that detaches a child the lock can't
+# cover) — instead the whole flocked subshell is backgrounded. If a warm is
+# already running, the dirty list is kept so a later edit re-attempts.
 WARM_THRESHOLD=10
 if [ "$DIRTY_COUNT" -ge "$WARM_THRESHOLD" ]; then
   TLDR_BIN="$PROJECT_DIR/.venv/bin/tldr"
   if [ -x "$TLDR_BIN" ]; then
-    # Clear dirty tracking before warm
-    : > "$DIRTY_FILE" 2>/dev/null || true
-    # Background warm — non-blocking
-    (cd "$PROJECT_DIR" && "$TLDR_BIN" warm . --background) >/dev/null 2>&1 &
+    WARM_LOCK="$PROJECT_DIR/.tldr/warm.lock"
+    (
+      flock -n 200 || exit 0
+      : > "$DIRTY_FILE" 2>/dev/null || true
+      cd "$PROJECT_DIR" && "$TLDR_BIN" warm .
+    ) 200>"$WARM_LOCK" >/dev/null 2>&1 &
   fi
 fi
 

@@ -1,5 +1,4 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync, appendFileSync, statSync } from 'fs';
-import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { Effect } from 'effect';
@@ -7,13 +6,11 @@ import {
   getAgentDir,
   getAgentStateSync,
   getAgentRuntimeStateSync,
-  getAgentRuntimeState,
 } from '../agents.js';
 import { encodeClaudeProjectDir } from '../paths.js';
 import { findLatestRollout, extractThreadIdFromRollout } from '../runtimes/codex.js';
 import { resolveLatestOhmypiSessionId } from '../runtimes/ohmypi.js';
 import { getHarnessBehavior } from '../runtimes/behavior.js';
-import { FsError } from '../errors.js';
 import { readLatestAgentClaudeSessionIdEventSync } from '../overdeck/event-reads.js';
 import { appendAgentPlaneSession, readAgentPlaneRecordSync } from '../pan-dir/agents.js';
 import { appendSessionIdToHistory, persistCurrentSessionId } from '../session-history.js';
@@ -179,6 +176,7 @@ export interface SessionResolutionResult {
 }
 
 export interface ClaudeSessionRecoveryDeps {
+  getAgentState?: typeof getAgentStateSync;
   readAgentPlaneRecord: typeof readAgentPlaneRecordSync;
   readEventSessionId: typeof readLatestAgentClaudeSessionIdEventSync;
   transcriptExists: (workspace: string, sessionId: string) => boolean;
@@ -259,7 +257,10 @@ export function resolveClaudeSessionRecoverySync(
     : { sessionId: null, checked };
 }
 
-export function resolveLatestSessionIdSync(agentId: string): SessionResolutionResult {
+export function resolveLatestSessionIdSync(
+  agentId: string,
+  recoveryDeps?: ClaudeSessionRecoveryDeps,
+): SessionResolutionResult {
   const checked: string[] = ['Codex rollout/thread id'];
   // 0. codex thread id FIRST — `session.id` below holds a placeholder UUID for codex agents, so
   //    returning it would make resumeAgent target a non-existent thread and codex would drift into
@@ -268,7 +269,7 @@ export function resolveLatestSessionIdSync(agentId: string): SessionResolutionRe
   if (codexThreadId) return { sessionId: codexThreadId, checked };
 
   // 1. ACP session id — the host writes the provider's durable session/load id.
-  const agentState = getAgentStateSync(agentId);
+  const agentState = recoveryDeps?.getAgentState?.(agentId) ?? getAgentStateSync(agentId);
   const sessionIdSource = agentState?.harness
     ? getHarnessBehavior(agentState.harness).sessionIdSource
     : undefined;
@@ -348,7 +349,7 @@ export function resolveLatestSessionIdSync(agentId: string): SessionResolutionRe
   if (agentState?.harness && sessionIdSource !== 'launcher-session-id') {
     return { sessionId: null, checked };
   }
-  const recovered = resolveClaudeSessionRecoverySync(agentId, agentState);
+  const recovered = resolveClaudeSessionRecoverySync(agentId, agentState, recoveryDeps);
   return {
     sessionId: recovered.sessionId,
     checked: [...checked, ...recovered.checked],
@@ -360,31 +361,8 @@ export function getLatestSessionIdSync(agentId: string): string | null {
   return resolveLatestSessionIdSync(agentId).sessionId;
 }
 
-export const getLatestSessionId = (agentId: string): Effect.Effect<string | null> => {
-  const agentDir = getAgentDir(agentId);
-  const sessionFile = join(agentDir, 'session.id');
-  const sessionsFile = join(agentDir, 'sessions.json');
-
-  return Effect.gen(function* () {
-    const sessionId = yield* Effect.tryPromise({
-      try: () => readFile(sessionFile, 'utf8'),
-      catch: (cause) => new FsError({ operation: 'read', path: sessionFile, cause }),
-    }).pipe(
-      Effect.map((content) => content.trim()),
-      Effect.orElseSucceed(() => ''),
-    );
-    if (sessionId) return sessionId;
-
-    const latestSession = yield* Effect.tryPromise({
-      try: async () => JSON.parse(await readFile(sessionsFile, 'utf8')) as unknown,
-      catch: (cause) => new FsError({ operation: 'read', path: sessionsFile, cause }),
-    }).pipe(
-      Effect.map((sessions) => Array.isArray(sessions) && sessions.length > 0 ? String(sessions[sessions.length - 1]) : null),
-      Effect.orElseSucceed(() => null),
-    );
-    if (latestSession) return latestSession;
-
-    const runtimeState = yield* getAgentRuntimeState(agentId);
-    return runtimeState?.claudeSessionId ?? null;
-  });
-};
+export const getLatestSessionId = (
+  agentId: string,
+  recoveryDeps?: ClaudeSessionRecoveryDeps,
+): Effect.Effect<string | null> =>
+  Effect.sync(() => resolveLatestSessionIdSync(agentId, recoveryDeps).sessionId);

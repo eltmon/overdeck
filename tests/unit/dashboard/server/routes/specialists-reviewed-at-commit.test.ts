@@ -320,9 +320,6 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
   });
 
   it('writes the HTTP blocked anchor only after feedback delivery', async () => {
-    // recordReviewVerdict (PAN-3512's verdict write door) rejects with
-    // issue-not-found unless a row already exists for the issue.
-    setReviewStatusSync('PAN-RAC-HTTP', { reviewStatus: 'pending' });
     mockExecHeadSha = 'blocked-http-head';
     mockDeliverReviewVerdictFeedback.mockImplementation(() => {
       const duringDelivery = getReviewStatusFromDbSync('PAN-RAC-HTTP');
@@ -348,16 +345,13 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
       'PAN-RAC-HTTP',
       '/fake/project/workspaces/feature-pan-rac-http',
     );
-    // mockSnapshotWorkspaceHeads fires twice for a review verdict: once
-    // up front for recordReviewVerdict's evidenceHead (PAN-3512), and once
-    // here after feedback delivery to anchor reviewedAtCommit. Index [1] is
-    // the post-feedback call this assertion cares about.
     expect(
       mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[1]!);
-    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')?.reviewedAtCommit).toBe(
-      'blocked-http-head',
-    );
+    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
+    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toMatchObject({
+      reviewStatus: 'blocked',
+      reviewedAtCommit: 'blocked-http-head',
+    });
   });
 
   it('reviewedAtCommit survives a subsequent partial update (not clobbered)', () => {

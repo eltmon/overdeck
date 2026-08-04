@@ -310,6 +310,11 @@ export function ensureOverdeckTmuxServerSync(cleanEnv: NodeJS.ProcessEnv): void 
           // so a memory-governor miss degrades gracefully instead of wiping every
           // agent process at once (#2390).
           '--property=ManagedOOMPreference=avoid',
+          // 2026-08-04 kernel OOM: a 41GB agent-spawned python was OOM-killed and
+          // systemd's default OOMPolicy=stop then FAILED the whole unit — the tmux
+          // server and every agent/conversation session died with it. continue =
+          // the guilty child dies, the server and every other session survive.
+          '--property=OOMPolicy=continue',
           'tmux', ...args,
         ],
         { stdio: 'ignore', env: cleanEnv },

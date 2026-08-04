@@ -61,12 +61,31 @@ describe('review status', () => {
     expect(invalidWrite).toBeTypeOf('function');
   });
 
-  // The stale-evidence-head rejection this test used to cover on
-  // setReviewStatusSync directly has moved to the verdict write door
-  // (recordReviewVerdict, PAN-3512) — setReviewStatusSync is now a plain
-  // writer with no staleness comparison of its own. See
-  // src/lib/cloister/__tests__/review-verdict-writer.test.ts's "stale
-  // evidence path" test for the current coverage of this scenario.
+  it('rejects a test verdict whose evidence HEAD differs from the reviewed target HEAD', () => {
+    const reviewedHead = rehydrateHeadAnchor('aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa');
+    const staleTestHead = rehydrateHeadAnchor('bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb');
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    setReviewStatusSync('PAN-3377', {
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      reviewedAtCommit: reviewedHead,
+    });
+    mockUpdateIssueRecordForIssue.mockClear();
+
+    const status = setReviewStatusSync('PAN-3377', {
+      testStatus: 'passed',
+      lastVerifiedCommit: staleTestHead,
+      testNotes: 'stale test result',
+    });
+
+    expect(status.testStatus).toBe('pending');
+    expect(status.lastVerifiedCommit).toBeUndefined();
+    expect(mockUpdateIssueRecordForIssue).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(staleTestHead));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining(reviewedHead));
+    warn.mockRestore();
+  });
 
   it('resolves canonical merged status even when the raw status map is stale', () => {
     setReviewStatusSync('PAN-3138', { mergeStatus: 'merged' });

@@ -4,7 +4,7 @@ import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
 const {
   mockSetReviewStatus,
-  mockGetReviewStatusSync,
+  mockGetReviewStatus,
   mockDeliverReviewVerdictFeedback,
   mockResolveProject,
   mockReadWorkspacePlan,
@@ -14,7 +14,7 @@ const {
   mockVerdictFallbackPath,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
-  mockGetReviewStatusSync: vi.fn(),
+  mockGetReviewStatus: vi.fn(),
   mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
     ...actual,
     setReviewStatus: mockSetReviewStatus,
     setReviewStatusSync: mockSetReviewStatus,
-    getReviewStatus: vi.fn(),
-    getReviewStatusSync: mockGetReviewStatusSync,
+    getReviewStatus: mockGetReviewStatus,
+    getReviewStatusSync: mockGetReviewStatus,
   };
 });
 
@@ -63,17 +63,7 @@ vi.mock('node:fs', async (importOriginal) => ({
   existsSync: vi.fn(() => true),
 }));
 
-// recordReviewVerdict (PAN-3512's verdict write door) forwards the row it
-// fetched via getReviewStatusSync as setReviewStatusSync's third argument.
-const NO_EVIDENCE_STATUS = {
-  issueId: 'PAN-1059',
-  reviewStatus: 'pending',
-  testStatus: 'pending',
-  verificationStatus: 'pending',
-  mergeStatus: 'pending',
-  readyForMerge: false,
-  prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
-};
+let currentReviewStatus: Record<string, unknown> | undefined;
 
 describe('specialists done command', () => {
   beforeEach(() => {
@@ -87,21 +77,21 @@ describe('specialists done command', () => {
     mockVerdictFallbackPath.mockReturnValue(
       '/project/workspaces/feature-pan-1059/.overdeck/pipeline-verdict.json',
     );
+    currentReviewStatus = undefined;
+    mockGetReviewStatus.mockImplementation(() => currentReviewStatus);
     mockSetReviewStatus.mockImplementation((_issueId: string, update: Record<string, unknown>) => {
-      return {
+      currentReviewStatus = {
         issueId: 'PAN-1059',
         reviewStatus: 'blocked',
         testStatus: 'pending',
         updatedAt: new Date().toISOString(),
         readyForMerge: false,
         prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+        ...currentReviewStatus,
         ...update,
       };
+      return currentReviewStatus;
     });
-    // recordReviewVerdict (PAN-3512's verdict write door) does its own
-    // getReviewStatusSync lookup and rejects with issue-not-found if it's
-    // nullish, short-circuiting before ever reaching mockSetReviewStatus.
-    mockGetReviewStatusSync.mockReturnValue(NO_EVIDENCE_STATUS);
     mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
       feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
       prCommentPosted: true,
@@ -132,9 +122,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
-      verificationStatus: undefined,
-      verificationNotes: undefined,
-    }, NO_EVIDENCE_STATUS);
+    });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
       verdict: 'blocked',
@@ -160,9 +148,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenNthCalledWith(1, 'PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
-      verificationStatus: undefined,
-      verificationNotes: undefined,
-    }, NO_EVIDENCE_STATUS);
+    });
     expect(mockSetReviewStatus).toHaveBeenNthCalledWith(2, 'PAN-1059', {
       reviewedAtCommit: 'blocked-head',
     });
@@ -184,9 +170,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'correctness blocker',
-      verificationStatus: undefined,
-      verificationNotes: undefined,
-    }, NO_EVIDENCE_STATUS);
+    });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
   });
 
@@ -201,9 +185,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'failed',
       reviewNotes: 'synthesis crashed',
-      verificationStatus: undefined,
-      verificationNotes: undefined,
-    }, NO_EVIDENCE_STATUS);
+    });
     expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
       issueId: 'PAN-1059',
       verdict: 'failed',
@@ -226,7 +208,7 @@ describe('specialists done command', () => {
       reviewedAtCommit: undefined,
       verificationStatus: 'passed',
       verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
-    }, NO_EVIDENCE_STATUS);
+    });
     expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
@@ -260,9 +242,7 @@ describe('specialists done command', () => {
     expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
       reviewStatus: 'blocked',
       reviewNotes: 'durable first',
-      verificationStatus: undefined,
-      verificationNotes: undefined,
-    }, NO_EVIDENCE_STATUS);
+    });
 
     await vi.advanceTimersByTimeAsync(30_000);
     await expect(completion).resolves.toBeUndefined();

@@ -5,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { execFile } = vi.hoisted(() => ({ execFile: vi.fn() }));
 
-// state-migrate.js transitively imports src/lib/cliproxy.ts (via
-// src/lib/memory/providers/cliproxy.ts), which does `promisify(exec)` at
-// module load — the mock must cover exec too, or that import throws.
-vi.mock('node:child_process', () => ({ execFile, exec: vi.fn() }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...await importOriginal<typeof import('node:child_process')>(),
+  execFile,
+}));
 
 import { __testInternals } from '../../../src/cli/commands/admin/state-migrate.js';
 
