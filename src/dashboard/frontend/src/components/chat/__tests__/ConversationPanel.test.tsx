@@ -540,3 +540,67 @@ describe('ConversationPanel rename flow', () => {
     expect(screen.queryByRole('button', { name: 'Detach conversation' })).toBeNull();
   });
 });
+
+describe('ConversationPanel empty-state gating (workLog-only agent sessions)', () => {
+  const workOnlyData = {
+    messages: [],
+    workLog: [{
+      id: 'call_1',
+      createdAt: new Date().toISOString(),
+      label: 'Bash',
+      tone: 'tool',
+      toolTitle: 'Bash',
+      detail: 'git status',
+    }],
+    streaming: false,
+  };
+
+  beforeEach(() => {
+    queryClients = [];
+    fetchControl = installStrictFetchMock(({ method, url }) => defaultConversationResponse(method, url));
+    vi.clearAllMocks();
+    localStorage.clear();
+  });
+
+  afterEach(async () => {
+    cleanup();
+    await Promise.all(queryClients.map((client) => client.cancelQueries()));
+    queryClients.forEach((client) => client.clear());
+    await fetchControl.assertNoUnexpectedRequests();
+    localStorage.clear();
+    vi.clearAllMocks();
+  });
+
+  // Regression: since the CLIProxy 7.2 upgrade (2026-08-03), GPT-harness work
+  // agents emit no assistant text blocks — only thinking/tool_use — and every
+  // user entry is a filtered hook injection, so messages.length stays 0 for a
+  // live, hard-at-work agent. The panel must render the work timeline, not the
+  // "How can I help you?" first-message state (2026-08-04, agent-pan-3511).
+  it('does not show the first-message empty state for a live session with workLog activity', () => {
+    renderPanel(
+      { ...mockConversation, sessionAlive: true, status: 'active', endedAt: null },
+      {},
+      workOnlyData,
+    );
+    expect(screen.queryByText('How can I help you?')).toBeNull();
+    expect(screen.queryByText('Type a message below to start the conversation.')).toBeNull();
+  });
+
+  it('does not claim "no saved history" for an ended session with workLog activity', () => {
+    renderPanel(
+      { ...mockConversation, sessionAlive: false, status: 'ended', endedAt: '2024-01-01T01:00:00Z' },
+      {},
+      workOnlyData,
+    );
+    expect(screen.queryByText(/no saved history/)).toBeNull();
+  });
+
+  it('still shows the first-message empty state for a live session with no activity at all', () => {
+    renderPanel(
+      { ...mockConversation, sessionAlive: true, status: 'active', endedAt: null },
+      {},
+      { messages: [], workLog: [], streaming: false },
+    );
+    expect(screen.getByText('How can I help you?')).toBeInTheDocument();
+  });
+});
