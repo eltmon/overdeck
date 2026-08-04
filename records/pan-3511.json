@@ -437,11 +437,6 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-04T22:50:38.379Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-04T22:52Z] review-agent → CHANGES-REQUESTED — seq 2",
-      "timestamp": "2026-08-04T22:52:06.005Z"
     }
   ],
   "feedback": [
@@ -451,13 +446,6 @@
       "outcome": "failed",
       "timestamp": "2026-08-04T22:49:39Z",
       "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-04T22:52:05Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-04T22:51:46Z\n\n## Verdict: CHANGES REQUESTED — all four convoy reviewers timed out without producing reports\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: a9b929918604303a61ec22b0189528eb8928c778\n- Cycle number: 4\n- Prior cycle SHA: 71c39512b297dd2d7a0972745d1b48a589cf18bb\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | timeout | — | infrastructure failure |\n| correctness | timeout | — | infrastructure failure |\n| performance | timeout | — | infrastructure failure |\n| requirements | timeout | — | infrastructure failure |\n\n## Blocking Findings\n\n### [security] Reviewer timed out without a usable report\nThe security reviewer exceeded its deadline and exhausted retries. No report exists for this run, so the security dimension is unreviewed and the change cannot be approved.\n\n### [correctness] Reviewer timed out without a usable report\nThe correctness reviewer exceeded its deadline and exhausted retries. No report exists for this run, so the correctness dimension is unreviewed and the change cannot be approved.\n\n### [performance] Reviewer timed out without a usable report\nThe performance reviewer exceeded its deadline and exhausted retries. No report exists for this run, so the performance dimension is unreviewed and the change cannot be approved.\n\n### [requirements] Reviewer timed out without a usable report\nThe requirements reviewer exceeded its deadline and exhausted retries. No report exists for this run, so the acceptance-criteria dimension is unreviewed and the change cannot be approved.\n\n## Non-blocking Findings\nNone.\n\n## Clean Sub-roles\nNone; all four sub-roles timed out before producing usable reports.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
     }
   ],
   "scopeDrift": {
@@ -509,10 +497,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T22:52:06.006Z",
+  "updated": "2026-08-04T22:52:10.339Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -520,12 +508,30 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T22:50:57.154Z",
-    "reviewNotes": "Review role spawn failed: Command failed: tmux -L overdeck -f /home/eltmon/.overdeck/tmux/overdeck.tmux.conf new-session -d -s agent-pan-3511-review -c /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511 -x 200 -y 50 -e ANTHROPIC_API_KEY= -e ANTHROPIC_BASE_URL=http://127.0.0.1:8317 -e ANTHROPIC_AUTH_TOKEN=overdeck-local-cliproxy-key -e ANTHROPIC_DEFAULT_HAIKU_MODEL= -e OPENAI_API_KEY= -e GEMINI_API_KEY= -e API_TIMEOUT_MS= -e CLAUDE_CODE_API_KEY_HELPER_TTL_MS= -e KIMI_API_KEY= -e MINIMAX_API_KEY= -e ZAI_API_KEY= -e MIMO_API_KEY= -e OPENROUTER_API_KEY= -e NOUS_API_KEY= -e DASHSCOPE_API_KEY= -e QUANTUMLLAMA_API_KEY= -e TERM=xterm-256color -e OVERDECK_AGENT_ID=agent-pan-3511-review -e OVERDECK_ISSUE_ID=PAN-3511 -e OVERDECK_SESSION_TYPE=review -e OVERDECK_AGENT_STARTED_BY=review-agent -e CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false -e GIT_SEQUENCE_EDITOR=false -e OVERDECK_FLYWHEEL_RUN_ID=RUN-79 -e OVERDECK_FLYWHEEL_AGENT_ROLE=review bash /home/eltmon/.overdeck/agents/agent-pan-3511-review/launcher.sh\nduplicate session: agent-pan-3511-review\n",
+    "updatedAt": "2026-08-04T22:52:05.189Z",
+    "reviewNotes": "All four convoy reviewers timed out without producing usable reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
     "lastVerifiedCommit": "a9b929918604303a61ec22b0189528eb8928c778",
-    "reviewSpawnedAt": "2026-08-04T22:48:55.736Z"
+    "reviewSpawnedAt": "2026-08-04T22:48:55.736Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "a9b929918604303a61ec22b0189528eb8928c778"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -540,9 +546,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 4752918,
-            "output": 134511,
-            "cacheRead": 35307008,
+            "input": 5178567,
+            "output": 140292,
+            "cacheRead": 40207360,
             "cacheWrite": 0
           }
         },
@@ -595,15 +601,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 20798029,
-          "output": 952857,
-          "cacheRead": 284939776,
+          "input": 21223678,
+          "output": 958638,
+          "cacheRead": 289840128,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 275.2228195,
-        "pricingAsOf": "2026-08-04T22:50:57.171Z"
+        "usd": 279.9746705,
+        "pricingAsOf": "2026-08-04T22:52:05.213Z"
       }
     },
     "merges": [
