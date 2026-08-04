@@ -287,9 +287,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-04T17:54:21.381Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T18:02Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-04T18:02:19.683Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-04T18:02:19Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3423\n\n# Review Synthesis — PAN-3423 — 2026-08-04T18:00:00Z\n\n## Verdict: CHANGES REQUESTED — the changed no-loss audit still leaves named UI acceptance criteria unproved\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/context.json\n- Branch: feature/pan-3423\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423\n- HEAD reviewed: 43fece7d1a3375415cb0ab1ed0582675af9241e7\n- Cycle number: 10\n- Prior cycle SHA: 2d6872f3e83701f9fa89b799684d6ef80ca5c7f8\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/requirements.md | 1 |\n\n## Blocking Findings\n\n### [requirements] The changed no-loss audit leaves named acceptance criteria unproved — `src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx:221`\nThe current-cycle diff changes this audit, so the cycle-10 convergence gate permits the finding. The test verifies metric text and top-consumer meters, but it still has no exact coverage for vitals meter width/color/null behavior, the `LEAKED` tag and leak-header mapping, the required visible header state badge, or unchanged popover width. The suite can remain green while those explicit FR-9/NFR-3 mappings regress. Add focused assertions for null versus zero, the 60/85 threshold boundaries, leak tag/header states, the labeled header badge, and the unchanged `w-[min(22rem,...)]` geometry.\n\n## Non-blocking Findings\n\n### Requirements — demoted by the cycle-10 convergence gate\n\n- `[demoted: previously reviewed]` Degraded warning/critical summaries omit memory, admission-headroom, idle-agent, and context-note details — `src/dashboard/frontend/src/lib/system-health-attention.ts:250`. The source file is unchanged since the approved prior-cycle SHA.\n- `[demoted: previously reviewed]` Singleton agent rows replace the inactivity-duration reason text with `<agentId> · <issueId>` — `src/dashboard/frontend/src/lib/system-health-attention.ts:193`. The source file is unchanged since the approved prior-cycle SHA.\n- `[demoted: previously reviewed]` The header uses an unlabeled visible dot instead of a visible state pill, and the relay chip collapses non-running states to `Stopped` — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:413`. The source file is unchanged since the approved prior-cycle SHA.\n- `[demoted: previously reviewed]` Grouped attention rows expose per-agent actions despite the cited xBRIEF decision limiting actions to singleton rows — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:521`. The source file is unchanged since the approved prior-cycle SHA.\n- `[demoted: previously reviewed]` A zero Overdeck share suppresses its meter, and exactly 85% maps to red rather than amber — `src/dashboard/frontend/src/components/SystemHealthPill.tsx:449`. The source file is unchanged since the approved prior-cycle SHA.\n\n### Requirements — advisory\n\n- `[demoted: pre-existing/out of PR scope]` The whole-feature 2946-minute server-copy case formats as `2 d.` rather than `49 h.`; the relevant server files are outside this PR manifest.\n- Duplicate `reasonLabel()` implementations remain in the attention module and component.\n- The grouping tests do not exercise the three-or-more `+N more` truncation case.\n- The resource-governor documentation says “4×2 grid” and describes attention rows as closed disclosures, which does not match the cited requirements.\n\n## Scope Note\nCycle 10 re-litigates only changes after `2d6872f3e83701f9fa89b799684d6ef80ca5c7f8`. That cycle diff changes only `src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx`; five requirements findings on unchanged source were therefore demoted as previously reviewed, while the incomplete changed audit remains blocking.\n\n## Clean Sub-roles\n- security\n- correctness\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423/.pan/review/agent-pan-3423-review-43fece7d/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3423 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "src/cli/commands/parked.ts",
@@ -324,10 +337,10 @@
     "recordedAt": "2026-08-02T23:23:05.476Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T17:54:21.381Z",
+  "updated": "2026-08-04T18:02:19.683Z",
   "pipeline": {
     "issueId": "PAN-3423",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -335,10 +348,30 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T17:52:36.894Z",
+    "updatedAt": "2026-08-04T18:02:18.755Z",
+    "reviewNotes": "Changed no-loss audit still leaves named UI acceptance criteria unproved",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
+    "reviewedAtCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7",
     "lastVerifiedCommit": "2d6872f3e83701f9fa89b799684d6ef80ca5c7f8",
-    "reviewSpawnedAt": "2026-08-04T17:52:36.890Z"
+    "reviewSpawnedAt": "2026-08-04T17:52:36.890Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "43fece7d1a3375415cb0ab1ed0582675af9241e7"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -353,9 +386,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 21745311,
-            "output": 305992,
-            "cacheRead": 88910336,
+            "input": 22958036,
+            "output": 321796,
+            "cacheRead": 93283840,
             "cacheWrite": 0
           }
         },
@@ -369,25 +402,25 @@
         },
         "review.performance": {
           "openai/gpt-5.6-sol": {
-            "input": 967156,
-            "output": 14910,
-            "cacheRead": 3347968,
+            "input": 1469167,
+            "output": 27128,
+            "cacheRead": 5790208,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-sol": {
-            "input": 1722715,
-            "output": 104180,
-            "cacheRead": 5429760,
+            "input": 2123273,
+            "output": 143875,
+            "cacheRead": 10240512,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-sol": {
-            "input": 833493,
-            "output": 10584,
-            "cacheRead": 2091520,
+            "input": 1233220,
+            "output": 21622,
+            "cacheRead": 3718144,
             "cacheWrite": 0
           }
         },
@@ -422,9 +455,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 29486616,
-          "output": 648890,
-          "cacheRead": 215422976,
+          "input": 32001637,
+          "output": 727645,
+          "cacheRead": 228676096,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -441,8 +474,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 284.7002463,
-        "pricingAsOf": "2026-08-04T17:52:42.712Z"
+        "usd": 306.2645613,
+        "pricingAsOf": "2026-08-04T18:02:18.790Z"
       }
     },
     "merges": [
