@@ -17,6 +17,7 @@ const terminal = new Set(['completed', 'cancelled']);
 export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[] {
   if (!doc) return ['  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
   const incomplete = doc.plan.items.flatMap((item) => {
+    if (item.status === 'cancelled') return [];
     const lines: string[] = [];
     if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);
     for (const child of subItemsOf(item)) {

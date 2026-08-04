@@ -19,7 +19,10 @@ import {
   evaluateIncompletePlanItems,
 } from '../done-preflight.js';
 
-function planWithStatus(status: 'pending' | 'completed'): XBriefDocument {
+function planWithStatus(
+  status: 'pending' | 'completed' | 'cancelled',
+  childStatus?: 'pending' | 'completed',
+): XBriefDocument {
   return {
     xBRIEFInfo: {
       version: '0.8',
@@ -41,6 +44,14 @@ function planWithStatus(status: 'pending' | 'completed'): XBriefDocument {
         title: 'First item',
         status,
         created: '2026-08-01T00:00:00.000Z',
+        ...(childStatus ? {
+          items: [{
+            id: 'ac1',
+            title: 'Acceptance criterion',
+            status: childStatus,
+            metadata: { kind: 'acceptance_criterion' },
+          }],
+        } : {}),
       }],
       edges: [],
     },
@@ -75,6 +86,17 @@ describe('plan checklist evaluation', () => {
     expect(checkIncompletePlanItemsSync('/project/workspaces/feature-pan-3451')).toEqual([]);
     expect(planMocks.readWorkspacePlanSync).toHaveBeenCalledWith('/project/workspaces/feature-pan-3451');
     expect(planMocks.readWorkspacePlan).not.toHaveBeenCalled();
+  });
+
+  it('ignores pending acceptance criteria under a cancelled item', () => {
+    expect(evaluateIncompletePlanItems(planWithStatus('cancelled', 'pending'))).toEqual([]);
+  });
+
+  it('still reports pending acceptance criteria under a completed item', () => {
+    expect(evaluateIncompletePlanItems(planWithStatus('completed', 'pending'))).toEqual([
+      '  Incomplete plan items (1):',
+      '    - item-one.ac1 Acceptance criterion (pending)',
+    ]);
   });
 
   it('reports a missing plan consistently through the shared evaluator', () => {
