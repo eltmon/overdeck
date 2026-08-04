@@ -187,6 +187,26 @@
       "reason": "feedback",
       "note": "[2026-08-04T17:46Z] review-agent → FAILED — seq 1",
       "timestamp": "2026-08-04T17:46:42.878Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-04T18:02:53.828Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-04T18:02:53.890Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-04T18:02:53.925Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-04T18:02:53.963Z"
     }
   ],
   "feedback": [
@@ -239,7 +259,7 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-04T18:02:11.316Z",
+  "updated": "2026-08-04T18:02:53.963Z",
   "pipeline": {
     "issueId": "PAN-3418",
     "reviewStatus": "reviewing",
