@@ -1,6 +1,13 @@
 {
   "issueId": "PAN-3497",
   "schemaVersion": 2,
+  "sessionHistory": [
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T20:39Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-04T20:39:35.234Z"
+    }
+  ],
   "feedback": [
     {
       "seq": 1,
@@ -11,28 +18,14 @@
     }
   ],
   "created": "2026-08-02T19:48:15.485Z",
-  "updated": "2026-08-04T20:39:35.234Z",
+  "updated": "2026-08-04T20:41:47.103Z",
   "pipeline": {
     "issueId": "PAN-3497",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T20:33:37.208Z",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since edaa34e (1 path): src/dashboard/server/main.ts",
-        "detectedAt": "2026-08-04T20:33:22.504Z"
-      }
-    ],
-    "conflictsSince": {
-      "sha": "edaa34ebfe810c26354802c81981deef32c79573",
-      "detectedAt": "2026-08-04T20:33:22.504Z",
-      "paths": [
-        "src/dashboard/server/main.ts"
-      ]
-    }
+    "updatedAt": "2026-08-04T20:41:47.094Z"
   },
   "closeOut": {
     "usage": {
@@ -56,19 +49,12 @@
       },
       "costAtCloseOut": {
         "usd": 28.725515,
-        "pricingAsOf": "2026-08-04T20:33:37.219Z"
+        "pricingAsOf": "2026-08-04T20:41:47.099Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-04T20:39Z] review-agent → FAILED — seq 1",
-      "timestamp": "2026-08-04T20:39:35.234Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
