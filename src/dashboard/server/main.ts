@@ -81,6 +81,7 @@ import { join } from 'node:path';
 import { Layer } from 'effect';
 import { createOverdeckDatabase } from '../../../scripts/create-overdeck-db.js';
 import { getOverdeckDatabasePath } from '../../lib/overdeck/paths.js';
+import { startProjectCiRefill } from '../../lib/overdeck/project-ci-fill.js';
 import { ProjectsLive } from '../../lib/overdeck/config.js';
 import { RecordsLive, TmuxLive } from '../../lib/overdeck/infra.js';
 import { startServerBootTelemetry } from './telemetry.js';
@@ -752,6 +753,11 @@ void reconcileStaleGitHubBlockers()
     }
   })
   .catch((err: any) => console.warn(`[overdeck] Startup blocker reconciliation failed: ${err.message}`));
+
+// PAN-3537: seed the per-project CI chip before the first webhook arrives, and
+// repair it every 15 minutes so a dropped webhook delivery cannot leave a
+// long-running dashboard showing an indefinitely stale CI state.
+startProjectCiRefill(15 * 60 * 1000);
 
 // Reset stuck merge queue entries (PAN-632): any 'processing' entries were
 // in-flight when the server died — reset to 'queued' so they resume.

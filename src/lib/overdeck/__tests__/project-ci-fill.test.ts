@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectConfig } from '../../projects.js';
 import {
   fillAllProjectCi,
   fillProjectCiObservations,
+  startProjectCiRefill,
 } from '../project-ci-fill.js';
 
 type Project = { key: string; config: ProjectConfig };
@@ -113,5 +114,48 @@ describe('fillAllProjectCi', () => {
       type: 'project.ci_suite_observed',
       payload: expect.objectContaining({ suiteId: '101' }),
     }));
+  });
+});
+
+describe('startProjectCiRefill', () => {
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
+  it('runs immediately and again after the configured interval', async () => {
+    vi.useFakeTimers();
+    const fill = vi.fn(async () => 0);
+    startProjectCiRefill(15 * 60 * 1000, { fill });
+
+    expect(fill).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+    expect(fill).toHaveBeenCalledTimes(2);
+  });
+
+  it('contains rejected fills and continues scheduling later ticks', async () => {
+    vi.useFakeTimers();
+    const fill = vi.fn(async () => { throw new Error('gh unavailable'); });
+    const warn = vi.fn();
+    startProjectCiRefill(15 * 60 * 1000, { fill, warn });
+
+    await vi.advanceTimersByTimeAsync(0);
+    expect(warn).toHaveBeenCalledWith('[overdeck] Project CI fill failed: gh unavailable');
+    await vi.advanceTimersByTimeAsync(15 * 60 * 1000);
+    expect(fill).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it('unrefs the interval so it does not keep the process alive', () => {
+    const unref = vi.fn();
+    const setIntervalFn = vi.fn(() => ({ unref }) as unknown as ReturnType<typeof setInterval>);
+    const fill = vi.fn(async () => 0);
+
+    startProjectCiRefill(15 * 60 * 1000, {
+      fill,
+      setIntervalFn: setIntervalFn as unknown as typeof setInterval,
+    });
+
+    expect(unref).toHaveBeenCalledTimes(1);
   });
 });

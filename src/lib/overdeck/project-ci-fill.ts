@@ -95,3 +95,26 @@ export async function fillAllProjectCi(
 
   return appended;
 }
+
+export function startProjectCiRefill(
+  intervalMs: number,
+  deps: {
+    fill?: typeof fillAllProjectCi;
+    warn?: (message: string) => void;
+    setIntervalFn?: typeof setInterval;
+  } = {},
+): ReturnType<typeof setInterval> {
+  const fill = deps.fill ?? fillAllProjectCi;
+  const warn = deps.warn ?? ((message: string) => console.warn(message));
+  const run = (): void => {
+    void fill().catch((err: unknown) => {
+      const message = err instanceof Error ? err.message : String(err);
+      warn(`[overdeck] Project CI fill failed: ${message}`);
+    });
+  };
+
+  run();
+  const timer = (deps.setIntervalFn ?? setInterval)(run, intervalMs);
+  timer.unref();
+  return timer;
+}
