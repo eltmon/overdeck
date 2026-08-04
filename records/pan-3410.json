@@ -940,19 +940,21 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-04T17:54:24.396Z",
+  "updated": "2026-08-04T18:01:59.138Z",
   "pipeline": {
     "issueId": "PAN-3410",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "failed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-04T17:50:44.210Z",
+    "updatedAt": "2026-08-04T18:01:58.827Z",
+    "reviewNotes": "Approved: all convoy reports readable; one requirements reinterpretation was demoted by the cycle-12 convergence gate because the cited contract is unchanged since cycle 11 approval.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -961,7 +963,25 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3475",
-    "reviewSpawnedAt": "2026-08-04T17:50:44.209Z"
+    "reviewSpawnedAt": "2026-08-04T17:50:44.209Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "154acd4ff622cc7f668b45d947f13ad81df9bea3"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "154acd4ff622cc7f668b45d947f13ad81df9bea3"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "154acd4ff622cc7f668b45d947f13ad81df9bea3"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "154acd4ff622cc7f668b45d947f13ad81df9bea3"
+      }
+    }
   },
   "closeOut": {
     "usage": {
@@ -976,9 +996,25 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 49930423,
-            "output": 917206,
-            "cacheRead": 201060352,
+            "input": 52012982,
+            "output": 949838,
+            "cacheRead": 214044160,
+            "cacheWrite": 0
+          }
+        },
+        "review.performance": {
+          "openai/gpt-5.6-sol": {
+            "input": 453978,
+            "output": 20838,
+            "cacheRead": 3995648,
+            "cacheWrite": 0
+          }
+        },
+        "review.requirements": {
+          "openai/gpt-5.6-sol": {
+            "input": 965116,
+            "output": 39250,
+            "cacheRead": 9068032,
             "cacheWrite": 0
           }
         },
@@ -998,9 +1034,9 @@
             "cacheWrite": 31969625
           },
           "openai/gpt-5.6-sol": {
-            "input": 498173,
-            "output": 24148,
-            "cacheRead": 8351744,
+            "input": 537451,
+            "output": 27154,
+            "cacheRead": 10795008,
             "cacheWrite": 0
           }
         }
@@ -1013,9 +1049,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 50428596,
-          "output": 941354,
-          "cacheRead": 209412096,
+          "input": 53969527,
+          "output": 1037080,
+          "cacheRead": 237902848,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1026,8 +1062,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 629.8534253,
-        "pricingAsOf": "2026-08-04T17:50:44.238Z"
+        "usd": 664.6752363,
+        "pricingAsOf": "2026-08-04T18:01:59.013Z"
       }
     },
     "merges": [
