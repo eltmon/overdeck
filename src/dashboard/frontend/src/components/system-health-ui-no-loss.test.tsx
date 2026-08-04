@@ -232,8 +232,11 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getAllByText(/^All clear .* spawn headroom .* relay running .* 0 stalled agents$/).length)
       .toBeGreaterThan(0);
 
+    const stateBadge = within(dialog).getByRole('status', { name: 'healthy system health' });
+    expect(stateBadge).toHaveTextContent('healthy');
+    expect(dialog).toHaveClass('w-[min(22rem,calc(100vw-1rem))]');
+
     // Chip row (new top status row, replaces old 8-tile status grid)
-    expect(within(dialog).getByRole('img', { name: 'healthy system health' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Admitted work agents: 2' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Containers: 1' })).toBeInTheDocument();
     expect(within(dialog).getByRole('group', { name: 'Webhook relay: Running' })).toBeInTheDocument();
@@ -251,6 +254,75 @@ describe('system health UI no-loss audit', () => {
     expect(within(dialog).getByText('Swap')).toBeInTheDocument();
     expect(within(dialog).getByText('50.0%')).toBeInTheDocument();
     expect(within(dialog).getByText('Overcommit 125.0%')).toBeInTheDocument();
+    expect(within(dialog).getByText('No leaks')).toBeInTheDocument();
+  });
+
+  it('maps vital meter boundaries and distinguishes zero from unavailable', () => {
+    const snapshot = createSnapshot();
+    hookState.current = {
+      data: {
+        ...snapshot,
+        host: {
+          ...snapshot.host,
+          metrics: {
+            ...snapshot.host.metrics,
+            cpuPercent: 59.9,
+            memoryUsedPercent: 60,
+            swapUsedPercent: 85,
+          },
+        },
+        summary: {
+          ...snapshot.summary,
+          overdeckMemoryPercent: 0,
+        },
+      },
+      isLoading: false,
+      error: null,
+    };
+    const rendered = renderPill();
+    fireEvent.click(screen.getByTestId('system-health-pill'));
+
+    let dialog = screen.getByRole('dialog', { name: 'System health' });
+    const cpuMeter = within(dialog).getByRole('meter', { name: 'CPU usage' });
+    const memoryMeter = within(dialog).getByRole('meter', { name: 'Memory usage' });
+    const swapMeter = within(dialog).getByRole('meter', { name: 'Swap usage' });
+    const overdeckMeter = within(dialog).getByRole('meter', { name: 'Overdeck memory share' });
+    expect(cpuMeter).toHaveClass('bg-success');
+    expect(cpuMeter).toHaveStyle({ width: '59.9%' });
+    expect(memoryMeter).toHaveClass('bg-warning');
+    expect(memoryMeter).toHaveStyle({ width: '60%' });
+    expect(swapMeter).toHaveClass('bg-warning');
+    expect(swapMeter).toHaveStyle({ width: '85%' });
+    expect(overdeckMeter).toHaveStyle({ width: '0%' });
+
+    hookState.current = {
+      data: {
+        ...snapshot,
+        host: {
+          ...snapshot.host,
+          metrics: {
+            ...snapshot.host.metrics,
+            cpuPercent: null,
+            memoryUsedPercent: 85.1,
+          },
+        },
+      },
+      isLoading: false,
+      error: null,
+    };
+    rendered.rerender(
+      <QueryClientProvider client={queryClient()}>
+        <DialogProvider>
+          <SystemHealthPill />
+        </DialogProvider>
+      </QueryClientProvider>,
+    );
+
+    dialog = screen.getByRole('dialog', { name: 'System health' });
+    expect(within(dialog).queryByRole('meter', { name: 'CPU usage' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Unavailable')).toBeInTheDocument();
+    expect(within(dialog).getByRole('meter', { name: 'Memory usage' })).toHaveClass('bg-destructive');
+    expect(within(dialog).getByRole('meter', { name: 'Memory usage' })).toHaveStyle({ width: '85.1%' });
   });
 
   it('retains agent kill, specialist kill, and container remove actions', async () => {
@@ -298,6 +370,8 @@ describe('system health UI no-loss audit', () => {
     // getBy* would fail on the section being MORE populated, not less.
     expect(within(dialog).getAllByText(/Work|Specialist|Container/).length).toBeGreaterThan(0);
     expect(within(dialog).getAllByText(/agent-pan-1|specialist-review-agent|container-1/).length).toBeGreaterThan(0);
+    expect(within(dialog).getByText('LEAKED')).toBeInTheDocument();
+    expect(within(dialog).getByText('⚠ 1 leaked specialist')).toBeInTheDocument();
   });
 
   it('exposes each consumer kind badge and proportional memory meter accessibly', () => {

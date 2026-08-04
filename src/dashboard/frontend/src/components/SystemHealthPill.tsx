@@ -415,10 +415,13 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="mb-2 flex items-center gap-2">
                 <span id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</span>
                 <span
-                  role="img"
+                  role="status"
                   aria-label={`${data.state} system health`}
-                  className={`inline-flex h-2 w-2 rounded-full ${stateDotClass(data.state)}`}
-                />
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium capitalize ${stateClasses(data.state)}`}
+                >
+                  <span aria-hidden="true" className={`inline-flex h-2 w-2 rounded-full ${stateDotClass(data.state)}`} />
+                  {data.state}
+                </span>
               </div>
               <div className="text-xs text-muted-foreground">Updated {Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago</div>
             </div>
@@ -446,7 +449,12 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               {data.host.metrics.cpuPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full ${data.host.metrics.cpuPercent < 60 ? 'bg-success' : data.host.metrics.cpuPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    role="meter"
+                    aria-label="CPU usage"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={data.host.metrics.cpuPercent}
+                    className={`h-full ${data.host.metrics.cpuPercent < 60 ? 'bg-success' : data.host.metrics.cpuPercent <= 85 ? 'bg-warning' : 'bg-destructive'}`}
                     style={{ width: `${Math.min(100, data.host.metrics.cpuPercent)}%` }}
                   />
                 </div>
@@ -461,7 +469,12 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               {data.host.metrics.memoryUsedPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full ${data.host.metrics.memoryUsedPercent < 60 ? 'bg-success' : data.host.metrics.memoryUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    role="meter"
+                    aria-label="Memory usage"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={data.host.metrics.memoryUsedPercent}
+                    className={`h-full ${data.host.metrics.memoryUsedPercent < 60 ? 'bg-success' : data.host.metrics.memoryUsedPercent <= 85 ? 'bg-warning' : 'bg-destructive'}`}
                     style={{ width: `${Math.min(100, data.host.metrics.memoryUsedPercent)}%` }}
                   />
                 </div>
@@ -471,14 +484,17 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               <div className="text-muted-foreground">Overdeck</div>
               <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
               <div className="mt-1 text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
-              {data.summary.overdeckMemoryPercent > 0 && (
-                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-full bg-info"
-                    style={{ width: `${Math.min(100, data.summary.overdeckMemoryPercent)}%` }}
-                  />
-                </div>
-              )}
+              <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  role="meter"
+                  aria-label="Overdeck memory share"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={data.summary.overdeckMemoryPercent}
+                  className="h-full bg-info"
+                  style={{ width: `${Math.min(100, data.summary.overdeckMemoryPercent)}%` }}
+                />
+              </div>
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Swap <span className="text-[11px]">historical · not live pressure</span></div>
@@ -486,7 +502,12 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
               {data.host.metrics.swapUsedPercent != null && (
                 <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
                   <div
-                    className={`h-full ${data.host.metrics.swapUsedPercent < 60 ? 'bg-success' : data.host.metrics.swapUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    role="meter"
+                    aria-label="Swap usage"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={data.host.metrics.swapUsedPercent}
+                    className={`h-full ${data.host.metrics.swapUsedPercent < 60 ? 'bg-success' : data.host.metrics.swapUsedPercent <= 85 ? 'bg-warning' : 'bg-destructive'}`}
                     style={{ width: `${Math.min(100, data.host.metrics.swapUsedPercent)}%` }}
                   />
                 </div>
