@@ -24,11 +24,20 @@
       "id": "a0dea72b-8bf9-4f96-a2b5-e06f41b8be51",
       "startedAt": "2026-08-02T03:55:35.455Z",
       "reason": "recovered"
+    },
+    {
+      "id": "54aa030f-f1a1-447f-a4ab-d543c0435d38",
+      "startedAt": "2026-08-04T17:55:30.248Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
     {
       "at": "2026-08-02T19:41:51.706Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-04T17:55:30.248Z",
       "event": "spawned"
     }
   ],
