@@ -353,7 +353,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-04T15:38:34.914Z",
+  "updated": "2026-08-04T17:39:42.017Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -361,22 +361,22 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T15:38:31.745Z",
+    "updatedAt": "2026-08-04T17:39:42.005Z",
     "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Merge conflict with target branch",
-        "detectedAt": "2026-08-04T15:38:31.745Z"
-      },
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
         "detectedAt": "2026-08-04T15:38:31.745Z"
+      },
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since 534828d (2 paths): src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts",
+        "detectedAt": "2026-08-04T17:35:47.540Z"
       }
     ],
     "conflictsSince": {
-      "sha": "2a4f6c2521e7e41a6a7ed27e5b1a1a5c2006a284",
-      "detectedAt": "2026-08-03T05:15:57.689Z",
+      "sha": "534828d51baafac0178caf7468544c06edfff550",
+      "detectedAt": "2026-08-04T17:35:47.540Z",
       "paths": [
         "src/lib/cloister/__tests__/review-verdict-writer.test.ts",
         "src/lib/cloister/review-verdict-writer.ts"
@@ -468,7 +468,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.3676167,
-        "pricingAsOf": "2026-08-04T15:38:31.780Z"
+        "pricingAsOf": "2026-08-04T17:39:42.009Z"
       }
     },
     "merges": [
