@@ -24,12 +24,25 @@
       "id": "cc5ec0e6-a36f-4edc-80a3-b2b5d3c3dbd6",
       "startedAt": "2026-08-02T03:55:35.098Z",
       "reason": "recovered"
+    },
+    {
+      "id": "07458737-09e0-41bc-a732-68d19a8b7e8f",
+      "startedAt": "2026-08-04T17:55:30.272Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
     {
       "at": "2026-08-02T19:41:51.655Z",
       "event": "spawned"
+    },
+    {
+      "at": "2026-08-04T17:55:30.272Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-02T23:56:35.908Z",
+      "event": "stopped"
     }
   ],
   "archiveRef": null,
