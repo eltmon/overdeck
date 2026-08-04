@@ -19,11 +19,20 @@
       "id": "9ccdb1be-e377-4d40-beb2-a14c79417204",
       "startedAt": "2026-08-04T09:47:05.670Z",
       "reason": "spawn"
+    },
+    {
+      "id": "cf6e384b-506b-4580-bbb9-8dedbb59f40a",
+      "startedAt": "2026-08-04T17:51:11.885Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
     {
       "at": "2026-08-04T09:47:05.670Z",
+      "event": "spawned"
+    },
+    {
+      "at": "2026-08-04T17:51:11.885Z",
       "event": "spawned"
     }
   ],
