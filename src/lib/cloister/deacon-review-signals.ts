@@ -11,7 +11,7 @@ import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
-import { applyCodexAuthBurnFlag, paneShowsCodexAuthBurn } from '../codex-auth.js';
+import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { extractMarkdownSection, findBlockingFindings } from '../review-findings.js';
 import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
 
@@ -384,7 +384,13 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
       // in the deacon CHILD process, so the flag must reach the dashboard
       // server's banner endpoint and spawn gate through the shared agents table,
       // not module memory.
-      if (paneShowsCodexAuthBurn(tail) && applyCodexAuthBurnFlag(state)) {
+      //
+      // PAN-3528 widened the markers to cover the CLIProxy route, whose 503
+      // wrapper text is generic enough to appear in a pane that is not
+      // codex-authenticated at all — so only reviewers actually routed through
+      // the codex credential family are eligible for the flag.
+      const codexRouted = isCodexAuthRouted(state.harness, state.model);
+      if (codexRouted && paneShowsCodexAuthBurn(tail) && applyCodexAuthBurnFlag(state)) {
         saveAgentStateSync(state);
         logDeaconEventSync(`review-monitor: ${agentId} marked troubled — Codex refresh token revoked (codex-auth-burned)`);
       }

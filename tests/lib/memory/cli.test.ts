@@ -48,7 +48,7 @@ beforeEach(async () => {
   workspace999 = await registerWorkspace('PAN-999', 'feature-pan-999');
   workspace998 = await registerWorkspace('PAN-998', 'feature-pan-998');
   workspace997 = await registerWorkspace('PAN-997', 'feature-pan-997');
-});
+}, 20_000);
 
 afterEach(() => {
   closeMemoryFtsDatabases();

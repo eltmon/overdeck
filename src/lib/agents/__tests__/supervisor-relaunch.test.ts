@@ -34,7 +34,7 @@ vi.mock('../../paths.js', async (importOriginal) => ({
   getOverdeckHome: () => getHome(),
 }));
 
-import { prepareSupervisorForRelaunch } from '../supervisor-channels.js';
+import { prepareSupervisorForFreshLaunch, prepareSupervisorForRelaunch } from '../supervisor-channels.js';
 import type { AgentState } from '../agent-state.js';
 
 function workState(overrides: Partial<AgentState> = {}): AgentState {
@@ -80,6 +80,33 @@ describe('prepareSupervisorForRelaunch (PAN-3257)', () => {
     });
     expect(state.supervisorEnabled).toBe(true);
     expect(mockWritePtyToken).toHaveBeenCalledWith('agent-pan-1837');
+  });
+
+  it('wires the supervisor for strike agents on fresh launch and relaunch', async () => {
+    const state = workState({
+      id: 'strike-pan-3525',
+      issueId: 'PAN-3525',
+      role: 'strike',
+      workspace: '/tmp/workspaces/feature-pan-3525-strike',
+    });
+    const options = {
+      issueId: 'PAN-3525',
+      workspace: state.workspace,
+      role: 'strike' as const,
+      model: 'claude-sonnet-5',
+      harness: 'claude-code' as const,
+    };
+
+    await expect(prepareSupervisorForFreshLaunch('strike-pan-3525', options, state)).resolves.toMatchObject({
+      useSupervisor: true,
+    });
+    await expect(prepareSupervisorForRelaunch(
+      'strike-pan-3525',
+      state,
+      'claude-sonnet-5',
+      'claude-code',
+    )).resolves.toMatchObject({ useSupervisor: true });
+    expect(mockWritePtyToken).toHaveBeenCalledTimes(2);
   });
 
   it('removes a stale supervisor socket when the relaunch is ineligible', async () => {

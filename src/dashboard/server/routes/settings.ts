@@ -34,6 +34,7 @@ import { getClaudeAuthStatus } from '../../../lib/claude-auth.js';
 import { setUiTheme } from '../../../lib/ui-theme.js';
 import { getOpenAIAuthStatus } from '../../../lib/openai-auth.js';
 import { PROVIDERS, getKimiAnthropicBaseUrl } from '../../../lib/providers.js';
+import { getDashScopeUpstreamBaseUrl } from '../../../lib/openai-compatible-proxy.js';
 import { OpenRouterService } from '../services/openrouter-service.js';
 import { httpHandler } from './http-handler.js';
 import { getProviderAuthMode, getProviderEnvForModel } from '../../../lib/agents.js';
@@ -157,6 +158,7 @@ export const MODEL_API_IDS: Record<string, { apiModel: string; endpoint?: string
   'qwen3-coder-plus': { apiModel: 'qwen3-coder-plus' },
   'qwen3-plus': { apiModel: 'qwen3-plus' },
   'qwen3.7-max': { apiModel: 'qwen3.7-max' },
+  'qwen3.8-max': { apiModel: 'qwen3.8-max' },
 };
 
 // ─── Route: GET /api/settings ─────────────────────────────────────────────────
@@ -486,7 +488,7 @@ const postTestApiKeyRoute = HttpRouter.add(
         case 'dashscope': {
           const apiModel = model ? (MODEL_API_IDS[model]?.apiModel || 'qwen3-max') : 'qwen3-max';
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/chat/completions', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/chat/completions`, {
               method: 'POST',
               headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
               body: JSON.stringify({ model: apiModel, messages: [{ role: 'user', content: testPrompt }], max_tokens: 10 }),
@@ -710,13 +712,13 @@ const postValidateApiKeyRoute = HttpRouter.add(
 
         case 'dashscope': {
           try {
-            const resp = await fetch('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models', {
+            const resp = await fetch(`${getDashScopeUpstreamBaseUrl()}/models`, {
               headers: { 'Authorization': `Bearer ${apiKey}` },
             });
             if (resp.ok) {
               const data = await resp.json() as { data?: Array<{ id: string }> };
               valid = true;
-              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max'];
+              models = data.data?.map(m => m.id) || ['qwen3-max', 'qwen3-coder-plus', 'qwen3-plus', 'qwen3.7-max', 'qwen3.8-max'];
             } else if (resp.status === 401) {
               error = 'Invalid API key';
             } else if (resp.status === 429) {
