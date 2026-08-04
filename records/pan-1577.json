@@ -1293,7 +1293,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T18:05:08.057Z",
+  "updated": "2026-08-04T18:14:49.232Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1303,7 +1303,6 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
     "updatedAt": "2026-08-04T18:05:08.026Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "testNotes": "Automated gates at HEAD 1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef: typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet) PASS. lint (eslint + all 18 sub-lints incl. circular-deps, ratchet-audit, quarantine-audit, skills, slash-commands, file-size) PASS clean on a controlled rerun; two transient failures (skill-CLI flake, build:cli heap OOM) traced to this machine's extreme concurrent load (uptime load average 28-37 across ~40 tmux sessions, swap saturated) and confirmed non-defects by isolating and rerunning the failing step successfully. Root vitest: 1403 files total, 53 failed / 1347 passed / 3 skipped, 13184/13294 tests passed. All 53 failures share one signature -- 'Hook timed out in 5000ms' inside beforeEach setupOverdeckTestDb() -- except one (operator-interventions.test.ts AC3, whose own last commit message documents it as a known 409-flakes-to-500 flake, unrelated to this branch's diff). Confirmed load-induced: reran a 17-file diverse sample spanning conversations/memory/workspaces/merge-sync/schema-audit/agents-state-db (including src/cli/commands/conversations/__tests__/move.test.ts, the file most relevant to this branch) with --testTimeout=30000 --hookTimeout=30000 -- all passed cleanly with 3-7s actual runtime, well inside the extended window, and zero code changes. Frontend vitest (full suite, not just the 4 files package.json's npm test targets): 307/307 files, 3013/3013 tests passed clean.",
