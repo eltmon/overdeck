@@ -467,25 +467,18 @@
     "recordedAt": "2026-08-02T20:52:55.785Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-04T17:38:42.223Z",
+  "updated": "2026-08-04T17:39:12.798Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T17:38:32.589Z",
-    "blockerReasons": [
-      {
-        "type": "failing_checks",
-        "summary": "Required checks are failing",
-        "detectedAt": "2026-08-04T17:38:32.589Z"
-      }
-    ],
+    "updatedAt": "2026-08-04T17:39:12.763Z",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -495,8 +488,7 @@
         "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx"
       ]
     },
-    "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
-    "reviewSpawnedAt": "2026-08-03T05:37:18.071Z"
+    "prUrl": "https://github.com/eltmon/overdeck/pull/3435"
   },
   "closeOut": {
     "usage": {
@@ -551,10 +543,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 2623,
-            "output": 247611,
-            "cacheRead": 113311724,
-            "cacheWrite": 2620836
+            "input": 2627,
+            "output": 248146,
+            "cacheRead": 113639641,
+            "cacheWrite": 2624066
           }
         },
         "work": {
@@ -580,15 +572,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 2623,
-          "output": 247611,
-          "cacheRead": 113311724,
-          "cacheWrite": 2620836
+          "input": 2627,
+          "output": 248146,
+          "cacheRead": 113639641,
+          "cacheWrite": 2624066
         }
       },
       "costAtCloseOut": {
-        "usd": 541.6485636,
-        "pricingAsOf": "2026-08-04T17:38:32.626Z"
+        "usd": 541.7275796,
+        "pricingAsOf": "2026-08-04T17:39:12.784Z"
       }
     },
     "merges": [
