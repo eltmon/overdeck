@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdirSync, rmSync } from 'fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
 import {
@@ -67,6 +67,46 @@ describe('work-agent-lifecycle', () => {
     expect(lifecycle.recommendedAction).toBe('resume');
     expect(lifecycle.reason).toContain(`pan reset-session ${agentId}`);
     expect(lifecycle.reason).not.toContain('--fresh');
+
+    transcriptExistsSpy.mockRestore();
+    sessionExistsSpy.mockRestore();
+  });
+
+  it('allows fresh start for a handed-off agent even with a saved session (PAN-3543)', () => {
+    const agentId = getUniqueAgentId('handoff-fresh');
+    const workspace = join('/tmp', agentId);
+    mkdirSync(workspace, { recursive: true });
+
+    saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-692',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: new Date().toISOString(),
+    });
+    saveAgentRuntimeState(agentId, {
+      state: 'idle',
+      lastActivity: new Date().toISOString(),
+    });
+    saveSessionId(agentId, 'session-123');
+    // Completion marker: the agent finished and handed off. A blocked review
+    // then owes rework, and --fresh is the ONLY forward path ("nothing to
+    // resume" by design, PAN-3334) — it must not be gated behind a
+    // resumable-session reset the durable plane immediately undoes (PAN-3541).
+    writeFileSync(join(getAgentDir(agentId), 'completed'), '');
+
+    const sessionExistsSpy = vi.spyOn(tmux, 'sessionExistsSync').mockReturnValue(false);
+    const transcriptExistsSpy = vi.spyOn(paths, 'claudeSessionTranscriptExists').mockReturnValue(true);
+    const lifecycle = getWorkAgentLifecycleStateSync(agentId);
+
+    expect(lifecycle.handedOff).toBe(true);
+    expect(lifecycle.canResumeSession).toBe(false);
+    expect(lifecycle.requiresSessionResetBeforeFreshStart).toBe(false);
+    expect(lifecycle.canStartFresh).toBe(true);
+    expect(lifecycle.recommendedAction).toBe('none');
 
     transcriptExistsSpy.mockRestore();
     sessionExistsSpy.mockRestore();
