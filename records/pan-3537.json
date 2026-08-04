@@ -22,7 +22,7 @@
   ],
   "feedback": [],
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T08:21:22.095Z",
+  "updated": "2026-08-04T08:37:36.462Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "pending",
@@ -89,18 +89,34 @@
   ],
   "workModel": "gpt-5.6-sol",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "contracts-event-and-reducer": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3537",
         "agentId": "agent-pan-3537",
         "pid": 3867432,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T08:21:22.095Z"
+        "claimedAt": "2026-08-04T08:21:22.095Z",
+        "itemId": "contracts-event-and-reducer",
+        "outcome": "completed",
+        "reason": "Added the shared project.ci_suite_observed schema, per-project CI snapshot reduction, derivation helper, snapshot hydration, and reducer tests.",
+        "releasedAt": "2026-08-04T08:37:36.462Z"
+      }
+    ],
+    "statusReasons": {
+      "contracts-event-and-reducer": {
+        "reason": "Added the shared project.ci_suite_observed schema, per-project CI snapshot reduction, derivation helper, snapshot hydration, and reducer tests.",
+        "updatedAt": "2026-08-04T08:37:36.462Z"
       }
     }
   },
   "statusOverrides": {
-    "contracts-event-and-reducer": "running"
+    "contracts-event-and-reducer": "completed",
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac1": "completed",
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac2": "completed",
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac3": "completed",
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac4": "completed",
+    "contracts-event-and-reducer.contracts-event-and-reducer.ac5": "completed"
   }
 }
