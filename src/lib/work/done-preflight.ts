@@ -14,6 +14,10 @@ import { runTestRequirementCheck } from './test-requirement-gate.js';
 const execAsync = promisify(exec);
 const terminal = new Set(['completed', 'cancelled']);
 
+function displaySubItemId(itemId: string, subItemId: string): string {
+  return subItemId.startsWith(`${itemId}.`) ? subItemId : `${itemId}.${subItemId}`;
+}
+
 export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[] {
   if (!doc) return ['  The required xBRIEF checklist is missing or unreadable; return the issue to planning before completion.'];
   const incomplete = doc.plan.items.flatMap((item) => {
@@ -21,7 +25,7 @@ export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[
     const lines: string[] = [];
     if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);
     for (const child of subItemsOf(item)) {
-      if (!terminal.has(child.status)) lines.push(`    - ${item.id}.${child.id} ${child.title} (${child.status})`);
+      if (!terminal.has(child.status)) lines.push(`    - ${displaySubItemId(item.id, child.id)} ${child.title} (${child.status})`);
     }
     return lines;
   });

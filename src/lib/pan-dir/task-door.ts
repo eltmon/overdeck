@@ -59,6 +59,10 @@ function statusFor(type: TaskOperationType): XBriefItemStatus {
   return 'cancelled';
 }
 
+function subItemOverrideKey(itemId: string, subItemId: string): string {
+  return subItemId.includes('.') ? subItemId : `${itemId}.${subItemId}`;
+}
+
 function allowedFrom(type: TaskOperationType, status: XBriefItemStatus): boolean {
   if (type === 'claim') return status === 'pending';
   if (type === 'done') return status === 'running';
@@ -118,18 +122,34 @@ export async function applyTaskStatusChange(
     const currentStatus = item.status;
     const currentSequence = record.tasks?.sequence ?? 0;
     const existingClaim = record.tasks?.claims[operation.itemId];
+    const nextStatus = statusFor(operation.type);
+    const subItems = subItemsOf(item);
+    const subIds = operation.subItemIds?.length
+      ? new Set(operation.subItemIds)
+      : new Set(
+          operation.type === 'done' || operation.type === 'cancel'
+            ? subItems.map(({ id }) => id)
+            : [],
+        );
+    const repeatedCancellation = operation.type === 'cancel' && currentStatus === 'cancelled';
     if (operation.expectedSequence !== undefined && operation.expectedSequence !== currentSequence) {
       throw new TaskStatusChangeError(
         `Task sequence conflict for ${normalizedIssueId}: expected ${operation.expectedSequence}, but the current sequence is ${currentSequence}. Run \`pan task next ${normalizedIssueId}\` and retry with the new sequence.`,
         { issueId: normalizedIssueId, itemId: operation.itemId, operation: operation.type, currentStatus, currentSequence },
       );
     }
-    if (TERMINAL.has(currentStatus)) throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId);
+    if (TERMINAL.has(currentStatus) && !repeatedCancellation) {
+      throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId);
+    }
     if (operation.force && !operation.reason) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId, 'A forced transition requires --reason.');
     }
     if ((operation.type === 'block' || operation.type === 'cancel') && !operation.reason) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId, 'This transition requires --reason.');
+    }
+    if (repeatedCancellation && subItems.every((subItem) => subItem.status === 'cancelled')) {
+      result = { issueId: normalizedIssueId, itemId: operation.itemId, status: 'cancelled', sequence: currentSequence, idempotent: true };
+      return record;
     }
     if (operation.type === 'claim' && currentStatus === 'running' && existingClaim?.writerId === writerId) {
       result = { issueId: normalizedIssueId, itemId: operation.itemId, status: 'running', sequence: currentSequence, claim: existingClaim, idempotent: true };
@@ -139,18 +159,14 @@ export async function applyTaskStatusChange(
     if (!operation.force && ownerRestricted && existingClaim?.writerId !== writerId) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId ?? 'missing claim owner');
     }
-    if (!operation.force && !allowedFrom(operation.type, currentStatus)) {
+    if (!operation.force && !repeatedCancellation && !allowedFrom(operation.type, currentStatus)) {
       throw taskError(normalizedIssueId, operation.itemId, operation.type, currentStatus, existingClaim?.writerId);
     }
 
     const now = new Date().toISOString();
-    const nextStatus = statusFor(operation.type);
     record.tasks ??= { sequence: 0, claims: {} };
     record.statusOverrides = { ...(record.statusOverrides ?? {}), [operation.itemId]: nextStatus };
-    const subIds = operation.subItemIds?.length
-      ? new Set(operation.subItemIds)
-      : new Set(operation.type === 'done' ? subItemsOf(item).map(({ id }) => id) : []);
-    for (const subId of subIds) record.statusOverrides[`${operation.itemId}.${subId}`] = nextStatus;
+    for (const subId of subIds) record.statusOverrides[subItemOverrideKey(operation.itemId, subId)] = nextStatus;
 
     if (operation.type === 'claim') {
       record.tasks.claims[operation.itemId] = {

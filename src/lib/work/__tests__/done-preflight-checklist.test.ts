@@ -22,6 +22,7 @@ import {
 function planWithStatus(
   status: 'pending' | 'completed' | 'cancelled',
   childStatus?: 'pending' | 'completed',
+  childId = 'ac1',
 ): XBriefDocument {
   return {
     xBRIEFInfo: {
@@ -46,7 +47,7 @@ function planWithStatus(
         created: '2026-08-01T00:00:00.000Z',
         ...(childStatus ? {
           items: [{
-            id: 'ac1',
+            id: childId,
             title: 'Acceptance criterion',
             status: childStatus,
             metadata: { kind: 'acceptance_criterion' },
@@ -92,8 +93,8 @@ describe('plan checklist evaluation', () => {
     expect(evaluateIncompletePlanItems(planWithStatus('cancelled', 'pending'))).toEqual([]);
   });
 
-  it('still reports pending acceptance criteria under a completed item', () => {
-    expect(evaluateIncompletePlanItems(planWithStatus('completed', 'pending'))).toEqual([
+  it('still reports pending acceptance criteria under a completed item without duplicating qualified IDs', () => {
+    expect(evaluateIncompletePlanItems(planWithStatus('completed', 'pending', 'item-one.ac1'))).toEqual([
       '  Incomplete plan items (1):',
       '    - item-one.ac1 Acceptance criterion (pending)',
     ]);
