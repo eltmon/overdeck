@@ -269,71 +269,7 @@
       "timestamp": "2026-08-04T20:30:42.033Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T19:29:26Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T19:36:22Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 3,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T19:44:24Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 4,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T19:53:21Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 5,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T20:02:00Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 6,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T20:11:07Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 7,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T20:15:29Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 8,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T20:23:28Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    },
-    {
-      "seq": 9,
-      "specialist": "review-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-04T20:30:42Z",
-      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -383,10 +319,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T20:30:42.033Z",
+  "updated": "2026-08-04T20:32:54.730Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -394,13 +330,13 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T20:11:44.485Z",
+    "updatedAt": "2026-08-04T20:32:54.560Z",
     "reviewNotes": "Review reset by deacon: no active review session after 45min",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "ec9f5180dd50309c0be73b78dac2dfdf6981b438",
     "lastVerifiedCommit": "a9b929918604303a61ec22b0189528eb8928c778",
     "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
-    "reviewSpawnedAt": "2026-08-04T19:27:12.415Z"
+    "reviewSpawnedAt": "2026-08-04T20:32:54.559Z"
   },
   "closeOut": {
     "usage": {
@@ -478,7 +414,7 @@
       },
       "costAtCloseOut": {
         "usd": 275.2180935,
-        "pricingAsOf": "2026-08-04T20:11:44.542Z"
+        "pricingAsOf": "2026-08-04T20:32:54.636Z"
       }
     },
     "merges": [
