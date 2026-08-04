@@ -1298,7 +1298,7 @@
     }
   ],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T18:21:18.571Z",
+  "updated": "2026-08-04T18:21:24.237Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "pending",
@@ -1308,14 +1308,14 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T18:18:34.243Z",
+    "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z",
+    "updatedAt": "2026-08-04T18:21:18.541Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "testNotes": "Automated gates at HEAD 1f7ba5e012876f4c8d9ae1bcec56c4c84a84d9ef: typecheck (root+hooks+evals+dashboard-ratchet+frontend-ratchet) PASS. lint (eslint + all 18 sub-lints incl. circular-deps, ratchet-audit, quarantine-audit, skills, slash-commands, file-size) PASS clean on a controlled rerun; two transient failures (skill-CLI flake, build:cli heap OOM) traced to this machine's extreme concurrent load (uptime load average 28-37 across ~40 tmux sessions, swap saturated) and confirmed non-defects by isolating and rerunning the failing step successfully. Root vitest: 1403 files total, 53 failed / 1347 passed / 3 skipped, 13184/13294 tests passed. All 53 failures share one signature -- 'Hook timed out in 5000ms' inside beforeEach setupOverdeckTestDb() -- except one (operator-interventions.test.ts AC3, whose own last commit message documents it as a known 409-flakes-to-500 flake, unrelated to this branch's diff). Confirmed load-induced: reran a 17-file diverse sample spanning conversations/memory/workspaces/merge-sync/schema-audit/agents-state-db (including src/cli/commands/conversations/__tests__/move.test.ts, the file most relevant to this branch) with --testTimeout=30000 --hookTimeout=30000 -- all passed cleanly with 3-7s actual runtime, well inside the extended window, and zero code changes. Frontend vitest (full suite, not just the 4 files package.json's npm test targets): 307/307 files, 3013/3013 tests passed clean.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
     "reviewRequestedAt": "2026-08-04T18:21:17.510Z",
-    "reviewSpawnedAt": "2026-08-04T17:36:33.374Z",
-    "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z"
+    "reviewSpawnedAt": "2026-08-04T17:36:33.374Z"
   },
   "closeOut": {
     "usage": {
@@ -1378,10 +1378,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1154,
-            "output": 219846,
-            "cacheRead": 125197423,
-            "cacheWrite": 1691930
+            "input": 1208,
+            "output": 225905,
+            "cacheRead": 131456021,
+            "cacheWrite": 1738746
           }
         },
         "work": {
@@ -1413,15 +1413,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5019,
-          "output": 983674,
-          "cacheRead": 958449432,
-          "cacheWrite": 32491607
+          "input": 5073,
+          "output": 989733,
+          "cacheRead": 964708030,
+          "cacheWrite": 32538423
         }
       },
       "costAtCloseOut": {
-        "usd": 916.0423923,
-        "pricingAsOf": "2026-08-04T18:18:35.050Z"
+        "usd": 917.4718493,
+        "pricingAsOf": "2026-08-04T18:21:24.229Z"
       }
     },
     "merges": [
