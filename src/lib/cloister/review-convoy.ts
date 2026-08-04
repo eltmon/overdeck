@@ -612,18 +612,41 @@ export async function handleReviewDiscoveryReady(
   // stranded any sibling reviewer that died before writing its report.
   const { inScope, carried, scope } = await computeConvoyScope(normalized, workspace);
   let sessions = new Set<string>();
+  let livenessProbeOk = true;
   try {
     sessions = new Set(await Effect.runPromise(listSessionNames()));
-  } catch { /* liveness probe failure — spawnRun's own guards hold */ }
+  } catch {
+    // Liveness probe failed — tmux cannot answer, so the state row's live claim
+    // is the only signal left and keeps its conservative vote below.
+    livenessProbeOk = false;
+  }
 
   const { existsSync } = await import('node:fs');
-  const reviewersToLaunch = inScope.filter((subRole) => {
+  const reviewersToLaunch: ReviewSubRole[] = [];
+  for (const subRole of inScope) {
     const reviewerId = reviewerAgentId(normalized, subRole);
     const reviewer = getAgentStateSync(reviewerId);
     const stateClaimsLive = reviewer?.status === 'running' || reviewer?.status === 'starting';
-    const outputPath = reviewerAgentOutputPath(workspace, runId, subRole);
-    return !sessions.has(reviewerId) && !stateClaimsLive && !existsSync(outputPath);
-  });
+    if (existsSync(reviewerAgentOutputPath(workspace, runId, subRole))) continue;
+    if (sessions.has(reviewerId)) continue;
+    // tmux is the liveness oracle (docs/AGENT-STATE-PLANES.md): a probe that
+    // answered "no session" outranks a state.json row still claiming
+    // running/starting. Rows go stale whenever liveness reconciliation cannot
+    // run (deacon freeze, boot --no-resume) or a reviewer exits without a
+    // stopped event; trusting the claim no-oped the convoy launch and stranded
+    // the synthesis parent waiting for reviewers that would never exist
+    // (PAN-3545; PAN-3511 cycle 3, 2026-08-04). Heal the stale row here, at the
+    // signal — event-driven, no patrol required. Probe failure keeps the row's
+    // conservative vote: better a skipped launch than a duplicate reviewer.
+    if (stateClaimsLive) {
+      if (!livenessProbeOk) continue;
+      try {
+        const { markAgentStoppedState } = await import('../agents/agent-state.js');
+        await Effect.runPromise(saveAgentState(markAgentStoppedState(reviewer!, 'system')));
+      } catch { /* best-effort heal — the launch must not fail over bookkeeping */ }
+    }
+    reviewersToLaunch.push(subRole);
+  }
   const carriedToWrite = carried.filter(({ subRole }) =>
     !existsSync(reviewerAgentOutputPath(workspace, runId, subRole)),
   );
