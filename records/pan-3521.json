@@ -1,27 +1,19 @@
 {
   "issueId": "PAN-3521",
   "schemaVersion": 2,
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "merge-agent",
-      "outcome": "needs-you",
-      "timestamp": "2026-08-04T17:34:15Z",
-      "markdownBody": "## Strike landing needs operator attention\n\nStrike landing for PAN-3521 needs operator attention after 1 cycle(s).\n1. strike 481a996397a81fd3ba61f1195fadd4f3ee9b9a9f; main 534828d51baafac0178caf7468544c06edfff550; failed: Could not validate strike branch: spawn git ENOENT; recovery not delivered: agent is paused (needs-you: idle-alive — no observable progress across 7 pokes (idle-alive escalation))"
-    }
-  ],
+  "feedback": [],
   "created": "2026-08-03T05:20:01.081Z",
-  "updated": "2026-08-04T17:34:15.225Z",
+  "updated": "2026-08-04T17:34:25.447Z",
   "pipeline": {
     "issueId": "PAN-3521",
     "reviewStatus": "pending",
     "testStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-03T07:35:38.702Z",
+    "updatedAt": "2026-08-04T17:34:15.163Z",
     "strikeReadyHead": "481a996397a81fd3ba61f1195fadd4f3ee9b9a9f",
     "strikeReadyAt": "2026-08-03T07:35:38.701Z",
-    "strikeLandingState": "ready",
+    "strikeLandingState": "landing",
     "strikeRecoveryCount": 0,
     "strikeLandingAttempts": []
   },
@@ -38,9 +30,9 @@
         },
         "strike": {
           "openai/gpt-5.6-sol": {
-            "input": 1205342,
-            "output": 54237,
-            "cacheRead": 41881088,
+            "input": 1208906,
+            "output": 54427,
+            "cacheRead": 42253824,
             "cacheWrite": 0
           }
         }
@@ -53,27 +45,20 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 1205342,
-          "output": 54237,
-          "cacheRead": 41881088,
+          "input": 1208906,
+          "output": 54427,
+          "cacheRead": 42253824,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 28.595854,
-        "pricingAsOf": "2026-08-03T07:35:38.732Z"
+        "usd": 28.805742,
+        "pricingAsOf": "2026-08-04T17:34:15.167Z"
       }
     },
     "merges": [],
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
-  "sessionHistory": [
-    {
-      "reason": "feedback",
-      "note": "[2026-08-04T17:34Z] merge-agent → NEEDS-YOU — seq 1",
-      "timestamp": "2026-08-04T17:34:15.225Z"
-    }
-  ]
+  "model": "gpt-5.6-sol"
 }
