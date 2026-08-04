@@ -130,6 +130,27 @@ export async function emitActivityEntryDurable(options: EmitActivityOptions): Pr
   await persistActivityEvent(buildActivityEntryEvent(options));
 }
 
+/**
+ * Append an arbitrary domain event through the process-local event store.
+ *
+ * The provider is shared with activity emission (it is set by
+ * src/dashboard/server/event-store.ts in the server and by deacon-main.ts in
+ * the deacon child). Resolves false when no store is wired — CLI and test
+ * contexts must not crash on an emit.
+ */
+export async function appendDomainEventAsync(
+  event: Omit<DomainEvent, 'sequence'>,
+): Promise<boolean> {
+  const store = getActivityEventStore();
+  if (!store) return false;
+  try {
+    await store.appendAsync(event);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function buildActivityEntryEvent(options: EmitActivityOptions): Omit<DomainEvent, 'sequence'> {
   return {
     type: 'activity.entry' as const,

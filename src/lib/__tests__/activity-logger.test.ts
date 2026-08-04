@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  appendDomainEventAsync,
   emitActivityEntryDurable,
   emitActivityEntryOnce,
   emitActivityEntrySync,
@@ -65,6 +66,68 @@ describe('activity logger', () => {
       level: 'info',
       message: 'Detached command accepted',
     })).rejects.toThrow('Activity event store is not initialized.');
+  });
+
+  it('returns false when no event store provider is wired', async () => {
+    setActivityEventStoreProvider(null);
+
+    await expect(appendDomainEventAsync({
+      type: 'project.ci_suite_observed',
+      timestamp: '2026-08-04T08:00:00.000Z',
+      payload: {
+        projectKey: 'overdeck',
+        repo: 'eltmon/overdeck',
+        branch: 'main',
+        headSha: 'abc123',
+        suiteId: '42',
+        status: 'queued',
+        conclusion: null,
+        observedAt: '2026-08-04T08:00:00.000Z',
+      },
+    })).resolves.toBe(false);
+  });
+
+  it('appends arbitrary domain events verbatim', async () => {
+    const event = {
+      type: 'project.ci_suite_observed' as const,
+      timestamp: '2026-08-04T08:00:00.000Z',
+      payload: {
+        projectKey: 'overdeck',
+        repo: 'eltmon/overdeck',
+        branch: 'main',
+        headSha: 'abc123',
+        suiteId: '42',
+        status: 'in_progress',
+        conclusion: null,
+        observedAt: '2026-08-04T08:00:00.000Z',
+      },
+    };
+
+    await expect(appendDomainEventAsync(event)).resolves.toBe(true);
+    expect(store.appendAsync).toHaveBeenCalledWith(event);
+  });
+
+  it('returns false when the event store append rejects', async () => {
+    const rejectingStore = {
+      append: vi.fn(() => 1),
+      appendAsync: vi.fn(async () => { throw new Error('append failed'); }),
+    };
+    setActivityEventStoreProvider(() => rejectingStore);
+
+    await expect(appendDomainEventAsync({
+      type: 'project.ci_suite_observed',
+      timestamp: '2026-08-04T08:00:00.000Z',
+      payload: {
+        projectKey: 'overdeck',
+        repo: 'eltmon/overdeck',
+        branch: 'main',
+        headSha: 'abc123',
+        suiteId: '42',
+        status: 'completed',
+        conclusion: 'success',
+        observedAt: '2026-08-04T08:00:00.000Z',
+      },
+    })).resolves.toBe(false);
   });
 
   it('mirrors dashboard lifecycle events into the ActivityPanel feed', () => {
