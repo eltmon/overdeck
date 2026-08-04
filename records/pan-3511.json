@@ -447,9 +447,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-04T22:55:09.478Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T23:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-04T23:01:06.886Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-04T23:01:06Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-04T23:00:27Z\n\n## Verdict: CHANGES REQUESTED — dashboard restarts invalidate active review attestation authority\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: a9b929918604303a61ec22b0189528eb8928c778\n- Cycle number: 4\n- Prior cycle SHA: ec9f5180dd50309c0be73b78dac2dfdf6981b438 (last complete synthesis)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Dashboard restarts discard the key needed to verify review evidence — `src/dashboard/server/main.ts:117`\n`ensureReviewAttestationKey()` creates a random HMAC key only in the dashboard process environment. A dashboard restart replaces it, so both an already-running review agent's run-bound completion token and any report attestations signed before the restart fail verification. The recovery readers then see no authoritative artifact and can reset or stick a review that actually finished, recreating the verdict-loss condition this change is intended to prevent.\n\nPersist the host-only signing key under `getOverdeckHome()` with mode `0600`, load it at boot, and generate plus atomically persist it only when absent. Keep that key stripped from agent environments, and add restart-boundary coverage for previously issued review-agent tokens and signed report artifacts. This line is in both the PR diff and the cycle diff from `ec9f5180dd50309c0be73b78dac2dfdf6981b438`, so it remains promotable in cycle 4.\n\n## Non-blocking Findings\n\n### [security] Host attestation key can reach workspace-controlled child processes — `src/lib/child-env.ts:93`\n~ **[demoted: pre-existing]** `buildChildEnvWithoutTmuxSync()` only removes terminal variables, so it does not inherit the new `PROVIDER_ENV_KEYS` filtering. That can expose the host signing key to workspace-controlled `./dev` processes. The concern is serious, but the reviewer cited line 93, which is outside both the PR and cycle diffs; the mandatory scope gate prevents it from blocking this review as reported. The PR-added key entries are at `src/lib/child-env.ts:43-45`.\n\n## Scope Note\nThe security reviewer identified an environment-isolation gap, but its cited implementation line is pre-existing and outside the PR/cycle diffs, so the scope gate demotes it rather than treating it as a blocker. The dashboard-restart correctness finding is independently blocking and is in the cycle diff.\n\n## Clean Sub-roles\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a9b92991/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -499,7 +512,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T23:01:06.055Z",
+  "updated": "2026-08-04T23:01:06.886Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
