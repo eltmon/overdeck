@@ -37,9 +37,11 @@ export const COMPACTION_CONTINUE_COOLDOWN_MS = 10 * 60_000;
 const MAX_TAIL_SCAN_BYTES = 4 * 1024 * 1024;
 
 const lastContinuationAt = new Map<string, number>();
+const postCompactContinuationInFlight = new Set<string>();
 
 export function resetCompactionContinuationState(): void {
   lastContinuationAt.clear();
+  postCompactContinuationInFlight.clear();
 }
 
 export interface CompactedIdleVerdict {
@@ -213,4 +215,62 @@ export async function maybeContinueCompactedAgent(
   await args.send(args.agentId, buildCompactionContinueMessage(state));
   lastContinuationAt.set(args.agentId, now);
   return `Compaction continuation: nudged ${args.agentId} — compacted and idle with no turn after the boundary`;
+}
+
+const POST_COMPACT_PROMPT_POLL_INTERVAL_MS = 250;
+const POST_COMPACT_PROMPT_POLL_ATTEMPTS = 20;
+
+export interface ContinueAfterPostCompactHookArgs
+  extends Omit<ContinueCompactedAgentArgs, 'tmuxOutput' | 'now'> {
+  capturePane: (agentId: string) => Promise<string>;
+  attempts?: number;
+  intervalMs?: number;
+  sleep?: (ms: number) => Promise<void>;
+  continueAgent?: typeof maybeContinueCompactedAgent;
+}
+
+/**
+ * Deterministic PostCompact continuation. The hook event can arrive while its
+ * own shell process is still exiting, so wait briefly for Claude's idle prompt
+ * instead of racing an injection into the compaction teardown. The 10-minute
+ * patrol remains a durable fallback, but a healthy hook path re-drives within
+ * seconds of the boundary.
+ */
+export async function continueCompactedAgentAfterHook(
+  args: ContinueAfterPostCompactHookArgs,
+): Promise<string | null> {
+  const readState = args.readState ?? getAgentStateSync;
+  const state = readState(args.agentId);
+  if (!state || !shouldContinueAfterCompaction(state).ok) return null;
+  if (postCompactContinuationInFlight.has(args.agentId)) return null;
+  postCompactContinuationInFlight.add(args.agentId);
+
+  try {
+    const attempts = args.attempts ?? POST_COMPACT_PROMPT_POLL_ATTEMPTS;
+    const intervalMs = args.intervalMs ?? POST_COMPACT_PROMPT_POLL_INTERVAL_MS;
+    const sleep = args.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    const continueAgent = args.continueAgent ?? maybeContinueCompactedAgent;
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      try {
+        const tmuxOutput = await args.capturePane(args.agentId);
+        const continued = await continueAgent({
+          agentId: args.agentId,
+          tmuxOutput,
+          send: args.send,
+          findBoundary: args.findBoundary,
+          readState,
+        });
+        if (continued) return continued;
+      } catch {
+        // The pane or transcript can be between compaction writes. Retry inside
+        // this hook-owned window; the patrol remains the fallback after it ends.
+      }
+      if (attempt < attempts) await sleep(intervalMs);
+    }
+
+    return null;
+  } finally {
+    postCompactContinuationInFlight.delete(args.agentId);
+  }
 }
