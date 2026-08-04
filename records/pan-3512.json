@@ -809,7 +809,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-04T20:30:41.949Z",
+  "updated": "2026-08-04T20:31:11.994Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
@@ -817,17 +817,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-04T20:17:43.726Z",
+    "updatedAt": "2026-08-04T20:31:11.971Z",
     "blockerReasons": [
       {
         "type": "failing_checks",
         "summary": "Required checks are failing",
-        "detectedAt": "2026-08-04T17:58:13.602Z"
-      },
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 67c640e (2 paths): src/lib/cloister/__tests__/review-verdict-writer.test.ts, src/lib/cloister/review-verdict-writer.ts",
-        "detectedAt": "2026-08-04T18:05:45.244Z"
+        "detectedAt": "2026-08-04T20:31:11.971Z"
       }
     ],
     "conflictsSince": {
@@ -924,7 +919,7 @@
       },
       "costAtCloseOut": {
         "usd": 51.3676167,
-        "pricingAsOf": "2026-08-04T20:17:43.730Z"
+        "pricingAsOf": "2026-08-04T20:31:11.989Z"
       }
     },
     "merges": [
