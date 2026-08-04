@@ -382,6 +382,11 @@
       "reason": "feedback",
       "note": "[2026-08-04T21:42Z] review-agent → FAILED — seq 9",
       "timestamp": "2026-08-04T21:42:53.173Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-04T21:51Z] review-agent → FAILED — seq 10",
+      "timestamp": "2026-08-04T21:51:41.483Z"
     }
   ],
   "feedback": [
@@ -447,6 +452,13 @@
       "outcome": "failed",
       "timestamp": "2026-08-04T21:42:53Z",
       "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
+    },
+    {
+      "seq": 10,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-04T21:51:41Z",
+      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3511`."
     }
   ],
   "scopeDrift": {
@@ -498,7 +510,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T21:42:53.173Z",
+  "updated": "2026-08-04T21:51:41.483Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
