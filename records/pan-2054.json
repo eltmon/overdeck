@@ -63,7 +63,7 @@
     }
   ],
   "created": "2026-06-27T02:50:24.426Z",
-  "updated": "2026-07-27T08:24:43.938Z",
+  "updated": "2026-08-04T13:05:07.722Z",
   "pipeline": {
     "issueId": "PAN-2054",
     "reviewStatus": "passed",
@@ -74,9 +74,6 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "updatedAt": "2026-07-27T08:24:39.719Z",
-    "reviewNotes": "review passed; terminal close-out production path and residue cleanup look correct",
-    "testNotes": "Quality gates: typecheck ✓, lint ✓ (7480 tests/735 files + 32 frontend tests). All implementation items verified by test suite — closedOut record field, read-door terminal shortcircuit, close-out marking, label stripping, reap-residue helper, patrol integration, integration test, resource-tree regression lock. No new failures. No UAT required for backend lifecycle fix.",
-    "inspectNotes": "workspace-m9lki passed: reapIssueResidue matches the vBRIEF helper requirements, uses the merge guard before disk/branch cleanup, uses execAsync plus Effect killSession, and introduces no prohibited execSync/sendKeys pattern.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/2092",
     "lastVerifiedCommit": "9ce404869ab723f66deae5e8fd21ed0c86d1f4b5"
   },
@@ -164,7 +161,7 @@
       },
       "costAtCloseOut": {
         "usd": 13.325215,
-        "pricingAsOf": "2026-07-27T08:24:41.488Z"
+        "pricingAsOf": "2026-08-04T13:05:07.715Z"
       }
     },
     "merges": [
