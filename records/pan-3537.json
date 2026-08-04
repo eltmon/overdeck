@@ -129,18 +129,18 @@
     "recordedAt": "2026-08-04T09:26:27.202Z"
   },
   "created": "2026-08-04T05:18:19.317Z",
-  "updated": "2026-08-04T18:03:02.150Z",
+  "updated": "2026-08-04T18:03:13.306Z",
   "pipeline": {
     "issueId": "PAN-3537",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T18:02:13.176Z",
+    "updatedAt": "2026-08-04T18:03:13.289Z",
     "reviewNotes": "Approved after cycle-3 convergence gate; no project-CI files changed since the prior cycle",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "inspectNotes": "All 5 ACs met: failure-first derivation, same-SHA suite merge, newer-SHA replace with identity-preserving stale drop, syncSnapshot hydrate/preserve (server populates ciByProjectKey in read-model.ts), and single-suite htmlUrl vs multi-suite commit/checks href. FAILED set correctly mirrors FAILING_CHECK_CONCLUSIONS. Note (non-blocking): reducer always writes htmlUrl, so a webhook observation after a REST fill for the same suiteId clears the stored URL and degrades the single-suite href to the commit checks fallback.",
@@ -204,24 +204,6 @@
         "tests/unit/lib/webhook-handlers.test.ts"
       ],
       "recordedAt": "2026-08-04T09:26:27.202Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "43fc78c69e3bc2fd15bf82c2673cb5f497e170e6"
-      }
     }
   },
   "closeOut": {
@@ -235,11 +217,19 @@
             "cacheWrite": 50046
           }
         },
+        "memory-extraction": {
+          "anthropic/claude-haiku-4-5": {
+            "input": 963,
+            "output": 200,
+            "cacheRead": 3,
+            "cacheWrite": 0
+          }
+        },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 1257481,
-            "output": 31264,
-            "cacheRead": 10242048,
+            "input": 1260701,
+            "output": 31904,
+            "cacheRead": 10566656,
             "cacheWrite": 0
           }
         },
@@ -299,16 +289,22 @@
           "cacheRead": 22414156,
           "cacheWrite": 50046
         },
+        "anthropic/claude-haiku-4-5": {
+          "input": 963,
+          "output": 200,
+          "cacheRead": 3,
+          "cacheWrite": 0
+        },
         "openai/gpt-5.6-sol": {
-          "input": 11011762,
-          "output": 502802,
-          "cacheRead": 142636544,
+          "input": 11014982,
+          "output": 503442,
+          "cacheRead": 142961152,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 166.462121,
-        "pricingAsOf": "2026-08-04T18:02:13.229Z"
+        "usd": 166.6616883,
+        "pricingAsOf": "2026-08-04T18:03:13.294Z"
       }
     },
     "merges": [
@@ -317,7 +313,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3537",
