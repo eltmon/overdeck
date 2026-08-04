@@ -26,7 +26,7 @@
   ],
   "feedback": [],
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-04T00:55:26.121Z",
+  "updated": "2026-08-04T01:13:54.536Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -80,16 +80,8 @@
     }
   ],
   "tasks": {
-    "sequence": 15,
-    "claims": {
-      "infra-breaker-consult": {
-        "writerId": "agent-pan-3511",
-        "agentId": "agent-pan-3511",
-        "pid": 879907,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-04T00:55:26.121Z"
-      }
-    },
+    "sequence": 16,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3511",
@@ -167,6 +159,16 @@
         "outcome": "released",
         "reason": "stale claim released (agent-pan-3511 dead)",
         "releasedAt": "2026-08-03T05:59:21.615Z"
+      },
+      {
+        "writerId": "agent-pan-3511",
+        "agentId": "agent-pan-3511",
+        "pid": 879907,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-04T00:55:26.121Z",
+        "itemId": "infra-breaker-consult",
+        "outcome": "completed",
+        "releasedAt": "2026-08-04T01:13:54.536Z"
       }
     ],
     "statusReasons": {
@@ -214,6 +216,10 @@
     "feedback-target-consult.feedback-target-consult.ac2": "completed",
     "feedback-target-consult.feedback-target-consult.ac3": "completed",
     "feedback-target-consult.feedback-target-consult.ac4": "completed",
-    "infra-breaker-consult": "running"
+    "infra-breaker-consult": "completed",
+    "infra-breaker-consult.infra-breaker-consult.ac1": "completed",
+    "infra-breaker-consult.infra-breaker-consult.ac2": "completed",
+    "infra-breaker-consult.infra-breaker-consult.ac3": "completed",
+    "infra-breaker-consult.infra-breaker-consult.ac4": "completed"
   }
 }
