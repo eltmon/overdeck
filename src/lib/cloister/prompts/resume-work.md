@@ -44,15 +44,17 @@ You have been **resumed** from a previous session. Your full conversation histor
 {{#TLDR_AVAILABLE}}
 ## TLDR: Fast Re-Orientation
 
-You have access to TLDR MCP tools for catching up on partial work without re-reading whole files:
-- `tldr_context <file>` — summarize in-flight files before editing them again
-- `tldr_structure <directory>` — rebuild your mental model of the touched subsystem
-- `tldr_semantic <query>` — locate code related to the resume instructions or feedback
-- `tldr_calls <function> <file>` — find callers before changing a resumed implementation
-- `tldr_impact <function> <file>` — understand downstream effects before continuing
+TLDR is wired in as a PreToolUse hook on `Read`, not as MCP tools: reading a
+large code file automatically returns a structured summary (~1k tokens instead
+of 10-25k) whenever the file's own checkout has `.venv/bin/tldr`. You don't
+need to invoke anything. To see full contents anyway, Read with offset/limit;
+recently-edited files always return full content so you can verify your changes.
 
-Use TLDR first to regain context quickly, then use full Reads only for exact code you need to edit or verify.
-
+For deliberate exploration, use the CLI via Bash from the checkout root:
+`.venv/bin/tldr context <module-path> --lang <lang>` for structure/exports, or
+`.venv/bin/tldr extract <file>` for structured JSON. Do NOT call `tldr_*` MCP
+tools (`tldr_context`, `tldr_semantic`, ...) — they are not registered in agent
+sessions and will not exist in your toolset (PAN-3534).
 {{/TLDR_AVAILABLE}}
 ## What To Do Now
 
