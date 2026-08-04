@@ -957,7 +957,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-04T17:36:23.207Z",
+  "updated": "2026-08-04T17:36:34.690Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
@@ -969,12 +969,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-04T17:36:03.223Z",
+    "updatedAt": "2026-08-04T17:36:32.722Z",
     "blockerReasons": [
       {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 534828d (1 path): scripts/file-size-allowlist.txt",
-        "detectedAt": "2026-08-04T17:35:47.540Z"
+        "type": "failing_checks",
+        "summary": "Required checks are failing",
+        "detectedAt": "2026-08-04T17:36:32.722Z"
       }
     ],
     "conflictsSince": {
@@ -1045,7 +1045,7 @@
       },
       "costAtCloseOut": {
         "usd": 622.4622483,
-        "pricingAsOf": "2026-08-04T17:36:03.232Z"
+        "pricingAsOf": "2026-08-04T17:36:32.742Z"
       }
     },
     "merges": [
