@@ -1251,10 +1251,10 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T17:36:33.318Z",
+  "updated": "2026-08-04T17:36:38.543Z",
   "pipeline": {
     "issueId": "PAN-1577",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "skipped",
@@ -1262,16 +1262,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-04T17:36:32.024Z",
+    "updatedAt": "2026-08-04T17:36:33.375Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
     "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - scripts/file-size-allowlist.txt\n  - src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts\n  - src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx\n  - src/lib/cloister/__tests__/review-verdict-writer.test.ts\n  - tests/cli/commands/specialists/done.test.ts\n  - tests/unit/cli/state-migrate-cancellation.test.ts\n  - tests/unit/dashboard/server/routes/specialists-reviewed-at-commit.test.ts\n  - tests/unit/lib/agents/spawn-flywheel-provenance.test.ts\n  - tests/unit/lib/harness-resolve.test.ts\n  - tests/unit/lib/review-status.test.ts",
-    "blockerReasons": [
-      {
-        "type": "merge_conflict",
-        "summary": "Conflicts with main since 534828d (10 paths): scripts/file-size-allowlist.txt, src/dashboard/frontend/src/components/Settings/sections/__tests__/tiered-crews.test.ts, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx, …",
-        "detectedAt": "2026-08-04T17:35:47.540Z"
-      }
-    ],
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -1291,7 +1284,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "lastVerifiedCommit": "126951910972a2bfed07e1ca80dfa5102a2d00c8",
     "reviewRequestedAt": "2026-08-04T17:33:51.228Z",
-    "reviewSpawnedAt": "2026-08-03T07:53:45.864Z"
+    "reviewSpawnedAt": "2026-08-04T17:36:33.374Z"
   },
   "closeOut": {
     "usage": {
@@ -1397,7 +1390,7 @@
       },
       "costAtCloseOut": {
         "usd": 892.5201033,
-        "pricingAsOf": "2026-08-04T17:36:32.038Z"
+        "pricingAsOf": "2026-08-04T17:36:34.017Z"
       }
     },
     "merges": [
