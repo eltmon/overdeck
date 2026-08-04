@@ -259,18 +259,20 @@
     "recordedAt": "2026-08-03T04:39:03.821Z"
   },
   "created": "2026-08-01T14:59:52.821Z",
-  "updated": "2026-08-04T18:02:53.963Z",
+  "updated": "2026-08-04T18:05:28.417Z",
   "pipeline": {
     "issueId": "PAN-3418",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-03T04:39:32.725Z",
-    "updatedAt": "2026-08-04T18:02:01.581Z",
+    "updatedAt": "2026-08-04T18:05:28.335Z",
+    "reviewNotes": "All four reviewers passed; all in-PR requirements are implemented, with FR-6 reserved for post-deploy close-out verification",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
       {
         "type": "failing_checks",
@@ -279,24 +281,42 @@
       }
     ],
     "prUrl": "https://github.com/eltmon/overdeck/pull/3428",
-    "reviewSpawnedAt": "2026-08-04T18:02:01.579Z"
+    "reviewSpawnedAt": "2026-08-04T18:02:01.579Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "2ffdbbc4b912d83575cd62850dded077e8e6ff75"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "2ffdbbc4b912d83575cd62850dded077e8e6ff75"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "2ffdbbc4b912d83575cd62850dded077e8e6ff75"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "2ffdbbc4b912d83575cd62850dded077e8e6ff75"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 2228,
-            "output": 800,
-            "cacheRead": 963,
+            "input": 4627,
+            "output": 1000,
+            "cacheRead": 966,
             "cacheWrite": 0
           }
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 10386597,
-            "output": 132910,
-            "cacheRead": 31320576,
+            "input": 12088423,
+            "output": 146683,
+            "cacheRead": 36044800,
             "cacheWrite": 0
           }
         },
@@ -351,15 +371,15 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 2228,
-          "output": 800,
-          "cacheRead": 963,
+          "input": 4627,
+          "output": 1000,
+          "cacheRead": 966,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 16735421,
-          "output": 424440,
-          "cacheRead": 172470272,
+          "input": 18437247,
+          "output": 438213,
+          "cacheRead": 177194496,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -370,8 +390,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 191.1993903,
-        "pricingAsOf": "2026-08-04T18:02:11.308Z"
+        "usd": 202.4872216,
+        "pricingAsOf": "2026-08-04T18:05:28.402Z"
       }
     },
     "merges": [
