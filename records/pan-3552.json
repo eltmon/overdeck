@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T17:31:00.436Z",
+  "updated": "2026-08-05T17:31:10.352Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 18,
-    "claims": {},
+    "sequence": 19,
+    "claims": {
+      "drop-conflicts-since-plumbing": {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 3385973,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:31:10.352Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -205,6 +213,7 @@
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac1": "completed",
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac2": "completed",
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac3": "completed",
-    "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac4": "completed"
+    "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac4": "completed",
+    "drop-conflicts-since-plumbing": "running"
   }
 }
