@@ -11,6 +11,11 @@
       "reason": "feedback",
       "note": "[2026-08-05T01:26Z] review-agent → FAILED — seq 2",
       "timestamp": "2026-08-05T01:26:54.603Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T01:30Z] review-agent → FAILED — seq 3",
+      "timestamp": "2026-08-05T01:30:00.985Z"
     }
   ],
   "feedback": [
@@ -27,10 +32,17 @@
       "outcome": "failed",
       "timestamp": "2026-08-05T01:26:54Z",
       "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3497` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3497`."
+    },
+    {
+      "seq": 3,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-05T01:30:00Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3497` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3497`."
     }
   ],
   "created": "2026-08-02T19:48:15.485Z",
-  "updated": "2026-08-05T01:26:54.603Z",
+  "updated": "2026-08-05T01:30:00.985Z",
   "pipeline": {
     "issueId": "PAN-3497",
     "reviewStatus": "pending",
