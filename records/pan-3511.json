@@ -809,15 +809,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T10:37:35Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — a workspace-provided head can still replay a stale approval\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-63d419b9/context.json`\n- Branch: `feature/pan-3511`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511`\n- HEAD reviewed: `63d419b952bb04353dd4a5864493e94151828311`\n- Cycle number: 14\n- Prior cycle SHA: `09638451ffa2dc04aed07d6d8738df79e2469514`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 1 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Workspace-controlled artifact head can still authorize stale verdict replay — `src/lib/review-status-read.ts:50`\n\nThe new host-run binding is used only for a headless artifact. An artifact that includes `.pan/review/<run>/context.json` instead follows `artifactHeadMatchesLive`, which compares a workspace-controlled `headSha` directly to the live row and does not require the host-recorded `roleRunHead`. A work agent can write a fresh matching artifact and context file for the active run, prime the asynchronous memo through a recovery reader, and cause the stale-journal resolver to replay a prior passed verdict. Require the host-recorded run anchor for every artifact-based stale-journal exception: it must be present and match `lastVerifiedCommit`; an artifact-provided head, when present, must also match that same host anchor. Missing or mismatched host evidence must retain the stale-journal refusal.\n\n## Scope and Convergence Gate\n\nThis is a security finding in `src/lib/review-status-read.ts`, which remains inside the PR diff and changed in cycle 14 from `09638451ffa2dc04aed07d6d8738df79e2469514` to `63d419b952bb04353dd4a5864493e94151828311`. The cycle's host-anchor addition closes the previous headless-artifact variant, but its artifact-head branch leaves the same authorization boundary open for artifacts that supply workspace-controlled `context.json`.\n\n## Clean Sub-roles\n\n- correctness — the host-run-head projection, memo-only status lookup, and current regression coverage are internally consistent.\n- performance — the host scalar comparison preserves the bounded, asynchronous artifact-read design and keeps the status resolver filesystem-free.\n- requirements — all seven delivery requirements and the explicit no-write-door/no-hot-path-scan constraints are implemented.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-63d419b9/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -876,7 +868,7 @@
     "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T11:12:04.143Z",
+  "updated": "2026-08-05T11:12:05.009Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
