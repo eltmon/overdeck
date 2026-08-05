@@ -268,7 +268,7 @@
     "recordedAt": "2026-08-05T20:54:21.371Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T20:57:55.214Z",
+  "updated": "2026-08-05T20:57:57.502Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -278,7 +278,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T20:56:22.918Z",
-    "updatedAt": "2026-08-05T20:57:55.159Z",
+    "updatedAt": "2026-08-05T20:57:57.445Z",
     "reviewNotes": "Removed re-review scope leaves its per-issue API caller broken",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "d09c573f9177d5775d56e4bce3844e7bae066636",
@@ -576,7 +576,7 @@
       },
       "costAtCloseOut": {
         "usd": 153.330856,
-        "pricingAsOf": "2026-08-05T20:57:55.208Z"
+        "pricingAsOf": "2026-08-05T20:57:57.497Z"
       }
     },
     "merges": [
