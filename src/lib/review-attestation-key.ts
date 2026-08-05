@@ -24,12 +24,12 @@ function keyFromEnv(env: NodeJS.ProcessEnv = process.env): string | null {
   return key && key.length >= 32 ? key : null;
 }
 
-function keyFilePath(): string {
+export function reviewAttestationKeyFilePath(): string {
   return join(getOverdeckHome(), REVIEW_ATTESTATION_KEY_FILE);
 }
 
 function readPersistedKey(): string | null {
-  const path = keyFilePath();
+  const path = reviewAttestationKeyFilePath();
   if (!existsSync(path)) return null;
   const key = readFileSync(path, 'utf8').trim();
   if (key.length < 32) {
@@ -44,7 +44,7 @@ function createPersistedKey(): string {
   mkdirSync(home, { recursive: true, mode: 0o700 });
 
   const generated = randomBytes(32).toString('base64url');
-  const path = keyFilePath();
+  const path = reviewAttestationKeyFilePath();
   const temporary = join(
     home,
     `.${REVIEW_ATTESTATION_KEY_FILE}.${process.pid}.${randomBytes(8).toString('hex')}.tmp`,
