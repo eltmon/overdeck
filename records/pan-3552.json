@@ -62,6 +62,11 @@
       "reason": "feedback",
       "note": "[2026-08-05T21:18Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-08-05T21:18:50.788Z"
+    },
+    {
+      "timestamp": "2026-08-05T21:30:44.313Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -309,7 +314,7 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:30:39.920Z",
+  "updated": "2026-08-05T21:30:44.372Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -318,11 +323,12 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T21:30:39.917Z",
+    "updatedAt": "2026-08-05T21:30:44.310Z",
     "reviewNotes": "conflictsSince remains live runtime and durable pipeline state",
     "verificationNotes": "Verification FAILED at test (652739ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/src/dashboard/frontend\n\n ❯ src/components/Settings/__tests__/RolesPanel.test.tsx (13 tests | 2 failed) 1586ms\n     × full mode with MIXED reviewer models renders the red uniformity banner naming the models 40ms\n     × full mode with UNIFORM reviewer models renders no banner 1032ms\n ❯ |root| tests/unit/lib/head-anchor-write-sites.test.ts (2 tests | 1 failed) 3105ms\n     × locks every documented write occurrence and source expression 3104ms (retry x1)\n\n Test Files  1 failed | 168 passed (169)\n      Tests  2 failed | 1962 passed (1964)\n   Start at  17:03:48\n   Duration  33.40s (transform 4.71s, setup 15.63s, import 44.48s, tests 32.13s, environment 24.86s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-MMIlts/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] s\n…(1002 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1",
+    "reviewRequestedAt": "2026-08-05T21:30:39.917Z",
     "reviewSpawnedAt": "2026-08-05T21:05:37.154Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -558,17 +564,16 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T21:30:38.954Z"
-    },
-    "reviewRequestedAt": "2026-08-05T21:30:39.917Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 2252599,
-            "output": 51680,
-            "cacheRead": 20419072,
+            "input": 2255099,
+            "output": 51984,
+            "cacheRead": 20780544,
             "cacheWrite": 0
           }
         },
@@ -606,24 +611,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 12333982,
-            "output": 811496,
-            "cacheRead": 336926208,
+            "input": 12424340,
+            "output": 828439,
+            "cacheRead": 347700224,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 23839831,
-          "output": 1100845,
-          "cacheRead": 415521792,
+          "input": 23932689,
+          "output": 1118092,
+          "cacheRead": 426657280,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 179.993211,
-        "pricingAsOf": "2026-08-05T21:18:56.891Z"
+        "usd": 183.267945,
+        "pricingAsOf": "2026-08-05T21:30:44.341Z"
       }
     },
     "merges": [
