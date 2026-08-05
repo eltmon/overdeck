@@ -33,6 +33,7 @@ describe('readLatestSynthesisVerdict', () => {
     runDir('agent-pan-1-review-abc123', '# Review Synthesis — PAN-1\n\n## Verdict: APPROVED\n\n## Summary\nAll four lenses pass with advisories. Ship it.\n\n## Details\n…\n', { headSha: 'abc123' });
     const verdict = readLatestSynthesisVerdict('PAN-1', { now: NOW, workspacePath: root });
     expect(verdict?.verdict).toBe('passed');
+    expect(verdict?.runId).toBe('agent-pan-1-review-abc123');
     expect(verdict?.headSha).toBe('abc123');
     expect(verdict?.notes).toContain('All four lenses pass');
   });

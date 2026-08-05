@@ -26,6 +26,8 @@ import {
 } from './review-verdict-report.js';
 
 export interface SynthesisArtifactVerdict {
+  /** Review run directory that owns this verdict artifact. */
+  runId: string;
   verdict: ReviewVerdict;
   notes?: string;
   headSha?: string;
@@ -72,7 +74,7 @@ export function readLatestSynthesisVerdict(
   }
 
   // Newest run dir by artifact mtime carrying EITHER verdict artifact shape.
-  let latest: { dir: string; mtimeMs: number; content: string } | null = null;
+  let latest: { dir: string; runId: string; mtimeMs: number; content: string } | null = null;
   try {
     for (const entry of readdirSync(reviewRoot)) {
       const runDir = join(reviewRoot, entry);
@@ -80,7 +82,7 @@ export function readLatestSynthesisVerdict(
       if (!report) continue;
       const mtimeMs = statSync(report.path).mtimeMs;
       if (!latest || mtimeMs > latest.mtimeMs) {
-        latest = { dir: runDir, mtimeMs, content: readFileSync(report.path, 'utf-8') };
+        latest = { dir: runDir, runId: entry, mtimeMs, content: readFileSync(report.path, 'utf-8') };
       }
     }
   } catch {
@@ -94,6 +96,7 @@ export function readLatestSynthesisVerdict(
   const headSha = readHeadEvidence(latest.dir);
 
   return {
+    runId: latest.runId,
     verdict: parsed.verdict,
     ...(notes ? { notes } : {}),
     ...(headSha ? { headSha } : {}),
