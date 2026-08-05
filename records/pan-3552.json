@@ -157,22 +157,9 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T23:17:03.709Z"
-    },
-    {
-      "reason": "feedback",
-      "note": "[2026-08-05T23:17Z] test-agent → FAILED — seq 1",
-      "timestamp": "2026-08-05T23:17:07.725Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "test-agent",
-      "outcome": "failed",
-      "timestamp": "2026-08-05T23:17:07Z",
-      "markdownBody": "# Test failure\n\ntypecheck PASSED. lint PASSED (exit 0). npm test FAILED: tests/unit/lib/head-anchor-write-sites.test.ts fails deterministically standalone - src/lib/cloister/review-verdict-writer.ts has a second write site for 'reviewedAtCommit: input.evidenceHead as HeadAnchor' (lines 162 and 235, 47 sites found vs 46 expected) not reflected in the test's ALLOWED_WRITE_SITES inventory. Root cause: xBRIEF item preserve-test-gate-on-same-head-converge (commit fa73ec8b29) added the second write site but its files_scope excluded tests/unit/lib/head-anchor-write-sites.test.ts; sibling item reconcile-reviewing-rows-through-write-door (commit abb3344b27) was scoped to that test and landed earlier, so the allowlist was never updated - a coordination gap between two xBRIEF items. Two full npm test runs also showed a shifting set of unrelated failures (beforeEach Hook-timed-out-in-5000ms in setupOverdeckTestDb across ~9 files, plus review-verdict-writer.test.ts/stall-sweeper.test.ts assertion mismatches) that all passed cleanly (25/25, 55/55) when re-run in isolation - consistent with resource contention from ~13 concurrently running agents on this machine, excluded from the verdict. The head-anchor-write-sites.test.ts failure is the real, deterministic, in-scope blocker.\n\n## Required\nFix the failing tests, commit and push, then re-run `pan done PAN-3552`."
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/DEACON-HEALTH-MONITORING.md",
@@ -409,17 +396,18 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:17:07.726Z",
+  "updated": "2026-08-05T23:17:08.910Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "reviewing",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T23:17:03.075Z",
+    "updatedAt": "2026-08-05T23:17:07.652Z",
+    "testNotes": "typecheck PASSED. lint PASSED (exit 0). npm test FAILED: tests/unit/lib/head-anchor-write-sites.test.ts fails deterministically standalone - src/lib/cloister/review-verdict-writer.ts has a second write site for 'reviewedAtCommit: input.evidenceHead as HeadAnchor' (lines 162 and 235, 47 sites found vs 46 expected) not reflected in the test's ALLOWED_WRITE_SITES inventory. Root cause: xBRIEF item preserve-test-gate-on-same-head-converge (commit fa73ec8b29) added the second write site but its files_scope excluded tests/unit/lib/head-anchor-write-sites.test.ts; sibling item reconcile-reviewing-rows-through-write-door (commit abb3344b27) was scoped to that test and landed earlier, so the allowlist was never updated - a coordination gap between two xBRIEF items. Two full npm test runs also showed a shifting set of unrelated failures (beforeEach Hook-timed-out-in-5000ms in setupOverdeckTestDb across ~9 files, plus review-verdict-writer.test.ts/stall-sweeper.test.ts assertion mismatches) that all passed cleanly (25/25, 55/55) when re-run in isolation - consistent with resource contention from ~13 concurrently running agents on this machine, excluded from the verdict. The head-anchor-write-sites.test.ts failure is the real, deterministic, in-scope blocker.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
     "lastVerifiedCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
@@ -736,7 +724,7 @@
       },
       "costAtCloseOut": {
         "usd": 259.125178,
-        "pricingAsOf": "2026-08-05T23:17:05.086Z"
+        "pricingAsOf": "2026-08-05T23:17:07.807Z"
       }
     },
     "merges": [
