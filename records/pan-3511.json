@@ -552,9 +552,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T02:56:44.327Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T03:01Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-05T03:01:32.157Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-05T03:01:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — workspace-controlled review subprocesses retain the attestation bearer token\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5\n- Cycle number: 7\n- Prior cycle SHA: 8bb38905afbcc7d9787eb84953484955ecd08e5f (last complete synthesis)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] Workspace subprocesses inherit the active attestation bearer token — `src/lib/agents/spawn.ts:427`\n`createSession()` supplies `OVERDECK_REVIEW_ATTESTATION_TOKEN` to the review agent, and the new launcher boundary at `src/lib/agent-host-secret-boundary.ts:24-32` removes only the signing key. Every repository-controlled child process of the reviewer consequently receives a valid token for the active run. It can replace the run's report and call the attestation endpoint, which accepts possession of that token as authorization and signs the workspace-authored report. Masking the persistent HMAC key does not protect an equivalent bearer credential that remains exposed to arbitrary workspace commands.\n\nThis survives the cycle-7 convergence gate: the new prelude is in the cycle diff and is the changed code that attempts the signing boundary while leaving the completion capability reachable. The fix must keep any capability that can request attestation out of processes that can execute workspace-controlled code, and the integration test must exercise a realistic review-session environment containing the token.\n\n### [correctness] Environment-supplied signing keys bypass the new host-secret boundary — `src/lib/agent-host-secret-boundary.ts:26`\nAt the assigned revision, `ensureReviewAttestationKey()` accepts a valid `OVERDECK_REVIEW_ATTESTATION_KEY` and returns it without materializing `review-attestation-key` (`src/lib/review-attestation-key.ts:77-82`). The prelude enters its PID and mount isolation only when that file exists. In this supported environment-key configuration it unsets the agent's direct copy but starts no boundary at all, leaving same-UID workspace processes able to inspect the host process environment and recover the signing key.\n\nThis is new-cycle code and survives the convergence gate. The boundary must activate whenever the host owns an attestation key, including environment-supplied keys, or the host must safely materialize that key at the protected canonical path before any agent launcher runs.\n\n### [requirements] The requirements lane could not assess the assigned review snapshot\nThe manifest binds this cycle to `a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5`, but the workspace had advanced to `b62284f2211d38866046f6db0dff9a1625558c43` when the requirements reviewer executed. The lane therefore deliberately produced no acceptance-criteria coverage for the assigned revision. A passed review would claim requirements coverage for a different tree, so the review must be re-run against a workspace checked out at the manifest's immutable target after the security and correctness findings are addressed.\n\n## Scope Note\nAll code blockers cite changes in the PR diff and, for this seventh cycle, in the diff from `8bb38905afbcc7d9787eb84953484955ecd08e5f` to `a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5`; they are not previously reviewed findings. The requirements blocker is classified `Scope: in_pr_scope` by that lane because the review task requires an assessment of its assigned revision, but its report cannot establish requirement coverage until the execution workspace matches the manifest target.\n\n## Clean Sub-roles\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -604,10 +617,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:56:44.328Z",
+  "updated": "2026-08-05T03:01:32.157Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -615,20 +628,40 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:51:35.900Z",
+    "updatedAt": "2026-08-05T03:01:31.417Z",
+    "reviewNotes": "Review-attestation bearer token remains exposed to workspace subprocesses",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
+    "reviewedAtCommit": "7fc5930e614e9b1151b8258a881d87b71537795d",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
-    "reviewSpawnedAt": "2026-08-05T02:51:35.899Z"
+    "reviewSpawnedAt": "2026-08-05T02:51:35.899Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "7fc5930e614e9b1151b8258a881d87b71537795d"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "7fc5930e614e9b1151b8258a881d87b71537795d"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "7fc5930e614e9b1151b8258a881d87b71537795d"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "7fc5930e614e9b1151b8258a881d87b71537795d"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 226503,
-            "output": 102276,
-            "cacheRead": 35089,
+            "input": 244746,
+            "output": 112760,
+            "cacheRead": 46257,
             "cacheWrite": 0
           }
         },
@@ -640,9 +673,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 7660400,
-            "output": 106475,
-            "cacheRead": 33737216,
+            "input": 11044076,
+            "output": 171864,
+            "cacheRead": 48280576,
             "cacheWrite": 0
           }
         },
@@ -704,50 +737,50 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 32,
-            "output": 6581,
-            "cacheRead": 2270579,
-            "cacheWrite": 174247
+            "input": 50,
+            "output": 8903,
+            "cacheRead": 3884162,
+            "cacheWrite": 184296
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4862696,
-            "output": 507027,
-            "cacheRead": 240659456,
+            "input": 4962589,
+            "output": 522259,
+            "cacheRead": 253093888,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 226503,
-          "output": 102276,
-          "cacheRead": 35089,
+          "input": 244746,
+          "output": 112760,
+          "cacheRead": 46257,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23117473,
-          "output": 1116411,
-          "cacheRead": 354836480,
+          "input": 23217366,
+          "output": 1131643,
+          "cacheRead": 367270912,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 13546879,
-          "output": 359510,
-          "cacheRead": 77036544,
+          "input": 16930555,
+          "output": 424899,
+          "cacheRead": 91579904,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 32,
-          "output": 6581,
-          "cacheRead": 2270579,
-          "cacheWrite": 174247
+          "input": 50,
+          "output": 8903,
+          "cacheRead": 3884162,
+          "cacheWrite": 184296
         }
       },
       "costAtCloseOut": {
-        "usd": 386.7140479,
-        "pricingAsOf": "2026-08-05T02:51:40.040Z"
+        "usd": 407.4064427,
+        "pricingAsOf": "2026-08-05T03:01:31.435Z"
       }
     },
     "merges": [
@@ -756,7 +789,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
