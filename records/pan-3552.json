@@ -381,17 +381,17 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:55:57.347Z",
+  "updated": "2026-08-05T22:56:05.999Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "passed",
-    "testStatus": "pending",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T22:55:56.364Z",
+    "updatedAt": "2026-08-05T22:56:05.986Z",
     "reviewNotes": "all current-cycle findings were previously reviewed and unchanged",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
@@ -632,24 +632,6 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T21:30:38.954Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689"
-      }
     }
   },
   "closeOut": {
@@ -657,9 +639,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 14588936,
-            "output": 297146,
-            "cacheRead": 95927296,
+            "input": 14593794,
+            "output": 297390,
+            "cacheRead": 96278528,
             "cacheWrite": 0
           }
         },
@@ -706,15 +688,15 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 36997018,
-          "output": 1433557,
-          "cacheRead": 540559872,
+          "input": 37001876,
+          "output": 1433801,
+          "cacheRead": 540911104,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 249.136498,
-        "pricingAsOf": "2026-08-05T22:55:56.414Z"
+        "usd": 249.240112,
+        "pricingAsOf": "2026-08-05T22:56:05.990Z"
       }
     },
     "merges": [
@@ -723,7 +705,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3552",
