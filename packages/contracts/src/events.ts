@@ -1343,6 +1343,21 @@ export const SweepEscalatedEvent = Schema.Struct({
 })
 export type SweepEscalatedEvent = typeof SweepEscalatedEvent.Type
 
+/** The sweeper recommended a remedy for a parked row (observability-only — never an action, PAN-3551). */
+export const SweepRecommendationEvent = Schema.Struct({
+  type: Schema.Literal("sweep.recommendation"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    recommendation: Schema.String,
+    recurring: Schema.optional(Schema.Boolean),
+    agentId: Schema.optional(Schema.String),
+  }),
+})
+export type SweepRecommendationEvent = typeof SweepRecommendationEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -1447,5 +1462,6 @@ export const DomainEvent = Schema.Union([
   SweepActionEvent,
   SweepUnparkedEvent,
   SweepEscalatedEvent,
+  SweepRecommendationEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type
