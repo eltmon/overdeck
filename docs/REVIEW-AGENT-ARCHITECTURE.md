@@ -11,7 +11,7 @@ For the broader mental model — what a Role is, how it relates to Claude Code s
 ## Invariants
 
 1. **Review is a role, not a server-owned verdict.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role; the convoy reviewers are launched either inline (non-Claude harnesses) or by `handleReviewDiscoveryReady()` after the parent's shared-discovery signal (Claude Code, PAN-1862 — see "Warm-parent discovery + fork"). Deacon monitors reviewer crash/timeout cases and backstops a parent that never signals.
+2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role and immediately launches all in-scope convoy reviewers. They run independently in parallel while the synthesis parent remains on standby; Deacon monitors reviewer crash and timeout cases.
 3. **Synthesis is the review decision.** The `review` role waits for `REVIEWER_READY` / `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` messages delivered through `pan tell`, reads ready reviewer outputs, synthesizes their findings, and emits the verdict. Those messages are sent by each reviewer's **launcher** on process exit (PAN-977) — not by the reviewer agent itself, and not by Deacon on the happy path.
 4. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
 5. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
@@ -41,9 +41,8 @@ The three modes:
   no fork. Cheapest AI review that still blocks real problems.
 - **`full`** — the four-reviewer **convoy** (`security`, `correctness`,
   `performance`, `requirements` — `REVIEW_SUB_ROLES`) plus the synthesis parent
-  as the fifth review role. Highest-scrutiny mode; this is the mode all the
-  PAN-1862 machinery below (discovery fork, selective re-review, per-reviewer
-  verdicts, model-uniformity banner) applies to.
+  as the fifth review role. All in-scope reviewers launch independently and in
+  parallel, then the parent synthesizes their reports.
 - **`none`** — no AI review at all. `spawnReviewRoleForIssue()` records
   `reviewStatus: 'skipped'` (which passes the merge gate exactly like
   `testStatus: 'skipped'`) and the lifecycle advances as if review approved.
@@ -334,40 +333,17 @@ every token as `repoKey@<8-char sha>` for clarity.
 
 ---
 
-## Warm-parent discovery + fork (PAN-1862, `full` mode on Claude Code)
+## Direct independent convoy launch (`full` mode)
 
-The convoy's first-cycle cost problem: four reviewers independently reading the
-same diff and files = 4× full-price input. The fix exploits Anthropic's
-content-addressed prompt cache (keyed by a hash of the prefix per model — not
-by session id):
+`spawnReviewRoleForIssue()` launches the synthesis parent and all in-scope
+reviewers in one dispatch. The parent receives a standby prompt while the four
+reviewers independently read the review context and write their reports in
+parallel. Once they signal completion, the parent reads those reports and writes
+the synthesis artifact.
 
-1. **Discovery:** the synthesis parent spawns with a discovery-first prompt —
-   read the context manifest, the committed diff, and the high-risk changed
-   files, so that content lives in the parent's session history (and the warm
-   cache).
-2. **Signal:** the parent runs `pan admin specialists discovery-ready review
-   <id>` exactly once at its turn boundary.
-3. **Fork:** `handleReviewDiscoveryReady()` copies the parent's JSONL to a fresh
-   session id per in-scope reviewer (shared `session-fork.ts` primitive, full
-   history, thinking-blocks sanitized) and launches each with
-   `claude --resume <forkedId>`. The forked reviewers replay a byte-identical
-   prefix → **cache reads (~10% of input price)** instead of re-reading.
-   The kickoff tells each reviewer the context is already in history and why.
-4. **Synthesis:** the parent survives unmodified and synthesizes as always.
-
-Per-reviewer fork conditions (each failure degrades to an independent fresh
-spawn — reviews are never blocked by a cache concern): parent harness is
-`claude-code`, the reviewer resolves to the **same model** as the parent (the
-Settings → Roles red banner warns when the five review roles are not
-model-uniform), and the reviewer has no resumable prior-cycle session of its own
-(its own context beats a re-fork).
-
-Backstops (Deacon patrol): `checkStalledReviewDiscovery` forces the convoy if a
-parent never signals within 8 minutes (or dies); `checkReviewForkCacheMisses`
-reads each forked reviewer's first cost event and reports `cacheRead == 0` as a
-warn-level activity entry + desktop notification, including the discovery→fork
-gap vs the 5-minute cache TTL. Misses are observability only — correctness never
-depends on the cache landing.
+A missing-reviewer recovery may launch only a lane with neither a current report
+nor a live session. It uses the parent run's persisted context-manifest path, so
+runtime registry reconstruction cannot leave an otherwise valid convoy stranded.
 
 ---
 

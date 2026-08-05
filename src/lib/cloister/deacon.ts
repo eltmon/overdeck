@@ -33,7 +33,7 @@ import { checkInspectAgentTimeouts } from './deacon-inspect.js';
 import { checkApiErrorAgents } from './deacon-api-recovery.js';
 import { checkPostReviewCommits } from './deacon-post-review-commits.js';
 import { patrolStrikeLandings } from './deacon-strike-landing.js';
-import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewDiscovery, checkStalledReviewParents, checkReviewForkCacheMisses } from './deacon-review.js';
+import { checkOrphanedReviewStatuses, recoverStalledReviewConvoys, checkMissingReviewStatuses, checkStuckReviewing, checkCompletedButUnsignaledReviews, reconcileUnappliedReviewVerdicts, monitorReviewConvoySignals, cleanupOrphanedReviewSessions, checkStalledReviewParents } from './deacon-review.js';
 import { getAutoCloseOutCanonicalState } from './deacon-canonical-state.js';
 import { checkReadyForMergeStuck as checkReadyForMergeStuckWithDeps, reconcileStaleMergeStatus, reconcileStuckMergingStates, reconcileFalseMerged, reconcileClosedPrReadyForMerge, reconcileAutoMergeRows, reconcileStaleMergeBlockers, reconcileStuckReadyForMerge, reconcileMergedButReviewing, checkFailedMergeRetry, autoCloseOut, checkFirstCompletionAgents, ciRetryMap, FAILED_MERGE_MAX_RETRIES } from './deacon-merge.js';
 import { reconcileBranchInvalidation } from './branch-invalidation.js';
@@ -2961,20 +2961,11 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...planningCleanupActions);
   for (const a of planningCleanupActions) addLog('action', a, state.patrolCycle);
 
-  // Notify review synthesis when server-owned convoy reviewers crash or time out.
-  // PAN-1862 Phase A backstops: force the convoy for a parent that never signals
-  // discovery-ready, and report fork cache misses (observability only).
-  const stalledDiscoveryActions = await checkStalledReviewDiscovery();
-  actions.push(...stalledDiscoveryActions);
-  for (const a of stalledDiscoveryActions) addLog('action', a, state.patrolCycle);
-  // PAN-2584: a review PARENT past its deadline with no terminal verdict is wedged —
-  // kill it so the durable review-request intent can respawn it warm.
+  // The review-parent patrol is observability-only and checks the synthesis artifact
+  // before the runtime row, so a completed parent is never mistaken for a stalled one.
   const stalledParentActions = await checkStalledReviewParents();
   actions.push(...stalledParentActions);
   for (const a of stalledParentActions) addLog('action', a, state.patrolCycle);
-  const forkCacheActions = await checkReviewForkCacheMisses();
-  actions.push(...forkCacheActions);
-  for (const a of forkCacheActions) addLog('action', a, state.patrolCycle);
 
   const reviewerMonitorActions = await monitorReviewConvoySignals();
   actions.push(...reviewerMonitorActions);
