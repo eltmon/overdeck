@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:44:49.129Z",
+  "updated": "2026-08-05T17:10:46.866Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 11,
-    "claims": {
-      "drop-selective-rereview-selection": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 1470613,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T15:44:49.128Z"
-      }
-    },
+    "sequence": 12,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -116,6 +108,16 @@
         "itemId": "drop-fork-agent-state-fields",
         "outcome": "completed",
         "releasedAt": "2026-08-05T15:44:41.513Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 1470613,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:44:49.128Z",
+        "itemId": "drop-selective-rereview-selection",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T17:10:46.866Z"
       }
     ],
     "statusReasons": {
@@ -156,6 +158,10 @@
     "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac2": "completed",
     "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac3": "completed",
     "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac4": "completed",
-    "drop-selective-rereview-selection": "running"
+    "drop-selective-rereview-selection": "completed",
+    "drop-selective-rereview-selection.drop-selective-rereview-selection.ac1": "completed",
+    "drop-selective-rereview-selection.drop-selective-rereview-selection.ac2": "completed",
+    "drop-selective-rereview-selection.drop-selective-rereview-selection.ac3": "completed",
+    "drop-selective-rereview-selection.drop-selective-rereview-selection.ac4": "completed"
   }
 }
