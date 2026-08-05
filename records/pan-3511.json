@@ -742,9 +742,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T10:05:27.328Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T10:07Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-05T10:07:32.250Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-05T10:07:32Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — headless workspace evidence can replay a stale approval\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-09638451/context.json`\n- Branch: `feature/pan-3511`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511`\n- HEAD reviewed: `09638451ffa2dc04aed07d6d8738df79e2469514`\n- Cycle number: 13\n- Prior cycle SHA: `59501a371249fe5dfaf36a0c110b989086a3e0ee`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 1 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 0 |\n| requirements | ready | `requirements.md` | 0 |\n\n## Blocking Findings\n\n### [security] Headless workspace artifact can authorize stale verdict replay — `src/lib/review-status-read.ts:50`\n\nThe cycle changes the stale-journal exception from requiring a matching artifact and live review-head anchor to accepting an artifact whenever either anchor is absent. A work agent can write a fresh `APPROVED` `review.md` in the host-selected active-run directory and omit workspace-controlled `context.json`; after the asynchronous reader populates its memo, the status resolver uses that headless artifact to lift the stale-journal refusal and replays an approval from a prior review cycle. The resulting terminal state can recompute `readyForMerge` without a current review verdict. Keep the stale-journal refusal unless immutable host-recorded or authenticated review-head evidence binds the artifact to the live row; missing workspace evidence must not satisfy that authorization condition.\n\n## Scope and Convergence Gate\n\nThis finding is in the PR diff and in cycle 13's diff from `59501a371249fe5dfaf36a0c110b989086a3e0ee` to `09638451ffa2dc04aed07d6d8738df79e2469514`, so it remains promotable. Correctness and requirements confirm that the change restores the documented headless quick-review behavior, but that behavior conflicts with the security boundary that workspace-writable evidence cannot authorize a terminal state.\n\n## Clean Sub-roles\n\n- correctness — optional-anchor handling, active-run binding, bounded memo use, and the updated regression cases are otherwise internally consistent.\n- performance — all artifact filesystem reads remain asynchronous, and the status resolver consumes cache-only evidence.\n- requirements — all seven delivery items and the explicit non-goals are implemented as written.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-09638451/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -795,7 +808,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:07:31.618Z",
+  "updated": "2026-08-05T10:07:32.250Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
