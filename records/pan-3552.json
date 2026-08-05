@@ -162,6 +162,11 @@
       "reason": "feedback",
       "note": "[2026-08-05T23:18Z] review-agent → CHANGES-REQUESTED — seq 2",
       "timestamp": "2026-08-05T23:18:15.017Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T23:29:24.598Z"
     }
   ],
   "feedback": [],
@@ -401,7 +406,7 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:29:23.225Z",
+  "updated": "2026-08-05T23:29:24.598Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "reviewing",
