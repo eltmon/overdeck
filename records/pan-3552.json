@@ -431,17 +431,17 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:38:55.759Z",
+  "updated": "2026-08-05T23:39:06.613Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "passed",
-    "testStatus": "failed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T23:38:51.482Z",
+    "updatedAt": "2026-08-05T23:39:06.592Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed anchor-match reviewed-head persistence, current-run verdict-of-record convergence, and recommendation-only sweeper state; updated the head-anchor audit.",
     "testNotes": "typecheck (npm run typecheck) PASSED. lint (npm run lint) PASSED (exit 0, all sub-lints incl. state-writes/state-paths/pipeline-membership/workspace-doors/park-exits green). npm test FAILED: tests/unit/lib/head-anchor-write-sites.test.ts > 'locks every documented write occurrence and source expression' fails deterministically and reproduces standalone (isolated run, no other files) - src/lib/cloister/review-verdict-writer.ts now contains a second, structurally-identical write site for 'reviewedAtCommit: input.evidenceHead as HeadAnchor' (lines 162 and 235) but the test's ALLOWED_WRITE_SITES inventory still lists only one occurrence, so the scan finds 47 sites vs an expected 46. Root cause: xBRIEF item 'preserve-test-gate-on-same-head-converge' (commit fa73ec8b29 'fix(review): preserve same-head test verdict') added the second write site to review-verdict-writer.ts but its files_scope did not include tests/unit/lib/head-anchor-write-sites.test.ts; the sibling item 'reconcile-reviewing-rows-through-write-door' (commit abb3344b27) was the one scoped to touch that inventory test and landed first, so the allowlist was never updated for the later addition - a coordination gap between two xBRIEF items, not a pre-existing failure (confirmed clean on origin/main baseline knowledge and the test asserts against this branch's own src/lib/cloister/review-verdict-writer.ts). Two full `npm test` runs also surfaced a shifting set of unrelated failures (beforeEach 'Hook timed out in 5000ms' in setupOverdeckTestDb() across ~9 files, plus review-verdict-writer.test.ts and stall-sweeper.test.ts assertion mismatches) that did not reproduce in isolation (25/25 and 55/55 passed when re-run standalone/in small batches) - consistent with system resource contention from ~13 concurrently running Overdeck agents on this machine, not a code defect; these are excluded from the failure verdict. The one blocking failure is the head-anchor-write-sites.test.ts inventory mismatch, which is real, deterministic, and directly caused by this branch's own commits.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
@@ -689,9 +689,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 20112589,
-            "output": 413522,
-            "cacheRead": 133853696,
+            "input": 20119923,
+            "output": 415516,
+            "cacheRead": 134320640,
             "cacheWrite": 0
           }
         },
@@ -746,9 +746,9 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 43014923,
-          "output": 1636131,
-          "cacheRead": 608146432,
+          "input": 43022257,
+          "output": 1638125,
+          "cacheRead": 608613376,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -759,8 +759,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 285.928113,
-        "pricingAsOf": "2026-08-05T23:38:54.745Z"
+        "usd": 286.093095,
+        "pricingAsOf": "2026-08-05T23:39:06.602Z"
       }
     },
     "merges": [
