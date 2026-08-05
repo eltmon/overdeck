@@ -564,15 +564,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T03:01:32Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — workspace-controlled review subprocesses retain the attestation bearer token\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5\n- Cycle number: 7\n- Prior cycle SHA: 8bb38905afbcc7d9787eb84953484955ecd08e5f (last complete synthesis)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/requirements.md | 1 |\n\n## Blocking Findings\n\n### [security] Workspace subprocesses inherit the active attestation bearer token — `src/lib/agents/spawn.ts:427`\n`createSession()` supplies `OVERDECK_REVIEW_ATTESTATION_TOKEN` to the review agent, and the new launcher boundary at `src/lib/agent-host-secret-boundary.ts:24-32` removes only the signing key. Every repository-controlled child process of the reviewer consequently receives a valid token for the active run. It can replace the run's report and call the attestation endpoint, which accepts possession of that token as authorization and signs the workspace-authored report. Masking the persistent HMAC key does not protect an equivalent bearer credential that remains exposed to arbitrary workspace commands.\n\nThis survives the cycle-7 convergence gate: the new prelude is in the cycle diff and is the changed code that attempts the signing boundary while leaving the completion capability reachable. The fix must keep any capability that can request attestation out of processes that can execute workspace-controlled code, and the integration test must exercise a realistic review-session environment containing the token.\n\n### [correctness] Environment-supplied signing keys bypass the new host-secret boundary — `src/lib/agent-host-secret-boundary.ts:26`\nAt the assigned revision, `ensureReviewAttestationKey()` accepts a valid `OVERDECK_REVIEW_ATTESTATION_KEY` and returns it without materializing `review-attestation-key` (`src/lib/review-attestation-key.ts:77-82`). The prelude enters its PID and mount isolation only when that file exists. In this supported environment-key configuration it unsets the agent's direct copy but starts no boundary at all, leaving same-UID workspace processes able to inspect the host process environment and recover the signing key.\n\nThis is new-cycle code and survives the convergence gate. The boundary must activate whenever the host owns an attestation key, including environment-supplied keys, or the host must safely materialize that key at the protected canonical path before any agent launcher runs.\n\n### [requirements] The requirements lane could not assess the assigned review snapshot\nThe manifest binds this cycle to `a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5`, but the workspace had advanced to `b62284f2211d38866046f6db0dff9a1625558c43` when the requirements reviewer executed. The lane therefore deliberately produced no acceptance-criteria coverage for the assigned revision. A passed review would claim requirements coverage for a different tree, so the review must be re-run against a workspace checked out at the manifest's immutable target after the security and correctness findings are addressed.\n\n## Scope Note\nAll code blockers cite changes in the PR diff and, for this seventh cycle, in the diff from `8bb38905afbcc7d9787eb84953484955ecd08e5f` to `a43edff454dbc5d0ea44c9e1b05eb8ecbee99ef5`; they are not previously reviewed findings. The requirements blocker is classified `Scope: in_pr_scope` by that lane because the review task requires an assessment of its assigned revision, but its report cannot establish requirement coverage until the execution workspace matches the manifest target.\n\n## Clean Sub-roles\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-a43edff4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -694,17 +686,17 @@
     "recordedAt": "2026-08-05T04:03:45.440Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T04:12:49.063Z",
+  "updated": "2026-08-05T04:16:29.319Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T04:12:48.966Z",
+    "updatedAt": "2026-08-05T04:16:29.295Z",
     "reviewNotes": "Review-attestation bearer token remains exposed to workspace subprocesses",
     "testNotes": "npm run typecheck: PASS. npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 reads its own module's source via readFileSync instead of exercising runtime behavior, and is not baselined; guard exits 1 (confirmed via direct re-run, real exit code 1), aborting the rest of the lint chain (no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit never ran). This is real code on this branch's sweeper-consult work item, not a false positive. npm test: 1407/1412 files passed, 13344/13403 tests passed; the 2 failures are Hook timed out in 5000ms inside setupOverdeckTestDb in tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file scope, and matches a pre-existing DB-setup-hook-timeout flake already documented in this issue's own session history. Overall automated-gate status is FAILED, blocking on lint:source-introspection against the branch's own new test.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -712,7 +704,7 @@
     "reviewedAtCommit": "7fc5930e614e9b1151b8258a881d87b71537795d",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
     "reviewRequestedAt": "2026-08-05T04:03:46.406Z",
-    "reviewSpawnedAt": "2026-08-05T02:51:35.899Z",
+    "reviewSpawnedAt": "2026-08-05T04:16:29.294Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/events.ts",
@@ -960,7 +952,7 @@
       },
       "costAtCloseOut": {
         "usd": 458.6960763,
-        "pricingAsOf": "2026-08-05T04:12:49.022Z"
+        "pricingAsOf": "2026-08-05T04:16:29.306Z"
       }
     },
     "merges": [
