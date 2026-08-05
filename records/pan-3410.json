@@ -940,7 +940,7 @@
     "recordedAt": "2026-08-02T18:36:54.913Z"
   },
   "created": "2026-08-01T15:21:00.500Z",
-  "updated": "2026-08-04T18:49:35.869Z",
+  "updated": "2026-08-05T12:41:39.211Z",
   "pipeline": {
     "issueId": "PAN-3410",
     "reviewStatus": "passed",
@@ -948,11 +948,12 @@
     "uatStatus": "passed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-02T18:40:33.820Z",
-    "updatedAt": "2026-08-04T18:49:35.384Z",
+    "updatedAt": "2026-08-05T12:41:36.652Z",
     "testNotes": "HEAD 154acd4ff62 (Merge origin/main into feature/pan-3410, merge-base 534828d51ba, no conflict markers). install: PASS (bun install --frozen-lockfile, no changes). typecheck: PASS (npm run typecheck — dashboard-types ratchet 55 known errors/none new, frontend-types 0/none new; confirms the prior cycle's TS1308 legacy-routes.ts failure is resolved on this HEAD via the merged origin/main fix). frontend-typecheck: PASS (npx tsc --noEmit in src/dashboard/frontend). lint: PASS on clean run (19 steps incl. lint:skills, lint:file-size, lint:circular, lint:ratchet-audit, lint:quarantine-audit all green); first attempt hit a transient lint:skills failure against the shared global `pan` deployment binary under this machine's concurrent-agent load (unrelated to PAN-3410 — branch diff vs merge-base touches only sync-sources/dev-skills/pan-style-guide/SKILL.md, not pan-flywheel), confirmed as a flake by an immediate clean re-run (exit 0). build: PASS (npm run build, vite + lint:dist-externals clean). server-bundle: PASS (npm run build:dashboard:server:bundle). test: PASS on retry (root vitest --changed origin/main: 874 files/8249 tests passed on retry, sanctioned by the gate's own retry:1; first attempt's single failure was src/lib/overdeck/__tests__/schema-audit.test.ts timing out at the 5000ms default under concurrent load — file untouched by this branch since PAN-2807, confirmed a contention flake by an isolated re-run passing all 4 tests in 5.38s; frontend vitest --changed origin/main: 114 files/1414 tests passed both attempts).\n\nUAT REQUIRED and PASSED. Rationale: PRD AC-2 requires 'the Overdeck Theme picker switches themes live, persists across reload', NFR-4 requires an instant no-reload switch, and the appearance-theme-picker/design-language-hook xBRIEF items encode observable browser behavior (live attribute flip, mirror/server round-trip) that only a running app can prove. Built and ran the dashboard from this workspace (not main): npm run build already produced dist/; started `node dist/dashboard/server.js` with PORT=3016, OVERDECK_DISABLE_DEACON=1 from this workspace root (peer mode, verified via GET /api/health: repoRoot=this workspace, buildCommit=154acd4ff62, buildBranch=feature/pan-3410, buildDirty=false). No PAN-3410 dashboard was already running (the earlier pgrep hit was a false-positive self-match on my own `ps aux | grep dashboard/server.js` command); the primary flywheel-owned dashboard on :3011 was left untouched throughout. Used the Playwright MCP tools directly (no separate uat-agent spawned).\n\nVerified via Playwright against http://127.0.0.1:3016: (1) fresh profile boots with documentElement.dataset.theme='broadsheet' and body computed font-family starts with 'Geist Variable' before any interaction — design-language-hook.ac1, theme-token-scope.ac2. (2) Settings→Appearance renders both theme cards (Ledger, Broadsheet) each with name, one-line description, and a live mini-specimen (OVERDECK/Aa/Sample chip) visibly rendered in that card's own font/scale side by side — appearance-theme-picker.ac1. (3) Clicking the Ledger card (data-testid=theme-card-ledger) flipped documentElement.dataset.theme to 'ledger' and body font-family to 'DM Sans' immediately with no navigation/reload — design-language-hook.ac2. (4) GET /api/settings confirmed the write persisted server-side (ui.theme: 'ledger'). (5) Reloading the page showed data-theme='ledger' already applied via the boot script before the settings fetch resolved, and the Appearance picker re-rendered with Ledger showing the selected treatment and Broadsheet unselected — design-language-hook.ac3, appearance-theme-picker.ac2/ac3. (6) The pre-existing 'Ready to Merge shimmer' toggle rendered and remained on, unchanged — appearance-theme-picker.ac4. (7) Badge radius token check on /board: computed border-radius on badge-bg-* elements is 8px (var(--radius-md)) under data-theme='broadsheet' and 6px (var(--radius-sm)) under 'ledger', matching the deliberate D-11/D-12 texture change — broadsheet-mechanical-migration.ac2. (8) No console errors on Home, Settings, or Board pages (0 errors across all navigations; only benign 'password field not in a form' verbose warnings unrelated to this change). (9) No visible layout regression in either theme across the pages exercised — Home/Board dense monitoring layout is visually identical between themes, consistent with the bounded/per-feature-adoption migration scope (D-12). The six before/after screenshots proving three-surface Ledger pixel-parity + Broadsheet type changes required by broadsheet-mechanical-migration.ac4/FR-5 were already captured and committed by the work agent in a prior cycle; this UAT independently re-verified the live behavior rather than re-deriving those specific screenshots.\n\nAll xBRIEF items show statusOverrides: completed with matching acceptance-criteria completions in the canonical record. reviewStatus=passed, verificationStatus=passed, inspectStatus=passed per the canonical review-status API prior to this run.",
     "uatNotes": "Live-verified against a workspace-built dashboard (PORT=3016, OVERDECK_DISABLE_DEACON=1, this checkout, buildCommit=154acd4ff62) via Playwright MCP, no separate uat-agent spawned. Confirmed: (1) fresh-profile boot defaults to Broadsheet/Geist before first paint; (2) Settings→Appearance two-card picker renders with live per-card mini-specimens in each theme's own font; (3) clicking Ledger flips data-theme + font-family instantly with no reload; (4) the write persists server-side (GET /api/settings ui.theme='ledger'); (5) reload preserves the selection via the boot-script mirror and the picker re-renders the correct selected/unselected card treatment; (6) the pre-existing Ready-to-Merge-shimmer toggle is unaffected; (7) badge border-radius resolves to 8px under Broadsheet and 6px under Ledger via the --badge-radius token, matching the sanctioned texture change; (8) zero console errors across Home/Settings/Board. No criterion was left unproven; the only screenshot-evidence AC (broadsheet-mechanical-migration.ac4) was already satisfied by the work agent's prior committed screenshots, which this session did not need to redo.",
     "conflictsSince": {
@@ -1002,10 +1003,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 1488,
-            "output": 150572,
-            "cacheRead": 85754689,
-            "cacheWrite": 1075423
+            "input": 1490,
+            "output": 150799,
+            "cacheRead": 86058474,
+            "cacheWrite": 1075807
           }
         },
         "work": {
@@ -1037,15 +1038,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 8611,
-          "output": 848455,
-          "cacheRead": 800863436,
-          "cacheWrite": 33045048
+          "input": 8613,
+          "output": 848682,
+          "cacheRead": 801167221,
+          "cacheWrite": 33045432
         }
       },
       "costAtCloseOut": {
-        "usd": 676.1981073,
-        "pricingAsOf": "2026-08-04T18:49:35.604Z"
+        "usd": 676.2620983,
+        "pricingAsOf": "2026-08-05T12:41:36.783Z"
       }
     },
     "merges": [
