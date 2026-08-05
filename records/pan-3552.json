@@ -203,7 +203,7 @@
     "recordedAt": "2026-08-05T19:29:31.746Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:29:45.737Z",
+  "updated": "2026-08-05T19:29:54.943Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -212,7 +212,7 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T19:29:42.233Z",
+    "updatedAt": "2026-08-05T19:29:54.897Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewRequestedAt": "2026-08-05T19:29:35.331Z",
     "scopeDrift": {
@@ -425,7 +425,7 @@
       },
       "costAtCloseOut": {
         "usd": 92.133962,
-        "pricingAsOf": "2026-08-05T19:29:45.732Z"
+        "pricingAsOf": "2026-08-05T19:29:54.938Z"
       }
     },
     "merges": [
