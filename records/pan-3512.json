@@ -857,6 +857,16 @@
       "reason": "feedback",
       "note": "[2026-08-05T02:35Z] review-agent → FAILED — seq 157",
       "timestamp": "2026-08-05T02:35:50.801Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T02:41Z] review-agent → FAILED — seq 158",
+      "timestamp": "2026-08-05T02:41:43.052Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T02:41Z] review-agent → FAILED — seq 159",
+      "timestamp": "2026-08-05T02:41:43.150Z"
     }
   ],
   "feedback": [
@@ -1958,6 +1968,20 @@
       "outcome": "failed",
       "timestamp": "2026-08-05T02:35:50Z",
       "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3512`."
+    },
+    {
+      "seq": 158,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-05T02:41:43Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3512` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3512`."
+    },
+    {
+      "seq": 159,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-05T02:41:43Z",
+      "markdownBody": "## Pipeline Rework Required\n\nreview/test feedback could not be delivered — the work agent is not running and nothing resumed it.\n\nAddress the pending feedback in `.pan/feedback`, commit, push, and run `pan done PAN-3512`."
     }
   ],
   "scopeDrift": {
@@ -2009,7 +2033,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-05T02:41:39.116Z",
+  "updated": "2026-08-05T02:41:43.150Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
