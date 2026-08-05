@@ -1301,18 +1301,19 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-04T19:14:21.832Z",
+  "updated": "2026-08-05T12:41:36.806Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
     "testStatus": "passed",
     "uatStatus": "passed",
     "verificationStatus": "passed",
-    "mergeStatus": "pending",
+    "mergeStatus": "merged",
+    "mergeStep": "post-merge-cleanup",
     "releaseStatus": "pending",
-    "readyForMerge": true,
+    "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z",
-    "updatedAt": "2026-08-04T19:09:04.688Z",
+    "updatedAt": "2026-08-05T12:41:36.570Z",
     "testNotes": "Automated gates at HEAD 5bc806f30c13b62b0446144e7d96d6945e3c3db6 (feature/pan-1577), all run against this exact commit via the durable verification-worker in this workspace (started 2026-08-04T18:14:58Z, finished 18:59:45Z): install (bun install --frozen-lockfile) PASS 13.5s. typecheck (root tsc + hooks + evals + dashboard/frontend shrink-only ratchets) PASS 421s. frontend-typecheck (npx tsc --noEmit) PASS 879s. lint (eslint + all 18 sub-lints: effect, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps, ratchet-audit, quarantine-audit) PASS 334s. build (npm run build) PASS 368s. server-bundle (npm run build:dashboard:server:bundle) PASS 156s. test (OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main, root + frontend concurrently) PASS 490s. Overall: 7/7 required gates passed, 0 failed (worker log: 'Complete: 7 passed, 0 failed out of 7 gates' / '[durable-review] Verification passed for PAN-1577 (HEAD=5bc806f3)'). Workspace was already up to date with main at run time (no sync needed). This reuses the freshest available automated-gate run rather than duplicating an already-in-flight ~35-minute full gate run against the identical commit in the same workspace, which would have caused resource contention on concurrent dist/node_modules writes for zero additional evidence.",
     "uatNotes": "UAT required: the xBRIEF's drag-drop-move.ac4 explicitly requires 'Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end', and the GitHub issue's UI acceptance criteria specify exact toast wording, drag-drop affordances, and menu-picker behavior that only a real browser can confirm. Built and ran the dashboard from THIS workspace (not main): reused the fresh dist/ produced by the automated build/server-bundle gates above (buildCommit 5bc806f3, matching current HEAD exactly), started as an isolated instance on port 3212 with a throwaway OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1. Did NOT touch or restart the live production dashboard on :3011 (mode=primary, actively orchestrating 25+ running agents per the session's own workspace status) -- stopping it would have been highly disruptive and is exactly what the 'never pan up restart' operating rule for this repo exists to prevent; an isolated peer instance on a free port satisfies 'run the dashboard from the workspace' without that blast radius. Registered two throwaway git-backed projects (uat-proj-a, uat-proj-b) in the isolated OVERDECK_HOME's projects.yaml and seeded one test conversation (cwd under uat-proj-a) directly via createConversation() in src/lib/overdeck/conversations.ts against the isolated DB (via tsx, no real agent spawn needed). Drove both move surfaces via the Playwright MCP tools against http://127.0.0.1:3212 (no separate UAT agent spawned): (1) Menu-picker move -- opened the 3-dot 'More actions' menu on the conversation row, clicked Move, confirmed the project-picker submenu showed 'uat-proj-a' disabled (current project, matching xBRIEF decision D5) and 'uat-proj-b' selectable, clicked uat-proj-b -- got a visible toast 'Moved \"UAT Move Test Conversation\" to uat-proj-b' (title-not-id, screenshot after-menu-move.png), uat-proj-a's Command Deck immediately showed 'No conversations yet' / count 0 (live re-group, no manual refresh), and GET /api/conversations confirmed server-side projectKey='uat-proj-b' while cwd remained pinned to the original uat-proj-a path (JSONL/cwd hazard H1 verified untouched -- move never rewrites cwd). (2) Native drag-and-drop -- navigated to uat-proj-b's Command Deck (confirmed 1 conversation there), dragged the conversation row onto the 'uat-proj-a' sidebar rail item via browser_drag, confirmed uat-proj-b's Command Deck flipped to '0 convos' / 'No conversations yet' (screenshot after-drag-drop.png) and GET /api/conversations confirmed server-side projectKey='uat-proj-a' with cwd still unchanged. Both flows were exercised with real UI interaction plus independent server-side API confirmation, matching AC1-AC3 of both menu-move and drag-drop-move xBRIEF items and drag-drop-move.ac4's end-to-end requirement. The isolated dashboard instance was stopped after verification (port 3212 confirmed free), and all throwaway artifacts (seed script, screenshots, throwaway git projects, throwaway OVERDECK_HOME) were deleted -- git status confirms a clean working tree on feature/pan-1577.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
@@ -1342,9 +1343,9 @@
         },
         "review": {
           "openai/gpt-5.6-sol": {
-            "input": 84317368,
-            "output": 892386,
-            "cacheRead": 213761024,
+            "input": 84321754,
+            "output": 893328,
+            "cacheRead": 214459392,
             "cacheWrite": 0
           }
         },
@@ -1390,10 +1391,10 @@
         },
         "work": {
           "anthropic/claude-sonnet-5": {
-            "input": 3897,
-            "output": 767312,
-            "cacheRead": 845453650,
-            "cacheWrite": 30809733
+            "input": 3903,
+            "output": 768097,
+            "cacheRead": 847761251,
+            "cacheWrite": 30810956
           }
         }
       },
@@ -1411,21 +1412,21 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 98627173,
-          "output": 1266912,
-          "cacheRead": 298941440,
+          "input": 98631559,
+          "output": 1267854,
+          "cacheRead": 299639808,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 5255,
-          "output": 1036130,
-          "cacheRead": 992547899,
-          "cacheWrite": 32802369
+          "input": 5261,
+          "output": 1036915,
+          "cacheRead": 994855500,
+          "cacheWrite": 32803592
         }
       },
       "costAtCloseOut": {
-        "usd": 974.1616026,
-        "pricingAsOf": "2026-08-04T19:09:04.770Z"
+        "usd": 975.0334166,
+        "pricingAsOf": "2026-08-05T12:41:36.643Z"
       }
     },
     "merges": [
@@ -1625,5 +1626,5 @@
     "drag-drop-move.drag-drop-move.ac4": "completed"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol"
+  "model": "claude-sonnet-5"
 }
