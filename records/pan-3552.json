@@ -331,16 +331,17 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:44:07.426Z",
+  "updated": "2026-08-05T21:44:09.866Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T21:42:09.422Z",
+    "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
+    "updatedAt": "2026-08-05T21:44:08.285Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3552-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1",
@@ -581,17 +582,16 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T21:30:38.954Z"
-    },
-    "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z"
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 7116146,
-            "output": 129529,
-            "cacheRead": 44056064,
+            "input": 7128556,
+            "output": 136563,
+            "cacheRead": 45040128,
             "cacheWrite": 0
           }
         },
@@ -638,15 +638,15 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 28814889,
-          "output": 1199250,
-          "cacheRead": 454067200,
+          "input": 28827299,
+          "output": 1206284,
+          "cacheRead": 455051264,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 203.543303,
-        "pricingAsOf": "2026-08-05T21:42:17.800Z"
+        "usd": 203.925855,
+        "pricingAsOf": "2026-08-05T21:44:09.861Z"
       }
     },
     "merges": [
