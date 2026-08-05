@@ -592,6 +592,26 @@
       "timestamp": "2026-08-05T06:53:32.460Z",
       "reason": "end",
       "note": "No deviations. Removed rejected attestation code, restored main's completion flow, retained verdict-of-record recovery and stale-evidence handling, and fixed the lint gate."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T07:01:04.100Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T07:01:04.112Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T07:01:04.129Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T07:01:04.141Z"
     }
   ],
   "feedback": [],
@@ -645,7 +665,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T06:59:38.013Z",
+  "updated": "2026-08-05T07:01:04.141Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "reviewing",
