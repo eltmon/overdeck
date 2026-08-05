@@ -802,6 +802,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T10:56:40.447Z"
+    },
+    {
+      "timestamp": "2026-08-05T11:03:42.560Z",
+      "reason": "end",
+      "note": "Agent signaled work complete"
     }
   ],
   "feedback": [
@@ -871,7 +876,7 @@
     "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T11:03:41.613Z",
+  "updated": "2026-08-05T11:03:42.560Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
