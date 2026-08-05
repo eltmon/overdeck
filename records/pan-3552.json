@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T14:50:57.478Z",
+  "updated": "2026-08-05T15:03:45.973Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,18 +53,32 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 1,
-    "claims": {
-      "drop-parent-discovery-mode": {
+    "sequence": 2,
+    "claims": {},
+    "claimHistory": [
+      {
         "writerId": "agent-pan-3552",
         "agentId": "agent-pan-3552",
         "pid": 295402,
         "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T14:50:57.478Z"
+        "claimedAt": "2026-08-05T14:50:57.478Z",
+        "itemId": "drop-parent-discovery-mode",
+        "outcome": "completed",
+        "reason": "Removed discovery/fork mode so full review dispatch always launches its convoy, and locked the standby prompt behavior with regression tests.",
+        "releasedAt": "2026-08-05T15:03:45.973Z"
+      }
+    ],
+    "statusReasons": {
+      "drop-parent-discovery-mode": {
+        "reason": "Removed discovery/fork mode so full review dispatch always launches its convoy, and locked the standby prompt behavior with regression tests.",
+        "updatedAt": "2026-08-05T15:03:45.973Z"
       }
     }
   },
   "statusOverrides": {
-    "drop-parent-discovery-mode": "running"
+    "drop-parent-discovery-mode": "completed",
+    "drop-parent-discovery-mode.drop-parent-discovery-mode.ac1": "completed",
+    "drop-parent-discovery-mode.drop-parent-discovery-mode.ac2": "completed",
+    "drop-parent-discovery-mode.drop-parent-discovery-mode.ac3": "completed"
   }
 }
