@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T18:13:27.995Z",
+  "updated": "2026-08-05T18:15:29.488Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,7 +53,7 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 26,
+    "sequence": 27,
     "claims": {
       "reconcile-reviewing-rows-through-write-door": {
         "writerId": "agent-pan-3552",
@@ -61,13 +61,6 @@
         "pid": 3973477,
         "host": "eltmon-z790",
         "claimedAt": "2026-08-05T17:55:07.520Z"
-      },
-      "docs-parked-merge-flywheel": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 29345,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T18:13:27.995Z"
       }
     },
     "claimHistory": [
@@ -193,6 +186,16 @@
         "itemId": "dispatch-consults-verdict-of-record",
         "outcome": "completed",
         "releasedAt": "2026-08-05T17:54:58.416Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 29345,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T18:13:27.995Z",
+        "itemId": "docs-parked-merge-flywheel",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T18:15:29.488Z"
       }
     ],
     "statusReasons": {
@@ -267,6 +270,9 @@
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac3": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac4": "completed",
     "reconcile-reviewing-rows-through-write-door": "running",
-    "docs-parked-merge-flywheel": "running"
+    "docs-parked-merge-flywheel": "completed",
+    "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac1": "completed",
+    "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac2": "completed",
+    "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac3": "completed"
   }
 }
