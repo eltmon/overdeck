@@ -15,7 +15,7 @@
  */
 
 import { Effect } from 'effect';
-import type { ReviewStatus } from './review-status.js';
+import type { ReviewStatus } from './review-status-reconcile.js';
 import { getInternalTokenSync, INTERNAL_TOKEN_HEADER } from './internal-token.js';
 
 export type PipelineEvent =

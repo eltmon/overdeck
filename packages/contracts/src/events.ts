@@ -1338,34 +1338,6 @@ export const SweepScanEvent = Schema.Struct({
 })
 export type SweepScanEvent = typeof SweepScanEvent.Type
 
-/** The sweeper took an autonomous action against a parked row. */
-export const SweepActionEvent = Schema.Struct({
-  type: Schema.Literal("sweep.action"),
-  sequence: SequenceNumber,
-  timestamp: Schema.String,
-  payload: Schema.Struct({
-    issueId: Schema.String,
-    orbit: Schema.String,
-    action: Schema.String,
-    agentId: Schema.optional(Schema.String),
-  }),
-})
-export type SweepActionEvent = typeof SweepActionEvent.Type
-
-/** A parked row was released by the sweeper (the issue re-enters the pipeline). */
-export const SweepUnparkedEvent = Schema.Struct({
-  type: Schema.Literal("sweep.unparked"),
-  sequence: SequenceNumber,
-  timestamp: Schema.String,
-  payload: Schema.Struct({
-    issueId: Schema.String,
-    orbit: Schema.String,
-    action: Schema.String,
-    agentId: Schema.optional(Schema.String),
-  }),
-})
-export type SweepUnparkedEvent = typeof SweepUnparkedEvent.Type
-
 /** A parked row was (re-)surfaced to the operator — gates respected, TTL re-surface, or exhaustion. */
 export const SweepEscalatedEvent = Schema.Struct({
   type: Schema.Literal("sweep.escalated"),
@@ -1497,8 +1469,6 @@ export const DomainEvent = Schema.Union([
   EnrichCompleteEvent,
   EmbedProgressEvent,
   SweepScanEvent,
-  SweepActionEvent,
-  SweepUnparkedEvent,
   SweepEscalatedEvent,
   SweepRecommendationEvent,
 ])

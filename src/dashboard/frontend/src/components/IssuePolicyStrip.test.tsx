@@ -13,7 +13,7 @@ function response(body: unknown): Response {
 }
 
 const defaults = {
-  review: { override: { reviewMode: null, reReviewScope: null, reviewModel: null }, resolved: { reviewMode: 'full', reReviewScope: 'changed', reviewModel: null } },
+  review: { override: { reviewMode: null, reviewModel: null }, resolved: { reviewMode: 'full', reviewModel: null } },
   staffing: {
     override: { workModel: null },
     tieredExecution: { effective: true, source: 'global', override: null },
@@ -149,13 +149,6 @@ describe('IssuePolicyStrip', () => {
     expect(quick).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('uses the effective review mode to decide whether re-review is available', async () => {
-    fixtures.review.override.reviewMode = 'quick';
-    render(<IssuePolicyStrip issueId="PAN-2681" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
-    expect(screen.queryByLabelText('Re-review scope for this issue')).not.toBeInTheDocument();
-  });
-
   it('keeps the tiered Work Model default until PAN-2684 lands', async () => {
     render(<IssuePolicyStrip issueId="PAN-2681" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
@@ -244,14 +237,13 @@ describe('IssuePolicyStrip', () => {
 
     for (const hint of [
       'How much AI review runs before merge.',
-      'Which reviewers run again after you push fixes.',
       'Which model reviews this issue.',
       'Pins the implementation model for this issue.',
       'Run plan items in parallel across several agents.',
       'Route each item to a model tier by difficulty.',
     ]) expect(screen.getByText(hint)).toBeInTheDocument();
 
-    for (const label of ['Mode help', 'Re-review help', 'Model help', 'Swarm help', 'Standing crew help']) {
+    for (const label of ['Mode help', 'Model help', 'Swarm help', 'Standing crew help']) {
       expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
     }
   });
@@ -286,8 +278,8 @@ describe('IssuePolicyStrip', () => {
     expect(screen.getByLabelText('Review mode for this issue')).toContainElement(document.activeElement as HTMLElement);
   });
 
-  it('preserves every affordance from the five-select policy strip', async () => {
-    fixtures.review.override = { reviewMode: 'full', reReviewScope: 'all', reviewModel: 'gpt-5.5' };
+  it('preserves every affordance from the four-select policy strip', async () => {
+    fixtures.review.override = { reviewMode: 'full', reviewModel: 'gpt-5.5' };
     fixtures.staffing.override.workModel = 'claude-sonnet-5';
     fixtures.staffing.resolved.recordedModel = 'gpt-5.5';
     fixtures.swarm.configured = { mode: 'always' };
@@ -295,14 +287,13 @@ describe('IssuePolicyStrip', () => {
 
     render(<IssuePolicyStrip issueId="PAN-2681" />);
     const strip = await screen.findByTestId('issue-policy-strip');
-    expect(within(strip).getByText('6')).toBeInTheDocument();
+    expect(within(strip).getByText('5')).toBeInTheDocument();
     expect(within(strip).getByRole('button', { name: /review · full/i })).toBeInTheDocument();
     expect(within(strip).getByRole('button', { name: 'restart pending' })).toBeInTheDocument();
 
     fireEvent.click(within(strip).getByRole('button', { name: 'Issue policies' }));
     const legacyControls = [
       'Review mode for this issue',
-      'Re-review scope for this issue',
       'Review model for this issue',
       'Work model for this issue',
       'Swarm mode for this issue',
@@ -312,7 +303,6 @@ describe('IssuePolicyStrip', () => {
 
     for (const accessibleName of [
       'Reset review mode to default',
-      'Reset re-review scope to default',
       'Reset review model to default',
       'Reset work model to default',
       'Reset swarm mode to default',
@@ -324,7 +314,6 @@ describe('IssuePolicyStrip', () => {
       const posts = vi.mocked(global.fetch).mock.calls.filter(([, init]) => init?.method === 'POST');
       expect(posts).toEqual(expect.arrayContaining([
         ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reviewMode: null }) })],
-        ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reReviewScope: null }) })],
         ['/api/review/PAN-2681/config', expect.objectContaining({ body: JSON.stringify({ reviewModel: null }) })],
         ['/api/issues/PAN-2681/staffing', expect.objectContaining({ body: JSON.stringify({ workModel: null }) })],
         ['/api/issues/PAN-2681/swarm-policy', expect.objectContaining({ body: JSON.stringify({ value: null }) })],

@@ -53,12 +53,7 @@ export const OVERDECK_SCHEMA_TOP_UP_EXPECTATIONS: SchemaTopUpExpectations = {
     { table: 'review_status', column: 'strike_landing_attempts' },
     { table: 'review_status', column: 'conflicts_since' },
     { table: 'agents', column: 'yielded_by_scheduler' },
-    { table: 'agents', column: 'review_discovery_pending' },
     { table: 'agents', column: 'review_context_manifest_path' },
-    { table: 'agents', column: 'review_discovery_ready_at' },
-    { table: 'agents', column: 'review_convoy_forked_at' },
-    { table: 'agents', column: 'review_fork_cache_checked' },
-    { table: 'agents', column: 'review_forked_from_parent' },
     { table: 'agents', column: 'yielded_at' },
     { table: 'agents', column: 'last_yield_resume_at' },
     { table: 'agents', column: 'started_by' },
@@ -192,14 +187,8 @@ function ensureRuntimeIndexesSync(db: SqliteDatabase): void {
   // migration only runs on a fresh DB, so existing overdeck.db files need these
   // columns added idempotently here.
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_by_scheduler` integer');
-  // PAN-2585: PAN-1862 discovery-fork state — was state.json-only (write-only under
-  // the DB-first reader), which blinded the discovery-ready signal and its backstop.
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_pending` integer');
+  // Existing databases need the run context manifest for missing-reviewer recovery.
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_context_manifest_path` text');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_discovery_ready_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_convoy_forked_at` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_fork_cache_checked` integer');
-  runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `review_forked_from_parent` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `yielded_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `last_yield_resume_at` integer');
   runSchemaTopUp(db, 'ALTER TABLE `agents` ADD COLUMN `started_by` text');

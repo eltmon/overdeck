@@ -30,7 +30,7 @@ recommended release without acting on it.
 - **Terminal residue** — a closed issue's leftover rows. Never parked; the
   only row a closed issue can produce is `zombie-session`.
 
-## The ten orbits
+## The nine orbits
 
 | # | Orbit | Detection (read doors only) | Recommended release |
 | --- | --- | --- | --- |
@@ -40,10 +40,9 @@ recommended release without acting on it.
 | 4 | `operator-gate` | agent `paused` (not yield) / `troubled` / `stoppedByUser` | `pan unpause` / `pan untroubled` / `pan start` — operator-only; re-surfaced on TTL |
 | 5 | `uat-failed` | `uatStatus=failed` with merge pending | recommendation: `pan resume <agent>` with the UAT feedback (`pan start` if stopped) |
 | 6 | `merge-failed` | `mergeStatus=failed`, no retry in flight | recommendation: `pan review resync` for merge re-evaluation |
-| 7 | `conflicts` | `conflictsSince` branch-invalidation mark | recommendation: `pan sync-main` + rework, then `pan done` |
-| 8 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
-| 9 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
-| 10 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
+| 7 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
+| 8 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
+| 9 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
 
 The `stuck-flag` orbit consults the **verdict of record** from the
 host-recorded active review run before making a recommendation. The sweeper is
@@ -127,6 +126,6 @@ per-stage tooltip; the sidebar shows FLOW/HOUR with per-stage counts.
 `scripts/guard-park-exits.sh` (wired into `npm run lint` as `lint:park-exits`)
 fails the build when a stuck flavor is parked without operator copy in
 `STUCK_REASON_COPY`. The fixture meta-test in
-`src/lib/parked/__tests__/resolver.test.ts` proves all ten orbits classify
+`src/lib/parked/__tests__/resolver.test.ts` proves all nine orbits classify
 with non-empty `parkReason` + `unparkCondition`. Adding an orbit or a stuck
 flavor without its exit documentation is unmergeable.

@@ -10,12 +10,11 @@ import { openRecoveryForStartBlock } from '../lib/resumeRecovery';
 const PANEL_WIDTH = 440;
 
 type ReviewModeValue = 'quick' | 'full' | 'none';
-type ReReviewScopeValue = 'all' | 'changed' | 'blockers';
 type SwarmMode = 'off' | 'auto' | 'always';
 
 interface ReviewConfigResponse {
-  override: { reviewMode: ReviewModeValue | null; reReviewScope: ReReviewScopeValue | null; reviewModel: string | null };
-  resolved: { reviewMode: ReviewModeValue; reReviewScope: ReReviewScopeValue; reviewModel: string | null };
+  override: { reviewMode: ReviewModeValue | null; reviewModel: string | null };
+  resolved: { reviewMode: ReviewModeValue; reviewModel: string | null };
 }
 
 interface StaffingResponse {
@@ -53,16 +52,6 @@ const POLICY_HELP = {
       ['Quick', 'One reviewer makes a single self-review pass.'],
       ['Full', 'Four reviewers — security, correctness, performance, requirements — run in parallel, then a fifth synthesizes their reports.'],
       ['None', 'Skips AI review only. The issue still advances to test and merge.'],
-    ] as Array<[string, string]>,
-  },
-  reReviewScope: {
-    hint: 'Which reviewers run again after you push fixes.',
-    title: 'Re-review scope',
-    body: 'On the second and later review cycles, which of the four reviewers run again. Reviewers that are skipped carry their earlier verdict forward.',
-    options: [
-      ['Changed', 'Reviewers that blocked, plus any whose domain the new commits touch. Correctness and requirements re-run on any change; security and performance only on paths that match theirs.'],
-      ['All', 'All four reviewers re-run every cycle.'],
-      ['Blockers', 'Only reviewers that blocked last cycle.'],
     ] as Array<[string, string]>,
   },
   reviewModel: {
@@ -296,12 +285,9 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
     staffing.override.workModel && staffing.override.workModel !== staffing.resolved.recordedModel,
   );
   const crewSuspended = staffing.tieredExecution.effective && Boolean(staffing.override.workModel);
-  const effectiveReviewMode = review.override.reviewMode ?? review.resolved.reviewMode;
-
   const modelName = (modelId: string) => models.find((model) => model.id === modelId)?.name ?? modelId;
   const overrides = [
     review.override.reviewMode && { key: 'review', label: 'review', value: review.override.reviewMode },
-    review.override.reReviewScope && { key: 're-review', label: 're-review', value: review.override.reReviewScope },
     review.override.reviewModel && { key: 'review-model', label: 'review model', value: modelName(review.override.reviewModel) },
     staffing.override.workModel && {
       key: 'work',
@@ -340,7 +326,6 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
 
   const resetAll = async () => {
     if (review.override.reviewMode !== null) await save(`/api/review/${encoded}/config`, { reviewMode: null });
-    if (review.override.reReviewScope !== null) await save(`/api/review/${encoded}/config`, { reReviewScope: null });
     if (review.override.reviewModel !== null) await save(`/api/review/${encoded}/config`, { reviewModel: null });
     if (staffing.override.workModel !== null) await save(`/api/issues/${encoded}/staffing`, { workModel: null });
     if (swarm.configured?.mode) await save(`/api/issues/${encoded}/swarm-policy`, { value: null });
@@ -399,16 +384,6 @@ export function IssuePolicyStrip({ issueId }: { issueId: string }) {
             <Segmented ariaLabel="Review mode for this issue" value={review.override.reviewMode} resolvedLabel={review.resolved.reviewMode} options={[["quick", "Quick"], ["full", "Full"], ["none", "None"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reviewMode: next })} />
           </PolicyRow>
 
-          {effectiveReviewMode === 'full' && (
-            <PolicyRow
-              label="Re-review"
-              help={POLICY_HELP.reReviewScope}
-              overridden={Boolean(review.override.reReviewScope)}
-              reset={review.override.reReviewScope ? <button type="button" aria-label="Reset re-review scope to default" className={resetClass} disabled={saving} onClick={() => save(`/api/review/${encoded}/config`, { reReviewScope: null })}>reset</button> : undefined}
-            >
-              <Segmented ariaLabel="Re-review scope for this issue" value={review.override.reReviewScope} resolvedLabel={review.resolved.reReviewScope} options={[["changed", "Changed"], ["all", "All"], ["blockers", "Blockers"]]} disabled={saving} onChange={(next) => save(`/api/review/${encoded}/config`, { reReviewScope: next })} />
-            </PolicyRow>
-          )}
 
           <PolicyRow
             label="Model"

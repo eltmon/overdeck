@@ -1,634 +1,217 @@
-# Review Role Architecture
+# Review Agent Architecture
 
-**How Overdeck runs code review after the Role primitive migration.**
+Overdeck review is a direct convoy: four independent reviewers produce evidence, a
+review parent synthesizes it, and the verdict write door records one terminal
+outcome. The pipeline has no discovery phase, fork tree, lane-selection policy,
+or autonomous branch-repair loop.
 
-This document describes the end-to-end architecture for automatic code review in the role-based pipeline. The review lifecycle is owned by the `review` role (`roles/review.md`). Its four convoy reviewers are harness-agnostic prompt templates owned by Overdeck, inlined into each convoy spawn message by the orchestrator.
-
-For the broader mental model — what a Role is, how it relates to Claude Code subagent files, and why `.claude/agents/` is a sync target rather than a source of truth — see [ROLES.md](./ROLES.md).
+For the role taxonomy and the distinction between pipeline roles and Claude Code
+subagents, see [ROLES.md](./ROLES.md).
 
 ---
 
 ## Invariants
 
-1. **Review is a role, not a server-owned verdict.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role; the convoy reviewers are launched either inline (non-Claude harnesses) or by `handleReviewDiscoveryReady()` after the parent's shared-discovery signal (Claude Code, PAN-1862 — see "Warm-parent discovery + fork"). Deacon monitors reviewer crash/timeout cases and backstops a parent that never signals.
-3. **Synthesis is the review decision.** The `review` role waits for `REVIEWER_READY` / `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` messages delivered through `pan tell`, reads ready reviewer outputs, synthesizes their findings, and emits the verdict. Those messages are sent by each reviewer's **launcher** on process exit (PAN-977) — not by the reviewer agent itself, and not by Deacon on the happy path.
-4. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
-5. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
-6. **Convoy prompts are harness-agnostic templates.** The orchestrator reads each `roles/review-<subRole>.md` template at spawn time and inlines its body into the convoy reviewer's first user message. The convoy never relies on Claude Code's `--agent` flag, never reads a file from the agent's workspace, and never appears as an ambient subagent that a work agent could auto-discover.
+1. **A full review always launches the complete convoy.** Security, correctness,
+   performance, and requirements run in parallel for every full review. Recovery
+   may launch a missing lane only when that lane has neither a report nor a live
+   session.
+2. **The review parent owns synthesis.** It reads the four reports, writes the
+   durable synthesis evidence, and signals one review result.
+3. **`recordReviewVerdict()` is the only terminal verdict write door.** Review
+   artifacts, reviewer reports, Deacon recovery, and dispatch logic never write a
+   terminal review status directly.
+4. **Artifacts are evidence, never authority.** A report is usable only for the
+   host-recorded active `reviewRunId` and its recorded head anchor. The worktree is
+   writable by the work agent, so a file alone cannot change pipeline state.
+5. **Blocked feedback is durable and delivered.** Once the write door records a
+   blocked verdict, it writes the feedback file, posts the PR comment, and uses
+   `pan tell` to notify the work agent.
+6. **Review never merges.** Review determines whether code advances to testing;
+   the dashboard merge path remains separately human-gated.
 
 ---
 
-## Review modes: quick / full (convoy) / none
+## Review modes
 
-What *kind* of review runs is a three-scope setting, resolved at the single
-review entry point (`spawnReviewRoleForIssue()` → `resolveReviewMode()`), so the
-trigger route, host auto-dispatch, and every Deacon re-dispatch site honor it:
+`spawnReviewRoleForIssue()` resolves the review mode at the single review entry
+point, so manual requests, automatic dispatch, and recovery use the same mode.
 
-| Scope | Where it lives | How to set it |
-| --- | --- | --- |
-| **Per-issue** (wins) | the per-issue record (`reviewMode`, `reviewModel`) | `pan review mode <id> <quick\|full\|none>` or the issue-header Policies control. `reviewModel` applies one explicit model to the synthesis parent and every reviewer in the next convoy. |
-| **Per-project** | `.pan.yaml` → `roles.review.mode` | edit the project config (merged over global by `mergeConfigs()`) |
-| **Global** | `~/.overdeck/config.yaml` → `roles.review.mode` | Settings → Roles → Review → *Review mode* selector |
+| Mode | Behavior |
+| --- | --- |
+| `quick` | One review agent performs a combined pass and writes `review.md`. |
+| `full` | The review parent plus the four-lane convoy run in parallel; the parent writes `synthesis.md`. |
+| `none` | AI review is skipped, but the verification quality floor still applies. |
 
-`POST /api/review/:issueId/trigger` accepts an optional `reviewMode` body field with `quick`, `full`, or `none`. The route persists that override through the per-issue record write door before it responds or starts background dispatch, so dashboard **Request review → Full / Quick / None** is one atomic operator interaction. It is equivalent to running `pan review mode <id> <mode>` and then `pan review request <id>`; invalid values and persistence failures return synchronously without dispatching.
-
-The three modes:
-
-- **`quick` (default)** — ONE review agent (`agent-<id>-review`) performs a single
-  combined pass over the diff (correctness + security + requirements + performance
-  in one report) and signals the verdict itself. No convoy, no synthesis fan-out,
-  no fork. Cheapest AI review that still blocks real problems.
-- **`full`** — the four-reviewer **convoy** (`security`, `correctness`,
-  `performance`, `requirements` — `REVIEW_SUB_ROLES`) plus the synthesis parent
-  as the fifth review role. Highest-scrutiny mode; this is the mode all the
-  PAN-1862 machinery below (discovery fork, selective re-review, per-reviewer
-  verdicts, model-uniformity banner) applies to.
-- **`none`** — no AI review at all. `spawnReviewRoleForIssue()` records
-  `reviewStatus: 'skipped'` (which passes the merge gate exactly like
-  `testStatus: 'skipped'`) and the lifecycle advances as if review approved.
-  The pre-review **verification gate** (typecheck/lint/test floor) still runs —
-  `none` skips only the AI review, never the quality floor.
-
-**Re-review scope** (`full` mode only) is the second knob, same three scopes:
-per-issue record (`pan review scope <id> <all|changed|blockers>` / cockpit
-selector) → `roles.review.reReviewScope` per-project → global; default `changed`.
-It governs which convoy reviewers re-run on a re-review cycle (see "Selective
-re-review" below).
+A full review never substitutes a prior report for a fresh convoy lane. If rework
+changes code, the next full review runs every lane again.
 
 ---
 
-## The work ↔ review loop
+## The direct nine-step flow
 
-The full round trip between the work agent and review:
+1. **Work finishes.** The work agent commits, pushes, and calls `pan done`; the
+   durable review request records that review is due.
+2. **Dispatch records the review run.** `spawnReviewRoleForIssue()` records the
+   active `reviewRunId` and the workspace head anchor before it starts reviewers.
+3. **Dispatch launches the complete convoy.** The synthesis parent and security,
+   correctness, performance, and requirements lanes all start in the same
+   dispatch. The parent waits for its reviewers; it does not perform a preparatory
+   investigation first.
+4. **Each lane reviews independently.** A lane reads the supplied review context
+   and writes its assigned report. The launcher reports lane completion to the
+   parent; Deacon only supplies failure recovery when that launcher cannot.
+5. **The parent synthesizes evidence.** Once all terminal lane reports are
+   available, the parent reads them and writes `.pan/review/<runId>/synthesis.md`.
+6. **The parent signals one verdict.** The canonical review completion signal
+   supplies the verdict, notes, run identity, and evidence head to
+   `recordReviewVerdict()`.
+7. **The write door validates and persists.** It rejects provably stale evidence,
+   accepts equal, fresh, and indeterminate anchors as specified below, and records
+   the terminal review result. A dispatch attempt first consults an already-settled
+   active artifact so it cannot overwrite a verdict with `reviewing` or start a
+   duplicate parent.
+8. **A pass advances to testing.** The persisted passed or skipped review outcome
+   lets the regular test role dispatch. A new review verdict at a different head
+   re-gates an existing terminal test result; a same-head verdict preserves it.
+9. **A block returns actionable feedback.** The write door records the block,
+   writes the feedback artifact, comments on the PR, and sends the work agent the
+   required changes. After the agent commits and pushes rework, the next full
+   review begins at step 1.
 
-1. **work → review:** the work agent finishes its beads and runs `pan done`,
-   which rebases + pushes, records the durable `reviewRequestedAt` intent in the
-   journal, and triggers review dispatch. If the reactive trigger is dropped, the
-   host auto-dispatches from the journal intent on the next status read
-   (PAN-1988) — no deacon required. The intent lifecycle has four stages: `pan
-   done` **writes** it before HTTP progression; dispatch **services** it by
-   stamping `reviewSpawnedAt`; a terminal verdict **consumes** it by clearing a
-   serviced request from status and the journal; and `needsReviewDispatch`
-   **guards** passed, skipped, and `readyForMerge` states from dispatch. Genuine
-   re-review paths reset `reviewStatus` to `pending` first. PAN-3083 added the
-   consumption and guards after an unconsumed intent repeatedly re-dispatched
-   passed-and-ready issues and invalidated their UAT generations. An unserviced
-   intent dies after `REVIEW_REQUEST_MAX_AGE_MS` (7 days): the next status read
-   clears it from the journal and emits one warning plus an activity entry. The
-   closed-issue reaper also clears unserviced intent when the tracker issue closes;
-   its patrol reads durable journals asynchronously and checks tracker closure in
-   bounded groups of four so pending requests cannot serialize the Deacon loop.
-   Host-side dispatch runs only in the dashboard server process, because only that
-   process registers the durable review pipeline handler; CLI processes emit at
-   most one debug line per process and skip dispatch.
-2. **Review runs** in the resolved mode (above). Sessions are **warm by
-   default** (PAN-2579): recording a verdict never kills the session; re-review
-   resumes reviewers with their prior-cycle context.
-3. **APPROVED / SKIPPED:** `setReviewStatusSync` emits `review.approved`;
-   reactive Cloister dispatches the test role. No agent-to-agent hop is needed.
-4. **BLOCKED / FAILED:** the verdict write is durable FIRST (and guarded — a
-   stale dispatch-side 'reviewing' write can never clobber a terminal verdict,
-   PAN-2578); then `deliverReviewVerdictFeedback` posts the PR comment, writes
-   the feedback file (`.overdeck/feedback/NNN-review-agent-*.md`), and messages
-   the work agent directly. The delivery key is stable for `(issueId, runId)`, so
-   writing `reviewedAtCommit` after delivery cannot create a duplicate, while a
-   later run gets a fresh key even after drift reset clears the anchor. Legacy
-   callers without a run ID fall back to the reviewed anchor; if neither identity
-   exists, delivery is unkeyed rather than risking suppression of a later run. If
-   the work agent is not running, the delivery door RESURRECTS it (unpause pipeline pauses,
-   clear troubled gates, resume stopped agents — PAN-2209/PAN-2461) before ever
-   escalating to the operator.
-5. **work again:** the work agent fixes the findings, commits, and pushes. The
-   blocked-review drift patrol observes the stable new HEAD over two patrol
-   ticks, resets review to `pending`, and starts a NEW review cycle, which in
-   `full` mode is a **selective** re-review. `pan review request <id>` remains the
-   manual fallback when automatic re-dispatch does not begin.
+The dashboard projects durable review state and domain events. It does not decide
+whether a review passes or rewrite review state from an artifact.
 
 ---
 
-## Verdict of record (PAN-3511)
+## Verdict of record
 
-A review artifact can appear in the workspace before the canonical review signal,
-but the workspace is writable by the work agent. It is recovery evidence, never
-an independent write path for a terminal status. Terminal verdicts enter the row
-only through `recordReviewVerdict()` when `pan admin specialists done review`
-processes the reviewer's canonical completion signal.
+Full reviews write `synthesis.md`; quick reviews write `review.md`. Both are
+recovery evidence for their host-recorded active run. A recovery consumer must
+require all of the following before it can ask the write door to converge state:
 
-The contract has four clauses:
+- the artifact belongs to the active `reviewRunId`;
+- the artifact includes a readable head anchor;
+- the artifact is within the review-artifact freshness bound; and
+- the current workspace head equals the artifact anchor.
 
-1. **Artifacts are evidence for the active run.** A recovery path may read
-   `synthesis.md` (convoy) or `review.md` (quick self-review) only when the path
-   is bound to the host-recorded active `reviewRunId`.
-2. **One verdict write door.** `recordReviewVerdict()` in
-   `src/lib/cloister/review-verdict-writer.ts` owns every terminal verdict and
-   rejects stale evidence before it reaches `review_status`.
-3. **Recovery preserves evidence without writing a verdict.** The deacon's
-   observation helper reads active-run evidence asynchronously and emits a
-   visible `review.verdict_restore_blocked` event for a mismatched anchor.
-   Recovery then continues its bounded reset or escalation path. Feedback and
-   sweeper paths inspect evidence only.
-4. **No artifact scan runs in status reads.** The synchronous status resolver
-   never walks `.pan/review`. Only after its stale-journal refusal predicate
-   matches may it consume a bounded, asynchronously populated memo entry whose
-   verdict corroborates the journal and whose host-recorded `roleRunHead`
-   binds to the live row. Every artifact requires that anchor to match; when an
-   artifact provides a head, it must match the same host-recorded anchor.
+`recordReviewVerdict()` in
+`src/lib/cloister/review-verdict-writer.ts` is the sole terminal write door. It
+classifies differing evidence and row anchors with per-repository
+`git merge-base --is-ancestor` probes:
 
-`readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
-reads one explicit active run rather than scanning `.pan/review/*/`. It returns
-`null` without a run ID or after the 30-minute freshness bound, and refreshes
-its bounded memo after each asynchronous read. The synchronous
-`readMemoizedArtifactVerdict()` is cache-only for stale-journal corroboration;
-it is LRU-bounded to 256 `(issueId, runId)` entries and expires a verdict at the
-sooner of its 60-second memo TTL or freshness deadline. A cold or expired memo
-entry preserves the stale-journal refusal without filesystem I/O.
-`observeActiveReviewArtifact()` is the shared deacon observation helper.
+- **equal anchors** land without re-gating an existing terminal test result;
+- **stale evidence** is rejected with `review.verdict_rejected` and an activity
+  entry;
+- **fresh evidence** lands and sets `reviewedAtCommit` to the evidence anchor;
+- **indeterminate evidence** lands conservatively when the anchor shapes or a git
+  probe cannot prove it stale.
 
-**The recovery sites that consult evidence:**
+When a fresh or indeterminate verdict lands at a different anchor and the row has
+`testStatus: passed` or `skipped`, the write door returns the test gate to
+`pending`. The notes identify both anchors and the writer tag, so the resulting
+verification is tied to the current reviewed code.
 
-| Site | File | Effect of evidence |
-| --- | --- | --- |
-| Deacon orphan reset | `cloister/deacon-review-status.ts` | asynchronously preserves active-run evidence for diagnosis, then continues the bounded reset path |
-| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | preserves active-run evidence and still marks/escalates the established infrastructure failure |
-| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
-| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays a matching verdict only when the host-recorded run head matches the live row and any artifact head matches that same anchor |
-| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
+### Recovery
 
-**Rule for future guard authors.** A new review recovery path reads only an
-active-run artifact before it acts. It preserves workspace artifact content as
-diagnostic evidence and never turns it into a terminal verdict.
+A dead parent does not strand a completed convoy. The fallback reads the completed
+lane reports for the active run, writes a synthesis artifact, and calls the same
+write door. The unsignaled reconciler also converges pending or reviewing rows
+through that door after the settle window, current-head check, newer-request
+check, and freshness check. It preserves the normal blocked-feedback path.
 
-### Review-mode differences
-
-Both modes are first-class; recovery must never assume one. Quick self-review is
-the fleet default, so a reader that only understood `synthesis.md` would be blind
-to most production reviews.
-
-| | Full (convoy) | Quick (self-review) |
-| --- | --- | --- |
-| Artifact filename | `synthesis.md` | `review.md` |
-| Blocked vocabulary | `## Verdict: CHANGES REQUESTED — <blocker>` | identical |
-| Verdict writer | synthesis parent (`coordinator`) | the review agent itself (`quick-signal`) |
-| Dead-agent recovery | fallback synthesis from the sub-reviewer files | none — no sub-reviewers exist to synthesize |
-| Head evidence | `reviewerVerdicts` plus `context.json` | usually none, so the head guard cannot trip |
-
-## Verdict application and fallback sweeps
-
-A completed review writes its verdict under `.pan/review/<runId>/`. Full convoy
-reviews write `synthesis.md`; quick self-reviews write `review.md`. Both files
-use the same heading contract: `## Verdict: APPROVED` for a pass or
-`## Verdict: CHANGES REQUESTED — <one-line top blocker>` for a blocked review.
-The shared verdict-report reader accepts both filenames and this vocabulary, so
-recovery does not depend on which review mode produced the report.
-
-Verdict application has three ordered layers:
-
-1. The review agent signals through `pan admin specialists done review`, which
-   durably writes review status and delivers blocked feedback before the run is
-   considered complete.
-2. `checkCompletedButUnsignaledReviews()` recovers a report whose status remains
-   `reviewing`: it nudges a live review parent once, then applies the verdict if
-   the parent stays unresponsive or has died.
-3. `reconcileUnappliedReviewVerdicts()` repairs the incident shape where a
-   report exists but review status has already reset to `pending`. It uses the
-   same nudge-first policy and applies the on-disk verdict after the grace
-   period, with an activity entry naming the sweep.
-
-The fallback sweeps fail closed. They wait for the report settle window, reject
-a report when the current workspace HEAD differs from `context.json`'s review
-anchor, and skip it when a newer `reviewRequestedAt` postdates the report. A
-blocked verdict resolves its work-agent delivery target through the agents table
-before resurrection or escalation, so `feedback_delivery_needs_you` means no
-eligible live registered session was found rather than that only the canonical
-tmux name was checked.
-
-### Verdict write door (`recordReviewVerdict`) — PAN-3512
-
-**Single source of truth for terminal review verdict writes.** Every call site that
-records a final verdict (`passed` or `blocked`) routes through `recordReviewVerdict()` in
-`src/lib/cloister/review-verdict-writer.ts`. The door enforces **dispatch-not-drop
-semantics**: a terminal review verdict whose evidence head disagrees with the row's
-`lastVerifiedCommit` is never silently discarded. Provably-stale evidence is rejected
-with a `review.verdict_rejected` domain event and an activity entry; anything else
-lands and re-gates.
-
-**Evidence classification.** When evidence heads differ, the door classifies the
-evidence by running per-repo `git merge-base --is-ancestor` probes (polyrepo-aware via
-`resolveWorkspaceRepoRootsSync()` and `parseCompositeSnapshot()`):
-
-- **Stale:** all sub-repos' evidence heads are strict ancestors of their row heads.
-  Verdict is rejected with `review.verdict_rejected` event; no status update.
-- **Fresh:** at least one sub-repo's evidence head is NOT an ancestor of its row head.
-  Verdict lands with `reviewedAtCommit` set to the evidence head.
-- **Indeterminate:** shape mismatch (composite vs bare), repo-key disagreement, or
-  git probe timeout/failure. Verdict lands conservatively.
-
-**Test-gate reset.** When evidence heads differ and the row's `testStatus` is
-`passed` or `skipped`, the update sets `testStatus` to `pending` with a `testNotes`
-string naming both shortened head anchors and the writer tag. This prevents stale
-test results from blocking merge and forces re-verification at the new head.
-
-**Writer tags** identify the source of the verdict: `coordinator` (synthesis parent),
-`fallback` (deacon sweep), `quick-signal` (quick-mode self-review), `orphan-restore`
-(recovered from disk), `sweeper-restore` (post-merge verification), `unsignaled-recovery`
-(reconcile unapplied), `infra-bypass` (review infrastructure failure). Both emitted
-domain events carry the writer tag for audit trail and reactive dispatch.
-
-**Merge-gate regression protection:** the test-gate reset ensures `readyForMerge`
-cannot become true at unverified heads, locking the merge gate until post-review
-verification runs at the new head.
+The stall sweeper is observation-only. It may recommend that an operator inspect
+fresh evidence, but it never writes a verdict, clears a stuck flag, starts a
+reviewer, stops an agent, or un-parks an issue.
 
 ---
 
-## Polyrepo workspaces (PAN-2948)
+## Evidence and polyrepo anchors
 
-For `workspace.type: polyrepo` projects the workspace root is a one-commit
-wrapper repo whose `.gitignore` excludes the code sub-repos (`fe/`, `api/`, …),
-so no review-path git operation may run at the workspace root. The review
-pipeline resolves the actual repo roots via `resolveWorkspaceRepoRootsSync()`
-(`src/lib/project-repos.ts`) — monorepo degenerates to a single root at the
-workspace path:
+`snapshotWorkspaceHeadsPromise()` is the producer for review `HeadAnchor` values:
+a monorepo anchor is one full SHA, while a polyrepo anchor is a space-separated
+set of `repoKey@sha` tokens. `parseCompositeSnapshot()` is the shared parser for
+inspection; persisted strings regain the `HeadAnchor` brand only through
+`rehydrateHeadAnchor()` at the storage boundary.
 
-- **Context manifest** (`review-context.ts`): per-sub-repo merge-base/diff
-  against each repo's target branch, aggregated with `repoKey/`-prefixed paths
-  and an additive `repos: [{repoKey, branch, headSha, diffBase, fileCount}]`
-  manifest field. Top-level `headSha`/`branch` come from the first sub-repo
-  with changes.
-- **runId head suffix** (`review-agent.ts`): monorepos keep their short HEAD;
-  polyrepos use the first eight hex characters of a SHA-1 over the full composite
-  snapshot, so a commit in any sub-repo creates a distinct review directory.
-- **Dispatch pushes** (`review-pipeline.ts`): one shared helper pushes each
-  sub-repo's `feature/<issue>` where the branch exists locally; the wrapper is
-  never pushed.
-- **Drift anchors** (`reviewedAtCommit`, `lastVerifiedCommit`, reviewer verdict
-  `atCommit`): `snapshotWorkspaceHeadsPromise()` records a composite
-  `fe@<sha> api@<sha>` snapshot. Composite anchors compare equal iff every
-  sub-repo head is unchanged; consumers that use an anchor as a git ref fail
-  the lookup and fall back to their conservative full-rerun path
-  (`computeConvoyScope` diffs in the primary sub-repo for the same reason).
-- **Inspection checkpoints** (`inspect-checkpoints.ts`): per-item diffs run in
-  the code sub-repos and checkpoints store the same composite head snapshot.
-  On later items, unchanged repos are omitted so an inspector never reviews an
-  older commit from an untouched repo or the wrapper's `.gitignore` commit.
-- **Verification** (`verification-runner.ts`): target-branch sync and the
-  empty-changeset guard loop over every resolved repo. Any content change in any
-  repo satisfies the guard; a failed repo diff skips the guard conservatively.
-  When a container gate reports infrastructure unavailable, verification waits
-  for the triggered stack rebuild to settle before another cycle can start.
-
-### Verdict anchors (`HeadAnchor`)
-
-`snapshotWorkspaceHeadsPromise()` is the only producer of `HeadAnchor`: one full
-SHA for a monorepo, or a space-separated `repoKey@sha` token for every polyrepo
-code root. `parseCompositeSnapshot()` is the one lenient parser for inspecting
-that composite shape; `parseWorkspaceHeadAnchor()` remains the strict validator
-used before passing an anchor to Git.
-
-The TypeScript brand prevents a plain string from entering the review-status
-write door. A value read from SQLite, a durable issue record, or another wire
-boundary may regain the brand only through `rehydrateHeadAnchor()`, with a
-comment naming that storage boundary. The pairing rule is: **a compare site may only compare against what the producer stamped**.
-
-The five converted stamp/compare sites are:
-
-1. `checkPostReviewCommits()` in `cloister/deacon-post-review-commits.ts`
-   compares `reviewedAtCommit` through the composite-aware drift evaluator.
-   Passed reviews reset immediately on real drift. Blocked reviews also detect
-   pushed rework: legacy rows without `reviewedAtCommit` may derive an anchor
-   only when every `reviewerVerdicts[*].atCommit` agrees, and a real new HEAD
-   must remain unchanged for two consecutive patrol ticks before review is
-   reset and re-dispatched. The debounce prevents per-item pushes from starting
-   review while the work agent is still committing the rest of the rework.
-
-   A repeat-reset bound prevents review from cycling indefinitely on an unchanged
-   commit. When a drifted verdict is recorded against a specific anchor, a second
-   patrol cycle that evaluates the *same* anchor as drifted is suppressed (no new
-   reset): instead, `recordDeadEndNeedsYou` escalates one `review-reset-loop`
-   needs-you to the operator for investigation. The repeat-reset suppression
-   persists until the workspace HEAD changes to a new, genuine anchor; the
-   module-local state (`lastResetAnchors`, `resetLoopEscalated`) clears only on
-   issue merge or dashboard restart. A genuinely new anchor (different from the
-   prior drifted anchor) still resets review normally. The locking tests are
-   `tests/unit/lib/workspace-anchor-drift.test.ts` (shape mismatch → unreadable)
-   and `tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts`
-   (reset-once-then-suppress-then-escalate; new-anchor-still-resets).
-2. Role-run liveness stamps in `agents/spawn.ts` and compares in
-   `cloister/service-reactive.ts` using the same full `roleRunHead` anchor.
-3. `POST /api/review/:issueId/status` in `routes/workspaces.ts` stamps
-   `reviewedAtCommit` from the producer.
-4. The legacy specialists-done route stamps `reviewedAtCommit` from the
-   producer.
-5. The verification/review contradiction bypass in `cloister/deacon.ts` stamps
-   `reviewedAtCommit` from the producer.
-
-A composite/bare anchor **shape disagreement** (e.g., composite `fe@<sha> api@<sha>`
-vs bare wrapper SHA) indicates a producer disagreement, not a code change.
-`evaluateWorkspaceAnchorDrift()` returns `unreadable` for shape mismatches and
-the existing review verdict is preserved — no review reset fires. This prevents
-the repeat-reset loops (PAN-3254) that occurred when a wrapper HEAD never moves
-but the evaluator repeatedly compared bare vs composite shapes. The historical
-incident signature was MIN-901's 426 identical review cycles in 19.5 hours —
-wrapper always `7492ae82`, composite always `fe@52d65 api@…`. Logs now render
-every token as `repoKey@<8-char sha>` for clarity.
+This keeps review evidence tied to the actual code repositories rather than the
+polyrepo wrapper repository. A composite/bare shape mismatch is indeterminate,
+not proof of code drift, so it cannot spuriously erase a review verdict.
 
 ---
 
-## Warm-parent discovery + fork (PAN-1862, `full` mode on Claude Code)
+## Convoy prompts and output
 
-The convoy's first-cycle cost problem: four reviewers independently reading the
-same diff and files = 4× full-price input. The fix exploits Anthropic's
-content-addressed prompt cache (keyed by a hash of the prefix per model — not
-by session id):
+The parent uses `roles/review.md`. The four lane prompts live in
+`roles/review-security.md`, `roles/review-correctness.md`,
+`roles/review-performance.md`, and `roles/review-requirements.md`. The
+orchestrator reads each lane template and inlines it into that reviewer's spawn
+message; they are not ambient Claude Code subagents and are not synced into a
+project workspace.
 
-1. **Discovery:** the synthesis parent spawns with a discovery-first prompt —
-   read the context manifest, the committed diff, and the high-risk changed
-   files, so that content lives in the parent's session history (and the warm
-   cache).
-2. **Signal:** the parent runs `pan admin specialists discovery-ready review
-   <id>` exactly once at its turn boundary.
-3. **Fork:** `handleReviewDiscoveryReady()` copies the parent's JSONL to a fresh
-   session id per in-scope reviewer (shared `session-fork.ts` primitive, full
-   history, thinking-blocks sanitized) and launches each with
-   `claude --resume <forkedId>`. The forked reviewers replay a byte-identical
-   prefix → **cache reads (~10% of input price)** instead of re-reading.
-   The kickoff tells each reviewer the context is already in history and why.
-4. **Synthesis:** the parent survives unmodified and synthesizes as always.
-
-Per-reviewer fork conditions (each failure degrades to an independent fresh
-spawn — reviews are never blocked by a cache concern): parent harness is
-`claude-code`, the reviewer resolves to the **same model** as the parent (the
-Settings → Roles red banner warns when the five review roles are not
-model-uniform), and the reviewer has no resumable prior-cycle session of its own
-(its own context beats a re-fork).
-
-Backstops (Deacon patrol): `checkStalledReviewDiscovery` forces the convoy if a
-parent never signals within 8 minutes (or dies); `checkReviewForkCacheMisses`
-reads each forked reviewer's first cost event and reports `cacheRead == 0` as a
-warn-level activity entry + desktop notification, including the discovery→fork
-gap vs the 5-minute cache TTL. Misses are observability only — correctness never
-depends on the cache landing.
-
----
-
-## Selective re-review + per-reviewer verdicts (PAN-1862, `full` mode)
-
-Synthesis records a **per-reviewer verdict** map alongside the aggregate:
-`reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`
-(journal-durable; written via `pan admin specialists done review … --reviewers
-"security=passed,correctness=blocked,…"`, or by the Deacon fallback synthesis).
-The workspace HEAD is stamped as `atCommit` on every verdict — a BLOCKED
-aggregate is exactly the cycle whose clean reviewers the next pass wants to skip.
-
-On a re-review cycle, `reviewersToRerun()` decides who actually runs from
-`reReviewScope`:
-
-- `all` — all four, every cycle.
-- `changed` (default) — reviewers that blocked, PLUS any reviewer whose domain
-  is touched by files changed since its `atCommit` (correctness/requirements:
-  any change; security: security-sensitive paths; performance: hot-path files).
-- `blockers` — only reviewers that blocked.
-
-Anything unprovable — no verdict, no commit anchor, an unreachable anchor after
-a rebase, an unknown diff — always re-runs (quality first, NFR-1). Reviewers NOT
-re-run have their verdict **carried forward** as a stub report in the new run
-directory, so synthesis and the Deacon fallback still see one report per
-sub-role, unchanged. The synthesis prompt lists which signals to expect and
-which verdicts are carried.
-
----
-
-## The flow
-
-```
-work role completes beads and signals done
-  │
-  │  Cloister quality gate passes
-  ▼
-spawnReviewRoleForIssue(issueId)
-  │
-  ├─ spawnRun(issueId, 'review')
-  │    └─ synthesis role (roles/review.md, Claude --agent on Claude Code harness)
-  │
-  ├─ spawnRun(issueId, 'review', { subRole: 'security' })      ← roles/review-security.md (inlined)
-  ├─ spawnRun(issueId, 'review', { subRole: 'correctness' })   ← roles/review-correctness.md (inlined)
-  ├─ spawnRun(issueId, 'review', { subRole: 'performance' })   ← roles/review-performance.md (inlined)
-  ├─ spawnRun(issueId, 'review', { subRole: 'requirements' })  ← roles/review-requirements.md (inlined)
-  │
-  ├─ each reviewer writes ~/.overdeck/agents/<reviewer>/review-<subRole>.md
-  ├─ each reviewer's LAUNCHER signals synthesis on process exit (PAN-977):
-  │    REVIEWER_READY   <subRole> <outputPath>   (report file written)
-  │    REVIEWER_FAILED  <subRole> <reason>       (exited, no report)
-  │    REVIEWER_TIMEOUT <subRole> <reason>       (timeout 1200s killed it)
-  │    then touches ~/.overdeck/agents/<reviewer>/reviewer-signaled
-  ├─ Deacon is the rare backup: only signals when the launcher's own bash
-  │    process was SIGKILLed before it could (no reviewer-signaled marker)
-  ├─ synthesis reads ready output files and synthesizes one verdict
-  └─ synthesis signals via Overdeck's CLI
-        │
-        ├─ pan specialists done review <id> --status passed  → review.approved → test role
-        └─ pan specialists done review <id> --status blocked → notify `work` with blockers
-```
-
-The dashboard displays the current review status from persisted review state and domain events. It does not own the review decision.
-
----
-
-## Strike-origin PR review support
-
-A strike agent works in `workspaces/feature-<id>-strike` on branch `strike/<id>` and opens its PR against that branch. Review dispatch must follow the workspace, not assume the conventional `feature/<id>` branch. All Deacon review-dispatch sites in `src/lib/cloister/deacon-review-status.ts` derive the branch from the resolved workspace path via `inferBranchFromWorkspace()` in `src/lib/lifecycle/archive-planning.ts`: paths ending in `-strike` map to `strike/<id>`, otherwise `feature/<id>`. The dashboard's `pan review restart --rerun` path resolves the workspace the same way. This makes strike-origin PRs reviewable without a manual `pan workspace create` (PAN-2270).
-
----
-
-## Instruction layout
-
-Two distinct on-disk shapes drive review behavior:
-
-```
-roles/
-├── review.md                  # synthesis role definition (Claude frontmatter
-│                              # for tools/hooks; loaded via --agent on Claude Code)
-├── review-security.md         # convoy sub-role prompt template (harness-agnostic,
-│                              # no frontmatter; inlined into spawn message)
-├── review-correctness.md
-├── review-performance.md
-└── review-requirements.md
-```
-
-The convoy templates are read by `src/lib/cloister/review-agent.ts` via `readConvoySubRoleTemplate(subRole)`, which resolves them from `packageRoot/roles/` — Overdeck's own install, **not** the agent's workspace. This keeps the prompts:
-
-- **Harness-agnostic.** The same body is delivered to a Claude Code reviewer, a Pi reviewer, or any future harness as its first user message. The harness never has to parse Overdeck-specific frontmatter.
-- **Workflow-injected, not auto-discovered.** Work agents running in project workspaces never see these files in their tree, so there is no risk of a work agent ambiently spawning a reviewer subagent or "self-reviewing" before the convoy fires.
-- **Versioned with code.** Behavior changes ship in the same commit as the role file change, reviewed under the same gates.
-
-There is no synthesis sub-role template. Synthesis is the review role itself.
-
----
-
-## Reviewer semantics
-
-Each convoy reviewer has a distinct focus and uses the same severity/evidence vocabulary across roles, drawn from the [`deftai/directive`](https://github.com/deftai/directive) verification framework.
-
-| Reviewer | Primary focus | Directive link |
-|----------|---------------|----------------|
-| `correctness` | Logic errors, edge cases, null handling, type safety, stub detection | [`verification/verification.md`](https://github.com/deftai/directive/blob/main/verification/verification.md) |
-| `security` | OWASP Top 10, injection, authn/authz, secrets, supply-chain risk | — |
-| `performance` | Algorithms, N+1 queries, memory leaks, allocation hot paths | — |
-| `requirements` | Acceptance criteria coverage, xBRIEF fulfillment, missing functionality | [`verification/plan-checking.md`](https://github.com/deftai/directive/blob/main/verification/plan-checking.md) |
-
-### Severity glyphs (RFC 2119)
-
-| Glyph | Meaning | Maps to synthesis tier |
-|-------|---------|------------------------|
-| `!` | MUST | Blocker / Critical |
-| `~` | SHOULD | High |
-| `≉` | SHOULD NOT | High |
-| `⊗` | MUST NOT | Blocker |
-| `?` | MAY | Medium / Low |
-
-### Verification ladder
-
-Findings carry the tier of evidence they cite:
-
-- **Tier 1 — Static**: files exist, lint passes, no stubs
-- **Tier 2 — Command**: tests pass, build succeeds
-- **Tier 3 — Behavioral**: browser/CLI/API confirms behavior
-- **Tier 4 — Human**: UAT-level verification required
-
-Synthesis uses tier as a tiebreaker when the same finding is raised at different confidence levels by multiple reviewers.
-
----
-
-## Output and signal contract
-
-Each convoy reviewer writes exactly one report to its assigned output file under `~/.overdeck/agents/<reviewerAgentId>/review-<subRole>.md`, then stops. The reviewer **does not** signal synthesis itself — it does not run `pan tell` and does not need to `exit` cleanly.
-
-**The launcher owns the signal (PAN-977).** For a Claude Code review sub-role, `spawnRun` generates a launcher that runs `timeout 1200 claude --print ... < initial-prompt.md` as a *child* process (not `exec`). When `claude` exits, the launcher's own bash process inspects the outcome and signals synthesis exactly once:
-
-- exit code `124` → `REVIEWER_TIMEOUT <subRole> ...`
-- report file is non-empty → `REVIEWER_READY <subRole> <outputPath>`
-- otherwise (crash, early exit, empty file) → `REVIEWER_FAILED <subRole> ...`
-
-It then `touch`es `~/.overdeck/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, then writes `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
-
-**Deacon is the rare backup, not the happy path.** `monitorReviewConvoySignals` skips any reviewer whose `reviewer-signaled` marker is newer than the run's `startedAt` — the launcher already signaled. Deacon only signals `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` itself when that marker is absent, i.e. the launcher's bash process was SIGKILLed before it could run its contract block. Synthesis treats either failure signal as a blocking infrastructure failure.
-
-Human-readable review output should include:
+Each lane produces one report. The parent records the combined decision in the
+run artifact using this human-readable shape:
 
 ```markdown
 # Verdict: APPROVED | CHANGES_REQUESTED | FAILED
 
 ## Summary
-<what changed, what was verified, and the decision>
 
 ## Blockers
-<required fixes before the pipeline can continue>
 
 ## Evidence
-<tests, static checks, file/line citations, or browser proof>
 
 ## Convoy Notes
-<security/correctness/performance/requirements highlights>
 ```
 
-Machine-readable status uses the existing review-status fields and lifecycle events:
-
-- `reviewStatus: 'passed'` emits `review.approved`
-- `reviewStatus: 'failed'` / blocked notes keep the issue with `work`
-- `reviewedAtCommit` snapshots the HEAD reviewed so new commits can reset review
-
----
-
-## Model and harness configuration
-
-Model selection is role-based and resolved through `resolveModel(role, subRole, config)`. A sub-role can set `model: parent` to inherit the parent role's effective model:
-
-```yaml
-workhorses:
-  expensive: claude-opus-4-7
-  mid: claude-sonnet-4-6
-  cheap: claude-haiku-4-5
-
-roles:
-  review:
-    model: workhorse:expensive
-    sub:
-      security:
-        model: parent          # inherits roles.review.model
-      correctness:
-        model: workhorse:mid
-      performance:
-        model: workhorse:mid
-      requirements:
-        model: workhorse:mid
-```
-
-`parent` is valid only for sub-role models (`roles.<role>.sub.<subRole>.model`). It is rejected for role-level models (`roles.<role>.model`) and workhorse slots (`workhorses.<slot>`), because those fields have no parent role to inherit from.
-
-Harness selection follows the same role/sub-role shape. Because the convoy prompts are inlined, the choice between Claude Code, Pi, or another harness does not change the reviewer's instructions — only the runtime. See [`HARNESSES.md`](./HARNESSES.md) for Pi vs Claude Code behavior and ToS rules.
+The individual lanes cover correctness, security, performance, and requirements.
+Their reports are evidence rather than independent votes: the parent evaluates
+severity, code citations, tests, and requirement coverage before producing one
+verdict.
 
 ---
 
-## Cost attribution
+## Removed layers and accepted tradeoffs
 
-Review cost events use `OVERDECK_SESSION_TYPE` as the stage key. The synthesis
-role records as `review`; convoy reviewers record as `review.security`,
-`review.correctness`, `review.performance`, and `review.requirements`.
+The simplified flow intentionally drops several former mechanisms. This table
+makes the protections no longer provided by the pipeline explicit.
 
-`pan cost issue <issueId>` reads the cost-event aggregate first and prints a
-**By Review Role** section when any review stages are present. The display maps
-`review` to `synthesis` so a full run can be compared as one synthesis cost plus
-four reviewer costs.
+| Removed layer | Protection given up | Accepted tradeoff |
+| --- | --- | --- |
+| Shared-discovery parent phase | A preliminary shared investigation and inherited reviewer context | Four independent reviewers can repeat small amounts of context reading, but dispatch is direct and failure handling is simpler. |
+| Parent-session forks and prompt-cache headers | Parent-context reuse and cache-hit telemetry | Review cost may increase, but there is no fork lifecycle, cache-key coupling, or cache-miss monitor to operate. |
+| Selective lane reruns and carried-forward reports | Reusing an unchanged lane's prior report | Every full review gets a complete, current evidence set rather than mixing reports from different commits. |
+| Per-reviewer verdict state | A machine-readable lane-by-lane verdict ledger | Lane reports remain durable evidence while synthesis remains the only review decision. |
+| Re-review scope configuration and command | Operator-selected subsets of the convoy | Full review semantics are uniform: all four lanes run. |
+| Background sibling-branch invalidation | Automatic conflict and CI discovery after another branch merges | The work agent or operator explicitly runs `pan sync-main <id>` and follows ordinary rework and review gates. |
+| Sweeper action and un-parking events | Autonomous repair of parked pipeline rows | The sweeper reports evidence and a recommendation only, so it cannot damage completed work through a false positive. |
 
-Baseline on 2026-05-11 for PAN-1059: the local cost database has no historical
-PAN-1059 events, so there is no reliable pre-change per-reviewer measurement.
-The measurable baseline after this change is the five-stage split above.
-
----
-
-## Dashboard restart invariant
-
-The dashboard is a projection layer:
-
-- It receives domain events over `/ws/rpc`.
-- It reads review status from persisted storage.
-- It can display role-run sessions through the terminal WebSocket.
-- It does not hold in-memory reviewer promises that must survive restart.
-
-Restarting the dashboard drops subscriptions and terminal connections, but role runs continue in tmux and persisted state catches the dashboard up on boot.
+**Verdict forgery is a non-threat in this deployment.** The deployment trust model
+does not treat a hostile local actor as an adversary, and artifacts still cannot
+write review status: active-run binding, anchor validation, and
+`recordReviewVerdict()` protect against ordinary stale or misplaced files without
+adding an artifact-signing subsystem.
 
 ---
 
-## Review convergence gate (PAN-3151)
+## Review convergence
 
-Large or fragmented changes can enter a review loop that never converges: blocking findings decrease for one cycle, then increase in the next, or stall at the same count across multiple cycles. This gate detects and blocks non-converging review loops.
+Blocked review cycles record their blocker count. After three or more cycles, a
+reversal (the newest count rises) or a stall (two non-decreases) marks the issue
+`review-not-converging`. The issue remains blocked with its feedback and a
+needs-you escalation; automatic rework re-drive stops until an operator runs
+`pan unstick <issueId>` or decomposes the work.
 
-### Convergence rule
-
-Every time review enters the `blocked` state, the system records the blocking-finding count (from the synthesis report's "## Blocking Findings" heading count) into a `reviewCycleHistory` series. When ≥3 cycles are recorded, the series is evaluated:
-
-- **Reversal**: if the latest count > previous count (e.g., counts = [12, 7, 5, 4, **12**]), the series reversed and is flagged not-converging.
-- **Stall**: if both of the last two comparisons are non-decreases (e.g., counts = [12, 7, 5, **5**, **5**]), the series stalled and is flagged not-converging.
-- **Converging**: otherwise (e.g., counts = [12, 7, 5, 4, 2]), the series is strictly decreasing and progress is evident.
-
-When a series is flagged **not-converging**:
-1. The issue is marked `stuck` with `stuckReason: 'review-not-converging'`.
-2. Automatic rework re-drive is suppressed — feedback is written and PR comment posted, but the work agent is not messaged.
-3. A needs-you escalation surfaces with the cycle count series and guidance to either decompose the change into sibling issues or unstick to attempt rework.
-4. The dashboard renders the cycle series (e.g., "Review cycles: 12 → 7 → 5 → 4 → 12 — not converging").
-
-### Unstick escape hatch
-
-`pan unstick <issueId>` clears the stuck flag, resets the `reviewCycleHistory` to empty, and resumes the issue for rework. This is the only manual override; the gate has no TTL or automatic timeout.
-
-### Distinction from prompt-level convergence
-
-This gate is mechanical and operates on the series **across multiple review cycles**. It is distinct from the prompt-level convergence gate described in `roles/review.md:62`, which governs which findings a single reviewer can report within one pass. That gate prevents individual reviewers from overwhelming the change; this gate prevents the entire issue from spinning in a loop across cycles.
+This cross-cycle safety gate is separate from a single review parent's judgment
+about which findings matter in one convoy.
 
 ---
 
-## What this replaced
+## Related files
 
-The pre-role architecture used `pan review run`, source prompt templates under `src/lib/cloister/prompts/review/`, and detached reviewer/synthesis tmux sessions coordinated outside the role runner. The Role primitive migration (PAN-1048) replaced that with a single lifecycle entry point: `spawnRun(issueId, 'review')`.
-
-The first cut of the role migration parked the convoy prompts as Claude Code subagent files under `.claude/agents/code-review-*.md`. That worked for the Claude Code harness in overdeck's own workspaces but coupled the prompt format to one harness's `--agent` mechanism and made the prompts auto-discoverable inside any session. The current layout — `roles/review-<subRole>.md`, inlined by the orchestrator, never synced into project workspaces — keeps the prompts harness-agnostic and orchestrator-owned.
+- `src/lib/cloister/review-agent.ts` — dispatches the parent and full convoy.
+- `src/lib/cloister/review-verdict-writer.ts` — terminal verdict write door.
+- `src/lib/cloister/verdict-restore.ts` — active-artifact convergence helper.
+- `src/lib/cloister/deacon-review-unsignaled.ts` — settled-artifact recovery.
+- `roles/review.md` and `roles/review-*.md` — parent and lane instructions.
+- `docs/ROLES.md` — role and harness taxonomy.
