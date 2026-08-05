@@ -184,6 +184,11 @@ describe('AgentState role persistence', () => {
       handoffCount: 3,
       agentPhase: 'implementation',
       type: 'work',
+      reviewDiscoveryPending: true,
+      reviewDiscoveryReadyAt: '2026-08-05T11:00:00.000Z',
+      reviewConvoyForkedAt: '2026-08-05T11:01:00.000Z',
+      reviewForkCacheChecked: true,
+      reviewForkedFromParent: true,
     } as any);
 
     const state = getAgentStateSync('agent-pan-role');
@@ -201,6 +206,11 @@ describe('AgentState role persistence', () => {
     expect(rawState.handoffCount).toBeUndefined();
     expect(rawState.agentPhase).toBeUndefined();
     expect(rawState.type).toBeUndefined();
+    expect(rawState.reviewDiscoveryPending).toBeUndefined();
+    expect(rawState.reviewDiscoveryReadyAt).toBeUndefined();
+    expect(rawState.reviewConvoyForkedAt).toBeUndefined();
+    expect(rawState.reviewForkCacheChecked).toBeUndefined();
+    expect(rawState.reviewForkedFromParent).toBeUndefined();
   });
 
   it('persists lastResumeAt through normal state save and load', async () => {
