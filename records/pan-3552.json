@@ -440,16 +440,16 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:47:10.059Z",
+  "updated": "2026-08-05T23:47:10.838Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "passed",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T23:45:20.936Z",
+    "updatedAt": "2026-08-05T23:47:10.836Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "lastVerifiedCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
@@ -467,9 +467,11 @@
         "scripts/dashboard-types-baseline.txt",
         "src/cli/commands/review-subcommands.ts",
         "src/dashboard/frontend/src/App/hooks/useDesktopActivityNotifications.ts",
+        "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
         "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
         "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
         "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
+        "src/dashboard/frontend/src/components/chat/__tests__/fixtures/slash-commands.pre-adapter.json",
         "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
         "src/dashboard/server/routes/admin.ts",
         "src/dashboard/server/routes/context.ts",
@@ -478,9 +480,7 @@
         "src/dashboard/server/routes/workspaces/__tests__/review-pipeline-route.test.ts",
         "src/dashboard/server/routes/workspaces/review-pipeline.ts",
         "src/dashboard/server/services/durable-review-pipeline.ts",
-        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-        "src/lib/__tests__/config-yaml-roles.test.ts",
         "src/lib/__tests__/review-status-reconcile.test.ts",
         "src/lib/agents/spawn-prep.ts",
         "src/lib/agents/spawn.ts",
@@ -507,6 +507,7 @@
         "src/lib/review-status-normalize.ts",
         "src/lib/review-status-types.ts",
         "src/lib/settings-api.ts",
+        "tests/unit/cli/parked-ack.test.ts",
         "tests/unit/lib/cloister/branch-invalidation.test.ts",
         "tests/unit/lib/cloister/conflict-gate.test.ts",
         "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
@@ -514,11 +515,11 @@
         "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
         "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
         "tests/unit/lib/overdeck/review-status-sync.test.ts",
+        "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "declaredScopeUntouched": [
         "src/lib/cloister/__tests__/branch-invalidation.test.ts",
-        "src/lib/cloister/stall-sweeper-state.ts",
         "tests/unit/lib/cloister/review-verdict-writer.test.ts"
       ],
       "declaredScope": [
@@ -601,6 +602,7 @@
         "src/dashboard/frontend/src/App/hooks/useDesktopActivityNotifications.ts",
         "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts",
         "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+        "src/dashboard/frontend/src/components/GodView/confluence/__tests__/useConfluenceData.test.ts",
         "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
         "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
         "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
@@ -608,6 +610,7 @@
         "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
         "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
         "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
+        "src/dashboard/frontend/src/components/chat/__tests__/fixtures/slash-commands.pre-adapter.json",
         "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
         "src/dashboard/server/routes/admin.ts",
         "src/dashboard/server/routes/context.ts",
@@ -617,9 +620,7 @@
         "src/dashboard/server/routes/workspaces/review-control.ts",
         "src/dashboard/server/routes/workspaces/review-pipeline.ts",
         "src/dashboard/server/services/durable-review-pipeline.ts",
-        "src/lib/__tests__/agent-state-role.test.ts",
         "src/lib/__tests__/agents-spawn-supervisor.test.ts",
-        "src/lib/__tests__/config-yaml-roles.test.ts",
         "src/lib/__tests__/review-status-reconcile.test.ts",
         "src/lib/agents/agent-state.ts",
         "src/lib/agents/spawn-prep.ts",
@@ -648,6 +649,7 @@
         "src/lib/cloister/review-rerun-scope.ts",
         "src/lib/cloister/review-verdict-feedback.ts",
         "src/lib/cloister/review-verdict-writer.ts",
+        "src/lib/cloister/stall-sweeper-state.ts",
         "src/lib/cloister/stall-sweeper.ts",
         "src/lib/cloister/synthesis-verdict.ts",
         "src/lib/cloister/verdict-preservation.ts",
@@ -676,6 +678,7 @@
         "src/lib/review-verdict-guards.ts",
         "src/lib/settings-api.ts",
         "tests/lib/cloister/review-agent.test.ts",
+        "tests/unit/cli/parked-ack.test.ts",
         "tests/unit/lib/cloister/branch-invalidation.test.ts",
         "tests/unit/lib/cloister/conflict-gate.test.ts",
         "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
@@ -685,9 +688,10 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts",
         "tests/unit/lib/overdeck/agent-discovery-columns.test.ts",
         "tests/unit/lib/overdeck/review-status-sync.test.ts",
+        "tests/unit/lib/pan-1908-no-loss-audit.test.ts",
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
-      "recordedAt": "2026-08-05T21:30:38.954Z"
+      "recordedAt": "2026-08-05T23:47:10.054Z"
     },
     "reviewerVerdicts": {
       "security": {
@@ -710,7 +714,8 @@
         "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-35d77802/requirements.md",
         "atCommit": "35d77802397e641c38d13f152dcfa2db4c32d125"
       }
-    }
+    },
+    "reviewRequestedAt": "2026-08-05T23:47:10.836Z"
   },
   "closeOut": {
     "usage": {
