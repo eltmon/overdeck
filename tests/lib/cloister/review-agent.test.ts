@@ -552,6 +552,9 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('launchConvoyReviewersPromise');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
+    expect(block).not.toContain('discoveryForkMode');
+    expect(block).not.toContain('markDiscoveryPending');
+    expect(block).not.toContain('return []');
     expect(block).toContain('message: `Convoy review spawned: ${run.id}`');
     // The fan-out itself (params.inScope.map -> spawnReviewSubRoleForIssue) lives in
     // review-convoy.ts and is exercised behaviorally by the review-rerun-scope and
@@ -1435,6 +1438,9 @@ describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
       runId: 'agent-pan-1059-review-deadbeef',
       contextManifestPath: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef/context.json',
     });
+    expect(prompt).toContain('STANDBY — REVIEW SYNTHESIS for PAN-1059');
+    expect(prompt).not.toContain('discovery-ready');
+    expect(prompt).not.toContain('PHASE 1 — SHARED DISCOVERY');
     expect(prompt).toContain('STALE-SIGNAL GUARD (PAN-3549)');
     expect(prompt).toContain('stat -c %y <manifest path>');
     expect(prompt).toContain('discard any signal whose deadline is older');
