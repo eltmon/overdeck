@@ -825,18 +825,18 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:33:40.448Z",
+  "updated": "2026-08-05T10:37:34.874Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:33:07.112Z",
-    "reviewNotes": "Agent re-review request (5/25): Fixed review issues",
+    "updatedAt": "2026-08-05T10:37:34.835Z",
+    "reviewNotes": "Workspace-controlled artifact heads can still replay stale approvals without the host-recorded run anchor",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "09638451ffa2dc04aed07d6d8738df79e2469514",
     "lastVerifiedCommit": "63d419b952bb04353dd4a5864493e94151828311",
@@ -889,6 +889,24 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "63d419b952bb04353dd4a5864493e94151828311"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "63d419b952bb04353dd4a5864493e94151828311"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "63d419b952bb04353dd4a5864493e94151828311"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "63d419b952bb04353dd4a5864493e94151828311"
+      }
     }
   },
   "closeOut": {
@@ -910,9 +928,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 36325701,
-            "output": 498519,
-            "cacheRead": 132015616,
+            "input": 44684178,
+            "output": 547848,
+            "cacheRead": 143706112,
             "cacheWrite": 0
           }
         },
@@ -1009,9 +1027,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 51981063,
-          "output": 1243784,
-          "cacheRead": 369932800,
+          "input": 60339540,
+          "output": 1293113,
+          "cacheRead": 381623296,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1022,8 +1040,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 629.1927646,
-        "pricingAsOf": "2026-08-05T10:33:09.014Z"
+        "usd": 653.7515466,
+        "pricingAsOf": "2026-08-05T10:37:34.862Z"
       }
     },
     "merges": [
