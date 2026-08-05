@@ -905,7 +905,7 @@
     "recordedAt": "2026-08-05T12:58:03.602Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T14:31:50.971Z",
+  "updated": "2026-08-05T16:10:12.737Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "passed",
@@ -916,7 +916,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T14:31:47.266Z",
+    "updatedAt": "2026-08-05T16:10:12.710Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "At HEAD 30c3c4f719 (branch up to date with origin/feature/pan-3511, clean tree). npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 54 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: PASS -- full chain green including lint:file-size, lint:circular (76 baselined cycles, no new), lint:ratchet-audit, lint:quarantine-audit (12 entries), lint:source-introspection, lint:park-exits, lint:overdeck-boundaries, lint:pipeline-membership, lint:workspace-doors, lint:state-writes/state-paths, lint:permissions, lint:effect. npm test: PASS -- root suite 1409 files / 3 skipped, 13329 tests passed / 50 skipped; frontend suite 4 files / 63 tests passed, 0 failures. Browser UAT not required: PAN-3511's xBRIEF and PRD scope entirely backend/cloister recovery-path logic -- verdict-restore.ts, deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts -- plus docs. No item's files_scope names a frontend/dashboard path and no acceptance criterion names observable dashboard or browser behavior.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
@@ -981,7 +981,9 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T12:58:03.602Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-05T16:10:12.710Z"
   },
   "closeOut": {
     "usage": {
@@ -1135,7 +1137,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3529"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-05T16:10:12.733Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 30c3c4f719916655ef2dbf5c02b766da7f659564",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3529 MERGED at 2026-08-05T14:31:12Z",
+          "status": "pass",
+          "mergedAt": "2026-08-05T14:31:12Z",
+          "mergeCommit": "299d98db34f9950d9dfea6356b9ff1821181a50f"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on 299d98db34f9950d9dfea6356b9ff1821181a50f",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit f69486a9 contains merge 299d98db",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 9 agent state directories (11 transcript files preserved); No strike branch strike/pan-3511 found; Pruned 1113 checkpoint ref(s) for agent-pan-3511, planning-pan-3511, strike-pan-3511; No specialist registry entries for PAN-3511"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
