@@ -875,17 +875,17 @@
     "recordedAt": "2026-08-05T12:58:03.602Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T12:58:03.603Z",
+  "updated": "2026-08-05T12:58:04.404Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T12:58:00.247Z",
+    "updatedAt": "2026-08-05T12:58:04.401Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "verificationNotes": "Verification FAILED at test (421878ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n\n ❯ |root| src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts (7 tests | 1 failed) 29ms\n     × reads active-run evidence asynchronously for recovery callers 9ms (retry x1)\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-IME4d0/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s elapsed)\n[prep] completed: sync-main (0s e\n…(59342 chars elided)…\nb/cloister/__tests__/review-verdict-feedback.test.ts (0 test)\n ❯ |root| src/lib/__tests__/agents-barrel-exports.test.ts (0 test)\n ❯ |root| src/lib/cloister/__tests__/specialist-resolve-harness.test.ts (0 test)\n ❯ |root| src/dashboard/server/routes/__tests__/agents-git-info-fallback.test.ts (0 test)\n ❯ |root| src/cli/commands/__tests__/doctor-main-divergence.test.ts (0 test)\n ❯ |root| tests/unit/lib/cloister/flywheel-membership.test.ts (0 test)\n ❯ |root| src/dashboard/server/routes/__tests__/events.test.ts (0 test)\n ❯ |root| tests/unit/dashboard/server/routes/health-runtime-census.test.ts (0 test)\n ❯ |root| tests/unit/dashboard/server/routes/resync-review-route.test.ts (0 test)\n ❯ |root| tests/unit/dashboard/server/services/agent-state-service.test.ts (0 test)\n ❯ |root| src/dashboard/server/routes/__tests__/agents-order-dispatch.test.ts (0 test)\n ❯ |root| tests/cli/commands/compliance.test.ts (0 test)\n ❯ |root| src/dashboard/server/routes/__tests__/agents-listing\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
@@ -893,6 +893,7 @@
       "outsideDeclaredScope": [
         "packages/contracts/src/events.ts",
         "scripts/file-size-allowlist.txt",
+        "scripts/source-introspection-baseline.txt",
         "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
         "src/lib/__tests__/review-status-reconcile.test.ts",
         "src/lib/agents/agent-state-source.ts",
@@ -926,6 +927,7 @@
         "docs/REVIEW-AGENT-ARCHITECTURE.md",
         "packages/contracts/src/events.ts",
         "scripts/file-size-allowlist.txt",
+        "scripts/source-introspection-baseline.txt",
         "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
         "src/lib/__tests__/review-status-read-artifact.test.ts",
         "src/lib/__tests__/review-status-reconcile.test.ts",
@@ -944,8 +946,9 @@
         "src/lib/review-status-read.ts",
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
-      "recordedAt": "2026-08-05T11:03:37.813Z"
-    }
+      "recordedAt": "2026-08-05T12:58:03.602Z"
+    },
+    "reviewRequestedAt": "2026-08-05T12:58:04.401Z"
   },
   "closeOut": {
     "usage": {
