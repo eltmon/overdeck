@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T18:15:29.488Z",
+  "updated": "2026-08-05T18:21:45.815Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 27,
-    "claims": {
-      "reconcile-reviewing-rows-through-write-door": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 3973477,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T17:55:07.520Z"
-      }
-    },
+    "sequence": 28,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -196,6 +188,17 @@
         "itemId": "docs-parked-merge-flywheel",
         "outcome": "completed",
         "releasedAt": "2026-08-05T18:15:29.488Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 3973477,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:55:07.520Z",
+        "itemId": "reconcile-reviewing-rows-through-write-door",
+        "outcome": "blocked",
+        "reason": "Required npm run typecheck fails dashboard ratchet: 60 errors against the 54-error baseline; the reconciler changes are committed and targeted Cloister tests pass.",
+        "releasedAt": "2026-08-05T18:21:45.815Z"
       }
     ],
     "statusReasons": {
@@ -210,6 +213,10 @@
       "drop-discovery-ready-cli": {
         "reason": "Retired the discovery-ready command in the preceding fork-removal change and added an explicit command-palette regression test that it remains unavailable.",
         "updatedAt": "2026-08-05T15:20:30.404Z"
+      },
+      "reconcile-reviewing-rows-through-write-door": {
+        "reason": "Required npm run typecheck fails dashboard ratchet: 60 errors against the 54-error baseline; the reconciler changes are committed and targeted Cloister tests pass.",
+        "updatedAt": "2026-08-05T18:21:45.815Z"
       }
     }
   },
@@ -269,7 +276,7 @@
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac2": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac3": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac4": "completed",
-    "reconcile-reviewing-rows-through-write-door": "running",
+    "reconcile-reviewing-rows-through-write-door": "blocked",
     "docs-parked-merge-flywheel": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac1": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac2": "completed",
