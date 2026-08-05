@@ -659,15 +659,7 @@
       "timestamp": "2026-08-05T08:05:01.579Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T08:05:01Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — The revision removes three required verdict-recovery behaviors\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-152565c9/context.json`\n- Branch: `feature/pan-3511`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511`\n- HEAD reviewed: `152565c99eb789dc0434cef9884716a094b12cb6`\n- Cycle number: 10\n- Prior cycle SHA: `e8840c4f28f445db550a0d2d2d41e9f56f46d135`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 0 |\n| correctness | ready | `correctness.md` | 0 |\n| performance | ready | `performance.md` | 1 |\n| requirements | ready | `requirements.md` | 3 |\n\n## Blocking Findings\n\n### [requirements] The shared restore helper and head-guard visibility path are absent — `src/lib/cloister/verdict-restore.ts:1`\n\nThe current file only reads active-run evidence. It no longer exposes the required restore outcome contract, head-mismatch prediction, safe restoration path, or producer for `review.verdict_restore_blocked`, although the event schema remains declared. This fails the in-scope `restore-helper` requirement and leaves a safe terminal artifact unable to take the required recovery path.\n\n### [requirements] Orphan recovery resets a reviewing row after finding active-run evidence — `src/lib/cloister/deacon-review-status.ts:597`\n\nThe orphan recovery branch logs active-run evidence and then unconditionally sets `reviewStatus: 'pending'`. It does not delegate its decision to the restore helper or preserve a guard-refused artifact, so the exact recovery path the issue targets can still overwrite recoverable terminal evidence. Keep the existing reset only for the helper's no-evidence outcome.\n\n### [requirements] The stale-journal refusal never consults corroborating artifact evidence — `src/lib/review-status-read.ts:36`\n\nThe artifact-based stale-journal recovery block was removed. The resolver now always refuses the stale journal snapshot, even where active-run evidence corroborates its terminal verdict. FR-7 requires the memoized consult exclusively after the existing stale-refusal predicate, so the common path remains filesystem-free while that recovery remains available.\n\n### [performance] Active-run artifact reads synchronously block Deacon recovery and feedback handling — `src/lib/cloister/synthesis-verdict.ts:74`\n\n`readActiveReviewArtifact()` uses synchronous existence checks, `statSync`, and `readFileSync`, and it is called from serial orphan patrol and feedback-delivery recovery paths. A slow or contended workspace filesystem blocks the dashboard's Node event loop for each eligible recovery item. Provide an async artifact reader for these callers, or ensure synchronous consumers use only evidence populated asynchronously in a bounded cache.\n\n## Non-blocking Findings\n\n### [correctness] Cached artifact evidence can outlive its 30-minute freshness bound — `src/lib/cloister/synthesis-verdict.ts:131`\n\nThe 60-second memo TTL can return a non-null artifact for up to one minute after `SYNTHESIS_ARTIFACT_FRESH_MS` expires. This only affects an observability recommendation in the current revision and does not write a terminal verdict, so it is advisory. Cap a non-null cache entry's expiry at the earlier of its memo TTL and artifact freshness deadline, with a boundary regression test.\n\n## Scope Note\n\nAll four blockers are in the PR diff and in the cycle diff since `e8840c4f28f445db550a0d2d2d41e9f56f46d135`, so they remain promotable under the cycle-10 convergence gate. The requirements review classifies each missing work item as `Scope: in_pr_scope`; the security reviewer confirms that the replacement active-run-evidence model closes the prior artifact-forgery authorization bypass, but that does not satisfy the missing recovery requirements.\n\n## Clean Sub-roles\n\n- security\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-152565c9/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -718,7 +710,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T08:58:53.301Z",
+  "updated": "2026-08-05T08:58:54.612Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
