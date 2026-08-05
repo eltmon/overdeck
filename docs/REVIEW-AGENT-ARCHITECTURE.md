@@ -131,21 +131,14 @@ The contract has four clauses:
 
 **The two doors.** `readLatestSynthesisVerdict()` in
 `src/lib/cloister/synthesis-verdict.ts` is the read door. It resolves the active
-review parent's `reviewRunId` through the agent-state read door and accepts only a
-report whose exact bytes and reviewed HEAD have a valid host HMAC attestation.
-The dashboard signs `context.json` before reviewers start, then signs the selected
-`synthesis.md` or `review.md` after the review agent signals its verdict but before
-the row write. Coding-agent environments explicitly blank the signing key; the
-review parent receives only a run-bound request token. Workspace-created runs,
-tampered contexts, and unsigned or altered reports are not verdict evidence.
-Polyrepo attestations bind the canonical full-SHA anchor
-`repoKey@sha repoKey@sha` in manifest order, matching the workspace snapshot
-format used by the HEAD guard.
-
-The reader returns `null` at the signed attestation's 30-minute freshness boundary,
-so changing a file mtime cannot revive old evidence. `readMemoizedArtifactVerdict()`
-uses a bounded LRU: absent evidence retries after 60 seconds, while verified
-non-null evidence remains cached until that 30-minute boundary.
+review parent's `reviewRunId` and host-issued `reviewArtifactCapability` through
+the agent-state read door, reads only that run directory, verifies that
+`context.json` binds the issue and run, and requires the capability marker as the
+artifact's first line. A newer workspace-created directory or a report without
+the active capability is not verdict evidence. The reader returns `null` at the
+30-minute freshness boundary so a previous cycle cannot resurrect over a new
+review. `readMemoizedArtifactVerdict()` wraps it in a bounded 60-second LRU whose
+non-null entries expire earlier when the artifact reaches that freshness boundary.
 `attemptArtifactVerdictRestore()` in `src/lib/cloister/verdict-restore.ts` is the
 shared decision point: it reads, predicts whether the write would be refused, and
 either restores or reports. It returns one of `no-artifact`, `restored`, or
@@ -161,7 +154,7 @@ consult can only ever *prevent* a destructive action, never invent an approval.
 | --- | --- | --- |
 | Deacon orphan reset | `cloister/deacon-review-status.ts` | resets a finished review to pending |
 | Review-infra breaker (×2: coordinator-died, orphan re-dispatch) | `cloister/deacon-review-status.ts` | strands a finished review behind an operator gate |
-| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | misses a safe review-row repair; the independent delivery-failure gate still lands |
+| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | marks stuck a review whose verdict exists; only *delivery* failed |
 | Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | re-drives the work agent over an approved review |
 | Stale-journal refusal | `review-status-read.ts` | refuses a journal the artifact independently agrees with |
 

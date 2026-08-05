@@ -158,7 +158,6 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  process.env.OVERDECK_REVIEW_ATTESTATION_KEY = 'review-agent-source-test-key-material-123456789';
   mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
   mockKillSessionAsync.mockResolvedValue(undefined);
   mockListSessionNames.mockReturnValue([]);
@@ -573,7 +572,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(resumeBlock).not.toBeNull();
     const block = resumeBlock![0];
 
-    expect(block).toContain('resumeAgent(reviewAgentId, prompt, { reviewRunId: runId })');
+    expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
     expect(block).toContain('if (fullReview)');
     expect(block).toContain('savedReview?.reviewRunId === runId');
     expect(block).toContain('handleReviewDiscoveryReady(opts.issueId');
@@ -727,7 +726,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     expect(guardBlock).toMatch(/!paneDead && !opts\.force && !staleRunId/);
   });
 
-  it('passes reviewRunId into spawn so provenance is durable before launch', async () => {
+  it('persists reviewRunId onto the synthesis agent state after spawn', async () => {
     const { readFileSync } = await import('fs');
     const { resolve } = await import('path');
     const agentSrc = readFileSync(
@@ -741,8 +740,8 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     expect(spawnMatch).not.toBeNull();
     const spawnBlock = spawnMatch![0];
 
-    expect(spawnBlock).toContain('reviewRunId: runId');
-    expect(spawnBlock).toContain('reviewAttestationToken');
+    expect(spawnBlock).toMatch(/run\.reviewRunId = runId/);
+    expect(spawnBlock).toContain('saveAgentState(run)');
   });
 });
 

@@ -234,8 +234,6 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     testDb.pragma('foreign_keys = ON');
     initSchema(testDb);
     vi.clearAllMocks();
-    vi.stubEnv('OVERDECK_AGENT_ID', '');
-    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', '');
     inMemoryJournal.clear();
     mockExecHeadSha = 'newsha99';
     mockOldTreeSha = 'old-tree';
@@ -268,7 +266,6 @@ describe('PAN-1215 post-review-rebase scenario', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllEnvs();
     testDb.close();
     if (existsSync(testRepoDir)) {
       rmSync(testRepoDir, { recursive: true, force: true });

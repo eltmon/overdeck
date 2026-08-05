@@ -42,7 +42,6 @@ import { processPendingLifecycle } from './pending-lifecycle.js';
 import { processPendingFeedbackDeliveries } from './pending-feedback.js';
 import { setPipelineHandlerSync } from '../../lib/pipeline-notifier.js';
 import { ensureInternalTokenSync } from '../../lib/internal-token.js';
-import { ensureReviewAttestationKey } from '../../lib/review-attestation-key.js';
 import { clearStuckMergeStatuses, fixStuckReadyForMerge, fixStuckCommentedReviews, getReviewStatusSync, loadReviewStatuses, clearReviewStatus } from '../../lib/review-status.js';
 import { reconcileStaleGitHubBlockers } from '../../lib/webhook-handlers.js';
 import { recoverStuckForks, waitForInFlightForkPipelines } from '../../lib/overdeck/conversation-forks.js';
@@ -114,9 +113,6 @@ await mkdir(getOverdeckHome(), { recursive: true });
 // Generates and persists a random token at <OVERDECK_HOME>/internal-token (mode 0600)
 // on first start; reused on subsequent starts. Used by /api/internal/pipeline/notify.
 ensureInternalTokenSync();
-// Generate one in-memory signing key before the HTTP server and Deacon start.
-// Coding-agent launchers explicitly blank it from their tmux environments.
-ensureReviewAttestationKey();
 
 // Prepare the managed tmux context exactly once, before any code path can spawn
 // tmux. After this call `buildTmuxArgs`, `buildTmuxCommandString`, and

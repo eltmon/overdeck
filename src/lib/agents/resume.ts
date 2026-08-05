@@ -54,11 +54,6 @@ import {
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
-import {
-  createReviewAgentAttestationToken,
-  REVIEW_ATTESTATION_KEY_ENV,
-  REVIEW_ATTESTATION_TOKEN_ENV,
-} from '../review-attestation-key.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -125,7 +120,7 @@ export async function buildCompactRecoverySeed(agentId: string): Promise<{ seed:
   };
 }
 
-export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause; reviewRunId?: string }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
+export async function resumeAgent(agentId: string, message?: string, opts?: { model?: string; harness?: RuntimeName; allowHost?: boolean; compact?: boolean; recoverGated?: boolean; startedBy?: string; resumeCause?: ResumeCause }): Promise<{ success: boolean; messageDelivered?: boolean; error?: string }> {
   const normalizedId = normalizeAgentId(agentId);
   const requestedModel = normalizeModelOverrideSync(opts?.model);
   logAgentLifecycleSync(normalizedId, `resumeAgent called (message=${message ? 'yes' : 'no'}, harness=${opts?.harness || 'unchanged'})`);
@@ -448,13 +443,6 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
-    const reviewRunId = opts?.reviewRunId ?? agentState.reviewRunId;
-    const reviewAttestationToken = agentState.role === 'review' && reviewRunId
-      ? createReviewAgentAttestationToken(normalizedId, reviewRunId)
-      : null;
-    if (agentState.role === 'review' && !reviewAttestationToken) {
-      return { success: false, error: 'Cannot resume review agent: review artifact attestation key is unavailable' };
-    }
 
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
@@ -464,8 +452,6 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         OVERDECK_SESSION_TYPE: agentState.role,
         OVERDECK_AGENT_STARTED_BY: startedBy,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
-        [REVIEW_ATTESTATION_KEY_ENV]: '',
-        [REVIEW_ATTESTATION_TOKEN_ENV]: reviewAttestationToken ?? '',
         ...providerEnv
       }
     }));

@@ -13,8 +13,6 @@ vi.mock('../merge-verification.js', () => ({
 
 const mockDeliverReviewVerdictFeedback = vi.hoisted(() => vi.fn());
 const mockSnapshotWorkspaceHeads = vi.hoisted(() => vi.fn());
-const mockAttestReviewReport = vi.hoisted(() => vi.fn(() => ({ reviewedHead: 'fallback-head' })));
-vi.mock('../review-artifact-attestation.js', () => ({ attestReviewReport: mockAttestReviewReport }));
 vi.mock('../review-verdict-feedback.js', async () => {
   const { Effect } = await import('effect');
   mockDeliverReviewVerdictFeedback.mockImplementation(() => Effect.succeed({

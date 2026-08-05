@@ -4,11 +4,11 @@ import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, getAgentStateSync, saveAgentStateSync, type AgentState } from '../agents.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
-import { attestReviewReport } from './review-artifact-attestation.js';
+import { reviewArtifactCapabilityMarker } from './review-artifact-capability.js';
 import { findVerdictReport } from './review-verdict-report.js';
 import { AGENTS_DIR } from '../paths.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
-import { rehydrateHeadAnchor, type HeadAnchor } from '../git-utils.js';
+import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { capturePane, isPaneDead, killSession, listSessionNames, listSessions, sessionExists, sessionExistsSync } from '../tmux.js';
@@ -216,19 +216,18 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reviewDir,
         reports,
       });
-      writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
-      // Attest before the row write so a process death between these operations
-      // leaves trusted recovery evidence. The signed context supplies the exact
-      // monorepo or polyrepo HEAD the reviewers saw.
-      const attestedReport = attestReviewReport({
-        issueId: state.issueId,
-        runId: state.reviewRunId!,
-        workspacePath: state.workspace,
-        expectedVerdict: synthesis.verdict,
-      });
-      const fallbackHead: HeadAnchor | undefined = attestedReport.reviewedHead
-        ? rehydrateHeadAnchor(attestedReport.reviewedHead)
-        : undefined;
+      const capabilityMarker = state.reviewArtifactCapability
+        ? `${reviewArtifactCapabilityMarker(state.reviewArtifactCapability)}\n`
+        : '';
+      writeFileSync(join(reviewDir, 'synthesis.md'), capabilityMarker + synthesis.body);
+      // PAN-1862 (FR-6): anchor each reviewer verdict to the reviewed HEAD so the
+      // next cycle's reviewersToRerun can skip provably-clean reviewers.
+      let fallbackHead: HeadAnchor | undefined;
+      try {
+        // PAN-2948: polyrepo-aware — anchors sub-repo heads, not the wrapper.
+        const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
+        fallbackHead = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace);
+      } catch { /* non-fatal — verdicts without an anchor simply re-run next cycle */ }
       const anchoredVerdicts = Object.fromEntries(
         Object.entries(synthesis.reviewerVerdicts).map(([subRole, v]) => [subRole, { ...v, ...(fallbackHead ? { atCommit: fallbackHead } : {}) }]),
       );

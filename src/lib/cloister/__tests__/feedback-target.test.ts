@@ -67,14 +67,14 @@ vi.mock('../../review-status.js', () => ({
   FEEDBACK_DELIVERY_STUCK_REASON: 'feedback_delivery_needs_you',
 }));
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { resolveIssueFeedbackTarget, surfaceIssueFeedbackNeedsYou } from '../feedback-target.js';
 import { resolveProjectFromIssueSync } from '../../projects.js';
-import { VERDICT_REPORT_FILENAMES, type VerdictReportFilename } from '../review-verdict-report.js';
-import { installTestReviewAttestationKey, writeAttestedReviewArtifact } from './review-artifact-test-helpers.js';
+import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
+import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 + PAN-2461)', () => {
@@ -198,15 +198,15 @@ describe('resolveIssueFeedbackTarget — resurrection-first delivery (PAN-2209 +
   });
 });
 
-describe('surfaceIssueFeedbackNeedsYou — verdict repair preserves the delivery gate (PAN-3511)', () => {
+describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the stuck mark (PAN-3511)', () => {
   const ISSUE = 'PAN-9999';
-  const REVIEW_RUN_ID = 'agent-pan-9999-review-run-1-att1';
+  const REVIEW_RUN_ID = 'agent-pan-9999-review-run-1';
+  const REVIEW_ARTIFACT_CAPABILITY = 'host-issued-capability';
   let projectPath: string;
   let workspacePath: string;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    installTestReviewAttestationKey();
     filesystem.existingPaths.clear();
     agentState.states.clear();
     reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing' });
@@ -218,6 +218,7 @@ describe('surfaceIssueFeedbackNeedsYou — verdict repair preserves the delivery
       id: `agent-${ISSUE.toLowerCase()}-review`,
       workspace: workspacePath,
       reviewRunId: REVIEW_RUN_ID,
+      reviewArtifactCapability: REVIEW_ARTIFACT_CAPABILITY,
     });
     vi.mocked(resolveProjectFromIssueSync).mockReturnValue({ projectKey: 'test', projectPath } as never);
   });
@@ -226,50 +227,38 @@ describe('surfaceIssueFeedbackNeedsYou — verdict repair preserves the delivery
     rmSync(projectPath, { recursive: true, force: true });
   });
 
-  /** Write a host-attested artifact and register it with the suite's existsSync mock. */
-  function writeArtifact(filename: VerdictReportFilename, body: string, headSha?: string): void {
-    const path = writeAttestedReviewArtifact({
-      workspacePath,
-      issueId: ISSUE,
-      runId: REVIEW_RUN_ID,
-      filename,
-      body,
-      ...(headSha ? { headSha } : {}),
-    });
+  /** Write a host-bound artifact and register it with the suite's existsSync mock. */
+  function writeArtifact(filename: string, body: string, headSha?: string): void {
+    const runDir = join(workspacePath, '.pan', 'review', REVIEW_RUN_ID);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(
+      join(runDir, 'context.json'),
+      JSON.stringify({ issueId: ISSUE, runId: REVIEW_RUN_ID, ...(headSha ? { headSha } : {}) }),
+      'utf-8',
+    );
+    const path = join(runDir, filename);
+    writeFileSync(
+      path,
+      `${reviewArtifactCapabilityMarker(REVIEW_ARTIFACT_CAPABILITY)}\n${body}`,
+      'utf-8',
+    );
     filesystem.existingPaths.add(path);
   }
 
   // Both shapes: synthesis.md is the convoy artifact, review.md is quick
   // self-review — the fleet default. A synthesis-only fixture would miss it.
   it.each(VERDICT_REPORT_FILENAMES)(
-    'restores a fresh approved %s and still records failed feedback delivery (ac1, ac2)',
+    'does not mark stuck when a fresh approved %s proves the review finished (ac1, ac2)',
     async (filename) => {
       writeArtifact(filename, '## Verdict: APPROVED\n\n## Summary\nEverything checks out cleanly.\n');
 
       await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
 
-      expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-        ISSUE,
-        'feedback_delivery_needs_you',
-        { reason: 'no live feedback target', agentId: 'agent-pan-9999' },
-      );
+      expect(reviewStatus.markWorkspaceStuck).not.toHaveBeenCalled();
       expect(reviewStatus.setReviewStatusSync).toHaveBeenCalledTimes(1);
       expect(reviewStatus.setReviewStatusSync.mock.calls[0]![1]).toMatchObject({ reviewStatus: 'passed' });
     },
   );
-
-  it('preserves a test-feedback delivery gate after review already passed', async () => {
-    reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'passed', testStatus: 'failed' });
-    writeArtifact('synthesis.md', '## Verdict: APPROVED\n');
-
-    await surfaceIssueFeedbackNeedsYou(ISSUE, 'test feedback could not be delivered', { phase: 'test' });
-
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE,
-      'feedback_delivery_needs_you',
-      { reason: 'test feedback could not be delivered', phase: 'test' },
-    );
-  });
 
   it('marks stuck with the unchanged details payload when no artifact exists (ac3)', async () => {
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
@@ -295,17 +284,15 @@ describe('surfaceIssueFeedbackNeedsYou — verdict repair preserves the delivery
     expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledTimes(1);
   });
 
-  it('still marks feedback delivery stuck when the artifact head disagrees', async () => {
-    reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing', lastVerifiedCommit: 'b'.repeat(40) });
-    writeArtifact('synthesis.md', '## Verdict: APPROVED\n', 'a'.repeat(40));
+  it('does not mark stuck when the artifact head disagrees — the review still finished', async () => {
+    // blocked-by-head-guard writes nothing, but the artifact proves a verdict
+    // exists, so the stuck mark would strand a finished review.
+    reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing', lastVerifiedCommit: 'bbbbbbb2' });
+    writeArtifact('synthesis.md', '## Verdict: APPROVED\n', 'aaaaaaa1');
 
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {});
 
     expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
-    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
-      ISSUE,
-      'feedback_delivery_needs_you',
-      { reason: 'no live feedback target' },
-    );
+    expect(reviewStatus.markWorkspaceStuck).not.toHaveBeenCalled();
   });
 });

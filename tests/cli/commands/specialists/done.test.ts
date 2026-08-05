@@ -69,8 +69,6 @@ describe('specialists done command', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
-    vi.stubEnv('OVERDECK_AGENT_ID', '');
-    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
@@ -132,48 +130,6 @@ describe('specialists done command', () => {
       prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
       runId: 'agent-pan-1059-review-abcdef12',
     });
-  });
-
-  it('requires host attestation for a review-agent completion signal', async () => {
-    vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
-    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
-
-    await expect(doneCommand('review', 'pan-1059', {
-      status: 'passed',
-      runId: 'agent-pan-1059-review-abcdef12-att1',
-    })).rejects.toThrow('host-issued attestation token');
-    expect(mockSetReviewStatus).not.toHaveBeenCalled();
-  });
-
-  it('uses the host-attested reviewed HEAD instead of re-reading the workspace', async () => {
-    vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
-    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', 'run-token');
-    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ reviewedHead: 'a'.repeat(40) }), { status: 200 }));
-    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
-
-    await doneCommand('review', 'pan-1059', {
-      status: 'passed',
-      notes: 'approved',
-      runId: 'agent-pan-1059-review-abcdef12-att1',
-    });
-
-    expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/review-artifact/attest', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-overdeck-review-attestation-token': 'run-token',
-      },
-      body: JSON.stringify({
-        issueId: 'PAN-1059',
-        runId: 'agent-pan-1059-review-abcdef12-att1',
-        verdict: 'passed',
-      }),
-    });
-    expect(mockSnapshotWorkspaceHeads).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', expect.objectContaining({
-      reviewStatus: 'passed',
-      reviewedAtCommit: 'a'.repeat(40),
-    }));
   });
 
   it('anchors a blocked verdict after feedback delivery', async () => {

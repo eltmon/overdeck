@@ -57,11 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { attestReviewContextManifest } from './review-artifact-attestation.js';
-import {
-  createReviewAgentAttestationToken,
-  REVIEW_ATTESTATION_RUN_SUFFIX,
-} from '../review-attestation-key.js';
+import { reviewArtifactCapabilityMarker } from './review-artifact-capability.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
@@ -122,7 +118,7 @@ export function buildReviewRolePrompt(opts: {
   workspace: string;
   branch: string;
   prUrl?: string;
-  runId: string; reviewDir: string;
+  runId: string; reviewDir: string; reviewArtifactCapability: string;
   contextManifestPath?: string; tier1Summary?: string;
   /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
   inScopeSubRoles?: ReviewSubRole[];
@@ -221,7 +217,7 @@ export function buildReviewRolePrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
-    'The host attests the finished report when you signal the verdict; do not create or edit attestation files.',
+    `The synthesis file's FIRST line MUST be exactly: ${reviewArtifactCapabilityMarker(opts.reviewArtifactCapability)} — this host-issued capability binds recovery to this review run; never omit or alter it.`,
     '',
     opts.tier1Summary
       ? [
@@ -272,7 +268,7 @@ function buildSelfReviewPrompt(opts: {
   workspace: string;
   branch: string;
   prUrl?: string;
-  runId: string; reviewDir: string;
+  runId: string; reviewDir: string; reviewArtifactCapability: string;
   contextManifestPath?: string; tier1Summary?: string;
 }): string {
   const reviewReportPath = selfReviewReportPath(opts.reviewDir);
@@ -292,7 +288,7 @@ function buildSelfReviewPrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Review output file: ${reviewReportPath}`,
-    'The host attests the finished report when you signal the verdict; do not create or edit attestation files.',
+    `The review file's FIRST line MUST be exactly: ${reviewArtifactCapabilityMarker(opts.reviewArtifactCapability)} — this host-issued capability binds recovery to this review run; never omit or alter it.`,
     '',
     opts.tier1Summary
       ? [
@@ -404,19 +400,15 @@ async function spawnReviewRoleForIssuePromise(
         try {
           const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
           if (head8 === 'unknown') throw new Error('workspace HEAD unavailable');
-          const currentRunPrefix = `agent-${opts.issueId.toLowerCase()}-review-${head8}-`;
+          currentRunId = `agent-${opts.issueId.toLowerCase()}-review-${head8}`;
           const synthReviewRunId = getAgentStateSync(reviewSessionName)?.reviewRunId;
-          // Each dispatch has a random attested run suffix. A live parent covers
-          // this HEAD only when its run uses the current attestation generation.
-          if (!synthReviewRunId
-            || !synthReviewRunId.startsWith(currentRunPrefix)
-            || !synthReviewRunId.endsWith(`-${REVIEW_ATTESTATION_RUN_SUFFIX}`)) {
+          // A missing identity cannot prove that the live pane covers the
+          // current obligation, so legacy/unknown sessions are stale too.
+          if (!synthReviewRunId || synthReviewRunId !== currentRunId) {
             staleRunId = true;
             console.log(
-              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId ?? 'missing'} does not match current prefix ${currentRunPrefix}; killing convoy and respawning`,
+              `[review-agent] ${reviewSessionName} is stale — runId ${synthReviewRunId ?? 'missing'} != current ${currentRunId}; killing convoy and respawning`,
             );
-          } else {
-            currentRunId = synthReviewRunId;
           }
         } catch (probeErr) {
           console.warn(
@@ -572,7 +564,6 @@ async function spawnReviewRoleForIssuePromise(
 
   try {
     const { spawnRun, saveAgentState, getAgentState, getAgentStateSync, getLatestSessionIdSync, resumeAgent, wipeAgentStateDirs } = await import('../agents.js');
-    const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
     const workAgentState = await Effect.runPromise(getAgentState(`agent-${opts.issueId.toLowerCase()}`));
     const allowHost = opts.allowHost === true || workAgentState?.hostOverride === true;
 
@@ -584,8 +575,10 @@ async function spawnReviewRoleForIssuePromise(
     // same issue get separate directories. Monorepos retain their short HEAD;
     // polyrepos hash the full composite anchor so any sub-repo move changes it.
     const head8 = await deriveReviewRunHead8(opts.issueId, opts.workspace);
-    const runNonce = randomUUID().slice(0, 8);
-    const runId = `${reviewAgentId}-${head8}-${runNonce}-${REVIEW_ATTESTATION_RUN_SUFFIX}`;
+    const runId = head8 !== 'unknown'
+      ? `agent-${opts.issueId.toLowerCase()}-review-${head8}`
+      : `agent-${opts.issueId.toLowerCase()}-review`;
+    const reviewArtifactCapability = randomUUID();
     const reviewDir = join(opts.workspace, PAN_DIRNAME, 'review', runId);
     let contextManifestPath: string | undefined;
     let tier1Summary: string | undefined;
@@ -597,12 +590,10 @@ async function spawnReviewRoleForIssuePromise(
         branch: opts.branch,
       }));
       contextManifestPath = manifest.manifestPath;
-      attestReviewContextManifest(contextManifestPath);
       tier1Summary = formatTier1Summary(manifest);
-      console.log(`[review-agent] Context manifest built and attested: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
+      console.log(`[review-agent] Context manifest built: ${contextManifestPath} (${manifest.changedFiles.length} files)`);
     } catch (ctxErr) {
-      contextManifestPath = undefined;
-      console.warn(`[review-agent] Context manifest build or attestation failed for ${opts.issueId} — reviewers will block on missing trusted context:`, ctxErr);
+      console.warn(`[review-agent] Context manifest build failed for ${opts.issueId} — reviewers will block on missing shared context:`, ctxErr);
     }
 
     const fullReview = isExtendedReviewEnabled(opts.issueId);
@@ -643,8 +634,8 @@ async function spawnReviewRoleForIssuePromise(
       && (opts.harness ?? savedReviewHarness ?? cfgReviewHarness ?? modelDefaultHarness ?? 'claude-code') === 'claude-code';
 
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
-      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, reviewArtifactCapability, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles, discovery: discoveryForkMode })
+      : buildSelfReviewPrompt({ ...opts, runId, reviewDir, reviewArtifactCapability, contextManifestPath, tier1Summary });
 
     // PAN-1862: in discovery-fork mode the convoy is NOT spawned here — the parent
     // signals discovery-ready and handleReviewDiscoveryReady launches (and forks)
@@ -693,9 +684,9 @@ async function spawnReviewRoleForIssuePromise(
     // was set out to fix. Fresh-spawn ONLY when the harness/model actually changed (it's a
     // different agent then) or there is no resumable saved session. The resume delivery is
     // resilient (supervisor → tmux fallback, PAN-1988).
+    const reviewAgentId = `agent-${opts.issueId.toLowerCase()}-review`;
     const savedReview = getAgentStateSync(reviewAgentId);
-    const savedRunIsAttestationAware = savedReview?.reviewRunId?.endsWith(`-${REVIEW_ATTESTATION_RUN_SUFFIX}`) === true;
-    const canResumeReview = savedRunIsAttestationAware && reviewResumeDecision({
+    const canResumeReview = reviewResumeDecision({
       requestedModel: opts.model,
       requestedHarness: opts.harness,
       savedModel: savedReview?.model,
@@ -705,13 +696,18 @@ async function spawnReviewRoleForIssuePromise(
     });
     if (canResumeReview) {
       console.log(`[review-agent] Resuming saved review session for ${opts.issueId} — model/harness unchanged, preserving context (PAN-1862)`);
-      // Persist active-run provenance before delivering the prompt so the host
-      // attestation endpoint cannot race the review agent's completion signal.
-      savedReview.reviewRunId = runId;
-      savedReview.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
-      await Effect.runPromise(saveAgentState(savedReview));
-      const resumeResult = await resumeAgent(reviewAgentId, prompt, { reviewRunId: runId });
+      const resumeResult = await resumeAgent(reviewAgentId, prompt);
       if (resumeResult.success) {
+        try {
+          // Keep the idempotency guard's HEAD-staleness detection honest for the resumed run.
+          const resumed = getAgentStateSync(reviewAgentId);
+          if (resumed) {
+            resumed.reviewRunId = runId; resumed.reviewArtifactCapability = reviewArtifactCapability;
+            // PAN-2584: arm the parent's liveness deadline for this cycle.
+            resumed.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+            await Effect.runPromise(saveAgentState(resumed));
+          }
+        } catch { /* non-fatal */ }
         if (fullReview) {
           if (savedReview?.reviewRunId === runId) {
             // PAN-3368: this is recovery of the current run, not a new review cycle.
@@ -744,19 +740,26 @@ async function spawnReviewRoleForIssuePromise(
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
-    const reviewAttestationToken = createReviewAgentAttestationToken(reviewAgentId, runId);
-    if (!reviewAttestationToken) throw new Error('review artifact attestation key is unavailable');
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
       ...(opts.model ? { model: opts.model } : {}),
       ...(opts.harness ? { harness: opts.harness } : {}),
       ...(allowHost ? { allowHost: true } : {}),
-      reviewRunId: runId,
-      reviewDeadlineAt: new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString(),
-      reviewAttestationToken,
       startedBy: 'review-agent',
     });
+    // Persist the runId on the synthesis agent's own state so the idempotency
+    // guard above can tell a genuinely-running review (runId matches current
+    // HEAD) from a finished-but-idle leftover (runId from an older HEAD) — see
+    // PAN-1131. Sub-reviewers already persist this; the synthesis agent did not.
+    run.reviewRunId = runId; run.reviewArtifactCapability = reviewArtifactCapability;
+    // PAN-2584: arm the parent's liveness deadline for this cycle.
+    run.reviewDeadlineAt = new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString();
+    try {
+      await Effect.runPromise(saveAgentState(run));
+    } catch (saveErr) {
+      console.warn(`[review-agent] Could not persist reviewRunId on ${run.id}:`, saveErr);
+    }
     if (fullReview) {
       await spawnConvoyReviewers(run.id);
       console.log(`[review-agent] Review role (convoy synthesis) spawned for ${opts.issueId}: ${run.id}`);

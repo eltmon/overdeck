@@ -11,13 +11,13 @@
  * points, and the artifact is a real file read by the real reader — a mocked
  * reader would prove the helper works, not that the patrol calls it.
  */
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { Effect } from 'effect';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { VERDICT_REPORT_FILENAMES, type VerdictReportFilename } from '../review-verdict-report.js';
-import { installTestReviewAttestationKey, writeAttestedReviewArtifact } from './review-artifact-test-helpers.js';
+import { reviewArtifactCapabilityMarker } from '../review-artifact-capability.js';
+import { VERDICT_REPORT_FILENAMES } from '../review-verdict-report.js';
 import type { ReviewStatus } from '../../review-status.js';
 
 const mocks = vi.hoisted(() => ({
@@ -117,7 +117,8 @@ vi.mock('../deacon-nudge-log.js', () => ({ recordDeaconNudge: vi.fn() }));
 vi.mock('../event-store-provider.js', () => ({ getCloisterEventStore: vi.fn(() => null) }));
 
 const ISSUE = 'PAN-3511';
-const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1-att1';
+const REVIEW_RUN_ID = 'agent-pan-3511-review-run-1';
+const REVIEW_ARTIFACT_CAPABILITY = 'host-issued-capability';
 const BREAKER_THRESHOLD = 3;
 
 let projectPath: string;
@@ -126,16 +127,20 @@ function workspacePath(): string {
   return join(projectPath, 'workspaces', `feature-${ISSUE.toLowerCase()}`);
 }
 
-/** Writes a host-attested reviewer artifact where the real reader will find it. */
-function writeArtifact(filename: VerdictReportFilename, body: string, attest = true): void {
-  writeAttestedReviewArtifact({
-    workspacePath: workspacePath(),
-    issueId: ISSUE,
-    runId: REVIEW_RUN_ID,
-    filename,
-    body,
-    attest,
-  });
+/** Writes a host-bound reviewer artifact where the real reader will find it. */
+function writeArtifact(filename: string, body: string): void {
+  const runDir = join(workspacePath(), '.pan', 'review', REVIEW_RUN_ID);
+  mkdirSync(runDir, { recursive: true });
+  writeFileSync(
+    join(runDir, 'context.json'),
+    JSON.stringify({ issueId: ISSUE, runId: REVIEW_RUN_ID }),
+    'utf-8',
+  );
+  writeFileSync(
+    join(runDir, filename),
+    `${reviewArtifactCapabilityMarker(REVIEW_ARTIFACT_CAPABILITY)}\n${body}`,
+    'utf-8',
+  );
 }
 
 const APPROVED = '## Verdict: APPROVED\n\n## Summary\nNo blocking findings in this pass.\n';
@@ -161,7 +166,6 @@ function orphanBreakerStatus(fields: Partial<ReviewStatus> = {}): ReviewStatus {
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  installTestReviewAttestationKey();
   projectPath = mkdtempSync(join(tmpdir(), 'pan3511-breaker-'));
   mocks.resolveProjectFromIssueSync.mockReturnValue({ projectPath });
   mocks.isIssueClosed.mockResolvedValue(false);
@@ -171,6 +175,7 @@ beforeEach(async () => {
     id: `agent-${ISSUE.toLowerCase()}-review`,
     workspace: workspacePath(),
     reviewRunId: REVIEW_RUN_ID,
+    reviewArtifactCapability: REVIEW_ARTIFACT_CAPABILITY,
   });
   mocks.loadReviewStatuses.mockReturnValue({});
   // The memo would otherwise carry one test's artifact into the next.
@@ -306,7 +311,7 @@ describe('no artifact on disk (ac3)', () => {
 
   it('still marks stuck when the artifact carries a non-terminal verdict line', async () => {
     // An unparseable artifact is no evidence, so protection must survive it.
-    writeArtifact('synthesis.md', '## Verdict: still deliberating\n', false);
+    writeArtifact('synthesis.md', '## Verdict: still deliberating\n');
 
     const { handleReviewCoordinatorDied } = await import('../deacon-review-status.js');
     await handleReviewCoordinatorDied(ISSUE, 'agent-pan-3511-review', 'pane died');

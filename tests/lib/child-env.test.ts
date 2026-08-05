@@ -12,8 +12,6 @@ describe('buildChildEnv', () => {
       ANTHROPIC_BASE_URL: 'http://proxy',
       ANTHROPIC_AUTH_TOKEN: 'secret',
       OPENAI_API_KEY: 'sk-xxx',
-      OVERDECK_REVIEW_ATTESTATION_KEY: 'host-key',
-      OVERDECK_REVIEW_ATTESTATION_TOKEN: 'review-token',
       HOME: '/home/test',
     };
     const result = buildChildEnvSync(base as NodeJS.ProcessEnv, { CUSTOM: 'value' });
@@ -29,8 +27,6 @@ describe('buildChildEnv', () => {
     expect(result.ANTHROPIC_BASE_URL).toBeUndefined();
     expect(result.ANTHROPIC_AUTH_TOKEN).toBeUndefined();
     expect(result.OPENAI_API_KEY).toBeUndefined();
-    expect(result.OVERDECK_REVIEW_ATTESTATION_KEY).toBeUndefined();
-    expect(result.OVERDECK_REVIEW_ATTESTATION_TOKEN).toBeUndefined();
   });
 
   it('overrides strip keys when explicitly provided', () => {

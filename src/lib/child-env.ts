@@ -40,9 +40,6 @@ const PROVIDER_ENV_KEYS = new Set([
   'NOUS_API_KEY',
   'DASHSCOPE_API_KEY',
   'QUANTUMLLAMA_API_KEY',
-  // Host-only review attestation material must never leak to coding agents.
-  'OVERDECK_REVIEW_ATTESTATION_KEY',
-  'OVERDECK_REVIEW_ATTESTATION_TOKEN',
 ]);
 
 /** All keys that should be stripped by default. */
