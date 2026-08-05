@@ -905,17 +905,17 @@
     "recordedAt": "2026-08-05T12:58:03.602Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T13:14:21.334Z",
+  "updated": "2026-08-05T13:14:30.692Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "passed",
-    "testStatus": "passed",
+    "testStatus": "testing",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
-    "readyForMerge": true,
-    "updatedAt": "2026-08-05T13:14:19.072Z",
+    "readyForMerge": false,
+    "updatedAt": "2026-08-05T13:14:30.672Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "At HEAD 80d42c27a5 (branch up to date with origin, clean tree). npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 55 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: PASS — full chain green including lint:source-introspection (the readFileSync self-introspection in stall-sweeper.test.ts flagged in the prior FAILED run at commit 63d419b9 is gone from the file at this HEAD; confirmed via grep), lint:file-size, lint:circular (76 baselined cycles, no new), lint:ratchet-audit, lint:quarantine-audit (12 entries validated), lint:no-coderabbit-merge-gate, lint:prompts/prompt-trailer/skills/slash-commands, lint:park-exits, lint:agent-dir-removal, lint:overdeck-boundaries, lint:pipeline-membership, lint:workspace-doors, lint:state-writes/state-paths, lint:permissions, lint:effect. npm test: PASS — root suite 1404 test files passed, 3 skipped (13289 tests passed, 50 skipped); frontend suite 4 files / 63 tests passed. No failures this run (the two DB-setup-hook-timeout flakes noted in the prior pipeline record at commit 63d419b9 did not recur). Browser UAT not required: the PRD (drafts/pan-3511.md on overdeck-state) and xBRIEF acceptance criteria are entirely backend/cloister recovery-path logic (verdict-restore.ts, deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts) plus docs; no item's files_scope names a frontend/dashboard path and no AC names observable dashboard/browser behavior.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
@@ -1009,9 +1009,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 52560232,
-            "output": 593832,
-            "cacheRead": 157045248,
+            "input": 52562638,
+            "output": 594070,
+            "cacheRead": 157308416,
             "cacheWrite": 0
           }
         },
@@ -1114,9 +1114,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 71321190,
-          "output": 1450368,
-          "cacheRead": 424041984,
+          "input": 71323596,
+          "output": 1450606,
+          "cacheRead": 424305152,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1127,8 +1127,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 705.5124196,
-        "pricingAsOf": "2026-08-05T13:14:21.327Z"
+        "usd": 705.5877976,
+        "pricingAsOf": "2026-08-05T13:14:30.681Z"
       }
     },
     "merges": [
