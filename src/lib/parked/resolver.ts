@@ -26,7 +26,7 @@
  *   4. operator-gate     paused (operator, not yield) / troubled / stoppedByUser
  *   5. uat-failed        uatStatus failed with merge still pending
  *   6. merge-failed      mergeStatus failed (retries saturated or abandoned)
- *   7. conflicts         conflictsSince branch-invalidation mark
+ *   7. conflicts         persisted conflictsSince marker
  *   8. zombie-session    live agent whose issue is merged/closed
  *   9. idle-running      live agent, no pipeline owner, idle beyond threshold
  *  10. circuit-breaker   autoRequeueCount >= 25 (dead-end recovery exhausted)
@@ -341,7 +341,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     );
   }
 
-  // 7. conflicts — branch-invalidation mark
+  // 7. conflicts — retain any persisted conflict marker for the parked view.
   if (!closed && r?.conflictsSince && r.mergeStatus !== 'merged') {
     push(
       'conflicts',
