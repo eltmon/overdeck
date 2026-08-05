@@ -131,9 +131,9 @@ The contract has four clauses:
 4. **No artifact scan runs in status reads.** The synchronous status resolver
    never walks `.pan/review`. Only after its stale-journal refusal predicate
    matches may it consume a bounded, asynchronously populated memo entry whose
-   verdict corroborates the journal and whose review head binds to the live row:
-   artifact-provided heads must match, while a headless quick-review artifact
-   requires the host-recorded `roleRunHead` for its active run to match.
+   verdict corroborates the journal and whose host-recorded `roleRunHead`
+   binds to the live row. Every artifact requires that anchor to match; when an
+   artifact provides a head, it must match the same host-recorded anchor.
 
 `readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
 reads one explicit active run rather than scanning `.pan/review/*/`. It returns
@@ -152,7 +152,7 @@ entry preserves the stale-journal refusal without filesystem I/O.
 | Deacon orphan reset | `cloister/deacon-review-status.ts` | asynchronously preserves active-run evidence for diagnosis, then continues the bounded reset path |
 | Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | preserves active-run evidence and still marks/escalates the established infrastructure failure |
 | Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
-| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays a matching verdict only with a matching artifact head or host-recorded run head |
+| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays a matching verdict only when the host-recorded run head matches the live row and any artifact head matches that same anchor |
 | Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
 
 **Rule for future guard authors.** A new review recovery path reads only an

@@ -108,7 +108,7 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     expect(reconcile).not.toHaveBeenCalled();
   });
 
-  it('refuses a headless quick-review artifact without a matching host run anchor', () => {
+  it('refuses an artifact without a matching host run anchor even when its head matches the live row', () => {
     terminalJournal('passed');
     staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
     readReviewArtifactContext.mockReturnValue({
@@ -119,6 +119,7 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     readArtifact.mockReturnValue({
       verdict: 'passed',
       runId: 'host-recorded-run',
+      headSha: 'reviewed-head',
       mtimeMs: 1,
     });
 

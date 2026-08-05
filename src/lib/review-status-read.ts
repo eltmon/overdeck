@@ -47,22 +47,19 @@ export function resolveJournalReconciledReviewStatusSync(
       const artifact = typeof journalVerdict === 'string' && review
         ? readMemoizedArtifactVerdict(issueId, review)
         : null;
-      const artifactHeadMatchesLive = Boolean(
-        artifact?.headSha
-        && liveStatus.lastVerifiedCommit
-        && artifact.headSha === liveStatus.lastVerifiedCommit,
-      );
-      const headlessArtifactHasHostBinding = Boolean(
-        artifact
-        && !artifact.headSha
-        && review?.roleRunHead
+      const hostRunHeadMatchesLive = Boolean(
+        review?.roleRunHead
         && liveStatus.lastVerifiedCommit
         && review.roleRunHead === liveStatus.lastVerifiedCommit,
+      );
+      const artifactHeadMatchesHostRun = Boolean(
+        !artifact?.headSha || artifact.headSha === review?.roleRunHead,
       );
       if (
         artifact
         && artifact.verdict === journalVerdict
-        && (artifactHeadMatchesLive || headlessArtifactHasHostBinding)
+        && hostRunHeadMatchesLive
+        && artifactHeadMatchesHostRun
       ) {
         console.log(
           `[review-status] Active-run artifact corroborated the stale journal verdict with a live review-head binding for ${issueId}; replaying the terminal journal result.`,
