@@ -154,7 +154,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     return { landed: true, classification: 'no-evidence' };
   }
 
-  // Evidence heads equal: take the anchor-match path
+  // Evidence heads equal: land the verdict without re-gating the same test result.
   if (input.evidenceHead === status.lastVerifiedCommit) {
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
@@ -162,6 +162,25 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
+
+    const eventStore = getCloisterEventStore();
+    if (eventStore) {
+      eventStore.append({
+        type: 'review.verdict_dispatched' as const,
+        timestamp: new Date().toISOString(),
+        payload: {
+          issueId,
+          workspaceId: workspacePath ? workspacePath.split('/').pop() : undefined,
+          writer: input.writer,
+          verdict: input.verdict,
+          evidenceHead: input.evidenceHead as string,
+          rowHead: status.lastVerifiedCommit as string,
+          classification: 'anchor-match',
+          testGateReset: false,
+        },
+      });
+    }
+
     return { landed: true, classification: 'anchor-match' };
   }
 
@@ -207,7 +226,8 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
   }
 
   // Fresh or indeterminate: land the verdict
-  const testGateReset = status.testStatus === 'passed' || status.testStatus === 'skipped';
+  const testGateReset = (status.testStatus === 'passed' || status.testStatus === 'skipped')
+    && input.evidenceHead !== status.lastVerifiedCommit;
   const update: ReviewStatusUpdate = {
     reviewStatus: input.verdict,
     reviewNotes: input.notes,
