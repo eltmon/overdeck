@@ -863,18 +863,19 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:56:40.447Z",
+  "updated": "2026-08-05T11:00:29.504Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:56:18.453Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
+    "updatedAt": "2026-08-05T11:00:29.366Z",
+    "reviewNotes": "All review lenses pass: stale replay requires matching host run and live verification anchors",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "63d419b952bb04353dd4a5864493e94151828311",
     "lastVerifiedCommit": "80d42c27a501a1100274fa1d06676bbf40352982",
@@ -927,6 +928,24 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "80d42c27a501a1100274fa1d06676bbf40352982"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "80d42c27a501a1100274fa1d06676bbf40352982"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "80d42c27a501a1100274fa1d06676bbf40352982"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "80d42c27a501a1100274fa1d06676bbf40352982"
+      }
     }
   },
   "closeOut": {
@@ -948,9 +967,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 44689344,
-            "output": 549760,
-            "cacheRead": 144398336,
+            "input": 51352654,
+            "output": 576249,
+            "cacheRead": 152257536,
             "cacheWrite": 0
           }
         },
@@ -1047,9 +1066,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 60629954,
-          "output": 1301753,
-          "cacheRead": 387543040,
+          "input": 67293264,
+          "output": 1328242,
+          "cacheRead": 395402240,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1060,8 +1079,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 656.0871286,
-        "pricingAsOf": "2026-08-05T10:56:18.501Z"
+        "usd": 675.1075436,
+        "pricingAsOf": "2026-08-05T11:00:29.452Z"
       }
     },
     "merges": [
