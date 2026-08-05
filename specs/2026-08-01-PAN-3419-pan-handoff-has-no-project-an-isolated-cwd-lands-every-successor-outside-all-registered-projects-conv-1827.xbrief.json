@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:25:39Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3419: pan handoff has no --project: an isolated --cwd lands every successor outside all registered projects (conv 1827)",
-    "updated": "2026-08-01T15:35:18.239Z"
+    "updated": "2026-08-05T16:10:40.226Z"
   },
   "plan": {
     "id": "pan-3419",
     "title": "pan handoff has no --project: an isolated --cwd lands every successor outside all registered projects (conv 1827)",
-    "status": "running",
+    "status": "completed",
     "uid": "930fc3f3-0cfa-4149-ae0f-548adfddface",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T15:25:39Z",
-    "updated": "2026-08-01T15:35:18.239Z",
+    "updated": "2026-08-05T16:10:40.226Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3419",
@@ -658,5 +658,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
