@@ -5,12 +5,12 @@
  * will advance it within 24h without operator or flywheel intervention. Over
  * months of incident response, each failure mode grew its own safety valve —
  * stuck flags, needs-you trips, deacon-ignore, resume gates, UAT gates, merge
- * retry caps, conflict marks, circuit breakers — and every one of them converts
- * autonomous motion into operator work. Ten of those valves exist today, in six
- * subsystems, and no surface could answer "what is stalled, why, and what would
- * release it." This resolver is that answer: ONE read door that unions all ten
- * orbits into typed rows, so the CLI, the API, the dashboard, and the stall
- * sweeper all agree by construction.
+ * retry caps, and circuit breakers — and every one of them converts autonomous
+ * motion into operator work. Nine of those valves exist today, in six subsystems,
+ * and no surface could answer "what is stalled, why, and what would release it."
+ * This resolver is that answer: ONE read door that unions all nine orbits into
+ * typed rows, so the CLI, the API, the dashboard, and the stall sweeper all agree
+ * by construction.
  *
  * Modeled on `resolvePipelineMembership()` (src/lib/pipeline-membership.ts):
  * a pure classifier over gathered signals, with the gathering done here through
@@ -18,7 +18,7 @@
  * the per-issue record door for recovery trips). No surface may re-derive
  * parking independently.
  *
- * The ten orbits (see docs/PARKED-POPULATION.md):
+ * The nine orbits (see docs/PARKED-POPULATION.md):
  *
  *   1. stuck-flag        review_status.stuck = 1 (any stuck_reason)
  *   2. needs-you         an open recovery trip in the permanent record
@@ -26,10 +26,9 @@
  *   4. operator-gate     paused (operator, not yield) / troubled / stoppedByUser
  *   5. uat-failed        uatStatus failed with merge still pending
  *   6. merge-failed      mergeStatus failed (retries saturated or abandoned)
- *   7. conflicts         persisted conflictsSince marker
- *   8. zombie-session    live agent whose issue is merged/closed
- *   9. idle-running      live agent, no pipeline owner, idle beyond threshold
- *  10. circuit-breaker   autoRequeueCount >= 25 (dead-end recovery exhausted)
+ *   7. zombie-session    live agent whose issue is merged/closed
+ *   8. idle-running      live agent, no pipeline owner, idle beyond threshold
+ *   9. circuit-breaker   autoRequeueCount >= 25 (dead-end recovery exhausted)
  */
 
 import { loadReviewStatuses, type ReviewStatus } from '../review-status.js';
@@ -51,7 +50,6 @@ export const PARKED_ORBITS = [
   'operator-gate',
   'uat-failed',
   'merge-failed',
-  'conflicts',
   'zombie-session',
   'idle-running',
   'circuit-breaker',
@@ -69,7 +67,6 @@ export const PARKED_ORBIT_SEVERITY: readonly ParkedOrbit[] = [
   'zombie-session',
   'merge-failed',
   'uat-failed',
-  'conflicts',
   'stuck-flag',
   'circuit-breaker',
   'idle-running',
@@ -341,18 +338,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     );
   }
 
-  // 7. conflicts — retain historical conflict markers for the parked view.
-  if (!closed && r?.conflictsSince && r.mergeStatus !== 'merged') {
-    push(
-      'conflicts',
-      isoOr(r.conflictsSince.detectedAt, s.now),
-      `a persisted conflict marker names ${r.conflictsSince.sha.slice(0, 10)}; this branch still needs rework`,
-      'resolve the recorded conflict, then submit the rework for review',
-      { sha: r.conflictsSince.sha, paths: r.conflictsSince.paths },
-    );
-  }
-
-  // 8. zombie-session — live agent whose issue is already merged/closed
+  // 7. zombie-session — live agent whose issue is already merged/closed
   for (const agent of s.liveAgents) {
     const merged = r?.mergeStatus === 'merged' || s.issueClosed === true;
     if (!merged) continue;
@@ -365,7 +351,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     );
   }
 
-  // 10. circuit-breaker — dead-end recovery exhausted
+  // 9. circuit-breaker — dead-end recovery exhausted
   const requeues = r?.autoRequeueCount ?? 0;
   if (!closed && requeues >= 25) {
     push(
@@ -377,7 +363,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     );
   }
 
-  // 9. idle-running — live agent, no pipeline owner, idle beyond threshold, and
+  // 8. idle-running — live agent, no pipeline owner, idle beyond threshold, and
   //    no other orbit already explains the stall (orbit of last resort).
   if (!closed && rows.length === 0) {
     for (const agent of s.liveAgents) {

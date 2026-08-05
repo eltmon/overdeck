@@ -280,11 +280,6 @@ function reportRow(
       return true;
     }
 
-    case 'conflicts': {
-      recommend(`resolve ${issueId}'s branch conflicts via pan sync-main ${issueId}, then pan done ${issueId}`);
-      return true;
-    }
-
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
 

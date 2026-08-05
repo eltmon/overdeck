@@ -130,7 +130,7 @@ describe('spawnReviewRoleForIssue', () => {
     }));
     mocks.saveAgentStateProgram.mockReturnValue(Effect.void);
     mocks.getAgentStateProgram.mockReturnValue(Effect.succeed({ hostOverride: true }));
-    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.getAgentStateFileSync.mockReturnValue(undefined);
     mocks.listAgentIdsByPrefixSync.mockReturnValue([]);
     mocks.removeAgent.mockResolvedValue({ removedDir: false, preservedTranscripts: 1 });
@@ -206,7 +206,7 @@ describe('spawnReviewRoleForIssue', () => {
 
   it('PAN-2534: replaces a lingering review session whose run identity is missing', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateSync.mockReturnValue(undefined);
+    mocks.getAgentStateFileSync.mockReturnValue(undefined);
 
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
@@ -221,7 +221,7 @@ describe('spawnReviewRoleForIssue', () => {
 
   it('keeps a live review session whose run identity matches current HEAD', async () => {
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
 
     const result = await Effect.runPromise(spawnReviewRoleForIssue({
       issueId: 'PAN-1194',
@@ -244,7 +244,7 @@ describe('spawnReviewRoleForIssue', () => {
     await mkdir(reviewDir, { recursive: true });
     await writeFile(`${reviewDir}/synthesis.md`, '# Review complete\n');
     mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
-    mocks.getAgentStateSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
     mocks.getReviewStatus.mockReturnValue({
       reviewStatus: 'pending',
       reviewRequestedAt: '2026-07-15T19:00:00.000Z',

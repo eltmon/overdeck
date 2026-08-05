@@ -31,7 +31,9 @@ import { truncateReviewStatusNote } from './review-status-limits.js';
 import { resolveJournalReconciledReviewStatusSync } from './review-status-read.js';
 import { capturePipelineStageForIssue } from './telemetry/pipeline.js';
 import type { ReviewStatusUpdate } from './workspace-anchor-drift.js';
+import type { HeadAnchor } from './git-utils.js';
 import { rejectVerdictEvidenceHeadMismatch } from './review-verdict-guards.js';
+import { registerVerdictPreservationStatusReader, registerWorkStartVerdictAdapter } from './cloister/work-start-verdicts.js';
 
 export { reviewGatesPassedSync, verificationSatisfied, MERGED_VERIFICATION_REASON } from './review-status-reconcile.js';
 export type { BlockerReason, ReviewStatus, StatusHistoryEntry } from './review-status-reconcile.js';
@@ -69,6 +71,8 @@ export function mergeGateEligibility(
 // warm-idle advancing classification (see cloister/review-status-source.ts).
 registerReviewStatusMapReader(() => getAllReviewStatusesFromDb());
 registerCanonicalReviewStatusResolver((issueId) => getReviewStatusSync(issueId));
+registerVerdictPreservationStatusReader((issueId) => { const status = getReviewStatusSync(issueId); return status ? { ...status, reviewedAtCommit: status.reviewedAtCommit as HeadAnchor | undefined } : null; });
+registerWorkStartVerdictAdapter({ refreshReviewedAnchor: (issueId, anchor) => setReviewStatusSync(issueId, { reviewedAtCommit: anchor }), resetPipelineVerdicts: (issueId) => resetPipelineVerdictsForWorkStartSync(issueId) !== null });
 
 const DEFAULT_STATUS_FILE = join(homedir(), '.overdeck', 'review-status.json');
 
@@ -523,24 +527,29 @@ function emitReactiveLifecycleEvent(
   }
 }
 
+export type ReviewVerdictFeedbackDelivery = (
+  issueId: string,
+  status: ReviewStatus,
+) => Promise<void>;
+
+let reviewVerdictFeedbackDelivery: ReviewVerdictFeedbackDelivery | null = null;
+
+export function registerReviewVerdictFeedbackDelivery(
+  delivery: ReviewVerdictFeedbackDelivery,
+): void {
+  reviewVerdictFeedbackDelivery = delivery;
+}
+
 async function deliverReviewVerdictFeedbackHostSide(
   issueId: string,
   status: ReviewStatus,
 ): Promise<void> {
+  if (!reviewVerdictFeedbackDelivery) {
+    console.warn(`[review-status] review feedback delivery is not registered for ${issueId}; preserving durable feedback state for a host retry`);
+    return;
+  }
   try {
-    const { deliverReviewVerdictFeedback } = await import('./cloister/review-verdict-feedback.js');
-    const { getAgentStateSync } = await import('./agents.js');
-    const runId = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
-    const result = await Effect.runPromise(deliverReviewVerdictFeedback({
-      issueId,
-      verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
-      notes: status.reviewNotes,
-      prUrl: status.prUrl,
-      ...(runId ? { runId } : {}),
-    }));
-    if (result.agentMessageSent) {
-      console.log(`[review-status] delivered review feedback to the work agent for ${issueId} (host-side)`);
-    }
+    await reviewVerdictFeedbackDelivery(issueId, status);
   } catch (err) {
     console.warn(`[review-status] host-side review feedback delivery for ${issueId} did not complete (non-fatal): ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -580,22 +589,20 @@ function maybeAutoDispatchReviewHostSide(issueId: string, status: ReviewStatus):
 export async function dispatchReviewHostSide(issueId: string, prUrl?: string): Promise<void> {
   try {
     const {
-      hasDurableReviewPipelineHandler,
-      startDurableReviewPipelineHostSide,
+      hasDurableReviewPipelineDispatch,
+      startRegisteredDurableReviewPipelineHostSide,
     } = await import('./cloister/durable-review-pipeline.js');
-    if (!hasDurableReviewPipelineHandler()) {
+    if (!hasDurableReviewPipelineDispatch()) {
       if (!loggedMissingPipelineHandler) {
         loggedMissingPipelineHandler = true;
         console.debug('[review-status] durable review pipeline handler is not registered; skipping host-side review auto-dispatch');
       }
       return;
     }
-    const { spawnReviewRoleForIssue } = await import('./cloister/review-agent.js');
-    const started = await startDurableReviewPipelineHostSide({
+    const started = await startRegisteredDurableReviewPipelineHostSide({
       issueId,
       ...(prUrl ? { prUrl } : {}),
       setReviewPending: (update) => setReviewStatusSync(issueId, update),
-      dispatchReview: (context) => Effect.runPromise(spawnReviewRoleForIssue(context)),
     });
     if (!started) {
       console.log(`[review-status] durable review pipeline unavailable or already in flight for ${issueId} (host-side)`);

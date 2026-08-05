@@ -1,7 +1,7 @@
 import { existsSync, linkSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile, readdir } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
-import type { ReviewStatus } from '../review-status.js';
+import type { ReviewStatus } from '../review-status-types.js';
 import { updateIssueRecordForIssue, type PanIssuePipelineRecord } from '../pan-dir/records.js';
 import { readIssueRecord, readIssueRecordSync } from '../pan-dir/record.js';
 import {

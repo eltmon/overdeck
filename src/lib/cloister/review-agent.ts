@@ -66,7 +66,7 @@ import { shouldSkipDispatchAsMerged } from './merge-verification.js';
 import { readIssueRecordSync, resolveProjectForIssue } from '../pan-dir/record.js';
 import { PAN_DIRNAME } from '../pan-dir/types.js';
 import { AGENTS_DIR, packageRoot, sessionFilePath } from '../paths.js';
-import { getAgentStateSync } from '../agents.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import type { RuntimeName } from '../runtimes/types.js';
 
 const execAsync = promisify(exec);

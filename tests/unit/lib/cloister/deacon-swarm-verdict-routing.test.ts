@@ -29,6 +29,14 @@ vi.mock('../../../../src/lib/agents.js', () => ({
   messageAgent: mockMessageAgent,
 }));
 
+vi.mock('../../../../src/lib/agents/messaging.js', () => ({
+  messageAgent: mockMessageAgent,
+}));
+
+vi.mock('../../../../src/lib/agents/agent-state.js', () => ({
+  getAgentStateSync: vi.fn(),
+}));
+
 vi.mock('../../../../src/lib/projects.js', () => ({
   resolveProjectFromIssueSync: vi.fn(() => null),
 }));

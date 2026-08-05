@@ -25,7 +25,7 @@ import {
   type ProjectConfig,
 } from '../projects.js';
 import { resolveStateReadHomeSync } from '../state-read-home.js';
-import type { ReviewStatus } from '../review-status.js';
+import type { ReviewStatus } from '../review-status-types.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import type {
   ContinueDecision,

@@ -126,14 +126,11 @@ describe('classifyParked — one orbit at a time', () => {
     expect(rows[0].parkReason).toContain('exhausted');
   });
 
-  it('conflicts: a conflicts_since mark parks until resolution', () => {
+  it('ignores a legacy conflictsSince marker instead of projecting it as a parked orbit', () => {
     const rows = classifyParked(signals({
       reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 4 * HOUR).toISOString(), paths: ['src/a.ts'] } }),
     }));
-    expect(rows).toHaveLength(1);
-    expect(rows[0].orbit).toBe('conflicts');
-    expect(rows[0].parkReason).toContain('persisted conflict marker');
-    expect(rows[0].parkReason).toContain('c8a911e6fa');
+    expect(rows).toHaveLength(0);
   });
 
   it('zombie-session: a live agent on a merged issue parks; on an open issue does not', () => {
@@ -206,7 +203,7 @@ describe('summarizeParked', () => {
 
 describe('guard-exit inventory (PAN-3488)', () => {
   it('every orbit in the taxonomy has a fixture producing non-empty park + release copy', () => {
-    // One fixture per orbit — the taxonomy is ten entries and each must
+    // One fixture per orbit — the taxonomy is nine entries and each must
     // classify with both sentences populated. A new orbit added to
     // PARKED_ORBITS without a classifier branch (or without copy) fails here.
     const fixtures: Record<string, ParkedSignals> = {
@@ -216,7 +213,6 @@ describe('guard-exit inventory (PAN-3488)', () => {
       'operator-gate': signals({ agents: [baseAgent({ paused: true })] }),
       'uat-failed': signals({ reviewStatus: baseStatus({ reviewStatus: 'passed', testStatus: 'passed', uatStatus: 'failed' }) }),
       'merge-failed': signals({ reviewStatus: baseStatus({ mergeStatus: 'failed' }) }),
-      conflicts: signals({ reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 60_000).toISOString(), paths: [] } }) }),
       'zombie-session': signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: [{ ...baseAgent({}), tmuxActive: true }] }),
       'idle-running': signals({ reviewStatus: baseStatus({}), liveAgents: [{ ...baseAgent({ lastActivity: new Date(NOW - IDLE_RUNNING_THRESHOLD_MS - 60_000).toISOString() }), tmuxActive: true }] }),
       'circuit-breaker': signals({ reviewStatus: baseStatus({ autoRequeueCount: 30 }) }),

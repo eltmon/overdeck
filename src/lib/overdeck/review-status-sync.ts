@@ -9,7 +9,7 @@
  * between the old and new domains — both tables exist in overdeck.db.
  */
 import { Effect } from 'effect';
-import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status.js';
+import type { BlockerReason, ReviewStatus, StatusHistoryEntry } from '../review-status-types.js';
 import { normalizeReviewStatusSync } from '../review-status-normalize.js';
 import { REVIEW_STATUS_HISTORY_LIMIT, REVIEW_STATUS_NOTE_LIMIT } from '../review-status-limits.js';
 import { getOverdeckDatabaseSync } from './infra.js';

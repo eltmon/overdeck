@@ -179,14 +179,6 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     expect(recs[0]!.payload.reviewNotes).toBe(artifact.notes);
   });
 
-  it('conflicts: recommends sync-main + rework', async () => {
-    const h = harness([parkedRow({ orbit: 'conflicts' })]);
-    await runStallSweeperPatrol(h.deps);
-    const recs = recommendations(h);
-    expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('sync-main');
-  });
-
   it('idle-running: recommends a nudge, then stopping if nothing moves', async () => {
     const row = parkedRow({ orbit: 'idle-running', details: { agentId: 'agent-pan-1', idleMinutes: 7200 } });
     const h = harness([row], { liveAgents: ['agent-pan-1'] });

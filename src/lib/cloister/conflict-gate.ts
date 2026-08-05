@@ -1,7 +1,8 @@
 import { exec, type ExecOptions } from 'node:child_process';
 import { promisify } from 'node:util';
 import { emitActivityEntrySync } from '../activity-logger.js';
-import { messageAgent, spawnRun } from '../agents.js';
+import { messageAgent } from '../agents/messaging.js';
+import { spawnRun } from '../agents/spawn.js';
 import { getReviewStatusSync, setReviewStatusSync, type BlockerReason, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
 
 const execAsync = promisify(exec);

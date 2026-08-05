@@ -114,6 +114,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
 }));
 
 vi.mock('../../../src/lib/agents/agent-state.js', () => ({
+  getAgentStateSync: (...args: Parameters<typeof mockGetAgentState>) => mockGetAgentState(...args),
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
   markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
 }));

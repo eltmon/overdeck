@@ -44,7 +44,13 @@ const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { getReviewStatusSync, loadReadyForMergeFlags, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import {
+  getReviewStatusSync,
+  loadReadyForMergeFlags,
+  registerReviewVerdictFeedbackDelivery,
+  resetPipelineVerdictsForWorkStartSync,
+  setReviewStatusSync,
+} from '../review-status.js';
 
 const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-1866',
@@ -58,6 +64,16 @@ const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
 describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    registerReviewVerdictFeedbackDelivery(async (issueId, status) => {
+      const runId = agents.getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
+      await Effect.runPromise(feedback.deliver({
+        issueId,
+        verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
+        notes: status.reviewNotes,
+        prUrl: status.prUrl,
+        ...(runId ? { runId } : {}),
+      }));
+    });
     db.getManyFromDb.mockReturnValue({});
     journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
     agents.getAgentStateSync.mockReturnValue(null);
