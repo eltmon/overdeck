@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:24:03.944Z",
+  "updated": "2026-08-05T19:24:06.931Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 30,
-    "claims": {
-      "reconcile-reviewing-rows-through-write-door": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 373565,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T19:24:03.944Z"
-      }
-    },
+    "sequence": 31,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -207,6 +199,16 @@
         "outcome": "blocked",
         "reason": "Required npm run typecheck fails dashboard ratchet: 60 errors against the 54-error baseline; the reconciler changes are committed and targeted Cloister tests pass.",
         "releasedAt": "2026-08-05T18:21:45.815Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 373565,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T19:24:03.944Z",
+        "itemId": "reconcile-reviewing-rows-through-write-door",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T19:24:06.931Z"
       }
     ],
     "statusReasons": {
@@ -284,10 +286,14 @@
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac2": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac3": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac4": "completed",
-    "reconcile-reviewing-rows-through-write-door": "running",
+    "reconcile-reviewing-rows-through-write-door": "completed",
     "docs-parked-merge-flywheel": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac1": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac2": "completed",
-    "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac3": "completed"
+    "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac3": "completed",
+    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac1": "completed",
+    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac2": "completed",
+    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac3": "completed",
+    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac4": "completed"
   }
 }
