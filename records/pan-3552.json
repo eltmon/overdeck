@@ -445,7 +445,7 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:57:48.480Z",
+  "updated": "2026-08-05T23:58:02.723Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -453,10 +453,10 @@
     "verificationStatus": "skipped",
     "mergeStatus": "merged",
     "mergeStep": "post-merge-cleanup",
-    "releaseStatus": "pending",
+    "releaseStatus": "skipped",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T23:51:33.187Z",
-    "updatedAt": "2026-08-05T23:57:48.466Z",
+    "updatedAt": "2026-08-05T23:58:02.488Z",
     "reviewNotes": "[review-agent] Skipping review dispatch for PAN-3552 — GitHub PR #3573 is merged",
     "testNotes": "npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 47 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED exit 0 (all sub-lints green incl. state-writes/state-paths/pipeline-membership/workspace-doors/park-exits/circular 56 baselined-0 new/ratchet-audit/quarantine-audit). Root npm test PASSED: 1409 test files / 13314 tests passed, 3 files / 50 tests skipped, 0 failed (head-anchor-write-sites.test.ts inventory mismatch from an earlier review cycle is resolved on this HEAD, re-ran standalone 2/2 passed). Full frontend suite (npm --prefix src/dashboard/frontend run test, no filter) PASSED: 309 test files / 3032 tests, 0 failed, incl. RolesPanel.test.tsx and IssuePolicyStrip.test.tsx covering the removed reReviewScope control. UAT not required: pure backend pipeline internals plus one UI control removal fully covered by component tests; no acceptance criteria or issue/PR notes call for browser verification.",
     "verificationNotes": "Merge already landed; verify-on-main owns post-merge validation.",
@@ -781,7 +781,7 @@
       },
       "costAtCloseOut": {
         "usd": 288.540977,
-        "pricingAsOf": "2026-08-05T23:57:48.475Z"
+        "pricingAsOf": "2026-08-05T23:58:02.492Z"
       }
     },
     "merges": [
