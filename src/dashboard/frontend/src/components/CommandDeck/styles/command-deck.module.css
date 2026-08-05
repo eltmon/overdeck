@@ -3275,6 +3275,26 @@
   background: var(--border);
 }
 
+.headerSubmenu {
+  position: absolute;
+  left: 100%;
+  top: 0;
+  margin-left: 4px;
+  z-index: 50;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--popover, var(--card));
+  color: var(--popover-foreground, var(--foreground));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
 .headerMenuDeliveryRow {
   display: flex;
   align-items: center;
