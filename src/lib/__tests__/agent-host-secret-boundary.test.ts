@@ -12,12 +12,16 @@ import { buildChildEnvWithoutTmuxSync } from '../child-env.js';
 import {
   REVIEW_ATTESTATION_KEY_ENV,
   REVIEW_ATTESTATION_TOKEN_ENV,
+  createReviewAgentAttestationToken,
   ensureReviewAttestationKey,
   reviewAttestationKeyFilePath,
+  verifyReviewAgentAttestationToken,
 } from '../review-attestation-key.js';
 import { shellQuote } from '../shell-quote.js';
 
 const execFileAsync = promisify(execFile);
+const AGENT_ID = 'agent-pan-3511-review';
+const RUN_ID = 'agent-pan-3511-review-deadbeef-run-att1';
 
 let root: string;
 
@@ -68,12 +72,13 @@ describe('agent host-secret boundary', () => {
     if (process.platform !== 'linux') return;
 
     const key = ensureReviewAttestationKey();
-    const expectedToken = 'active-review-run-token-that-must-not-cross-the-boundary';
-    process.env[REVIEW_ATTESTATION_TOKEN_ENV] = expectedToken;
+    const expectedToken = createReviewAgentAttestationToken(AGENT_ID, RUN_ID);
+    expect(expectedToken).toBeTruthy();
 
     const server = createServer((request, response) => {
       const token = String(request.headers['x-overdeck-review-attestation-token'] ?? '');
-      response.writeHead(token === expectedToken ? 201 : 401).end();
+      const accepted = verifyReviewAgentAttestationToken(AGENT_ID, RUN_ID, token);
+      response.writeHead(accepted ? 201 : 401).end();
     });
     await new Promise<void>((resolve, reject) => {
       server.once('error', reject);
@@ -86,11 +91,13 @@ describe('agent host-secret boundary', () => {
       const keyPath = reviewAttestationKeyFilePath();
       const probePath = join(root, 'workspace-probe.cjs');
       writeFileSync(probePath, `
+        const { createHmac } = require('node:crypto');
         const { readFileSync } = require('node:fs');
         void (async () => {
           let signingKey = null;
           try { signingKey = readFileSync(process.env.PROBE_KEY_PATH, 'utf8').trim(); } catch {}
-          const token = process.env.OVERDECK_REVIEW_ATTESTATION_TOKEN || '';
+          const payload = 'review-artifact-attestation:v1:' + process.env.PROBE_AGENT_ID + ':' + process.env.PROBE_RUN_ID;
+          const token = signingKey ? createHmac('sha256', signingKey).update(payload).digest('base64url') : '';
           const result = await fetch(process.env.PROBE_URL, {
             method: 'POST',
             headers: { 'x-overdeck-review-attestation-token': token },
@@ -114,6 +121,8 @@ describe('agent host-secret boundary', () => {
         OVERDECK_AGENT_HOST_SECRET_BOUNDARY: '1',
         PROBE_KEY_PATH: keyPath,
         PROBE_EXPECTED_KEY: key,
+        PROBE_AGENT_ID: AGENT_ID,
+        PROBE_RUN_ID: RUN_ID,
         PROBE_URL: `http://127.0.0.1:${address.port}/attest`,
       });
       const { stdout } = await execFileAsync(launcherPath, { env });

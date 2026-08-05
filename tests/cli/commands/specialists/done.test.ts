@@ -1,19 +1,24 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Effect } from 'effect';
 import { verificationSatisfied } from '../../../../src/lib/review-status.js';
 
 const {
   mockSetReviewStatus,
   mockGetReviewStatus,
+  mockDeliverReviewVerdictFeedback,
   mockResolveProject,
   mockReadWorkspacePlan,
+  mockSnapshotWorkspaceHeads,
   mockFlushJournalWrites,
   mockReadVerdictFallback,
   mockVerdictFallbackPath,
 } = vi.hoisted(() => ({
   mockSetReviewStatus: vi.fn(),
   mockGetReviewStatus: vi.fn(),
+  mockDeliverReviewVerdictFeedback: vi.fn(),
   mockResolveProject: vi.fn(),
   mockReadWorkspacePlan: vi.fn(),
+  mockSnapshotWorkspaceHeads: vi.fn(),
   mockFlushJournalWrites: vi.fn(),
   mockReadVerdictFallback: vi.fn(),
   mockVerdictFallbackPath: vi.fn(),
@@ -30,6 +35,10 @@ vi.mock('../../../../src/lib/review-status.js', async (importOriginal) => {
   };
 });
 
+vi.mock('../../../../src/lib/cloister/review-verdict-feedback.js', () => ({
+  deliverReviewVerdictFeedback: mockDeliverReviewVerdictFeedback,
+}));
+
 vi.mock('../../../../src/lib/overdeck/review-status-record-sync.js', () => ({
   flushReviewStatusJournalWrites: mockFlushJournalWrites,
   readWorkspaceVerdictFallbackSync: mockReadVerdictFallback,
@@ -44,6 +53,16 @@ vi.mock('../../../../src/lib/xbrief/io.js', () => ({
   readWorkspacePlanSync: mockReadWorkspacePlan,
 }));
 
+vi.mock('../../../../src/lib/git-utils.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/lib/git-utils.js')>()),
+  snapshotWorkspaceHeadsPromise: mockSnapshotWorkspaceHeads,
+}));
+
+vi.mock('node:fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs')>()),
+  existsSync: vi.fn(() => true),
+}));
+
 let currentReviewStatus: Record<string, unknown> | undefined;
 
 describe('specialists done command', () => {
@@ -51,8 +70,10 @@ describe('specialists done command', () => {
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_DASHBOARD_URL', 'http://localhost:3011');
     vi.stubEnv('OVERDECK_AGENT_ID', '');
+    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', '');
     vi.spyOn(console, 'log').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockSnapshotWorkspaceHeads.mockResolvedValue(undefined);
     mockFlushJournalWrites.mockResolvedValue(undefined);
     mockReadVerdictFallback.mockReturnValue(null);
     mockVerdictFallbackPath.mockReturnValue(
@@ -73,6 +94,11 @@ describe('specialists done command', () => {
       };
       return currentReviewStatus;
     });
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.succeed({
+      feedbackPath: '/workspace/.pan/feedback/001-review-agent-changes-requested.md',
+      prCommentPosted: true,
+      agentMessageSent: true,
+    }));
     mockResolveProject.mockReturnValue({ projectPath: '/project' });
     mockReadWorkspacePlan.mockReturnValue({
       plan: { items: [{ id: 'issue-view-model' }] },
@@ -86,7 +112,7 @@ describe('specialists done command', () => {
     vi.restoreAllMocks();
   });
 
-  it('cannot write a review verdict when the caller identity is unset', async () => {
+  it('allows review to signal blocked status', async () => {
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -95,28 +121,34 @@ describe('specialists done command', () => {
       runId: 'agent-pan-1059-review-abcdef12',
     });
 
-    expect(fetch).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'blocked',
+      notes: 'correctness blocker',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+      runId: 'agent-pan-1059-review-abcdef12',
+    });
   });
 
-  it('requires the active review identity and run id for the compatibility signal', async () => {
+  it('requires host attestation for a review-agent completion signal', async () => {
     vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await expect(doneCommand('review', 'pan-1059', {
       status: 'passed',
-    })).rejects.toThrow('requires --run-id and the matching review identity');
-
-    vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-9999-review');
-    await expect(doneCommand('review', 'pan-1059', {
-      status: 'passed',
-      runId: 'agent-pan-1059-review-abcdef12',
-    })).rejects.toThrow('requires --run-id and the matching review identity');
+      runId: 'agent-pan-1059-review-abcdef12-att1',
+    })).rejects.toThrow('host-issued attestation token');
     expect(mockSetReviewStatus).not.toHaveBeenCalled();
   });
 
-  it('does not expose attestation or verdict-write capability to the review process', async () => {
+  it('uses the host-attested reviewed HEAD instead of re-reading the workspace', async () => {
     vi.stubEnv('OVERDECK_AGENT_ID', 'agent-pan-1059-review');
+    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', 'run-token');
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify({ reviewedHead: 'a'.repeat(40) }), { status: 200 }));
     const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
 
     await doneCommand('review', 'pan-1059', {
@@ -125,8 +157,103 @@ describe('specialists done command', () => {
       runId: 'agent-pan-1059-review-abcdef12-att1',
     });
 
-    expect(fetch).not.toHaveBeenCalled();
-    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(fetch).toHaveBeenCalledWith('http://localhost:3011/api/specialists/review-artifact/attest', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-overdeck-review-attestation-token': 'run-token',
+      },
+      body: JSON.stringify({
+        issueId: 'PAN-1059',
+        runId: 'agent-pan-1059-review-abcdef12-att1',
+        verdict: 'passed',
+      }),
+    });
+    expect(mockSnapshotWorkspaceHeads).not.toHaveBeenCalled();
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', expect.objectContaining({
+      reviewStatus: 'passed',
+      reviewedAtCommit: 'a'.repeat(40),
+    }));
+  });
+
+  it('anchors a blocked verdict after feedback delivery', async () => {
+    mockSnapshotWorkspaceHeads.mockResolvedValue('blocked-head');
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'correctness blocker',
+    });
+
+    expect(mockSnapshotWorkspaceHeads).toHaveBeenCalledWith(
+      'PAN-1059',
+      '/project/workspaces/feature-pan-1059',
+    );
+    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(1, 'PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    expect(mockSetReviewStatus).toHaveBeenNthCalledWith(2, 'PAN-1059', {
+      reviewedAtCommit: 'blocked-head',
+    });
+    expect(mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0]).toBeLessThan(
+      mockSetReviewStatus.mock.invocationCallOrder[1]!,
+    );
+  });
+
+  it('preserves a blocked verdict when the post-feedback HEAD snapshot fails', async () => {
+    mockSnapshotWorkspaceHeads.mockRejectedValue(new Error('git unavailable'));
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await expect(doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'correctness blocker',
+    })).resolves.toBeUndefined();
+
+    expect(mockSetReviewStatus).toHaveBeenCalledTimes(1);
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'correctness blocker',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledOnce();
+  });
+
+  it('delivers synthesis feedback when review signals failed status', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'failed',
+      notes: 'synthesis crashed',
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'failed',
+      reviewNotes: 'synthesis crashed',
+    });
+    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith({
+      issueId: 'PAN-1059',
+      verdict: 'failed',
+      notes: 'synthesis crashed',
+      prUrl: 'https://github.com/eltmon/overdeck/pull/1059',
+    });
+  });
+
+  it('does not deliver feedback when review passes', async () => {
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    await doneCommand('review', 'pan-1059', {
+      status: 'passed',
+      notes: 'approved',
+    });
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'passed',
+      reviewNotes: 'approved',
+      reviewedAtCommit: undefined,
+      verificationStatus: 'passed',
+      verificationNotes: 'Cleared by `pan specialists done review --status passed` override (PAN-1215)',
+    });
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
   });
 
   it('records required UAT separately from passed automated gates', async () => {
@@ -145,6 +272,24 @@ describe('specialists done command', () => {
       uatStatus: 'failed',
       uatNotes: 'workspace has no tracker-backed issue data',
     });
+  });
+
+  it('PAN-2524: persists the verdict before a hanging feedback delivery times out', async () => {
+    vi.useFakeTimers();
+    mockDeliverReviewVerdictFeedback.mockReturnValue(Effect.never);
+    const { doneCommand } = await import('../../../../src/cli/commands/specialists/done.js');
+
+    const completion = doneCommand('review', 'pan-1059', {
+      status: 'blocked',
+      notes: 'durable first',
+    });
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1059', {
+      reviewStatus: 'blocked',
+      reviewNotes: 'durable first',
+    });
+
+    await vi.advanceTimersByTimeAsync(30_000);
+    await expect(completion).resolves.toBeUndefined();
   });
 
   it('forces a successful CLI exit after durable completion', async () => {

@@ -1,7 +1,4 @@
-import {
-  REVIEW_ATTESTATION_KEY_ENV,
-  REVIEW_ATTESTATION_TOKEN_ENV,
-} from './review-attestation-key.js';
+import { REVIEW_ATTESTATION_KEY_ENV } from './review-attestation-key.js';
 import { shellQuote } from './shell-quote.js';
 
 /**
@@ -24,7 +21,6 @@ export function buildAgentHostSecretBoundaryPrelude(
   const lines = [
     keyAssignment,
     `unset ${REVIEW_ATTESTATION_KEY_ENV}`,
-    `unset ${REVIEW_ATTESTATION_TOKEN_ENV}`,
     `if [[ -f ${keyReference} ]] && (IFS= read -r -n 1 < ${keyReference}) 2>/dev/null; then`,
   ];
 

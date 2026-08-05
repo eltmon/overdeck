@@ -54,7 +54,11 @@ import {
   buildAgentLaunchConfig,
 } from './spawn-prep.js';
 import { buildResumeContract, type ResumeCause } from '../resume-contract.js';
-import { REVIEW_ATTESTATION_KEY_ENV } from '../review-attestation-key.js';
+import {
+  createReviewAgentAttestationToken,
+  REVIEW_ATTESTATION_KEY_ENV,
+  REVIEW_ATTESTATION_TOKEN_ENV,
+} from '../review-attestation-key.js';
 
 /**
  * Resume a suspended agent (PAN-80)
@@ -444,6 +448,13 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
     const launcherScript = join(getAgentDir(normalizedId), 'launcher.sh');
     await writeLauncherScriptAtomic(launcherScript, launcherContent);
     const claudeCmd = `bash ${launcherScript}`;
+    const reviewRunId = opts?.reviewRunId ?? agentState.reviewRunId;
+    const reviewAttestationToken = agentState.role === 'review' && reviewRunId
+      ? createReviewAgentAttestationToken(normalizedId, reviewRunId)
+      : null;
+    if (agentState.role === 'review' && !reviewAttestationToken) {
+      return { success: false, error: 'Cannot resume review agent: review artifact attestation key is unavailable' };
+    }
 
     await Effect.runPromise(createSession(normalizedId, agentState.workspace, claudeCmd, {
       env: {
@@ -454,6 +465,7 @@ export async function resumeAgent(agentId: string, message?: string, opts?: { mo
         OVERDECK_AGENT_STARTED_BY: startedBy,
         CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
         [REVIEW_ATTESTATION_KEY_ENV]: '',
+        [REVIEW_ATTESTATION_TOKEN_ENV]: reviewAttestationToken ?? '',
         ...providerEnv
       }
     }));

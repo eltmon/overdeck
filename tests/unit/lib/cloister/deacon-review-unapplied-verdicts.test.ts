@@ -20,11 +20,6 @@ const mocks = vi.hoisted(() => ({
   snapshotWorkspaceHeads: vi.fn(),
   deliverReviewVerdictFeedback: vi.fn(),
   emitActivityEntry: vi.fn(),
-  reviewedHead: 'a'.repeat(40),
-  attestReport: vi.fn(),
-  verifyContext: vi.fn(),
-  recordReviewVerdict: vi.fn(),
-  getProvenance: vi.fn(),
 }));
 
 vi.mock('../../../../src/lib/review-status.js', () => ({
@@ -70,20 +65,8 @@ vi.mock('../../../../src/lib/activity-logger.js', () => ({
   emitActivityEntrySync: (...args: unknown[]) => mocks.emitActivityEntry(...args),
 }));
 
-vi.mock('../../../../src/lib/cloister/review-artifact-attestation.js', () => ({
-  verifyReviewContextManifest: (...args: unknown[]) => mocks.verifyContext(...args),
-  attestReviewReport: (...args: unknown[]) => mocks.attestReport(...args),
-}));
-
-vi.mock('../../../../src/lib/cloister/review-verdict-writer.js', () => ({
-  recordReviewVerdict: (...args: unknown[]) => mocks.recordReviewVerdict(...args),
-}));
-
-vi.mock('../../../../src/lib/overdeck/agent-review-provenance.js', () => ({
-  getReviewArtifactProvenanceSync: (...args: unknown[]) => mocks.getProvenance(...args),
-}));
-
 import {
+  buildReviewCompletionCommand,
   checkCompletedButUnsignaledReviews,
   reconcileUnappliedReviewVerdicts,
 } from '../../../../src/lib/cloister/deacon-review-unsignaled.js';
@@ -108,9 +91,6 @@ async function writeReviewFixture(options: {
     headSha: options.headSha ?? HEAD,
     ...(options.repos ? { repos: options.repos } : {}),
   }));
-  mocks.reviewedHead = options.repos
-    ? options.repos.map(repo => `${repo.repoKey}@${repo.headSha}`).join(' ')
-    : (options.headSha ?? HEAD);
   const reportPath = join(reviewDir, options.filename ?? 'synthesis.md');
   await writeFile(reportPath, options.body);
   const reportTime = new Date(NOW.getTime() - (options.ageMs ?? 10 * 60 * 1000));
@@ -144,29 +124,6 @@ describe('reconcileUnappliedReviewVerdicts', () => {
       agentMessageSent: true,
     }));
     mocks.emitActivityEntry.mockReset();
-    mocks.reviewedHead = HEAD;
-    mocks.verifyContext.mockReset().mockImplementation(() => ({ reviewedHead: mocks.reviewedHead }));
-    mocks.attestReport.mockReset().mockImplementation(() => ({
-      filename: 'synthesis.md',
-      verdict: 'passed',
-      reviewedHead: mocks.reviewedHead,
-    }));
-    mocks.recordReviewVerdict.mockReset().mockImplementation(
-      (issueId: string, input: { verdict: string; notes?: string; evidenceHead?: string }) => {
-        mocks.setReviewStatus(issueId, {
-          reviewStatus: input.verdict,
-          reviewNotes: input.notes,
-          ...(input.evidenceHead && (input.verdict === 'passed' || input.verdict === 'blocked')
-            ? { reviewedAtCommit: input.evidenceHead }
-            : {}),
-        });
-        return Promise.resolve({ landed: true, classification: 'anchor-match' });
-      },
-    );
-    mocks.getProvenance.mockReset().mockImplementation(() => ({
-      workspace: mocks.workspace,
-      reviewRunId: RUN_ID,
-    }));
   });
 
   afterEach(async () => {
@@ -317,61 +274,72 @@ describe('reconcileUnappliedReviewVerdicts', () => {
     expect(mocks.setReviewStatus).not.toHaveBeenCalled();
   });
 
-  it('host-applies a settled pending verdict without messaging the live review process', async () => {
+  it('nudges a live review session, then applies directly after the thirty-minute grace', async () => {
     await writeReviewFixture({ body: '## Verdict: APPROVED' });
     mocks.statuses[ISSUE_ID] = pendingStatus();
     mocks.sessionAlive = true;
 
     await reconcileUnappliedReviewVerdicts();
 
-    expect(mocks.messageAgent).not.toHaveBeenCalled();
-    expect(mocks.attestReport).toHaveBeenCalledWith({
-      issueId: ISSUE_ID,
-      runId: RUN_ID,
-      workspacePath: mocks.workspace,
-      expectedVerdict: 'passed',
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-3206-review',
+      expect.stringContaining('pan admin specialists done review'),
+    );
+    expect(mocks.setReviewStatus).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(30 * 60 * 1000 + 1);
+    await reconcileUnappliedReviewVerdicts();
+
+    expect(mocks.setReviewStatus).toHaveBeenCalledWith(ISSUE_ID, expect.objectContaining({
+      reviewStatus: 'passed',
+    }));
+  });
+
+  it('shell-quotes every report-derived completion argument', () => {
+    const notes = 'double " single \' backtick `cmd` substitution $(cmd)\nnext line';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
+
+    const command = buildReviewCompletionCommand(ISSUE_ID, 'blocked', notes, runId);
+
+    expect(command).toContain("--notes 'double \" single '\\'' backtick `cmd` substitution $(cmd)\nnext line'");
+    expect(command).toContain("--run-id 'agent-pan-3206-review-run'\\'';$(cmd)`tick`'");
+  });
+
+  it('uses shell-quoted report text in the pending-verdict nudge path', async () => {
+    const blocker = 'quote " single \' backtick `cmd` substitution $(cmd)';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
+    await writeReviewFixture({
+      body: `## Verdict: CHANGES REQUESTED — ${blocker}`,
+      runId,
     });
-    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({
-        verdict: 'passed',
-        evidenceHead: HEAD,
-        extra: expect.objectContaining({
-          reviewedAtCommit: HEAD,
-          verificationStatus: 'passed',
-        }),
-        writer: 'unsignaled-recovery',
-      }),
+    mocks.statuses[ISSUE_ID] = pendingStatus();
+    mocks.sessionAlive = true;
+
+    await reconcileUnappliedReviewVerdicts();
+
+    const expectedCommand = buildReviewCompletionCommand(ISSUE_ID, 'blocked', blocker, runId);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-3206-review',
+      expect.stringContaining(expectedCommand),
     );
   });
 
-  it('host-attests and applies a settled report while the review session remains warm', async () => {
-    const blocker = 'workspace subprocess cannot request attestation';
+  it('uses shell-quoted report text in the reviewing fallback nudge path', async () => {
+    const blocker = 'quote " single \' backtick `cmd` substitution $(cmd)';
+    const runId = 'agent-pan-3206-review-run\';$(cmd)`tick`';
     await writeReviewFixture({
-      filename: 'review.md',
       body: `## Verdict: CHANGES REQUESTED — ${blocker}`,
+      runId,
     });
     mocks.statuses[ISSUE_ID] = pendingStatus({ reviewStatus: 'reviewing' });
     mocks.sessionAlive = true;
 
     await checkCompletedButUnsignaledReviews();
 
-    expect(mocks.messageAgent).not.toHaveBeenCalled();
-    expect(mocks.recordReviewVerdict).toHaveBeenCalledWith(
-      ISSUE_ID,
-      expect.objectContaining({
-        verdict: 'blocked',
-        evidenceHead: HEAD,
-        writer: 'quick-signal',
-      }),
-    );
-    expect(mocks.deliverReviewVerdictFeedback).toHaveBeenCalledWith(
-      expect.objectContaining({
-        issueId: ISSUE_ID,
-        verdict: 'blocked',
-        notes: blocker,
-        runId: RUN_ID,
-      }),
+    const expectedCommand = buildReviewCompletionCommand(ISSUE_ID, 'blocked', blocker, runId);
+    expect(mocks.messageAgent).toHaveBeenCalledWith(
+      'agent-pan-3206-review',
+      expect.stringContaining(expectedCommand),
     );
   });
 

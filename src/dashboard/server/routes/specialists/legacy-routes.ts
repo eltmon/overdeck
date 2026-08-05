@@ -8,8 +8,13 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 
 import { getAgentState, getAgentRuntimeState, messageAgent, saveAgentRuntimeState, transitionIssueToInProgress } from '../../../../lib/agents.js';
 import { getUnblockedItemsSync } from '../../../../lib/cloister/task-readiness.js';
+import { attestReviewReport } from '../../../../lib/cloister/review-artifact-attestation.js';
+import { recordReviewVerdict } from '../../../../lib/cloister/review-verdict-writer.js';
+import { getReviewArtifactProvenanceSync } from '../../../../lib/overdeck/agent-review-provenance.js';
+import { verifyReviewAgentAttestationToken } from '../../../../lib/review-attestation-key.js';
+import type { HeadAnchor } from '../../../../lib/git-utils.js';
 import { resolveProjectFromIssueSync } from '../../../../lib/projects.js';
-import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
+import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync as setReviewStatusBase, type ReviewStatus, type ReviewStatusUpdate } from '../../../../lib/review-status.js';
 import { readWorkspacePlanSync } from '../../../../lib/xbrief/io.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
@@ -107,6 +112,59 @@ const postSpecialistsResetAllRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: POST /api/specialists/review-artifact/attest ─────────────────────
+
+const REVIEW_ATTESTATION_TOKEN_HEADER = 'x-overdeck-review-attestation-token';
+
+const postReviewArtifactAttestRoute = HttpRouter.add(
+  'POST',
+  '/api/specialists/review-artifact/attest',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const body = yield* readJsonBody;
+    const { issueId, runId, verdict } = body as {
+      issueId?: string;
+      runId?: string;
+      verdict?: 'passed' | 'blocked' | 'failed';
+    };
+    if (!issueId || !runId || !verdict || !['passed', 'blocked', 'failed'].includes(verdict)) {
+      return jsonResponse({ error: 'issueId, runId, and a valid verdict are required' }, { status: 400 });
+    }
+
+    const normalizedIssueId = issueId.toUpperCase();
+    const reviewAgentId = `agent-${normalizedIssueId.toLowerCase()}-review`;
+    const token = request.headers[REVIEW_ATTESTATION_TOKEN_HEADER];
+    if (typeof token !== 'string' || !verifyReviewAgentAttestationToken(reviewAgentId, runId, token)) {
+      return jsonResponse({ error: 'Invalid review artifact attestation token' }, { status: 401 });
+    }
+
+    const provenance = getReviewArtifactProvenanceSync(reviewAgentId);
+    if (!provenance || provenance.reviewRunId !== runId) {
+      return jsonResponse({ error: 'Review run is not the active host-recorded run' }, { status: 409 });
+    }
+
+    try {
+      const attested = attestReviewReport({
+        issueId: normalizedIssueId,
+        runId,
+        workspacePath: provenance.workspace,
+        expectedVerdict: verdict,
+      });
+      return jsonResponse({
+        success: true,
+        filename: attested.filename,
+        verdict: attested.verdict,
+        reviewedHead: attested.reviewedHead,
+      });
+    } catch (err) {
+      return jsonResponse(
+        { error: err instanceof Error ? err.message : String(err) },
+        { status: 409 },
+      );
+    }
+  })),
+);
+
 // ─── Route: POST /api/specialists/done ───────────────────────────────────────
 // CRITICAL: This endpoint has idempotency guards — see CLAUDE.md.
 // Must be registered before /:name/* routes to prevent "done" matching as :name.
@@ -117,12 +175,13 @@ const postSpecialistsDoneRoute = HttpRouter.add(
   httpHandler(Effect.gen(function* () {
     const body = yield* readJsonBody;
     const eventStore = yield* EventStoreService;
-    const { specialist, issueId, status, notes, itemId } = body as {
+    const { specialist, issueId, status, notes, itemId, runId } = body as {
       specialist: string;
       issueId: string;
       status: string;
       notes?: string;
       itemId?: string;
+      runId?: string;
     };
 
     // Validate specialist type
@@ -148,16 +207,6 @@ const postSpecialistsDoneRoute = HttpRouter.add(
     }
 
     const normalizedIssueId = issueId.toUpperCase();
-
-    if (specialist === 'review') {
-      return jsonResponse(
-        {
-          error:
-            'Review reports are observed and attested by the host; this endpoint cannot attest or write review verdicts',
-        },
-        { status: 409 },
-      );
-    }
 
     if (specialist === 'inspect' && status === 'passed') {
       if (!itemId) {
@@ -201,8 +250,36 @@ const postSpecialistsDoneRoute = HttpRouter.add(
 
     // Build the update based on specialist type
     const update: ReviewStatusUpdate = {};
+    let reviewEvidenceHead: HeadAnchor | undefined;
 
     switch (specialist) {
+      case 'review':
+        // Passed verdicts need the current workspace head for the write-door check.
+        // Blocked verdicts stay durable-first and take their anchor after feedback.
+        if (status === 'passed') {
+          yield* Effect.promise(async () => {
+            try {
+              const project = resolveProjectFromIssueSync(normalizedIssueId);
+              if (project) {
+                const workspacePath = join(
+                  project.projectPath,
+                  'workspaces',
+                  `feature-${normalizedIssueId.toLowerCase()}`,
+                );
+                if (existsSync(workspacePath)) {
+                  const { snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+                  reviewEvidenceHead = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+                }
+              }
+            } catch {
+              // Non-fatal; recordReviewVerdict will proceed without evidenceHead
+            }
+          });
+        }
+        update.reviewStatus = status === 'passed' ? 'passed' : 'blocked';
+        if (notes) update.reviewNotes = notes;
+        break;
+
       case 'test':
         update.testStatus = status as typeof update.testStatus;
         if (notes) update.testNotes = notes;
@@ -232,8 +309,27 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         break;
     }
 
-    // Apply the update (triggers side effects like idle state and queue processing).
-    const updatedStatus = setReviewStatusBase(normalizedIssueId, update);
+    // Apply the update (triggers side effects like idle state, queue processing)
+    // For review verdicts, route through recordReviewVerdict (PAN-3512)
+    let updatedStatus: ReviewStatus;
+    if (specialist === 'review' && (status === 'passed' || status === 'blocked' || status === 'failed')) {
+      const verdictOutcome = yield* Effect.promise(() => recordReviewVerdict(normalizedIssueId, {
+        verdict: status === 'passed' ? 'passed' : 'blocked',
+        notes,
+        evidenceHead: reviewEvidenceHead,
+        writer: 'coordinator',
+      }));
+      if (!verdictOutcome.landed) {
+        // Verdict was rejected (stale evidence) — return error
+        return jsonResponse(
+          { error: `Verdict rejected: ${verdictOutcome.reason}` },
+          { status: 400 },
+        );
+      }
+      updatedStatus = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+    } else {
+      updatedStatus = setReviewStatusBase(normalizedIssueId, update);
+    }
     if (specialist === 'inspect' && status === 'failed') {
       yield* Effect.promise(() => reportTieredInspectFailureEscalation(normalizedIssueId, notes));
       // PAN-3078: a blocked verdict must reach the work agent, or it keeps
@@ -314,6 +410,33 @@ const postSpecialistsDoneRoute = HttpRouter.add(
         console.error(`[specialists/done] Error managing specialist state:`, err);
       }
     });
+
+    // When review passes, snapshot the current HEAD commit so we can detect
+    // if the agent makes new commits before merge (which invalidates the review).
+    if (specialist === 'review' && status === 'passed') {
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+              const headAnchor = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (headAnchor) {
+                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit: headAnchor });
+                console.log(`[specialists/done] Snapshotted reviewedAtCommit=${formatAnchorShort(headAnchor)} for ${normalizedIssueId}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Failed to snapshot reviewedAtCommit for ${normalizedIssueId}:`, err);
+        }
+      });
+    }
 
     // When inspect specialist reports success, save checkpoint
     if (specialist === 'inspect' && status === 'passed') {
@@ -459,6 +582,65 @@ const postSpecialistsDoneRoute = HttpRouter.add(
           }
         });
       }
+    }
+
+    if (specialist === 'review' && (status === 'failed' || status === 'blocked')) {
+      // Only deliver feedback if this is a coordinator verdict (not handled by CLI/fallback)
+      // The verdict write door has already validated the evidence head
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          const workspacePath = project
+            ? join(project.projectPath, 'workspaces', `feature-${normalizedIssueId.toLowerCase()}`)
+            : undefined;
+          const { deliverReviewVerdictFeedback } = await import(
+            '../../../../lib/cloister/review-verdict-feedback.js'
+          );
+          const result = await Effect.runPromise(deliverReviewVerdictFeedback({
+            issueId: normalizedIssueId,
+            verdict: status === 'failed' ? 'failed' : 'blocked',
+            notes,
+            workspacePath,
+            prUrl: updatedStatus.prUrl,
+            ...(runId ? { runId } : {}),
+          }));
+          console.log(
+            `[specialists/done] Delivered review verdict feedback for ${normalizedIssueId}` +
+              ` (feedback=${result.feedbackPath ?? 'none'}, synthesis=${result.synthesisPath ?? 'none'}, prComment=${result.prCommentPosted})`,
+          );
+        } catch (err: any) {
+          console.warn(`[specialists/done] Failed to deliver review verdict feedback: ${err.message}`);
+        }
+      });
+    }
+
+    // PAN-3148: the HTTP review prompt reports changes requested as status=failed,
+    // which the durable write above maps to reviewStatus=blocked. Snapshot the
+    // reviewed HEAD only after feedback delivery so the verdict remains durable
+    // even when the git probe stalls or fails (PAN-2524 ordering).
+    if (specialist === 'review' && status === 'failed') {
+      yield* Effect.promise(async () => {
+        try {
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              const { formatAnchorShort, snapshotWorkspaceHeadsPromise } = await import('../../../../lib/git-utils.js');
+              const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (reviewedAtCommit) {
+                setReviewStatusBase(normalizedIssueId, { reviewedAtCommit });
+                console.log(`[specialists/done] Snapshotted blocked reviewedAtCommit=${formatAnchorShort(reviewedAtCommit)} for ${normalizedIssueId}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`[specialists/done] Failed to snapshot blocked reviewedAtCommit for ${normalizedIssueId}:`, err);
+        }
+      });
     }
 
     // Emit domain event for role-backed specialist completion/failure.
@@ -758,6 +940,7 @@ export const specialistsLegacyRouteLayer = Layer.mergeAll(
   getSpecialistsRoute,
   getSpecialistsProjectsRoute,
   postSpecialistsResetAllRoute,
+  postReviewArtifactAttestRoute,
   postSpecialistsDoneRoute,
   postSpecialistsLogsCleanupAllRoute,
   postSpecialistWakeRoute,

@@ -139,6 +139,8 @@ export interface SpawnRunOptions {
   registerConversation?: boolean;
   effort?: RoleEffort;
   extraEnvExports?: string[];
+  /** Ephemeral host-issued token for review report attestation; never persisted. */
+  reviewAttestationToken?: string;
   resumeSessionId?: string;
   flywheelRunId?: string;
   startedBy: string;

@@ -1,4 +1,5 @@
 import { exitCli } from '../../exit.js';
+import { Effect } from 'effect';
 /**
  * Specialist Done Command
  *
@@ -15,9 +16,14 @@ import { exitCli } from '../../exit.js';
 import chalk from 'chalk';
 import {
   setReviewStatusSync,
+  getReviewStatusSync,
   type ReviewStatus,
   type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
+import type { HeadAnchor } from '../../../lib/git-utils.js';
+import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
+import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
+import { REVIEW_ATTESTATION_TOKEN_ENV } from '../../../lib/review-attestation-key.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -66,15 +72,33 @@ export async function doneCommand(
     return exitCli(1);
   }
 
+  let attestedEvidenceHead: HeadAnchor | undefined;
   const callerAgentId = process.env.OVERDECK_AGENT_ID;
-  if (specialist === 'review') {
+  if (specialist === 'review' && callerAgentId) {
     const expectedReviewAgentId = `agent-${normalizedIssueId.toLowerCase()}-review`;
-    if (!options.runId || (callerAgentId && callerAgentId !== expectedReviewAgentId)) {
-      throw new Error('Review report compatibility signal requires --run-id and the matching review identity when called from an agent');
+    const token = process.env[REVIEW_ATTESTATION_TOKEN_ENV];
+    if (callerAgentId !== expectedReviewAgentId || !options.runId || !token) {
+      throw new Error('Review-agent completion requires the active review identity, --run-id, and a host-issued attestation token');
     }
-    console.log(chalk.green(`✓ Review report ready for host attestation: ${normalizedIssueId}`));
-    console.log(chalk.dim('  The host observes the settled report and records the verdict; this command cannot attest or write review state.'));
-    return;
+    const baseUrl = (process.env.OVERDECK_DASHBOARD_URL || process.env.DASHBOARD_URL || 'http://localhost:3011').replace(/\/$/, '');
+    const response = await fetch(`${baseUrl}/api/specialists/review-artifact/attest`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-overdeck-review-attestation-token': token,
+      },
+      body: JSON.stringify({
+        issueId: normalizedIssueId,
+        runId: options.runId,
+        verdict: options.status,
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Could not attest review artifact (${response.status}): ${await response.text()}`);
+    }
+    const attested = await response.json() as { reviewedHead?: string };
+    if (!attested.reviewedHead) throw new Error('Host-attested review artifact did not include a reviewed HEAD');
+    attestedEvidenceHead = rehydrateHeadAnchor(attested.reviewedHead);
   }
 
   if (specialist === 'inspect') {
@@ -116,6 +140,75 @@ export async function doneCommand(
   const update: ReviewStatusUpdate = {};
 
   switch (specialist) {
+    case 'review':
+      update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
+      if (options.notes) update.reviewNotes = options.notes;
+      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
+      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
+      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
+      // Anchored to the workspace HEAD recorded below; malformed entries are
+      // dropped with a warning rather than failing the verdict write.
+      if (options.reviewers) {
+        const verdicts: NonNullable<ReviewStatus['reviewerVerdicts']> = {};
+        for (const pair of options.reviewers.split(',')) {
+          const [subRole, verdict] = pair.split('=').map(t => t.trim().toLowerCase());
+          if (subRole && (verdict === 'passed' || verdict === 'blocked')) {
+            verdicts[subRole] = { status: verdict };
+          } else if (pair.trim()) {
+            console.warn(chalk.yellow(`  ⚠ Ignoring malformed --reviewers entry: "${pair.trim()}" (want subRole=passed|blocked)`));
+          }
+        }
+        if (Object.keys(verdicts).length > 0) update.reviewerVerdicts = verdicts;
+      }
+      // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
+      // route does. The synthesis agent signals via this CLI path, so without this
+      // the snapshot never happens: canSkipTests can't fire and the deacon's
+      // post-review-commit drift detection goes blind, jamming the issue at
+      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts
+      // (reviewedAtCommit) AND for any verdict carrying --reviewers: per-reviewer
+      // verdicts need their atCommit anchor on a BLOCKED aggregate too — that is
+      // exactly the cycle whose clean reviewers selective re-review wants to skip
+      // next time (PAN-1862 FR-6/NFR-1). A bare blocked verdict skips this probe so
+      // the durable verdict write stays synchronous ahead of feedback delivery;
+      // its reviewedAtCommit anchor is recorded by a second best-effort write after
+      // feedback delivery below (PAN-2524, PAN-3148).
+      if (options.status === 'passed' || update.reviewerVerdicts) {
+        let workspaceHead = attestedEvidenceHead;
+        if (!workspaceHead) try {
+          const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+          const { existsSync } = await import('node:fs');
+          const { join } = await import('node:path');
+          const project = resolveProjectFromIssueSync(normalizedIssueId);
+          if (project) {
+            const workspacePath = join(
+              project.projectPath,
+              'workspaces',
+              `feature-${normalizedIssueId.toLowerCase()}`,
+            );
+            if (existsSync(workspacePath)) {
+              // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
+              const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
+              const snapshot = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+              if (snapshot) workspaceHead = snapshot;
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
+        }
+        if (workspaceHead && update.reviewerVerdicts) {
+          for (const v of Object.values(update.reviewerVerdicts)) if (v) v.atCommit = workspaceHead;
+        }
+        if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
+      }
+      if (options.status === 'passed') {
+        // Clear any stale verificationStatus='failed' so the override unblocks
+        // readyForMerge. A human passing review assumes responsibility for the gate.
+        update.verificationStatus = 'passed';
+        update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
+      }
+      break;
+
     case 'test':
       update.testStatus = options.status as ReviewStatus['testStatus'];
       if (options.notes) update.testNotes = options.notes;
@@ -174,7 +267,130 @@ export async function doneCommand(
       break;
   }
 
-  const status = setReviewStatusSync(normalizedIssueId, update);
+  let status = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+
+  // For review verdicts, route through the verdict write door (PAN-3512)
+  // when there's an evidence head (passed verdict with reviewers, or any blocked/failed verdict).
+  if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
+    let evidenceHead = attestedEvidenceHead;
+    if (update.reviewedAtCommit) {
+      evidenceHead = update.reviewedAtCommit;
+    } else if (update.reviewerVerdicts) {
+      const firstVerdict = Object.values(update.reviewerVerdicts)[0];
+      if (firstVerdict?.atCommit) {
+        evidenceHead = rehydrateHeadAnchor(firstVerdict.atCommit);
+      }
+    }
+
+    const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
+      verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
+      notes: options.notes,
+      reviewerVerdicts: update.reviewerVerdicts,
+      evidenceHead,
+      extra: {
+        ...(attestedEvidenceHead ? { reviewedAtCommit: attestedEvidenceHead } : {}),
+        ...(update.verificationStatus !== undefined
+          ? { verificationStatus: update.verificationStatus }
+          : {}),
+        ...(update.verificationNotes !== undefined
+          ? { verificationNotes: update.verificationNotes }
+          : {}),
+      },
+      runId: options.runId,
+      writer: 'quick-signal',
+    });
+
+    if (!verdictOutcome.landed) {
+      // Verdict was rejected (stale evidence) — report it and exit non-zero
+      console.error(chalk.red(`Review verdict rejected: ${verdictOutcome.reason}`));
+      return exitCli(1);
+    }
+
+    const updatedStatus = getReviewStatusSync(normalizedIssueId);
+    if (updatedStatus) status = updatedStatus;
+
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    } else if (options.status === 'blocked') {
+      console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
+    } else {
+      console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
+    }
+  } else if (specialist === 'review') {
+    // No evidence head (skipped verdict) — use setReviewStatusSync
+    status = setReviewStatusSync(normalizedIssueId, update);
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    }
+  } else {
+    status = setReviewStatusSync(normalizedIssueId, update);
+  }
+
+  if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
+    // PAN-2518: the verdict is already durable (recordReviewVerdict or setReviewStatusSync above).
+    // Feedback delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
+    // shells out to network + tmux, any of which can STALL. `pan admin specialists
+    // done` is run from inside the review agent's own session, so a hung delivery
+    // leaves that agent waiting on a never-returning command and the issue stalls
+    // in-review. Bound the whole step in wall-clock time so the CLI always exits;
+    // a missed comment/message is recovered by the deacon feedback janitor.
+    const FEEDBACK_DELIVERY_TIMEOUT_MS = 30_000;
+    try {
+      const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
+      const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
+        issueId: normalizedIssueId,
+        verdict: options.status as 'blocked' | 'failed',
+        notes: options.notes,
+        prUrl: status?.prUrl || undefined,
+        ...(options.runId ? { runId: options.runId } : {}),
+      }));
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`feedback delivery timed out after ${FEEDBACK_DELIVERY_TIMEOUT_MS}ms`)),
+          FEEDBACK_DELIVERY_TIMEOUT_MS,
+        );
+      });
+      try {
+        await Promise.race([delivery, timeout]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(chalk.yellow(`Could not deliver review feedback: ${message}`));
+    }
+  }
+
+  // PAN-3148: a blocked verdict needs the reviewed HEAD as the baseline for
+  // detecting the rework commit that should trigger a fresh review. Keep this as
+  // a second, best-effort write after the durable verdict and feedback delivery;
+  // folding the git probe into the first write would reopen PAN-2524's stall.
+  if (specialist === 'review' && options.status === 'blocked' && !attestedEvidenceHead) {
+    try {
+      const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
+      const { existsSync } = await import('node:fs');
+      const { join } = await import('node:path');
+      const project = resolveProjectFromIssueSync(normalizedIssueId);
+      if (project) {
+        const workspacePath = join(
+          project.projectPath,
+          'workspaces',
+          `feature-${normalizedIssueId.toLowerCase()}`,
+        );
+        if (existsSync(workspacePath)) {
+          const { snapshotWorkspaceHeadsPromise } = await import('../../../lib/git-utils.js');
+          const reviewedAtCommit = await snapshotWorkspaceHeadsPromise(normalizedIssueId, workspacePath);
+          if (reviewedAtCommit) setReviewStatusSync(normalizedIssueId, { reviewedAtCommit });
+        }
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(chalk.yellow(`  ⚠ Could not snapshot blocked review HEAD: ${message}`));
+    }
+  }
 
   if (specialist === 'test' && status.readyForMerge) {
     console.log(chalk.green('✓ Ready for merge!'));

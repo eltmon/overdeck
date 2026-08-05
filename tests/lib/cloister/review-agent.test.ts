@@ -528,8 +528,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(parentOptions.prompt).not.toContain('STANDBY');
     const runId = parentOptions.prompt.match(/Run ID: (\S+)/)?.[1];
     expect(runId).toBeTruthy();
-    expect(parentOptions.prompt).toContain('The host observes');
-    expect(parentOptions.prompt).not.toContain('specialists done review');
+    expect(parentOptions.prompt).toContain(`--run-id "${runId}"`);
   });
 
   it('full mode branches to synthesis prompt and fans out every sub-reviewer lane', async () => {
@@ -743,7 +742,7 @@ describe('stale synthesis session detection (PAN-1131)', () => {
     const spawnBlock = spawnMatch![0];
 
     expect(spawnBlock).toContain('reviewRunId: runId');
-    expect(spawnBlock).not.toContain('reviewAttestationToken');
+    expect(spawnBlock).toContain('reviewAttestationToken');
   });
 });
 

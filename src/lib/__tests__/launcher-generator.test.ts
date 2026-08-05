@@ -78,7 +78,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -105,7 +104,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -137,7 +135,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -271,7 +268,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -466,7 +462,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -707,7 +702,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -747,7 +741,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -784,7 +777,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -826,7 +818,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -886,7 +877,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -914,7 +904,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -960,7 +949,6 @@ describe('generateLauncherScript', () => {
       "#!/bin/bash
       _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
       unset OVERDECK_REVIEW_ATTESTATION_KEY
-      unset OVERDECK_REVIEW_ATTESTATION_TOKEN
       if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then
         command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
         exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"
@@ -1249,7 +1237,6 @@ describe('generateLauncherWrapper', () => {
           '#!/bin/bash',
           '_overdeck_review_attestation_key="${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"',
           'unset OVERDECK_REVIEW_ATTESTATION_KEY',
-          'unset OVERDECK_REVIEW_ATTESTATION_TOKEN',
           'if [[ -f "$_overdeck_review_attestation_key" ]] && (IFS= read -r -n 1 < "$_overdeck_review_attestation_key") 2>/dev/null; then',
           "  command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }",
           '  exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" -- "$0" "$@"',

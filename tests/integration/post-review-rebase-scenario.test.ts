@@ -5,7 +5,7 @@ import { Effect } from 'effect';
  * Covers three substrate gaps that compose into one failure mode:
  *   A) Deacon redispatches review convoy after post-review reset
  *   B) Checkpoint excludes workspace-only .pan/ artifacts from commits
- *   C) Review compatibility signaling cannot mutate verdict state
+ *   C) Review override clears stale verificationStatus
  *
  * Scenario: review passes → main drifts → rebase → deacon resets → convoy
  * redispatches → AC gate passes → readyForMerge=true.
@@ -235,6 +235,7 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     initSchema(testDb);
     vi.clearAllMocks();
     vi.stubEnv('OVERDECK_AGENT_ID', '');
+    vi.stubEnv('OVERDECK_REVIEW_ATTESTATION_TOKEN', '');
     inMemoryJournal.clear();
     mockExecHeadSha = 'newsha99';
     mockOldTreeSha = 'old-tree';
@@ -334,9 +335,10 @@ describe('PAN-1215 post-review-rebase scenario', () => {
     expect(after?.reviewedAtCommit).toBe('newsha99');
   });
 
-  // ─── Gap C: Review compatibility signaling has no write capability ─────────
+  // ─── Gap C: Review override clears stale verificationStatus ─────────────────
 
-  it('preserves stale verification state until the host applies an attested report', async () => {
+  it('clears stale verificationStatus when review override signals passed', async () => {
+    // Pre-seed a status with failed verification (e.g. from a prior cycle)
     setReviewStatusSync('PAN-1215-C', {
       reviewStatus: 'pending',
       testStatus: 'pending',
@@ -344,15 +346,14 @@ describe('PAN-1215 post-review-rebase scenario', () => {
       readyForMerge: false,
     });
 
-    await doneCommand('review', 'pan-1215-c', {
-      status: 'passed',
-      runId: 'agent-pan-1215-c-review-abcdef12',
-    });
+    await doneCommand('review', 'pan-1215-c', { status: 'passed' });
 
     const after = getReviewStatusSync('PAN-1215-C');
-    expect(after?.reviewStatus).toBe('pending');
-    expect(after?.verificationStatus).toBe('failed');
-    expect(verificationSatisfied(after!)).toBe(false);
+    expect(after?.reviewStatus).toBe('passed');
+    expect(after?.verificationStatus).toBe('passed');
+    expect(after?.verificationNotes).toContain('PAN-1215');
+    expect(after?.verificationNotes).toContain('override');
+    expect(verificationSatisfied(after!)).toBe(true);
   });
 
   // ─── Gap B.1: Checkpoint excludes workspace-only .pan/ artifacts ────────────

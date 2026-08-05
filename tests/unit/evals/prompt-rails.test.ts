@@ -35,17 +35,16 @@ describe('prompt load-bearing rails', () => {
       expect(prompt).toContain('### [correctness] <title> — `path/to/file.ts:42`');
     });
 
-    it('writes blocked status through the canonical report heading', () => {
-      expect(prompt).toContain('## Verdict: CHANGES REQUESTED — <one-line top blocker');
+    it('signals blocked status through the CLI', () => {
+      expect(prompt).toMatch(/pan admin specialists done review.*--status blocked/);
     });
 
-    it('writes passed status through the canonical report heading', () => {
-      expect(prompt).toContain('## Verdict: APPROVED');
+    it('signals passed status through the CLI', () => {
+      expect(prompt).toMatch(/pan admin specialists done review.*--status passed/);
     });
 
-    it('keeps attestation capability out of the review process', () => {
-      expect(prompt).toContain('Do not run a completion command');
-      expect(prompt).not.toContain('pan admin specialists done review');
+    it('threads the review run ID into verdict signals', () => {
+      expect(prompt).toMatch(/pan admin specialists done review.*--run-id "<runId>"/);
     });
   });
 

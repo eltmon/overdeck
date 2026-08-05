@@ -650,29 +650,28 @@ requires:
       RUN_ID: 'agent-pan-999-review-abcdef12',
     };
 
-    it.effect('writes stale-branch approval to the host-observed review artifact', () =>
+    it.effect('reports stale branches through specialists/done instead of direct review status updates', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
           name: 'review',
           vars: baseReviewVars,
         });
-        expect(out).toContain('.pan/review/agent-pan-999-review-abcdef12/review.md');
-        expect(out).toContain('## Verdict: APPROVED');
-        expect(out).toContain('host observes and attests the settled report');
-        expect(out).not.toContain('/api/specialists/done');
+        expect(out).toContain('curl -s -X POST http://localhost:3011/api/specialists/done');
+        expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"passed"');
+        expect(out).toContain('"runId":"agent-pan-999-review-abcdef12"');
         expect(out).not.toContain('/api/review/PAN-999/status');
+        expect(out).not.toContain('pan tell PAN-999');
       })
     );
 
-    it.effect('writes blocked results without exposing a completion endpoint', () =>
+    it.effect('reports blocked review results through specialists/done instead of pan tell', () =>
       Effect.gen(function* () {
         const out = yield* renderPrompt({
           name: 'review',
           vars: baseReviewVars,
         });
-        expect(out).toContain('## Verdict: CHANGES REQUESTED — <one-line top blocker>');
-        expect(out).toContain('never call a completion endpoint');
-        expect(out).not.toContain('/api/specialists/done');
+        expect(out).toContain('"specialist":"review","issueId":"PAN-999","status":"failed"');
+        expect(out).toContain('Do NOT message the work agent directly');
         expect(out).not.toContain('pan tell PAN-999');
       })
     );
