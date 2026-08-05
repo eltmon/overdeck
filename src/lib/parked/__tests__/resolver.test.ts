@@ -183,9 +183,9 @@ describe('classifyParked — one orbit at a time', () => {
 describe('summarizeParked', () => {
   it('counts by orbit and picks the most severe primary per issue', () => {
     const summary = summarizeParked([
-      { issueId: 'PAN-1', orbit: 'operator-gate', parkedAt: '2026-08-02T00:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
-      { issueId: 'PAN-1', orbit: 'zombie-session', parkedAt: '2026-08-02T01:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
-      { issueId: 'PAN-2', orbit: 'stuck-flag', parkedAt: '2026-08-02T02:00:00Z', parkReason: '', unparkCondition: '', lastActionAt: null, actionCount: 0 },
+      { issueId: 'PAN-1', orbit: 'operator-gate', parkedAt: '2026-08-02T00:00:00Z', parkReason: '', unparkCondition: '' },
+      { issueId: 'PAN-1', orbit: 'zombie-session', parkedAt: '2026-08-02T01:00:00Z', parkReason: '', unparkCondition: '' },
+      { issueId: 'PAN-2', orbit: 'stuck-flag', parkedAt: '2026-08-02T02:00:00Z', parkReason: '', unparkCondition: '' },
     ]);
     expect(summary.total).toBe(2);
     expect(summary.byOrbit).toEqual({ 'operator-gate': 1, 'zombie-session': 1, 'stuck-flag': 1 });

@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   buildReviewContext: vi.fn(),
   formatTier1Summary: vi.fn(),
   archiveFeedbackFiles: vi.fn(),
+  convergeRowFromVerdictOfRecord: vi.fn(),
   notifyPipeline: vi.fn(),
   notifyPipelineSync: vi.fn(),
 }));
@@ -103,6 +104,10 @@ vi.mock('../merge-verification.js', () => ({
   verifyMergedBeforeLifecycle: vi.fn(),
 }));
 
+vi.mock('../verdict-restore.js', () => ({
+  convergeRowFromVerdictOfRecord: mocks.convergeRowFromVerdictOfRecord,
+}));
+
 vi.mock('../../pipeline-notifier.js', () => ({
   notifyPipeline: mocks.notifyPipeline,
 }));
@@ -144,6 +149,7 @@ describe('spawnReviewRoleForIssue', () => {
     mocks.buildReviewContext.mockResolvedValue({ manifestPath: undefined, changedFiles: [] });
     mocks.formatTier1Summary.mockReturnValue('shared review context');
     mocks.archiveFeedbackFiles.mockResolvedValue(undefined);
+    mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
   });
 
   it('inherits host override from the completed work agent for the review spawn', async () => {
@@ -232,6 +238,35 @@ describe('spawnReviewRoleForIssue', () => {
     expect(result).toEqual({
       success: false,
       message: 'Review dispatch skipped — already running: agent-pan-1194-review',
+    });
+    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
+      runId: 'agent-pan-1194-review-abc12345',
+      workspacePath: '/tmp/pan-review-current',
+      writer: 'dispatch-converge',
+    });
+    expect(mocks.killSession).not.toHaveBeenCalled();
+    expect(mocks.spawnRun).not.toHaveBeenCalled();
+  });
+
+  it('converges a current-run verdict artifact before treating a live parent as active', async () => {
+    mocks.listSessionNames.mockReturnValue(Effect.succeed(['agent-pan-1194-review']));
+    mocks.getAgentStateFileSync.mockReturnValue({ reviewRunId: 'agent-pan-1194-review-abc12345' });
+    mocks.convergeRowFromVerdictOfRecord.mockResolvedValue({ converged: true });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1194',
+      workspace: '/tmp/pan-review-current-verdict',
+      branch: 'feature/pan-1194',
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Review dispatch converged from the verdict of record: PAN-1194',
+    });
+    expect(mocks.convergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1194', {
+      runId: 'agent-pan-1194-review-abc12345',
+      workspacePath: '/tmp/pan-review-current-verdict',
+      writer: 'dispatch-converge',
     });
     expect(mocks.killSession).not.toHaveBeenCalled();
     expect(mocks.spawnRun).not.toHaveBeenCalled();

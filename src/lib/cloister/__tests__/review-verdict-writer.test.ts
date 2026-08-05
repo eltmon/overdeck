@@ -170,6 +170,10 @@ describe('recordReviewVerdict', () => {
 
       expect(result).toEqual({ landed: true, classification: 'anchor-match' });
       expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', expect.objectContaining({
+        reviewStatus: 'passed',
+        reviewedAtCommit: commitSha,
+      }), status);
     });
   });
 

@@ -72,8 +72,6 @@ export interface ParkedRowView {
   parkedAt: string;
   parkReason: string;
   unparkCondition: string;
-  lastActionAt: string | null;
-  actionCount: number;
   details?: Record<string, unknown>;
 }
 

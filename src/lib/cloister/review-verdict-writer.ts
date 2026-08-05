@@ -159,6 +159,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
+      reviewedAtCommit: input.evidenceHead as HeadAnchor,
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);

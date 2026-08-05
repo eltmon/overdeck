@@ -24,7 +24,7 @@ let savedHome: string | undefined;
 
 import {
   runStallSweeperPatrol,
-  SWEEP_MAX_ACTIONS_PER_ROW,
+  SWEEP_MAX_RECOMMENDATIONS_PER_ROW,
   type StallSweeperDeps,
 } from '../stall-sweeper.js';
 import { writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
@@ -38,8 +38,6 @@ function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
     parkedAt: new Date(NOW - 5 * HOUR).toISOString(),
     parkReason: 'test park reason',
     unparkCondition: 'test release condition',
-    lastActionAt: null,
-    actionCount: 0,
     ...overrides,
   };
 }
@@ -189,11 +187,10 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
 
     // Second scan past the grace window with the agent still idle: recommend stopping.
     writeSweeperRowState('PAN-1', 'idle-running', {
-      actionCount: 1,
-      lastActionAt: new Date(NOW - 2 * HOUR).toISOString(),
+      recommendationCount: 1,
+      lastRecommendedAt: new Date(NOW - 2 * HOUR).toISOString(),
       episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
-      lastNudgedAt: new Date(NOW - 2 * HOUR).toISOString(),
-    });
+      });
     const h2 = harness([row], { liveAgents: ['agent-pan-1'] });
     await runStallSweeperPatrol(h2.deps);
     recs = recommendations(h2);
@@ -212,8 +209,8 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
 
   it('a row that exhausted its recommendation budget escalates instead of recommending', async () => {
     writeSweeperRowState('PAN-1', 'merge-failed', {
-      actionCount: SWEEP_MAX_ACTIONS_PER_ROW,
-      lastActionAt: new Date(NOW - 3 * HOUR).toISOString(),
+      recommendationCount: SWEEP_MAX_RECOMMENDATIONS_PER_ROW,
+      lastRecommendedAt: new Date(NOW - 3 * HOUR).toISOString(),
       episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
     });
     const h = harness([parkedRow({ orbit: 'merge-failed' })]);
@@ -225,8 +222,8 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
 
   it('recommendations cool down per orbit', async () => {
     writeSweeperRowState('PAN-1', 'merge-failed', {
-      actionCount: 1,
-      lastActionAt: new Date(NOW - 30 * 60_000).toISOString(), // inside the 2h cooldown
+      recommendationCount: 1,
+      lastRecommendedAt: new Date(NOW - 30 * 60_000).toISOString(), // inside the 2h cooldown
       episodeStartedAt: new Date(NOW - 5 * HOUR).toISOString(),
     });
     const h = harness([parkedRow({ orbit: 'merge-failed' })]);

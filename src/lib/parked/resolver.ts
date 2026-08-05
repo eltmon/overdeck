@@ -58,9 +58,9 @@ export const PARKED_ORBITS = [
 export type ParkedOrbit = (typeof PARKED_ORBITS)[number];
 
 /**
- * Sweep/severity order — the sweeper works orbits in this order (mechanical
- * reaps and fresh retries first, operator-gated last so a full sweep always
- * ends by surfacing what only a human can release). The God View tints an orb
+ * Severity order — recommendations surface these orbits in this order, with
+ * operator-gated rows last so a full report ends by surfacing what only a human
+ * can release. The God View tints an orb
  * by its most severe orbit.
  */
 export const PARKED_ORBIT_SEVERITY: readonly ParkedOrbit[] = [
@@ -84,10 +84,6 @@ export interface ParkedRow {
   parkReason: string;
   /** Operator-facing sentence: what would release it. */
   unparkCondition: string;
-  /** ISO of the last sweep action taken against this row, if any. */
-  lastActionAt: string | null;
-  /** Number of sweep actions taken against this row. */
-  actionCount: number;
   /** Orbit-specific evidence (stuck reason, gate kind, idle minutes, …). */
   details?: Record<string, unknown>;
 }
@@ -98,11 +94,11 @@ export interface ParkedRow {
 const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   feedback_delivery_needs_you: {
     park: 'review/test feedback could not be delivered — the work agent is not running and nothing resumed it',
-    unpark: 'resume the work agent with its pending feedback (sweeper does this; pan start <id> does it manually)',
+    unpark: 'resume the work agent with its pending feedback through the established work-resume door',
   },
   review_infrastructure_failure: {
     park: 'the review pipeline failed repeatedly for infrastructure reasons, not verdict reasons',
-    unpark: 're-dispatch a fresh review once the infra cause cools (sweeper does this after cooldown)',
+    unpark: 're-dispatch a fresh review through the review door once the infra cause is resolved',
   },
   review_parent_stalled_needs_you: {
     park: 'the review parent exceeded its deadline with no terminal verdict in the row or verdict artifact',
@@ -118,7 +114,7 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   },
   main_diverged: {
     park: 'the PR branch diverged from main and cannot merge cleanly',
-    unpark: 'sync-main and resolve conflicts, then re-drive (sweeper treats this as the conflicts orbit)',
+    unpark: 'sync-main and resolve conflicts, then re-drive through the normal pipeline',
   },
   model_divergence: {
     park: 'the agent hit a model/API divergence error and was parked for investigation',
@@ -134,7 +130,7 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   },
   review_convoy_unrecoverable: {
     park: 'the review convoy died and could not be recovered in place',
-    unpark: 're-dispatch a fresh review convoy (sweeper does this after cooldown)',
+    unpark: 're-dispatch a fresh review convoy through the review door after the root cause is resolved',
   },
   test_signal_strand: {
     park: 'a test verdict was written but never delivered to the pipeline',
@@ -235,7 +231,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
   const r = s.reviewStatus;
   const issueId = s.issueId;
   const push = (orbit: ParkedOrbit, parkedAt: string, parkReason: string, unparkCondition: string, details?: Record<string, unknown>) => {
-    rows.push({ issueId, orbit, parkedAt, parkReason, unparkCondition, lastActionAt: null, actionCount: 0, ...(details ? { details } : {}) });
+    rows.push({ issueId, orbit, parkedAt, parkReason, unparkCondition, ...(details ? { details } : {}) });
   };
 
   // Terminal issues are never parked — they are residue. A closed issue can
@@ -319,7 +315,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
       'uat-failed',
       isoOr(r.updatedAt, s.now),
       'UAT failed after review and test passed — the merge gate will not take it and nothing routed the failure back to work',
-      'route the UAT failure notes to the work agent as a rework kickoff (sweeper does this)',
+      'route the UAT failure notes to the work agent as a rework kickoff through the existing work-resume door',
       { uatNotes: r.uatNotes ?? null },
     );
   }
@@ -346,7 +342,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
       'zombie-session',
       isoOr(agent.lastActivity ?? agent.startedAt, s.now),
       `${agent.id} is still running but the issue is ${r?.mergeStatus === 'merged' ? 'merged' : 'closed'} — it holds a session and a concurrency slot for nothing`,
-      'reap the session (sweeper does this; it is the doctrine-sanctioned merged-zombie reap)',
+      'reap the session through the established merged-zombie teardown door',
       { agentId: agent.id, mergeStatus: r?.mergeStatus ?? null },
     );
   }
@@ -382,7 +378,7 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
         'idle-running',
         new Date(lastMs).toISOString(),
         `${agent.id} is alive but has done nothing for ${Math.floor(idleMs / 60_000)} minutes and no pipeline stage owns the next move`,
-        'poke for progress; if none, stop or resume with a nudge (sweeper does this)',
+        'poke for progress; if none, stop or resume with a nudge through the established agent-control door',
         { agentId: agent.id, idleMinutes: Math.floor(idleMs / 60_000) },
       );
     }

@@ -413,6 +413,18 @@ async function spawnReviewRoleForIssuePromise(
       }
 
       if (!paneDead && !opts.force && !staleRunId && !finishedIdle) {
+        const convergence = currentRunId
+          ? await convergeRowFromVerdictOfRecord(opts.issueId, {
+            runId: currentRunId,
+            workspacePath: opts.workspace,
+            writer: 'dispatch-converge',
+          })
+          : { converged: false };
+        if (convergence.converged) {
+          const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
+          emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+          return { success: true, message };
+        }
         console.log(`[review-agent] Idempotency guard: ${reviewSessionName} already running for ${opts.issueId} — skipping spawn`);
         return { success: false, message: `Review dispatch skipped — already running: ${reviewSessionName}` };
       }
