@@ -819,6 +819,7 @@
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
       "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
       "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
       "src/lib/__tests__/review-status-reconcile.test.ts",
       "src/lib/agents/agent-state-source.ts",
@@ -852,6 +853,7 @@
       "docs/REVIEW-AGENT-ARCHITECTURE.md",
       "packages/contracts/src/events.ts",
       "scripts/file-size-allowlist.txt",
+      "scripts/source-introspection-baseline.txt",
       "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
       "src/lib/__tests__/review-status-read-artifact.test.ts",
       "src/lib/__tests__/review-status-reconcile.test.ts",
@@ -870,10 +872,10 @@
       "src/lib/review-status-read.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
-    "recordedAt": "2026-08-05T11:03:37.813Z"
+    "recordedAt": "2026-08-05T12:58:03.602Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T12:58:00.281Z",
+  "updated": "2026-08-05T12:58:03.603Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
