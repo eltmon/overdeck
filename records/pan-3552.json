@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:27:29.043Z",
+  "updated": "2026-08-05T19:29:05.121Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 34,
-    "claims": {
-      "docs-review-architecture": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 463309,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T19:27:29.043Z"
-      }
-    },
+    "sequence": 35,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -227,6 +219,16 @@
         "itemId": "preserve-test-gate-on-same-head-converge",
         "outcome": "completed",
         "releasedAt": "2026-08-05T19:26:59.233Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 463309,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T19:27:29.043Z",
+        "itemId": "docs-review-architecture",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T19:29:05.121Z"
       }
     ],
     "statusReasons": {
@@ -317,6 +319,9 @@
     "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac1": "completed",
     "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac2": "completed",
     "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac3": "completed",
-    "docs-review-architecture": "running"
+    "docs-review-architecture": "completed",
+    "docs-review-architecture.docs-review-architecture.ac1": "completed",
+    "docs-review-architecture.docs-review-architecture.ac2": "completed",
+    "docs-review-architecture.docs-review-architecture.ac3": "completed"
   }
 }
