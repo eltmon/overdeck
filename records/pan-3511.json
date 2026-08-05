@@ -617,19 +617,20 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T03:07:13.050Z",
+  "updated": "2026-08-05T03:12:29.695Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
-    "testStatus": "pending",
+    "testStatus": "failed",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T03:01:38.230Z",
+    "updatedAt": "2026-08-05T03:12:29.567Z",
     "reviewNotes": "Review-attestation bearer token remains exposed to workspace subprocesses",
+    "testNotes": "npm run typecheck: PASS. npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 reads its own module's source via readFileSync instead of exercising runtime behavior, and is not baselined; guard exits 1 (confirmed via direct re-run, real exit code 1), aborting the rest of the lint chain (no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit never ran). This is real code on this branch's sweeper-consult work item, not a false positive. npm test: 1407/1412 files passed, 13344/13403 tests passed; the 2 failures are Hook timed out in 5000ms inside setupOverdeckTestDb in tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file scope, and matches a pre-existing DB-setup-hook-timeout flake already documented in this issue's own session history. Overall automated-gate status is FAILED, blocking on lint:source-introspection against the branch's own new test.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "7fc5930e614e9b1151b8258a881d87b71537795d",
@@ -641,9 +642,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 244746,
-            "output": 112760,
-            "cacheRead": 46257,
+            "input": 253950,
+            "output": 115598,
+            "cacheRead": 47153,
             "cacheWrite": 0
           }
         },
@@ -655,9 +656,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 11044076,
-            "output": 171864,
-            "cacheRead": 48280576,
+            "input": 11086682,
+            "output": 177639,
+            "cacheRead": 49068544,
             "cacheWrite": 0
           }
         },
@@ -719,50 +720,50 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 50,
-            "output": 8903,
-            "cacheRead": 3884162,
-            "cacheWrite": 184296
+            "input": 100,
+            "output": 18723,
+            "cacheRead": 8730317,
+            "cacheWrite": 210029
           }
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4963317,
-            "output": 522313,
-            "cacheRead": 253310464,
+            "input": 5573597,
+            "output": 567862,
+            "cacheRead": 265701376,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 244746,
-          "output": 112760,
-          "cacheRead": 46257,
+          "input": 253950,
+          "output": 115598,
+          "cacheRead": 47153,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 23218094,
-          "output": 1131697,
-          "cacheRead": 367487488,
+          "input": 23828374,
+          "output": 1177246,
+          "cacheRead": 379878400,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 16930555,
-          "output": 424899,
-          "cacheRead": 91579904,
+          "input": 16973161,
+          "output": 430674,
+          "cacheRead": 92367872,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 50,
-          "output": 8903,
-          "cacheRead": 3884162,
-          "cacheWrite": 184296
+          "input": 100,
+          "output": 18723,
+          "cacheRead": 8730317,
+          "cacheWrite": 210029
         }
       },
       "costAtCloseOut": {
-        "usd": 407.5199907,
-        "pricingAsOf": "2026-08-05T03:01:38.234Z"
+        "usd": 419.6787983,
+        "pricingAsOf": "2026-08-05T03:12:29.648Z"
       }
     },
     "merges": [
@@ -771,7 +772,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
