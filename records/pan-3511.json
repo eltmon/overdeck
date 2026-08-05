@@ -718,7 +718,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T08:05:01.579Z",
+  "updated": "2026-08-05T08:05:07.623Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -728,10 +728,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T08:05:00.890Z",
+    "updatedAt": "2026-08-05T08:05:07.614Z",
     "reviewNotes": "The revision removes required restore, orphan-adoption, and journal-corroboration paths and adds synchronous recovery I/O",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
+    "reviewedAtCommit": "152565c99eb789dc0434cef9884716a094b12cb6",
     "lastVerifiedCommit": "152565c99eb789dc0434cef9884716a094b12cb6",
     "reviewSpawnedAt": "2026-08-05T08:01:20.182Z",
     "scopeDrift": {
@@ -782,24 +782,6 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
-      }
     }
   },
   "closeOut": {
@@ -934,7 +916,7 @@
       },
       "costAtCloseOut": {
         "usd": 530.6081785,
-        "pricingAsOf": "2026-08-05T08:05:00.912Z"
+        "pricingAsOf": "2026-08-05T08:05:07.619Z"
       }
     },
     "merges": [
