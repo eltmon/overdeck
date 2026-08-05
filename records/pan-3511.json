@@ -522,7 +522,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T01:23:24.518Z",
+  "updated": "2026-08-05T01:40:33.983Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -533,7 +533,7 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T01:13:28.169Z",
+    "updatedAt": "2026-08-05T01:40:33.975Z",
     "reviewNotes": "Dashboard restarts invalidate active review attestation authority",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
@@ -545,9 +545,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 107517,
-            "output": 45620,
-            "cacheRead": 25267,
+            "input": 120007,
+            "output": 50283,
+            "cacheRead": 25270,
             "cacheWrite": 0
           }
         },
@@ -623,24 +623,24 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 2971590,
-            "output": 350027,
-            "cacheRead": 176278016,
+            "input": 3502691,
+            "output": 381387,
+            "cacheRead": 194756096,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 107517,
-          "output": 45620,
-          "cacheRead": 25267,
+          "input": 120007,
+          "output": 50283,
+          "cacheRead": 25270,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 21226367,
-          "output": 959411,
-          "cacheRead": 290455040,
+          "input": 21757468,
+          "output": 990771,
+          "cacheRead": 308933120,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
@@ -651,8 +651,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 300.7667047,
-        "pricingAsOf": "2026-08-05T01:13:28.173Z"
+        "usd": 313.637855,
+        "pricingAsOf": "2026-08-05T01:40:33.978Z"
       }
     },
     "merges": [
