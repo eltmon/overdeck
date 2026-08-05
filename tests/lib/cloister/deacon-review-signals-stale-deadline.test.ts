@@ -28,6 +28,9 @@ const {
   mockIsPaneDead,
   mockListSessions,
   mockKillSession,
+  mockListAgentStates,
+  mockMarkWorkspaceStuck,
+  mockFindVerdictReport,
 } = vi.hoisted(() => ({
   mockGetAgentState: vi.fn(),
   mockGetAgentStateSync: vi.fn(),
@@ -38,6 +41,9 @@ const {
   mockIsPaneDead: vi.fn(),
   mockListSessions: vi.fn(),
   mockKillSession: vi.fn(),
+  mockListAgentStates: vi.fn(() => []),
+  mockMarkWorkspaceStuck: vi.fn(),
+  mockFindVerdictReport: vi.fn(() => null),
 }));
 
 vi.mock('../../../src/lib/agents.js', () => ({
@@ -46,6 +52,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
   saveAgentStateSync: (...args: Parameters<typeof mockSaveAgentStateSync>) => mockSaveAgentStateSync(...args),
   getAgentRuntimeStateSync: (...args: Parameters<typeof mockGetAgentRuntimeStateSync>) => mockGetAgentRuntimeStateSync(...args),
   messageAgent: (...args: Parameters<typeof mockMessageAgent>) => mockMessageAgent(...args),
+  listAgentStates: (...args: Parameters<typeof mockListAgentStates>) => mockListAgentStates(...args),
 }));
 
 vi.mock('../../../src/lib/tmux.js', () => ({
@@ -70,6 +77,7 @@ vi.mock('../../../src/lib/persistent-logger.js', () => ({
 vi.mock('../../../src/lib/review-status.js', () => ({
   getReviewStatusSync: vi.fn(() => null),
   setReviewStatusSync: vi.fn(),
+  markWorkspaceStuck: (...args: Parameters<typeof mockMarkWorkspaceStuck>) => mockMarkWorkspaceStuck(...args),
 }));
 
 vi.mock('../../../src/lib/cloister/review-verdict-feedback.js', () => ({
@@ -77,7 +85,7 @@ vi.mock('../../../src/lib/cloister/review-verdict-feedback.js', () => ({
 }));
 
 vi.mock('../../../src/lib/cloister/review-verdict-report.js', () => ({
-  findVerdictReport: vi.fn(() => null),
+  findVerdictReport: (...args: unknown[]) => mockFindVerdictReport(...args),
 }));
 
 vi.mock('../../../src/lib/codex-auth.js', () => ({
@@ -99,7 +107,15 @@ vi.mock('../../../src/lib/context-overflow.js', () => ({
   isContextOverflowTail: vi.fn(() => false),
 }));
 
-import { monitorReviewConvoySignals } from '../../../src/lib/cloister/deacon-review-signals.js';
+vi.mock('../../../src/lib/cloister/review-agent.js', () => ({
+  PARENT_REVIEW_TIMEOUT_MS: 60 * 60 * 1000,
+}));
+
+vi.mock('../../../src/lib/activity-logger.js', () => ({
+  emitActivityEntrySync: vi.fn(),
+}));
+
+import { checkStalledReviewParents, monitorReviewConvoySignals } from '../../../src/lib/cloister/deacon-review-signals.js';
 
 const PARENT = 'agent-pan-1059-review';
 const LANE = 'agent-pan-1059-review-security';
@@ -198,3 +214,74 @@ describe('monitorReviewConvoySignals — stale-deadline guard (PAN-3549)', () =>
     }
   });
 });
+
+describe('checkStalledReviewParents — observability-only (PAN-3551, operator directive 2026-08-05)', () => {
+  const parentState = (overrides: Record<string, unknown> = {}) => ({
+    id: 'agent-pan-1059-review',
+    issueId: 'PAN-1059',
+    role: 'review',
+    status: 'running',
+    startedAt: '2026-08-04T20:00:00.000Z',
+    workspace: '/tmp/pan-3549-ws',
+    reviewRunId: 'agent-pan-1059-review-deadbeef',
+    reviewDeadlineAt: '2026-08-04T21:00:00.000Z',
+    ...overrides,
+  });
+
+  it('skips a past-deadline parent whose verdict exists of record — no escalation, no kill', async () => {
+    mockListAgentStates.mockReturnValue([parentState()]);
+    mockFindVerdictReport.mockReturnValue('/tmp/pan-3549-ws/.pan/review/agent-pan-1059-review-deadbeef/synthesis.md');
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T23:00:00.000Z'));
+    try {
+      const actions = await checkStalledReviewParents();
+      expect(actions).toEqual([]);
+      expect(mockMarkWorkspaceStuck).not.toHaveBeenCalled();
+      expect(mockKillSession).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('escalates needs-you for a past-deadline parent with no verdict anywhere — and never kills', async () => {
+    mockListAgentStates.mockReturnValue([parentState()]);
+    mockFindVerdictReport.mockReturnValue(null);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T23:00:00.000Z'));
+    try {
+      const actions = await checkStalledReviewParents();
+      expect(actions).toHaveLength(1);
+      expect(actions[0]).toContain('escalated to operator');
+      expect(mockMarkWorkspaceStuck).toHaveBeenCalledTimes(1);
+      expect(mockMarkWorkspaceStuck).toHaveBeenCalledWith(
+        'PAN-1059',
+        'review_parent_stalled_needs_you',
+        expect.objectContaining({ deadline: '2026-08-04T21:00:00.000Z' }),
+      );
+      expect(mockKillSession).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('escalates once per deadline epoch, not every patrol', async () => {
+    // Distinct deadline from the previous test — the module-level dedup set is
+    // keyed agentId:deadlineMs and persists across tests in this file.
+    mockListAgentStates.mockReturnValue([parentState({ reviewDeadlineAt: '2026-08-04T21:30:00.000Z' })]);
+    mockFindVerdictReport.mockReturnValue(null);
+
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-04T23:00:00.000Z'));
+    try {
+      await checkStalledReviewParents();
+      const second = await checkStalledReviewParents();
+      expect(second).toEqual([]);
+      expect(mockMarkWorkspaceStuck).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
