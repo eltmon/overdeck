@@ -499,15 +499,7 @@
       "timestamp": "2026-08-05T02:26:21.038Z"
     }
   ],
-  "feedback": [
-    {
-      "seq": 1,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T02:26:21Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — the persisted attestation key remains readable by workspace-controlled processes\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: ac6d229579cbd985ec065cfcc50289aafe531c2d\n- Cycle number: 5\n- Prior cycle SHA: a9b929918604303a61ec22b0189528eb8928c778 (last complete synthesis)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Persisting the signing key at a same-UID path does not make it host-only — `src/lib/review-attestation-key.ts:31`\nThe new restart-safe key is read from `<OVERDECK_HOME>/review-attestation-key` with mode `0600`. Review agents and repository-controlled subprocesses run as the same Unix account as the dashboard, so they can read that file directly despite environment stripping. With the active run ID from workspace `context.json`, such a process can derive the HMAC completion token, write an APPROVED report, and call the attestation endpoint; the host then signs attacker-authored content as a valid verdict of record.\n\nThe key persistence code is in both the PR diff and the cycle diff from `a9b929918604303a61ec22b0189528eb8928c778`, so this remains promotable in cycle 5. Put attestation behind an actual privilege or mount boundary unavailable to review-workspace processes, and prove a workspace-owned subprocess cannot read the signing material, derive a current-run token, or obtain a passed attestation.\n\n### [correctness] A head-guard refusal suppresses the review-infrastructure breaker without restoring a verdict — `src/lib/cloister/deacon-review-status.ts:359`\n`artifactSupersededBreaker()` returns `true` for every result other than `no-artifact`. On `blocked-by-head-guard`, `attemptArtifactVerdictRestore()` intentionally writes no status, but both exhausted-retry breaker sites return before their existing `markWorkspaceStuck('review_infrastructure_failure', ...)` call. A dead review that completed on a different HEAD is consequently left pending or reviewing with no live reviewer and no durable operator-visible recovery state; subsequent patrols repeat the failed restore without advancing or escalating it.\n\nThis helper and both callers were introduced in the cycle diff. Treat only `restored` as superseding the breaker. Keep the blocked-restore event and activity evidence, then execute the established infrastructure-failure stuck mark for a guard-rejected artifact so the unresolved verdict is visible without claiming that it landed.\n\n## Scope Note\nBoth blockers cite lines added after the previous complete synthesis and remain inside the overall PR diff, so neither is demoted by the mandatory PR-scope or cycle convergence gates. The requirements report marks all seven traced work items `Scope: in_pr_scope` and complete; it does not override the independently found security and recovery-state failures.\n\n## Clean Sub-roles\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -557,10 +549,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:30:14.438Z",
+  "updated": "2026-08-05T02:42:16.872Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -568,10 +560,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:26:27.099Z",
+    "updatedAt": "2026-08-05T02:42:16.538Z",
     "reviewNotes": "Persisted attestation key is readable by workspace-controlled processes",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
     "reviewSpawnedAt": "2026-08-05T02:18:14.039Z"
   },
@@ -580,9 +571,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 140952,
-            "output": 65050,
-            "cacheRead": 26376,
+            "input": 159593,
+            "output": 74110,
+            "cacheRead": 28046,
             "cacheWrite": 0
           }
         },
@@ -594,9 +585,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 2491063,
-            "output": 34652,
-            "cacheRead": 15612928,
+            "input": 2496269,
+            "output": 37100,
+            "cacheRead": 16251904,
             "cacheWrite": 0
           }
         },
@@ -658,36 +649,36 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4235724,
-            "output": 398562,
-            "cacheRead": 209746944,
+            "input": 4673375,
+            "output": 470754,
+            "cacheRead": 221581824,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 140952,
-          "output": 65050,
-          "cacheRead": 26376,
+          "input": 159593,
+          "output": 74110,
+          "cacheRead": 28046,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22490501,
-          "output": 1007946,
-          "cacheRead": 323923968,
+          "input": 22928152,
+          "output": 1080138,
+          "cacheRead": 335758848,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 8377542,
-          "output": 287687,
-          "cacheRead": 58912256,
+          "input": 8382748,
+          "output": 290135,
+          "cacheRead": 59551232,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 345.1090306,
-        "pricingAsOf": "2026-08-05T02:26:27.106Z"
+        "usd": 355.6540736,
+        "pricingAsOf": "2026-08-05T02:42:16.575Z"
       }
     },
     "merges": [
@@ -696,7 +687,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
