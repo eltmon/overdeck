@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:31:24Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3410: design(dashboard): style guide v2 — Geist type system, display scale, chips, soft cards, page-not-modal doctrine",
-    "updated": "2026-08-02T02:50:24.266Z"
+    "updated": "2026-08-05T16:08:15.597Z"
   },
   "plan": {
     "id": "pan-3410",
     "title": "design(dashboard): style guide v2 — Geist type system, display scale, chips, soft cards, page-not-modal doctrine",
-    "status": "running",
+    "status": "completed",
     "uid": "07629d7d-5992-4dbd-ba6b-eb977bc4787d",
     "author": "agent:k3[1m]",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-01T15:31:24Z",
-    "updated": "2026-08-02T02:50:24.266Z",
+    "updated": "2026-08-05T16:08:15.597Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3410",
@@ -821,5 +821,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
