@@ -1,0 +1,1300 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-05T14:39:51Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3552: Simplify the review pipeline to the operator's flow — drop speculative layers, keep the two real protections",
+    "updated": "2026-08-05T14:49:47.118Z"
+  },
+  "plan": {
+    "id": "pan-3552",
+    "title": "Simplify the review pipeline to the operator's flow — drop speculative layers, keep the two real protections",
+    "status": "proposed",
+    "uid": "5fefeb54-4e05-41ff-ac88-f82f6f3d9184",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-05T14:39:51Z",
+    "updated": "2026-08-05T14:49:47.118Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3552",
+        "label": "PAN-3552",
+        "type": "issue"
+      },
+      {
+        "uri": "file:///home/eltmon/review-pipeline-evolution-2026-08-05.md",
+        "label": "Review-pipeline evolution evidence report (2026-08-05)",
+        "type": "doc"
+      }
+    ],
+    "tags": [
+      "review-pipeline",
+      "simplification",
+      "removal",
+      "cloister",
+      "verdict-of-record"
+    ],
+    "metadata": {
+      "upstreamDependencies": [
+        "PAN-3512"
+      ],
+      "upstreamDependencyNote": "PAN-3512 (strike-pan-3512) is actively implementing the recordReviewVerdict write door, its dispatch-not-drop semantics, and the fallback kill-conditional while this plan is authored. Items tagged metadata.upstreamDependency PAN-3512 must run pan sync-main PAN-3552 first and build on the merged write-door contract rather than reimplementing any part of it.",
+      "sizeJustification": "The five drops are entangled in the same modules — review-agent.ts, review-convoy.ts, review-status.ts, pan-dir/record.ts, parked/resolver.ts and deacon.ts each carry two or more of them — so independently shippable sibling issues would rebase-conflict on nearly every item. The plan keeps one workspace and encodes the real file-sharing dependencies as blocks edges, which serializes exactly the items that touch the same files and leaves the rest free.",
+      "canonicalFilename": "2026-08-05-PAN-3552-simplify-the-review-pipeline-to-the-operator-s-flow-drop-speculative-layers-keep-the-two-real-protections.xbrief.json",
+      "promotionIntent": "automatic"
+    },
+    "narratives": {
+      "Problem": "The review pipeline accreted eight layers over six months. An operator-commissioned evidence review found that no forged verdict has ever occurred — the threat model is trusted agents on a single-operator machine — while every real incident is verdict loss or row drift. The speculative layers cost real reliability: on 2026-08-05 a duplicate review dispatch flipped the row to reviewing at review-agent.ts:546, the parent correctly refused to re-signal an already-finalized run, nothing reset the row, and the only exit was a manual pan review request.",
+      "Proposal": "Cut the pipeline to the operator's stated flow — convoy reviewers do their job, they tell the synthesis parent, the parent tells the work agent to ship it or hands over the feedback — plus the two protections that answer observed incidents: the synthesis artifact as verdict of record, and recordReviewVerdict as the single write door with head-anchor staleness rejection. Drop the discovery fork and cache-miss detector, selective re-review and per-reviewer verdicts, the branch-invalidation sweep, and the stall sweeper's residual actor event surface. Add the reconciliation today's drift evidence proves is missing: dispatch consults the verdict of record before mutating the row, the deacon reconciler covers reviewing rows through the write door, and a same-head converge stops re-gating an already-recorded test verdict.",
+      "NonGoals": "- Do NOT remove src/lib/conversations/session-fork.ts — conversation summary forks depend on it; only the review caller goes.\n- Do NOT remove or weaken recordReviewVerdict, its head-anchor staleness rejection, or the verdict-of-record contract.\n- Do NOT remove synthesizeReviewFromReports, the minimal dead-parent fallback that reads the four reports and writes synthesis.md.\n- Do NOT remove checkStalledReviewParents, the observability-only parent liveness watch.\n- Do NOT remove deliverReviewVerdictFeedback or any part of feedback delivery — PR comment, feedback file, and pan tell all stay.\n- Do NOT remove resolveParkedPopulation or the God View's parked read; only the actor-shaped event surface goes.\n- Do NOT add HMAC signing, sandboxing, attestation sidecars, or any cryptographic verdict provenance — forgery is a non-threat in this deployment.\n- Do NOT drop SQLite columns or write a schema migration; the removed agent-state columns stay inert.\n- Do NOT give the stall sweeper any ability to spawn, stop, kill, message, dispatch, clear, or reset.\n- Do NOT change the convoy contract in roles/review.md beyond removing references to dropped machinery.\n- Do NOT reimplement PAN-3512's write-door work — its dispatch-not-drop semantics and fallback kill-conditional are upstream of this plan; sync main and build on them.\n- Do NOT backfill or migrate durable records that still carry reviewerVerdicts or conflictsSince; readers tolerate the extra keys."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Planned as one xBRIEF with plan.metadata.sizeJustification rather than sibling issues.",
+        "rationale": "The swarm contract prefers sibling issues, but review-agent.ts, review-convoy.ts, review-status.ts, pan-dir/record.ts, parked/resolver.ts and deacon.ts are each touched by two or more of the five drops, so parallel siblings would conflict on nearly every item. Blocks edges serialize exactly the shared-file items instead."
+      },
+      {
+        "summary": "No attestation-removal item: HMAC attestation and the sandbox boundary are already absent from main at 299d98db34.",
+        "rationale": "PAN-3511 merged on 2026-08-05 without them; the only surviving mention is roles/review-security.md telling reviewers not to request them. The architecture doc item asserts the absence instead of deleting code that does not exist."
+      },
+      {
+        "summary": "handleReviewDiscoveryReady is renamed rather than deleted.",
+        "rationale": "It carries the PAN-3368 per-lane recovery that the same-run parent resume depends on; deleting it outright would strand review-agent.ts:716. The fork parameters go, the recovery stays."
+      },
+      {
+        "summary": "The stall sweeper's detection and recommendation surface is kept; only sweep.action and sweep.unparked go.",
+        "rationale": "The issue body — the operator's decided scope, later than the evidence report's harder 4.2 recommendation — says to finish removing the actor surface and keep the parked-population read for the God View."
+      },
+      {
+        "summary": "SQLite agents columns are left in place as inert columns instead of being migrated away.",
+        "rationale": "The agents table is a rebuildable cache per docs/AGENT-STATE-PLANES.md, so a destructive column drop buys nothing and risks a boot failure on an existing database."
+      },
+      {
+        "summary": "The four items touching the verdict write door are sequenced behind PAN-3512 and marked with metadata.upstreamDependency.",
+        "rationale": "strike-pan-3512 is implementing the write door, dispatch-not-drop, and the fallback kill-conditional in the same files in parallel. Planning on top of its contract — with a mandatory pan sync-main before those items — avoids duplicating its scope and avoids a rebase fight over review-verdict-writer.ts."
+      },
+      {
+        "summary": "Convergence reuses SYNTHESIS_ARTIFACT_FRESH_MS rather than defining a new freshness window.",
+        "rationale": "That constant already encodes belongs-to-the-current-review-cycle; a second window would be a new drift surface in a simplification issue."
+      }
+    ],
+    "items": [
+      {
+        "id": "drop-parent-discovery-mode",
+        "title": "Spawn the convoy inline at dispatch — remove the parent's discovery phase",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-agent.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/lib/cloister/review-agent.test.ts",
+            "git grep -n 'discoveryForkMode' src/ ; true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for tests/lib/cloister/review-agent.test.ts",
+            "git grep prints no match for discoveryForkMode under src/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "NFR-1"
+          ],
+          "parallelSafeReason": "Touches only review-agent.ts and its own test file; every later item that shares review-agent.ts has a blocks edge from this one."
+        },
+        "narrative": {
+          "Action": "Delete the discovery option on buildReviewRolePrompt (review-agent.ts:133), the discoverySection prompt branch (:153-179), the discoveryForkMode decision (:633) with the harness locals that exist only to compute it, and markDiscoveryPending (:645). Reduce spawnConvoyReviewers to an unconditional launchConvoyReviewersPromise call so every harness gets its convoy at dispatch time."
+        },
+        "items": [
+          {
+            "id": "drop-parent-discovery-mode.ac1",
+            "title": "Given a claude-code review dispatch, spawnReviewAgentForIssue spawns all four convoy reviewers during the dispatch call instead of returning an empty array",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-parent-discovery-mode.ac2",
+            "title": "The review parent prompt contains the STANDBY preamble and contains no discovery-ready instruction",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-parent-discovery-mode.ac3",
+            "title": "git grep for discoveryForkMode, markDiscoveryPending, and discoverySection under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-reviewer-session-fork",
+        "title": "Remove the reviewer session fork and rename the recovery entry point",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/cloister/review-agent.ts",
+            "tests/lib/cloister/review-agent.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/lib/cloister/review-agent.test.ts",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for tests/lib/cloister/review-agent.test.ts",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ],
+          "foundationFor": [
+            "drop-fork-observability-patrols",
+            "drop-fork-agent-state-fields",
+            "drop-selective-rereview-selection"
+          ],
+          "parallelSafeReason": "Serialized behind drop-parent-discovery-mode by a blocks edge; no other in-flight item touches review-convoy.ts before it."
+        },
+        "narrative": {
+          "Action": "Delete forkParentSessionForReviewer (review-convoy.ts:400), the forkFromParent field on ConvoyLaunchParams, the per-reviewer fork decision block (:480-505), and the forkedSessionId/forkParentSessionId spawn options. Rename handleReviewDiscoveryReady to launchMissingConvoyReviewers, drop its discovery-pending bookkeeping, keep its per-lane report/live-session evidence checks and stale-row heal, and repoint the re-exports and the same-run resume call in review-agent.ts."
+        },
+        "items": [
+          {
+            "id": "drop-reviewer-session-fork.ac1",
+            "title": "Given a convoy launch, each reviewer spawns with no forked session id and no parent session id argument",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-reviewer-session-fork.ac2",
+            "title": "Given a lane whose report file already exists, launchMissingConvoyReviewers spawns no reviewer for it, and given a lane with neither a report nor a live tmux session it spawns one",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-reviewer-session-fork.ac3",
+            "title": "git grep for forkFromParent, forkParentSessionForReviewer, and handleReviewDiscoveryReady under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-reviewer-session-fork.ac4",
+            "title": "src/lib/conversations/session-fork.ts survives the removal and the conversation summary-fork path still imports it",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-discovery-ready-cli",
+        "title": "Remove the pan admin specialists discovery-ready verb",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/cli/commands/specialists/index.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "node dist/cli.js admin specialists --help ; true"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "the specialists help output contains no discovery-ready entry"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete the discovery-ready command registration at src/cli/commands/specialists/index.ts:42-55 and its handleReviewDiscoveryReady import, so no CLI verb survives that signals a handler this issue removed."
+        },
+        "items": [
+          {
+            "id": "drop-discovery-ready-cli.ac1",
+            "title": "pan admin specialists --help prints a command list that contains no discovery-ready entry",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-discovery-ready-cli.ac2",
+            "title": "git grep for discovery-ready under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-discovery-ready-cli.ac3",
+            "title": "npm run typecheck exits 0 after the handleReviewDiscoveryReady import is deleted",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-fork-observability-patrols",
+        "title": "Delete the stalled-discovery backstop and the fork cache-miss detector",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/cloister/deacon-review.ts",
+            "src/lib/cloister/deacon.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for src/lib/cloister/__tests__",
+            "lint:circular exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete REVIEW_DISCOVERY_TIMEOUT_MS, FORK_CACHE_CHECK_DELAY_MS, checkStalledReviewDiscovery (deacon-review-signals.ts:631) and checkReviewForkCacheMisses (:768), remove both from the deacon-review.ts barrel and the deacon.ts:36 import, and delete the patrol invocations at deacon.ts:2967 and :2975 with their action push and log lines."
+        },
+        "items": [
+          {
+            "id": "drop-fork-observability-patrols.ac1",
+            "title": "A deacon patrol cycle emits no stalled-discovery or fork-cache action strings",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-fork-observability-patrols.ac2",
+            "title": "synthesizeReviewFromReports survives the removal, checkStalledReviewParents survives the removal, and the deacon patrol still invokes both",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-fork-observability-patrols.ac3",
+            "title": "git grep for checkStalledReviewDiscovery and checkReviewForkCacheMisses under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-fork-agent-state-fields",
+        "title": "Remove the five fork-only AgentState fields from every read and write path",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/agents/agent-state.ts",
+            "src/lib/overdeck/agent-state-sync.ts",
+            "src/lib/overdeck/agents.ts",
+            "tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove reviewDiscoveryPending, reviewDiscoveryReadyAt, reviewConvoyForkedAt, reviewForkCacheChecked and reviewForkedFromParent from the AgentState interface (agent-state.ts:167-173), the normalizer (:293-298), the row-to-state mapping (agent-state-sync.ts:192-197) and both INSERT column and value lists (agent-state-sync.ts:251-256, agents.ts:820-825). Leave the SQLite columns in place per decision D5 and keep reviewContextManifestPath wired."
+        },
+        "items": [
+          {
+            "id": "drop-fork-agent-state-fields.ac1",
+            "title": "Saving and reloading an agent state preserves reviewContextManifestPath and returns no fork fields",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-fork-agent-state-fields.ac2",
+            "title": "The agents INSERT statement contains no review_discovery_pending or review_forked_from_parent column",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-fork-agent-state-fields.ac3",
+            "title": "git grep for reviewDiscoveryPending and reviewForkedFromParent under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-fork-agent-state-fields.ac4",
+            "title": "The SQLite schema still declares the five inert columns, so an existing database opens without a migration",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-selective-rereview-selection",
+        "title": "Run all four reviewers every cycle — delete the re-review selection logic",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "refactor",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-rerun-scope.ts",
+            "src/lib/cloister/review-convoy.ts",
+            "src/lib/cloister/review-agent.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/lib/cloister/review-agent.test.ts",
+            "npm run lint:source-introspection"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for tests/lib/cloister/review-agent.test.ts",
+            "lint:source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "parallelSafeReason": "Serialized behind the fork removal by a blocks edge; its only shared file, review-agent.ts, is held by predecessors that must land first."
+        },
+        "narrative": {
+          "Action": "Delete src/lib/cloister/review-rerun-scope.ts, computeConvoyScope (review-convoy.ts:345), resolveReReviewScope (:704), the carried-forward stub report writer (:439-462) and the carried and scope fields on ConvoyLaunchParams. In review-agent.ts replace the computeConvoyScope call (:602-605) with the constant REVIEW_SUB_ROLES list and delete the carriedSection prompt plumbing so the parent always waits for four signals."
+        },
+        "items": [
+          {
+            "id": "drop-selective-rereview-selection.ac1",
+            "title": "Given a re-review dispatch after a blocked verdict, the convoy spawns all four sub-roles",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-selective-rereview-selection.ac2",
+            "title": "No run directory receives a VERDICT CARRIED FORWARD stub report",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-selective-rereview-selection.ac3",
+            "title": "The synthesis parent prompt contains four expected terminal signal lines and contains no carried-forward section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-selective-rereview-selection.ac4",
+            "title": "src/lib/cloister/review-rerun-scope.ts no longer exists and git grep for reviewersToRerun under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-reviewer-verdicts-state",
+        "title": "Remove the reviewerVerdicts map from status, the write door, and the durable record",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "src/lib/cloister/review-verdict-writer.ts",
+            "src/lib/review-verdict-guards.ts",
+            "src/lib/review-status-reconcile.ts",
+            "src/cli/commands/specialists/done.ts",
+            "src/lib/cloister/deacon-review-signals.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/pipeline-verdict-merge.ts",
+            "src/lib/overdeck/review-status-record-sync.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/lib/cloister",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for tests/unit/lib/cloister",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2"
+          ],
+          "parallelSafeReason": "Every file it touches is shared only with predecessors or successors carrying an explicit blocks edge, so no concurrent slot can hold the same file.",
+          "upstreamDependency": "PAN-3512"
+        },
+        "narrative": {
+          "Action": "Run pan sync-main PAN-3552 before editing: PAN-3512 is landing the recordReviewVerdict write door, its dispatch-not-drop semantics, and the fallback kill-conditional in these same files in parallel. Build on whatever shape PAN-3512 merged; do not reimplement it. Remove the reviewerVerdicts field from ReviewStatus and ReviewStatusUpdate, from VerdictInput and its spread sites inside recordReviewVerdict, from the durable per-issue record shape and its merge and sync paths, and from the pan admin specialists done payload. Remove the ReviewerVerdictEntry and ReviewerVerdictsMap imports left dangling by the selection-logic deletion."
+        },
+        "items": [
+          {
+            "id": "drop-reviewer-verdicts-state.ac1",
+            "title": "recordReviewVerdict still records a passed verdict and still rejects evidence whose head is an ancestor of the row anchor",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-reviewer-verdicts-state.ac2",
+            "title": "A durable per-issue record written after this change contains no reviewerVerdicts key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-reviewer-verdicts-state.ac3",
+            "title": "git grep for reviewerVerdicts under src/ and packages/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-rereview-scope-config-surface",
+        "title": "Remove the reReviewScope setting from config, API, CLI, and both UI surfaces",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "frontend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/config-yaml/schema.ts",
+            "src/lib/config-yaml/roles.ts",
+            "src/dashboard/server/routes/workspaces/review-control.ts",
+            "src/cli/commands/review-mode.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
+            "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/IssuePolicyStrip.test.tsx",
+            "npm run lint"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for IssuePolicyStrip.test.tsx",
+            "npm run lint exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-2",
+            "NFR-1"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove reReviewScope from RoleConfig (schema.ts:374) and its validation (roles.ts:297-298) so a leftover key in an existing config.yaml is ignored rather than fatal, from the GET and PUT handlers of /api/review/:id/config, from pan review-mode's scope writer, from the per-issue record shape, and from the Settings roles control and the issue policy strip segmented control."
+        },
+        "items": [
+          {
+            "id": "drop-rereview-scope-config-surface.ac1",
+            "title": "GET /api/review/:id/config returns a body whose override and resolved objects contain no reReviewScope key",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-rereview-scope-config-surface.ac2",
+            "title": "Given a config.yaml that still declares roles.review.reReviewScope, loadYamlConfig resolves without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-rereview-scope-config-surface.ac3",
+            "title": "The issue policy strip renders review mode and review model controls and renders no re-review scope control",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-rereview-scope-config-surface.ac4",
+            "title": "git grep for reReviewScope under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-branch-invalidation-sweep",
+        "title": "Delete the branch-invalidation patrol",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/branch-invalidation.ts",
+            "src/lib/cloister/deacon.ts",
+            "src/lib/cloister/__tests__/branch-invalidation.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__",
+            "npm run lint:source-introspection"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for src/lib/cloister/__tests__",
+            "lint:source-introspection exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete src/lib/cloister/branch-invalidation.ts and its test file, the deacon.ts:39 import, and the patrol block at deacon.ts:3061-3063, so no patrol probes in-pipeline branches with git merge-tree after a merge to main."
+        },
+        "items": [
+          {
+            "id": "drop-branch-invalidation-sweep.ac1",
+            "title": "Given a merge to main, a deacon patrol cycle spawns no git merge-tree probe against in-pipeline branches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-branch-invalidation-sweep.ac2",
+            "title": "src/lib/cloister/branch-invalidation.ts no longer exists and git grep for reconcileBranchInvalidation under src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-branch-invalidation-sweep.ac3",
+            "title": "resolveConflictGate still defers a review dispatch when the branch conflicts with main",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-conflicts-since-plumbing",
+        "title": "Remove the conflictsSince field and its parked orbit",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status-reconcile.ts",
+            "src/lib/overdeck/review-status-sync.ts",
+            "src/lib/pan-dir/record.ts",
+            "src/lib/pan-dir/records.ts",
+            "src/lib/pan-dir/verdict-restore.ts",
+            "src/lib/overdeck/review-status-record-sync.ts",
+            "src/lib/cloister/conflict-gate.ts",
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts",
+            "src/dashboard/frontend/src/components/CommandDeck/ZoneCOverviewTabs/queries.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/parked/__tests__/resolver.test.ts",
+            "npm run lint:park-exits"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for src/lib/parked/__tests__/resolver.test.ts",
+            "lint:park-exits exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-3",
+            "NFR-3"
+          ],
+          "parallelSafeReason": "Blocks edges from the branch-invalidation removal and the reReviewScope removal cover every record and status file it shares."
+        },
+        "narrative": {
+          "Action": "Remove conflictsSince from the ReviewStatus shape, the SQLite row serialize and deserialize, the durable record and its sync paths, and the frontend DTO. Remove the conflictsSince clear inside the conflict gate while keeping its blocker clear, and delete parked orbit 7 so the resolver classifies nine orbits. Record readers must ignore a leftover conflictsSince key rather than throw."
+        },
+        "items": [
+          {
+            "id": "drop-conflicts-since-plumbing.ac1",
+            "title": "resolveParkedPopulation returns nine orbits and marks no issue parked with a branch-invalidation reason",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-conflicts-since-plumbing.ac2",
+            "title": "Given a durable record that still contains a conflictsSince key, the record reader resolves it without throwing",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-conflicts-since-plumbing.ac3",
+            "title": "git grep for conflictsSince under src/ and packages/src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-conflicts-since-plumbing.ac4",
+            "title": "lint:park-exits exits 0 with every remaining stuck flavor still carrying its exit copy",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "drop-sweeper-actor-events",
+        "title": "Remove the stall sweeper's residual actor event surface",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "packages/contracts/src/events.ts",
+            "src/lib/parked/resolver.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceChoreography.ts",
+            "src/dashboard/frontend/src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "src/lib/cloister/stall-sweeper.ts",
+            "src/lib/cloister/stall-sweeper-state.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npm --prefix ./src/dashboard/frontend run test -- src/components/GodView/confluence/__tests__/choreography.test.ts",
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__/stall-sweeper.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for choreography.test.ts",
+            "vitest reports 0 failures for stall-sweeper.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-4"
+          ]
+        },
+        "narrative": {
+          "Action": "Delete the sweep.action and sweep.unparked event schemas and their union members, the lastSweepActionAt and sweepActionCount fields on ParkedRow with whatever populates them, and the two God View choreography branches keyed on those events. Rename any remaining sweeper budget identifier that still says action so the module cannot read as though it can act."
+        },
+        "items": [
+          {
+            "id": "drop-sweeper-actor-events.ac1",
+            "title": "The domain event union contains sweep.scan, sweep.recommendation and sweep.escalated and contains no sweep.action or sweep.unparked member",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-sweeper-actor-events.ac2",
+            "title": "The God View confluence canvas still renders orbs from sweep.scan and still fires a flare on sweep.escalated",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-sweeper-actor-events.ac3",
+            "title": "git grep for sweep.action and sweep.unparked under src/ and packages/src/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "drop-sweeper-actor-events.ac4",
+            "title": "The stall sweeper module exposes no function that spawns, stops, kills, messages, or dispatches",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "dispatch-consults-verdict-of-record",
+        "title": "Converge the row from the verdict of record before a dispatch writes reviewing",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "expert",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": true,
+          "inspectionDepth": "deep",
+          "files_scope": [
+            "src/lib/cloister/verdict-restore.ts",
+            "src/lib/cloister/review-agent.ts",
+            "src/lib/cloister/__tests__/verdict-restore.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__/verdict-restore.test.ts",
+            "npx vitest run --configLoader runner tests/lib/cloister/review-agent.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for verdict-restore.test.ts",
+            "vitest reports 0 failures for tests/lib/cloister/review-agent.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-5"
+          ],
+          "foundationFor": [
+            "reconcile-reviewing-rows-through-write-door",
+            "preserve-test-gate-on-same-head-converge"
+          ],
+          "parallelSafeReason": "Blocks edges from all three review-agent.ts predecessors serialize the only shared file; verdict-restore.ts is touched by no other item.",
+          "upstreamDependency": "PAN-3512"
+        },
+        "narrative": {
+          "Action": "Run pan sync-main PAN-3552 before editing: PAN-3512 is landing the recordReviewVerdict write door, its dispatch-not-drop semantics, and the fallback kill-conditional in these same files in parallel. Build on whatever shape PAN-3512 merged; do not reimplement it. Add convergeRowFromVerdictOfRecord to verdict-restore.ts beside observeActiveReviewArtifact: it reads the active run artifact, requires it to be within SYNTHESIS_ARTIFACT_FRESH_MS and its headSha to match the workspace head, and lands the verdict through recordReviewVerdict with the caller's writer tag rather than writing the row itself. Call it in spawnReviewAgentForIssue immediately before the reviewStatus reviewing write at review-agent.ts:546 and return without spawning when it converges."
+        },
+        "items": [
+          {
+            "id": "dispatch-consults-verdict-of-record.ac1",
+            "title": "Given a fresh synthesis artifact recording APPROVED at the workspace head and a row at reviewing, a review dispatch records passed through recordReviewVerdict and spawns no agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-consults-verdict-of-record.ac2",
+            "title": "Given an artifact older than SYNTHESIS_ARTIFACT_FRESH_MS, the dispatch proceeds and writes reviewing as before",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-consults-verdict-of-record.ac3",
+            "title": "convergeRowFromVerdictOfRecord routes every verdict write through recordReviewVerdict and contains no setReviewStatusSync call",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "dispatch-consults-verdict-of-record.ac4",
+            "title": "A converged dispatch emits a review.verdict_dispatched event whose writer field is dispatch-converge",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "reconcile-reviewing-rows-through-write-door",
+        "title": "Reconcile reviewing rows that already have a verdict on disk",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "complex",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/deacon-review-unsignaled.ts",
+            "tests/unit/lib/head-anchor-write-sites.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/lib/head-anchor-write-sites.test.ts",
+            "npx vitest run --configLoader runner tests/unit/lib/cloister"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for head-anchor-write-sites.test.ts",
+            "vitest reports 0 failures for tests/unit/lib/cloister"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-6",
+            "NFR-2"
+          ],
+          "parallelSafeReason": "deacon-review-unsignaled.ts is touched by no other item, and its dependency on the converge helper is an explicit blocks edge.",
+          "upstreamDependency": "PAN-3512"
+        },
+        "narrative": {
+          "Action": "Run pan sync-main PAN-3552 before editing: PAN-3512 is landing the recordReviewVerdict write door, its dispatch-not-drop semantics, and the fallback kill-conditional in these same files in parallel. Build on whatever shape PAN-3512 merged; do not reimplement it. Widen the reconciler gate at deacon-review-unsignaled.ts:214 to accept a reviewing row as well as a pending one, keeping the reviewSpawnedAt requirement, the settle window, the newer-request skip and the current-HEAD anchor match. Replace its direct setReviewStatusSync verdict write with convergeRowFromVerdictOfRecord using the reconciler writer tag, keep the blocked-verdict feedback delivery, and delete the now-unreachable allow entry from ALLOWED_WRITE_SITES."
+        },
+        "items": [
+          {
+            "id": "reconcile-reviewing-rows-through-write-door.ac1",
+            "title": "Given a reviewing row whose active run report sits on disk at current HEAD and is older than the settle window, one deacon patrol records that verdict on the row",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-reviewing-rows-through-write-door.ac2",
+            "title": "Given an artifact whose context anchor differs from current HEAD, the patrol records no verdict and leaves the row untouched",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-reviewing-rows-through-write-door.ac3",
+            "title": "Given a blocked verdict reconciled by the patrol, the pipeline sends a PR comment, writes a feedback file, and sends a pan tell message to the work agent",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "reconcile-reviewing-rows-through-write-door.ac4",
+            "title": "ALLOWED_WRITE_SITES no longer contains the deacon-review-unsignaled reviewedAtCommit entry and the exact-array audit passes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "preserve-test-gate-on-same-head-converge",
+        "title": "Stop re-gating a test verdict recorded at the same head",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/review-verdict-writer.ts",
+            "tests/unit/lib/cloister/review-verdict-writer.test.ts"
+          ],
+          "files_scope_confidence": "medium",
+          "verify_commands": [
+            "npm run typecheck",
+            "npx vitest run --configLoader runner tests/unit/lib/cloister/review-verdict-writer.test.ts"
+          ],
+          "expected_outputs": [
+            "typecheck completes without errors",
+            "vitest reports 0 failures for review-verdict-writer.test.ts"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7"
+          ],
+          "upstreamDependency": "PAN-3512"
+        },
+        "narrative": {
+          "Action": "Run pan sync-main PAN-3552 before editing: PAN-3512 is landing the recordReviewVerdict write door, its dispatch-not-drop semantics, and the fallback kill-conditional in these same files in parallel. Build on whatever shape PAN-3512 merged; do not reimplement it. In the testGateReset computation at review-verdict-writer.ts:214, additionally require that the incoming evidence head differs from the head the test verdict was recorded against, so landing a review verdict anchored to the same commit preserves an already-recorded terminal test verdict instead of resetting it to pending."
+        },
+        "items": [
+          {
+            "id": "preserve-test-gate-on-same-head-converge.ac1",
+            "title": "Given testStatus passed recorded at head H and a review verdict landing with evidenceHead equal to H, the row preserves testStatus passed and its notes",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preserve-test-gate-on-same-head-converge.ac2",
+            "title": "Given a review verdict landing with an evidence head different from H, the row still resets testStatus to pending with the re-gate note",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "preserve-test-gate-on-same-head-converge.ac3",
+            "title": "The write door emits a review.verdict_dispatched event whose testGateReset field is false for the same-head case",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-review-architecture",
+        "title": "Rewrite the review architecture doc to the simplified flow",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "docs",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/REVIEW-AGENT-ARCHITECTURE.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'discovery-ready' docs/ CLAUDE.md ; true",
+            "npm run lint:prompts"
+          ],
+          "expected_outputs": [
+            "git grep prints no match for discovery-ready under docs/ or CLAUDE.md",
+            "lint:prompts exits 0"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite docs/REVIEW-AGENT-ARCHITECTURE.md to the nine-step flow from section 4.3 of the evidence report, delete its discovery-fork, selective-re-review, reviewerVerdicts, discovery-ready and fork-cache sections, and add a section naming every dropped layer with the tradeoff accepted for it, including that verdict forgery is a non-threat in this deployment. Update the CLAUDE.md review sections that reference removed machinery."
+        },
+        "items": [
+          {
+            "id": "docs-review-architecture.ac1",
+            "title": "docs/REVIEW-AGENT-ARCHITECTURE.md contains a flow description naming recordReviewVerdict as the only terminal verdict write door and showing the convoy spawning at dispatch",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-review-architecture.ac2",
+            "title": "The architecture doc contains a section listing each dropped layer with the protection given up for it, including that verdict forgery is a non-threat in this deployment",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-review-architecture.ac3",
+            "title": "git grep for discovery-ready, reReviewScope and reviewerVerdicts under docs/ and CLAUDE.md returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-parked-merge-flywheel",
+        "title": "Update the parked, merge, and flywheel docs for the removed layers",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-05T14:39:51Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3552",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PARKED-POPULATION.md",
+            "docs/MERGE-WORKFLOW.md",
+            "docs/MERGE-TRAIN.md",
+            "docs/FLYWHEEL-STATE.md",
+            "docs/QUICK-REFERENCE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "git grep -n 'branch-invalidation\\|conflictsSince\\|sweep.action' docs/ ; true"
+          ],
+          "expected_outputs": [
+            "git grep prints no match for branch-invalidation, conflictsSince or sweep.action under docs/"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "Remove the branch-invalidation sweep section from docs/MERGE-WORKFLOW.md and its references in docs/MERGE-TRAIN.md, replacing them with the pan sync-main and CI-failure story. Drop the conflicts orbit from the docs/PARKED-POPULATION.md orbit table and the sweep.action and sweep.unparked rows from its event list, drop the discovery-ready reference from docs/FLYWHEEL-STATE.md, and remove any reReviewScope or discovery-ready entry from docs/QUICK-REFERENCE.md."
+        },
+        "items": [
+          {
+            "id": "docs-parked-merge-flywheel.ac1",
+            "title": "docs/PARKED-POPULATION.md contains nine orbit rows and lists sweep.scan, sweep.recommendation and sweep.escalated as the sweeper's only events",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-parked-merge-flywheel.ac2",
+            "title": "docs/MERGE-WORKFLOW.md contains a post-merge conflict section naming pan sync-main and CI failure and contains no automatic branch-invalidation sweep section",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-parked-merge-flywheel.ac3",
+            "title": "git grep for branch-invalidation, conflictsSince and sweep.action under docs/ returns no match",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "drop-parent-discovery-mode",
+        "to": "drop-reviewer-session-fork",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-session-fork",
+        "to": "drop-discovery-ready-cli",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-session-fork",
+        "to": "drop-fork-observability-patrols",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-fork-observability-patrols",
+        "to": "drop-fork-agent-state-fields",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-session-fork",
+        "to": "drop-selective-rereview-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-selective-rereview-selection",
+        "to": "drop-reviewer-verdicts-state",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-fork-observability-patrols",
+        "to": "drop-reviewer-verdicts-state",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-verdicts-state",
+        "to": "drop-rereview-scope-config-surface",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-fork-observability-patrols",
+        "to": "drop-branch-invalidation-sweep",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-branch-invalidation-sweep",
+        "to": "drop-conflicts-since-plumbing",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-rereview-scope-config-surface",
+        "to": "drop-conflicts-since-plumbing",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-conflicts-since-plumbing",
+        "to": "drop-sweeper-actor-events",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-selective-rereview-selection",
+        "to": "dispatch-consults-verdict-of-record",
+        "type": "blocks"
+      },
+      {
+        "from": "dispatch-consults-verdict-of-record",
+        "to": "reconcile-reviewing-rows-through-write-door",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-verdicts-state",
+        "to": "preserve-test-gate-on-same-head-converge",
+        "type": "blocks"
+      },
+      {
+        "from": "reconcile-reviewing-rows-through-write-door",
+        "to": "preserve-test-gate-on-same-head-converge",
+        "type": "blocks"
+      },
+      {
+        "from": "preserve-test-gate-on-same-head-converge",
+        "to": "docs-review-architecture",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-sweeper-actor-events",
+        "to": "docs-parked-merge-flywheel",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-parent-discovery-mode",
+        "to": "drop-selective-rereview-selection",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-parent-discovery-mode",
+        "to": "dispatch-consults-verdict-of-record",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-session-fork",
+        "to": "dispatch-consults-verdict-of-record",
+        "type": "blocks"
+      },
+      {
+        "from": "drop-reviewer-verdicts-state",
+        "to": "drop-conflicts-since-plumbing",
+        "type": "blocks"
+      }
+    ]
+  },
+  "status": "proposed"
+}
