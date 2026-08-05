@@ -705,18 +705,18 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T08:02:08.840Z",
+  "updated": "2026-08-05T08:05:00.922Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T08:01:27.214Z",
-    "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
+    "updatedAt": "2026-08-05T08:05:00.890Z",
+    "reviewNotes": "The revision removes required restore, orphan-adoption, and journal-corroboration paths and adds synchronous recovery I/O",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
     "lastVerifiedCommit": "152565c99eb789dc0434cef9884716a094b12cb6",
@@ -769,6 +769,24 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
+      },
+      "performance": {
+        "status": "blocked",
+        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "152565c99eb789dc0434cef9884716a094b12cb6"
+      }
     }
   },
   "closeOut": {
@@ -776,9 +794,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 398138,
-            "output": 165263,
-            "cacheRead": 66710,
+            "input": 421005,
+            "output": 181246,
+            "cacheRead": 68755,
             "cacheWrite": 0
           }
         },
@@ -790,9 +808,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 12369241,
-            "output": 214642,
-            "cacheRead": 57494016,
+            "input": 16232690,
+            "output": 269114,
+            "cacheRead": 76258304,
             "cacheWrite": 0
           }
         },
@@ -877,9 +895,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 398138,
-          "output": 165263,
-          "cacheRead": 66710,
+          "input": 421005,
+          "output": 181246,
+          "cacheRead": 68755,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -889,9 +907,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 25794045,
-          "output": 798289,
-          "cacheRead": 207092736,
+          "input": 29657494,
+          "output": 852761,
+          "cacheRead": 225857024,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -902,8 +920,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 515.338389,
-        "pricingAsOf": "2026-08-05T08:01:29.003Z"
+        "usd": 530.6081785,
+        "pricingAsOf": "2026-08-05T08:05:00.912Z"
       }
     },
     "merges": [
