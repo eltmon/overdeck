@@ -69,15 +69,7 @@
       "note": "Agent signaled work complete"
     }
   ],
-  "feedback": [
-    {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T21:18:50Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3552\n\n# Review Synthesis — PAN-3552 — 2026-08-05T21:17:35Z\n\n## Verdict: CHANGES REQUESTED — `conflictsSince` remains live runtime and durable pipeline state\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/context.json`\n- Branch: `feature/pan-3552`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552`\n- PR base: `c3cf20667708989489a34a6b3a68ae36f49d2cfc`\n- HEAD reviewed: `11bdaa31a582ab559b261f1a90f5a60c9c35a7b1`\n- Cycle number: 2\n- Prior cycle SHA: `d09c573f9177d5775d56e4bce3844e7bae066636`\n\n## Convoy Status\n\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] `conflictsSince` remains active status and durable-record plumbing — `src/lib/review-status-types.ts:56`\n\nFR-3/NFR-3 require removal of the retired `conflictsSince` field and its parked orbit. The branch removes the `conflicts` parked orbit, but introduces the field as an active optional member of `ReviewStatus` in the new `src/lib/review-status-types.ts`, and the existing review-status and durable-record projections continue to hydrate and persist it. The compatibility constraint permits old durable records to carry the extra key, which means readers must ignore it; it does not permit the legacy key to remain live state that is rewritten on unrelated review-status updates.\n\nRemove `conflictsSince` from the active status and pipeline-record types plus their hydration, serialization, projection, and restoration call sites. Keep the SQLite column physically inert and tolerate legacy JSON records by ignoring the extra key.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- correctness\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3552 -m \"Fixed review issues\"`"
-    }
-  ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/DEACON-HEALTH-MONITORING.md",
@@ -314,21 +306,21 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:33:58.998Z",
+  "updated": "2026-08-05T21:36:37.662Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T21:33:58.888Z",
+    "updatedAt": "2026-08-05T21:36:37.584Z",
     "reviewNotes": "conflictsSince remains live runtime and durable pipeline state",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1",
     "reviewRequestedAt": "2026-08-05T21:30:39.917Z",
-    "reviewSpawnedAt": "2026-08-05T21:05:37.154Z",
+    "reviewSpawnedAt": "2026-08-05T21:36:37.583Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/DEACON-HEALTH-MONITORING.md",
@@ -627,7 +619,7 @@
       },
       "costAtCloseOut": {
         "usd": 184.408624,
-        "pricingAsOf": "2026-08-05T21:33:58.941Z"
+        "pricingAsOf": "2026-08-05T21:36:37.623Z"
       }
     },
     "merges": [
