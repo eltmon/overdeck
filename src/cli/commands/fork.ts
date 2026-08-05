@@ -9,6 +9,7 @@ import { sessionFilePath } from '../../lib/paths.js';
 interface ForkOptions {
   model?: string;
   cwd?: string;
+  project?: string;
   plain?: boolean;
 }
 
@@ -60,6 +61,7 @@ export async function forkCommand(
     newConv = await forkConversationViaServer(conv.name, {
       model: options.model,
       cwd: options.cwd,
+      projectKey: options.project,
       forkMode,
     });
   } catch (err) {

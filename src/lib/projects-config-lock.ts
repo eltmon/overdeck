@@ -4,7 +4,9 @@ import { resolve } from 'node:path';
 import { Worker } from 'node:worker_threads';
 
 const LOCK_HOST = '127.0.0.1';
-const LOCK_PORT_BASE = 40_000;
+// Stay below the default ephemeral ranges on Linux, macOS, and Windows so
+// outbound dashboard connections cannot transiently occupy a lock port.
+const LOCK_PORT_BASE = 10_000;
 const LOCK_PORT_COUNT = 20_000;
 const SYNC_LOCK_TIMEOUT_MS = 5_000;
 
