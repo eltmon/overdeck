@@ -868,18 +868,18 @@
     "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T11:12:41.111Z",
+  "updated": "2026-08-05T12:31:42.840Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T11:12:41.080Z",
-    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
+    "updatedAt": "2026-08-05T12:31:42.803Z",
+    "reviewNotes": "Agent re-review request (1/25): Merged latest main (threat-model criteria + lint-guard fixes) and reconciled the two parallel lint solves: deduped the review_parent_stalled_needs_you copy entry, dropped the stale source-introspection baseline line. No functional changes beyond the merge; prior cycle passed all four lanes at 80d42c27a5.",
     "testNotes": "npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 55 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 calls readFileSync(join(import.meta.dirname, '..', 'stall-sweeper.ts')) to introspect the source module's own code instead of exercising runtime behavior, and is not baselined in the source-introspection allowlist. Guard exits 1 and the lint chain aborts there — lint:no-coderabbit-merge-gate, lint:circular, lint:ratchet-audit, and lint:quarantine-audit never ran. This is real code committed on this branch (part of the sweeper-consult work item), not a false positive; confirmed with a direct re-run of `npm run lint:source-introspection` outside any pipe, real exit code 1. npm test: 1407 passed | 2 failed | 3 skipped test files (13344 passed | 2 failed | 50 skipped tests, 359.79s). Both failures are `Hook timed out in 5000ms` inside setupOverdeckTestDb — tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file set (declared or actual scope), and this exact failure signature (DB-setup hook timeout under parallel load) is already recorded as a pre-existing flake in this issue's own session history (2026-08-04T01:54Z note: 'Full-suite flakes, not regressions... all pass in isolation'). Reported for completeness, not counted as the blocking cause. Overall automated-gate status is FAILED, blocking on the lint:source-introspection guard against this branch's own test file. Browser UAT was not required: the PRD and xBRIEF acceptance criteria are entirely backend/cloister recovery-path logic (deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts) with no dashboard/browser-facing behavior.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "63d419b952bb04353dd4a5864493e94151828311",
@@ -947,6 +947,14 @@
   "closeOut": {
     "usage": {
       "byStage": {
+        "implementation": {
+          "anthropic/claude-fable-5": {
+            "input": 33,
+            "output": 16963,
+            "cacheRead": 3745407,
+            "cacheWrite": 64234
+          }
+        },
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
             "input": 695119,
@@ -1027,10 +1035,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 136,
-            "output": 26432,
-            "cacheRead": 11556284,
-            "cacheWrite": 409925
+            "input": 146,
+            "output": 31817,
+            "cacheRead": 12579063,
+            "cacheWrite": 420683
           }
         },
         "work": {
@@ -1049,6 +1057,12 @@
         }
       },
       "totals": {
+        "anthropic/claude-fable-5": {
+          "input": 33,
+          "output": 16963,
+          "cacheRead": 3745407,
+          "cacheWrite": 64234
+        },
         "anthropic/claude-haiku-4-5": {
           "input": 695119,
           "output": 303832,
@@ -1068,15 +1082,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 136,
-          "output": 26432,
-          "cacheRead": 11556284,
-          "cacheWrite": 409925
+          "input": 146,
+          "output": 31817,
+          "cacheRead": 12579063,
+          "cacheWrite": 420683
         }
       },
       "costAtCloseOut": {
-        "usd": 677.5975976,
-        "pricingAsOf": "2026-08-05T11:12:41.104Z"
+        "usd": 683.2797366,
+        "pricingAsOf": "2026-08-05T12:31:42.833Z"
       }
     },
     "merges": [
