@@ -45,6 +45,25 @@ describe('active review artifact evidence', () => {
     })).resolves.toMatchObject({ runId: 'active-run', verdict: 'blocked' });
   });
 
+  it('reads a composite anchor from a polyrepo review context', async () => {
+    writeArtifact('active-run', 'synthesis.md', '## Verdict: APPROVED\n');
+    writeFileSync(join(workspace, '.pan', 'review', 'active-run', 'context.json'), JSON.stringify({
+      headSha: 'ignored-wrapper-head',
+      repos: [
+        { repoKey: 'fe', headSha: 'a'.repeat(40) },
+        { repoKey: 'api', headSha: 'b'.repeat(40) },
+      ],
+    }));
+
+    await expect(readLatestSynthesisVerdictAsync('PAN-1', {
+      now: NOW,
+      workspacePath: workspace,
+      runId: 'active-run',
+    })).resolves.toMatchObject({
+      headSha: `fe@${'a'.repeat(40)} api@${'b'.repeat(40)}`,
+    });
+  });
+
   it('returns no evidence when the caller omits the host-recorded run ID', async () => {
     writeArtifact('forged-run', 'review.md', '## Verdict: APPROVED\n');
 

@@ -44,6 +44,8 @@ export interface VerdictOfRecordConvergenceOptions {
   runId?: string;
   workspacePath: string;
   writer: VerdictWriter;
+  /** Caller attribution that augments the artifact's report-derived notes. */
+  notes?: string;
   deps?: Partial<VerdictOfRecordConvergenceDeps>;
 }
 
@@ -152,7 +154,7 @@ export async function convergeRowFromVerdictOfRecord(
 
   const outcome = await deps.recordVerdict(issueId, {
     verdict: artifact.verdict,
-    notes: artifact.notes,
+    notes: options.notes ?? artifact.notes,
     evidenceHead: rehydrateHeadAnchor(artifact.headSha),
     runId: artifact.runId,
     writer: options.writer,
