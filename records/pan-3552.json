@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:20:04.791Z",
+  "updated": "2026-08-05T15:20:30.404Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 5,
-    "claims": {
-      "drop-discovery-ready-cli": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 931157,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T15:20:04.790Z"
-      }
-    },
+    "sequence": 6,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -85,6 +77,17 @@
         "outcome": "completed",
         "reason": "Removed parent-session fork/resume and cache-scope wiring, renamed the missing-lane recovery entry point, and retired the obsolete discovery-ready command with explicit no-loss audit coverage.",
         "releasedAt": "2026-08-05T15:19:38.547Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 931157,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:20:04.790Z",
+        "itemId": "drop-discovery-ready-cli",
+        "outcome": "completed",
+        "reason": "Retired the discovery-ready command in the preceding fork-removal change and added an explicit command-palette regression test that it remains unavailable.",
+        "releasedAt": "2026-08-05T15:20:30.404Z"
       }
     ],
     "statusReasons": {
@@ -95,6 +98,10 @@
       "drop-reviewer-session-fork": {
         "reason": "Removed parent-session fork/resume and cache-scope wiring, renamed the missing-lane recovery entry point, and retired the obsolete discovery-ready command with explicit no-loss audit coverage.",
         "updatedAt": "2026-08-05T15:19:38.547Z"
+      },
+      "drop-discovery-ready-cli": {
+        "reason": "Retired the discovery-ready command in the preceding fork-removal change and added an explicit command-palette regression test that it remains unavailable.",
+        "updatedAt": "2026-08-05T15:20:30.404Z"
       }
     }
   },
@@ -108,6 +115,9 @@
     "drop-reviewer-session-fork.drop-reviewer-session-fork.ac2": "completed",
     "drop-reviewer-session-fork.drop-reviewer-session-fork.ac3": "completed",
     "drop-reviewer-session-fork.drop-reviewer-session-fork.ac4": "completed",
-    "drop-discovery-ready-cli": "running"
+    "drop-discovery-ready-cli": "completed",
+    "drop-discovery-ready-cli.drop-discovery-ready-cli.ac1": "completed",
+    "drop-discovery-ready-cli.drop-discovery-ready-cli.ac2": "completed",
+    "drop-discovery-ready-cli.drop-discovery-ready-cli.ac3": "completed"
   }
 }
