@@ -1301,7 +1301,7 @@
   ],
   "feedback": [],
   "created": "2026-07-28T21:04:35.249Z",
-  "updated": "2026-08-05T12:41:36.806Z",
+  "updated": "2026-08-05T16:07:50.098Z",
   "pipeline": {
     "issueId": "PAN-1577",
     "reviewStatus": "passed",
@@ -1313,14 +1313,16 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T18:21:17.510Z",
-    "updatedAt": "2026-08-05T12:41:36.570Z",
+    "updatedAt": "2026-08-05T16:07:50.063Z",
     "testNotes": "Automated gates at HEAD 5bc806f30c13b62b0446144e7d96d6945e3c3db6 (feature/pan-1577), all run against this exact commit via the durable verification-worker in this workspace (started 2026-08-04T18:14:58Z, finished 18:59:45Z): install (bun install --frozen-lockfile) PASS 13.5s. typecheck (root tsc + hooks + evals + dashboard/frontend shrink-only ratchets) PASS 421s. frontend-typecheck (npx tsc --noEmit) PASS 879s. lint (eslint + all 18 sub-lints: effect, permissions, state-writes, state-paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps, ratchet-audit, quarantine-audit) PASS 334s. build (npm run build) PASS 368s. server-bundle (npm run build:dashboard:server:bundle) PASS 156s. test (OVERDECK_VERIFICATION=1 npx vitest run --changed origin/main, root + frontend concurrently) PASS 490s. Overall: 7/7 required gates passed, 0 failed (worker log: 'Complete: 7 passed, 0 failed out of 7 gates' / '[durable-review] Verification passed for PAN-1577 (HEAD=5bc806f3)'). Workspace was already up to date with main at run time (no sync needed). This reuses the freshest available automated-gate run rather than duplicating an already-in-flight ~35-minute full gate run against the identical commit in the same workspace, which would have caused resource contention on concurrent dist/node_modules writes for zero additional evidence.",
     "uatNotes": "UAT required: the xBRIEF's drag-drop-move.ac4 explicitly requires 'Browser UAT in an isolated Playwright profile verifies both drag-drop and the menu picker move + toast end-to-end', and the GitHub issue's UI acceptance criteria specify exact toast wording, drag-drop affordances, and menu-picker behavior that only a real browser can confirm. Built and ran the dashboard from THIS workspace (not main): reused the fresh dist/ produced by the automated build/server-bundle gates above (buildCommit 5bc806f3, matching current HEAD exactly), started as an isolated instance on port 3212 with a throwaway OVERDECK_HOME and OVERDECK_DISABLE_DEACON=1. Did NOT touch or restart the live production dashboard on :3011 (mode=primary, actively orchestrating 25+ running agents per the session's own workspace status) -- stopping it would have been highly disruptive and is exactly what the 'never pan up restart' operating rule for this repo exists to prevent; an isolated peer instance on a free port satisfies 'run the dashboard from the workspace' without that blast radius. Registered two throwaway git-backed projects (uat-proj-a, uat-proj-b) in the isolated OVERDECK_HOME's projects.yaml and seeded one test conversation (cwd under uat-proj-a) directly via createConversation() in src/lib/overdeck/conversations.ts against the isolated DB (via tsx, no real agent spawn needed). Drove both move surfaces via the Playwright MCP tools against http://127.0.0.1:3212 (no separate UAT agent spawned): (1) Menu-picker move -- opened the 3-dot 'More actions' menu on the conversation row, clicked Move, confirmed the project-picker submenu showed 'uat-proj-a' disabled (current project, matching xBRIEF decision D5) and 'uat-proj-b' selectable, clicked uat-proj-b -- got a visible toast 'Moved \"UAT Move Test Conversation\" to uat-proj-b' (title-not-id, screenshot after-menu-move.png), uat-proj-a's Command Deck immediately showed 'No conversations yet' / count 0 (live re-group, no manual refresh), and GET /api/conversations confirmed server-side projectKey='uat-proj-b' while cwd remained pinned to the original uat-proj-a path (JSONL/cwd hazard H1 verified untouched -- move never rewrites cwd). (2) Native drag-and-drop -- navigated to uat-proj-b's Command Deck (confirmed 1 conversation there), dragged the conversation row onto the 'uat-proj-a' sidebar rail item via browser_drag, confirmed uat-proj-b's Command Deck flipped to '0 convos' / 'No conversations yet' (screenshot after-drag-drop.png) and GET /api/conversations confirmed server-side projectKey='uat-proj-a' with cwd still unchanged. Both flows were exercised with real UI interaction plus independent server-side API confirmation, matching AC1-AC3 of both menu-move and drag-drop-move xBRIEF items and drag-drop-move.ac4's end-to-end requirement. The isolated dashboard instance was stopped after verification (port 3212 confirmed free), and all throwaway artifacts (seed script, screenshots, throwaway git projects, throwaway OVERDECK_HOME) were deleted -- git status confirms a clean working tree on feature/pan-1577.",
     "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3433",
     "reviewedAtCommit": "5bc806f30c13b62b0446144e7d96d6945e3c3db6",
     "lastVerifiedCommit": "5bc806f30c13b62b0446144e7d96d6945e3c3db6",
-    "reviewSpawnedAt": "2026-08-04T18:38:17.078Z"
+    "reviewSpawnedAt": "2026-08-04T18:38:17.078Z",
+    "closedOut": true,
+    "closedOutAt": "2026-08-05T16:07:50.063Z"
   },
   "closeOut": {
     "usage": {
@@ -1432,7 +1434,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3433"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-05T16:07:50.093Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 5bc806f30c13b62b0446144e7d96d6945e3c3db6",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3433 MERGED at 2026-08-05T12:41:36Z",
+          "status": "pass",
+          "mergedAt": "2026-08-05T12:41:36Z",
+          "mergeCommit": "3e8f783fdce309eef5b67c2dd121c8afaad0a9eb"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "1 check-runs concluded successfully on 3e8f783fdce309eef5b67c2dd121c8afaad0a9eb",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit f69486a9 contains merge 3e8f783f",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 7 agent state directories (8 transcript files preserved); No strike branch strike/pan-1577 found; Pruned 1195 checkpoint ref(s) for agent-pan-1577, planning-pan-1577, strike-pan-1577; No specialist registry entries for PAN-1577"
+        }
+      ],
+      "accepted": []
+    }
   },
   "recoveryTrips": [
     {
