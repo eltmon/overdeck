@@ -203,18 +203,19 @@
     "recordedAt": "2026-08-05T19:29:31.746Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:29:57.344Z",
+  "updated": "2026-08-05T19:31:19.971Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T19:29:56.689Z",
+    "updatedAt": "2026-08-05T19:31:19.938Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewRequestedAt": "2026-08-05T19:29:35.331Z",
+    "reviewSpawnedAt": "2026-08-05T19:31:19.937Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/DEACON-HEALTH-MONITORING.md",
@@ -408,24 +409,24 @@
       "byStage": {
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 8986586,
-            "output": 583518,
-            "cacheRead": 243657728,
+            "input": 8994125,
+            "output": 585669,
+            "cacheRead": 245168640,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 8986586,
-          "output": 583518,
-          "cacheRead": 243657728,
+          "input": 8994125,
+          "output": 585669,
+          "cacheRead": 245168640,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 92.133962,
-        "pricingAsOf": "2026-08-05T19:29:57.339Z"
+        "usd": 92.562806,
+        "pricingAsOf": "2026-08-05T19:31:19.954Z"
       }
     },
     "merges": [
