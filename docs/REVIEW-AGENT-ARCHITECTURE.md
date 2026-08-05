@@ -135,8 +135,11 @@ review parent's `reviewRunId` through the agent-state read door and accepts only
 report whose exact bytes and reviewed HEAD have a valid host HMAC attestation.
 The dashboard signs `context.json` before reviewers start, then signs the selected
 `synthesis.md` or `review.md` after the review agent signals its verdict but before
-the row write. Coding-agent environments explicitly blank the signing key; the
-review parent receives only a run-bound request token. Workspace-created runs,
+the row write. The host key is atomically created once at
+`<OVERDECK_HOME>/review-attestation-key`, forced to mode `0600`, and loaded on every
+dashboard boot, so restarts preserve active tokens and signed evidence. Both child
+environment builders strip the host key and request token; the review parent receives
+only its run-bound token through the explicit launch override. Workspace-created runs,
 tampered contexts, and unsigned or altered reports are not verdict evidence.
 Polyrepo attestations bind the canonical full-SHA anchor
 `repoKey@sha repoKey@sha` in manifest order, matching the workspace snapshot

@@ -47,14 +47,18 @@ describe('buildChildEnv', () => {
 });
 
 describe('buildChildEnvWithoutTmux', () => {
-  it('only strips tmux/screen artifacts', () => {
+  it('preserves provider routing but strips tmux and host-only attestation secrets', () => {
     const base = {
       PATH: '/usr/bin',
       TMUX: 'yes',
       ANTHROPIC_BASE_URL: 'http://proxy',
+      OVERDECK_REVIEW_ATTESTATION_KEY: 'host-key',
+      OVERDECK_REVIEW_ATTESTATION_TOKEN: 'review-token',
     };
     const result = buildChildEnvWithoutTmuxSync(base as NodeJS.ProcessEnv);
     expect(result.TMUX).toBeUndefined();
     expect(result.ANTHROPIC_BASE_URL).toBe('http://proxy');
+    expect(result.OVERDECK_REVIEW_ATTESTATION_KEY).toBeUndefined();
+    expect(result.OVERDECK_REVIEW_ATTESTATION_TOKEN).toBeUndefined();
   });
 });
