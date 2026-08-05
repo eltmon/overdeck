@@ -22,6 +22,7 @@ import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
+  buildReviewRolePrompt,
   handleReviewDiscoveryReady,
   isReviewSessionForIssue,
   killAllReviewerSessions,
@@ -54,6 +55,7 @@ const {
   mockResumeAgent,
   mockStopAgent,
   mockWipeAgentStateDirs,
+  mockMarkAgentStoppedState,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
@@ -76,6 +78,7 @@ const {
   mockResumeAgent: vi.fn().mockResolvedValue({ success: false, error: 'no session' }),
   mockStopAgent: vi.fn().mockResolvedValue(undefined),
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
+  mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -110,6 +113,7 @@ vi.mock('../../../src/lib/agents.js', () => ({
 
 vi.mock('../../../src/lib/agents/agent-state.js', () => ({
   saveAgentState: (...args: Parameters<typeof mockSaveAgentStateAsync>) => Effect.promise(() => mockSaveAgentStateAsync(...args)),
+  markAgentStoppedState: (...args: Parameters<typeof mockMarkAgentStoppedState>) => mockMarkAgentStoppedState(...args),
 }));
 
 vi.mock('../../../src/lib/config-yaml.js', () => ({
@@ -1178,6 +1182,86 @@ describe('convoy orchestration', () => {
     expect(readTestFileSync(`${reviewDir}/performance.md`, 'utf-8')).toBe('performance complete');
     expect(readTestFileSync(`${reviewDir}/requirements.md`, 'utf-8')).toBe('requirements complete');
   });
+
+  // PAN-3545: the per-lane filter must treat tmux as the liveness oracle. A
+  // state.json row still claiming 'running' after its session died (deacon
+  // freeze, boot --no-resume, missed stopped event) must not block the launch —
+  // trusting it no-oped the convoy and stranded the synthesis parent (PAN-3511
+  // cycle 3, 2026-08-04). The stale row is healed to stopped at the signal.
+  it('launches every lane despite stale running rows when the tmux probe says no sessions', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    const staleReviewer = (id: string) => ({
+      id,
+      issueId: 'PAN-1059',
+      role: 'review',
+      status: 'running',
+      startedAt: '2000-01-01T00:00:00.000Z',
+    });
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            workspace,
+            reviewRunId: REVIEW_AGENT_RUN_ID,
+            reviewContextManifestPath: manifestPath,
+          }
+        : staleReviewer(agentId),
+    );
+    mockSpawnRun.mockImplementation(async (issueId: string, _role: string, options: { subRole?: string }) => ({
+      id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
+    }));
+
+    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+
+    // The filter's output is the message denominator: 4 lanes selected despite
+    // four stale 'running' rows. (The per-lane spawn outcomes themselves are
+    // not asserted — four parallel dynamic imports of the mocked agents.js
+    // barrel resolve nondeterministically under vitest; the deterministic
+    // regression signal is the filter decision plus the heal calls below.)
+    expect(result.message).toMatch(/launched \d+\/4 missing convoy reviewer/);
+    expect(result.message).not.toContain('already launched');
+    expect(mockMarkAgentStoppedState).toHaveBeenCalledTimes(4);
+    expect(mockMarkAgentStoppedState).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-pan-1059-review-security', status: 'running' }),
+      'system',
+    );
+    expect(mockMarkAgentStoppedState.mock.calls.every(([, cause]) => cause === 'system')).toBe(true);
+    expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'agent-pan-1059-review-correctness', status: 'stopped' }),
+    );
+  });
+
+  // PAN-3545: when the tmux probe itself fails, the state row keeps its
+  // conservative vote — a skipped launch beats a duplicate reviewer.
+  it('keeps the state row vote and skips the launch when the tmux probe fails', async () => {
+    const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
+    const manifestPath = writeReviewManifest(workspace);
+    mockListSessionNamesEffect.mockImplementation(() => Effect.fail(new Error('tmux down')) as never);
+    mockGetAgentState.mockImplementation((agentId: string) =>
+      agentId === 'agent-pan-1059-review'
+        ? {
+            id: agentId,
+            workspace,
+            reviewRunId: REVIEW_AGENT_RUN_ID,
+            reviewContextManifestPath: manifestPath,
+          }
+        : {
+            id: agentId,
+            issueId: 'PAN-1059',
+            role: 'review',
+            status: 'running',
+            startedAt: '2000-01-01T00:00:00.000Z',
+          },
+    );
+
+    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toContain('already launched');
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+    expect(mockMarkAgentStoppedState).not.toHaveBeenCalled();
+  });
 });
 
 // ── deacon gated review deferral (PAN-1765) ───────────────────────────────────
@@ -1340,3 +1424,21 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
+  it('teaches the synthesis parent to discard replayed signals from dead attempts', () => {
+    const prompt = buildReviewRolePrompt({
+      issueId: 'PAN-1059',
+      branch: 'feature/pan-1059',
+      workspace: '/tmp/ws',
+      reviewDir: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef',
+      runId: 'agent-pan-1059-review-deadbeef',
+      contextManifestPath: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef/context.json',
+    });
+    expect(prompt).toContain('STALE-SIGNAL GUARD (PAN-3549)');
+    expect(prompt).toContain('stat -c %y <manifest path>');
+    expect(prompt).toContain('discard any signal whose deadline is older');
+    expect(prompt).toContain('Run ID: agent-pan-1059-review-deadbeef');
+  });
+});
+

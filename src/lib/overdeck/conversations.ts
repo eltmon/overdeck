@@ -37,7 +37,6 @@ const conversationsTable = sqliteTable('conversations', {
   name:                text('name').notNull(),
   cwd:                 text('cwd').notNull(),
   issueId:             text('issue_id'),
-  projectKey:          text('project_key'),
   harness:             text('harness'),
   model:               text('model'),
   effort:              text('effort'),
@@ -62,6 +61,7 @@ const conversationsTable = sqliteTable('conversations', {
   forkFallbackReason:  text('fork_fallback_reason'),
   deliveryMethod:      text('delivery_method'),
   spawnError:          text('spawn_error'),
+  projectKey:          text('project_key'),
 });
 
 const conversationFilesTable = sqliteTable('conversation_files', {
@@ -124,7 +124,6 @@ export const Conversation = Schema.Struct({
   name:                ConversationName,
   cwd:                 Schema.String,
   issueId:             Schema.NullOr(Schema.String),
-  projectKey:          Schema.NullOr(Schema.String),
   harness:             Schema.NullOr(Harness),
   model:               Schema.NullOr(Schema.String),
   effort:              Schema.NullOr(Schema.String),
@@ -135,6 +134,8 @@ export const Conversation = Schema.Struct({
   handoffDocPath:      Schema.NullOr(Schema.String),
   handoffTargetConvId: Schema.NullOr(ConversationId),
   clearedToConvId:     Schema.NullOr(ConversationId),
+  /** Explicit project assignment override (PAN-1577). Null = fall back to deriving the project from cwd. */
+  projectKey:          Schema.NullOr(Schema.String),
   files:               Schema.Array(BackingFile),
 });
 export type Conversation = typeof Conversation.Type;
@@ -211,7 +212,6 @@ function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
     name:                row.name,
     cwd:                 row.cwd,
     issueId:             row.issueId ?? null,
-    projectKey:          row.projectKey ?? null,
     harness:             row.harness ?? null,
     model:               row.model ?? null,
     effort:              row.effort ?? null,
@@ -222,6 +222,7 @@ function rowToConversation(row: ConvRow, files: FileRow[]): Conversation {
     handoffDocPath:      row.handoffDocPath ?? null,
     handoffTargetConvId: row.handoffTargetConvId ?? null,
     clearedToConvId:     row.clearedToConvId ?? null,
+    projectKey:          row.projectKey ?? null,
     files:               files.map(rowToBackingFile),
   });
 }
@@ -401,6 +402,8 @@ export class ConversationWriter extends Context.Service<ConversationWriter, {
     Effect.Effect<Conversation, ConversationNotFound>;
   readonly setModel:   (name: ConversationName, model: string)    => Effect.Effect<Conversation, ConversationNotFound>;
   readonly setHarness: (name: ConversationName, harness: Harness) => Effect.Effect<Conversation, ConversationNotFound>;
+  /** Explicit project assignment override (PAN-1577); pass null to clear it back to cwd-derived grouping. */
+  readonly setProjectKey: (name: ConversationName, projectKey: string | null) => Effect.Effect<Conversation, ConversationNotFound>;
   readonly handoff:     (source: ConversationName, target: ConversationName, docPath: string) =>
     Effect.Effect<{ conversation: Conversation; backingFile: string }, ConversationNotFound>;
   readonly clear:       (source: ConversationName) =>
@@ -532,6 +535,17 @@ export const ConversationWriterLive = Layer.effect(
         return yield* resolver.get(name);
       });
 
+    const setProjectKey = (name: ConversationName, projectKey: string | null):
+      Effect.Effect<Conversation, ConversationNotFound> =>
+      Effect.gen(function* () {
+        yield* resolver.get(name);
+        yield* Effect.promise(() =>
+          db.q.update(conversationsTable).set({ projectKey }).where(eq(conversationsTable.name, name)),
+        );
+        yield* bus.emit({ type: 'conversation.projectKeyChanged', payload: { name, projectKey } });
+        return yield* resolver.get(name);
+      });
+
     // The fork primitive — the ONLY mechanism that creates a new backing file.
     // Creates a fresh UUID locator, registers a conversation_files pointer, records lineage.
     // NEVER opens an existing file for write.
@@ -583,7 +597,7 @@ export const ConversationWriterLive = Layer.effect(
 
     return ConversationWriter.of({
       create, archive, unarchive, setFavorite, unsetFavorite,
-      retitle, setModel, setHarness,
+      retitle, setModel, setHarness, setProjectKey,
       handoff, clear, summaryFork, compact,
     });
   }),
@@ -675,6 +689,7 @@ export interface LegacyConversation {
   forkRequest: string | null;
   forkRetryCount: number;
   workspaceId: string | null;
+  /** Explicit project assignment override. Null = fall back to deriving the project from cwd. */
   projectKey: string | null;
 }
 
@@ -1217,7 +1232,7 @@ export function createConversation(opts: {
   deliveryMethod?: 'auto' | 'channels' | 'tmux';
   /** PAN-1990: explicit workspace id. Falls back to resolveWorkspaceForCwd(cwd) when omitted. */
   workspaceId?: string | null;
-  /** PAN-3419: explicit registered-project association; never inferred from cwd at write time. */
+  /** Explicit registered-project association; never inferred from cwd at write time. */
   projectKey?: string | null;
 }): LegacyConversation {
   const db = overdeckDb();
@@ -1367,6 +1382,7 @@ export function setConversationHarness(name: string, harness: RuntimeName): void
   overdeckDb().prepare(`UPDATE conversations SET harness = ? WHERE name = ?`).run(harness, name);
 }
 
+/** Set (or clear, with null) the project assignment override for a conversation. */
 export function setConversationProjectKey(name: string, projectKey: string | null): void {
   overdeckDb().prepare(`UPDATE conversations SET project_key = ? WHERE name = ?`).run(projectKey, name);
 }

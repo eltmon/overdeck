@@ -74,7 +74,6 @@ CREATE TABLE `conversations` (
 	`name` text NOT NULL,
 	`cwd` text NOT NULL,
 	`issue_id` text,
-	`project_key` text,
 	`harness` text,
 	`model` text,
 	`effort` text,
@@ -100,6 +99,7 @@ CREATE TABLE `conversations` (
 	`delivery_method` text,
 	`spawn_error` text,
 	`workspace_id` text,
+	`project_key` text,
 	FOREIGN KEY (`handoff_target_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`cleared_to_conv_id`) REFERENCES `conversations`(`id`) ON UPDATE no action ON DELETE no action
 );

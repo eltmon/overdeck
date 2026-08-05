@@ -1169,6 +1169,20 @@ export const ConversationCreatedEvent = Schema.Struct({
 })
 export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
 
+/** Emitted (in-memory only, not persisted) when a conversation's project
+ * assignment override changes, so the sidebar can re-group it live instead of
+ * waiting for its poll tick. */
+export const ConversationMovedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.moved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    projectKey: Schema.String,
+  }),
+})
+export type ConversationMovedEvent = typeof ConversationMovedEvent.Type
+
 /** Emitted (in-memory only) when a conversation title changes, so the sidebar
  * list can refresh immediately instead of waiting for its poll tick. */
 export const ConversationTitleChangedEvent = Schema.Struct({
@@ -1343,6 +1357,21 @@ export const SweepEscalatedEvent = Schema.Struct({
 })
 export type SweepEscalatedEvent = typeof SweepEscalatedEvent.Type
 
+/** The sweeper recommended a remedy for a parked row (observability-only — never an action, PAN-3551). */
+export const SweepRecommendationEvent = Schema.Struct({
+  type: Schema.Literal("sweep.recommendation"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    recommendation: Schema.String,
+    recurring: Schema.optional(Schema.Boolean),
+    agentId: Schema.optional(Schema.String),
+  }),
+})
+export type SweepRecommendationEvent = typeof SweepRecommendationEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -1435,6 +1464,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
+  ConversationMovedEvent,
   ConversationTitleChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
@@ -1447,5 +1477,6 @@ export const DomainEvent = Schema.Union([
   SweepActionEvent,
   SweepUnparkedEvent,
   SweepEscalatedEvent,
+  SweepRecommendationEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

@@ -32,6 +32,17 @@ async function unfavoriteConversation(name: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to unfavorite conversation');
 }
 
+async function moveConversation(name: string, projectKey: string): Promise<{ projectKey: string | null }> {
+  const res = await fetch(`/api/conversations/${encodeURIComponent(name)}/move`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectKey }),
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(data?.error || 'Failed to move conversation');
+  return data as { projectKey: string | null };
+}
+
 type ApiForkMode = 'summary' | 'plain' | 'handoff';
 type ForkModeOption = ApiForkMode | 'fast-summary';
 type HandoffAuthor = 'source' | 'external';
@@ -70,6 +81,7 @@ export interface ConversationMutations {
   retitle: (name: string) => void;
   isRetitlePending: (name: string) => boolean;
   toggleFavorite: (opts: { name: string; favorited: boolean }) => void;
+  move: (opts: { name: string; projectKey: string; projectName: string }) => void;
   openForkModal: (conv: Conversation, options?: { mode?: ForkModeOption; focus?: string }) => void;
   submitFork: (conv: Conversation, launchModel: string, summaryModel: string, forkMode: ApiForkMode, localSummaryOnly: boolean, includeThinkingInSummary: boolean, title?: string, launchHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', summaryHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', focus?: string, handoffAuthor?: HandoffAuthor, handoffAuthorModel?: string, handoffAuthorHarness?: 'claude-code' | 'ohmypi' | 'codex' | 'acp' | 'kimi-code', projectKey?: string) => void;
   forkTarget: Conversation | null;
@@ -163,6 +175,39 @@ export function useConversationMutations(
     },
   });
 
+  const moveMutation = useMutation({
+    mutationFn: (vars: { name: string; projectKey: string; projectName: string }) =>
+      moveConversation(vars.name, vars.projectKey),
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ['conversations'] });
+      const previous = queryClient.getQueryData<Conversation[]>(['conversations']);
+      const title = previous?.find((c) => c.name === vars.name)?.title ?? vars.name;
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === vars.name ? { ...c, projectKey: vars.projectKey } : c)) ?? [],
+      );
+      return { previous, title };
+    },
+    onError: (err: Error, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(['conversations'], ctx.previous);
+      toast.error(err.message, { duration: 6000 });
+    },
+    onSuccess: (data, vars, ctx) => {
+      // Settle the cache with the server-confirmed projectKey directly;
+      // other clients converge via the conversation.moved domain event. An
+      // unconditional invalidate here would double the list refetch.
+      queryClient.setQueryData<Conversation[]>(['conversations'], (old) =>
+        old?.map((c) => (c.name === vars.name ? { ...c, projectKey: data.projectKey } : c)) ?? [],
+      );
+      toast.success(`Moved "${ctx?.title ?? vars.name}" to ${vars.projectName}`, { duration: 4000 });
+    },
+    onSettled: (_data, error) => {
+      // onError already rolled back to the pre-mutation snapshot; re-sync
+      // from the server only on failure, since that snapshot may not reflect
+      // a concurrent change from elsewhere.
+      if (error) queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
+
   const summaryForkMutation = useMutation({
     mutationFn: summaryForkConversation,
     onSuccess: (_data, variables) => {
@@ -226,6 +271,7 @@ export function useConversationMutations(
       if (pendingFavoriteNamesRef.current.has(opts.name)) return;
       favoriteMutation.mutate(opts);
     },
+    move: (opts) => moveMutation.mutate(opts),
     openForkModal,
     submitFork,
     forkTarget,

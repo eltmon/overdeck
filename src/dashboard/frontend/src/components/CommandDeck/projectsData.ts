@@ -19,31 +19,40 @@ export interface RegisteredProjectLite {
   path: string;
 }
 
-/** Resolve an explicit project association first, then fall back to cwd containment. */
+/** The project a conversation effectively belongs to (PAN-1577): the explicit
+ * `projectKey` override when set, otherwise the registered project whose path
+ * contains `cwd`. Null when neither resolves — the single source of truth for
+ * every "is this conversation already in project X" check (grouping, the move
+ * pickers' current-project indicator, and drag-drop's no-op detection) so they
+ * can't disagree with each other. */
+export function resolveEffectiveProjectKey(
+  conv: { cwd?: string | null; projectKey?: string | null },
+  registeredProjects: readonly RegisteredProjectLite[],
+): string | null {
+  if (conv.projectKey) return conv.projectKey;
+  const cwd = conv.cwd;
+  if (!cwd) return null;
+  const matched = registeredProjects.find((rp) => rp.path && (cwd === rp.path || cwd.startsWith(rp.path + '/')));
+  return matched?.key ?? null;
+}
+
+/** Resolve a conversation's effective project record for consumers that need its display name. */
 export function resolveConversationProject(
   conv: { cwd?: string | null; projectKey?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
 ): RegisteredProjectLite | null {
-  if (conv.projectKey) {
-    const explicit = registeredProjects.find((rp) => rp.key === conv.projectKey)
-      ?? registeredProjects.find((rp) => rp.name === conv.projectKey);
-    if (explicit) return explicit;
-  }
-
-  const cwd = conv.cwd?.replace(/\/+$/, '');
-  if (!cwd) return null;
-  return registeredProjects.find((rp) => {
-    const projectPath = rp.path?.replace(/\/+$/, '');
-    return Boolean(projectPath) && (cwd === projectPath || cwd.startsWith(`${projectPath}/`));
-  }) ?? null;
+  const key = resolveEffectiveProjectKey(conv, registeredProjects);
+  return key ? registeredProjects.find((project) => project.key === key) ?? null : null;
 }
 
-/** True when neither an explicit association nor cwd containment resolves a project. */
+/** True when a conversation doesn't resolve to any registered project — i.e. it
+ * belongs in the No-project bucket. */
 export function isUnscopedConversation(
   conv: { cwd?: string | null; projectKey?: string | null },
   registeredProjects: readonly RegisteredProjectLite[],
 ): boolean {
-  return resolveConversationProject(conv, registeredProjects) === null;
+  const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+  return effectiveKey === null || !registeredProjects.some((rp) => rp.key === effectiveKey);
 }
 
 export interface ProjectData {

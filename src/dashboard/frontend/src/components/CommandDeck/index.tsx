@@ -10,7 +10,7 @@ import { ProjectHome } from '../Stage/ProjectHome';
 import { IssueOverview } from '../Stage/IssueOverview';
 import { SessionFeedSidebar } from '../sessionFeed/SessionFeedSidebar';
 import { usePanesStore } from '../../lib/panesStore';
-import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveConversationProject, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
+import { fetchProjects, filterSpecOnlyPlanned, isUnscopedConversation, resolveEffectiveProjectKey, NO_PROJECT_KEY, NO_PROJECT_LABEL } from './projectsData';
 import { ProjectMembershipBoundary } from './ProjectMembershipBoundary';
 import { TasksDialog } from '../TasksDialog';
 import { PlanDialog } from '../PlanDialog';
@@ -472,22 +472,33 @@ export function CommandDeck({
     refetchInterval: 10000,
   });
 
-  // Partition conversations into project-scoped vs unscoped.
-  const projectConversations = useMemo(() => {
+  // Partition conversations into project-scoped vs unscoped
+  const { projectConversations } = useMemo(() => {
     const map: Record<string, import('./ConversationList').Conversation[]> = {};
-    if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return map;
+    const excludeSet = new Set<number>();
+    if (!Array.isArray(registeredProjects) || registeredProjects.length === 0) return { projectConversations: map, excludeConvIds: excludeSet };
 
+    const keyToKeys = new Map<string, string[]>();
+    for (const rp of registeredProjects) {
+      const keys = Array.from(new Set([rp.key, rp.name].filter((key): key is string => Boolean(key))));
+      keyToKeys.set(rp.key, keys);
+    }
+
+    // One resolver decides "which project" for every conversation (PAN-1577):
+    // explicit projectKey override first, cwd→project-path inference otherwise.
     for (const conv of conversations) {
-      const project = resolveConversationProject(conv, registeredProjects);
-      if (!project) continue;
-      const projectKeys = Array.from(new Set([project.key, project.name].filter((key): key is string => Boolean(key))));
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) continue;
+      const projectKeys = keyToKeys.get(effectiveKey);
+      if (!projectKeys) continue;
       for (const projectKey of projectKeys) {
         if (!map[projectKey]) map[projectKey] = [];
         map[projectKey].push(conv);
       }
+      excludeSet.add(conv.id);
     }
 
-    return map;
+    return { projectConversations: map, excludeConvIds: excludeSet };
   }, [conversations, registeredProjects]);
 
   // Track the last deep-link ID we applied so we only navigate for *new* deep-links
@@ -496,11 +507,17 @@ export function CommandDeck({
   // PAN-2005: same idea for the issue cockpit deep-link (/command-deck/<proj>/<issue>).
   const appliedCockpit = useRef<string | null>(null);
 
-  // Resolve the registered project name using the same explicit-first rule as grouping.
+  // Resolve the registered project (by name) that owns a conversation, or null
+  // when the conversation is unscoped. Prefers the explicit `projectKey`
+  // override (PAN-1577) when set; falls back to cwd→project-path inference
+  // only when it's null (e.g. created without a projectKey, so cwd defaults to
+  // ~/Projects).
   const resolveConversationProjectName = useCallback(
     (conv: Conversation | null | undefined): string | null => {
       if (!conv) return null;
-      const matched = resolveConversationProject(conv, registeredProjects);
+      const effectiveKey = resolveEffectiveProjectKey(conv, registeredProjects);
+      if (!effectiveKey) return null;
+      const matched = registeredProjects.find((rp) => rp.key === effectiveKey);
       return matched ? (matched.name ?? matched.key) : null;
     },
     [registeredProjects],

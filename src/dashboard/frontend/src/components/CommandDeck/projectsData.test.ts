@@ -6,6 +6,7 @@ import {
   isUnscopedConversation,
   refreshProjectPipelineMembership,
   resolveConversationProject,
+  type RegisteredProjectLite,
 } from './projectsData';
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -42,43 +43,31 @@ function feature(issueId: string, projectName: string): ProjectFeature {
   };
 }
 
-describe('conversation project grouping', () => {
-  const registeredProjects = [
+describe('resolveConversationProject', () => {
+  const registeredProjects: RegisteredProjectLite[] = [
     { key: 'root-key', name: 'Root Project', path: '/projects/root' },
     { key: 'nested-key', name: 'Nested Project', path: '/projects/root/nested' },
   ];
 
-  it('prefers an explicit yaml key over cwd containment', () => {
-    const conv = { projectKey: 'nested-key', cwd: '/isolated/handoff' };
-    expect(resolveConversationProject(conv, registeredProjects)).toEqual(registeredProjects[1]);
-    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
-  });
-
-  it('accepts a display name as an explicit association', () => {
+  it('resolves an explicit association for an isolated handoff cwd', () => {
     expect(resolveConversationProject(
-      { projectKey: 'Nested Project', cwd: '/isolated/handoff' },
+      { projectKey: 'nested-key', cwd: '/isolated/handoff' },
       registeredProjects,
     )).toEqual(registeredProjects[1]);
   });
 
-  it('falls back to cwd containment when no explicit association exists', () => {
+  it('falls back to cwd containment only when no explicit association exists', () => {
     expect(resolveConversationProject(
       { projectKey: null, cwd: '/projects/root/src' },
       registeredProjects,
     )).toEqual(registeredProjects[0]);
   });
 
-  it('falls back to cwd containment when an explicit association is unknown', () => {
+  it('does not override an unknown explicit association with cwd containment', () => {
     expect(resolveConversationProject(
       { projectKey: 'missing', cwd: '/projects/root/src' },
       registeredProjects,
-    )).toEqual(registeredProjects[0]);
-  });
-
-  it('leaves a conversation unscoped when neither association method matches', () => {
-    const conv = { projectKey: null, cwd: '/outside' };
-    expect(resolveConversationProject(conv, registeredProjects)).toBeNull();
-    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+    )).toBeNull();
   });
 });
 
@@ -120,6 +109,37 @@ describe('project pipeline membership probes', () => {
 
     await expect(refreshProjectPipelineMembership('overdeck'))
       .rejects.toThrow('Repository missing (repo_unavailable)');
+  });
+});
+
+describe('isUnscopedConversation (PAN-1577 grouping precedence)', () => {
+  const registeredProjects: RegisteredProjectLite[] = [
+    { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+    { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+  ];
+
+  it('prefers the projectKey override over cwd when both are present', () => {
+    const conv = { cwd: '/home/user/Projects/krux', projectKey: 'myn' };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
+  });
+
+  it('is unscoped when projectKey is set but matches no registered project, even if cwd would match one', () => {
+    const conv = { cwd: '/home/user/Projects/krux', projectKey: 'deleted-project' };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+  });
+
+  it('falls back to cwd inference when projectKey is null', () => {
+    const conv = { cwd: '/home/user/Projects/myn/sub', projectKey: null };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
+  });
+
+  it('is unscoped when projectKey is null and cwd matches no registered project', () => {
+    const conv = { cwd: '/home/user/Projects/unrelated', projectKey: null };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+  });
+
+  it('is unscoped when neither projectKey nor cwd is set', () => {
+    expect(isUnscopedConversation({}, registeredProjects)).toBe(true);
   });
 });
 
