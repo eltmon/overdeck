@@ -33,12 +33,7 @@ function allow(
 // Stable audit identity: file + field + normalized AST expression. Source lines
 // are deliberately excluded, while the full-array comparison preserves counts.
 const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
-  allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'update.reviewedAtCommit = workspaceHead', 'Producer-fed passed review verdict CLI stamp.'),
-  allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'reviewedAtCommit: attestedEvidenceHead', 'Host-attested active-run review evidence carried into the verdict write.'),
-  allow('src/cli/commands/specialists/done.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed blocked review verdict CLI stamp after feedback delivery.'),
   allow('src/dashboard/server/read-model.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit || undefined', 'Read-model projection of persisted status.'),
-  allow('src/dashboard/server/routes/specialists/legacy-routes.ts', 'reviewedAtCommit', 'reviewedAtCommit: headAnchor', 'Producer-fed passed legacy review verdict stamp.'),
-  allow('src/dashboard/server/routes/specialists/legacy-routes.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed blocked legacy review verdict stamp after feedback delivery.'),
   allow('src/dashboard/server/routes/workspaces/review-control.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit review-reset clear.'),
   allow('src/dashboard/server/routes/workspaces.ts', 'reviewedAtCommit', 'update.reviewedAtCommit = headAnchor', 'Producer-fed review status route stamp.'),
   allow('src/lib/agents/agent-state.ts', 'roleRunHead', 'roleRunHead: raw.roleRunHead', 'Agent-state storage deserialization.'),
@@ -47,7 +42,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/cloister/deacon-review-signals.ts', 'reviewedAtCommit', 'reviewedAtCommit: fallbackHead', 'Producer-fed blocked fallback-synthesis review stamp.'),
   allow('src/lib/cloister/deacon-review-status.ts', 'reviewedAtCommit', "reviewUpdate['reviewedAtCommit'] = await snapshotWorkspaceHeadsPromise(issueId, workspacePath)", 'Producer-fed review recovery stamp.'),
   allow('src/lib/cloister/verdict-restore.ts', 'reviewedAtCommit', 'reviewedAtCommit: rehydrateHeadAnchor(artifact.headSha)', 'Synthesis-artifact verdict restore stamps the artifact head SHA (PAN-1577 race guard); moved out of deacon-review-status.ts into the shared restore door by PAN-3511.'),
-  allow('src/lib/cloister/deacon-review-unsignaled.ts', 'reviewedAtCommit', 'reviewedAtCommit: currentHead', 'Producer-fed pending-verdict recovery stamp after the context anchor matches current HEAD.'),
+  allow('src/lib/cloister/deacon-review-unsignaled.ts', 'reviewedAtCommit', 'reviewedAtCommit: evidenceHead', 'Host-attested report evidence carried into the canonical verdict write after the context anchor matches current HEAD.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: status.lastVerifiedCommit', 'Diagnostic nudge payload mirrors persisted status.'),
   allow('src/lib/cloister/deacon.ts', 'reviewedAtCommit', 'reviewedAtCommit', 'Producer-fed verification-bypass stamp.'),

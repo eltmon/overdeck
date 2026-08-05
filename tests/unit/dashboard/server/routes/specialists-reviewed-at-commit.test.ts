@@ -1,16 +1,18 @@
 /**
  * Regression tests for reviewedAtCommit snapshot behavior (PAN-653).
  *
- * When POST /api/specialists/done receives { specialist: 'review', status: 'passed' },
- * the route resolves the workspace path, reads the current HEAD commit via
- * getWorkspaceGitInfo(), and persists it to reviewedAtCommit via setReviewStatus().
+ * Review verdicts now reach reviewedAtCommit only through the host-owned verdict
+ * observer. The generic POST /api/specialists/done endpoint rejects review writes,
+ * while the persisted anchor and deacon invalidation behavior remain unchanged.
  *
- * These tests exercise two layers:
+ * These tests exercise three layers:
  *
- *   1. DB persistence — setReviewStatus({ reviewedAtCommit }) round-trips through
+ *   1. Route boundary — generic specialist completion cannot write review state.
+ *
+ *   2. DB persistence — setReviewStatus({ reviewedAtCommit }) round-trips through
  *      SQLite so the field survives a dashboard restart.
  *
- *   2. Deacon detection — checkPostReviewCommits() reads reviewedAtCommit, compares
+ *   3. Deacon detection — checkPostReviewCommits() reads reviewedAtCommit, compares
  *      it to the current workspace HEAD, and resets the review pipeline when HEAD
  *      has moved (i.e. new commits pushed after review passed).
  *
@@ -293,7 +295,7 @@ import { checkPostReviewCommits } from '../../../../../src/lib/cloister/deacon.j
 
 // ─── 1. DB persistence ───────────────────────────────────────────────────────
 
-describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', () => {
+describe('reviewedAtCommit persistence and route boundary', () => {
   it('persists reviewedAtCommit via setReviewStatus and loads it back from SQLite', () => {
     const sha = 'abc1234def5678901234567890123456789012ab';
     setReviewStatusSync('PAN-RAC1', {
@@ -319,15 +321,7 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
     expect(row?.reviewedAtCommit).toBe(sha);
   });
 
-  it('writes the HTTP blocked anchor only after feedback delivery', async () => {
-    mockExecHeadSha = 'blocked-http-head';
-    mockDeliverReviewVerdictFeedback.mockImplementation(() => {
-      const duringDelivery = getReviewStatusFromDbSync('PAN-RAC-HTTP');
-      expect(duringDelivery?.reviewStatus).toBe('blocked');
-      expect(duringDelivery?.reviewedAtCommit).toBeUndefined();
-      return Effect.succeed({ prCommentPosted: false, agentMessageSent: true });
-    });
-
+  it('rejects review verdict writes through the generic completion endpoint', async () => {
     const responseStatus = await postDone({
       specialist: 'review',
       issueId: 'PAN-RAC-HTTP',
@@ -336,22 +330,10 @@ describe('reviewedAtCommit DB persistence (specialists/done snapshot layer)', ()
       runId: 'agent-pan-rac-http-review-abcdef12',
     });
 
-    expect(responseStatus).toBe(200);
-    expect(mockDeliverReviewVerdictFeedback).toHaveBeenCalledWith(expect.objectContaining({
-      issueId: 'PAN-RAC-HTTP',
-      runId: 'agent-pan-rac-http-review-abcdef12',
-    }));
-    expect(mockSnapshotWorkspaceHeads).toHaveBeenCalledWith(
-      'PAN-RAC-HTTP',
-      '/fake/project/workspaces/feature-pan-rac-http',
-    );
-    expect(
-      mockDeliverReviewVerdictFeedback.mock.invocationCallOrder[0],
-    ).toBeLessThan(mockSnapshotWorkspaceHeads.mock.invocationCallOrder[0]!);
-    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toMatchObject({
-      reviewStatus: 'blocked',
-      reviewedAtCommit: 'blocked-http-head',
-    });
+    expect(responseStatus).toBe(409);
+    expect(mockDeliverReviewVerdictFeedback).not.toHaveBeenCalled();
+    expect(mockSnapshotWorkspaceHeads).not.toHaveBeenCalled();
+    expect(getReviewStatusFromDbSync('PAN-RAC-HTTP')).toBeNull();
   });
 
   it('reviewedAtCommit survives a subsequent partial update (not clobbered)', () => {

@@ -39,11 +39,10 @@ function readPersistedKey(): string | null {
   return key;
 }
 
-function createPersistedKey(): string {
+function publishPersistedKey(key: string): string {
   const home = getOverdeckHome();
   mkdirSync(home, { recursive: true, mode: 0o700 });
 
-  const generated = randomBytes(32).toString('base64url');
   const path = reviewAttestationKeyFilePath();
   const temporary = join(
     home,
@@ -51,18 +50,23 @@ function createPersistedKey(): string {
   );
 
   try {
-    writeFileSync(temporary, `${generated}\n`, { mode: 0o600, flag: 'wx' });
+    writeFileSync(temporary, `${key}\n`, { mode: 0o600, flag: 'wx' });
     chmodSync(temporary, 0o600);
     try {
       // A hard link publishes the fully-written inode only when the final path
       // is absent. Concurrent dashboard boots cannot overwrite each other's key.
       linkSync(temporary, path);
       chmodSync(path, 0o600);
-      return generated;
+      return key;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
       const existing = readPersistedKey();
       if (!existing) throw new Error(`review attestation key disappeared during creation: ${path}`);
+      if (existing !== key) {
+        throw new Error(
+          `review attestation key environment does not match persisted key: ${path}`,
+        );
+      }
       return existing;
     }
   } finally {
@@ -74,9 +78,17 @@ function createPersistedKey(): string {
   }
 }
 
+function createPersistedKey(): string {
+  return publishPersistedKey(randomBytes(32).toString('base64url'));
+}
+
 export function ensureReviewAttestationKey(env: NodeJS.ProcessEnv = process.env): string {
   const existing = keyFromEnv(env);
-  if (existing) return existing;
+  if (existing) {
+    const persisted = publishPersistedKey(existing);
+    env[REVIEW_ATTESTATION_KEY_ENV] = persisted;
+    return persisted;
+  }
   const persisted = readPersistedKey() ?? createPersistedKey();
   env[REVIEW_ATTESTATION_KEY_ENV] = persisted;
   return persisted;
@@ -103,30 +115,5 @@ export function verifyReviewAttestationSignature(
   if (!expected) return false;
   const expectedBytes = Buffer.from(expected);
   const actualBytes = Buffer.from(signature);
-  return expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes);
-}
-
-function reviewAgentTokenPayload(agentId: string, runId: string): string {
-  return `review-artifact-attestation:v${REVIEW_ATTESTATION_VERSION}:${agentId}:${runId}`;
-}
-
-export function createReviewAgentAttestationToken(
-  agentId: string,
-  runId: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string | null {
-  return signReviewAttestationPayload(reviewAgentTokenPayload(agentId, runId), env);
-}
-
-export function verifyReviewAgentAttestationToken(
-  agentId: string,
-  runId: string,
-  token: string,
-  env: NodeJS.ProcessEnv = process.env,
-): boolean {
-  const expected = createReviewAgentAttestationToken(agentId, runId, env);
-  if (!expected) return false;
-  const expectedBytes = Buffer.from(expected);
-  const actualBytes = Buffer.from(token);
   return expectedBytes.length === actualBytes.length && timingSafeEqual(expectedBytes, actualBytes);
 }

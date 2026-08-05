@@ -86,7 +86,6 @@ import { ensureLifecycleHooksBeforeLaunch } from './hook-readiness.js';
 import { withAutoSpawnConsentClaim, type AcceptAutoSpawnConsent } from '../planning/auto-spawn-consent.js';
 import { isOperatorStartedBy } from './provenance.js';
 import { buildRegisteredSlotPrompt, ensureRegisteredSlotWorktree } from './registered-slot-spawn.js';
-import { REVIEW_ATTESTATION_TOKEN_ENV } from '../review-attestation-key.js';
 const execAsync = promisify(exec);
 export async function spawnRun(issueId: string, role: Role, options: SpawnRunOptions): Promise<AgentState> {
   if (role !== 'work') return spawnRunWithoutConsentClaim(issueId, role, options);
@@ -424,7 +423,6 @@ async function spawnRunWithoutConsentClaim(
       OVERDECK_AGENT_STARTED_BY: startedBy,
       CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION: 'false',
       GIT_SEQUENCE_EDITOR: 'false',
-      [REVIEW_ATTESTATION_TOKEN_ENV]: options.reviewAttestationToken ?? '',
       ...flywheelEnv,
       ...providerEnv,
     },

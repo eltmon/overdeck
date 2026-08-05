@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,15 +9,12 @@ import {
   readAttestedReviewReports,
 } from '../cloister/review-artifact-attestation.js';
 import {
-  createReviewAgentAttestationToken,
   ensureReviewAttestationKey,
   REVIEW_ATTESTATION_KEY_ENV,
-  verifyReviewAgentAttestationToken,
 } from '../review-attestation-key.js';
 
 const ISSUE_ID = 'PAN-3511';
 const RUN_ID = 'agent-pan-3511-review-restart-att1';
-const AGENT_ID = 'agent-pan-3511-review';
 const HEAD_SHA = 'a'.repeat(40);
 let root: string;
 let workspacePath: string;
@@ -36,10 +33,8 @@ afterEach(() => {
 });
 
 describe('review attestation key persistence', () => {
-  it('keeps active-run tokens and signed reports valid across host restarts', () => {
+  it('keeps signed reports valid across host restarts', () => {
     const firstKey = ensureReviewAttestationKey();
-    const token = createReviewAgentAttestationToken(AGENT_ID, RUN_ID);
-    expect(token).toBeTruthy();
 
     const runDir = join(workspacePath, '.pan', 'review', RUN_ID);
     mkdirSync(runDir, { recursive: true });
@@ -58,11 +53,30 @@ describe('review attestation key persistence', () => {
     const restartedKey = ensureReviewAttestationKey();
 
     expect(restartedKey).toBe(firstKey);
-    expect(verifyReviewAgentAttestationToken(AGENT_ID, RUN_ID, token!)).toBe(true);
     expect(readAttestedReviewReports({ issueId: ISSUE_ID, runId: RUN_ID, workspacePath }))
       .toHaveLength(1);
     expect(statSync(join(root, 'overdeck-home', 'review-attestation-key')).mode & 0o777)
       .toBe(0o600);
+  });
+
+  it('materializes an environment-supplied key at the protected canonical path', () => {
+    const supplied = 'environment-review-attestation-key-material-123456789';
+    process.env[REVIEW_ATTESTATION_KEY_ENV] = supplied;
+
+    expect(ensureReviewAttestationKey()).toBe(supplied);
+
+    const path = join(root, 'overdeck-home', 'review-attestation-key');
+    expect(readFileSync(path, 'utf8').trim()).toBe(supplied);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
+
+  it('fails loudly when environment and persisted signing keys disagree', () => {
+    const persisted = ensureReviewAttestationKey();
+    process.env[REVIEW_ATTESTATION_KEY_ENV] = `${persisted}-different`;
+
+    expect(() => ensureReviewAttestationKey()).toThrow(
+      'review attestation key environment does not match persisted key',
+    );
   });
 
   it('fails loudly instead of rotating an invalid persisted key', () => {

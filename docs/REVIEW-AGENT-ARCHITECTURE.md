@@ -133,19 +133,25 @@ The contract has four clauses:
 `src/lib/cloister/synthesis-verdict.ts` is the read door. It resolves the active
 review parent's `reviewRunId` through the agent-state read door and accepts only a
 report whose exact bytes and reviewed HEAD have a valid host HMAC attestation.
-The dashboard signs `context.json` before reviewers start, then signs the selected
-`synthesis.md` or `review.md` after the review agent signals its verdict but before
-the row write. The host key is atomically created once at
+The dashboard signs `context.json` before reviewers start. After a report settles,
+the host verifies that the active run's signed context still matches the current
+workspace HEAD, signs the selected `synthesis.md` or `review.md` bytes, and routes the
+verdict through `recordReviewVerdict()`. The review process does not request this
+attestation: it writes the report and waits, so workspace-controlled subprocesses
+receive neither the signing key nor an equivalent bearer capability.
+
+The host key is atomically created once at
 `<OVERDECK_HOME>/review-attestation-key`, forced to mode `0600`, and loaded on every
-dashboard boot, so restarts preserve active tokens and signed evidence. File mode is
-storage hygiene, not the trust boundary: every local coding-agent launcher unsets the
-key and re-execs before workspace code runs. Linux uses Bubblewrap to bind-mask the
-key with `/dev/null` in a new mount/PID/IPC namespace; macOS uses `sandbox-exec` to
-deny reads and writes to the exact key path. Launch fails closed when the platform's
-boundary tool is unavailable. Both child environment builders also strip the host key
-and request token; the review parent receives only its run-bound token through the
-explicit launch override. Workspace-created runs, tampered contexts, and unsigned or
-altered reports are not verdict evidence.
+dashboard boot, so restarts preserve signed evidence. A valid environment-supplied
+key is atomically materialized at that canonical path before any launcher runs; a
+mismatch with an existing persisted key fails loudly. File mode is storage hygiene,
+not the trust boundary: every local coding-agent launcher unsets the key and legacy
+request-token variable, then re-execs before workspace code runs. Linux uses
+Bubblewrap to bind-mask the key with `/dev/null` in a new mount/PID/IPC namespace;
+macOS uses `sandbox-exec` to deny reads and writes to the exact key path. Launch fails
+closed when the platform's boundary tool is unavailable. Both child environment
+builders also strip the host key and legacy request-token variable. Workspace-created
+runs, tampered contexts, and unsigned or altered reports are not verdict evidence.
 Polyrepo attestations bind the canonical full-SHA anchor
 `repoKey@sha repoKey@sha` in manifest order, matching the workspace snapshot
 format used by the HEAD guard.
@@ -210,18 +216,17 @@ use the same heading contract: `## Verdict: APPROVED` for a pass or
 The shared verdict-report reader accepts both filenames and this vocabulary, so
 recovery does not depend on which review mode produced the report.
 
-Verdict application has three ordered layers:
+Verdict application has two host-owned layers:
 
-1. The review agent signals through `pan admin specialists done review`, which
-   durably writes review status and delivers blocked feedback before the run is
-   considered complete.
-2. `checkCompletedButUnsignaledReviews()` recovers a report whose status remains
-   `reviewing`: it nudges a live review parent once, then applies the verdict if
-   the parent stays unresponsive or has died.
-3. `reconcileUnappliedReviewVerdicts()` repairs the incident shape where a
-   report exists but review status has already reset to `pending`. It uses the
-   same nudge-first policy and applies the on-disk verdict after the grace
-   period, with an activity entry naming the sweep.
+1. `checkCompletedButUnsignaledReviews()` observes the active run's settled report
+   while the row remains `reviewing`, verifies the signed context against the current
+   workspace HEAD, attests the report, and applies it through the verdict write door.
+   The warm review session receives no completion capability and stays available for
+   the next cycle.
+2. `reconcileUnappliedReviewVerdicts()` repairs the incident shape where a settled
+   report exists but review status has already reset to `pending`. It performs the
+   same host-owned verification, attestation, and write after the longer recovery
+   settle window, with an activity entry naming the sweep.
 
 The fallback sweeps fail closed. They wait for the report settle window, reject
 a report when the current workspace HEAD differs from `context.json`'s review
@@ -401,11 +406,11 @@ depends on the cache landing.
 
 ## Selective re-review + per-reviewer verdicts (PAN-1862, `full` mode)
 
-Synthesis records a **per-reviewer verdict** map alongside the aggregate:
-`reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`
-(journal-durable; written via `pan admin specialists done review … --reviewers
-"security=passed,correctness=blocked,…"`, or by the Deacon fallback synthesis).
-The workspace HEAD is stamped as `atCommit` on every verdict — a BLOCKED
+The host records a **per-reviewer verdict** map alongside the aggregate:
+`reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`.
+After `synthesis.md` settles, it derives each outcome from the sub-role report files
+that ran this cycle; the review-status writer merges that partial map with carried
+prior verdicts. The workspace HEAD is stamped as `atCommit` on every verdict — a BLOCKED
 aggregate is exactly the cycle whose clean reviewers the next pass wants to skip.
 
 On a re-review cycle, `reviewersToRerun()` decides who actually runs from
@@ -451,11 +456,12 @@ spawnReviewRoleForIssue(issueId)
   │    then touches ~/.overdeck/agents/<reviewer>/reviewer-signaled
   ├─ Deacon is the rare backup: only signals when the launcher's own bash
   │    process was SIGKILLed before it could (no reviewer-signaled marker)
-  ├─ synthesis reads ready output files and synthesizes one verdict
-  └─ synthesis signals via Overdeck's CLI
+  ├─ synthesis reads ready output files, writes one verdict report, and waits
+  └─ host observes the settled active-run report
         │
-        ├─ pan specialists done review <id> --status passed  → review.approved → test role
-        └─ pan specialists done review <id> --status blocked → notify `work` with blockers
+        ├─ verifies signed context still matches workspace HEAD
+        ├─ attests the exact report bytes and derives per-reviewer outcomes
+        └─ writes through recordReviewVerdict → test role or blocked feedback
 ```
 
 The dashboard displays the current review status from persisted review state and domain events. It does not own the review decision.
@@ -537,7 +543,7 @@ Each convoy reviewer writes exactly one report to its assigned output file under
 - report file is non-empty → `REVIEWER_READY <subRole> <outputPath>`
 - otherwise (crash, early exit, empty file) → `REVIEWER_FAILED <subRole> ...`
 
-It then `touch`es `~/.overdeck/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, then writes `.pan/review/<runId>/synthesis.md` and signals the verdict via `pan specialists done review`.
+It then `touch`es `~/.overdeck/agents/<reviewerAgentId>/reviewer-signaled`. This makes the happy path *and* the failure path self-contained in the launcher's bash process: the agent cannot forget to signal, cannot double-signal, and a crash still produces `REVIEWER_FAILED`. The synthesis role never spawns reviewers and never polls files or tmux; it waits for one terminal signal per sub-role, reads the output paths from `REVIEWER_READY`, writes `.pan/review/<runId>/synthesis.md`, and waits while the host-owned report observer attests and applies it.
 
 **Deacon is the rare backup, not the happy path.** `monitorReviewConvoySignals` skips any reviewer whose `reviewer-signaled` marker is newer than the run's `startedAt` — the launcher already signaled. Deacon only signals `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` itself when that marker is absent, i.e. the launcher's bash process was SIGKILLed before it could run its contract block. Synthesis treats either failure signal as a blocking infrastructure failure.
 

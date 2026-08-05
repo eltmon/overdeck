@@ -24,8 +24,8 @@
  * button — flows through
  * spawnReviewRoleForIssue → spawnRun(issueId, 'review'). The review role
  * launches four isolated review sub-role sessions via `pan review spawn-reviewer`,
- * then writes the report and signals the verdict via Overdeck's CLI inside
- * the role itself (see roles/review.md).
+ * then writes the report and waits while the host-owned observer attests and
+ * applies the verdict (see roles/review.md).
  *
  * Surface area kept:
  *   - spawnReviewRoleForIssue       — the only review entry point
@@ -58,10 +58,7 @@ import { providerDefaultHarnessSync } from '../agents/staffing.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { attestReviewContextManifest } from './review-artifact-attestation.js';
-import {
-  createReviewAgentAttestationToken,
-  REVIEW_ATTESTATION_RUN_SUFFIX,
-} from '../review-attestation-key.js';
+import { REVIEW_ATTESTATION_RUN_SUFFIX } from '../review-attestation-key.js';
 import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
@@ -221,7 +218,7 @@ export function buildReviewRolePrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Synthesis output file: ${synthesisPath}`,
-    'The host attests the finished report when you signal the verdict; do not create or edit attestation files.',
+    'The host observes and attests the settled report; do not create or edit attestation files.',
     '',
     opts.tier1Summary
       ? [
@@ -239,19 +236,11 @@ export function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Overdeck CLI,',
-    'including a per-reviewer verdict for each sub-role that RAN this cycle',
-    '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
-    'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
-    '',
-    // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
-    // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
-    // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
-    'After running the signal command above, STOP and wait — do not exit, do not run',
-    'any further commands. The session stays open for the next review cycle.',
+    'After writing the synthesis report, STOP and wait — do not run a completion',
+    'command, do not exit, and do not run any further commands. The host observes',
+    'the settled report, derives the per-reviewer outcomes from the files that ran',
+    'this cycle, attests the exact report bytes, and records the verdict. The session',
+    'stays open for the next review cycle.',
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
@@ -292,7 +281,7 @@ function buildSelfReviewPrompt(opts: {
     `Run ID: ${opts.runId}`,
     `Review directory: ${opts.reviewDir}`,
     `Review output file: ${reviewReportPath}`,
-    'The host attests the finished report when you signal the verdict; do not create or edit attestation files.',
+    'The host observes and attests the settled report; do not create or edit attestation files.',
     '',
     opts.tier1Summary
       ? [
@@ -314,16 +303,10 @@ function buildSelfReviewPrompt(opts: {
     '   severity + verdict vocabulary in roles/review.md.',
     `3. Write your findings to ${reviewReportPath}.`,
     '',
-    'Then signal the verdict with the Overdeck CLI (exactly one):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
-    '',
-    // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
-    // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
-    // review cycle without a cold re-spawn. Exiting before the signal command is
-    // what stranded reviews at reviewStatus=reviewing.
-    'After running the signal command above, STOP and wait — do not exit, do not run',
-    'any further commands. The session stays open for the next review cycle.',
+    'After writing the review report, STOP and wait — do not run a completion',
+    'command, do not exit, and do not run any further commands. The host observes',
+    'the settled report, attests the exact report bytes, and records the verdict.',
+    'The session stays open for the next review cycle.',
     '',
     'Reactive Cloister dispatches the test role after review passes. Never queue tests yourself and never edit code.',
   ].filter(Boolean).join('\n');
@@ -744,8 +727,6 @@ async function spawnReviewRoleForIssuePromise(
       try { await wipeAgentStateDirs(opts.issueId, { rolePrefix: 'review' }); }
       catch (wipeErr) { console.warn(`[review-agent] review state wipe before fresh spawn failed (non-fatal): ${wipeErr instanceof Error ? wipeErr.message : String(wipeErr)}`); }
     }
-    const reviewAttestationToken = createReviewAgentAttestationToken(reviewAgentId, runId);
-    if (!reviewAttestationToken) throw new Error('review artifact attestation key is unavailable');
     const run = await spawnRun(opts.issueId, 'review', {
       workspace: opts.workspace,
       prompt,
@@ -754,7 +735,6 @@ async function spawnReviewRoleForIssuePromise(
       ...(allowHost ? { allowHost: true } : {}),
       reviewRunId: runId,
       reviewDeadlineAt: new Date(Date.now() + PARENT_REVIEW_TIMEOUT_MS).toISOString(),
-      reviewAttestationToken,
       startedBy: 'review-agent',
     });
     if (fullReview) {

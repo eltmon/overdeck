@@ -98,17 +98,22 @@ describe('prompt invariants', () => {
     ).toMatch(/require_uat_before_merge[\s\S]{0,200}default ON/i);
   });
 
-  it('review synthesis uses the canonical verdict header template', () => {
+  it('review synthesis uses the canonical verdict headings', () => {
     expect(
       review,
-      `Expected roles/review.md to contain the canonical verdict header template. ${RAIL_MESSAGE}`,
-    ).toMatch(/## Verdict: APPROVED \/ CHANGES REQUESTED/);
+      `Expected roles/review.md to contain the approved verdict heading. ${RAIL_MESSAGE}`,
+    ).toContain('## Verdict: APPROVED');
+    expect(
+      review,
+      `Expected roles/review.md to contain the blocked verdict heading. ${RAIL_MESSAGE}`,
+    ).toContain('## Verdict: CHANGES REQUESTED — <one-line top blocker');
   });
 
-  it('review blocked signal uses the canonical blocked command', () => {
+  it('review completion is host-attested from the canonical report', () => {
     expect(
       review,
-      `Expected roles/review.md to contain the canonical blocked signal command. ${RAIL_MESSAGE}`,
-    ).toMatch(/pan admin specialists done review[\s\S]{0,200}--status blocked/);
+      `Expected roles/review.md to keep attestation capability out of the review process. ${RAIL_MESSAGE}`,
+    ).toContain('The host observes the settled report');
+    expect(review).not.toContain('pan admin specialists done review');
   });
 });

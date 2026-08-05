@@ -55,18 +55,12 @@ hooks:
 > files / synthesize" instruction in this file below — none of it applies right now.
 > You are the **sole reviewer**: read the diff yourself and review it across
 > **correctness, security, requirements/acceptance-criteria, and performance** in one
-> pass, write your findings to `.pan/review/<runId>/review.md`, then signal your verdict:
->
-> ```
-> pan admin specialists done review <issueId> --status passed  --notes "<one-line summary>" --run-id "<runId>"
-> pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
-> ```
->
-> **Signal once (PAN-3092).** If the command reports that the verdict went to the
-> workspace fallback because the journal write is contended, the verdict IS durable
-> — do NOT re-run the signal. The host folds it automatically (fallback drain plus
-> the deacon's stranded-fallback sweep). Repeated signals only add lock pressure and
-> burn tokens. Continue to your final summary.
+> pass, write your findings to `.pan/review/<runId>/review.md`, then STOP and
+> wait. Do not run a completion command. The host observes the settled report,
+> verifies its signed context against the current workspace HEAD, attests the exact
+> report bytes, and records the verdict through the canonical write door. Review
+> processes receive neither the signing key nor any bearer capability that can
+> request attestation.
 >
 > Use the dimension criteria, severity vocabulary, and verdict rules below as the
 > standard for **your own** review. Do NOT spawn anything, do NOT wait for any signal,
@@ -172,8 +166,18 @@ Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling 
 ```markdown
 # Review Synthesis — <issueId> — <timestamp>
 
-## Verdict: APPROVED / CHANGES REQUESTED — <when CHANGES REQUESTED: one-line top blocker, e.g. "auth bypass in routes/agents.ts">
+## Verdict: APPROVED
+```
 
+or:
+
+```markdown
+## Verdict: CHANGES REQUESTED — <one-line top blocker, e.g. "auth bypass in routes/agents.ts">
+```
+
+Then continue the report:
+
+```markdown
 ## Context
 - Manifest: <path>
 - Branch: <branch>
@@ -207,17 +211,13 @@ Write the full synthesis to `.pan/review/<runId>/synthesis.md` before signaling 
 
 If you find no blocking findings, set `## Blocking Findings` to `None`. Omit `## Scope Note` when neither gate fired.
 
-### 7. Signal review status
+### 7. Finish the review report
 
-After writing `synthesis.md`, use the local Overdeck CLI to signal the verdict:
-
-```bash
-# Approved
-pan admin specialists done review <issueId> --status passed --notes "<one-line summary>" --run-id "<runId>"
-
-# Changes requested
-pan admin specialists done review <issueId> --status blocked --notes "<one-line top blocker>" --run-id "<runId>"
-```
+After writing `synthesis.md`, STOP and wait. Do not run a completion command or
+edit the report again. The host observes the settled report, derives the outcomes
+of the sub-reviewers that ran from their report files, verifies the signed context
+against the current workspace HEAD, attests the exact synthesis bytes, and records
+the verdict through the canonical write door.
 
 For Pi sessions, also end your final response with exactly one structured sentinel line:
 
@@ -241,7 +241,7 @@ pan tell flywheel-orchestrator "review <issue>: <what I'm NOT doing and why> —
 
 Under full autonomy nobody is watching the `❯` prompt. A silent park leaves the issue Pending forever and the orchestrator never learns you pushed back — it only finds out if a human happens to ask. The one-line tell lets it follow through in the same tick instead of waiting on a human. This is fire-and-forget: it no-ops gracefully when no Flywheel run is active — the message just lands in an idle or absent session. If the tell itself fails (an error, or "not running"), fall back to posting the same analysis as a comment on the issue — that is the durable channel the orchestrator checks on its next tick.
 
-The four push-back shapes that require this signal: **self-abort** (review can't proceed — e.g. context is missing and unrecoverable), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing). A normal blocked verdict signalled through `pan admin specialists done review ... --status blocked` is *not* a stall — the pipeline already consumes it; this rule covers the cases where you would otherwise park silently without signalling anyone.
+The four push-back shapes that require this signal: **self-abort** (review can't proceed — e.g. context is missing and unrecoverable), **refuse-to-fix-forward** (a gate is red for reasons orthogonal to your change and you won't chase them), **full-pipeline-needed** (the work is broader than this role's path), and **blocking question** (you genuinely need an operator decision before continuing). A normal blocked verdict written into the review report is *not* a stall — the host consumes it automatically; this rule covers the cases where you would otherwise park silently without producing the report.
 
 ## Boundaries
 
