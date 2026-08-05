@@ -9,6 +9,7 @@ import { jsonResponse } from "../http-helpers.js";
  *   POST /api/settings/test-api-key
  *   POST /api/settings/validate-api-key
  *   PUT  /api/settings
+ *   PUT  /api/settings/design-language
  */
 
 import { randomBytes } from 'node:crypto';
@@ -20,6 +21,7 @@ import { HttpRouter, HttpServerRequest } from 'effect/unstable/http';
 import {
   loadSettingsApi,
   saveSettingsApi,
+  saveDesignLanguage,
   validateSettingsApi,
   getAvailableModelsApi,
   getOptimalDefaultsApi,
@@ -929,6 +931,35 @@ const putUiThemeRoute = HttpRouter.add(
   })),
 );
 
+// ─── Route: PUT /api/settings/design-language ─────────────────────────────────
+// The Overdeck Theme (Ledger/Broadsheet) picker saves here directly instead of
+// GET-then-PUT /api/settings: that client round trip left a window in which a
+// concurrent settings save (another tab, or the top-level Settings form) could
+// commit and then be silently overwritten by this save's now-stale snapshot of
+// every other field. A single request that only ever carries `theme` and reads
+// the current document fresh server-side removes that window (PAN-3410 review
+// finding — no-loss guarantee, FR-7).
+
+const putDesignLanguageRoute = HttpRouter.add(
+  'PUT',
+  '/api/settings/design-language',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const authError = rejectUnsafeDashboardMutationRequest(request);
+    if (authError) return authError;
+    const body = yield* readJsonBody;
+
+    return yield* Effect.promise(async () => {
+      const theme = (body as { theme?: unknown } | null)?.theme;
+      if (theme !== 'ledger' && theme !== 'broadsheet') {
+        return jsonResponse({ error: "theme must be 'ledger' or 'broadsheet'" }, { status: 400 });
+      }
+      await Effect.runPromise(saveDesignLanguage(theme));
+      return jsonResponse({ success: true });
+    });
+  })),
+);
+
 // ─── Route: GET /api/settings/openrouter/models ──────────────────────────────
 
 const getOpenRouterModelsRoute = HttpRouter.add(
@@ -1127,6 +1158,7 @@ export const settingsRouteLayer = Layer.mergeAll(
   getConversationSearchReindexProgressRoute,
   putSettingsRoute,
   putUiThemeRoute,
+  putDesignLanguageRoute,
   getOpenRouterModelsRoute,
   putOpenRouterFavoritesRoute,
   putOpenRouterApiKeyRoute,

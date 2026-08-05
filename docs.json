@@ -102,6 +102,7 @@
               "configuration/knowledge",
               "configuration/harnesses",
               "configuration/context-layers",
+              "configuration/appearance",
               "configuration/state-branch",
               "configuration/issue-trackers",
               "configuration/polyrepo",

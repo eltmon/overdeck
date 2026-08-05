@@ -3,7 +3,9 @@ import type { ProjectFeature } from './ProjectTree/ProjectNode';
 import {
   fetchProjectPipelineMembership,
   groupProjects,
+  isUnscopedConversation,
   refreshProjectPipelineMembership,
+  type RegisteredProjectLite,
 } from './projectsData';
 
 vi.mock('../../lib/wsTransport', () => ({
@@ -78,6 +80,37 @@ describe('project pipeline membership probes', () => {
 
     await expect(refreshProjectPipelineMembership('overdeck'))
       .rejects.toThrow('Repository missing (repo_unavailable)');
+  });
+});
+
+describe('isUnscopedConversation (PAN-1577 grouping precedence)', () => {
+  const registeredProjects: RegisteredProjectLite[] = [
+    { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+    { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+  ];
+
+  it('prefers the projectKey override over cwd when both are present', () => {
+    const conv = { cwd: '/home/user/Projects/krux', projectKey: 'myn' };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
+  });
+
+  it('is unscoped when projectKey is set but matches no registered project, even if cwd would match one', () => {
+    const conv = { cwd: '/home/user/Projects/krux', projectKey: 'deleted-project' };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+  });
+
+  it('falls back to cwd inference when projectKey is null', () => {
+    const conv = { cwd: '/home/user/Projects/myn/sub', projectKey: null };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(false);
+  });
+
+  it('is unscoped when projectKey is null and cwd matches no registered project', () => {
+    const conv = { cwd: '/home/user/Projects/unrelated', projectKey: null };
+    expect(isUnscopedConversation(conv, registeredProjects)).toBe(true);
+  });
+
+  it('is unscoped when neither projectKey nor cwd is set', () => {
+    expect(isUnscopedConversation({}, registeredProjects)).toBe(true);
   });
 });
 

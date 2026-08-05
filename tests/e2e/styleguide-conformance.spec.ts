@@ -384,8 +384,16 @@ beforeAll(async () => {
       name: 'styleguide-empty-index-css',
       enforce: 'pre',
       transform(_code: string, id: string) {
+        // Mirrors the real token wiring (PAN-3410): :root carries Ledger's
+        // value for --font-display, and font-display consumes the variable
+        // rather than a literal font name, so this proves the token chain
+        // resolves end-to-end rather than asserting an unrelated stub rule.
         return id.endsWith('/src/index.css')
-          ? { code: '.font-display { font-family: "Space Grotesk", system-ui, sans-serif; }', map: null }
+          ? {
+              code: ':root { --font-display: "Space Grotesk", system-ui, sans-serif; } '
+                + '.font-display { font-family: var(--font-display), system-ui, sans-serif; }',
+              map: null,
+            }
           : null;
       },
     }],

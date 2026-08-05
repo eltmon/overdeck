@@ -1169,6 +1169,20 @@ export const ConversationCreatedEvent = Schema.Struct({
 })
 export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
 
+/** Emitted (in-memory only, not persisted) when a conversation's project
+ * assignment override changes, so the sidebar can re-group it live instead of
+ * waiting for its poll tick. */
+export const ConversationMovedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.moved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    projectKey: Schema.String,
+  }),
+})
+export type ConversationMovedEvent = typeof ConversationMovedEvent.Type
+
 /** Emitted (in-memory only) when a conversation title changes, so the sidebar
  * list can refresh immediately instead of waiting for its poll tick. */
 export const ConversationTitleChangedEvent = Schema.Struct({
@@ -1450,6 +1464,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
+  ConversationMovedEvent,
   ConversationTitleChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
