@@ -50,12 +50,14 @@ import {
   getConversationRead,
   getConversationsPendingInputFeed,
   patchConversationTitle,
+  handleConversationMove,
   retitleConversation,
   resolveSessionFile,
 } from '../../../lib/overdeck/conversation-reads.js';
 import {
   getEnrichedConversationList,
   invalidateConversationFavoritesCache,
+  invalidateConversationListEnrichmentCache,
 } from '../../../lib/overdeck/conversation-list.js';
 import {
   clearPendingConversationControlAcksForTests,
@@ -155,7 +157,6 @@ import {
   shouldInterceptManualCompact,
 } from '../services/conversation-compaction.js';
 import { encodeClaudeProjectDir, packageRoot, getOverdeckHome, resolveOhmypiExtensionPath } from '../../../lib/paths.js';
-import { getEventStore } from '../event-store.js';
 import {
   ensureConversationAttachmentDir,
   getConversationAttachmentsRoot,
@@ -711,6 +712,32 @@ const patchConversationRoute = HttpRouter.add(
     });
   }),
 );
+const patchConversationMoveRoute = HttpRouter.add(
+  'PATCH',
+  '/api/conversations/:name/move',
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const originCheck = validateOrigin(request);
+    if (!originCheck.ok) {
+      return jsonResponse({ error: originCheck.error }, { status: 403 });
+    }
+    const params = yield* HttpRouter.params;
+    const name = decodeURIComponent(params['name'] ?? '');
+    const body = yield* readJsonBody;
+    return yield* Effect.promise(async () => {
+      try {
+        const result = await handleConversationMove(name, body, {
+          invalidateListEnrichmentCache: invalidateConversationListEnrichmentCache,
+        });
+        return jsonResponse(result.body, { status: result.status });
+      } catch (error: unknown) {
+        const msg = error instanceof Error ? error.message : String(error);
+        console.error('[conversations] move conversation failed:', msg);
+        return jsonResponse({ error: 'Internal server error' }, { status: 500 });
+      }
+    });
+  }),
+);
 const deleteConversationRoute = HttpRouter.add(
   'DELETE',
   '/api/conversations/:name',
@@ -972,6 +999,7 @@ export const conversationsRouteLayer = Layer.mergeAll(
   getConversationHandoffDocRoute,
   postConversationRoute,
   patchConversationRoute,
+  patchConversationMoveRoute,
   deleteConversationRoute,
   postConversationStopRoute,
   postConversationResumeRoute,

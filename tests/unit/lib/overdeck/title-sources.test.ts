@@ -102,6 +102,7 @@ describe('TitleSource schema', () => {
       handoffDocPath: null,
       handoffTargetConvId: null,
       clearedToConvId: null,
+      projectKey: null,
       files: [],
     }).titleSource).toBe(titleSource);
   });

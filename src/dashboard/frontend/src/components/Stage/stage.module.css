@@ -351,7 +351,7 @@
 .ddKeys {
   color: var(--muted-foreground);
   font-size: 11px;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono), 'SF Mono', monospace;
 }
 
 .gicon {
@@ -639,7 +639,7 @@
 
 .fileStat {
   font-size: 11px;
-  font-family: 'SF Mono', monospace;
+  font-family: var(--font-mono), 'SF Mono', monospace;
 }
 
 /* Sub-toggle panes (e.g. PlanPane, DocsPane) */

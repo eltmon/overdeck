@@ -8,6 +8,7 @@ import { useDashboardStore } from '../../lib/store';
 import type { ContextUsage } from '../chat/chat-types';
 import styles from './styles/command-deck.module.css';
 import { fetchWithTimeout } from '../../lib/apiFetch';
+import { fetchRegisteredProjects } from './UnknownProjectState';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,8 @@ export interface Conversation {
   needsTerminal?: boolean;
   /** PAN-1990: the projects/workspaces registry row this conversation belongs to. Null for pre-migration rows. */
   workspaceId?: string | null;
+  /** PAN-1577: explicit project assignment override. Null = fall back to deriving the project from cwd. */
+  projectKey?: string | null;
 }
 
 // ─── Sort types ───────────────────────────────────────────────────────────────
@@ -204,6 +207,14 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
       const pendingSpawn = data.some((c: Conversation) => !c.sessionAlive && !c.endedAt && !c.spawnError);
       return (pendingFork || pendingSpawn) ? 2000 : 10000;
     },
+  });
+
+  // Registered projects for each row's Move submenu (PAN-1577) — one shared
+  // query for the whole list, same key the Sidebar/CommandDeck use.
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: fetchRegisteredProjects,
+    staleTime: 60000,
   });
 
   // Refresh the list the instant a conversation is created (server emits a
@@ -323,6 +334,7 @@ export function ConversationList({ selectedConversation, onSelectConversation, e
                   isSelected={selectedConversation === conv.name}
                   onSelect={(name) => onSelectConversation(name)}
                   mutations={mutations}
+                  registeredProjects={registeredProjects}
                 />
               </motion.div>
             ))}

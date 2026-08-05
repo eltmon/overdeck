@@ -222,6 +222,7 @@ export const DEFAULT_CONFIG: NormalizedConfig = {
   },
   ui: {
     openInEditorCommand: null,
+    theme: 'broadsheet',
   },
   experimental: {
     experimentalFeatures: false,
