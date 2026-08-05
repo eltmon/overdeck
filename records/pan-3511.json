@@ -838,18 +838,18 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:37:41.519Z",
+  "updated": "2026-08-05T10:49:05.115Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:37:41.502Z",
-    "reviewNotes": "Workspace-controlled artifact heads can still replay stale approvals without the host-recorded run anchor",
+    "updatedAt": "2026-08-05T10:49:05.020Z",
+    "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "63d419b952bb04353dd4a5864493e94151828311",
     "lastVerifiedCommit": "63d419b952bb04353dd4a5864493e94151828311",
@@ -923,9 +923,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 44684178,
-            "output": 547848,
-            "cacheRead": 143706112,
+            "input": 44689344,
+            "output": 549760,
+            "cacheRead": 144398336,
             "cacheWrite": 0
           }
         },
@@ -1001,9 +1001,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 4821073,
-            "output": 281221,
-            "cacheRead": 158351360,
+            "input": 5103831,
+            "output": 287688,
+            "cacheRead": 163136000,
             "cacheWrite": 0
           }
         }
@@ -1022,9 +1022,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 60339540,
-          "output": 1293113,
-          "cacheRead": 381623296,
+          "input": 60627464,
+          "output": 1301492,
+          "cacheRead": 387100160,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -1035,8 +1035,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 653.7515466,
-        "pricingAsOf": "2026-08-05T10:37:41.511Z"
+        "usd": 655.9662676,
+        "pricingAsOf": "2026-08-05T10:49:05.087Z"
       }
     },
     "merges": [
