@@ -427,6 +427,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-04T21:58:59.541Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-sol",
+      "timestamp": "2026-08-05T17:05:16.040Z"
     }
   ],
   "feedback": [],
@@ -462,7 +467,7 @@
     "recordedAt": "2026-08-04T18:51:45.736Z"
   },
   "created": "2026-08-01T15:27:10.925Z",
-  "updated": "2026-08-04T22:14:59.263Z",
+  "updated": "2026-08-05T17:05:16.040Z",
   "pipeline": {
     "issueId": "PAN-3423",
     "reviewStatus": "pending",
@@ -474,10 +479,26 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T19:45:02.360Z",
-    "updatedAt": "2026-08-04T22:14:59.251Z",
+    "updatedAt": "2026-08-05T17:05:15.993Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3423-review",
     "testNotes": "Automated gates on feature/pan-3423 at HEAD 5e2735f1597e06cc2434e504ab2105799fa9ca0c (workspace /home/eltmon/Projects/overdeck/workspaces/feature-pan-3423), re-run fresh since lastVerifiedCommit (2d6872f) was stale relative to HEAD (SystemHealthPill.tsx changed 49 lines and system-health-ui-no-loss.test.tsx changed 106 lines since then via the 'fix(dashboard): prove system health no-loss criteria' commit). npm run typecheck PASSED (root, hooks, evals, dashboard guard 55 known/0 new, frontend guard 0 known/0 new). npm run lint PASSED (exit 0) including lint:file-size — the previously-reported merge-ops.ts file-size ratchet failure is resolved now that this branch has merged current origin/main. Scoped tests: npx vitest run system-health-ui-no-loss SystemHealthPill system-health-attention (frontend workspace) -> 3 files / 34 tests passed. npx vitest run src/lib/agents/__tests__/agent-health.test.ts (FR-3 server change) -> 1 file / 12 tests passed. Full frontend suite (src/dashboard/frontend, npx vitest run) -> 306 files / 3003 tests passed. Full root-level npm test (npx vitest run from repo root) -> 1399 files / 13263 tests passed, 3 files / 50 tests skipped, 0 failures (the DB-fixture-timeout flakiness seen in a prior run under heavier host contention did not reproduce this run).",
     "uatNotes": "UAT required: PAN-3423 is a UI redesign of the SystemHealthPill popover with acceptance criteria describing observable rendering (state badge, meter bars, chip row, grouped attention rows, context-notes disclosure, row actions, top-consumers badges). Built the workspace at HEAD (npm run build, dist build succeeded) and ran it standalone on PORT=3017 from this workspace's dist/dashboard/server.js (buildCommit 5e2735f1597e06cc2434e504ab2105799fa9ca0c, buildBranch feature/pan-3423, buildDirty false) rather than touching the primary :3011 dashboard (which is the Flywheel-managed production instance, mode=primary, deployed from ~/.overdeck/deployments/dashboard — non-flywheel agents must not restart it). Drove it with the Playwright MCP tools against an isolated tab. Clicked [data-testid=system-health-pill] in the topbar (live state: Critical / agent session missing) and verified live, against the workspace's own real agent/host data (no mocks needed — the environment happened to have live critical/warning conditions): (1) header renders a 'Critical' badge pill next to 'System health' and a relative 'Updated Ns ago' time that advanced across screenshots (11s -> 20s) confirming per-render computation, not a live ticker; (2) a bordered summary box between the header and vitals reads 'Action required: 2 critical issues (3 stalled agents)'; (3) the 2x2 vitals grid (CPU, Memory, Overdeck, Swap) each render a meter bar -- CPU/Memory green, Overdeck neutral blue, Swap red at 98.8-98.9% (>85% threshold) -- and the swap tile carries the 'historical · not live pressure' sub-label; (4) the chip row renders 'Admitted work agents 2', 'Containers 20', and a green-dot 'Webhook relay Running' chip, with the old three-tile grid gone; (5) the Needs-attention list renders severity-dotted rows: two critical/warning grouped 'agent activity stalled x3' rows (red and amber dots) each showing '3x agents: agent-pan-3419, agent-pan-3419-test +1 more' with a closed-by-default 'Actions for 3 agents' disclosure, plus one singleton critical row 'agent session missing / agent-pan-1577-review-requirements · PAN-1577' carrying visible Open and Kill buttons; (6) verified via DOM query that all three <details> disclosures (two grouped-actions, one context-notes) render closed by default; (7) expanded the context-notes disclosure -- it read '2 context notes — background, not pressure signals' and, opened, showed exactly two info-severity notes ('Swap occupancy is historical context...', 'Virtual memory commitment is diagnostic...') with no other reasons mixed in; (8) expanded a grouped row's 'Actions for 3 agents' disclosure and it revealed per-agent Open/Kill sub-rows (agent-pan-3419, agent-pan-3419-test, agent-pan-3537-test) -- the group row itself renders no Kill/Open, only the individual expanded sub-rows do; (9) clicked one sub-row's Open button (agent-pan-3419) and confirmed via URL change to '?issue=PAN-3419&tab=conversation' that it invoked the store's openIssue navigation, and confirmed via DOM query that the popover dialog ([role=dialog][aria-labelledby=system-health-popover-title]) was gone afterward, i.e. Open closes the popover; (10) Top consumers rows render a 'Specialist' kind badge and a proportional blue memory bar per row (agent-pan-3423-test 2.72 GB largest, others scaled smaller), and the section header reads 'No leaks' (no leaked consumer present in this session, confirming the else-branch of the ⚠ N leaked / No leaks toggle). Did not exercise the null-metric 'Unavailable' tile state or an active LEAKED consumer live, since the running environment had no such data at capture time; both are covered by the passing SystemHealthPill.test.tsx and system-health-attention.test.ts unit suites (vitals-meter-tiles.ac2, top-consumers-upgrade.ac2) rather than by live pixels this run. No browser console errors or warnings were logged at any point in the session (open, expand, navigate, close: 0 errors, 0 warnings). Cleaned up: killed the workspace-only dashboard process (port 3017) after verification; the primary :3011 dashboard was never touched.",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since c3cf206 (3 paths): src/dashboard/frontend/src/components/SystemHealthPill.tsx, src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx, tests/unit/lib/head-anchor-write-sites.test.ts",
+        "detectedAt": "2026-08-05T17:05:05.363Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "c3cf20667708989489a34a6b3a68ae36f49d2cfc",
+      "detectedAt": "2026-08-05T17:05:05.363Z",
+      "paths": [
+        "src/dashboard/frontend/src/components/SystemHealthPill.tsx",
+        "src/dashboard/frontend/src/components/system-health-ui-no-loss.test.tsx",
+        "tests/unit/lib/head-anchor-write-sites.test.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3466",
     "lastVerifiedCommit": "ecb1548e0c394679b62feec066d854a23a961a1b",
     "reviewRequestedAt": "2026-08-04T19:45:02.360Z",
@@ -616,7 +637,7 @@
       },
       "costAtCloseOut": {
         "usd": 370.5894373,
-        "pricingAsOf": "2026-08-04T22:14:59.259Z"
+        "pricingAsOf": "2026-08-05T17:05:16.001Z"
       }
     },
     "merges": [
