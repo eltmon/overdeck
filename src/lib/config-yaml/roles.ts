@@ -294,6 +294,9 @@ function validateRoleFields(role: Role, roleConfig: RoleConfig): void {
   if (roleConfig.mode !== undefined && roleConfig.mode !== 'quick' && roleConfig.mode !== 'full' && roleConfig.mode !== 'none') {
     throw new Error(`config.yaml: roles.${role}.mode must be quick, full, or none`);
   }
+  if ('reReviewScope' in roleConfig) {
+    throw new Error(`config.yaml: roles.${role}.reReviewScope was removed; full reviews always run every convoy lane`);
+  }
   if (roleConfig.maxAgents !== undefined && (!Number.isInteger(roleConfig.maxAgents) || roleConfig.maxAgents < 1)) {
     throw new Error(`config.yaml: roles.${role}.maxAgents must be a positive integer`);
   }
