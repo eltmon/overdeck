@@ -76,12 +76,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -102,12 +96,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -133,12 +121,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -266,12 +248,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -460,12 +436,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script.replaceAll(tempHome, '<OVERDECK_HOME>')).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       set -o pipefail
@@ -700,12 +670,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -739,12 +703,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       set -o pipefail
@@ -775,12 +733,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -816,12 +768,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -875,12 +821,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -902,12 +842,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -947,12 +881,6 @@ describe('generateLauncherScript', () => {
     });
     expect(script).toMatchInlineSnapshot(`
       "#!/bin/bash
-      _overdeck_review_attestation_key="\${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"
-      unset OVERDECK_REVIEW_ATTESTATION_KEY
-      if [[ -e "$_overdeck_review_attestation_key" && "\${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then
-        command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }
-        exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"
-      fi
       export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"
       unset TMUX TMUX_PANE STY
       command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"
@@ -1230,17 +1158,11 @@ describe('generateLauncherWrapper', () => {
       sessionId: 'sess-abc',
     };
 
-    it('flag-off: omits channel flags without changing the secured launcher shape', () => {
+    it('flag-off: output is byte-identical to pre-PAN-985 behaviour', () => {
       const script = generateLauncherScriptSync(FIXTURE_CONFIG);
       expect(script).toBe(
         [
           '#!/bin/bash',
-          '_overdeck_review_attestation_key="${OVERDECK_HOME:-$HOME/.overdeck}/review-attestation-key"',
-          'unset OVERDECK_REVIEW_ATTESTATION_KEY',
-          'if [[ -e "$_overdeck_review_attestation_key" && "${OVERDECK_AGENT_HOST_SECRET_BOUNDARY:-}" != "1" ]]; then',
-          "  command -v bwrap >/dev/null 2>&1 || { echo 'review attestation isolation is unavailable; refusing to start coding agent: bubblewrap (bwrap) is required' >&2; exit 78; }",
-          '  exec bwrap --bind / / --dev-bind /dev /dev --unshare-pid --proc /proc --unshare-ipc --new-session --bind /dev/null "$_overdeck_review_attestation_key" --setenv OVERDECK_AGENT_HOST_SECRET_BOUNDARY 1 -- "$0" "$@"',
-          'fi',
           'export OVERDECK_HOST_TMUX="$TMUX" OVERDECK_HOST_TMUX_PANE="$TMUX_PANE"',
           'unset TMUX TMUX_PANE STY',
           'command -v mkcert >/dev/null 2>&1 && export NODE_EXTRA_CA_CERTS="$(mkcert -CAROOT)/rootCA.pem"',

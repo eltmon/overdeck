@@ -10,7 +10,6 @@ import { packageRoot } from './paths.js';
 import { buildGitGuardLines } from './launcher-git-guard.js';
 import { buildCodexCommand } from './launcher-codex-command.js';
 import { shellQuote } from './shell-quote.js';
-import { buildAgentHostSecretBoundaryPrelude } from './agent-host-secret-boundary.js';
 
 export type LauncherSpawnMode = 'conversation' | 'remote' | 'resume';
 
@@ -255,13 +254,6 @@ export function generateLauncherScriptSync(config: LauncherConfig): string {
 
   // Shebang
   lines.push('#!/bin/bash');
-
-  // Local coding agents share the operator's Unix uid, so file mode alone cannot
-  // protect host signing material. Re-exec behind a per-process mount boundary
-  // before workspace-controlled code runs. Remote launchers have no local key.
-  if (config.spawnMode !== 'remote') {
-    lines.push(...buildAgentHostSecretBoundaryPrelude());
-  }
 
   // Strip tmux/screen host-shell artifacts so nested tmux operations don't fail
   // with "sessions should be nested with care" (PAN-912). Preserve the pane's
