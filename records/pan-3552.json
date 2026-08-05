@@ -386,22 +386,22 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:59:28.154Z",
+  "updated": "2026-08-05T22:59:33.739Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T22:59:26.372Z",
-    "reviewNotes": "Agent re-review request (1/25): Addressed all review and verification findings; swept retired direct-convoy identifiers and made the legacy conflicts_since column inert.",
+    "updatedAt": "2026-08-05T22:59:27.164Z",
+    "reviewNotes": "all current-cycle findings were previously reviewed and unchanged",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
     "lastVerifiedCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
-    "reviewSpawnedAt": "2026-08-05T22:46:23.389Z",
+    "reviewSpawnedAt": "2026-08-05T22:59:27.163Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/DEACON-HEALTH-MONITORING.md",
@@ -714,7 +714,7 @@
       },
       "costAtCloseOut": {
         "usd": 250.171162,
-        "pricingAsOf": "2026-08-05T22:59:27.835Z"
+        "pricingAsOf": "2026-08-05T22:59:33.728Z"
       }
     },
     "merges": [
