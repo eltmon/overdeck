@@ -1,7 +1,7 @@
 /* Command Deck layout utilities — theme via global semantic tokens */
 
 .commandDeck {
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   color: var(--foreground);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -107,7 +107,7 @@
   border-radius: calc(8px - 2px);
   font-size: 12px;
   font-weight: 500;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   color: var(--muted-foreground);
   cursor: pointer;
   transition: background 0.15s, color 0.15s, box-shadow 0.15s;
@@ -468,7 +468,7 @@
   color: var(--muted-foreground);
   background: color-mix(in srgb, var(--foreground) 3%, transparent);
   border: 1px solid var(--border);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   white-space: nowrap;
 }
 
@@ -551,7 +551,7 @@
 .featureId_sidebar {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   flex-shrink: 0;
   min-width: 56px;
 }
@@ -770,7 +770,7 @@
 
 .issueHeaderId {
   font-size: 12px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   color: var(--primary);
   text-decoration: none;
   flex-shrink: 0;
@@ -826,7 +826,7 @@
 
 .issueHeaderCost {
   font-size: 12px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   color: var(--muted-foreground);
 }
 
@@ -928,7 +928,7 @@
 .sessionPanelModel {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -937,7 +937,7 @@
 .sessionPanelDuration {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   flex-shrink: 0;
 }
 
@@ -1167,7 +1167,7 @@
 }
 
 .sessionModel {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 10.5px;
   color: color-mix(in srgb, var(--muted-foreground) 70%, transparent);
   flex-shrink: 0;
@@ -1260,14 +1260,14 @@
   font-size: 12px;
   color: var(--muted-foreground);
   flex-shrink: 0;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 /* Cost value — technical numeric data, mono for alignment per PAN-698 policy */
 .featureCost {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .emptyProject {
@@ -1518,7 +1518,7 @@
 .featureId {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 /* Badge Bar */
@@ -1651,7 +1651,7 @@
 .sectionModel {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 .sectionTime {
@@ -1705,7 +1705,7 @@
 .sectionPreview {
   padding: 8px 16px;
   font-size: 12px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   color: var(--muted-foreground);
   white-space: nowrap;
   overflow: hidden;
@@ -1719,7 +1719,7 @@
 .sectionContent {
   padding: 16px;
   font-size: 12px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   white-space: pre-wrap;
   word-break: break-word;
   background: var(--background);
@@ -1804,7 +1804,7 @@
   flex: 1;
   overflow-y: auto;
   padding: 24px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2011,7 +2011,7 @@
 .markdownContent li { margin-bottom: 4px; }
 /* Inline code — mono per PAN-698 policy */
 .markdownContent code {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   padding: 1px 4px;
   border-radius: 3px;
@@ -2019,7 +2019,7 @@
 }
 /* Code block — mono per PAN-698 policy */
 .markdownContent pre {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   padding: 12px;
   border-radius: 4px;
@@ -2062,7 +2062,7 @@
   display: inline-block;
   padding: 1px 5px;
   font-size: 10px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   background: var(--card);
   border: 1px solid var(--input);
   border-radius: 3px;
@@ -2189,7 +2189,7 @@
   padding: 8px 16px;
   border-top: 1px solid var(--border);
   background: rgba(0, 0, 0, 0.15);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   line-height: 1.5;
 }
@@ -2241,7 +2241,7 @@
 .versionLabel {
   font-size: 10px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   letter-spacing: 0.03em;
 }
 
@@ -2379,7 +2379,7 @@
   background: var(--muted) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 5px center;
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   cursor: pointer;
   outline: none;
   flex-shrink: 0;
@@ -2412,7 +2412,7 @@
   border: 1px solid var(--input);
   border-radius: 4px;
   font-size: 12px;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   color: var(--foreground);
   background: var(--background);
   box-sizing: border-box;
@@ -2539,7 +2539,7 @@
 .conversationMetaLine time {
   flex-shrink: 0;
   opacity: 0.8;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 .conversationMetaSep {
@@ -2702,7 +2702,7 @@
   color: var(--muted-foreground);
   opacity: 0.7;
   white-space: nowrap;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   letter-spacing: 0;
 }
 
@@ -2879,7 +2879,7 @@
 .conversationModelLabel {
   font-size: 12px;
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
 /* Conversation Terminal Panel */
@@ -3015,7 +3015,7 @@
   font-size: 10px;
   color: var(--muted-foreground);
   opacity: 0.5;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   user-select: all;
   flex: 0 1 120px;
   overflow: hidden;
@@ -3110,7 +3110,7 @@
   color: var(--foreground);
   font-size: 12px;
   font-weight: 600;
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   padding: 2px 6px;
   outline: none;
 }
@@ -3627,7 +3627,7 @@
 
 /* Terminal icon character — mono for glyph alignment per PAN-698 policy */
 .workLogTerminalIcon {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 10px;
   font-weight: 700;
   flex-shrink: 0;
@@ -3644,7 +3644,7 @@
 /* Work log detail — technical identifier/path data, mono per PAN-698 policy */
 .workLogDetail {
   color: var(--muted-foreground);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3658,7 +3658,7 @@
   padding: 6px 8px;
   background: var(--muted);
   border-radius: 4px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   color: var(--muted-foreground);
   white-space: pre-wrap;
@@ -3954,7 +3954,7 @@
 }
 
 .chatMarkdown code:not(pre code) {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 0.9em;
   background: var(--accent);
   border: 1px solid var(--border);
@@ -4017,7 +4017,7 @@
   margin: 0;
   padding: 12px 16px;
   background: var(--accent);
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   overflow-x: auto;
   white-space: pre;
@@ -4031,7 +4031,7 @@
 
 /* Markdown fallback — raw text output, mono per PAN-698 policy */
 .mdFallback {
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -4089,7 +4089,7 @@
   outline: none;
   min-height: 36px;
   color: var(--foreground);
-  font-family: "DM Sans", system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 .composerEditable p { margin: 0; }
@@ -4141,7 +4141,7 @@
 /* Slash command label — command identifier (e.g. /help), mono per PAN-698 policy */
 .slashMenuLabel {
   font-size: 14px;
-  font-family: "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-family: var(--font-mono), "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   color: var(--foreground);
   font-weight: 500;
 }

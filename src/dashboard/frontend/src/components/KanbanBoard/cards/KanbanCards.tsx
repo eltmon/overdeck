@@ -808,7 +808,7 @@ export function IssueCard({ issue, workAgent, workAgents = [], planningAgent, sp
               </>
             ) : (
               <>
-                <span className="text-[10px] text-muted-foreground italic" style={{ fontFamily: '"DM Sans", sans-serif' }}>
+                <span className="text-[10px] text-muted-foreground italic" style={{ fontFamily: 'var(--font-sans), sans-serif' }}>
                   no agent
                 </span>
                 <span className="font-mono text-[9px] text-muted-foreground truncate">{trackerRef}</span>

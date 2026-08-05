@@ -458,6 +458,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/settings/conversation-search/reindex-progress', kind: 'http', disposition: 'RELOCATE',  door: 'Conversations/search' },
   { surface: 'PUT /api/settings',                                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG' },
   { surface: 'PUT /api/settings/ui-theme',                           kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG (ui-theme.json)' },
+  { surface: 'PUT /api/settings/design-language',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via saveDesignLanguage (theme-only merge)' },
   { surface: 'GET /api/settings/openrouter/models',                  kind: 'http', disposition: 'RELOCATE',    door: 'OpenRouter service' },
   { surface: 'PUT /api/settings/openrouter/favorites',               kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG' },
   { surface: 'PUT /api/settings/openrouter/api-key',                 kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },
