@@ -574,10 +574,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:44:44.358Z",
+  "updated": "2026-08-05T02:48:37.048Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -585,8 +585,9 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:44:42.211Z",
-    "reviewNotes": "Persisted attestation key is readable by workspace-controlled processes",
+    "updatedAt": "2026-08-05T02:48:36.993Z",
+    "reviewNotes": "Breaker now preserves a head-guard rejection and escalates it through the durable stuck gate",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "blockerReasons": [
       {
         "type": "merge_conflict",
@@ -603,17 +604,36 @@
       ]
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
+    "reviewedAtCommit": "2e2d316d27cc0a73e1223756bdbdb8ab367fcf1e",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
-    "reviewSpawnedAt": "2026-08-05T02:42:16.886Z"
+    "reviewSpawnedAt": "2026-08-05T02:42:16.886Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "2e2d316d27cc0a73e1223756bdbdb8ab367fcf1e"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "2e2d316d27cc0a73e1223756bdbdb8ab367fcf1e"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "2e2d316d27cc0a73e1223756bdbdb8ab367fcf1e"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "2e2d316d27cc0a73e1223756bdbdb8ab367fcf1e"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 169247,
-            "output": 79745,
-            "cacheRead": 29326,
+            "input": 207539,
+            "output": 97136,
+            "cacheRead": 33297,
             "cacheWrite": 0
           }
         },
@@ -625,9 +645,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 7056957,
-            "output": 85390,
-            "cacheRead": 26227712,
+            "input": 7654130,
+            "output": 104647,
+            "cacheRead": 32889344,
             "cacheWrite": 0
           }
         },
@@ -689,36 +709,36 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4720005,
-            "output": 485845,
-            "cacheRead": 225555968,
+            "input": 4827793,
+            "output": 498469,
+            "cacheRead": 234585600,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 169247,
-          "output": 79745,
-          "cacheRead": 29326,
+          "input": 207539,
+          "output": 97136,
+          "cacheRead": 33297,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22974782,
-          "output": 1095229,
-          "cacheRead": 339732992,
+          "input": 23082570,
+          "output": 1107853,
+          "cacheRead": 348762624,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 12943436,
-          "output": 338425,
-          "cacheRead": 69527040,
+          "input": 13540609,
+          "output": 357682,
+          "cacheRead": 76188672,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 372.9850266,
-        "pricingAsOf": "2026-08-05T02:44:42.220Z"
+        "usd": 381.9903497,
+        "pricingAsOf": "2026-08-05T02:48:37.038Z"
       }
     },
     "merges": [
