@@ -587,6 +587,11 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T04:19:09.393Z"
+    },
+    {
+      "timestamp": "2026-08-05T06:53:32.460Z",
+      "reason": "end",
+      "note": "No deviations. Removed rejected attestation code, restored main's completion flow, retained verdict-of-record recovery and stale-evidence handling, and fixed the lint gate."
     }
   ],
   "feedback": [],
@@ -640,7 +645,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T06:53:27.034Z",
+  "updated": "2026-08-05T06:53:32.513Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -650,10 +655,11 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T06:53:27.032Z",
+    "updatedAt": "2026-08-05T06:53:32.457Z",
     "reviewNotes": "Verification failed at lint — fix and resubmit",
     "verificationNotes": "Verification FAILED at lint (71562ms):\n\n\n> @overdeck/core@0.48.0 lint\n> eslint src/ --ext .js,.ts,.tsx --no-inline-config && npm run lint:effect && npm run lint:permissions && npm run lint:state-writes && npm run lint:state-paths && npm run lint:overdeck-boundaries && npm run lint:pipeline-membership && npm run lint:workspace-doors && npm run lint:park-exits && npm run lint:agent-dir-removal && npm run lint:skills && npm run lint:slash-commands && npm run lint:prompts && npm run lint:prompt-trailer && npm run lint:file-size && npm run lint:source-introspection && npm run lint:no-coderabbit-merge-gate && npm run lint:circular && npm run lint:ratchet-audit && npm run lint:quarantine-audit\n\n\n> @overdeck/core@0.48.0 lint:effect\n> node scripts/check-effect-versions.mjs\n\n✓ Effect pinning OK — all effect/@effect/* on 4.0.0-beta.73, effect is a direct runtime dependency.\n\n> @overdeck/core@0.48.0 lint:permissions\n> bash scripts/lint-permissions.sh\n\n✓ permission-flag lint passed (no leaks or resolver omissions outside allowlist)\n\n> @overdeck/core@0.48.0 lint:state-writes\n> bash scripts/lint-state-writes.sh\n\n✓ state-write lint passed (single write surface intact)\n\n> @overdeck/core@0.48.0 lint:state-paths\n> bash scripts/lint-state-paths.sh\n\n✓ state-path lint passed (canonical spec/draft paths use getProjectPanPaths)\n\n> @overdeck/core@0.48.0 lint:overdeck-boundaries\n> PAN_OVERDECK_BOUNDARY_LINT=1 bash scripts/lint-overdeck-boundaries.sh\n\n✓ overdeck boundary gate: zero consumers on the old database\n\n> @overdeck/core@0.48.0 lint:pipeline-membership\n> bash scripts/lint-pipeline-membership.sh\n\n✓ pipeline-membership boundary passed: six consumers delegate and durable lenses remain L5-free\n\n> @overdeck/core@0.48.0 lint:workspace-doors\n> bash scripts/guard-workspace-doors.sh\n\n✓ workspace-doors guard passed (no direct SQL outside the two doors)\n\n> @overdeck/core@0.48.0 lint:park-exits\n> bash scripts/guard-park-exits.sh\n\n✓ park-exits guard passed (every stuck flavor documents its exit)\n\n> @overdeck/core@0.48.0 lint:agent-dir-r\n…(63428 chars elided)…\n                   \u001b[2m 10.74 kB\u001b[22m \u001b[2m│ gzip:   2.36 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcodex-app-server-host.d.ts\u001b[22m\u001b[39m                     \u001b[2m  3.16 kB\u001b[22m \u001b[2m│ gzip:   1.09 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mpty-supervisor.d.ts\u001b[22m\u001b[39m                            \u001b[2m  2.51 kB\u001b[22m \u001b[2m│ gzip:   1.05 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mcli/index.d.ts\u001b[22m\u001b[39m                                 \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mlib/memory/fts-worker.d.ts\u001b[22m\u001b[39m                     \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1msupervisor/server.d.ts\u001b[22m\u001b[39m                         \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m \u001b[2mdist/\u001b[22m\u001b[32m\u001b[1mverification-worker.d.ts\u001b[22m\u001b[39m                       \u001b[2m  0.01 kB\u001b[22m \u001b[2m│ gzip:   0.03 kB\u001b[22m\n\u001b[34mℹ\u001b[39m 505 files, total: 17.47 MB\n\u001b[32m✔\u001b[39m Build complete in \u001b[32m4055ms\u001b[3\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
+    "reviewRequestedAt": "2026-08-05T06:53:27.032Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/events.ts",
@@ -702,8 +708,7 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
-    },
-    "reviewRequestedAt": "2026-08-05T06:53:27.032Z"
+    }
   },
   "closeOut": {
     "usage": {
@@ -802,9 +807,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 270153,
-            "output": 8813,
-            "cacheRead": 4912640,
+            "input": 457662,
+            "output": 35530,
+            "cacheRead": 21830656,
             "cacheWrite": 0
           }
         }
@@ -823,9 +828,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 20621811,
-          "output": 568293,
-          "cacheRead": 120446976,
+          "input": 20809320,
+          "output": 595010,
+          "cacheRead": 137364992,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -836,8 +841,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 476.9256593,
-        "pricingAsOf": "2026-08-05T06:28:32.078Z"
+        "usd": 482.0247133,
+        "pricingAsOf": "2026-08-05T06:53:32.486Z"
       }
     },
     "merges": [
