@@ -513,10 +513,10 @@
     "recordedAt": "2026-08-05T13:06:10.698Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-05T13:18:07.006Z",
+  "updated": "2026-08-05T13:25:00.977Z",
   "pipeline": {
     "issueId": "PAN-3419",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "passed",
     "testStatus": "pending",
     "uatStatus": "passed",
     "verificationStatus": "passed",
@@ -524,8 +524,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T13:17:29.654Z",
+    "updatedAt": "2026-08-05T13:25:00.871Z",
+    "reviewNotes": "Approved: explicit project association remains complete; the sole palette performance finding is unchanged since prior approval and demoted by convergence.",
     "uatNotes": "UAT required: this issue changes observable dashboard behavior (Fork/Handoff modal Project select, CommandDeck grouping, command-palette routing -- FR-6/7/8 of the PRD). Built and ran the workspace's own dashboard as a 'peer' instance (mode=peer, buildBranch=feature/pan-3419, buildCommit=3b7b8927148) on a non-host port (never touched the shared primary dashboard on :3011 -- src/dashboard/server/config.ts:78-121 explicitly guards against a workspace checkout binding the host port, citing PAN-2322 where UAT agents hijacked :3011 in the past). Drove it with Playwright MCP: (1) FR-6/FR-9 -- navigated to the mind-your-now project deck and found conv 1827 ('Launching Overdeck planning system fixes', branch hoff-agent-surface) correctly grouped there despite its cwd (/home/eltmon/Projects/hoff-agent-surface) being outside every registered project path -- confirms the explicit-first grouping fix and the conv-1827 backfill both landed. (2) FR-7 -- opened conv 1827's 'Create summary fork' menu; the Fork/Handoff modal renders a Project <select> defaulted to 'Same as source (mind-your-now)' followed by every registered project (panopticon-cli, mind-your-now, auricle, myn-cli, papers-please, lexerra, krux, pan-tts, eltmon-stream, eltmon-video, tindra, puzzdom); verified the select is interactive (chose krux, selection updated) and persists across all three fork intents (Fresh summary / Agent handoff / Exact copy); cancelled without submitting to avoid spawning a real billed conversation. (3) FR-8 -- opened the command palette (/) on the fresh session, searched conv 1827's content, found the hit, and clicked it: navigated cleanly to /conv/20260801-2fc7 with no console errors; cross-checked palette.ts source to confirm toPaletteConversationHit computes hit.projectKey via explicit-first resolution (conversation.projectKey else cwd-encoded fallback) which is exactly what onOpenConversationHit uses for routing, while hit.projectId (the raw JSONL-dir label shown in the hit's pill) is deliberately left untouched per AC1's 'despite a foreign projectId' wording -- matches the passing palette.test.ts. Zero console errors or warnings across the entire session (checked after every interaction). Did not click 'Continue' on the fork modal (would spawn a real $90/1M Claude Fable 5 conversation) and did not restart the shared host dashboard -- both would have been disproportionate/unauthorized for a UI verification. Cleaned up the peer dashboard processes after UAT.",
+    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "conflictsSince": {
       "sha": "534828d51baafac0178caf7468544c06edfff550",
       "detectedAt": "2026-08-04T17:35:47.540Z",
@@ -537,7 +539,6 @@
     },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3435",
     "lastVerifiedCommit": "747f5e3293e5ab8cec632edcfb0678e3cf7250bf",
-    "reviewRequestedAt": "2026-08-05T13:06:11.571Z",
     "reviewSpawnedAt": "2026-08-05T13:17:29.653Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -625,6 +626,24 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-05T13:06:10.698Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "747f5e3293e5ab8cec632edcfb0678e3cf7250bf"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "747f5e3293e5ab8cec632edcfb0678e3cf7250bf"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "747f5e3293e5ab8cec632edcfb0678e3cf7250bf"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "747f5e3293e5ab8cec632edcfb0678e3cf7250bf"
+      }
     }
   },
   "closeOut": {
@@ -644,6 +663,12 @@
             "output": 307961,
             "cacheRead": 93253632,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 457325,
+            "output": 21166,
+            "cacheRead": 6667264,
+            "cacheWrite": 0
           }
         },
         "review.correctness": {
@@ -651,6 +676,12 @@
             "input": 6023695,
             "output": 151368,
             "cacheRead": 38104576,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 3112272,
+            "output": 39306,
+            "cacheRead": 7608320,
             "cacheWrite": 0
           }
         },
@@ -660,6 +691,12 @@
             "output": 83240,
             "cacheRead": 8356864,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 422045,
+            "output": 21124,
+            "cacheRead": 3784704,
+            "cacheWrite": 0
           }
         },
         "review.requirements": {
@@ -668,6 +705,12 @@
             "output": 127771,
             "cacheRead": 12491776,
             "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 1095112,
+            "output": 16243,
+            "cacheRead": 3277312,
+            "cacheWrite": 0
           }
         },
         "review.security": {
@@ -675,6 +718,12 @@
             "input": 2975915,
             "output": 46896,
             "cacheRead": 8466432,
+            "cacheWrite": 0
+          },
+          "openai/gpt-5.6-terra": {
+            "input": 516238,
+            "output": 25537,
+            "cacheRead": 4707840,
             "cacheWrite": 0
           }
         },
@@ -714,22 +763,22 @@
           "cacheRead": 456320512,
           "cacheWrite": 0
         },
+        "openai/gpt-5.6-terra": {
+          "input": 6334554,
+          "output": 184224,
+          "cacheRead": 51956736,
+          "cacheWrite": 0
+        },
         "anthropic/claude-sonnet-5": {
           "input": 3105,
           "output": 378873,
           "cacheRead": 171345242,
           "cacheWrite": 3047866
-        },
-        "openai/gpt-5.6-terra": {
-          "input": 731562,
-          "output": 60848,
-          "cacheRead": 25911296,
-          "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 651.0918316,
-        "pricingAsOf": "2026-08-05T13:17:31.452Z"
+        "usd": 673.4613546,
+        "pricingAsOf": "2026-08-05T13:25:00.944Z"
       }
     },
     "merges": [
