@@ -39,6 +39,10 @@ describe('slash command no-loss audit', () => {
     expect(findMissingMappings(SLASH_COMMANDS)).toEqual([]);
   });
 
+  it('excludes the retired discovery-ready command because review dispatch launches the convoy', () => {
+    expect(SLASH_COMMANDS.some(command => command.insert.startsWith('/pan admin specialists discovery-ready'))).toBe(false);
+  });
+
   it('detects when a mapped legacy convenience is dropped', () => {
     const withoutShowCv = SLASH_COMMANDS.filter(command => command.insert !== '/pan show --cv');
 
