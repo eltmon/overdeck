@@ -1,14 +1,17 @@
 /**
  * Verdict artifact recovery observation (PAN-3511).
  *
- * Workspace artifacts are diagnostic evidence from a host-recorded active review
- * run. Recovery preserves and reports that evidence, but it never writes a
- * terminal verdict: a workspace-writable file cannot authorize pipeline state.
+ * Workspace artifacts are evidence from a host-recorded active review run. A
+ * recovery path may converge that evidence only through recordReviewVerdict(),
+ * which owns the terminal pipeline-state write and its head protections.
  */
 import { emitActivityEntryOnce, type ActivityEmitOutcome, type EmitActivityOptions } from '../activity-logger.js';
+import { rehydrateHeadAnchor, snapshotWorkspaceHeadsPromise } from '../git-utils.js';
 import { getCloisterEventStore } from './event-store-provider.js';
+import { recordReviewVerdict, type VerdictOutcome, type VerdictWriter } from './review-verdict-writer.js';
 import {
   readLatestSynthesisVerdictAsync,
+  SYNTHESIS_ARTIFACT_FRESH_MS,
   type SynthesisArtifactVerdict,
 } from './synthesis-verdict.js';
 
@@ -36,6 +39,24 @@ export interface ArtifactVerdictObservationDeps {
   emitActivity(options: EmitActivityOptions & { id: string }): Promise<ActivityEmitOutcome>;
 }
 
+export interface VerdictOfRecordConvergenceOptions {
+  /** Host-recorded active review run; no run ID means no artifact is eligible. */
+  runId?: string;
+  workspacePath: string;
+  writer: VerdictWriter;
+  deps?: Partial<VerdictOfRecordConvergenceDeps>;
+}
+
+export interface VerdictOfRecordConvergenceDeps {
+  readArtifact(issueId: string, options: { runId?: string; workspacePath?: string }): Promise<SynthesisArtifactVerdict | null>;
+  snapshotWorkspaceHeads(issueId: string, workspacePath: string): Promise<string | undefined>;
+  recordVerdict(issueId: string, input: Parameters<typeof recordReviewVerdict>[1]): Promise<VerdictOutcome>;
+}
+
+export type VerdictOfRecordConvergenceResult =
+  | { converged: false }
+  | { converged: true; artifact: SynthesisArtifactVerdict; outcome: VerdictOutcome & { landed: true } };
+
 /** Flag evidence whose recorded review head conflicts with the live row anchor. */
 export function restoreWouldTripHeadGuard(input: {
   artifactHead?: string;
@@ -60,6 +81,12 @@ const DEFAULT_DEPS: ArtifactVerdictObservationDeps = {
   readArtifact: (issueId, options) => readLatestSynthesisVerdictAsync(issueId, options),
   emitEvent: defaultEmitEvent,
   emitActivity: (options) => emitActivityEntryOnce(options),
+};
+
+const DEFAULT_CONVERGENCE_DEPS: VerdictOfRecordConvergenceDeps = {
+  readArtifact: (issueId, options) => readLatestSynthesisVerdictAsync(issueId, options),
+  snapshotWorkspaceHeads: snapshotWorkspaceHeadsPromise,
+  recordVerdict: recordReviewVerdict,
 };
 
 async function reportBlockedObservation(
@@ -96,6 +123,43 @@ export function readActiveReviewArtifactAsync(
 ): Promise<SynthesisArtifactVerdict | null> {
   if (!options.runId) return Promise.resolve(null);
   return readLatestSynthesisVerdictAsync(issueId, options);
+}
+
+/**
+ * Converge a pending review dispatch from a fresh artifact owned by the
+ * host-recorded active review run. The artifact must name the current workspace
+ * head, then the verdict write door decides whether the terminal state can land.
+ */
+export async function convergeRowFromVerdictOfRecord(
+  issueId: string,
+  options: VerdictOfRecordConvergenceOptions,
+): Promise<VerdictOfRecordConvergenceResult> {
+  if (!options.runId) return { converged: false };
+
+  const deps = { ...DEFAULT_CONVERGENCE_DEPS, ...options.deps };
+  const artifact = await deps.readArtifact(issueId, {
+    runId: options.runId,
+    workspacePath: options.workspacePath,
+  });
+  if (
+    !artifact
+    || !artifact.headSha
+    || Date.now() - artifact.mtimeMs > SYNTHESIS_ARTIFACT_FRESH_MS
+  ) return { converged: false };
+
+  const workspaceHead = await deps.snapshotWorkspaceHeads(issueId, options.workspacePath);
+  if (!workspaceHead || artifact.headSha !== workspaceHead) return { converged: false };
+
+  const outcome = await deps.recordVerdict(issueId, {
+    verdict: artifact.verdict,
+    notes: artifact.notes,
+    evidenceHead: rehydrateHeadAnchor(artifact.headSha),
+    runId: artifact.runId,
+    writer: options.writer,
+  });
+  return outcome.landed
+    ? { converged: true, artifact, outcome }
+    : { converged: false };
 }
 
 /**

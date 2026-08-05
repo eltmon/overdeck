@@ -56,6 +56,7 @@ const {
   mockStopAgent,
   mockWipeAgentStateDirs,
   mockMarkAgentStoppedState,
+  mockConvergeRowFromVerdictOfRecord,
 } = vi.hoisted(() => ({
   mockKillSessionAsync: vi.fn().mockResolvedValue(undefined),
   mockListSessionNames: vi.fn().mockReturnValue([]),
@@ -79,6 +80,7 @@ const {
   mockStopAgent: vi.fn().mockResolvedValue(undefined),
   mockWipeAgentStateDirs: vi.fn().mockResolvedValue(undefined),
   mockMarkAgentStoppedState: vi.fn((state: { id?: string; status?: string }) => ({ ...state, status: 'stopped' })),
+  mockConvergeRowFromVerdictOfRecord: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/tmux.js', async () => {
@@ -156,6 +158,10 @@ vi.mock('../../../src/lib/cloister/feedback-writer.js', () => ({
   archiveFeedbackFiles: mockArchiveFeedbackFiles,
 }));
 
+vi.mock('../../../src/lib/cloister/verdict-restore.js', () => ({
+  convergeRowFromVerdictOfRecord: mockConvergeRowFromVerdictOfRecord,
+}));
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockSpawnRun.mockResolvedValue({ id: 'agent-pan-1059-review-security' });
@@ -176,6 +182,7 @@ beforeEach(() => {
   mockResolveConflictGate.mockResolvedValue({ gated: false });
   mockGetCachedConflictGateMergeability.mockReturnValue(undefined);
   mockArchiveFeedbackFiles.mockReturnValue(Effect.void);
+  mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
 });
 
 const REVIEW_MODE_WORKSPACE = '/tmp/pan-review-mode';
@@ -489,6 +496,54 @@ describe('spawnReviewRoleForIssue conflict gate', () => {
     expect(block.indexOf('resolveConflictGate')).toBeLessThan(block.indexOf('archiveFeedbackFiles'));
     expect(block).toContain('if (gate.gated)');
     expect(block).toContain('return { success: false, gated: true, message }');
+  });
+});
+
+describe('spawnReviewRoleForIssue verdict-of-record convergence', () => {
+  beforeEach(() => {
+    prepareWorkspace(REVIEW_MODE_WORKSPACE);
+  });
+
+  it('lands the active verdict and does not re-enter reviewing or spawn a parent', async () => {
+    mockGetAgentState.mockReturnValue({ reviewRunId: 'agent-pan-1982-review-abcdef12' });
+    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({
+      converged: true,
+      artifact: { runId: 'agent-pan-1982-review-abcdef12', verdict: 'passed' },
+      outcome: { landed: true, classification: 'dispatched' },
+    });
+
+    const result = await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1982',
+      workspace: REVIEW_MODE_WORKSPACE,
+      branch: 'feature/pan-1982',
+      force: true,
+    }));
+
+    expect(result).toEqual({
+      success: true,
+      message: 'Review dispatch converged from the verdict of record: PAN-1982',
+    });
+    expect(mockConvergeRowFromVerdictOfRecord).toHaveBeenCalledWith('PAN-1982', {
+      runId: 'agent-pan-1982-review-abcdef12',
+      workspacePath: REVIEW_MODE_WORKSPACE,
+      writer: 'dispatch-converge',
+    });
+    expect(mockSetReviewStatus).not.toHaveBeenCalled();
+    expect(mockSpawnRun).not.toHaveBeenCalled();
+  });
+
+  it('continues the normal dispatch when no fresh verdict can converge', async () => {
+    mockConvergeRowFromVerdictOfRecord.mockResolvedValue({ converged: false });
+
+    await Effect.runPromise(spawnReviewRoleForIssue({
+      issueId: 'PAN-1982',
+      workspace: REVIEW_MODE_WORKSPACE,
+      branch: 'feature/pan-1982',
+      force: true,
+    }));
+
+    expect(mockSetReviewStatus).toHaveBeenCalledWith('PAN-1982', expect.objectContaining({ reviewStatus: 'reviewing' }));
+    expect(mockSpawnRun).toHaveBeenCalled();
   });
 });
 

@@ -233,7 +233,7 @@ describe('recordReviewVerdict', () => {
 
       const input: VerdictInput = {
         verdict: 'passed',
-        writer: 'coordinator',
+        writer: 'dispatch-converge',
         evidenceHead,
       };
 
@@ -255,7 +255,7 @@ describe('recordReviewVerdict', () => {
           type: 'review.verdict_dispatched',
           payload: expect.objectContaining({
             issueId: 'PAN-3512',
-            writer: 'coordinator',
+            writer: 'dispatch-converge',
             verdict: 'passed',
             classification: 'fresh',
             testGateReset: false,

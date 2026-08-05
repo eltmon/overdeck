@@ -23,7 +23,7 @@ const execFileAsync = promisify(execFile);
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type VerdictWriter = 'coordinator' | 'fallback' | 'quick-signal' | 'orphan-restore' | 'sweeper-restore' | 'unsignaled-recovery' | 'infra-bypass';
+export type VerdictWriter = 'coordinator' | 'fallback' | 'quick-signal' | 'orphan-restore' | 'sweeper-restore' | 'unsignaled-recovery' | 'infra-bypass' | 'dispatch-converge';
 
 export type ReviewVerdict = 'passed' | 'blocked' | 'failed';
 

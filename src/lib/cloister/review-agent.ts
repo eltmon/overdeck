@@ -57,6 +57,7 @@ import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
+import { convergeRowFromVerdictOfRecord } from './verdict-restore.js';
 import {
   recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
@@ -479,6 +480,17 @@ async function spawnReviewRoleForIssuePromise(
   // pan review request before reaching here. If callers somehow bypass the
   // gate, uncommitted scratch becomes visible in the review — that's the
   // correct fail-loud behavior, not a reason to silently stash.
+  const convergence = await convergeRowFromVerdictOfRecord(opts.issueId, {
+    runId: getAgentStateSync(reviewSessionName)?.reviewRunId,
+    workspacePath: opts.workspace,
+    writer: 'dispatch-converge',
+  });
+  if (convergence.converged) {
+    const message = `Review dispatch converged from the verdict of record: ${opts.issueId}`;
+    emitActivityEntrySync({ source: 'review', level: 'info', message, issueId: opts.issueId });
+    return { success: true, message };
+  }
+
   try {
     const currentStatus = getReviewStatusSync(opts.issueId);
     setReviewStatusSync(opts.issueId, {
