@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T17:31:10.352Z",
+  "updated": "2026-08-05T17:34:04.011Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 19,
-    "claims": {
-      "drop-conflicts-since-plumbing": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 3385973,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T17:31:10.352Z"
-      }
-    },
+    "sequence": 20,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -156,6 +148,16 @@
         "itemId": "drop-rereview-scope-config-surface",
         "outcome": "completed",
         "releasedAt": "2026-08-05T17:31:00.435Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 3385973,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:31:10.352Z",
+        "itemId": "drop-conflicts-since-plumbing",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T17:34:04.011Z"
       }
     ],
     "statusReasons": {
@@ -214,6 +216,10 @@
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac2": "completed",
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac3": "completed",
     "drop-rereview-scope-config-surface.drop-rereview-scope-config-surface.ac4": "completed",
-    "drop-conflicts-since-plumbing": "running"
+    "drop-conflicts-since-plumbing": "completed",
+    "drop-conflicts-since-plumbing.drop-conflicts-since-plumbing.ac1": "completed",
+    "drop-conflicts-since-plumbing.drop-conflicts-since-plumbing.ac2": "completed",
+    "drop-conflicts-since-plumbing.drop-conflicts-since-plumbing.ac3": "completed",
+    "drop-conflicts-since-plumbing.drop-conflicts-since-plumbing.ac4": "completed"
   }
 }
