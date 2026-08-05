@@ -141,6 +141,19 @@ repository's forge adapter to merge its PR or MR, waits for positive forge
 evidence, then runs `postMergeLifecycle()` to clean up labels, Docker networks,
 and agent sessions.
 
+## After another feature merges
+
+A merge does not trigger a background scan of sibling branches. An open feature
+branch stays in its current pipeline state until its work agent or operator
+explicitly runs `pan sync-main <id>`; that command brings the branch forward to
+current `main` and exposes any real conflict for the work agent to resolve.
+
+If the sync produces a conflict, resolve it in the feature workspace, commit and
+push the rework, then request review again. If CI fails after the merge, treat
+the failing check as the evidence: repair the reported code or test failure and
+run the normal review and verification gates again. Neither case is inferred
+from a historical marker or silently re-dispatched by the Deacon.
+
 ## Single Merge Oracle
 
 The forge review artifact is the merge oracle. GitHub repositories read the

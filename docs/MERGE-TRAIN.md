@@ -9,7 +9,10 @@
 > This document is retained as the historical PAN-1691 decision record (the engine,
 > the tri-state auto-merge policy, and the reconciler it describes still underpin
 > the batch trains). The verb-contract gap noted in §7 was fixed in
-> [PAN-1736](https://github.com/eltmon/overdeck/issues/1736).
+> [PAN-1736](https://github.com/eltmon/overdeck/issues/1736). Open feature branches
+> now move forward only through `pan sync-main <id>`; conflicts and CI failures
+> follow the normal work, review, and verification flow rather than a background
+> sibling-branch scan.
 >
 
 > Mind-dump / handoff for PAN-1691 and friends, written 2026-06-09 because the
