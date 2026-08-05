@@ -57,9 +57,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T21:09:03.642Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T21:18Z] review-agent → CHANGES-REQUESTED — seq 2",
+      "timestamp": "2026-08-05T21:18:50.788Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 2,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-05T21:18:50Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3552\n\n# Review Synthesis — PAN-3552 — 2026-08-05T21:17:35Z\n\n## Verdict: CHANGES REQUESTED — `conflictsSince` remains live runtime and durable pipeline state\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/context.json`\n- Branch: `feature/pan-3552`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552`\n- PR base: `c3cf20667708989489a34a6b3a68ae36f49d2cfc`\n- HEAD reviewed: `11bdaa31a582ab559b261f1a90f5a60c9c35a7b1`\n- Cycle number: 2\n- Prior cycle SHA: `d09c573f9177d5775d56e4bce3844e7bae066636`\n\n## Convoy Status\n\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/correctness.md` | 0 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/requirements.md` | 1 |\n\n## Blocking Findings\n\n### [requirements] `conflictsSince` remains active status and durable-record plumbing — `src/lib/review-status-types.ts:56`\n\nFR-3/NFR-3 require removal of the retired `conflictsSince` field and its parked orbit. The branch removes the `conflicts` parked orbit, but introduces the field as an active optional member of `ReviewStatus` in the new `src/lib/review-status-types.ts`, and the existing review-status and durable-record projections continue to hydrate and persist it. The compatibility constraint permits old durable records to carry the extra key, which means readers must ignore it; it does not permit the legacy key to remain live state that is rewritten on unrelated review-status updates.\n\nRemove `conflictsSince` from the active status and pipeline-record types plus their hydration, serialization, projection, and restoration call sites. Keep the SQLite column physically inert and tolerate legacy JSON records by ignoring the extra key.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- correctness\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-11bdaa31/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3552 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/DEACON-HEALTH-MONITORING.md",
@@ -290,18 +303,18 @@
     "recordedAt": "2026-08-05T20:54:21.371Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:09:10.595Z",
+  "updated": "2026-08-05T21:18:50.789Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "failed",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "failed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T20:56:22.918Z",
-    "updatedAt": "2026-08-05T21:09:06.065Z",
-    "reviewNotes": "Verification failed at test",
+    "updatedAt": "2026-08-05T21:18:49.914Z",
+    "reviewNotes": "conflictsSince remains live runtime and durable pipeline state",
     "verificationNotes": "Verification FAILED at test (652739ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/src/dashboard/frontend\n\n ❯ src/components/Settings/__tests__/RolesPanel.test.tsx (13 tests | 2 failed) 1586ms\n     × full mode with MIXED reviewer models renders the red uniformity banner naming the models 40ms\n     × full mode with UNIFORM reviewer models renders no banner 1032ms\n ❯ |root| tests/unit/lib/head-anchor-write-sites.test.ts (2 tests | 1 failed) 3105ms\n     × locks every documented write occurrence and source expression 3104ms (retry x1)\n\n Test Files  1 failed | 168 passed (169)\n      Tests  2 failed | 1962 passed (1964)\n   Start at  17:03:48\n   Duration  33.40s (transform 4.71s, setup 15.63s, import 44.48s, tests 32.13s, environment 24.86s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-MMIlts/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] s\n…(1002 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "d09c573f9177d5775d56e4bce3844e7bae066636",
@@ -534,6 +547,24 @@
         "tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
       ],
       "recordedAt": "2026-08-05T20:54:21.371Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "passed",
+        "atCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1"
+      },
+      "requirements": {
+        "status": "blocked",
+        "atCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1"
+      }
     }
   },
   "closeOut": {
@@ -541,64 +572,64 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 1630674,
-            "output": 46114,
-            "cacheRead": 16366080,
+            "input": 2252599,
+            "output": 51680,
+            "cacheRead": 20419072,
             "cacheWrite": 0
           }
         },
         "review.correctness": {
           "openai/gpt-5.6-terra": {
-            "input": 2068311,
-            "output": 50162,
-            "cacheRead": 12531200,
+            "input": 2420709,
+            "output": 66079,
+            "cacheRead": 18105856,
             "cacheWrite": 0
           }
         },
         "review.performance": {
           "openai/gpt-5.6-terra": {
-            "input": 1952960,
-            "output": 43083,
-            "cacheRead": 8811520,
+            "input": 1982106,
+            "output": 44932,
+            "cacheRead": 9244160,
             "cacheWrite": 0
           }
         },
         "review.requirements": {
           "openai/gpt-5.6-terra": {
-            "input": 2680482,
-            "output": 43391,
-            "cacheRead": 9610240,
+            "input": 2969564,
+            "output": 80686,
+            "cacheRead": 17551872,
             "cacheWrite": 0
           }
         },
         "review.security": {
           "openai/gpt-5.6-terra": {
-            "input": 1602558,
-            "output": 38161,
-            "cacheRead": 8911360,
+            "input": 1880871,
+            "output": 45972,
+            "cacheRead": 13274624,
             "cacheWrite": 0
           }
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 12006605,
-            "output": 805749,
-            "cacheRead": 331190272,
+            "input": 12333982,
+            "output": 811496,
+            "cacheRead": 336926208,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 21941590,
-          "output": 1026660,
-          "cacheRead": 387420672,
+          "input": 23839831,
+          "output": 1100845,
+          "cacheRead": 415521792,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 167.109534,
-        "pricingAsOf": "2026-08-05T21:09:10.579Z"
+        "usd": 179.993211,
+        "pricingAsOf": "2026-08-05T21:18:49.939Z"
       }
     },
     "merges": [
