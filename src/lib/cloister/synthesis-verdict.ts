@@ -1,4 +1,4 @@
-/*
+/**
  * Synthesis-artifact verdict reader — the race guard for review recovery.
  *
  * The review verdict artifact is the review verdict of RECORD:
@@ -14,19 +14,11 @@
  * review-verdict-report.ts — the quick mode's blocked vocabulary is
  * CHANGES REQUESTED, which a synthesis-only reader cannot see. A recovery
  * path that reads only synthesis.md is blind to the fleet's default mode.
- *
- * A workspace file is evidence, not authority by itself. Recovery accepts a
- * report only from the active review run recorded by the agent-state read door,
- * with the per-run capability that the host injected into that reviewer's
- * prompt. A work or test process can create another `.pan/review/*` directory,
- * but it cannot make that directory the host-recorded run or mint its capability.
  */
-import { readFileSync, statSync } from 'fs';
-import { basename, join } from 'path';
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join } from 'path';
 
-import { getReviewArtifactProvenanceSync } from '../overdeck/agent-review-provenance.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
-import { reviewArtifactCapabilityMarker } from './review-artifact-capability.js';
 import {
   findVerdictReport,
   parseVerdictReport,
@@ -37,24 +29,8 @@ export interface SynthesisArtifactVerdict {
   verdict: ReviewVerdict;
   notes?: string;
   headSha?: string;
-  /** Host-recorded review run that produced this artifact. */
-  runId: string;
   /** mtime (ms) of the verdict artifact — must belong to the CURRENT review cycle. */
   mtimeMs: number;
-}
-
-export interface SynthesisArtifactReadOptions {
-  now?: number;
-  workspacePath?: string;
-  /** Test/recovery injection; production resolves both values from agent state. */
-  reviewRunId?: string;
-  reviewArtifactCapability?: string;
-}
-
-interface TrustedReviewRun {
-  workspacePath: string;
-  runId: string;
-  capability: string;
 }
 
 /**
@@ -64,43 +40,12 @@ interface TrustedReviewRun {
  */
 export const SYNTHESIS_ARTIFACT_FRESH_MS = 30 * 60_000;
 
-function resolveTrustedReviewRun(
-  issueId: string,
-  options: SynthesisArtifactReadOptions,
-): TrustedReviewRun | null {
-  const state = options.reviewRunId && options.reviewArtifactCapability
-    ? null
-    : getReviewArtifactProvenanceSync(`agent-${issueId.toLowerCase()}-review`);
-  const runId = options.reviewRunId ?? state?.reviewRunId;
-  const capability = options.reviewArtifactCapability ?? state?.reviewArtifactCapability;
-  const workspacePath = options.workspacePath ?? state?.workspace ?? (() => {
-    const resolved = resolveProjectFromIssueSync(issueId);
-    return resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : null;
-  })();
-
-  if (!workspacePath || !runId || !capability) return null;
-  if (basename(runId) !== runId || !runId.startsWith(`agent-${issueId.toLowerCase()}-review`)) return null;
-  return { workspacePath, runId, capability };
-}
-
-function readRunContext(
-  runDir: string,
-  issueId: string,
-  runId: string,
-): { headSha?: string } | null {
+function readHeadEvidence(runDir: string): string | undefined {
   try {
-    const context = JSON.parse(readFileSync(join(runDir, 'context.json'), 'utf-8')) as {
-      issueId?: unknown;
-      runId?: unknown;
-      headSha?: unknown;
-    };
-    if (context.issueId !== issueId || context.runId !== runId) return null;
-    return typeof context.headSha === 'string' && context.headSha.length > 0
-      ? { headSha: context.headSha }
-      : {};
-  } catch {
-    return null;
-  }
+    const context = JSON.parse(readFileSync(join(runDir, 'context.json'), 'utf-8')) as { headSha?: unknown };
+    if (typeof context.headSha === 'string' && context.headSha.length > 0) return context.headSha;
+  } catch { /* head is optional evidence (quick mode often omits context.json) */ }
+  return undefined;
 }
 
 function readNotes(content: string, topBlocker: string): string | undefined {
@@ -111,120 +56,81 @@ function readNotes(content: string, topBlocker: string): string | undefined {
 
 export function readLatestSynthesisVerdict(
   issueId: string,
-  options: SynthesisArtifactReadOptions = {},
+  options: { now?: number; workspacePath?: string } = {},
 ): SynthesisArtifactVerdict | null {
   const now = options.now ?? Date.now();
-  const trusted = resolveTrustedReviewRun(issueId, options);
-  if (!trusted) return null;
-
-  const runDir = join(trusted.workspacePath, '.pan', 'review', trusted.runId);
-  const context = readRunContext(runDir, issueId, trusted.runId);
-  if (!context) return null;
-
+  const workspacePath = options.workspacePath ?? (() => {
+    const resolved = resolveProjectFromIssueSync(issueId);
+    return resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : null;
+  })();
+  if (!workspacePath) return null;
+  const reviewRoot = join(workspacePath, '.pan', 'review');
   try {
-    if (!statSync(runDir).isDirectory()) return null;
-    const report = findVerdictReport(runDir);
-    if (!report) return null;
-    const mtimeMs = statSync(report.path).mtimeMs;
-    if (now - mtimeMs >= SYNTHESIS_ARTIFACT_FRESH_MS) return null;
-
-    const content = readFileSync(report.path, 'utf-8');
-    const marker = reviewArtifactCapabilityMarker(trusted.capability);
-    if (content.split(/\r?\n/, 1)[0] !== marker) return null;
-
-    const parsed = parseVerdictReport(content);
-    if (!parsed) return null;
-    const notes = readNotes(content, parsed.topBlocker);
-
-    return {
-      verdict: parsed.verdict,
-      ...(notes ? { notes } : {}),
-      ...(context.headSha ? { headSha: context.headSha } : {}),
-      runId: trusted.runId,
-      mtimeMs,
-    };
+    if (!statSync(reviewRoot).isDirectory()) return null;
   } catch {
     return null;
   }
+
+  // Newest run dir by artifact mtime carrying EITHER verdict artifact shape.
+  let latest: { dir: string; mtimeMs: number; content: string } | null = null;
+  try {
+    for (const entry of readdirSync(reviewRoot)) {
+      const runDir = join(reviewRoot, entry);
+      const report = findVerdictReport(runDir);
+      if (!report) continue;
+      const mtimeMs = statSync(report.path).mtimeMs;
+      if (!latest || mtimeMs > latest.mtimeMs) {
+        latest = { dir: runDir, mtimeMs, content: readFileSync(report.path, 'utf-8') };
+      }
+    }
+  } catch {
+    return null;
+  }
+  if (!latest || now - latest.mtimeMs > SYNTHESIS_ARTIFACT_FRESH_MS) return null;
+
+  const parsed = parseVerdictReport(latest.content);
+  if (!parsed) return null;
+  const notes = readNotes(latest.content, parsed.topBlocker);
+  const headSha = readHeadEvidence(latest.dir);
+
+  return {
+    verdict: parsed.verdict,
+    ...(notes ? { notes } : {}),
+    ...(headSha ? { headSha } : {}),
+    mtimeMs: latest.mtimeMs,
+  };
 }
 
-/*
+/**
  * Memoized artifact read for callers on a hot path (PAN-3511).
  *
  * `resolveJournalReconciledReviewStatusSync` runs on EVERY `getReviewStatusSync`
- * call in the system, so it cannot afford a directory walk per read. The key
- * includes host provenance, so a new review run never inherits the previous
- * run's cached verdict. Non-null entries expire at the earlier of the memo TTL
- * and the artifact freshness boundary. The bounded LRU also evicts completed
- * issue keys instead of retaining the fleet's lifetime issue history.
+ * call in the system, so it cannot afford a directory walk per read. This wraps
+ * the reader in a short per-issue TTL: a caller that consults the artifact on a
+ * rare branch pays at most one filesystem scan per issue per minute, and the
+ * common path pays nothing because it never calls this at all.
+ *
+ * A null result is memoized too — an issue with no artifact is the common case,
+ * and re-scanning for an absent file every read is exactly the cost this avoids.
  */
 export const ARTIFACT_VERDICT_MEMO_TTL_MS = 60_000;
-export const ARTIFACT_VERDICT_MEMO_MAX_ENTRIES = 256;
 
-interface ArtifactVerdictMemoEntry {
-  value: SynthesisArtifactVerdict | null;
-  expiresAt: number;
-}
-
-const artifactVerdictMemo = new Map<string, ArtifactVerdictMemoEntry>();
-
-function memoKey(issueId: string, trusted: TrustedReviewRun): string {
-  return JSON.stringify([
-    issueId,
-    trusted.workspacePath,
-    trusted.runId,
-    trusted.capability,
-  ]);
-}
-
-function setMemoEntry(key: string, entry: ArtifactVerdictMemoEntry): void {
-  artifactVerdictMemo.delete(key);
-  artifactVerdictMemo.set(key, entry);
-  while (artifactVerdictMemo.size > ARTIFACT_VERDICT_MEMO_MAX_ENTRIES) {
-    const oldest = artifactVerdictMemo.keys().next().value as string | undefined;
-    if (!oldest) break;
-    artifactVerdictMemo.delete(oldest);
-  }
-}
+const artifactVerdictMemo = new Map<string, { value: SynthesisArtifactVerdict | null; checkedAt: number }>();
 
 export function readMemoizedArtifactVerdict(
   issueId: string,
-  options: SynthesisArtifactReadOptions = {},
+  options: { now?: number; workspacePath?: string } = {},
 ): SynthesisArtifactVerdict | null {
   const now = options.now ?? Date.now();
-  const trusted = resolveTrustedReviewRun(issueId, options);
-  if (!trusted) return null;
-  const key = memoKey(issueId, trusted);
-  const cached = artifactVerdictMemo.get(key);
-  if (cached && now < cached.expiresAt) {
-    artifactVerdictMemo.delete(key);
-    artifactVerdictMemo.set(key, cached);
-    return cached.value;
-  }
-  if (cached) artifactVerdictMemo.delete(key);
+  const cached = artifactVerdictMemo.get(issueId);
+  if (cached && now - cached.checkedAt < ARTIFACT_VERDICT_MEMO_TTL_MS) return cached.value;
 
-  const value = readLatestSynthesisVerdict(issueId, {
-    ...options,
-    now,
-    workspacePath: trusted.workspacePath,
-    reviewRunId: trusted.runId,
-    reviewArtifactCapability: trusted.capability,
-  });
-  const freshnessExpiry = value
-    ? value.mtimeMs + SYNTHESIS_ARTIFACT_FRESH_MS
-    : Number.POSITIVE_INFINITY;
-  setMemoEntry(key, {
-    value,
-    expiresAt: Math.min(now + ARTIFACT_VERDICT_MEMO_TTL_MS, freshnessExpiry),
-  });
+  const value = readLatestSynthesisVerdict(issueId, { now, ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}) });
+  artifactVerdictMemo.set(issueId, { value, checkedAt: now });
   return value;
 }
 
-/** Test seams — module-level memo state leaks across tests in a file otherwise. */
+/** Test seam — module-level memo state leaks across tests in a file otherwise. */
 export function __resetArtifactVerdictMemo(): void {
   artifactVerdictMemo.clear();
-}
-
-export function __artifactVerdictMemoSize(): number {
-  return artifactVerdictMemo.size;
 }

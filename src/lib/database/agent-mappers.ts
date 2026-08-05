@@ -50,7 +50,6 @@ export function agentStateToDbAgent(state: AgentState): DbAgent {
     roleRunHead: state.roleRunHead ?? null,
     reviewSubRole: state.reviewSubRole ?? null,
     reviewRunId: state.reviewRunId ?? null,
-    reviewArtifactCapability: state.reviewArtifactCapability ?? null,
     reviewSynthesisAgentId: state.reviewSynthesisAgentId ?? null,
     reviewOutputPath: state.reviewOutputPath ?? null,
     reviewDeadlineAt: state.reviewDeadlineAt ?? null,

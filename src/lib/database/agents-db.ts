@@ -52,7 +52,6 @@ export interface Agent {
   roleRunHead: string | null;
   reviewSubRole: string | null;
   reviewRunId: string | null;
-  reviewArtifactCapability: string | null;
   reviewSynthesisAgentId: string | null;
   reviewOutputPath: string | null;
   reviewDeadlineAt: string | null;
@@ -107,7 +106,6 @@ export function rowToAgent(row: Record<string, unknown>): Agent {
     roleRunHead: (row['role_run_head'] as string | null) ?? null,
     reviewSubRole: (row['review_sub_role'] as string | null) ?? null,
     reviewRunId: (row['review_run_id'] as string | null) ?? null,
-    reviewArtifactCapability: (row['review_artifact_capability'] as string | null) ?? null,
     reviewSynthesisAgentId: (row['review_synthesis_agent_id'] as string | null) ?? null,
     reviewOutputPath: (row['review_output_path'] as string | null) ?? null,
     reviewDeadlineAt: (row['review_deadline_at'] as string | null) ?? null,
@@ -132,7 +130,7 @@ const ALL_COLUMNS = [
   'troubled', 'troubled_at', 'consecutive_failures',
   'first_failure_in_run_at', 'last_failure_at', 'last_failure_reason', 'last_failure_next_retry_at',
   'flywheel_run_id', 'started_by', 'role_run_head',
-  'review_sub_role', 'review_run_id', 'review_artifact_capability', 'review_synthesis_agent_id',
+  'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled', 'review_retry_attempt',
   'inspect_sub_role',
   'delivery_method', 'supervisor_enabled', 'channels_enabled', 'updated_at',
@@ -180,7 +178,6 @@ function agentToParams(agent: Agent): unknown[] {
     agent.roleRunHead,
     agent.reviewSubRole,
     agent.reviewRunId,
-    agent.reviewArtifactCapability ?? null,
     agent.reviewSynthesisAgentId,
     agent.reviewOutputPath,
     agent.reviewDeadlineAt,

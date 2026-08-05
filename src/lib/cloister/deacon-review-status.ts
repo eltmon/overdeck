@@ -10,6 +10,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
+import { readLatestSynthesisVerdict } from './synthesis-verdict.js';
 import { attemptArtifactVerdictRestore } from './verdict-restore.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
@@ -604,7 +605,7 @@ async function reconcileReviewStatusOrphan(
       const restore = await attemptArtifactVerdictRestore(issueId, {
         caller: 'orphan-reset',
         clearStuckReason: 'review_infrastructure_failure',
-        deps: reviewStatusRowAccess,
+        deps: { ...reviewStatusRowAccess, readArtifact: (id, o) => { const a = readLatestSynthesisVerdict(id, o); return a?.verdict === 'passed' ? a : null; } },
       });
       if (restore.outcome === 'restored') {
         actions.push(

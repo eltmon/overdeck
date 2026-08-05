@@ -43,12 +43,7 @@
 import { rehydrateHeadAnchor } from '../git-utils.js';
 import { emitActivityEntryOnce, type ActivityEmitOutcome, type EmitActivityOptions } from '../activity-logger.js';
 import { getCloisterEventStore } from './event-store-provider.js';
-import { restoreWouldTripHeadGuard } from './verdict-head-guard.js';
-import {
-  readMemoizedArtifactVerdict,
-  type SynthesisArtifactReadOptions,
-  type SynthesisArtifactVerdict,
-} from './synthesis-verdict.js';
+import { readLatestSynthesisVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
 
 /**
  * The row fields this door reads, and the update it writes, declared
@@ -89,7 +84,7 @@ export type ArtifactVerdictRestoreResult =
 export interface ArtifactVerdictRestoreDeps {
   readArtifact(
     issueId: string,
-    options: SynthesisArtifactReadOptions,
+    options: { now?: number; workspacePath?: string },
   ): SynthesisArtifactVerdict | null;
   getStatus(issueId: string): VerdictRestoreRow | null;
   setStatus(issueId: string, update: VerdictRestoreUpdate): void;
@@ -107,14 +102,32 @@ export interface ArtifactVerdictRestoreOptions {
   /** Recovery path attempting the restore — recorded on the blocked event. */
   caller?: string;
   workspacePath?: string;
-  /** Test/recovery injection for the active host-recorded run provenance. */
-  reviewRunId?: string;
-  reviewArtifactCapability?: string;
-  /** Reuse a caller-selected immutable snapshot instead of re-reading the filesystem. */
-  selectedArtifact?: SynthesisArtifactVerdict;
   /** getStatus/setStatus are required — see VerdictRestoreRow for why. */
   deps: Pick<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'>
   & Partial<Omit<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'>>;
+}
+
+/**
+ * Would writing this artifact's verdict be rejected for disagreeing with the
+ * row's anchor? True only when BOTH heads are present and differ — an artifact
+ * with no head evidence (the common quick-self-review shape, which carries no
+ * context.json) cannot trip it, and neither can a row that has never recorded a
+ * verified commit.
+ *
+ * The row side is named `rowHead`, not `lastVerifiedCommit`: this reads an
+ * anchor to predict a rejection, and the HeadAnchor write-site inventory in
+ * tests/unit/lib/head-anchor-write-sites.test.ts should not carry a read as if
+ * it were a persistence write.
+ */
+export function restoreWouldTripHeadGuard(input: {
+  artifactHead?: string | undefined;
+  rowHead?: string | undefined;
+}): boolean {
+  const artifactHead = input.artifactHead;
+  const rowHead = input.rowHead;
+  if (typeof artifactHead !== 'string' || artifactHead.length === 0) return false;
+  if (typeof rowHead !== 'string' || rowHead.length === 0) return false;
+  return artifactHead !== rowHead;
 }
 
 function defaultEmitEvent(type: string, payload: Record<string, unknown>): void {
@@ -133,7 +146,7 @@ function defaultEmitEvent(type: string, payload: Record<string, unknown>): void 
 }
 
 const DEFAULT_DEPS: Omit<ArtifactVerdictRestoreDeps, 'getStatus' | 'setStatus'> = {
-  readArtifact: readMemoizedArtifactVerdict,
+  readArtifact: readLatestSynthesisVerdict,
   emitEvent: defaultEmitEvent,
   // Called through rather than bound, so importing this module does not force
   // every transitive importer's test to mock an export only the blocked path uses.
@@ -154,11 +167,9 @@ export async function attemptArtifactVerdictRestore(
 ): Promise<ArtifactVerdictRestoreResult> {
   const deps: ArtifactVerdictRestoreDeps = { ...DEFAULT_DEPS, ...options.deps };
 
-  const artifact = options.selectedArtifact ?? deps.readArtifact(issueId, {
+  const artifact = deps.readArtifact(issueId, {
     now: deps.now(),
     ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}),
-    ...(options.reviewRunId ? { reviewRunId: options.reviewRunId } : {}),
-    ...(options.reviewArtifactCapability ? { reviewArtifactCapability: options.reviewArtifactCapability } : {}),
   });
   // An absent artifact is "no evidence", never "approve" — the caller keeps its
   // existing behavior untouched.

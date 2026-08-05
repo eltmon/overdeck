@@ -157,8 +157,6 @@ export interface AgentState {
   /** Review-convoy metadata for server-side reviewer lifecycle monitoring. */
   reviewSubRole?: string;
   reviewRunId?: string;
-  /** Host-issued capability required on the active run's verdict artifact. */
-  reviewArtifactCapability?: string;
   reviewOutputPath?: string;
   reviewSynthesisAgentId?: string;
   reviewDeadlineAt?: string;
@@ -287,7 +285,6 @@ function cleanAgentState(raw: AgentState): AgentState {
     deliveryMethod: raw.deliveryMethod,
     reviewSubRole: raw.reviewSubRole,
     reviewRunId: raw.reviewRunId,
-    reviewArtifactCapability: raw.reviewArtifactCapability,
     reviewOutputPath: raw.reviewOutputPath,
     reviewSynthesisAgentId: raw.reviewSynthesisAgentId,
     reviewDeadlineAt: raw.reviewDeadlineAt,

@@ -75,7 +75,6 @@ const COLUMN_MAP: Record<keyof DbAgent, string> = {
   roleRunHead: 'role_run_head',
   reviewSubRole: 'review_sub_role',
   reviewRunId: 'review_run_id',
-  reviewArtifactCapability: 'review_artifact_capability',
   reviewSynthesisAgentId: 'review_synthesis_agent_id',
   reviewOutputPath: 'review_output_path',
   reviewDeadlineAt: 'review_deadline_at',

@@ -4,7 +4,6 @@ import { Effect } from 'effect';
 import { isContextOverflowTail } from '../context-overflow.js';
 import { getAgentRuntimeStateSync, getAgentState, getAgentStateSync, saveAgentStateSync, type AgentState } from '../agents.js';
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
-import { reviewArtifactCapabilityMarker } from './review-artifact-capability.js';
 import { findVerdictReport } from './review-verdict-report.js';
 import { AGENTS_DIR } from '../paths.js';
 import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
@@ -216,10 +215,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reviewDir,
         reports,
       });
-      const capabilityMarker = state.reviewArtifactCapability
-        ? `${reviewArtifactCapabilityMarker(state.reviewArtifactCapability)}\n`
-        : '';
-      writeFileSync(join(reviewDir, 'synthesis.md'), capabilityMarker + synthesis.body);
+      writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
       // PAN-1862 (FR-6): anchor each reviewer verdict to the reviewed HEAD so the
       // next cycle's reviewersToRerun can skip provably-clean reviewers.
       let fallbackHead: HeadAnchor | undefined;

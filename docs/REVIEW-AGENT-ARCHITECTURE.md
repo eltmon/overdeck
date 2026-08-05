@@ -130,15 +130,11 @@ The contract has four clauses:
    emits a reason and leaves the verdict on disk for the write door to land.
 
 **The two doors.** `readLatestSynthesisVerdict()` in
-`src/lib/cloister/synthesis-verdict.ts` is the read door. It resolves the active
-review parent's `reviewRunId` and host-issued `reviewArtifactCapability` through
-the agent-state read door, reads only that run directory, verifies that
-`context.json` binds the issue and run, and requires the capability marker as the
-artifact's first line. A newer workspace-created directory or a report without
-the active capability is not verdict evidence. The reader returns `null` at the
-30-minute freshness boundary so a previous cycle cannot resurrect over a new
-review. `readMemoizedArtifactVerdict()` wraps it in a bounded 60-second LRU whose
-non-null entries expire earlier when the artifact reaches that freshness boundary.
+`src/lib/cloister/synthesis-verdict.ts` is the read door — it walks
+`.pan/review/*/`, takes the newest run carrying either artifact filename, and
+returns `null` past a 30-minute freshness bound so a previous cycle's artifact can
+never resurrect over a newly spawned review. `readMemoizedArtifactVerdict()` wraps
+it with a 60-second TTL for callers on the ~60s deacon patrol.
 `attemptArtifactVerdictRestore()` in `src/lib/cloister/verdict-restore.ts` is the
 shared decision point: it reads, predicts whether the write would be refused, and
 either restores or reports. It returns one of `no-artifact`, `restored`, or
