@@ -6,7 +6,6 @@ import {
   __artifactVerdictMemoSize,
   __resetArtifactVerdictMemo,
   ARTIFACT_VERDICT_MEMO_MAX_ENTRIES,
-  readLatestSynthesisVerdict,
   readLatestSynthesisVerdictAsync,
   readMemoizedArtifactVerdict,
   SYNTHESIS_ARTIFACT_FRESH_MS,
@@ -35,19 +34,24 @@ afterEach(() => {
 });
 
 describe('active review artifact evidence', () => {
-  it('reads a fresh verdict only from the requested active run', () => {
+  it('reads a fresh verdict only from the requested active run', async () => {
     writeArtifact('old-run', 'synthesis.md', '## Verdict: APPROVED\n');
     writeArtifact('active-run', 'review.md', '## Verdict: CHANGES REQUESTED — missing null check\n', NOW - 30_000);
 
-    const verdict = readLatestSynthesisVerdict('PAN-1', { now: NOW, workspacePath: workspace, runId: 'active-run' });
-
-    expect(verdict).toMatchObject({ runId: 'active-run', verdict: 'blocked' });
+    await expect(readLatestSynthesisVerdictAsync('PAN-1', {
+      now: NOW,
+      workspacePath: workspace,
+      runId: 'active-run',
+    })).resolves.toMatchObject({ runId: 'active-run', verdict: 'blocked' });
   });
 
-  it('returns no evidence when the caller omits the host-recorded run ID', () => {
+  it('returns no evidence when the caller omits the host-recorded run ID', async () => {
     writeArtifact('forged-run', 'review.md', '## Verdict: APPROVED\n');
 
-    expect(readLatestSynthesisVerdict('PAN-1', { now: NOW, workspacePath: workspace })).toBeNull();
+    await expect(readLatestSynthesisVerdictAsync('PAN-1', {
+      now: NOW,
+      workspacePath: workspace,
+    })).resolves.toBeNull();
   });
 
   it('does not use an artifact from a prior review cycle', async () => {
@@ -71,26 +75,24 @@ describe('active review artifact evidence', () => {
     await expect(readLatestSynthesisVerdictAsync('PAN-1', { workspacePath: workspace, runId: 'active-run', now: NOW })).resolves.toBeNull();
   });
 
-  it('expires memoized verdict evidence at the freshness boundary', () => {
+  it('returns only an asynchronously populated memo entry and expires it at the freshness boundary', async () => {
     writeArtifact('active-run', 'synthesis.md', '## Verdict: APPROVED\n', NOW - SYNTHESIS_ARTIFACT_FRESH_MS + 10);
+    const options = { now: NOW, workspacePath: workspace, runId: 'active-run' };
 
-    expect(readMemoizedArtifactVerdict('PAN-1', {
-      now: NOW,
-      workspacePath: workspace,
-      runId: 'active-run',
-    })?.verdict).toBe('passed');
+    expect(readMemoizedArtifactVerdict('PAN-1', options)).toBeNull();
+    await readLatestSynthesisVerdictAsync('PAN-1', options);
+    expect(readMemoizedArtifactVerdict('PAN-1', options)?.verdict).toBe('passed');
 
     rmSync(join(workspace, '.pan'), { recursive: true, force: true });
     expect(readMemoizedArtifactVerdict('PAN-1', {
+      ...options,
       now: NOW + 10,
-      workspacePath: workspace,
-      runId: 'active-run',
     })).toBeNull();
   });
 
-  it('bounds memoized evidence across review runs', () => {
+  it('bounds asynchronously populated evidence across review runs', async () => {
     for (let index = 0; index <= ARTIFACT_VERDICT_MEMO_MAX_ENTRIES; index++) {
-      readMemoizedArtifactVerdict('PAN-1', {
+      await readLatestSynthesisVerdictAsync('PAN-1', {
         now: NOW,
         workspacePath: workspace,
         runId: `run-${index}`,

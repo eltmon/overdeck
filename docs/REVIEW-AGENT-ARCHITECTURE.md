@@ -112,8 +112,8 @@ The full round trip between the work agent and review:
 A review artifact can appear in the workspace before the canonical review signal,
 but the workspace is writable by the work agent. It is recovery evidence, never
 an independent write path for a terminal status. Terminal verdicts enter the row
-only through `recordReviewVerdict()`, either from `pan admin specialists done
-review` or from the recovery helper after its active-run and anchor checks.
+only through `recordReviewVerdict()` when `pan admin specialists done review`
+processes the reviewer's canonical completion signal.
 
 The contract has four clauses:
 
@@ -123,35 +123,39 @@ The contract has four clauses:
 2. **One verdict write door.** `recordReviewVerdict()` in
    `src/lib/cloister/review-verdict-writer.ts` owns every terminal verdict and
    rejects stale evidence before it reaches `review_status`.
-3. **Recovery restores through the write door.** The deacon's restore helper
-   reads active-run evidence asynchronously, refuses a mismatched anchor with a
-   visible `review.verdict_restore_blocked` event, and otherwise delegates to
-   `recordReviewVerdict()`. Feedback and sweeper paths inspect evidence only.
+3. **Recovery preserves evidence without writing a verdict.** The deacon's
+   observation helper reads active-run evidence asynchronously and emits a
+   visible `review.verdict_restore_blocked` event for a mismatched anchor.
+   Recovery then continues its bounded reset or escalation path. Feedback and
+   sweeper paths inspect evidence only.
 4. **No artifact scan runs in status reads.** The synchronous status resolver
    never walks `.pan/review`. Only after its stale-journal refusal predicate
-   matches may it consult a bounded memo for active-run corroboration.
+   matches may it consume a bounded, asynchronously populated memo entry whose
+   verdict and head both corroborate the live row.
 
 `readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
 reads one explicit active run rather than scanning `.pan/review/*/`. It returns
-`null` without a run ID or after the 30-minute freshness bound. The synchronous
-`readMemoizedArtifactVerdict()` is reserved for stale-journal corroboration; it
-is LRU-bounded to 256 `(issueId, runId)` entries and expires a verdict at the
-sooner of its 60-second memo TTL or freshness deadline. `attemptArtifactVerdictRestore()`
-is the shared deacon restore helper.
+`null` without a run ID or after the 30-minute freshness bound, and refreshes
+its bounded memo after each asynchronous read. The synchronous
+`readMemoizedArtifactVerdict()` is cache-only for stale-journal corroboration;
+it is LRU-bounded to 256 `(issueId, runId)` entries and expires a verdict at the
+sooner of its 60-second memo TTL or freshness deadline. A cold or expired memo
+entry preserves the stale-journal refusal without filesystem I/O.
+`observeActiveReviewArtifact()` is the shared deacon observation helper.
 
 **The recovery sites that consult evidence:**
 
 | Site | File | Effect of evidence |
 | --- | --- | --- |
-| Deacon orphan reset | `cloister/deacon-review-status.ts` | restores a safe active-run terminal verdict through `recordReviewVerdict()`; only no-evidence keeps the legacy reset |
-| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | restores through the helper or preserves a guard-refused artifact instead of marking/re-dispatching over it |
+| Deacon orphan reset | `cloister/deacon-review-status.ts` | asynchronously preserves active-run evidence for diagnosis, then continues the bounded reset path |
+| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | preserves active-run evidence and still marks/escalates the established infrastructure failure |
 | Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
-| Stale-journal resolver | `review-status-read.ts` | consults bounded active-run memo evidence only after a stale-refusal predicate, then replays a corroborated terminal journal verdict |
+| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays only a verdict with a matching live head |
 | Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
 
 **Rule for future guard authors.** A new review recovery path reads only an
-active-run artifact before it acts. It must never turn workspace artifact content
-into a terminal verdict; use `recordReviewVerdict()` for that write.
+active-run artifact before it acts. It preserves workspace artifact content as
+diagnostic evidence and never turns it into a terminal verdict.
 
 ### Review-mode differences
 

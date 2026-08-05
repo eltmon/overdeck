@@ -38,6 +38,7 @@ export function resolveJournalReconciledReviewStatusSync(
         )
       : null;
     if (staleSnapshot) {
+      const liveStatus = dbStatus!;
       // PAN-3511: the normal status-read path stays filesystem-free. Only after
       // the existing stale-refusal predicate matches do we consult the bounded
       // active-run memo, and only to corroborate a terminal journal verdict.
@@ -46,9 +47,15 @@ export function resolveJournalReconciledReviewStatusSync(
       const artifact = typeof journalVerdict === 'string' && review
         ? readMemoizedArtifactVerdict(issueId, review)
         : null;
-      if (artifact && artifact.verdict === journalVerdict) {
+      if (
+        artifact
+        && artifact.verdict === journalVerdict
+        && artifact.headSha
+        && liveStatus.lastVerifiedCommit
+        && artifact.headSha === liveStatus.lastVerifiedCommit
+      ) {
         console.log(
-          `[review-status] Active-run artifact corroborated the stale journal verdict for ${issueId}; replaying the terminal journal result.`,
+          `[review-status] Active-run artifact corroborated the stale journal verdict and live review anchor for ${issueId}; replaying the terminal journal result.`,
         );
         return reconcileJournalIntoCacheSync(issueId, dbStatus ?? null, journal, hooks);
       }

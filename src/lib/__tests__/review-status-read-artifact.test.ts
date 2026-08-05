@@ -17,7 +17,11 @@ vi.mock('../review-status-reconcile.js', () => ({ reconcileJournalIntoCacheSync:
 vi.mock('../pan-dir/pipeline-verdict-merge.js', () => ({ staleVerdictSnapshotAgainstLiveCycle: vi.fn() }));
 
 const ISSUE = 'PAN-3511';
-const DB_ROW = { reviewStatus: 'reviewing', updatedAt: '2026-08-03T00:00:00.000Z' } as never;
+const DB_ROW = {
+  reviewStatus: 'reviewing',
+  updatedAt: '2026-08-03T00:00:00.000Z',
+  lastVerifiedCommit: 'reviewed-head',
+} as never;
 const RECONCILED = { reviewStatus: 'passed', updatedAt: '2026-08-03T01:00:00.000Z' } as never;
 
 const readArtifact = vi.mocked(readMemoizedArtifactVerdict);
@@ -57,7 +61,12 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
   it('reconciles a stale terminal journal only when active-run evidence corroborates it', () => {
     terminalJournal('passed');
     staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
-    readArtifact.mockReturnValue({ verdict: 'passed', runId: 'host-recorded-run', mtimeMs: 1 });
+    readArtifact.mockReturnValue({
+      verdict: 'passed',
+      runId: 'host-recorded-run',
+      headSha: 'reviewed-head',
+      mtimeMs: 1,
+    });
 
     const result = resolveJournalReconciledReviewStatusSync(ISSUE, DB_ROW, hooks());
 
@@ -73,6 +82,20 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     terminalJournal('passed');
     staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
     readArtifact.mockReturnValue({ verdict: 'blocked', runId: 'host-recorded-run', mtimeMs: 1 });
+
+    expect(resolveJournalReconciledReviewStatusSync(ISSUE, DB_ROW, hooks())).toBe(DB_ROW);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a stale journal when matching verdict evidence has a different head', () => {
+    terminalJournal('passed');
+    staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
+    readArtifact.mockReturnValue({
+      verdict: 'passed',
+      runId: 'host-recorded-run',
+      headSha: 'different-head',
+      mtimeMs: 1,
+    });
 
     expect(resolveJournalReconciledReviewStatusSync(ISSUE, DB_ROW, hooks())).toBe(DB_ROW);
     expect(reconcile).not.toHaveBeenCalled();
