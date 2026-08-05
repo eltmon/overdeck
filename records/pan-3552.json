@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T17:39:42.958Z",
+  "updated": "2026-08-05T17:54:58.416Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 23,
-    "claims": {
-      "dispatch-consults-verdict-of-record": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 3597756,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T17:39:42.958Z"
-      }
-    },
+    "sequence": 24,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -176,6 +168,16 @@
         "itemId": "drop-sweeper-actor-events",
         "outcome": "completed",
         "releasedAt": "2026-08-05T17:39:32.531Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 3597756,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:39:42.958Z",
+        "itemId": "dispatch-consults-verdict-of-record",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T17:54:58.416Z"
       }
     ],
     "statusReasons": {
@@ -244,6 +246,10 @@
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac2": "completed",
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac3": "completed",
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac4": "completed",
-    "dispatch-consults-verdict-of-record": "running"
+    "dispatch-consults-verdict-of-record": "completed",
+    "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac1": "completed",
+    "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac2": "completed",
+    "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac3": "completed",
+    "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac4": "completed"
   }
 }
