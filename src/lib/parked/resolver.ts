@@ -139,10 +139,6 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
     park: 'the review convoy died and could not be recovered in place',
     unpark: 're-dispatch a fresh review convoy (sweeper does this after cooldown)',
   },
-  review_parent_stalled_needs_you: {
-    park: 'the review synthesis parent passed its deadline with no verdict on record — the sweeper no longer kills it, it escalates',
-    unpark: 'inspect the parent pane, respawn or re-dispatch the review (operator call), then pan unstick',
-  },
   test_signal_strand: {
     park: 'a test verdict was written but never delivered to the pipeline',
     unpark: 're-drive the stranded verdict to a resumed work agent',
