@@ -80,6 +80,9 @@ function makeClient() {
     },
   });
   client.setQueryData(['conversations'], [mockConversation]);
+  // PAN-1577: pre-seed so ConversationList's registered-projects query (for
+  // each row's Move submenu) doesn't fire an extra real fetch in these tests.
+  client.setQueryData(['registered-projects'], []);
   return client;
 }
 
@@ -404,5 +407,170 @@ describe('ConversationList rename flow', () => {
     expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
 
     resolveResponse?.();
+  });
+});
+
+// ─── Move menu (PAN-1577) ──────────────────────────────────────────────────
+
+describe('ConversationList move flow (PAN-1577)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (typeof url === 'string' && url.endsWith('/move')) {
+        return Promise.resolve({ ok: true, json: async () => ({ projectKey: 'myn' }) });
+      }
+      // Background refetches (e.g. onSettled's invalidateQueries) hit /api/conversations —
+      // must resolve to an array or ConversationList's memo chain throws.
+      return Promise.resolve({ ok: true, json: async () => [mockConversation] });
+    }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function renderWithProjects() {
+    const client = makeClient();
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    return client;
+  }
+
+  it('exposes a Move item with a project picker from the 3-dot menu (ac1)', () => {
+    renderWithProjects();
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).toBeInTheDocument();
+  });
+
+  it('exposes a Move item with a project picker from right-click (ac1)', () => {
+    renderWithProjects();
+    fireEvent.contextMenu(screen.getByTitle('test-conv'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeInTheDocument();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).toBeInTheDocument();
+  });
+
+  it('disables the conversation\'s current project in the picker (ac2)', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).not.toBeDisabled();
+  });
+
+  it('disables the cwd-derived project in the picker when there is no explicit override (review fix: effective resolution)', () => {
+    const client = makeClient();
+    // No projectKey override -- this conversation is only ever grouped into
+    // Krux via cwd inference, which the picker's disabled-state check must
+    // also honor (previously it only compared the raw, nullable projectKey).
+    client.setQueryData(['conversations'], [{ ...mockConversation, cwd: '/home/user/Projects/krux/sub', projectKey: null }]);
+    client.setQueryData(['registered-projects'], [
+      { key: 'krux', name: 'Krux', path: '/home/user/Projects/krux' },
+      { key: 'myn', name: 'MYN', path: '/home/user/Projects/myn' },
+    ]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+
+    expect(screen.getByRole('menuitem', { name: 'Krux' })).toBeDisabled();
+    expect(screen.getByRole('menuitem', { name: 'MYN' })).not.toBeDisabled();
+  });
+
+  it('moves the conversation via the shared mutation when another project is selected (ac2)', async () => {
+    renderWithProjects();
+    fireEvent.click(screen.getByTitle('More actions'));
+    fireEvent.click(screen.getByRole('menuitem', { name: /Move/ }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'MYN' }));
+
+    await waitFor(() => {
+      expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+        '/api/conversations/test-conv/move',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: JSON.stringify({ projectKey: 'myn' }),
+        }),
+      );
+    });
+  });
+});
+
+// ─── Drag-drop move (PAN-1577) ─────────────────────────────────────────────
+
+function fakeDataTransfer() {
+  const store = new Map<string, string>();
+  return {
+    effectAllowed: 'uninitialized',
+    dropEffect: 'none',
+    get types() { return Array.from(store.keys()); },
+    setData: (type: string, value: string) => { store.set(type, value); },
+    getData: (type: string) => store.get(type) ?? '',
+  };
+}
+
+describe('ConversationRow drag source (PAN-1577)', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('is draggable and carries {name, projectKey, cwd} as the drag payload (ac2)', () => {
+    const client = makeClient();
+    client.setQueryData(['conversations'], [{ ...mockConversation, projectKey: 'krux' }]);
+    render(
+      <DialogProvider>
+        <QueryClientProvider client={client}>
+          <ConversationList selectedConversation={null} onSelectConversation={() => {}} />
+        </QueryClientProvider>
+      </DialogProvider>,
+    );
+
+    const row = screen.getByTitle('test-conv');
+    expect(row).toHaveAttribute('draggable', 'true');
+
+    const dataTransfer = fakeDataTransfer();
+    fireEvent.dragStart(row, { dataTransfer });
+
+    // cwd travels too (review fix): the drop target needs it to resolve the
+    // conversation's *effective* current project (override-first, cwd
+    // fallback) for the already-in-target no-op check.
+    expect(dataTransfer.getData('application/json')).toBe(
+      JSON.stringify({ name: 'test-conv', projectKey: 'krux', cwd: mockConversation.cwd }),
+    );
   });
 });

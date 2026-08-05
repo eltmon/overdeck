@@ -32,6 +32,7 @@ pan-agent-activity
 pan-approve
 pan-close
 pan-code-review
+pan-conversations
 pan-convoy-synthesis
 pan-dev
 pan-diagnose

@@ -315,7 +315,7 @@ export function RationaleSidePanel({
       </div>
 
       {/* Identity */}
-      <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--muted-foreground)' }}>{node.issueId}</div>
       {node.title && (
         <div style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.35, margin: '2px 0 10px' }}>{node.title}</div>
       )}
@@ -339,7 +339,7 @@ export function RationaleSidePanel({
           </span>
         </span>
         <span style={META_KEY}>Impact score</span>
-        <span style={{ ...META_VAL, fontFamily: 'monospace' }}>{node.score} / 100</span>
+        <span style={{ ...META_VAL, fontFamily: 'var(--font-mono)' }}>{node.score} / 100</span>
       </div>
       <div style={{ height: 5, borderRadius: 3, background: 'var(--accent)', overflow: 'hidden', marginTop: 3, marginBottom: 12 }}>
         <div style={{ height: '100%', width: `${clampedScore}%`, borderRadius: 3, background: 'linear-gradient(90deg, var(--warning), var(--destructive))' }} />
@@ -350,7 +350,7 @@ export function RationaleSidePanel({
         <span style={META_KEY}>Est. size</span>
         <span style={META_VAL}>{node.size} effort</span>
         <span style={META_KEY}>Depends on</span>
-        <span style={{ ...META_VAL, fontFamily: 'monospace' }}>{node.dependsOn.length ? node.dependsOn.join(', ') : '— none'}</span>
+        <span style={{ ...META_VAL, fontFamily: 'var(--font-mono)' }}>{node.dependsOn.length ? node.dependsOn.join(', ') : '— none'}</span>
       </div>
 
       {/* Status flags */}
@@ -493,8 +493,8 @@ export function BacklogDAG({
           background: color-mix(in srgb, var(--primary) 6%, var(--card));
         }
         .bk-dag-root .node .row1 { display: flex; align-items: center; gap: 7px; }
-        .bk-dag-root .node .rank { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
-        .bk-dag-root .node .iid { font-family: ui-monospace, "SF Mono", monospace; font-size: 11px; color: var(--muted-foreground); }
+        .bk-dag-root .node .rank { font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--foreground); background: var(--accent); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 17px; }
+        .bk-dag-root .node .iid { font-family: var(--font-mono); font-size: 11px; color: var(--muted-foreground); }
         .bk-dag-root .node .size-tag { margin-left: auto; font-size: 9px; font-weight: 500; letter-spacing: .06em; color: var(--muted-foreground); border: 1px solid var(--border); border-radius: 4px; padding: 0 5px; line-height: 15px; }
         .bk-dag-root .node .title { font-size: 12.5px; font-weight: 500; color: var(--foreground); line-height: 1.32; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .bk-dag-root .node .chips { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
@@ -510,7 +510,7 @@ export function BacklogDAG({
         .bk-dag-root .chip.verb.work { color: var(--info-foreground); border-color: color-mix(in srgb, var(--info) 32%, transparent); background: color-mix(in srgb, var(--info) 8%, transparent); }
         .bk-dag-root .chip.verb .pulsedot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: bk-blink 1.4s ease-in-out infinite; }
         @keyframes bk-blink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
-        .bk-dag-root .node .score { font-family: ui-monospace, "SF Mono", monospace; font-size: 9.5px; color: var(--muted-foreground); margin-left: auto; }
+        .bk-dag-root .node .score { font-family: var(--font-mono); font-size: 9.5px; color: var(--muted-foreground); margin-left: auto; }
         .bk-dag-root .react-flow__controls-button { background: var(--card) !important; border-color: var(--border) !important; color: var(--foreground) !important; }
         .bk-dag-root .react-flow__controls-button svg { fill: var(--foreground) !important; }
       `}</style>

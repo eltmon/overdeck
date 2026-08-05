@@ -426,14 +426,23 @@ export interface IssuesConfig {
 
 export interface TelemetryConfig { enabled?: boolean }
 
-/** Dashboard UI behavior that is not theme (theme lives in ~/.overdeck/ui-theme.json). */
+/**
+ * Dashboard UI behavior. Two independent theme axes live here:
+ * dark/light color scheme is tracked separately in `~/.overdeck/ui-theme.json`;
+ * the Overdeck Theme design language (Ledger vs Broadsheet) is `theme` below.
+ */
 export interface UiConfig {
   /**
    * Command template for "Open in editor", with `{path}` substituted — e.g.
    * `cursor {path}` or `code {path}`. Unset hides the editor entry entirely.
    */
   open_in_editor_command?: string;
+  /** Overdeck Theme design language. Defaults to 'broadsheet' when unset. */
+  theme?: DesignLanguage;
 }
+
+/** Overdeck Theme design language: Ledger (legacy, frozen) or Broadsheet (default). */
+export type DesignLanguage = 'ledger' | 'broadsheet';
 
 /**
  * Complete configuration structure (YAML schema)
@@ -929,7 +938,7 @@ export interface NormalizedConfig {
   telemetry: Required<TelemetryConfig>;
 
   /** Dashboard UI behavior, normalised (always defined; null when unset). */
-  ui: { openInEditorCommand: string | null };
+  ui: { openInEditorCommand: string | null; theme: DesignLanguage };
 
   /** Experimental flag values, normalised (always defined, never undefined). */
   experimental: NormalizedExperimentalConfig;

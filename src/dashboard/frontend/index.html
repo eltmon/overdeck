@@ -5,10 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Overdeck</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" as="style" />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:ital,opsz,wght@0,9..40,300..800;1,9..40,300..800&display=swap" rel="stylesheet" />
     <script>
       // Flash prevention: Apply theme class before React mounts.
       // Default is dark — add .dark unless user chose light.
@@ -17,6 +13,15 @@
         if (theme === 'dark') {
           document.documentElement.classList.add('dark');
         }
+      })();
+    </script>
+    <script>
+      // Flash prevention (PAN-3410): apply the Overdeck Theme design language
+      // (Ledger/Broadsheet — independent from the dark/light color scheme
+      // above) before React mounts. Default is broadsheet.
+      (function() {
+        var designLanguage = localStorage.getItem('overdeck.ui.designLanguage');
+        document.documentElement.dataset.theme = designLanguage === 'ledger' ? 'ledger' : 'broadsheet';
       })();
     </script>
     <style>
@@ -30,7 +35,16 @@
       #pan-boot {
         position: fixed; inset: 0;
         display: flex; align-items: center; justify-content: center; gap: 10px;
-        font-family: 'DM Sans', system-ui, sans-serif; font-size: 14px;
+        /* Deliberate theme-invariant exception (PAN-3410 NFR-3): this inline
+           <style> paints before index.css's --font-sans token loads (that CSS
+           is imported by the main.tsx module script at the bottom of <body>,
+           which hasn't executed yet at first paint) and before localStorage's
+           theme mirror can be read here without duplicating that read. The
+           var() fallback keeps today's literal if the token isn't resolved
+           yet; either way #pan-boot is replaced by #root the instant React
+           mounts (see the PAN-1580 note above), so it never needs to reflect
+           the Ledger/Broadsheet distinction. */
+        font-family: var(--font-sans, 'DM Sans', system-ui, sans-serif); font-size: 14px;
         color: #6b7280; background: inherit;
       }
       html.dark #pan-boot { color: #8b93a1; }

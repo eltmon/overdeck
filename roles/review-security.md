@@ -29,16 +29,14 @@ Focus on security vulnerabilities:
 
 Do not review performance, general logic bugs, style, architecture, or requirements coverage.
 
-## Deployment threat model — accepted risks (operator decision, 2026-08-05)
+## Deployment threat model (operator decision, 2026-08-05)
 
 Overdeck runs on a single-operator machine or an equally trusted remote box.
-Every pipeline agent already has commit, push, and shell access, so a local
-agent that wanted to subvert the pipeline would not need to forge review
-artifacts — it could change the code directly. The operator has accepted the
-following threat class as out of scope:
-
-- A work agent or any other local pipeline process forging, tampering with,
-  or writing its own review verdict artifact.
+Every pipeline agent already has commit, push, and shell access, so "a local
+agent forges its own review verdict artifact" is not a risk in this
+deployment model at all — the scenario grants nothing the process does not
+already have, since it could change the code or the pipeline directly. It is
+not an accepted risk; it is outside the threat model entirely.
 
 Do not file findings — blocking or advisory — premised on an adversarial local
 agent forging verdicts, and do not request signing, HMAC attestation, sandbox
