@@ -27,17 +27,14 @@
       "timestamp": "2026-08-05T20:54:28.333Z",
       "reason": "end",
       "note": "Agent signaled work complete"
-    }
-  ],
-  "feedback": [
+    },
     {
-      "seq": 2,
-      "specialist": "review-agent",
-      "outcome": "changes-requested",
-      "timestamp": "2026-08-05T19:38:53Z",
-      "markdownBody": "# Review CHANGES REQUESTED for PAN-3552\n\n# Review Synthesis — PAN-3552 — 2026-08-05T15:38:15-04:00\n\n## Verdict: CHANGES REQUESTED — removing `resolveReReviewScope` leaves the live per-issue review-config API throwing\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/context.json`\n- Branch: `feature/pan-3552`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552`\n- HEAD reviewed: `d09c573f9177d5775d56e4bce3844e7bae066636`\n- PR base: `c3cf20667708989489a34a6b3a68ae36f49d2cfc`\n- Cycle number: 1\n- Prior cycle SHA: none\n\n## Convoy Status\n\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/security.md` | 0 |\n| correctness | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/correctness.md` | 2 |\n| performance | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/performance.md` | 0 |\n| requirements | ready | `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/requirements.md` | 2 |\n\n## Blocking Findings\n\n### [correctness, requirements] Removing `resolveReReviewScope` leaves a live API caller broken — `src/lib/cloister/review-agent.ts:827`\n\nThe changed export surface removes `resolveReReviewScope`, while the still-live `GET` and `POST /api/review/:issueId/config` route dynamically imports and calls it at `src/dashboard/server/routes/workspaces/review-control.ts:680`, `:686`, `:726`, and `:746`. Each route reaches `TypeError: resolveReReviewScope is not a function`. The same route also accepts, persists, and returns the removed `reReviewScope` override, so FR-2's API-surface removal is incomplete.\n\nAlthough the stale caller itself predates this branch, the behavior regression is introduced by the changed removal of its export and is directly within the PR's scope. Remove the obsolete API field and dynamic import, then add route coverage for both the GET and POST paths.\n\n### [correctness, requirements] `conflictsSince` remains an active parked condition — `src/lib/parked/resolver.ts:344`\n\nThe branch deliberately changes this PR-scoped code to retain historical `conflictsSince` markers as the `conflicts` parked orbit. That contradicts the requirement to remove conflicts-since plumbing and its parked orbit, and it violates the stated compatibility contract: legacy durable keys must be tolerated rather than projected into live pipeline behavior. Existing records with the marker will keep issues visibly parked after the branch-invalidation owner has been deleted.\n\nRemove `conflictsSince` from the active review-status projection and `classifyParked`, including the `conflicts` orbit and its tests. Continue accepting old durable records without surfacing the legacy key as an active state.\n\n## Non-blocking Findings\n\n### [requirements] Stale branch-invalidation guidance — `CLAUDE.md:615`\n\nThe project guidance still claims the removed branch-invalidation Deacon sweep detects, marks, and notifies sibling branches, while the updated merge workflow now requires explicit `pan sync-main`. This file is outside the PR diff, so it is advisory under the scope gate, but it should be corrected with the functional fixes to keep future agents from relying on retired behavior.\n\n## Clean Sub-roles\n\n- security\n- performance\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-d09c573f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3552 -m \"Fixed review issues\"`"
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T21:05:37.833Z"
     }
   ],
+  "feedback": [],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "docs/DEACON-HEALTH-MONITORING.md",
@@ -268,22 +265,22 @@
     "recordedAt": "2026-08-05T20:54:21.371Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T20:57:57.502Z",
+  "updated": "2026-08-05T21:05:37.833Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T20:56:22.918Z",
-    "updatedAt": "2026-08-05T20:57:57.445Z",
+    "updatedAt": "2026-08-05T21:05:37.155Z",
     "reviewNotes": "Removed re-review scope leaves its per-issue API caller broken",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "d09c573f9177d5775d56e4bce3844e7bae066636",
     "reviewRequestedAt": "2026-08-05T20:56:22.918Z",
-    "reviewSpawnedAt": "2026-08-05T19:31:19.937Z",
+    "reviewSpawnedAt": "2026-08-05T21:05:37.154Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "docs/DEACON-HEALTH-MONITORING.md",
@@ -576,7 +573,7 @@
       },
       "costAtCloseOut": {
         "usd": 153.330856,
-        "pricingAsOf": "2026-08-05T20:57:57.497Z"
+        "pricingAsOf": "2026-08-05T21:05:37.177Z"
       }
     },
     "merges": [
