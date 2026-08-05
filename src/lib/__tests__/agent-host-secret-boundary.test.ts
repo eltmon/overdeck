@@ -44,6 +44,30 @@ describe('agent host-secret boundary', () => {
     expect(lines.join('\n')).toContain('exit 78');
   });
 
+  it('fails closed when the required Linux boundary tool is unavailable', async () => {
+    if (process.platform !== 'linux') return;
+
+    ensureReviewAttestationKey();
+    const launcherPath = join(root, 'missing-bwrap-launcher.sh');
+    writeFileSync(launcherPath, [
+      '#!/bin/bash',
+      ...buildAgentHostSecretBoundaryPrelude(),
+      'exit 0',
+      '',
+    ].join('\n'), { mode: 0o700 });
+
+    await expect(execFileAsync(launcherPath, {
+      env: {
+        HOME: root,
+        OVERDECK_HOME: join(root, 'overdeck-home'),
+        PATH: join(root, 'empty-bin'),
+      },
+    })).rejects.toMatchObject({
+      code: 78,
+      stderr: expect.stringContaining('bubblewrap (bwrap) is required'),
+    });
+  });
+
   it('prevents a workspace subprocess from reading the key, deriving a run token, or obtaining attestation', async () => {
     if (process.platform !== 'linux') return;
 
@@ -92,6 +116,9 @@ describe('agent host-secret boundary', () => {
 
       const env = buildChildEnvWithoutTmuxSync(process.env, {
         OVERDECK_HOME: join(root, 'overdeck-home'),
+        // A workspace cannot bypass the boundary by pre-setting a marker in its
+        // inherited environment; isolation is detected by the masked key itself.
+        OVERDECK_AGENT_HOST_SECRET_BOUNDARY: '1',
         PROBE_KEY_PATH: keyPath,
         PROBE_EXPECTED_KEY: key,
         PROBE_AGENT_ID: AGENT_ID,

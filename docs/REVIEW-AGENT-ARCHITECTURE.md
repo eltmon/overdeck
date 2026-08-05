@@ -137,10 +137,15 @@ The dashboard signs `context.json` before reviewers start, then signs the select
 `synthesis.md` or `review.md` after the review agent signals its verdict but before
 the row write. The host key is atomically created once at
 `<OVERDECK_HOME>/review-attestation-key`, forced to mode `0600`, and loaded on every
-dashboard boot, so restarts preserve active tokens and signed evidence. Both child
-environment builders strip the host key and request token; the review parent receives
-only its run-bound token through the explicit launch override. Workspace-created runs,
-tampered contexts, and unsigned or altered reports are not verdict evidence.
+dashboard boot, so restarts preserve active tokens and signed evidence. File mode is
+storage hygiene, not the trust boundary: every local coding-agent launcher unsets the
+key and re-execs before workspace code runs. Linux uses Bubblewrap to bind-mask the
+key with `/dev/null` in a new mount/PID/IPC namespace; macOS uses `sandbox-exec` to
+deny reads and writes to the exact key path. Launch fails closed when the platform's
+boundary tool is unavailable. Both child environment builders also strip the host key
+and request token; the review parent receives only its run-bound token through the
+explicit launch override. Workspace-created runs, tampered contexts, and unsigned or
+altered reports are not verdict evidence.
 Polyrepo attestations bind the canonical full-SHA anchor
 `repoKey@sha repoKey@sha` in manifest order, matching the workspace snapshot
 format used by the HEAD guard.
@@ -165,7 +170,7 @@ consult can only ever *prevent* a destructive action, never invent an approval.
 | Deacon orphan reset | `cloister/deacon-review-status.ts` | resets a finished review to pending |
 | Review-infra breaker (×2: coordinator-died, orphan re-dispatch) | `cloister/deacon-review-status.ts` | strands a finished review behind an operator gate |
 | Feedback-delivery stuck mark | `cloister/feedback-target.ts` | misses a safe review-row repair; the independent delivery-failure gate still lands |
-| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | re-drives the work agent over an approved review |
+| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends re-drive over an approved review instead of the canonical verdict-restore door |
 | Stale-journal refusal | `review-status-read.ts` | refuses a journal the artifact independently agrees with |
 
 **Known limitation (AC-READ-GUARD).** `restoreWouldTripHeadGuard()` is
