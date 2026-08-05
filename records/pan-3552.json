@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:43:19.871Z",
+  "updated": "2026-08-05T15:44:41.513Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 9,
-    "claims": {
-      "drop-fork-agent-state-fields": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 1440051,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T15:43:19.871Z"
-      }
-    },
+    "sequence": 10,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -106,6 +98,16 @@
         "itemId": "drop-fork-observability-patrols",
         "outcome": "completed",
         "releasedAt": "2026-08-05T15:42:56.805Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 1440051,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:43:19.871Z",
+        "itemId": "drop-fork-agent-state-fields",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T15:44:41.513Z"
       }
     ],
     "statusReasons": {
@@ -141,6 +143,10 @@
     "drop-fork-observability-patrols.drop-fork-observability-patrols.ac1": "completed",
     "drop-fork-observability-patrols.drop-fork-observability-patrols.ac2": "completed",
     "drop-fork-observability-patrols.drop-fork-observability-patrols.ac3": "completed",
-    "drop-fork-agent-state-fields": "running"
+    "drop-fork-agent-state-fields": "completed",
+    "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac1": "completed",
+    "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac2": "completed",
+    "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac3": "completed",
+    "drop-fork-agent-state-fields.drop-fork-agent-state-fields.ac4": "completed"
   }
 }
