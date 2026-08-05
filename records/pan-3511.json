@@ -612,9 +612,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T07:01:04.141Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T07:05Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-05T07:05:34.966Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T07:05:35.092Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-05T07:05:34Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — Workspace-writable artifacts can independently set a passed review verdict\n\n## Context\n- Manifest: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-e8840c4f/context.json`\n- Branch: `feature/pan-3511`\n- Workspace: `/home/eltmon/Projects/overdeck/workspaces/feature-pan-3511`\n- HEAD reviewed: `e8840c4f28f445db550a0d2d2d41e9f56f46d135`\n- Cycle number: 9\n- Prior cycle SHA: `250ced115b9940dea6a8ac02b6e35f7c5a4bd539`\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | `security.md` | 1 |\n| correctness | ready | `correctness.md` | 1 |\n| performance | ready | `performance.md` | 2 |\n| requirements | ready | `requirements.md` | 1 |\n\n## Blocking Findings\n\n### [security] Workspace-controlled artifacts can bypass independent review — `src/lib/cloister/synthesis-verdict.ts:76`\n\n`readLatestSynthesisVerdict()` selects the newest parseable `synthesis.md` or `review.md` in the workspace-owned `.pan/review` tree and `attemptArtifactVerdictRestore()` writes that verdict through the review-status door. A work agent can create a fresh `review.md` containing `## Verdict: APPROVED`; it can omit `context.json`, so the head guard does not apply. A recovery path can then persist `reviewStatus: 'passed'` without a reviewer-issued artifact or host-owned provenance. This defeats the independent-review boundary.\n\n### [correctness] Artifact freshness is not scoped to the active review cycle — `src/lib/cloister/synthesis-verdict.ts:77`\n\nThe reader accepts the most recently modified artifact from any run when it is younger than 30 minutes, without matching it to the active row's `reviewSpawnedAt` or review run. If review A writes an approved quick-review artifact and review B begins within that window, a recovery path before B emits a verdict can restore A's passed state onto B's reviewing row. Quick-review artifacts often have no head evidence, so the head guard does not prevent this stale-cycle restore.\n\n### [performance] A cache miss synchronously scans workspace artifacts from the canonical status-read path — `src/lib/review-status-read.ts:53`\n\nThe stale-journal branch calls `readMemoizedArtifactVerdict()` from `resolveJournalReconciledReviewStatusSync()`. A cache miss invokes synchronous `statSync`, `readdirSync`, `statSync`, and `readFileSync` operations over `.pan/review` in `src/lib/cloister/synthesis-verdict.ts:69-89`. The status resolver is reached by dashboard/API status reads, so a batch of stale-journal rows serializes filesystem walks on the Node event loop. This also violates the explicit no-per-read filesystem-artifact-scan constraint.\n\n### [performance] The artifact verdict memo grows for the lifetime of the dashboard process — `src/lib/cloister/synthesis-verdict.ts:121`\n\nThe module-level `artifactVerdictMemo` adds an entry for every consulted issue, including absent artifacts, but never evicts entries. Its 60-second TTL controls refresh timing rather than retention, so a long-lived server retains historical issue keys, verdict metadata, and notes indefinitely. Restore the prior bounded/LRU cache behavior or otherwise bound eviction to the active-review population.\n\n### [requirements] Sweeper documentation promises behavior the implementation deliberately does not perform — `docs/PARKED-POPULATION.md:47`\n\nThe documentation says the observability-only stall sweeper restores a verdict, clears the stuck flag, and emits `sweep.unparked`. The implementation in `src/lib/cloister/stall-sweeper.ts:284-315` only emits `sweep.recommendation`; it neither restores review status nor clears a flag. The required operator-facing contract is inaccurate and could leave an issue parked while an operator expects it to advance automatically.\n\n## Non-blocking Findings\n\nNone.\n\n## Scope Note\n\nAll five blocking findings are in the PR diff and in the cycle diff since `250ced115b9940dea6a8ac02b6e35f7c5a4bd539`. The security, active-cycle, and memory-boundary regressions were introduced when this cycle reverted host-attested, active-run artifact selection and bounded memoization; they are promotable under the cycle-9 convergence gate. The requirements finding is explicitly classified `Scope: in_pr_scope` by the requirements reviewer.\n\n## Clean Sub-roles\n\nNone. Every completed sub-role reported at least one blocking finding.\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-e8840c4f/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -665,7 +683,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T07:05:34.308Z",
+  "updated": "2026-08-05T07:05:35.092Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
