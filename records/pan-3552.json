@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:20:38.415Z",
+  "updated": "2026-08-05T15:42:56.806Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 7,
-    "claims": {
-      "drop-fork-observability-patrols": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 944124,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T15:20:38.415Z"
-      }
-    },
+    "sequence": 8,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -96,6 +88,16 @@
         "outcome": "completed",
         "reason": "Retired the discovery-ready command in the preceding fork-removal change and added an explicit command-palette regression test that it remains unavailable.",
         "releasedAt": "2026-08-05T15:20:30.404Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 944124,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:20:38.415Z",
+        "itemId": "drop-fork-observability-patrols",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T15:42:56.805Z"
       }
     ],
     "statusReasons": {
@@ -127,6 +129,9 @@
     "drop-discovery-ready-cli.drop-discovery-ready-cli.ac1": "completed",
     "drop-discovery-ready-cli.drop-discovery-ready-cli.ac2": "completed",
     "drop-discovery-ready-cli.drop-discovery-ready-cli.ac3": "completed",
-    "drop-fork-observability-patrols": "running"
+    "drop-fork-observability-patrols": "completed",
+    "drop-fork-observability-patrols.drop-fork-observability-patrols.ac1": "completed",
+    "drop-fork-observability-patrols.drop-fork-observability-patrols.ac2": "completed",
+    "drop-fork-observability-patrols.drop-fork-observability-patrols.ac3": "completed"
   }
 }
