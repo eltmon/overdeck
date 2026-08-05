@@ -22,7 +22,8 @@ recommended release without acting on it.
 
 - **Parked orbit** — a state an issue can sit in where no autonomous actor
   will advance it within 24h without operator or flywheel intervention.
-- **Sweep** — one observability pass that records the recommended un-park action.
+- **Sweep** — a stall detection pass; today the sweeper only *recommends* (it
+  never acts — see the observability-only law below).
 - **Guard-exit invariant** — every code path that parks an issue must also
   document the condition that releases it (and stuck flavors must carry
   operator copy — enforced in CI).
@@ -33,15 +34,15 @@ recommended release without acting on it.
 
 | # | Orbit | Detection (read doors only) | Recommended release |
 | --- | --- | --- | --- |
-| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | sweeper: consult active-run artifact evidence first (PAN-3511), then recommend canonical feedback resume or review re-dispatch by flavor |
+| 1 | `stuck-flag` | `review_status.stuck` (any `stuck_reason`) | recommendation: consult active-run artifact evidence first (PAN-3511), then `pan unstick` + rework resume / `pan review restart` by flavor |
 | 2 | `needs-you` | open recovery trip in the per-issue permanent record | operator answers; sweeper re-surfaces on TTL |
 | 3 | `deacon-ignored` | `review_status.deaconIgnored` | operator clears the flag; sweeper re-surfaces on TTL |
 | 4 | `operator-gate` | agent `paused` (not yield) / `troubled` / `stoppedByUser` | `pan unpause` / `pan untroubled` / `pan start` — operator-only; re-surfaced on TTL |
-| 5 | `uat-failed` | `uatStatus=failed` with merge pending | sweeper: UAT notes → fresh work-agent kickoff |
-| 6 | `merge-failed` | `mergeStatus=failed`, no retry in flight | sweeper: reset for merge re-evaluation |
-| 7 | `conflicts` | `conflictsSince` branch-invalidation mark | sweeper: resume work agent with conflict-resolution kickoff |
-| 8 | `zombie-session` | live agent + merged/closed issue | sweeper: doctrine-sanctioned reap |
-| 9 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | sweeper: nudge → stop if nothing moves in 90m |
+| 5 | `uat-failed` | `uatStatus=failed` with merge pending | recommendation: `pan resume <agent>` with the UAT feedback (`pan start` if stopped) |
+| 6 | `merge-failed` | `mergeStatus=failed`, no retry in flight | recommendation: `pan review resync` for merge re-evaluation |
+| 7 | `conflicts` | `conflictsSince` branch-invalidation mark | recommendation: `pan sync-main` + rework, then `pan done` |
+| 8 | `zombie-session` | live agent + merged/closed issue | recommendation: close-out owns teardown (`pan close`); the reaper is the backstop |
+| 9 | `idle-running` | live agent, no pipeline owner, idle ≥ 6h | recommendation: `pan tell` nudge, then `pan kill` / resume if nothing moves |
 | 10 | `circuit-breaker` | `autoRequeueCount >= 25` | operator decision; re-surfaced on TTL |
 
 The `stuck-flag` orbit consults the **verdict of record** from the
@@ -70,12 +71,22 @@ Surfaces:
 - `GET /api/parked` — `{rows, summary}` for the dashboard.
 - `GET /api/velocity` — transitions/hour plus the parked census.
 
-## The sweeper (deacon patrol)
+## The sweeper (deacon patrol) — OBSERVABILITY ONLY
 
 `runStallSweeperPatrol()` in `src/lib/cloister/stall-sweeper.ts` runs every
-deacon patrol and walks rows in severity order. It emits a recommendation and
-activity entry only; it never changes review status, clears flags, dispatches,
-messages, spawns, or stops an agent. Guardrails:
+deacon patrol, walking rows in severity order. **It detects and recommends; it
+never acts** (operator directive 2026-08-05 — see the law in the module header
+of `stall-sweeper.ts`). The earlier kill-and-re-drive incarnation acted on
+drifted state (it killed a completed review parent on a lost verdict and
+re-dispatched on phantom stuck flags), so the action surface was removed
+entirely: the module holds no door to spawn, stop, message, dispatch, clear,
+or reset anything. Do not reintroduce one.
+
+What a patrol produces per row: a `sweep.recommendation` domain event and an
+activity-feed entry naming the evidence and the canonical remedy (the same
+doors the deacon/operator uses — `pan resume/start/tell/unstick/review
+restart/sync-main/done/close`), plus an "Observability-only: no action taken"
+trailer. Guardrails:
 
 - **One recommendation per row per cooldown** (15m zombie, 2h most orbits, 30m idle).
 - **8 recommendations per park episode**, then escalate-only.
@@ -86,16 +97,18 @@ messages, spawns, or stops an agent. Guardrails:
   on a 24h TTL — the anti-silence property.
 - **Idempotent reporting**: recommendation and escalation state flows through
   the sweeper-state writer so the feed is not flooded.
+- **Recurring stalls flag substrate.** A stall that recurs across an episode
+  appends a substrate-bug note so the flywheel's intake files *why* the issue
+  keeps parking, instead of the symptom being swept forever.
 
 ## Events and surfaces
 
 - `sweep.scan` — the parked population changed (compact rows; emitted on
   change only, never on a no-op scan).
-- `sweep.action` — an autonomous action ran (nudge, merge reset, re-drive).
-- `sweep.unparked` — a row was released; the issue re-enters the pipeline.
+- `sweep.recommendation` — a recommended remedy with evidence (never an action).
 - `sweep.escalated` — a row was (re-)surfaced to the operator.
 
-All four are registered in `packages/contracts/src/events.ts` and flow over
+All three are registered in `packages/contracts/src/events.ts` and flow over
 `/ws/rpc` like any domain event. The God View consumes them (see
 `docs/GOD-VIEW.md` — the sweeper beam, thaw, and flare); the activity feed
 renders full-sentence sweep entries.
