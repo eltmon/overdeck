@@ -557,7 +557,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:26:27.111Z",
+  "updated": "2026-08-05T02:30:14.438Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -696,7 +696,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-sol",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
