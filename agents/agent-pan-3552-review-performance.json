@@ -19,6 +19,11 @@
       "id": "c74265d0-83c1-427a-a9e2-85305f6c4ff1",
       "startedAt": "2026-08-05T19:33:22.987Z",
       "reason": "spawn"
+    },
+    {
+      "id": "b08df811-dae2-4739-8e9f-72825d2658b3",
+      "startedAt": "2026-08-05T21:07:35.185Z",
+      "reason": "spawn"
     }
   ],
   "lifecycle": [
@@ -29,6 +34,10 @@
     {
       "at": "2026-08-05T19:44:58.662Z",
       "event": "stopped"
+    },
+    {
+      "at": "2026-08-05T21:07:35.185Z",
+      "event": "spawned"
     }
   ],
   "archiveRef": null,
