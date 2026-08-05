@@ -19,6 +19,7 @@ export function evaluateIncompletePlanItems(doc: XBriefDocument | null): string[
   const incomplete = doc.plan.items.flatMap((item) => {
     const lines: string[] = [];
     if (!terminal.has(item.status)) lines.push(`    - ${item.id} ${item.title} (${item.status})`);
+    if (item.status === 'cancelled') return lines;
     for (const child of subItemsOf(item)) {
       if (!terminal.has(child.status)) lines.push(`    - ${item.id}.${child.id} ${child.title} (${child.status})`);
     }
