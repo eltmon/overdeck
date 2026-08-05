@@ -793,6 +793,28 @@ export const ReviewVerdictDispatchedEvent = Schema.Struct({
 })
 export type ReviewVerdictDispatchedEvent = typeof ReviewVerdictDispatchedEvent.Type
 
+/**
+ * A recovery path found a fresh verdict artifact but declined to restore it,
+ * because the artifact's head evidence disagrees with the row's anchor. The
+ * verdict is NOT lost silently — it is reported here so the operator can see a
+ * finished review that recovery refused to write (PAN-3511).
+ */
+export const ReviewVerdictRestoreBlockedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_restore_blocked"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    /** Recovery path that attempted the restore (orphan-reset, sweeper, …). */
+    caller: Schema.String,
+    verdict: Schema.String,
+    artifactHead: Schema.String,
+    rowHead: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewVerdictRestoreBlockedEvent = typeof ReviewVerdictRestoreBlockedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
@@ -1435,6 +1457,7 @@ export const DomainEvent = Schema.Union([
   ReviewCoordinatorDiedEvent,
   ReviewVerdictRejectedEvent,
   ReviewVerdictDispatchedEvent,
+  ReviewVerdictRestoreBlockedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,

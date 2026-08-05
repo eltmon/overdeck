@@ -31,6 +31,7 @@
  *  - this module holds no door to any mutation — there is nothing to force.
  */
 import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import {
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
@@ -39,6 +40,7 @@ import {
 } from '../parked/resolver.js';
 import { sessionExistsSync } from '../tmux.js';
 import { getCloisterEventStore } from './event-store-provider.js';
+import { readMemoizedArtifactVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
 import {
   clearSweeperRowState,
   readSweeperRowState,
@@ -76,6 +78,7 @@ const NO_ACTION_TRAILER = 'Observability-only: no action taken.';
 export interface StallSweeperDeps {
   now?: number;
   resolveRows?: () => Promise<ParkedRow[]>;
+  readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
   isAgentLive?: (agentId: string) => boolean;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
@@ -149,6 +152,13 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
+  const readArtifact = deps.readArtifact ?? ((issueId: string) => {
+    const review = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+    return readMemoizedArtifactVerdict(issueId, {
+      runId: review?.reviewRunId,
+      workspacePath: review?.workspace,
+    });
+  });
   const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
@@ -202,7 +212,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     }
     if (actionBudget <= 0) continue;
 
-    const reported = reportRow(row, state, now, { isAgentLive, emitActivity, emitEvent }, outcome);
+    const reported = reportRow(row, state, now, { readArtifact, isAgentLive, emitActivity, emitEvent }, outcome);
     if (reported) {
       recordAction(issueId, orbit, state, now);
       actionBudget--;
@@ -215,6 +225,7 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
 // ─── Per-orbit recommendations ────────────────────────────────────────────────
 
 interface ReportActions {
+  readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
   isAgentLive: (agentId: string) => boolean;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
@@ -276,12 +287,30 @@ function reportRow(
 
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
+
+      // PAN-3511: evidence from the active review run prevents a recommendation
+      // from re-driving work over a review that has already finished. The
+      // sweeper remains observability-only and cannot promote that evidence into
+      // a terminal review status.
+      const artifact = actions.readArtifact(issueId);
+      if (artifact?.verdict === 'passed') {
+        recommend(
+          `preserve ${issueId}'s passed review evidence from run ${artifact.runId} and await pan admin specialists done review; do not re-dispatch or resume rework`,
+          { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, artifactHead: artifact.headSha },
+        );
+        return true;
+      }
       if (reason === 'review_infrastructure_failure') {
         recommend(`clear ${issueId}'s infra-failure stuck flag and re-dispatch the review via pan unstick ${issueId} && pan review restart ${issueId}`);
         return true;
       }
       if (reason === 'feedback_delivery_needs_you' || reason === 'verification_stuck') {
-        recommend(`resume ${issueId} rework from the pending feedback via pan resume agent-${issueId.toLowerCase()} (feedback is in .pan/feedback)`);
+        recommend(
+          artifact?.notes
+            ? `resume ${issueId} rework via pan resume agent-${issueId.toLowerCase()} using the blocker from review run ${artifact.runId}`
+            : `resume ${issueId} rework from the pending feedback via pan resume agent-${issueId.toLowerCase()} (feedback is in .pan/feedback)`,
+          artifact?.notes ? { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, reviewNotes: artifact.notes.slice(0, 400) } : {},
+        );
         return true;
       }
       // Unknown / dead-end stuck flavors are operator-owned — re-surface on TTL.

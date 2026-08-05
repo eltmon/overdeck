@@ -5,7 +5,6 @@
 1 src/lib/cloister/__tests__/lint-stub-ui.test.ts
 1 src/lib/cloister/__tests__/no-resume-mode.test.ts
 1 src/lib/cloister/__tests__/reap-issue-residue.test.ts
-1 src/lib/cloister/__tests__/stall-sweeper.test.ts
 1 src/lib/conversations/__tests__/scanner.test.ts
 1 src/lib/cost-parsers/__tests__/ohmypi-parser.test.ts
 1 tests/dashboard/cache-service-init-home.test.ts

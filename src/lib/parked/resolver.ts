@@ -107,6 +107,10 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
     park: 'the review pipeline failed repeatedly for infrastructure reasons, not verdict reasons',
     unpark: 're-dispatch a fresh review once the infra cause cools (sweeper does this after cooldown)',
   },
+  review_parent_stalled_needs_you: {
+    park: 'the review parent exceeded its deadline with no terminal verdict in the row or verdict artifact',
+    unpark: 'inspect the parent pane and review artifacts, then pan unstick <id> and pan review restart <id> if a fresh review is required',
+  },
   verification_stuck: {
     park: 'verification exhausted its cycles without passing',
     unpark: 're-drive the verification feedback to a resumed work agent',
@@ -134,10 +138,6 @@ const STUCK_REASON_COPY: Record<string, { park: string; unpark: string }> = {
   review_convoy_unrecoverable: {
     park: 'the review convoy died and could not be recovered in place',
     unpark: 're-dispatch a fresh review convoy (sweeper does this after cooldown)',
-  },
-  review_parent_stalled_needs_you: {
-    park: 'the review synthesis parent passed its deadline with no verdict on record — the sweeper no longer kills it, it escalates',
-    unpark: 'inspect the parent pane, respawn or re-dispatch the review (operator call), then pan unstick',
   },
   test_signal_strand: {
     park: 'a test verdict was written but never delivered to the pipeline',

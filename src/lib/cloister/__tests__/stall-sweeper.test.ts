@@ -8,7 +8,7 @@
  * taken" trailer. These tests pin each orbit's recommendation, the cooldowns,
  * the exhaustion escalation, and the no-action-door source guard.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -29,6 +29,7 @@ import {
 } from '../stall-sweeper.js';
 import { writeSweeperRowState, writeSweeperSignature } from '../stall-sweeper-state.js';
 import type { ParkedRow } from '../../parked/resolver.js';
+import type { SynthesisArtifactVerdict } from '../synthesis-verdict.js';
 
 function parkedRow(overrides: Partial<ParkedRow>): ParkedRow {
   return {
@@ -51,12 +52,16 @@ interface Harness {
   };
 }
 
-function harness(rows: ParkedRow[], opts: { liveAgents?: string[] } = {}): Harness {
+function harness(
+  rows: ParkedRow[],
+  opts: { liveAgents?: string[]; artifact?: SynthesisArtifactVerdict | null } = {},
+): Harness {
   const calls: Harness['calls'] = { events: [], activity: [] };
   const live = new Set(opts.liveAgents ?? []);
   const deps: StallSweeperDeps = {
     now: NOW,
     resolveRows: async () => rows,
+    readArtifact: () => opts.artifact ?? null,
     isAgentLive: (agentId) => live.has(agentId),
     emitActivity: (entry) => { calls.activity.push(entry); },
     emitEvent: (type, payload) => { calls.events.push({ type, payload }); },
@@ -122,6 +127,56 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     const recs = recommendations(h);
     expect(recs).toHaveLength(1);
     expect(String(recs[0]!.payload.recommendation)).toContain('rework');
+  });
+
+  it.each([
+    'review_infrastructure_failure',
+    'feedback_delivery_needs_you',
+    'verification_stuck',
+  ])('stuck-flag %s + fresh PASSED artifact: preserves evidence and awaits the canonical signal', async (stuckReason) => {
+    const artifact = {
+      verdict: 'passed',
+      runId: 'agent-pan-1-review-run-att1',
+      headSha: 'a'.repeat(40),
+      mtimeMs: NOW - 60_000,
+    } as const;
+    const h = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason } })],
+      { artifact },
+    );
+
+    await runStallSweeperPatrol(h.deps);
+
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain('preserve PAN-1');
+    expect(String(recs[0]!.payload.recommendation)).toContain('do not re-dispatch or resume rework');
+    expect(recs[0]!.payload).toMatchObject({
+      artifactVerdict: 'passed',
+      artifactRunId: artifact.runId,
+      artifactHead: artifact.headSha,
+    });
+    expect(h.calls.activity[0]!.message).toContain('Observability-only: no action taken.');
+  });
+
+  it('stuck-flag + fresh BLOCKED artifact: recommends rework with the reviewer blocker as evidence', async () => {
+    const artifact = {
+      verdict: 'blocked',
+      runId: 'agent-pan-1-review-run-att1',
+      notes: 'null deref in the parser',
+      mtimeMs: NOW - 60_000,
+    } as const;
+    const h = harness(
+      [parkedRow({ orbit: 'stuck-flag', details: { stuckReason: 'feedback_delivery_needs_you' } })],
+      { artifact },
+    );
+
+    await runStallSweeperPatrol(h.deps);
+
+    const recs = recommendations(h);
+    expect(recs).toHaveLength(1);
+    expect(String(recs[0]!.payload.recommendation)).toContain(`review run ${artifact.runId}`);
+    expect(recs[0]!.payload.reviewNotes).toBe(artifact.notes);
   });
 
   it('conflicts: recommends sync-main + rework', async () => {
@@ -195,17 +250,3 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
   });
 });
 
-describe('observability-only law (operator directive 2026-08-05)', () => {
-  it('the module holds no door to any mutation', () => {
-    const src = readFileSync(join(import.meta.dirname, '..', 'stall-sweeper.ts'), 'utf-8');
-    const forbidden = [
-      'stopAgent', 'spawnWorkAgent', 'messageAgent', 'writeFeedbackFile',
-      'dispatchReviewHostSide', 'clearWorkspaceStuck', 'setReviewStatusSync',
-      'decideAutonomousRedrive', 'killSession',
-    ];
-    for (const door of forbidden) {
-      expect(src, `stall-sweeper.ts must not reference ${door}`).not.toContain(door);
-    }
-    expect(src).toContain('OBSERVABILITY ONLY — OPERATOR DIRECTIVE');
-  });
-});

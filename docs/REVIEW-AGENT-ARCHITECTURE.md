@@ -107,6 +107,72 @@ The full round trip between the work agent and review:
 
 ---
 
+## Verdict of record (PAN-3511)
+
+A review artifact can appear in the workspace before the canonical review signal,
+but the workspace is writable by the work agent. It is recovery evidence, never
+an independent write path for a terminal status. Terminal verdicts enter the row
+only through `recordReviewVerdict()` when `pan admin specialists done review`
+processes the reviewer's canonical completion signal.
+
+The contract has four clauses:
+
+1. **Artifacts are evidence for the active run.** A recovery path may read
+   `synthesis.md` (convoy) or `review.md` (quick self-review) only when the path
+   is bound to the host-recorded active `reviewRunId`.
+2. **One verdict write door.** `recordReviewVerdict()` in
+   `src/lib/cloister/review-verdict-writer.ts` owns every terminal verdict and
+   rejects stale evidence before it reaches `review_status`.
+3. **Recovery preserves evidence without writing a verdict.** The deacon's
+   observation helper reads active-run evidence asynchronously and emits a
+   visible `review.verdict_restore_blocked` event for a mismatched anchor.
+   Recovery then continues its bounded reset or escalation path. Feedback and
+   sweeper paths inspect evidence only.
+4. **No artifact scan runs in status reads.** The synchronous status resolver
+   never walks `.pan/review`. Only after its stale-journal refusal predicate
+   matches may it consume a bounded, asynchronously populated memo entry whose
+   verdict corroborates the journal and whose host-recorded `roleRunHead`
+   binds to the live row. Every artifact requires that anchor to match; when an
+   artifact provides a head, it must match the same host-recorded anchor.
+
+`readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
+reads one explicit active run rather than scanning `.pan/review/*/`. It returns
+`null` without a run ID or after the 30-minute freshness bound, and refreshes
+its bounded memo after each asynchronous read. The synchronous
+`readMemoizedArtifactVerdict()` is cache-only for stale-journal corroboration;
+it is LRU-bounded to 256 `(issueId, runId)` entries and expires a verdict at the
+sooner of its 60-second memo TTL or freshness deadline. A cold or expired memo
+entry preserves the stale-journal refusal without filesystem I/O.
+`observeActiveReviewArtifact()` is the shared deacon observation helper.
+
+**The recovery sites that consult evidence:**
+
+| Site | File | Effect of evidence |
+| --- | --- | --- |
+| Deacon orphan reset | `cloister/deacon-review-status.ts` | asynchronously preserves active-run evidence for diagnosis, then continues the bounded reset path |
+| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | preserves active-run evidence and still marks/escalates the established infrastructure failure |
+| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
+| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays a matching verdict only when the host-recorded run head matches the live row and any artifact head matches that same anchor |
+| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
+
+**Rule for future guard authors.** A new review recovery path reads only an
+active-run artifact before it acts. It preserves workspace artifact content as
+diagnostic evidence and never turns it into a terminal verdict.
+
+### Review-mode differences
+
+Both modes are first-class; recovery must never assume one. Quick self-review is
+the fleet default, so a reader that only understood `synthesis.md` would be blind
+to most production reviews.
+
+| | Full (convoy) | Quick (self-review) |
+| --- | --- | --- |
+| Artifact filename | `synthesis.md` | `review.md` |
+| Blocked vocabulary | `## Verdict: CHANGES REQUESTED — <blocker>` | identical |
+| Verdict writer | synthesis parent (`coordinator`) | the review agent itself (`quick-signal`) |
+| Dead-agent recovery | fallback synthesis from the sub-reviewer files | none — no sub-reviewers exist to synthesize |
+| Head evidence | `reviewerVerdicts` plus `context.json` | usually none, so the head guard cannot trip |
+
 ## Verdict application and fallback sweeps
 
 A completed review writes its verdict under `.pan/review/<runId>/`. Full convoy

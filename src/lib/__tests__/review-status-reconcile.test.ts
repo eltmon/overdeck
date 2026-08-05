@@ -4,8 +4,11 @@ import type { ReviewStatus } from '../review-status.js';
 
 const feedback = vi.hoisted(() => ({ deliver: vi.fn(() => Effect.succeed({ agentMessageSent: true, prCommentPosted: false })) }));
 const agents = vi.hoisted(() => ({ getAgentStateSync: vi.fn() }));
+const artifacts = vi.hoisted(() => ({ readMemoized: vi.fn() }));
 vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictFeedback: feedback.deliver }));
 vi.mock('../agents.js', () => ({ getAgentStateSync: agents.getAgentStateSync }));
+vi.mock('../agents/agent-state.js', () => ({ getAgentStateSync: agents.getAgentStateSync }));
+vi.mock('../cloister/synthesis-verdict.js', () => ({ readMemoizedArtifactVerdict: artifacts.readMemoized }));
 
 // Mock the DB cache layer and the journal layer so we can drive getReviewStatusSync /
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.

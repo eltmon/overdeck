@@ -1,4 +1,5 @@
 # Audited growth exceptions: <lines> <path> # <ISSUE-REF>
+1005 src/lib/cloister/deacon-review-status.ts # PAN-3511
 1004 src/lib/overdeck/merge.ts # PAN-3166
 1005 src/cli/commands/doctor.ts # PAN-3327
 1763 src/lib/database/schema.ts # PAN-3092
