@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:24:06.931Z",
+  "updated": "2026-08-05T19:24:23.801Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 31,
-    "claims": {},
+    "sequence": 32,
+    "claims": {
+      "preserve-test-gate-on-same-head-converge": {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 376273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T19:24:23.801Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -294,6 +302,7 @@
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac1": "completed",
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac2": "completed",
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac3": "completed",
-    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac4": "completed"
+    "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac4": "completed",
+    "preserve-test-gate-on-same-head-converge": "running"
   }
 }
