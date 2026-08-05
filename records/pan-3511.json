@@ -795,18 +795,18 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:05:27.328Z",
+  "updated": "2026-08-05T10:07:31.618Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:04:31.999Z",
-    "reviewNotes": "Headless quick-review artifacts cannot corroborate matching stale journal verdicts because optional head evidence is required",
+    "updatedAt": "2026-08-05T10:07:31.583Z",
+    "reviewNotes": "Headless workspace artifacts can replay a stale approval without immutable or authenticated head evidence",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "59501a371249fe5dfaf36a0c110b989086a3e0ee",
     "lastVerifiedCommit": "09638451ffa2dc04aed07d6d8738df79e2469514",
@@ -859,6 +859,24 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
+    },
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
+      },
+      "correctness": {
+        "status": "passed",
+        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
+      }
     }
   },
   "closeOut": {
@@ -866,9 +884,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 647688,
-            "output": 276010,
-            "cacheRead": 106081,
+            "input": 669254,
+            "output": 295143,
+            "cacheRead": 108122,
             "cacheWrite": 0
           }
         },
@@ -880,9 +898,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 30756194,
-            "output": 447215,
-            "cacheRead": 119187456,
+            "input": 36322953,
+            "output": 498303,
+            "cacheRead": 131746304,
             "cacheWrite": 0
           }
         },
@@ -967,9 +985,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 647688,
-          "output": 276010,
-          "cacheRead": 106081,
+          "input": 669254,
+          "output": 295143,
+          "cacheRead": 108122,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -979,9 +997,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 46100366,
-          "output": 1174631,
-          "cacheRead": 341952000,
+          "input": 51667125,
+          "output": 1225719,
+          "cacheRead": 354510848,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -992,8 +1010,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 606.2715071,
-        "pricingAsOf": "2026-08-05T10:04:33.285Z"
+        "usd": 624.2118942,
+        "pricingAsOf": "2026-08-05T10:07:31.608Z"
       }
     },
     "merges": [
