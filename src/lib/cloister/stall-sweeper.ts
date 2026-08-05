@@ -1,50 +1,45 @@
 /**
- * The Stall Sweeper (PAN-3485 phase 2) — the pipeline's un-parker.
+ * The Stall Sweeper (PAN-3485 phase 2) — the pipeline's stall DETECTOR.
+ *
+ * ─── OBSERVABILITY ONLY — OPERATOR DIRECTIVE (2026-08-05) ───────────────────
+ * This module detects parked/stalled work and reports it with a recommended
+ * action. It must NEVER act. Do not re-add spawn/stop/kill/message/dispatch/
+ * clear/reset capability here — not behind a flag, not as "just this one safe
+ * case", not as an opt-in. The kill-and-re-drive incarnation killed a
+ * completed PAN-3511 review parent on a lost verdict and re-dispatched on
+ * phantom stuck flags (2026-08-05): every failure was the sweeper ACTING on
+ * state that had drifted. Detection is trustworthy because it reads; action
+ * was not, because it wrote. The operator (or a deliberately invoked door)
+ * executes recommendations.
+ * ───────────────────────────────────────────────────────────────────────────
  *
  * Every failure path in the pipeline parks the issue somewhere autonomous
- * motion stops (the ten orbits in src/lib/parked/resolver.ts). Until now each
- * orbit fired its escalation once and went silent forever; the operator was
- * the only un-parker, and the flywheel parks structural blockers by design.
- * This patrol walks the parked population every deacon cycle and executes the
- * orbit's autonomous action — resume-with-feedback, merge re-evaluation, UAT
- * re-drive, zombie reap, idle nudge-then-stop — with bounded retries and
- * cooldowns. Operator-set gates are never overridden; they (and truly
- * exhausted rows) are re-surfaced to the operator on a TTL instead of going
- * silent. Every action and escalation emits a sweep.* domain event and an
- * activity-feed sentence, so a sweep is always visible (PAN-3489 wires those
- * events into the God View).
+ * motion stops (the orbits in src/lib/parked/resolver.ts). This patrol walks
+ * the parked population every deacon cycle and emits, per row: an
+ * activity-feed sentence and a sweep.recommendation domain event naming the
+ * evidence and the recommended remedy. Operator-set gates are never touched;
+ * gated and truly exhausted rows are re-surfaced to the operator on a TTL
+ * instead of going silent. Every recommendation and escalation emits a
+ * sweep.* domain event and an activity-feed sentence, so a sweep is always
+ * visible (PAN-3489 wires those events into the God View).
  *
  * Guardrails:
- *  - one action per row per cooldown window; SWEEP_MAX_ACTIONS_PER_ROW per
- *    park episode, then escalate-only;
- *  - a global mutating-action budget per scan so a graveyard census can't
- *    spawn a fleet at once;
- *  - resumes go through decideAutonomousRedrive (resume gates + cached memory
- *    verdict) — the sweeper asks, it never forces;
- *  - every mutation flows through existing doors (review-status write door,
- *    agents endpoint spawn, feedback writer, stopAgent) — no new store access.
+ *  - one recommendation per row per cooldown window; SWEEP_MAX_ACTIONS_PER_ROW
+ *    per park episode, then escalate-only;
+ *  - a global recommendation budget per scan so a graveyard census can't
+ *    flood the feed at once;
+ *  - this module holds no door to any mutation — there is nothing to force.
  */
-import { Effect } from 'effect';
-
 import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
-import { getAgentStateSync } from '../agents.js';
-import { messageAgent } from '../agents/messaging.js';
-import { stopAgent } from '../agents.js';
 import {
-  IDLE_EXEMPT_ROLES,
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
   type ParkedOrbit,
   type ParkedRow,
 } from '../parked/resolver.js';
-import { clearWorkspaceStuck, dispatchReviewHostSide, getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import { sessionExistsSync } from '../tmux.js';
-import { decideAutonomousRedrive } from './redrive-gate.js';
-import { writeFeedbackFile } from './feedback-writer.js';
-import { spawnWorkAgentThroughAgentsEndpoint } from './work-agent-start.js';
 import { getCloisterEventStore } from './event-store-provider.js';
 import { readMemoizedArtifactVerdict, type SynthesisArtifactVerdict } from './synthesis-verdict.js';
-import { attemptArtifactVerdictRestore, type ArtifactVerdictRestoreResult } from './verdict-restore.js';
 import {
   clearSweeperRowState,
   readSweeperRowState,
@@ -56,11 +51,11 @@ import {
 
 // ─── Policy constants ─────────────────────────────────────────────────────────
 
-/** Max autonomous actions per park episode; beyond this the row is escalate-only. */
+/** Max recommendations per park episode; beyond this the row is escalate-only. */
 export const SWEEP_MAX_ACTIONS_PER_ROW = 8;
-/** Max mutating actions per patrol scan — a full graveyard drains over cycles, never in one burst. */
+/** Max recommendations per patrol scan — a full graveyard surfaces over cycles, never in one burst. */
 export const SWEEP_MAX_ACTIONS_PER_SCAN = 4;
-/** Operator-gated / exhausted rows re-surface to the operator this often (and stay autonomous-hands-off otherwise). */
+/** Operator-gated / exhausted rows re-surface to the operator this often (and stay hands-off otherwise). */
 export const SWEEP_RESURFACE_TTL_MS = 24 * 60 * 60_000;
 
 const ORBIT_COOLDOWN_MS: Record<string, number> = {
@@ -71,27 +66,21 @@ const ORBIT_COOLDOWN_MS: Record<string, number> = {
   'stuck-flag': 2 * 60 * 60_000,
   'idle-running': 30 * 60_000,
 };
-/** After an idle nudge, wait this long for movement before stopping the agent. */
-const IDLE_NUDGE_GRACE_MS = 90 * 60_000;
+/** An idle-running recommendation repeats at most this often while nothing moves. */
+const IDLE_RECOMMEND_GRACE_MS = 90 * 60_000;
+
+/** Every feed entry carries this so a recommendation can never be mistaken for an action. */
+const NO_ACTION_TRAILER = 'Observability-only: no action taken.';
 
 // ─── Deps (injectable for tests) ──────────────────────────────────────────────
 
 export interface StallSweeperDeps {
   now?: number;
   resolveRows?: () => Promise<ParkedRow[]>;
-  spawnWorkAgent?: (issueId: string) => Promise<{ spawned: boolean; skippedReason?: string; error?: string }>;
-  stopAgent?: (agentId: string) => Promise<void>;
-  messageAgent?: (agentId: string, message: string) => Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }>;
-  writeFeedback?: (issueId: string, stage: string, summary: string, markdownBody: string) => Promise<void>;
-  dispatchReview?: (issueId: string) => Promise<void>;
-  clearStuck?: (issueId: string) => void;
-  resetMergeForEvaluation?: (issueId: string) => void;
+  readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
   isAgentLive?: (agentId: string) => boolean;
   emitActivity?: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent?: (type: string, payload: Record<string, unknown>) => void;
-  /** PAN-3511: the verdict of record, consulted before any stuck-flag action. */
-  readArtifact?: (issueId: string) => SynthesisArtifactVerdict | null;
-  restoreVerdict?: (issueId: string, artifact: SynthesisArtifactVerdict) => Promise<ArtifactVerdictRestoreResult>;
 }
 
 interface ScanOutcome {
@@ -162,40 +151,10 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const spawn = deps.spawnWorkAgent ?? ((issueId: string) => spawnWorkAgentThroughAgentsEndpoint(issueId, undefined, false, 'stall-sweeper'));
-  const stop = deps.stopAgent ?? (async (agentId: string) => { await Effect.runPromise(stopAgent(agentId)); });
-  const message = deps.messageAgent ?? ((agentId: string, text: string) => messageAgent(agentId, text, 'stall-sweeper'));
-  const writeFeedback = deps.writeFeedback ?? (async (issueId: string, stage: string, summary: string, markdownBody: string) => {
-    // The feedback writer's specialist union is the pipeline role set — map the
-    // sweeper's stage names onto it (rework/conflict notes are review-agent work).
-    const specialist = stage === 'uat' ? 'uat-agent' as const
-      : stage === 'merge' ? 'merge-agent' as const
-        : 'review-agent' as const;
-    await Effect.runPromise(writeFeedbackFile({ issueId, specialist, outcome: 'failed', summary, markdownBody }).pipe(
-      Effect.catch((error: { message?: string }) => { console.warn(`[sweeper] feedback write failed for ${issueId}:`, error?.message ?? error); return Effect.succeed({ success: false }); }),
-    ));
-  });
-  const dispatchReview = deps.dispatchReview ?? ((issueId: string) => dispatchReviewHostSide(issueId));
-  const clearStuck = deps.clearStuck ?? clearWorkspaceStuck;
-  const resetMerge = deps.resetMergeForEvaluation ?? ((issueId: string) => {
-    setReviewStatusSync(issueId, { mergeStatus: 'pending', mergeRetryCount: 0, mergeNotes: 'stall sweeper: reset for merge re-evaluation' });
-  });
+  const readArtifact = deps.readArtifact ?? readMemoizedArtifactVerdict;
   const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
-  // Memoized: the patrol walks the whole parked population every deacon cycle,
-  // and re-stat'ing the same run dirs each pass buys nothing.
-  const readArtifact = deps.readArtifact ?? ((issueId: string) => readMemoizedArtifactVerdict(issueId));
-  const restoreVerdict = deps.restoreVerdict
-    ?? ((issueId: string, artifact: SynthesisArtifactVerdict) => attemptArtifactVerdictRestore(issueId, {
-      caller: 'stall-sweeper',
-      selectedArtifact: artifact,
-      // The restore door owns no review-status import (cycle) — we lend it ours.
-      deps: {
-        getStatus: getReviewStatusSync,
-        setStatus: (id, update) => { setReviewStatusSync(id, update); },
-      },
-    }));
 
   const rows = await resolveRows();
   const outcome: ScanOutcome = { actions: [], escalations: [] };
@@ -238,19 +197,16 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
     if ((state?.actionCount ?? 0) >= SWEEP_MAX_ACTIONS_PER_ROW) {
       if (dueForResurface(state, now)) {
         recordEscalation(issueId, orbit, state, now);
-        emitEvent('sweep.escalated', { issueId, orbit, reason: `exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} sweep actions` });
-        emitActivity({ level: 'warn', issueId, message: `🧹 sweeper: ${issueId} (${orbit}) exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} autonomous actions — needs a human. ${row.parkReason}` });
+        emitEvent('sweep.escalated', { issueId, orbit, reason: `exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} sweep recommendations` });
+        emitActivity({ level: 'warn', issueId, message: `🧹 sweeper: ${issueId} (${orbit}) exhausted ${SWEEP_MAX_ACTIONS_PER_ROW} recommendations — needs a human. ${row.parkReason}` });
         outcome.escalations.push(`${issueId} (${orbit}) exhausted → operator`);
       }
       continue;
     }
     if (actionBudget <= 0) continue;
 
-    const acted = await sweepRow(row, state, now, {
-      spawn, stop, message, writeFeedback, dispatchReview, clearStuck, resetMerge, isAgentLive, emitActivity, emitEvent,
-      readArtifact, restoreVerdict,
-    }, outcome);
-    if (acted) {
+    const reported = reportRow(row, state, now, { readArtifact, isAgentLive, emitActivity, emitEvent }, outcome);
+    if (reported) {
       recordAction(issueId, orbit, state, now);
       actionBudget--;
     }
@@ -259,162 +215,86 @@ export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promis
   return [...outcome.actions, ...outcome.escalations];
 }
 
-// ─── Per-orbit actions ────────────────────────────────────────────────────────
+// ─── Per-orbit recommendations ────────────────────────────────────────────────
 
-interface SweepActions {
-  spawn: (issueId: string) => Promise<{ spawned: boolean; skippedReason?: string; error?: string }>;
-  stop: (agentId: string) => Promise<void>;
-  message: (agentId: string, text: string) => Promise<{ delivered: boolean; queuedToMail: boolean; reason?: string }>;
-  writeFeedback: (issueId: string, stage: string, summary: string, markdownBody: string) => Promise<void>;
-  dispatchReview: (issueId: string) => Promise<void>;
-  clearStuck: (issueId: string) => void;
-  resetMerge: (issueId: string) => void;
+interface ReportActions {
+  readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
   isAgentLive: (agentId: string) => boolean;
   emitActivity: (entry: { level: ActivityLevel; issueId?: string; message: string }) => void;
   emitEvent: (type: string, payload: Record<string, unknown>) => void;
-  readArtifact: (issueId: string) => SynthesisArtifactVerdict | null;
-  restoreVerdict: (issueId: string, artifact: SynthesisArtifactVerdict) => Promise<ArtifactVerdictRestoreResult>;
 }
 
-async function resumeWorkAgentWithFeedback(
-  row: ParkedRow,
-  stage: string,
-  summary: string,
-  markdownBody: string,
-  actions: Pick<SweepActions, 'spawn' | 'writeFeedback' | 'message' | 'isAgentLive'>,
-): Promise<{ ok: boolean; note: string }> {
-  const agentId = `agent-${row.issueId.toLowerCase()}`;
-  // Warm path (PAN-2579): the agent is ALIVE — deliver the feedback to it
-  // directly. Spawning here is not just wasteful, it is refused by the
-  // start-agent endpoint ("already running") and was the sweeper's entire
-  // spawn-failed failure class on its first live night.
-  if (actions.isAgentLive(agentId)) {
-    const outcome = await actions.message(
-      agentId,
-      `Pipeline rework for ${row.issueId} — ${summary}. Read the newest file in \`.pan/feedback\`, address it, commit, push, then run \`pan done ${row.issueId}\`.`,
-    );
-    // Honesty check: a pasted-but-unsubmitted composer is NOT a re-drive
-    // (restored sessions wedge exactly this way — text sits, Enter never
-    // lands). Only confirmed delivery (or a durable mail queue) earns the
-    // feedback file and the cleared flag downstream.
-    if (!outcome.delivered && !outcome.queuedToMail) {
-      return { ok: false, note: `delivery unconfirmed (${outcome.reason ?? 'no delivery path accepted'})` };
-    }
-    await actions.writeFeedback(row.issueId, stage, summary, markdownBody);
-    return { ok: true, note: `messaged warm ${agentId} with ${stage} feedback` };
-  }
-  const agentState = getAgentStateSync(agentId);
-  const gate = decideAutonomousRedrive(agentState ?? {}, { owesRework: true });
-  if (gate.decision !== 'proceed') {
-    return { ok: false, note: `re-drive deferred — ${gate.reason}` };
-  }
-  await actions.writeFeedback(row.issueId, stage, summary, markdownBody);
-  const result = await actions.spawn(row.issueId);
-  if (!result.spawned) {
-    return { ok: false, note: `spawn skipped (${result.skippedReason ?? result.error ?? 'unknown'})` };
-  }
-  return { ok: true, note: `resumed ${agentId} with ${stage} feedback` };
-}
-
-async function sweepRow(
+/**
+ * Build the per-orbit recommendation. This is the ONLY thing the sweeper does
+ * with a row: describe the evidence, name the remedy, emit both. There is no
+ * action door — see the file-header law.
+ */
+function reportRow(
   row: ParkedRow,
   state: StallSweeperRowState | null,
   now: number,
-  actions: SweepActions,
+  actions: ReportActions,
   outcome: ScanOutcome,
-): Promise<boolean> {
+): boolean {
   const { issueId, orbit } = row;
-  const act = (text: string) => {
-    outcome.actions.push(text);
-    actions.emitActivity({ level: 'info', issueId, message: `🧹 ${text}` });
+  const recommend = (recommendation: string, evidence: Record<string, unknown> = {}) => {
+    actions.emitEvent('sweep.recommendation', { issueId, orbit, recommendation, ...evidence });
+    actions.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper recommends: ${recommendation} — ${row.parkReason}. ${NO_ACTION_TRAILER}` });
+    outcome.actions.push(`${issueId} (${orbit}) recommended: ${recommendation}`);
   };
 
   switch (orbit) {
     case 'zombie-session': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      await actions.stop(agentId);
-      actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'reaped-zombie', agentId });
-      act(`sweeper reaped zombie ${agentId} — ${issueId} is merged/closed (${row.parkReason})`);
+      const live = actions.isAgentLive(agentId);
+      recommend(`reap zombie session ${agentId} — ${issueId} is merged/closed`, { agentId, sessionCurrentlyLive: live });
       return true;
     }
 
     case 'merge-failed': {
-      actions.resetMerge(issueId);
-      actions.emitEvent('sweep.action', { issueId, orbit, action: 'merge-reevaluate' });
-      act(`sweeper reset ${issueId} merge for re-evaluation — ${row.parkReason}`);
+      recommend(`reset ${issueId}'s merge for re-evaluation`);
       return true;
     }
 
     case 'uat-failed': {
       const notes = typeof row.details?.uatNotes === 'string' ? row.details.uatNotes : 'UAT failed — see the UAT panel for details';
-      const result = await resumeWorkAgentWithFeedback(row, 'uat', `UAT failed for ${issueId}`, `## UAT Failure — Rework Required\n\n${notes}\n\nFix the failing acceptance criteria, commit, push, and run \`pan done ${issueId}\`.`, actions);
-      if (!result.ok) {
-        outcome.actions.push(`sweeper: ${issueId} UAT re-drive ${result.note}`);
-        return false;
-      }
-      actions.emitEvent('sweep.action', { issueId, orbit, action: 'uat-redrive' });
-      act(`sweeper re-drove ${issueId} UAT failure to a fresh work agent — ${result.note}`);
+      recommend(`re-drive ${issueId} for UAT rework`, { uatNotes: notes.slice(0, 400) });
       return true;
     }
 
     case 'conflicts': {
-      const result = await resumeWorkAgentWithFeedback(row, 'conflicts', `Branch conflicts for ${issueId}`, `## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run \`pan sync-main ${issueId}\` (or rebase), resolve the conflicts, commit, push, and run \`pan done ${issueId}\`.`, actions);
-      if (!result.ok) {
-        outcome.actions.push(`sweeper: ${issueId} conflict re-drive ${result.note}`);
-        return false;
-      }
-      actions.emitEvent('sweep.action', { issueId, orbit, action: 'conflict-redrive' });
-      act(`sweeper resumed ${issueId} work agent for conflict resolution — ${result.note}`);
+      recommend(`run pan sync-main ${issueId} and resolve the branch conflicts, then pan done ${issueId}`);
       return true;
     }
 
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
 
-      // PAN-3511: the verdict of record is consulted BEFORE every branch below.
-      // Ordering is the whole point — consulting after the re-drive would let a
-      // passed artifact still push a rework message at the work agent before the
-      // restore short-circuited, which is the wipe this issue exists to stop.
+      // PAN-3511: the verdict artifact is the read-side source of truth. The
+      // sweeper remains observability-only, but its recommendation must never
+      // tell an operator to re-drive over a review that already finished.
       const artifact = actions.readArtifact(issueId);
       if (artifact?.verdict === 'passed') {
-        const restore = await actions.restoreVerdict(issueId, artifact);
-        if (restore.outcome === 'restored') {
-          actions.clearStuck(issueId);
-          actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'verdict-restored', verdict: restore.artifact.verdict });
-          act(`sweeper restored ${issueId} from a fresh passed review artifact and cleared the stuck flag — the review had already finished, so no message was sent to the work agent`);
-          return true;
-        }
-        // Blocked by the head guard: the artifact still proves a review FINISHED,
-        // so re-driving is the same mistake. The restore door already reported it.
-        outcome.actions.push(`sweeper: ${issueId} left parked — a fresh passed artifact could not be restored (${restore.outcome})`);
-        return false;
+        recommend(
+          `restore ${issueId}'s passed review verdict from run ${artifact.runId} through the verdict restore door; do not re-dispatch or resume rework`,
+          { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, artifactHead: artifact.headSha },
+        );
+        return true;
       }
-
       if (reason === 'review_infrastructure_failure') {
-        actions.clearStuck(issueId);
-        await actions.dispatchReview(issueId);
-        actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'review-redispatch' });
-        act(`sweeper cleared ${issueId} infra-failure stuck flag and re-dispatched review`);
+        recommend(`clear ${issueId}'s infra-failure stuck flag and re-dispatch the review`);
         return true;
       }
       if (reason === 'feedback_delivery_needs_you' || reason === 'verification_stuck') {
-        const summary = reason === 'verification_stuck' ? `Verification exhausted for ${issueId}` : `Review/test feedback delivery for ${issueId}`;
-        // A blocked/failed artifact holds the reviewer's actual blocker. Hand the
-        // agent that text instead of a pointer at a directory it has to go read.
-        const body = artifact?.notes
-          ? `## Pipeline Rework Required\n\n${row.parkReason}.\n\nThe review verdict of record says:\n\n> ${artifact.notes}\n\nAddress it, commit, push, and run \`pan done ${issueId}\`.`
-          : `## Pipeline Rework Required\n\n${row.parkReason}.\n\nAddress the pending feedback in \`.pan/feedback\`, commit, push, and run \`pan done ${issueId}\`.`;
-        const result = await resumeWorkAgentWithFeedback(row, 'rework', summary, body, actions);
-        if (!result.ok) {
-          outcome.actions.push(`sweeper: ${issueId} stuck re-drive ${result.note}`);
-          return false;
-        }
-        actions.clearStuck(issueId);
-        actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'stuck-redrive' });
-        act(`sweeper cleared ${issueId} stuck flag and resumed rework — ${result.note}`);
+        recommend(
+          artifact?.notes
+            ? `resume ${issueId} rework using the blocker from review run ${artifact.runId}`
+            : `resume ${issueId} rework from the pending feedback`,
+          artifact?.notes ? { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, reviewNotes: artifact.notes.slice(0, 400) } : {},
+        );
         return true;
       }
-      // Unknown / dead-end stuck flavors are operator-owned.
+      // Unknown / dead-end stuck flavors are operator-owned — re-surface on TTL.
       if (dueForResurface(state, now)) {
         recordEscalation(issueId, orbit, state, now);
         actions.emitEvent('sweep.escalated', { issueId, orbit, reason: row.parkReason });
@@ -426,39 +306,24 @@ async function sweepRow(
 
     case 'idle-running': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
-      // Belt-and-suspenders: never nudge/stop an orchestrator or conversation
-      // (their activity lives outside the stamp this orbit reads — the
-      // first-night flywheel kill). The resolver exempts them; this guards
-      // against any row that still slips through.
-      const agentState = getAgentStateSync(agentId);
-      if (IDLE_EXEMPT_ROLES.has(String(agentState?.role ?? ''))) return false;
       const lastActivity = typeof row.details?.idleMinutes === 'number' ? row.details.idleMinutes : 0;
-      const currentActivity = agentState?.lastActivity ?? null;
-      // Step 2: previously nudged, grace elapsed, and the agent never moved → stop it.
-      if (state?.nudgedActivityAt && currentActivity && state.nudgedActivityAt === currentActivity
-        && now - (state.lastNudgedAt ? Date.parse(state.lastNudgedAt) : 0) >= IDLE_NUDGE_GRACE_MS) {
-        await actions.stop(agentId);
-        actions.emitEvent('sweep.unparked', { issueId, orbit, action: 'stopped-idle', agentId });
-        act(`sweeper stopped ${agentId} — no progress ${Math.round(lastActivity / 60)}h after a nudge; the slot is freed for live work`);
-        return true;
-      }
-      // Step 1: nudge once, remember the activity stamp it must beat.
-      if (state?.lastNudgedAt && now - Date.parse(state.lastNudgedAt) < IDLE_NUDGE_GRACE_MS) return false;
-      const nudgeOutcome = await actions.message(agentId, `You have been idle for ${Math.floor(lastActivity / 60)}h with no pipeline stage owning your next move. If you have unfinished xBRIEF items, continue them now. If your work is complete, run \`pan done ${issueId}\`. If you are blocked, say so plainly in one sentence.`);
-      if (!nudgeOutcome.delivered && !nudgeOutcome.queuedToMail) {
-        outcome.actions.push(`sweeper: ${issueId} idle nudge delivery unconfirmed (${nudgeOutcome.reason ?? 'no delivery path accepted'})`);
-        return false;
-      }
+      const graceMs = IDLE_RECOMMEND_GRACE_MS;
+      if (state?.lastNudgedAt && now - Date.parse(state.lastNudgedAt) < graceMs) return false;
+      const previouslyReported = !!state?.lastNudgedAt;
       writeSweeperRowState(issueId, orbit, {
         actionCount: (state?.actionCount ?? 0) + 1,
         lastActionAt: new Date(now).toISOString(),
         episodeStartedAt: state?.episodeStartedAt ?? new Date(now).toISOString(),
         lastNudgedAt: new Date(now).toISOString(),
-        ...(currentActivity ? { nudgedActivityAt: currentActivity } : {}),
+        ...(state?.nudgedActivityAt ? { nudgedActivityAt: state.nudgedActivityAt } : {}),
       });
-      actions.emitEvent('sweep.action', { issueId, orbit, action: 'nudged-idle', agentId });
-      act(`sweeper nudged idle ${agentId} for ${issueId} — stop follows if nothing moves within ${IDLE_NUDGE_GRACE_MS / 60_000} minutes`);
-      return false; // the nudge records its own row state above
+      recommend(
+        previouslyReported
+          ? `stop or resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
+          : `nudge ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
+        { agentId, idleMinutes: lastActivity, live: actions.isAgentLive(agentId) },
+      );
+      return false; // the recommendation records its own row state above
     }
 
     default:
