@@ -65,6 +65,7 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   reviewSpawnedAt?: string | number;
   reviewRequestedAt?: string;
   conflictResolutionDispatchedAt?: string;
+  /** Legacy persisted conflict marker retained for parked-population reads. */
   conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   testRetryCount?: number;
   reviewRetryCount?: number;

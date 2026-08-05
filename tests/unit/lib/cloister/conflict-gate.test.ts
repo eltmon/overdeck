@@ -271,13 +271,13 @@ describe('resolveConflictGate', () => {
 
     expect(deps.setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
-      { blockerReasons: [nonMergeBlocker], conflictsSince: undefined },
+      { blockerReasons: [nonMergeBlocker] },
       status,
     );
     expect(deps.dispatchResolver).not.toHaveBeenCalled();
   });
 
-  it('clears conflictsSince in the same write that clears stale merge blockers (PAN-3154)', async () => {
+  it('retains a historical conflictsSince marker while clearing a stale merge blocker', async () => {
     const status = makeStatus({
       blockerReasons: [mergeBlocker],
       conflictsSince: {
@@ -292,7 +292,7 @@ describe('resolveConflictGate', () => {
 
     expect(deps.setReviewStatus).toHaveBeenCalledWith(
       'PAN-1765',
-      { blockerReasons: undefined, conflictsSince: undefined },
+      { blockerReasons: undefined },
       status,
     );
   });

@@ -233,7 +233,7 @@ export interface ReviewStatusData {
   reviewCycleHistory?: Array<{ cycle: number; runId: string; atCommit?: string; blockingCount: number; recordedAt: string }>;
   /** PAN-905: GitHub-native merge blocker reasons */
   blockerReasons?: BlockerReason[];
-  /** PAN-3154: main-head SHA/paths that first made this branch conflict. */
+  /** Legacy persisted conflict marker retained for parked-population reads. */
   conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   /** PAN-366: Queue position — null = not queued, 0 = active, 1+ = position */
   queuePosition?: number | null;

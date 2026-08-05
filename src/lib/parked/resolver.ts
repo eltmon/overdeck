@@ -341,13 +341,13 @@ export function classifyParked(s: ParkedSignals): ParkedRow[] {
     );
   }
 
-  // 7. conflicts — retain any persisted conflict marker for the parked view.
+  // 7. conflicts — retain historical conflict markers for the parked view.
   if (!closed && r?.conflictsSince && r.mergeStatus !== 'merged') {
     push(
       'conflicts',
       isoOr(r.conflictsSince.detectedAt, s.now),
-      `a merge to main invalidated this branch at ${r.conflictsSince.sha.slice(0, 10)} — conflict resolution was never completed`,
-      'kick off conflict resolution (sync-main / rebase) on a resumed work agent',
+      `a persisted conflict marker names ${r.conflictsSince.sha.slice(0, 10)}; this branch still needs rework`,
+      'resolve the recorded conflict, then submit the rework for review',
       { sha: r.conflictsSince.sha, paths: r.conflictsSince.paths },
     );
   }

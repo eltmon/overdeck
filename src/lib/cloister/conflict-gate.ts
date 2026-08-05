@@ -211,8 +211,6 @@ export async function resolveConflictGate(
       issueId,
       {
         blockerReasons: remainingBlockers.length > 0 ? remainingBlockers : undefined,
-        // Clear any persisted conflict marker in the same write as its blocker.
-        conflictsSince: undefined,
       },
       status,
     );

@@ -132,6 +132,7 @@ describe('classifyParked — one orbit at a time', () => {
     }));
     expect(rows).toHaveLength(1);
     expect(rows[0].orbit).toBe('conflicts');
+    expect(rows[0].parkReason).toContain('persisted conflict marker');
     expect(rows[0].parkReason).toContain('c8a911e6fa');
   });
 
