@@ -63,7 +63,7 @@ describe('active review artifact evidence', () => {
   it('reads active-run evidence asynchronously for recovery callers', async () => {
     writeArtifact('active-run', 'synthesis.md', '## Verdict: APPROVED\n');
 
-    await expect(readLatestSynthesisVerdictAsync('PAN-1', { workspacePath: workspace, runId: 'active-run' })).resolves.toMatchObject({
+    await expect(readLatestSynthesisVerdictAsync('PAN-1', { now: NOW, workspacePath: workspace, runId: 'active-run' })).resolves.toMatchObject({
       runId: 'active-run',
       verdict: 'passed',
     });
