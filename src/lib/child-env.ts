@@ -21,12 +21,6 @@ const LEAKED_ENV_KEYS = new Set([
   'WINDOW', // GNU screen window number
 ]);
 
-/** Host-only secrets that must never reach workspace-controlled child processes. */
-const HOST_ONLY_ENV_KEYS = new Set([
-  'OVERDECK_REVIEW_ATTESTATION_KEY',
-  'OVERDECK_REVIEW_ATTESTATION_TOKEN',
-]);
-
 /** Provider-specific keys that must be cleared before re-routing a child. */
 const PROVIDER_ENV_KEYS = new Set([
   'ANTHROPIC_API_KEY',
@@ -46,14 +40,13 @@ const PROVIDER_ENV_KEYS = new Set([
   'NOUS_API_KEY',
   'DASHSCOPE_API_KEY',
   'QUANTUMLLAMA_API_KEY',
+  // Host-only review attestation material must never leak to coding agents.
+  'OVERDECK_REVIEW_ATTESTATION_KEY',
+  'OVERDECK_REVIEW_ATTESTATION_TOKEN',
 ]);
 
 /** All keys that should be stripped by default. */
-const STRIPPED_KEYS = new Set([
-  ...LEAKED_ENV_KEYS,
-  ...HOST_ONLY_ENV_KEYS,
-  ...PROVIDER_ENV_KEYS,
-]);
+const STRIPPED_KEYS = new Set([...LEAKED_ENV_KEYS, ...PROVIDER_ENV_KEYS]);
 
 /**
  * Build a sanitized child environment.
@@ -90,12 +83,12 @@ export function buildChildEnvSync(
  * then sets the correct values for the child process.
  */
 export const BLANKED_PROVIDER_ENV: Record<string, string> = Object.fromEntries(
-  [...PROVIDER_ENV_KEYS, ...HOST_ONLY_ENV_KEYS].map(k => [k, '']),
+  [...PROVIDER_ENV_KEYS].map(k => [k, '']),
 );
 
 /**
- * Variant that preserves provider routing while stripping tmux/screen artifacts
- * and host-only secrets. Use this when the caller handles provider env separately.
+ * Variant that strips ONLY tmux/screen artifacts (not provider keys).
+ * Use this when the caller will handle provider env separately (e.g. launcher scripts).
  */
 export function buildChildEnvWithoutTmuxSync(
   baseEnv: NodeJS.ProcessEnv = process.env,
@@ -104,7 +97,7 @@ export function buildChildEnvWithoutTmuxSync(
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(baseEnv)) {
     if (v === undefined) continue;
-    if (LEAKED_ENV_KEYS.has(k) || HOST_ONLY_ENV_KEYS.has(k)) continue;
+    if (LEAKED_ENV_KEYS.has(k)) continue;
     out[k] = v;
   }
   if (overrides) {
