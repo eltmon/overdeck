@@ -445,7 +445,7 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:51:39.200Z",
+  "updated": "2026-08-05T23:51:51.556Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "passed",
@@ -455,9 +455,9 @@
     "releaseStatus": "pending",
     "readyForMerge": true,
     "panDoneRecoveredAt": "2026-08-05T23:51:33.187Z",
-    "updatedAt": "2026-08-05T23:51:36.361Z",
+    "updatedAt": "2026-08-05T23:51:51.170Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
-    "testNotes": "Skipped: no code changed since pre-review verification gate",
+    "testNotes": "npm run typecheck PASSED (root tsc, hooks, evals, dashboard-types guard 47 known/0 new, frontend-types guard 0 known/0 new). npm run lint PASSED exit 0 (all sub-lints green incl. state-writes/state-paths/pipeline-membership/workspace-doors/park-exits/circular 56 baselined-0 new/ratchet-audit/quarantine-audit). Root npm test PASSED: 1409 test files / 13314 tests passed, 3 files / 50 tests skipped, 0 failed (head-anchor-write-sites.test.ts inventory mismatch from an earlier review cycle is resolved on this HEAD, re-ran standalone 2/2 passed). Full frontend suite (npm --prefix src/dashboard/frontend run test, no filter) PASSED: 309 test files / 3032 tests, 0 failed, incl. RolesPanel.test.tsx and IssuePolicyStrip.test.tsx covering the removed reReviewScope control. UAT not required: pure backend pipeline internals plus one UI control removal fully covered by component tests; no acceptance criteria or issue/PR notes call for browser verification.",
     "verificationNotes": "Pre-review verification already covered the reviewed commit",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
@@ -749,10 +749,10 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 122,
-            "output": 26024,
-            "cacheRead": 9131182,
-            "cacheWrite": 342091
+            "input": 126,
+            "output": 27518,
+            "cacheRead": 9539215,
+            "cacheWrite": 343567
           }
         },
         "work": {
@@ -772,15 +772,15 @@
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 122,
-          "output": 26024,
-          "cacheRead": 9131182,
-          "cacheWrite": 342091
+          "input": 126,
+          "output": 27518,
+          "cacheRead": 9539215,
+          "cacheWrite": 343567
         }
       },
       "costAtCloseOut": {
-        "usd": 288.440732,
-        "pricingAsOf": "2026-08-05T23:51:39.193Z"
+        "usd": 288.540977,
+        "pricingAsOf": "2026-08-05T23:51:51.297Z"
       }
     },
     "merges": [
