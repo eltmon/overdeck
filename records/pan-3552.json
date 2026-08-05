@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:23:55.963Z",
+  "updated": "2026-08-05T19:24:03.944Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 29,
-    "claims": {},
+    "sequence": 30,
+    "claims": {
+      "reconcile-reviewing-rows-through-write-door": {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 373565,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T19:24:03.944Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -276,7 +284,7 @@
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac2": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac3": "completed",
     "dispatch-consults-verdict-of-record.dispatch-consults-verdict-of-record.ac4": "completed",
-    "reconcile-reviewing-rows-through-write-door": "pending",
+    "reconcile-reviewing-rows-through-write-door": "running",
     "docs-parked-merge-flywheel": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac1": "completed",
     "docs-parked-merge-flywheel.docs-parked-merge-flywheel.ac2": "completed",
