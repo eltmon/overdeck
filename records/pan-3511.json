@@ -871,17 +871,17 @@
     "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T11:03:37.815Z",
+  "updated": "2026-08-05T11:03:38.699Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
-    "verificationStatus": "passed",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T11:00:45.261Z",
+    "updatedAt": "2026-08-05T11:03:38.697Z",
     "reviewNotes": "Agent re-review request (6/25): Fixed review issues",
     "testNotes": "npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 55 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 calls readFileSync(join(import.meta.dirname, '..', 'stall-sweeper.ts')) to introspect the source module's own code instead of exercising runtime behavior, and is not baselined in the source-introspection allowlist. Guard exits 1 and the lint chain aborts there — lint:no-coderabbit-merge-gate, lint:circular, lint:ratchet-audit, and lint:quarantine-audit never ran. This is real code committed on this branch (part of the sweeper-consult work item), not a false positive; confirmed with a direct re-run of `npm run lint:source-introspection` outside any pipe, real exit code 1. npm test: 1407 passed | 2 failed | 3 skipped test files (13344 passed | 2 failed | 50 skipped tests, 359.79s). Both failures are `Hook timed out in 5000ms` inside setupOverdeckTestDb — tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file set (declared or actual scope), and this exact failure signature (DB-setup hook timeout under parallel load) is already recorded as a pre-existing flake in this issue's own session history (2026-08-04T01:54Z note: 'Full-suite flakes, not regressions... all pass in isolation'). Reported for completeness, not counted as the blocking cause. Overall automated-gate status is FAILED, blocking on the lint:source-introspection guard against this branch's own test file. Browser UAT was not required: the PRD and xBRIEF acceptance criteria are entirely backend/cloister recovery-path logic (deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts) with no dashboard/browser-facing behavior.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
@@ -892,12 +892,17 @@
       "outsideDeclaredScope": [
         "packages/contracts/src/events.ts",
         "scripts/file-size-allowlist.txt",
+        "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
+        "src/lib/__tests__/review-status-reconcile.test.ts",
+        "src/lib/agents/agent-state-source.ts",
         "src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
         "src/lib/parked/resolver.ts",
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "declaredScopeUntouched": [
-        "roles/review.md"
+        "roles/review.md",
+        "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts"
       ],
       "declaredScope": [
         "docs/PARKED-POPULATION.md",
@@ -920,23 +925,27 @@
         "docs/REVIEW-AGENT-ARCHITECTURE.md",
         "packages/contracts/src/events.ts",
         "scripts/file-size-allowlist.txt",
+        "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
         "src/lib/__tests__/review-status-read-artifact.test.ts",
+        "src/lib/__tests__/review-status-reconcile.test.ts",
+        "src/lib/agents/agent-state-source.ts",
         "src/lib/cloister/__tests__/feedback-target.test.ts",
         "src/lib/cloister/__tests__/stall-sweeper.test.ts",
         "src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts",
-        "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
         "src/lib/cloister/__tests__/verdict-restore.test.ts",
         "src/lib/cloister/deacon-review-status.ts",
         "src/lib/cloister/feedback-target.ts",
         "src/lib/cloister/stall-sweeper.ts",
         "src/lib/cloister/synthesis-verdict.ts",
         "src/lib/cloister/verdict-restore.ts",
+        "src/lib/overdeck/agent-state-sync.ts",
         "src/lib/parked/resolver.ts",
         "src/lib/review-status-read.ts",
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
-      "recordedAt": "2026-08-05T06:53:26.179Z"
-    }
+      "recordedAt": "2026-08-05T11:03:37.813Z"
+    },
+    "reviewRequestedAt": "2026-08-05T11:03:38.697Z"
   },
   "closeOut": {
     "usage": {
