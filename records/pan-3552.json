@@ -359,20 +359,20 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:03:39.333Z",
+  "updated": "2026-08-05T22:05:31.072Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "pending",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T21:58:42.457Z",
+    "updatedAt": "2026-08-05T22:03:42.549Z",
     "reviewNotes": "Review dispatch skipped — already running: agent-pan-3552-review",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
-    "reviewedAtCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1",
+    "reviewedAtCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
     "lastVerifiedCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
     "reviewRequestedAt": "2026-08-05T21:44:07.056Z",
     "reviewSpawnedAt": "2026-08-05T21:56:14.170Z",
@@ -617,9 +617,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 7128556,
-            "output": 136563,
-            "cacheRead": 45040128,
+            "input": 9388196,
+            "output": 168361,
+            "cacheRead": 58848256,
             "cacheWrite": 0
           }
         },
@@ -657,24 +657,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 12445493,
-            "output": 832052,
-            "cacheRead": 351834624,
+            "input": 12637301,
+            "output": 832608,
+            "cacheRead": 353267200,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 28827299,
-          "output": 1206284,
-          "cacheRead": 455051264,
+          "input": 31278747,
+          "output": 1238638,
+          "cacheRead": 470291968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 203.925855,
-        "pricingAsOf": "2026-08-05T21:58:43.967Z"
+        "usd": 214.349993,
+        "pricingAsOf": "2026-08-05T22:05:10.568Z"
       }
     },
     "merges": [
