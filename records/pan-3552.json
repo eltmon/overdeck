@@ -431,21 +431,18 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:39:06.613Z",
+  "updated": "2026-08-05T23:44:32.357Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "passed",
-    "testStatus": "testing",
+    "reviewStatus": "pending",
+    "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T23:39:06.592Z",
-    "reviewNotes": "Agent re-review request (2/25): Fixed anchor-match reviewed-head persistence, current-run verdict-of-record convergence, and recommendation-only sweeper state; updated the head-anchor audit.",
-    "testNotes": "typecheck (npm run typecheck) PASSED. lint (npm run lint) PASSED (exit 0, all sub-lints incl. state-writes/state-paths/pipeline-membership/workspace-doors/park-exits green). npm test FAILED: tests/unit/lib/head-anchor-write-sites.test.ts > 'locks every documented write occurrence and source expression' fails deterministically and reproduces standalone (isolated run, no other files) - src/lib/cloister/review-verdict-writer.ts now contains a second, structurally-identical write site for 'reviewedAtCommit: input.evidenceHead as HeadAnchor' (lines 162 and 235) but the test's ALLOWED_WRITE_SITES inventory still lists only one occurrence, so the scan finds 47 sites vs an expected 46. Root cause: xBRIEF item 'preserve-test-gate-on-same-head-converge' (commit fa73ec8b29 'fix(review): preserve same-head test verdict') added the second write site to review-verdict-writer.ts but its files_scope did not include tests/unit/lib/head-anchor-write-sites.test.ts; the sibling item 'reconcile-reviewing-rows-through-write-door' (commit abb3344b27) was the one scoped to touch that inventory test and landed first, so the allowlist was never updated for the later addition - a coordination gap between two xBRIEF items, not a pre-existing failure (confirmed clean on origin/main baseline knowledge and the test asserts against this branch's own src/lib/cloister/review-verdict-writer.ts). Two full `npm test` runs also surfaced a shifting set of unrelated failures (beforeEach 'Hook timed out in 5000ms' in setupOverdeckTestDb() across ~9 files, plus review-verdict-writer.test.ts and stall-sweeper.test.ts assertion mismatches) that did not reproduce in isolation (25/25 and 55/55 passed when re-run standalone/in small batches) - consistent with system resource contention from ~13 concurrently running Overdeck agents on this machine, not a code defect; these are excluded from the failure verdict. The one blocking failure is the head-anchor-write-sites.test.ts inventory mismatch, which is real, deterministic, and directly caused by this branch's own commits.",
+    "updatedAt": "2026-08-05T23:44:32.030Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
-    "reviewedAtCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
     "lastVerifiedCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
     "reviewSpawnedAt": "2026-08-05T23:32:59.091Z",
     "scopeDrift": {
@@ -729,38 +726,38 @@
         },
         "test": {
           "anthropic/claude-sonnet-5": {
-            "input": 84,
-            "output": 18887,
-            "cacheRead": 6104746,
-            "cacheWrite": 160616
+            "input": 112,
+            "output": 24324,
+            "cacheRead": 8134818,
+            "cacheWrite": 335023
           }
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 13649084,
-            "output": 984940,
-            "cacheRead": 416116224,
+            "input": 13781744,
+            "output": 986698,
+            "cacheRead": 417858560,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 43022257,
-          "output": 1638125,
-          "cacheRead": 608613376,
+          "input": 43154917,
+          "output": 1639883,
+          "cacheRead": 610355712,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
-          "input": 84,
-          "output": 18887,
-          "cacheRead": 6104746,
-          "cacheWrite": 160616
+          "input": 112,
+          "output": 24324,
+          "cacheRead": 8134818,
+          "cacheWrite": 335023
         }
       },
       "costAtCloseOut": {
-        "usd": 286.093095,
-        "pricingAsOf": "2026-08-05T23:39:06.602Z"
+        "usd": 287.783159,
+        "pricingAsOf": "2026-08-05T23:44:32.066Z"
       }
     },
     "merges": [
