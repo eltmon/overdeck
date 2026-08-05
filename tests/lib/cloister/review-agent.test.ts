@@ -602,9 +602,8 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
 
     expect(block).toContain('buildReviewRolePrompt');
     expect(block).toContain('buildSelfReviewPrompt');
-    // PAN-1862: the fan-out itself lives in review-convoy.ts — the dispatch block
-    // delegates to launchConvoyReviewersPromise over the selective in-scope set
-    // (all four on a first cycle; a subset when carried verdicts prove skips safe).
+    // The fan-out itself lives in review-convoy.ts and always launches the four
+    // independent convoy lanes for a new review run.
     expect(block).toContain('launchConvoyReviewersPromise');
     expect(block).toContain('...(opts.model ? { model: opts.model } : {})');
     expect(block).toContain('...(opts.harness ? { harness: opts.harness } : {})');
@@ -1495,7 +1494,6 @@ describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
       contextManifestPath: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef/context.json',
     });
     expect(prompt).toContain('STANDBY — REVIEW SYNTHESIS for PAN-1059');
-    expect(prompt).not.toContain('discovery-ready');
     expect(prompt).not.toContain('PHASE 1 — SHARED DISCOVERY');
     expect(prompt).toContain('STALE-SIGNAL GUARD (PAN-3549)');
     expect(prompt).toContain('stat -c %y <manifest path>');

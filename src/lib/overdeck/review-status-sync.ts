@@ -89,7 +89,6 @@ interface DbRow {
   strike_next_attempt_at: number | null;
   strike_landing_attempts: string | null;
   review_cycle_history: string | null;
-  conflicts_since: string | null;
 }
 
 function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewStatus {
@@ -214,9 +213,9 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_ready_head, strike_ready_at, strike_landing_state,
         strike_recovery_count, strike_transport_retry_count,
         strike_next_attempt_at, strike_landing_attempts,
-        review_cycle_history, conflicts_since
+        review_cycle_history
       ) VALUES (
-        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
       )
       ON CONFLICT(issue_id) DO UPDATE SET
         review_status = excluded.review_status,
@@ -269,8 +268,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
         strike_transport_retry_count = excluded.strike_transport_retry_count,
         strike_next_attempt_at = excluded.strike_next_attempt_at,
         strike_landing_attempts = excluded.strike_landing_attempts,
-        review_cycle_history = excluded.review_cycle_history,
-        conflicts_since = excluded.conflicts_since
+        review_cycle_history = excluded.review_cycle_history
     `).run(
       s.issueId,
       s.reviewStatus,
@@ -324,7 +322,6 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       isoToMs(s.strikeNextAttemptAt),
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
       s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
-      null,
     );
 
     if (s.history && s.history.length > 0) {

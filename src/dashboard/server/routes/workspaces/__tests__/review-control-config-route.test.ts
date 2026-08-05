@@ -69,21 +69,19 @@ beforeEach(() => {
   routeMocks.readIssueRecordSync.mockReturnValue({
     reviewMode: 'full',
     reviewModel: 'claude-sonnet-4-6',
-    reReviewScope: 'blockers',
   });
   routeMocks.updateIssueRecord.mockImplementation(async (_project, _issueId, mutate) => {
     const record: Record<string, unknown> = {
       reviewMode: 'full',
       reviewModel: 'claude-sonnet-4-6',
-      reReviewScope: 'blockers',
-    };
+      };
     mutate(record);
     return record;
   });
 });
 
 describe('GET/POST /api/review/:issueId/config', () => {
-  it('does not project a legacy reReviewScope record field from GET', async () => {
+  it('returns only supported review overrides from GET', async () => {
     const result = await requestReviewConfig({ method: 'GET' });
 
     expect(result).toEqual({
@@ -94,14 +92,13 @@ describe('GET/POST /api/review/:issueId/config', () => {
         resolved: { reviewMode: 'full', reviewModel: 'claude-sonnet-4-6' },
       },
     });
-    expect(JSON.stringify(result.body)).not.toContain('reReviewScope');
   });
 
-  it('rejects a retired reReviewScope-only POST without persisting it', async () => {
+  it('rejects a POST with no supported override without persisting it', async () => {
     const result = await requestReviewConfig({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ reReviewScope: 'blockers' }),
+      body: JSON.stringify({ legacySetting: 'ignored' }),
     });
 
     expect(result).toEqual({

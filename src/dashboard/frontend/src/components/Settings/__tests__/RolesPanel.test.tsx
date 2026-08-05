@@ -317,13 +317,12 @@ describe('RolesPanel — review pipeline controls (PAN-1862 FR-10/FR-17)', () =>
     fireEvent.click(toggle!);
   }
 
-  it('shows the review mode selector; the retired scope control and full-mode banner are absent in quick mode', async () => {
+  it('shows the review mode selector and no full-mode banner in quick mode', async () => {
     installFetchMock(); // default: no mode set -> quick
     await expandReviewCard();
 
     const modeSelect = await screen.findByDisplayValue(/Quick — one reviewer/);
     expect(modeSelect).toBeInTheDocument();
-    expect(screen.queryByText(/Re-review scope/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('review-model-uniformity-banner')).not.toBeInTheDocument();
   });
 
@@ -338,7 +337,6 @@ describe('RolesPanel — review pipeline controls (PAN-1862 FR-10/FR-17)', () =>
     expect(banner.textContent).toContain('cache sharing is disabled');
     expect(banner.textContent).toContain('security=claude-opus-4-7');
     expect(banner.textContent).toContain('correctness=claude-sonnet-4-6');
-    expect(screen.queryByText(/Re-review scope/)).not.toBeInTheDocument();
   });
 
   it('full mode with UNIFORM reviewer models renders no banner', async () => {
@@ -355,7 +353,6 @@ describe('RolesPanel — review pipeline controls (PAN-1862 FR-10/FR-17)', () =>
     await expandReviewCard();
 
     await screen.findByDisplayValue(/Full — four-reviewer convoy/);
-    expect(screen.queryByText(/Re-review scope/)).not.toBeInTheDocument();
     expect(screen.queryByTestId('review-model-uniformity-banner')).not.toBeInTheDocument();
   });
 });

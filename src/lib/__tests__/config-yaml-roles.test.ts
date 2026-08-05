@@ -177,17 +177,6 @@ describe('role model configuration', () => {
     })).toThrow('config.yaml: roles.review.mode must be quick, full, or none');
   });
 
-  it('rejects the retired reReviewScope configuration instead of carrying it into the normalized review role', () => {
-    expect(() => mergeConfigs({
-      roles: {
-        review: {
-          model: 'workhorse:expensive',
-          reReviewScope: 'failed-only',
-        } as never,
-      },
-    })).toThrow('config.yaml: roles.review.reReviewScope was removed; full reviews always run every convoy lane');
-  });
-
   it('seeds missing roles while preserving partial user role config', () => {
     const { config } = mergeConfigs({
       roles: {

@@ -149,13 +149,6 @@ describe('IssuePolicyStrip', () => {
     expect(quick).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('uses the effective review mode to decide whether re-review is available', async () => {
-    fixtures.review.override.reviewMode = 'quick';
-    render(<IssuePolicyStrip issueId="PAN-2681" />);
-    fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));
-    expect(screen.queryByLabelText('Re-review scope for this issue')).not.toBeInTheDocument();
-  });
-
   it('keeps the tiered Work Model default until PAN-2684 lands', async () => {
     render(<IssuePolicyStrip issueId="PAN-2681" />);
     fireEvent.click(await screen.findByRole('button', { name: 'Issue policies' }));

@@ -105,7 +105,22 @@ describe('overdeck review status sync', () => {
       'PAN-CONFLICTS-SINCE',
     );
 
-    expect(getReviewStatusFromDbSync('PAN-CONFLICTS-SINCE')).not.toHaveProperty('conflictsSince');
+    upsertReviewStatusSync({
+      issueId: 'PAN-CONFLICTS-SINCE',
+      reviewStatus: 'passed',
+      testStatus: 'pending',
+      updatedAt: new Date().toISOString(),
+      readyForMerge: false,
+    });
+
+    expect(getReviewStatusFromDbSync('PAN-CONFLICTS-SINCE')).toMatchObject({ reviewStatus: 'passed' });
+    const raw = odb.raw().prepare('SELECT conflicts_since FROM review_status WHERE issue_id = ?')
+      .get('PAN-CONFLICTS-SINCE') as { conflicts_since: string };
+    expect(JSON.parse(raw.conflicts_since)).toEqual({
+      sha: '6ac4a3dc11',
+      detectedAt: '2026-07-26T18:58:00.000Z',
+      paths: ['a.txt'],
+    });
   });
 
   describe('bounded history with large note limits (PAN-3253)', () => {
