@@ -132,6 +132,25 @@ describe('recordReviewVerdict', () => {
       expect(result).toEqual({ landed: true, classification: 'no-evidence' });
       expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
     });
+
+    it('Given a fallback blocked verdict with evidence and no verified row head, the door preserves its reviewed anchor through extra fields', async () => {
+      const evidenceHead = 'b'.repeat(40);
+      const status = reviewStatus({ lastVerifiedCommit: undefined });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+
+      await recordReviewVerdict('PAN-3512', {
+        verdict: 'blocked',
+        writer: 'fallback',
+        evidenceHead,
+        extra: { reviewedAtCommit: evidenceHead },
+      });
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', expect.objectContaining({
+        reviewStatus: 'blocked',
+        reviewedAtCommit: evidenceHead,
+      }), status);
+    });
   });
 
   describe('anchor-match path', () => {

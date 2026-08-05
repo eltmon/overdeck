@@ -48,7 +48,6 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--uat-status <status>', 'Test only: required browser UAT result (passed or failed)')
     .option('--uat-notes <notes>', 'Test only: browser UAT evidence or blocking condition')
     .option('--run-id <runId>', 'Review cycle ID used to deduplicate review feedback')
-    .option('--reviewers <verdicts>', 'PAN-1862 (review only): per-reviewer verdicts, e.g. "security=passed,correctness=blocked"')
     .action(doneAndExitCommand);
 
   // pan specialists logs <project> <type> [runId]

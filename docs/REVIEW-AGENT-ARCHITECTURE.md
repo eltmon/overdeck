@@ -167,7 +167,7 @@ to most production reviews.
 | Blocked vocabulary | `## Verdict: CHANGES REQUESTED — <blocker>` | identical |
 | Verdict writer | synthesis parent (`coordinator`) | the review agent itself (`quick-signal`) |
 | Dead-agent recovery | fallback synthesis from the sub-reviewer files | none — no sub-reviewers exist to synthesize |
-| Head evidence | `reviewerVerdicts` plus `context.json` | usually none, so the head guard cannot trip |
+| Head evidence | `reviewedAtCommit` plus `context.json` | usually none, so the head guard cannot trip |
 
 ## Verdict application and fallback sweeps
 
@@ -290,11 +290,10 @@ The five converted stamp/compare sites are:
 1. `checkPostReviewCommits()` in `cloister/deacon-post-review-commits.ts`
    compares `reviewedAtCommit` through the composite-aware drift evaluator.
    Passed reviews reset immediately on real drift. Blocked reviews also detect
-   pushed rework: legacy rows without `reviewedAtCommit` may derive an anchor
-   only when every `reviewerVerdicts[*].atCommit` agrees, and a real new HEAD
-   must remain unchanged for two consecutive patrol ticks before review is
-   reset and re-dispatched. The debounce prevents per-item pushes from starting
-   review while the work agent is still committing the rest of the rework.
+   pushed rework from `reviewedAtCommit`, and a real new HEAD must remain
+   unchanged for two consecutive patrol ticks before review is reset and
+   re-dispatched. The debounce prevents per-item pushes from starting review
+   while the work agent is still committing the rest of the rework.
 
    A repeat-reset bound prevents review from cycling indefinitely on an unchanged
    commit. When a drifted verdict is recorded against a specific anchor, a second
@@ -340,17 +339,6 @@ the synthesis artifact.
 A missing-reviewer recovery may launch only a lane with neither a current report
 nor a live session. It uses the parent run's persisted context-manifest path, so
 runtime registry reconstruction cannot leave an otherwise valid convoy stranded.
-
----
-
-## Per-reviewer verdicts (`full` mode)
-
-Synthesis records a **per-reviewer verdict** map alongside the aggregate:
-`reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`
-(journal-durable; written via `pan admin specialists done review … --reviewers
-"security=passed,correctness=blocked,…"`, or by the Deacon fallback synthesis).
-Every full-review cycle still launches all four reviewers independently; the map
-is an audit of that cycle's reports, never a reason to skip a reviewer.
 
 ---
 

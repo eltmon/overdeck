@@ -239,13 +239,6 @@ export function setReviewStatusSync(
 
   const merged = settleMergedVerification({ ...status, ...update });
 
-  // PAN-1862 (FR-6): reviewerVerdicts is a per-sub-role MAP — a partial update
-  // (synthesis reporting only the reviewers that re-ran this cycle) must merge
-  // with, not replace, the carried-forward entries from prior cycles.
-  if (update.reviewerVerdicts && status.reviewerVerdicts) {
-    merged.reviewerVerdicts = { ...status.reviewerVerdicts, ...update.reviewerVerdicts };
-  }
-
   // Terminal verdicts consume the request that spawned this review. Preserve a newer request
   // because it represents an explicit re-review requested while the current review was running.
   const terminalReviewVerdict = update.reviewStatus !== status.reviewStatus &&
@@ -690,7 +683,7 @@ export function resetPipelineVerdictsForWorkStartSync(issueId: string, options: 
     reviewedAtCommit: undefined,
     lastVerifiedCommit: undefined,
     reviewRequestedAt: undefined, reviewSpawnedAt: undefined,
-    conflictResolutionDispatchedAt: undefined, blockerReasons: undefined, reviewerVerdicts: undefined,
+    conflictResolutionDispatchedAt: undefined, blockerReasons: undefined,
   });
 }
 

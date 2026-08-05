@@ -73,11 +73,6 @@ export interface ReviewStatus extends StrikeLandingStatus, InspectionStatusField
   deaconIgnoredAt?: string;
   deaconIgnoredReason?: string;
   scopeDrift?: ScopeDriftRecord;
-  reviewerVerdicts?: Partial<Record<string, {
-    status: 'passed' | 'blocked';
-    atCommit?: string;
-    findingsPath?: string;
-  }>>;
   reviewCycleHistory?: ReviewCycleEntry[];
 }
 

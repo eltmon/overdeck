@@ -177,10 +177,9 @@ export function buildReviewRolePrompt(opts: {
     'Convoy reviewer output files (read each one ONLY after its REVIEWER_READY signal):',
     subRoleFiles,
     '',
-    'After writing the synthesis report, signal the verdict with Overdeck CLI,',
-    'including a per-reviewer verdict for every convoy sub-role:',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${REVIEW_SUB_ROLES.map(r => `${r}=passed`).join(',')}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${REVIEW_SUB_ROLES.join(', ')}>"`,
+    'After writing the synthesis report, signal the verdict with Overdeck CLI:',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next

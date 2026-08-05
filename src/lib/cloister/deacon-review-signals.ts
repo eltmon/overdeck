@@ -6,7 +6,7 @@ import { getAgentRuntimeStateSync, getAgentState, getAgentStateSync, saveAgentSt
 import { deliverReviewVerdictFeedback } from './review-verdict-feedback.js';
 import { findVerdictReport } from './review-verdict-report.js';
 import { AGENTS_DIR } from '../paths.js';
-import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
+import { getReviewStatusSync } from '../review-status.js';
 import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
@@ -23,8 +23,6 @@ type DeaconReviewSynthesis = {
   verdict: 'passed' | 'blocked';
   topBlocker: string;
   body: string;
-  /** PAN-1862 (FR-6): per-sub-role outcome derived from each report's blocking findings. */
-  reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }>;
 };
 
 export function synthesizeReviewFromReports(opts: {
@@ -40,14 +38,6 @@ export function synthesizeReviewFromReports(opts: {
     })),
   );
   const verdict: 'passed' | 'blocked' = blockers.length > 0 ? 'blocked' : 'passed';
-  // PAN-1862 (FR-6): per-reviewer verdicts — a report with >=1 blocking finding blocks.
-  const reviewerVerdicts: Record<string, { status: 'passed' | 'blocked'; findingsPath?: string }> = {};
-  for (const report of opts.reports) {
-    reviewerVerdicts[report.subRole] = {
-      status: blockers.some(b => b.subRole === report.subRole) ? 'blocked' : 'passed',
-      findingsPath: report.path,
-    };
-  }
   const topBlocker = blockers[0] ? `[${blockers[0].subRole}] ${blockers[0].title}` : '';
   const blockerSection = blockers.length > 0
     ? blockers.map(blocker => `### [${blocker.subRole}] ${blocker.title}\nSource: ${blocker.path}`).join('\n\n')
@@ -86,7 +76,7 @@ export function synthesizeReviewFromReports(opts: {
     '',
   ].join('\n');
 
-  return { verdict, topBlocker, body, reviewerVerdicts };
+  return { verdict, topBlocker, body };
 }
 
 /**
@@ -167,7 +157,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
 
     const reviewDir = join(state.workspace, '.pan', 'review', state.reviewRunId!);
     // A synthesis.md on disk does NOT mean the verdict landed: the parent can
-    // die between writing the file and setReviewStatusSync, wedging the issue
+    // die between writing the file and the verdict write door, wedging the issue
     // in 'reviewing' forever (observed 3× on 2026-07-13). Since reviewStatus
     // is still 'reviewing' here (guard above), fall through and land the
     // verdict deterministically instead of skipping.
@@ -216,27 +206,27 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reports,
       });
       writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
-      // Anchor each reviewer verdict to the reviewed HEAD for the review audit.
       let fallbackHead: HeadAnchor | undefined;
       try {
-        // PAN-2948: polyrepo-aware — anchors sub-repo heads, not the wrapper.
+        // PAN-2948: polyrepo-aware — snapshots sub-repo heads, not the wrapper.
         const { snapshotWorkspaceHeadsPromise } = await import('../git-utils.js');
         fallbackHead = await snapshotWorkspaceHeadsPromise(state.issueId, state.workspace);
-      } catch { /* non-fatal — verdicts without an anchor simply re-run next cycle */ }
-      const anchoredVerdicts = Object.fromEntries(
-        Object.entries(synthesis.reviewerVerdicts).map(([subRole, v]) => [subRole, { ...v, ...(fallbackHead ? { atCommit: fallbackHead } : {}) }]),
-      );
-      setReviewStatusSync(state.issueId, {
-        reviewStatus: synthesis.verdict,
-        reviewNotes: synthesis.topBlocker || 'Review approved by Deacon fallback from completed reviewer reports',
-        reviewerVerdicts: anchoredVerdicts,
-        ...(synthesis.verdict === 'blocked' && fallbackHead ? { reviewedAtCommit: fallbackHead } : {}),
+      } catch { /* non-fatal — the verdict write door accepts missing evidence. */ }
+      const notes = synthesis.topBlocker || 'Review approved by Deacon fallback from completed reviewer reports';
+      const { recordReviewVerdict } = await import('./review-verdict-writer.js');
+      const outcome = await recordReviewVerdict(state.issueId, {
+        verdict: synthesis.verdict,
+        notes,
+        evidenceHead: fallbackHead,
+        ...(synthesis.verdict === 'blocked' && fallbackHead ? { extra: { reviewedAtCommit: fallbackHead } } : {}),
+        runId: state.reviewRunId,
+        writer: 'fallback',
       });
-      if (synthesis.verdict === 'blocked') {
+      if (outcome.landed && synthesis.verdict === 'blocked') {
         await Effect.runPromise(deliverReviewVerdictFeedback({
           issueId: state.issueId,
           verdict: 'blocked',
-          notes: synthesis.topBlocker || 'Review blocked by Deacon fallback from completed reviewer reports',
+          notes,
           workspacePath: state.workspace,
           prUrl: status.prUrl,
           runId: state.reviewRunId,

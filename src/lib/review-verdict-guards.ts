@@ -12,7 +12,6 @@ interface ReviewGuardUpdate {
   testStatus?: string;
   reviewedAtCommit?: string;
   lastVerifiedCommit?: string;
-  reviewerVerdicts?: Partial<Record<string, { atCommit?: string }>>;
 }
 
 type StuckFields = Pick<ReviewGuardStatus, 'stuck' | 'stuckReason' | 'stuckAt' | 'stuckDetails'>;

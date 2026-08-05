@@ -30,7 +30,6 @@ export type ReviewVerdict = 'passed' | 'blocked' | 'failed';
 export interface VerdictInput {
   verdict: ReviewVerdict;
   notes?: string;
-  reviewerVerdicts?: ReviewStatus['reviewerVerdicts'];
   evidenceHead?: HeadAnchor;
   extra?: Record<string, unknown>;
   runId?: string;
@@ -133,7 +132,6 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     setReviewStatusSync(issueId, {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     });
     return { landed: true, classification: 'no-evidence' };
@@ -150,7 +148,6 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
@@ -162,7 +159,6 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     const update: ReviewStatusUpdate = {
       reviewStatus: input.verdict,
       reviewNotes: input.notes,
-      ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
     };
     setReviewStatusSync(issueId, update, status);
@@ -216,7 +212,6 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     reviewStatus: input.verdict,
     reviewNotes: input.notes,
     ...(input.evidenceHead ? { reviewedAtCommit: input.evidenceHead as HeadAnchor } : {}),
-    ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
     ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
     ...(input.extra ? { ...input.extra } : {}),
   };
