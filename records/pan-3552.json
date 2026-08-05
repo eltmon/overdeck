@@ -359,7 +359,7 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:05:31.072Z",
+  "updated": "2026-08-05T22:05:33.816Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "blocked",
@@ -657,24 +657,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 12637301,
-            "output": 832608,
-            "cacheRead": 353267200,
+            "input": 12647501,
+            "output": 833382,
+            "cacheRead": 354499072,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 31278747,
-          "output": 1238638,
-          "cacheRead": 470291968,
+          "input": 31288947,
+          "output": 1239412,
+          "cacheRead": 471523840,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 214.349993,
-        "pricingAsOf": "2026-08-05T22:05:10.568Z"
+        "usd": 214.695071,
+        "pricingAsOf": "2026-08-05T22:05:33.807Z"
       }
     },
     "merges": [
