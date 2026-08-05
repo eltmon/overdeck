@@ -873,25 +873,18 @@
     "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T12:43:02.972Z",
+  "updated": "2026-08-05T12:47:14.029Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T12:43:02.923Z",
-    "reviewNotes": "Verification failed at test — fix and resubmit",
-    "testNotes": "npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 55 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 calls readFileSync(join(import.meta.dirname, '..', 'stall-sweeper.ts')) to introspect the source module's own code instead of exercising runtime behavior, and is not baselined in the source-introspection allowlist. Guard exits 1 and the lint chain aborts there — lint:no-coderabbit-merge-gate, lint:circular, lint:ratchet-audit, and lint:quarantine-audit never ran. This is real code committed on this branch (part of the sweeper-consult work item), not a false positive; confirmed with a direct re-run of `npm run lint:source-introspection` outside any pipe, real exit code 1. npm test: 1407 passed | 2 failed | 3 skipped test files (13344 passed | 2 failed | 50 skipped tests, 359.79s). Both failures are `Hook timed out in 5000ms` inside setupOverdeckTestDb — tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file set (declared or actual scope), and this exact failure signature (DB-setup hook timeout under parallel load) is already recorded as a pre-existing flake in this issue's own session history (2026-08-04T01:54Z note: 'Full-suite flakes, not regressions... all pass in isolation'). Reported for completeness, not counted as the blocking cause. Overall automated-gate status is FAILED, blocking on the lint:source-introspection guard against this branch's own test file. Browser UAT was not required: the PRD and xBRIEF acceptance criteria are entirely backend/cloister recovery-path logic (deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts) with no dashboard/browser-facing behavior.",
-    "verificationNotes": "Verification FAILED at test (478527ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/src/dashboard/frontend\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n\n ❯ |root| src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts (7 tests | 1 failed) 37ms\n     × reads active-run evidence asynchronously for recovery callers 7ms (retry x1)\n\n Test Files  153 passed (153)\n      Tests  1814 passed (1814)\n   Start at  08:38:59\n   Duration  27.35s (transform 4.22s, setup 12.83s, import 37.43s, tests 25.61s, environment 20.10s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-im4E09/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspace already up to date with main\n[prep] Workspac\n…(731 chars elided)…\nfeature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-IYZGFV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-IYZGFV/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
+    "updatedAt": "2026-08-05T12:47:14.011Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "63d419b952bb04353dd4a5864493e94151828311",
-    "lastVerifiedCommit": "80d42c27a501a1100274fa1d06676bbf40352982",
-    "reviewRequestedAt": "2026-08-05T11:03:38.697Z",
-    "reviewSpawnedAt": "2026-08-05T11:12:05.057Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
         "packages/contracts/src/events.ts",
@@ -955,10 +948,10 @@
       "byStage": {
         "implementation": {
           "anthropic/claude-fable-5": {
-            "input": 45,
-            "output": 21046,
-            "cacheRead": 5350803,
-            "cacheWrite": 70793
+            "input": 47,
+            "output": 22121,
+            "cacheRead": 5656019,
+            "cacheWrite": 72809
           }
         },
         "memory-extraction": {
@@ -1064,10 +1057,10 @@
       },
       "totals": {
         "anthropic/claude-fable-5": {
-          "input": 45,
-          "output": 21046,
-          "cacheRead": 5350803,
-          "cacheWrite": 70793
+          "input": 47,
+          "output": 22121,
+          "cacheRead": 5656019,
+          "cacheWrite": 72809
         },
         "anthropic/claude-haiku-4-5": {
           "input": 695119,
@@ -1095,8 +1088,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 685.1713916,
-        "pricingAsOf": "2026-08-05T12:43:02.944Z"
+        "usd": 685.5555776,
+        "pricingAsOf": "2026-08-05T12:47:14.024Z"
       }
     },
     "merges": [
