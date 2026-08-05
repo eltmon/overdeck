@@ -361,17 +361,18 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:46:24.895Z",
+  "updated": "2026-08-05T22:46:45.628Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "passed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T22:46:23.391Z",
+    "updatedAt": "2026-08-05T22:46:45.566Z",
+    "reviewNotes": "Agent re-review request (1/25): Addressed all review and verification findings; swept retired direct-convoy identifiers and made the legacy conflicts_since column inert.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
     "lastVerifiedCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
@@ -617,9 +618,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 9518670,
-            "output": 172269,
-            "cacheRead": 60306432,
+            "input": 9663139,
+            "output": 172812,
+            "cacheRead": 60694528,
             "cacheWrite": 0
           }
         },
@@ -657,24 +658,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 13118674,
-            "output": 891225,
-            "cacheRead": 384282624,
+            "input": 13120706,
+            "output": 891331,
+            "cacheRead": 384562176,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 31890594,
-          "output": 1301163,
-          "cacheRead": 502765568,
+          "input": 32037095,
+          "output": 1301812,
+          "cacheRead": 503433216,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 224.935914,
-        "pricingAsOf": "2026-08-05T22:46:23.441Z"
+        "usd": 225.478816,
+        "pricingAsOf": "2026-08-05T22:46:45.616Z"
       }
     },
     "merges": [
