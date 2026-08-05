@@ -627,6 +627,11 @@
       "reason": "feedback",
       "note": "[2026-08-05T07:44Z] verification-gate → FAILED — seq 2",
       "timestamp": "2026-08-05T07:44:14.054Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-05T08:01:21.636Z"
     }
   ],
   "feedback": [],
@@ -680,7 +685,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T08:01:20.847Z",
+  "updated": "2026-08-05T08:01:21.636Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
