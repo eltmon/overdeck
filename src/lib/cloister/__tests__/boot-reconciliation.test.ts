@@ -470,6 +470,36 @@ describe('boot reconciliation', () => {
     );
   });
 
+  // PAN-3547: a read/UI peer (OVERDECK_DISABLE_DEACON=1) must never assert boot
+  // ownership in shared state — a peer boot on 2026-08-04 stamped a record
+  // holding MIN-839/864/874 and the primary surfaced it with a live countdown.
+  it('never stamps a boot record from a peer dashboard (OVERDECK_DISABLE_DEACON=1)', () => {
+    vi.stubEnv('OVERDECK_DISABLE_DEACON', '1');
+    try {
+      mocks.agents = [
+        stoppedWorkAgent(testHome, 'agent-pan-2076', { workspace: workspacePath(testHome, 'workspace') }),
+      ];
+
+      const result = startBootReconciliation({ bootId: 'boot-peer', now: BASE_TIME });
+
+      expect(result).toEqual({
+        bootId: 'boot-peer',
+        graceDeadline: '2026-06-29T15:00:30.000Z',
+        candidateIds: [],
+        decision: 'hold_all',
+        timerArmed: false,
+      });
+      // The shared record is untouched: no boot id, no pending decision.
+      expect(getBootReconciliationState().bootId).toBeNull();
+      expect(getBootReconciliationState().decision).toBeNull();
+      expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+        'boot reconciliation skipped for boot-peer — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not write boot records (PAN-3547)',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   // PAN-3052: the boot dialog is the only surface on a deadline and expiry commits
   // the classified default, so an operator answering a different blocking question
   // must not lose the window. The extend door buys time; the cap keeps it bounded.

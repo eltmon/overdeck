@@ -25,7 +25,7 @@ import {
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
-import { spawn, execSync, exec } from 'child_process';
+import { spawn, execSync, exec, type ChildProcess } from 'child_process';
 import { promisify } from 'util';
 import net from 'net';
 import { Effect, Data } from 'effect';
@@ -678,6 +678,33 @@ export function getCliproxyClientEnv(): Record<string, string> {
 
 // ─── Async lifecycle (safe for dashboard server — no execSync) ─────────────────
 
+export async function waitForCliproxySpawn(
+  child: Pick<ChildProcess, 'once' | 'removeListener' | 'pid' | 'unref'>,
+): Promise<number> {
+  return new Promise<number>((resolve, reject) => {
+    const cleanup = () => {
+      child.removeListener('spawn', onSpawn);
+      child.removeListener('error', onError);
+    };
+    const onSpawn = () => {
+      cleanup();
+      if (!child.pid) {
+        reject(new Error('Failed to spawn cliproxy'));
+        return;
+      }
+      child.unref();
+      resolve(child.pid);
+    };
+    const onError = (error: Error) => {
+      cleanup();
+      reject(error);
+    };
+
+    child.once('spawn', onSpawn);
+    child.once('error', onError);
+  });
+}
+
 /** Check whether the cliproxy TCP port is accepting connections. */
 async function checkCliproxyPortTask(): Promise<boolean> {
   return new Promise((resolve) => {
@@ -740,21 +767,20 @@ async function startCliproxyTask(): Promise<void> {
   const config = getCliproxyConfigPath();
   const logPath = getCliproxyLogPath();
 
-  const { openSync } = await import('fs');
+  const { closeSync, openSync } = await import('fs');
   const logFd = openSync(logPath, 'a');
 
-  const child = spawn(bin, ['-config', config], {
-    detached: true,
-    stdio: ['ignore', logFd, logFd],
-    cwd: getCliproxyDir(),
-  });
-
-  if (!child.pid) {
-    throw new Error('Failed to spawn cliproxy');
+  try {
+    const child = spawn(bin, ['-config', config], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      cwd: getCliproxyDir(),
+    });
+    const pid = await waitForCliproxySpawn(child);
+    writeFileSync(getCliproxyPidPath(), String(pid));
+  } finally {
+    closeSync(logFd);
   }
-
-  writeFileSync(getCliproxyPidPath(), String(child.pid));
-  child.unref();
 }
 
 /** Restart cliproxy asynchronously. Safe for the event loop. */

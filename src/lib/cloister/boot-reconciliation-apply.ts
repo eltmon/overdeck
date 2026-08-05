@@ -47,6 +47,14 @@ export async function applyBootReconciliationDecision(
   opts: BootReconciliationApplyOptions = {},
 ): Promise<BootReconciliationApplyResult> {
   const origin = opts.origin ?? 'auto';
+  // PAN-3547: only the primary may act on a boot decision. A read/UI peer
+  // (OVERDECK_DISABLE_DEACON=1) that applies a decision would resume agents
+  // against the primary's drain posture — the decision itself is already in
+  // shared state and the primary's own machinery applies it.
+  if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+    logDeaconEventSync('applyBootReconciliationDecision: skipped — peer dashboard does not apply boot decisions (PAN-3547)');
+    return emptyBootReconciliationApplyResult();
+  }
   const decisionKey = bootReconciliationDecisionKey();
   if (!decisionKey) return emptyBootReconciliationApplyResult();
   if (appliedBootReconciliationDecisions.has(decisionKey)) {

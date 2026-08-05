@@ -75,6 +75,16 @@ export function startCliproxyWatchdog(): void {
   setInterval(() => void tick(), intervalMs);
 }
 
+/** Host dashboards supervise CLIProxy; read-only peer dashboards do not. */
+export function startCliproxyWatchdogForDashboard(
+  isPeerDashboard: boolean,
+  startWatchdog: () => void = startCliproxyWatchdog,
+): boolean {
+  if (isPeerDashboard) return false;
+  startWatchdog();
+  return true;
+}
+
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 const getCliproxyStatusRoute = HttpRouter.add(
