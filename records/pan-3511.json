@@ -695,22 +695,21 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T07:55:17.141Z",
+  "updated": "2026-08-05T08:01:18.831Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T07:55:14.786Z",
+    "updatedAt": "2026-08-05T08:01:18.786Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed sync-target-branch",
-    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - docs/PARKED-POPULATION.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
-    "lastVerifiedCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
+    "lastVerifiedCommit": "152565c99eb789dc0434cef9884716a094b12cb6",
     "reviewSpawnedAt": "2026-08-05T06:59:36.304Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -767,9 +766,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 389123,
-            "output": 163215,
-            "cacheRead": 65942,
+            "input": 398138,
+            "output": 165263,
+            "cacheRead": 66710,
             "cacheWrite": 0
           }
         },
@@ -859,18 +858,18 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 2584797,
-            "output": 119147,
-            "cacheRead": 68979200,
+            "input": 2590515,
+            "output": 119603,
+            "cacheRead": 70032896,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 389123,
-          "output": 163215,
-          "cacheRead": 65942,
+          "input": 398138,
+          "output": 165263,
+          "cacheRead": 66710,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -880,9 +879,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 25788327,
-          "output": 797833,
-          "cacheRead": 206039040,
+          "input": 25794045,
+          "output": 798289,
+          "cacheRead": 207092736,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -893,8 +892,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 515.0344972,
-        "pricingAsOf": "2026-08-05T07:55:17.033Z"
+        "usd": 515.338389,
+        "pricingAsOf": "2026-08-05T08:01:18.819Z"
       }
     },
     "merges": [
