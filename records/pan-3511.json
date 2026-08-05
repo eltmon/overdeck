@@ -695,18 +695,19 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T07:44:15.340Z",
+  "updated": "2026-08-05T07:44:17.653Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "failed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T07:44:13.617Z",
+    "updatedAt": "2026-08-05T07:44:14.041Z",
     "reviewNotes": "Agent re-review request (1/25): Fixed review issues",
+    "verificationNotes": "Sync with main FAILED — merge conflicts detected:\n\nMerge conflicts with main:\n  - docs/PARKED-POPULATION.md",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
     "lastVerifiedCommit": "e8840c4f28f445db550a0d2d2d41e9f56f46d135",
@@ -893,7 +894,7 @@
       },
       "costAtCloseOut": {
         "usd": 513.0331355,
-        "pricingAsOf": "2026-08-05T07:44:15.333Z"
+        "pricingAsOf": "2026-08-05T07:44:17.648Z"
       }
     },
     "merges": [
