@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:42:56.806Z",
+  "updated": "2026-08-05T15:43:19.871Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 8,
-    "claims": {},
+    "sequence": 9,
+    "claims": {
+      "drop-fork-agent-state-fields": {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 1440051,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:43:19.871Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -132,6 +140,7 @@
     "drop-fork-observability-patrols": "completed",
     "drop-fork-observability-patrols.drop-fork-observability-patrols.ac1": "completed",
     "drop-fork-observability-patrols.drop-fork-observability-patrols.ac2": "completed",
-    "drop-fork-observability-patrols.drop-fork-observability-patrols.ac3": "completed"
+    "drop-fork-observability-patrols.drop-fork-observability-patrols.ac3": "completed",
+    "drop-fork-agent-state-fields": "running"
   }
 }
