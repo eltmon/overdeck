@@ -406,22 +406,22 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:29:24.598Z",
+  "updated": "2026-08-05T23:32:57.181Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T23:29:23.186Z",
+    "updatedAt": "2026-08-05T23:32:57.133Z",
     "reviewNotes": "Agent re-review request (2/25): Fixed anchor-match reviewed-head persistence, current-run verdict-of-record convergence, and recommendation-only sweeper state; updated the head-anchor audit.",
     "testNotes": "typecheck PASSED. lint PASSED (exit 0). npm test FAILED: tests/unit/lib/head-anchor-write-sites.test.ts fails deterministically standalone - src/lib/cloister/review-verdict-writer.ts has a second write site for 'reviewedAtCommit: input.evidenceHead as HeadAnchor' (lines 162 and 235, 47 sites found vs 46 expected) not reflected in the test's ALLOWED_WRITE_SITES inventory. Root cause: xBRIEF item preserve-test-gate-on-same-head-converge (commit fa73ec8b29) added the second write site but its files_scope excluded tests/unit/lib/head-anchor-write-sites.test.ts; sibling item reconcile-reviewing-rows-through-write-door (commit abb3344b27) was scoped to that test and landed earlier, so the allowlist was never updated - a coordination gap between two xBRIEF items. Two full npm test runs also showed a shifting set of unrelated failures (beforeEach Hook-timed-out-in-5000ms in setupOverdeckTestDb across ~9 files, plus review-verdict-writer.test.ts/stall-sweeper.test.ts assertion mismatches) that all passed cleanly (25/25, 55/55) when re-run in isolation - consistent with resource contention from ~13 concurrently running agents on this machine, excluded from the verdict. The head-anchor-write-sites.test.ts failure is the real, deterministic, in-scope blocker.",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
-    "lastVerifiedCommit": "9ef214d03c6255159d4607d16e1f2ba956c46689",
+    "lastVerifiedCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
     "reviewSpawnedAt": "2026-08-05T23:29:23.186Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -664,9 +664,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 14593794,
-            "output": 297390,
-            "cacheRead": 96278528,
+            "input": 15937048,
+            "output": 308386,
+            "cacheRead": 99929600,
             "cacheWrite": 0
           }
         },
@@ -721,9 +721,9 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 37496128,
-          "output": 1519999,
-          "cacheRead": 570571264,
+          "input": 38839382,
+          "output": 1530995,
+          "cacheRead": 574222336,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -734,8 +734,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 260.995295,
-        "pricingAsOf": "2026-08-05T23:29:23.207Z"
+        "usd": 265.431145,
+        "pricingAsOf": "2026-08-05T23:32:57.167Z"
       }
     },
     "merges": [
