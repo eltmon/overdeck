@@ -2664,14 +2664,12 @@ export async function runPatrol(): Promise<PatrolResult> {
   actions.push(...stuckRemediationActions);
   for (const a of stuckRemediationActions) addLog('action', a, state.patrolCycle);
 
-  // PAN-3485: the stall sweeper — walk the parked population and execute each
-  // orbit's autonomous un-park action (resume-with-feedback, merge re-eval,
-  // UAT re-drive, zombie reap, idle nudge→stop). Operator gates are respected,
-  // never overridden — re-surfaced on a TTL instead. Emits sweep.* events.
+  // PAN-3485: the stall sweeper observes the parked population and records
+  // recommendations. It never un-parks work; operator gates remain untouched.
   try {
-    const sweepActions = await (await import('./stall-sweeper.js')).runStallSweeperPatrol();
-    actions.push(...sweepActions);
-    for (const a of sweepActions) addLog('action', a, state.patrolCycle);
+    const sweepRecommendations = await (await import('./stall-sweeper.js')).runStallSweeperPatrol();
+    actions.push(...sweepRecommendations);
+    for (const recommendation of sweepRecommendations) addLog('info', recommendation, state.patrolCycle);
   } catch (err: any) {
     console.warn(`[deacon] stall sweeper patrol failed: ${err?.message ?? err}`);
     addLog('warn', `Stall sweeper patrol failed: ${err?.message ?? err}`, state.patrolCycle);

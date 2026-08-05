@@ -522,16 +522,16 @@ async function fetchParked(): Promise<ParkedResponse> {
 
 /**
  * The parked population for the God View cast (PAN-3490). Fetched once on
- * mount; refreshed ONLY by real sweep.* domain events (the sweeper emits
- * sweep.scan on population change, sweep.unparked on release). No polling
- * interval — the honesty contract forbids fabricated motion, and a timer
- * refetch would animate nothing that didn't happen.
+ * mount; refreshed only by sweeper observation events, including sweep.scan
+ * when the population changes. No polling interval — the honesty contract
+ * forbids fabricated motion, and a timer refetch would animate nothing that
+ * happened.
  */
 export function useParked(): ParkedResponse | null {
   const queryClient = useQueryClient();
   useEffect(() => {
     const unsubscribe = subscribeDashboardDomainEvents((events) => {
-      if (events.some((event) => event.type.startsWith('sweep.'))) {
+      if (events.some((event) => event.type === 'sweep.scan')) {
         void queryClient.invalidateQueries({ queryKey: ['parked-population'] });
       }
     });
