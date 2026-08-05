@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T17:11:01.154Z",
+  "updated": "2026-08-05T17:15:49.948Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 13,
-    "claims": {
-      "drop-branch-invalidation-sweep": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 2799933,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T17:11:01.154Z"
-      }
-    },
+    "sequence": 14,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -126,6 +118,16 @@
         "itemId": "drop-selective-rereview-selection",
         "outcome": "completed",
         "releasedAt": "2026-08-05T17:10:46.866Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 2799933,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:11:01.154Z",
+        "itemId": "drop-branch-invalidation-sweep",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T17:15:49.947Z"
       }
     ],
     "statusReasons": {
@@ -171,6 +173,9 @@
     "drop-selective-rereview-selection.drop-selective-rereview-selection.ac2": "completed",
     "drop-selective-rereview-selection.drop-selective-rereview-selection.ac3": "completed",
     "drop-selective-rereview-selection.drop-selective-rereview-selection.ac4": "completed",
-    "drop-branch-invalidation-sweep": "running"
+    "drop-branch-invalidation-sweep": "completed",
+    "drop-branch-invalidation-sweep.drop-branch-invalidation-sweep.ac1": "completed",
+    "drop-branch-invalidation-sweep.drop-branch-invalidation-sweep.ac2": "completed",
+    "drop-branch-invalidation-sweep.drop-branch-invalidation-sweep.ac3": "completed"
   }
 }
