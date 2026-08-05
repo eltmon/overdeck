@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T19:24:23.801Z",
+  "updated": "2026-08-05T19:26:59.233Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 32,
-    "claims": {
-      "preserve-test-gate-on-same-head-converge": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 376273,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T19:24:23.801Z"
-      }
-    },
+    "sequence": 33,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -217,6 +209,16 @@
         "itemId": "reconcile-reviewing-rows-through-write-door",
         "outcome": "completed",
         "releasedAt": "2026-08-05T19:24:06.931Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 376273,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T19:24:23.801Z",
+        "itemId": "preserve-test-gate-on-same-head-converge",
+        "outcome": "completed",
+        "releasedAt": "2026-08-05T19:26:59.233Z"
       }
     ],
     "statusReasons": {
@@ -303,6 +305,9 @@
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac2": "completed",
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac3": "completed",
     "reconcile-reviewing-rows-through-write-door.reconcile-reviewing-rows-through-write-door.ac4": "completed",
-    "preserve-test-gate-on-same-head-converge": "running"
+    "preserve-test-gate-on-same-head-converge": "completed",
+    "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac1": "completed",
+    "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac2": "completed",
+    "preserve-test-gate-on-same-head-converge.preserve-test-gate-on-same-head-converge.ac3": "completed"
   }
 }
