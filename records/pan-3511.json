@@ -770,7 +770,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:04:24.699Z",
+  "updated": "2026-08-05T10:04:25.376Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "pending",
@@ -780,8 +780,8 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:04:23.397Z",
-    "reviewNotes": "Headless quick-review artifacts cannot corroborate matching stale journal verdicts because optional head evidence is required",
+    "updatedAt": "2026-08-05T10:04:24.145Z",
+    "reviewNotes": "Agent re-review request (4/25): Fixed review issues",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "59501a371249fe5dfaf36a0c110b989086a3e0ee",
     "lastVerifiedCommit": "09638451ffa2dc04aed07d6d8738df79e2469514",
@@ -968,7 +968,7 @@
       },
       "costAtCloseOut": {
         "usd": 606.2715071,
-        "pricingAsOf": "2026-08-05T10:04:23.427Z"
+        "pricingAsOf": "2026-08-05T10:04:25.371Z"
       }
     },
     "merges": [
