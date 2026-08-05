@@ -759,7 +759,6 @@ export async function appendSessionEntry(
     queueIssueRecordCommit(project, issueId, recordPath);
   }
 }
-
 /** Append a feedback entry to the per-issue record. */
 export async function appendFeedbackEntry(
   project: ProjectConfig,
@@ -768,6 +767,7 @@ export async function appendFeedbackEntry(
   opts: WriteStatusOverrideOptions = {},
 ): Promise<void> {
   const record = await ensureIssueRecord(project, issueId);
+  if (JSON.stringify(record.feedback?.at(-1)) === JSON.stringify(entry)) return;
   record.feedback = [...(record.feedback ?? []), entry];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   if (opts.autoCommit !== false) {
@@ -858,7 +858,6 @@ export function appendSessionEntrySync(
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
 }
-
 /** Append a feedback entry to the per-issue record (sync). */
 export function appendFeedbackEntrySync(
   project: ProjectConfig,
@@ -866,6 +865,7 @@ export function appendFeedbackEntrySync(
   entry: ContinueFeedbackEntry,
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
+  if (JSON.stringify(record.feedback?.at(-1)) === JSON.stringify(entry)) return;
   record.feedback = [...(record.feedback ?? []), entry];
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
