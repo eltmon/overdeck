@@ -87,6 +87,7 @@
       "src/cli/commands/review-subcommands.ts",
       "src/dashboard/frontend/src/App/hooks/useDesktopActivityNotifications.ts",
       "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+      "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
       "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
       "src/dashboard/server/routes/admin.ts",
@@ -130,12 +131,13 @@
       "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
       "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
       "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
-      "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+      "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
     "declaredScopeUntouched": [
       "src/lib/cloister/__tests__/branch-invalidation.test.ts",
       "src/lib/cloister/stall-sweeper-state.ts",
-      "src/lib/pan-dir/verdict-restore.ts",
       "tests/unit/lib/cloister/review-verdict-writer.test.ts"
     ],
     "declaredScope": [
@@ -223,6 +225,7 @@
       "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
       "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
       "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+      "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
       "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
       "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
       "src/dashboard/server/routes/admin.ts",
@@ -281,6 +284,7 @@
       "src/lib/pan-dir/pipeline-verdict-merge.ts",
       "src/lib/pan-dir/record.ts",
       "src/lib/pan-dir/records.ts",
+      "src/lib/pan-dir/verdict-restore.ts",
       "src/lib/parked/__tests__/resolver.test.ts",
       "src/lib/parked/resolver.ts",
       "src/lib/pipeline-notifier.ts",
@@ -298,12 +302,14 @@
       "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
       "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts",
-      "tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
+      "tests/unit/lib/overdeck/agent-discovery-columns.test.ts",
+      "tests/unit/lib/overdeck/review-status-sync.test.ts",
+      "tests/unit/lib/pan-dir/verdict-restore.test.ts"
     ],
-    "recordedAt": "2026-08-05T20:54:21.371Z"
+    "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:30:27.315Z",
+  "updated": "2026-08-05T21:30:38.960Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "blocked",
