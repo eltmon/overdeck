@@ -808,7 +808,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T10:07:32.250Z",
+  "updated": "2026-08-05T10:07:38.299Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -818,10 +818,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T10:07:31.583Z",
+    "updatedAt": "2026-08-05T10:07:38.288Z",
     "reviewNotes": "Headless workspace artifacts can replay a stale approval without immutable or authenticated head evidence",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "59501a371249fe5dfaf36a0c110b989086a3e0ee",
+    "reviewedAtCommit": "09638451ffa2dc04aed07d6d8738df79e2469514",
     "lastVerifiedCommit": "09638451ffa2dc04aed07d6d8738df79e2469514",
     "reviewSpawnedAt": "2026-08-05T10:04:24.727Z",
     "scopeDrift": {
@@ -872,24 +872,6 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
-      },
-      "correctness": {
-        "status": "passed",
-        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
-      },
-      "performance": {
-        "status": "passed",
-        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
-      },
-      "requirements": {
-        "status": "passed",
-        "atCommit": "09638451ffa2dc04aed07d6d8738df79e2469514"
-      }
     }
   },
   "closeOut": {
@@ -1024,7 +1006,7 @@
       },
       "costAtCloseOut": {
         "usd": 624.2118942,
-        "pricingAsOf": "2026-08-05T10:07:31.608Z"
+        "pricingAsOf": "2026-08-05T10:07:38.294Z"
       }
     },
     "merges": [
