@@ -371,18 +371,17 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T22:18:52.000Z",
+  "updated": "2026-08-05T22:19:58.393Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z",
-    "updatedAt": "2026-08-05T22:18:51.980Z",
-    "reviewNotes": "the review-status write door still rewrites the retired `conflicts_since` column",
+    "updatedAt": "2026-08-05T22:19:58.354Z",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
     "lastVerifiedCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
@@ -628,9 +627,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 9397472,
-            "output": 171423,
-            "cacheRead": 59786240,
+            "input": 9518670,
+            "output": 172269,
+            "cacheRead": 60306432,
             "cacheWrite": 0
           }
         },
@@ -677,15 +676,15 @@
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 31425929,
-          "output": 1269616,
-          "cacheRead": 492107776,
+          "input": 31547127,
+          "output": 1270462,
+          "cacheRead": 492627968,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 220.636579,
-        "pricingAsOf": "2026-08-05T22:18:51.991Z"
+        "usd": 221.082311,
+        "pricingAsOf": "2026-08-05T22:19:58.388Z"
       }
     },
     "merges": [
