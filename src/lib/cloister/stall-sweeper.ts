@@ -224,6 +224,13 @@ interface ReportActions {
  * Build the per-orbit recommendation. This is the ONLY thing the sweeper does
  * with a row: describe the evidence, name the remedy, emit both. There is no
  * action door — see the file-header law.
+ *
+ * Recommendations always name the CANONICAL existing door (the same machinery
+ * the deacon/operator uses — pan resume/start/tell/unstick/review restart/
+ * sync-main/done/close), never a sweeper-invented path. A stall that keeps
+ * recurring across an episode is a substrate bug by definition: the
+ * recommendation says so, so the flywheel's substrate intake files why it
+ * keeps parking instead of the symptom being swept forever.
  */
 function reportRow(
   row: ParkedRow,
@@ -233,9 +240,13 @@ function reportRow(
   outcome: ScanOutcome,
 ): boolean {
   const { issueId, orbit } = row;
+  const recurrence = state?.actionCount ?? 0;
+  const substrateNote = recurrence >= 1
+    ? ` This stall has recurred (${recurrence + 1} sweeps this episode) — that is a substrate bug: file why ${issueId} keeps parking here (flywheel substrate intake), don't just remedy the symptom.`
+    : '';
   const recommend = (recommendation: string, evidence: Record<string, unknown> = {}) => {
-    actions.emitEvent('sweep.recommendation', { issueId, orbit, recommendation, ...evidence });
-    actions.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper recommends: ${recommendation} — ${row.parkReason}. ${NO_ACTION_TRAILER}` });
+    actions.emitEvent('sweep.recommendation', { issueId, orbit, recommendation, recurring: recurrence >= 1, ...evidence });
+    actions.emitActivity({ level: 'warn', issueId, message: `🧹 sweeper recommends: ${recommendation} — ${row.parkReason}.${substrateNote} ${NO_ACTION_TRAILER}` });
     outcome.actions.push(`${issueId} (${orbit}) recommended: ${recommendation}`);
   };
 
@@ -243,34 +254,34 @@ function reportRow(
     case 'zombie-session': {
       const agentId = String(row.details?.agentId ?? `agent-${issueId.toLowerCase()}`);
       const live = actions.isAgentLive(agentId);
-      recommend(`reap zombie session ${agentId} — ${issueId} is merged/closed`, { agentId, sessionCurrentlyLive: live });
+      recommend(`reap zombie session ${agentId} via the existing door (pan close ${issueId} owns merged/closed teardown; the reaper is the backstop)`, { agentId, sessionCurrentlyLive: live });
       return true;
     }
 
     case 'merge-failed': {
-      recommend(`reset ${issueId}'s merge for re-evaluation`);
+      recommend(`reset ${issueId}'s merge for re-evaluation via pan review resync ${issueId}`);
       return true;
     }
 
     case 'uat-failed': {
       const notes = typeof row.details?.uatNotes === 'string' ? row.details.uatNotes : 'UAT failed — see the UAT panel for details';
-      recommend(`re-drive ${issueId} for UAT rework`, { uatNotes: notes.slice(0, 400) });
+      recommend(`re-drive ${issueId} for UAT rework via pan resume agent-${issueId.toLowerCase()} with the UAT feedback (pan start ${issueId} if the agent is stopped)`, { uatNotes: notes.slice(0, 400) });
       return true;
     }
 
     case 'conflicts': {
-      recommend(`run pan sync-main ${issueId} and resolve the branch conflicts, then pan done ${issueId}`);
+      recommend(`resolve ${issueId}'s branch conflicts via pan sync-main ${issueId}, then pan done ${issueId}`);
       return true;
     }
 
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
       if (reason === 'review_infrastructure_failure') {
-        recommend(`clear ${issueId}'s infra-failure stuck flag and re-dispatch the review`);
+        recommend(`clear ${issueId}'s infra-failure stuck flag and re-dispatch the review via pan unstick ${issueId} && pan review restart ${issueId}`);
         return true;
       }
       if (reason === 'feedback_delivery_needs_you' || reason === 'verification_stuck') {
-        recommend(`resume ${issueId} rework from the pending feedback`);
+        recommend(`resume ${issueId} rework from the pending feedback via pan resume agent-${issueId.toLowerCase()} (feedback is in .pan/feedback)`);
         return true;
       }
       // Unknown / dead-end stuck flavors are operator-owned — re-surface on TTL.
@@ -298,8 +309,8 @@ function reportRow(
       });
       recommend(
         previouslyReported
-          ? `stop or resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
-          : `nudge ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
+          ? `stop or resume ${agentId} via pan kill ${agentId} / pan resume ${agentId} — still idle ${Math.round(lastActivity / 60)}h after a prior recommendation`
+          : `nudge ${agentId} via pan tell ${agentId} — idle ${Math.round(lastActivity / 60)}h with no pipeline stage owning its next move`,
         { agentId, idleMinutes: lastActivity, live: actions.isAgentLive(agentId) },
       );
       return false; // the recommendation records its own row state above
