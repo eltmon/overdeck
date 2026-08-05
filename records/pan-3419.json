@@ -513,7 +513,7 @@
     "recordedAt": "2026-08-05T13:06:10.698Z"
   },
   "created": "2026-08-01T14:51:54.022Z",
-  "updated": "2026-08-05T15:43:09.983Z",
+  "updated": "2026-08-05T16:11:08.920Z",
   "pipeline": {
     "issueId": "PAN-3419",
     "reviewStatus": "passed",
@@ -525,7 +525,7 @@
     "mergeStep": "merged",
     "releaseStatus": "skipped",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T15:43:06.495Z",
+    "updatedAt": "2026-08-05T16:11:08.805Z",
     "testNotes": "HEAD=747f5e3293e5ab8cec632edcfb0678e3cf7250bf (a 'chore: sync PAN-3419 with origin/main' merge landed AFTER the prior recorded test evidence, which was for the pre-merge SHA 3b7b8927148 -- that merge touched CommandDeck/index.tsx, projectsData.ts, ConversationList.tsx, ConversationRow.tsx, ConversationActionMenu.tsx, added src/cli/commands/conversations/move.ts (PAN-1577), so all gates were re-run fresh against current HEAD rather than trusting the stale evidence). bun install picked up the merge's new files cleanly. npm run typecheck: clean (root tsc, hooks, evals, dashboard-ratchet 54 known/0 new, frontend-ratchet 0 known/0 new). npm run lint: all 19 gates passed (eslint, effect, permissions, state-writes/paths, overdeck-boundaries, pipeline-membership, workspace-doors, park-exits, agent-dir-removal, skills, slash-commands, prompts, prompt-trailer, file-size, source-introspection, no-coderabbit-merge-gate, circular-deps 76 baselined/0 new, ratchet-audit, quarantine-audit). Targeted PAN-3419 test files (the 9 files this xBRIEF's work items name): npx vitest run conversation-project-key.test.ts conversation-fork-project.test.ts conversation-project-cwd.test.ts handoff.test.ts fork-client.test.ts palette.test.ts conversations.test.ts title-sources.test.ts projects-version-sync.test.ts -> 91/91 passed. Frontend full `--changed main` suite: 161 files / 1894 tests, all passed (larger than the pre-merge run's 154/1819, confirming the merge's new/changed frontend files -- including projectsData.test.ts and ForkModal.test.tsx -- were picked up and pass). Full root `CI=1 npm test`: 1397/1408 files passed, 11 failed (13311/13322 tests passed, 50 skipped). All 11 failing files re-run in isolation (maxWorkers=1, no contention) -> 11/11 files, 56/56 tests PASSED clean -- confirming the failures were 'Hook timed out in 5000ms' environmental flakes from this machine running 20+ concurrent agents, not real regressions. None of the 11 flaky files are in PAN-3419's declared or actual changed-file scope (they cover workspace-scratch-isolated, agents-state-db, idle-stack-reaper, state-mirror, agent-discovery-columns, workspaces/rebuild+relocate, costs/unknown-backfill, conversations/correlator, memory/workspace-capture, conversations/scan -- all unrelated subsystems).",
     "uatNotes": "UAT required: FR-6/7/8 of the PRD are observable dashboard behavior (CommandDeck grouping, Fork/Handoff modal Project select, command-palette routing). Used the workspace's own already-running devcontainer stack (overdeck-feature-pan-3419-{server,frontend,dev}-1, docker compose, live source mount) rather than a peer host process -- verified the server container's checked-out commit (747f5e3293...) and dist/dashboard/server.js build timestamp (13:25 UTC) both matched current HEAD before trusting it. Never touched the host dashboard. The container's OVERDECK_HOME is isolated per the single-deacon-invariant (no host ~/.overdeck mount), so it started with zero registered projects/conversations -- conv 1827 (the issue's live repro) lives only in the host's runtime DB and isn't reachable from this container. To exercise the actual mechanism rather than block on that, registered a synthetic project ('uat-pan-3419-project' -> /workspaces/overdeck) via the real write door (registerProjectFromPath, called in-container via bun -e, mirroring the pattern the work agent used for the conv-1827 cleanup item) and seeded a conversation row (createConversation, same write door, no process spawn) with cwd=/tmp/isolated-uat-cwd (outside every registered project path) and an explicit projectKey='uat-pan-3419-project' -- i.e. conv 1827's exact scenario reproduced with disposable data. (One earlier misstep: a first attempt went through POST /api/conversations, which resolves cwd from the project for a *new* conversation by design and also spawned a real tmux/Claude session -- immediately stopped that session via POST .../stop before any real cost accrued, then re-did the seed via the direct DB writer, which spawns nothing.) Drove the container's own dashboard (https://feature-pan-3419.overdeck.localhost) with Playwright MCP: (1) FR-6 -- navigated to the uat-pan-3419-project deck; both the synthetic conversation and an incidental one grouped correctly under it (Conversations: 2, page header '# uat-pan-3419-project', not 'Unknown project') despite the synthetic conversation's cwd sitting outside the registered project's path -- confirms explicit-first grouping overriding cwd containment, live. (2) FR-7 -- opened the conversation's action menu -> 'Hand off to new conversation'; the modal renders a Project <select> defaulted to 'Same as source (uat-pan-3419-project)' with the registered project as the other option; selected it and confirmed the choice updates, then clicked Cancel without confirming (would have spawned a second real billed conversation). (3) FR-8 -- the live command palette (Ctrl+K) searches transcript content via searchConversationChunks, which my synthetic conversation has none of (no real Claude session ever ran against it), so no palette hit was produced for it; direct curl to /api/palette/search confirmed the route runs cleanly on this commit with no server error. The underlying explicit-first resolution primitive that FR-8 depends on (toPaletteConversationHit consulting conversation.projectKey before the cwd-encoded fallback) is the identical mechanism just proven live under FR-6, and is covered end-to-end by the passing palette.test.ts unit suite (row with project_key routes to that project's deck identifier despite a foreign/absent cwd match; NULL project_key falls back to cwd-encoded derivation) -- both cases included in the 91/91 targeted-test pass above. Console errors seen throughout (PostHog missing token, intermittent 403s on /api/conversations, /api/conversations/pending-input, /api/fs/list-dirs) all trace to pre-existing dashboard-auth/CSRF session-cookie behavior in this containerized environment -- confirmed via `git diff main...HEAD -- src/dashboard/server/routes/conversations.ts` that PAN-3419's own commits never touched that route's auth gating, and dashboard-auth.ts is outside this issue's declared and actual file scope. Stopped the one accidentally-spawned real conversation session immediately; the rest of the synthetic data lives only in the disposable container's isolated OVERDECK_HOME and never reached the host.",
     "conflictsSince": {
@@ -627,7 +627,9 @@
         "tests/unit/lib/projects-version-sync.test.ts"
       ],
       "recordedAt": "2026-08-05T13:06:10.698Z"
-    }
+    },
+    "closedOut": true,
+    "closedOutAt": "2026-08-05T16:11:08.805Z"
   },
   "closeOut": {
     "usage": {
@@ -767,7 +769,88 @@
     "merges": [
       "https://github.com/eltmon/overdeck/pull/3435"
     ],
-    "ranOn": "eltmon-z790"
+    "ranOn": "eltmon-z790",
+    "dodGate": {
+      "evaluatedAt": "2026-08-05T16:11:08.914Z",
+      "rows": [
+        {
+          "id": "review",
+          "num": 1,
+          "title": "Review passed",
+          "expected": "reviewStatus: passed, or tracker-closed with landed work and no negative review verdict",
+          "observed": "reviewStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "tests",
+          "num": 2,
+          "title": "Tests passed",
+          "expected": "testStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "testStatus: passed",
+          "status": "pass"
+        },
+        {
+          "id": "verification",
+          "num": 3,
+          "title": "Verification green on the branch",
+          "expected": "verificationStatus: passed, or tracker-closed with landed work (negative verdict requires main verification pass)",
+          "observed": "verificationStatus: passed at 747f5e3293e5ab8cec632edcfb0678e3cf7250bf",
+          "status": "pass"
+        },
+        {
+          "id": "merged",
+          "num": 4,
+          "title": "Merged to main",
+          "expected": "PR merged on the forge (feature or strike head), or branch work contained in main (non-PR landing)",
+          "observed": "Merge specialist confirmed merge completed; PR #3435 MERGED at 2026-08-05T15:42:26Z",
+          "status": "pass",
+          "mergedAt": "2026-08-05T15:42:26Z",
+          "mergeCommit": "f69486a9c618306779df8a15b6c9a555974c503a"
+        },
+        {
+          "id": "post-merge",
+          "num": 5,
+          "title": "Post-merge lifecycle ran",
+          "expected": "agents paused, workspace stack stopped, and verifying-on-main label applied",
+          "observed": "canonical state: verifying_on_main; no running work/planning agents",
+          "status": "pass"
+        },
+        {
+          "id": "main-verify",
+          "num": 6,
+          "title": "Verified on main",
+          "expected": "merged commit verified on main",
+          "observed": "9 check-runs concluded successfully on f69486a9c618306779df8a15b6c9a555974c503a",
+          "status": "pass"
+        },
+        {
+          "id": "ship",
+          "num": 7,
+          "title": "Version strings propagated",
+          "expected": "every declared version_sync.expect path reports the batch version",
+          "observed": "project declares no version_sync; ship step not applicable",
+          "status": "skip"
+        },
+        {
+          "id": "deploy",
+          "num": 8,
+          "title": "Deployed",
+          "expected": "live server build includes the merged commit",
+          "observed": "build commit f69486a9 contains merge f69486a9",
+          "status": "pass"
+        },
+        {
+          "id": "teardown",
+          "num": 9,
+          "title": "Close-out teardown verified",
+          "expected": "workspace and configured branches removed, planning archived, issue closed, and Docker network removed",
+          "overridable": false,
+          "status": "pass",
+          "observed": "No tmux sessions found; No shadow state found; No legacy planning directory found; No strike worktree found; Cleaned 9 agent state directories (13 transcript files preserved); No strike branch strike/pan-3419 found; Pruned 599 checkpoint ref(s) for agent-pan-3419, planning-pan-3419, strike-pan-3419; No specialist registry entries for PAN-3419"
+        }
+      ],
+      "accepted": []
+    }
   },
   "harness": "claude-code",
   "model": "gpt-5.6-terra",
