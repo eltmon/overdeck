@@ -22,6 +22,7 @@ import { dirname } from 'path';
 
 import {
   buildConvoyPrompt,
+  buildReviewRolePrompt,
   handleReviewDiscoveryReady,
   isReviewSessionForIssue,
   killAllReviewerSessions,
@@ -1423,3 +1424,21 @@ describe('dispatch failure reviewStatus regression', () => {
     expect(pendingMatches!.length).toBeGreaterThanOrEqual(4);
   });
 });
+
+describe('buildReviewRolePrompt — stale-signal guard (PAN-3549)', () => {
+  it('teaches the synthesis parent to discard replayed signals from dead attempts', () => {
+    const prompt = buildReviewRolePrompt({
+      issueId: 'PAN-1059',
+      branch: 'feature/pan-1059',
+      workspace: '/tmp/ws',
+      reviewDir: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef',
+      runId: 'agent-pan-1059-review-deadbeef',
+      contextManifestPath: '/tmp/ws/.pan/review/agent-pan-1059-review-deadbeef/context.json',
+    });
+    expect(prompt).toContain('STALE-SIGNAL GUARD (PAN-3549)');
+    expect(prompt).toContain('stat -c %y <manifest path>');
+    expect(prompt).toContain('discard any signal whose deadline is older');
+    expect(prompt).toContain('Run ID: agent-pan-1059-review-deadbeef');
+  });
+});
+

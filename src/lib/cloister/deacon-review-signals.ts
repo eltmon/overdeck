@@ -10,7 +10,7 @@ import { getReviewStatusSync, setReviewStatusSync } from '../review-status.js';
 import type { HeadAnchor } from '../git-utils.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
-import { capturePane, isPaneDead, killSession, listSessionNames, sessionExists, sessionExistsSync } from '../tmux.js';
+import { capturePane, isPaneDead, killSession, listSessionNames, listSessions, sessionExists, sessionExistsSync } from '../tmux.js';
 import { applyCodexAuthBurnFlag, isCodexAuthRouted, paneShowsCodexAuthBurn } from '../codex-auth.js';
 import { extractMarkdownSection, findBlockingFindings } from '../review-findings.js';
 import { getAgentEffectiveLastActivityMs } from './agent-idle.js';
@@ -291,6 +291,14 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     return actions;
   }
 
+  // PAN-3549: session-created index for the stale-deadline guard below. One
+  // probe up front; if it fails the guard stays off (legacy behavior).
+  let sessionCreatedMsByName = new Map<string, number>();
+  try {
+    const sessions = await Effect.runPromise(listSessions());
+    sessionCreatedMsByName = new Map(sessions.map((s) => [s.name, s.created.getTime()]));
+  } catch { /* liveness probe failure — guard disabled this sweep */ }
+
   const reviewStates: AgentState[] = [];
 
   for (const agentId of agentDirs) {
@@ -343,6 +351,29 @@ export async function monitorReviewConvoySignals(): Promise<string[]> {
     // delivers REVIEWER_READY); Deacon is the backup for when that didn't fire.
     const reviewerSessionAlive = (await Effect.runPromise(sessionExists(agentId)).catch(() => false))
       && !(await Effect.runPromise(isPaneDead(agentId)).catch(() => true));
+
+    // PAN-3549: a deadline older than the lane's CURRENT tmux session belongs
+    // to a dead attempt — run ids are content-derived (head8), so a re-dispatch
+    // on the same HEAD inherits the previous attempt's monitor state, and
+    // timing out on it kills the fresh lane mid-resume (retryReviewer kills the
+    // live session first) while the stale signal replays into the resumed
+    // parent as a phantom "infrastructure failure" verdict (PAN-3511,
+    // 2026-08-04). The live session is the oracle: clear the stale monitor
+    // state through the state door and let the new attempt run.
+    if (reviewerSessionAlive && Number.isFinite(deadlineMs)) {
+      const sessionCreatedMs = sessionCreatedMsByName.get(agentId);
+      if (sessionCreatedMs !== undefined && sessionCreatedMs > deadlineMs) {
+        const staleDeadline = state.reviewDeadlineAt;
+        delete state.reviewMonitorSignaled;
+        delete state.reviewRetryAttempt;
+        delete state.reviewDeadlineAt;
+        try {
+          saveAgentStateSync(state);
+        } catch { /* best-effort — the next sweep re-evaluates */ }
+        logDeaconEventSync(`monitorReviewConvoySignals: ${agentId} deadline ${staleDeadline} predates its live session — cleared stale monitor state (PAN-3549)`);
+        continue;
+      }
+    }
 
     // Startup grace: give the session time to come up before "gone" reads as death.
     const REVIEWER_STARTUP_GRACE_MS = 90_000;

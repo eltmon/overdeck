@@ -112,7 +112,7 @@ async function deriveReviewRunHead8(issueId: string, workspace: string): Promise
   }
 }
 
-function buildReviewRolePrompt(opts: {
+export function buildReviewRolePrompt(opts: {
   issueId: string;
   workspace: string;
   branch: string;
@@ -196,6 +196,15 @@ function buildReviewRolePrompt(opts: {
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
     'wastes tokens reviewing nothing.',
+    '',
+    'STALE-SIGNAL GUARD (PAN-3549): terminal signals from a dead prior attempt of',
+    'this same branch can replay into your session when you resume — every signal',
+    'carries its deadline in its text. A signal is current only if its deadline is',
+    "NEWER than this dispatch's context manifest. Before counting any",
+    'REVIEWER_TIMEOUT or REVIEWER_FAILED signal, compare: run',
+    '`stat -c %y <manifest path>` and discard any signal whose deadline is older.',
+    'Stale signals describe lanes that no longer exist; the current lanes are',
+    'still running and their signals arrive later.',
     '',
     `Once you have all ${inScope.length} terminal signal(s), follow roles/review.md exactly to`,
     'read the reports (including any carried-forward stubs), synthesize the verdict,',
