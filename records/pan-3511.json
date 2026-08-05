@@ -524,10 +524,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:18:15.476Z",
+  "updated": "2026-08-05T02:18:20.285Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "pending",
+    "reviewStatus": "reviewing",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -535,12 +535,12 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:18:13.150Z",
+    "updatedAt": "2026-08-05T02:18:14.039Z",
     "reviewNotes": "Agent re-review request (12/25): Fixed lint",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
-    "reviewSpawnedAt": "2026-08-04T22:54:43.249Z"
+    "reviewSpawnedAt": "2026-08-05T02:18:14.039Z"
   },
   "closeOut": {
     "usage": {
@@ -654,7 +654,7 @@
       },
       "costAtCloseOut": {
         "usd": 325.313694,
-        "pricingAsOf": "2026-08-05T02:18:14.656Z"
+        "pricingAsOf": "2026-08-05T02:18:20.274Z"
       }
     },
     "merges": [
@@ -663,7 +663,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
