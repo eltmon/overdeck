@@ -817,12 +817,17 @@
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
       "scripts/file-size-allowlist.txt",
+      "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
+      "src/lib/__tests__/review-status-reconcile.test.ts",
+      "src/lib/agents/agent-state-source.ts",
       "src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
       "src/lib/parked/resolver.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
     "declaredScopeUntouched": [
-      "roles/review.md"
+      "roles/review.md",
+      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts"
     ],
     "declaredScope": [
       "docs/PARKED-POPULATION.md",
@@ -845,25 +850,28 @@
       "docs/REVIEW-AGENT-ARCHITECTURE.md",
       "packages/contracts/src/events.ts",
       "scripts/file-size-allowlist.txt",
+      "src/dashboard/server/routes/__tests__/operator-interventions.test.ts",
       "src/lib/__tests__/review-status-read-artifact.test.ts",
+      "src/lib/__tests__/review-status-reconcile.test.ts",
+      "src/lib/agents/agent-state-source.ts",
       "src/lib/cloister/__tests__/feedback-target.test.ts",
       "src/lib/cloister/__tests__/stall-sweeper.test.ts",
       "src/lib/cloister/__tests__/synthesis-artifact-verdict.test.ts",
-      "src/lib/cloister/__tests__/verdict-restore-breaker.test.ts",
       "src/lib/cloister/__tests__/verdict-restore.test.ts",
       "src/lib/cloister/deacon-review-status.ts",
       "src/lib/cloister/feedback-target.ts",
       "src/lib/cloister/stall-sweeper.ts",
       "src/lib/cloister/synthesis-verdict.ts",
       "src/lib/cloister/verdict-restore.ts",
+      "src/lib/overdeck/agent-state-sync.ts",
       "src/lib/parked/resolver.ts",
       "src/lib/review-status-read.ts",
       "tests/unit/lib/head-anchor-write-sites.test.ts"
     ],
-    "recordedAt": "2026-08-05T06:53:26.179Z"
+    "recordedAt": "2026-08-05T11:03:37.813Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T11:03:34.748Z",
+  "updated": "2026-08-05T11:03:37.815Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "passed",
