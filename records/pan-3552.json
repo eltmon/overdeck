@@ -331,7 +331,7 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:42:17.805Z",
+  "updated": "2026-08-05T21:44:07.426Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -345,7 +345,7 @@
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "reviewedAtCommit": "11bdaa31a582ab559b261f1a90f5a60c9c35a7b1",
     "lastVerifiedCommit": "92ffee9abd3596f8b65a7c4256f4829261ba4900",
-    "reviewRequestedAt": "2026-08-05T21:30:39.917Z",
+    "reviewRequestedAt": "2026-08-05T21:44:07.056Z",
     "reviewSpawnedAt": "2026-08-05T21:36:37.583Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -581,7 +581,8 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T21:30:38.954Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-05T21:44:07.056Z"
   },
   "closeOut": {
     "usage": {
