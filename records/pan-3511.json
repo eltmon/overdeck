@@ -711,23 +711,22 @@
     "recordedAt": "2026-08-05T04:03:45.440Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T04:19:09.393Z",
+  "updated": "2026-08-05T04:19:36.286Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "reviewing",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "passed",
     "inspectStatus": "passed",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T04:16:29.295Z",
+    "updatedAt": "2026-08-05T04:19:31.118Z",
     "reviewNotes": "Review-attestation bearer token remains exposed to workspace subprocesses",
     "testNotes": "npm run typecheck: PASS. npm run lint: FAILED at lint:source-introspection — src/lib/cloister/__tests__/stall-sweeper.test.ts:255 reads its own module's source via readFileSync instead of exercising runtime behavior, and is not baselined; guard exits 1 (confirmed via direct re-run, real exit code 1), aborting the rest of the lint chain (no-coderabbit-merge-gate, circular, ratchet-audit, quarantine-audit never ran). This is real code on this branch's sweeper-consult work item, not a false positive. npm test: 1407/1412 files passed, 13344/13403 tests passed; the 2 failures are Hook timed out in 5000ms inside setupOverdeckTestDb in tests/unit/lib/database/conversation-workspace-linkage.test.ts and tests/unit/lib/overdeck/review-status-timestamp-units.test.ts — neither file is in this branch's changed-file scope, and matches a pre-existing DB-setup-hook-timeout flake already documented in this issue's own session history. Overall automated-gate status is FAILED, blocking on lint:source-introspection against the branch's own new test.",
-    "verificationNotes": "Cleared by `pan specialists done review --status passed` override (PAN-1215)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "7fc5930e614e9b1151b8258a881d87b71537795d",
-    "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
+    "lastVerifiedCommit": "250ced115b9940dea6a8ac02b6e35f7c5a4bd539",
     "reviewRequestedAt": "2026-08-05T04:03:46.406Z",
     "reviewSpawnedAt": "2026-08-05T04:16:29.294Z",
     "scopeDrift": {
@@ -870,9 +869,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 11086682,
-            "output": 177639,
-            "cacheRead": 49068544,
+            "input": 11855256,
+            "output": 193133,
+            "cacheRead": 50214400,
             "cacheWrite": 0
           }
         },
@@ -963,9 +962,9 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 16973161,
-          "output": 430674,
-          "cacheRead": 92367872,
+          "input": 17741735,
+          "output": 446168,
+          "cacheRead": 93513728,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -976,8 +975,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 458.6960763,
-        "pricingAsOf": "2026-08-05T04:16:29.306Z"
+        "usd": 461.1363893,
+        "pricingAsOf": "2026-08-05T04:19:31.151Z"
       }
     },
     "merges": [
@@ -986,7 +985,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
