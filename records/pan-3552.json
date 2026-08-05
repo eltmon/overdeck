@@ -445,16 +445,16 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:47:20.991Z",
+  "updated": "2026-08-05T23:49:55.381Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T23:47:18.277Z",
+    "updatedAt": "2026-08-05T23:49:55.314Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "lastVerifiedCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
@@ -753,18 +753,18 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 13798793,
-            "output": 987680,
-            "cacheRead": 418818560,
+            "input": 13800785,
+            "output": 988230,
+            "cacheRead": 419270656,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 43171966,
-          "output": 1640865,
-          "cacheRead": 611315712,
+          "input": 43173958,
+          "output": 1641415,
+          "cacheRead": 611767808,
           "cacheWrite": 0
         },
         "anthropic/claude-sonnet-5": {
@@ -775,8 +775,8 @@
         }
       },
       "costAtCloseOut": {
-        "usd": 288.080513,
-        "pricingAsOf": "2026-08-05T23:47:20.952Z"
+        "usd": 288.206768,
+        "pricingAsOf": "2026-08-05T23:49:55.374Z"
       }
     },
     "merges": [
