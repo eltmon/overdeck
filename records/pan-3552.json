@@ -309,16 +309,16 @@
     "recordedAt": "2026-08-05T21:30:38.954Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T21:30:38.960Z",
+  "updated": "2026-08-05T21:30:39.920Z",
   "pipeline": {
     "issueId": "PAN-3552",
-    "reviewStatus": "blocked",
+    "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "failed",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T21:18:56.884Z",
+    "updatedAt": "2026-08-05T21:30:39.917Z",
     "reviewNotes": "conflictsSince remains live runtime and durable pipeline state",
     "verificationNotes": "Verification FAILED at test (652739ms):\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552\n\n\n RUN  v4.1.6 /home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/src/dashboard/frontend\n\n ❯ src/components/Settings/__tests__/RolesPanel.test.tsx (13 tests | 2 failed) 1586ms\n     × full mode with MIXED reviewer models renders the red uniformity banner naming the models 40ms\n     × full mode with UNIFORM reviewer models renders no banner 1032ms\n ❯ |root| tests/unit/lib/head-anchor-write-sites.test.ts (2 tests | 1 failed) 3105ms\n     × locks every documented write occurrence and source expression 3104ms (retry x1)\n\n Test Files  1 failed | 168 passed (169)\n      Tests  2 failed | 1962 passed (1964)\n   Start at  17:03:48\n   Duration  33.40s (transform 4.71s, setup 15.63s, import 44.48s, tests 32.13s, environment 24.86s)\n\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Workspace already up to date with main\n[prep] completed: sync-main (0s elapsed)\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-MMIlts/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] Spawning agent...\n[prep] spawn\n[prep] completed: spawn (0s elapsed)\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] state-reconcile\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] completed: state-reconcile (0s elapsed)\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] sync-main\n[prep] Syncing latest main into workspace...\n[prep] s\n…(1002 chars elided)…\neature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Found workspace on branch: feature/pan-1141\n[prep] Found workspace: /tmp/pan-auto-resume-gating-XEarXq/project/workspaces/feature-pan-1141\n[prep] Validating workspace state...\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] Building agent prompt with planning context...\n[prep] tracker-context\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-context (0s elapsed)\n[prep] completed: tracker-contex\n...(truncated)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
@@ -338,6 +338,7 @@
         "src/cli/commands/review-subcommands.ts",
         "src/dashboard/frontend/src/App/hooks/useDesktopActivityNotifications.ts",
         "src/dashboard/frontend/src/components/GodView/confluence/useConfluenceData.ts",
+        "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
         "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
         "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
         "src/dashboard/server/routes/admin.ts",
@@ -381,12 +382,13 @@
         "tests/unit/lib/cloister/deacon-post-blocked-review-commits.test.ts",
         "tests/unit/lib/cloister/deacon-review-unapplied-verdicts.test.ts",
         "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
-        "tests/unit/lib/cloister/review-verdict-feedback.test.ts"
+        "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts",
+        "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "declaredScopeUntouched": [
         "src/lib/cloister/__tests__/branch-invalidation.test.ts",
         "src/lib/cloister/stall-sweeper-state.ts",
-        "src/lib/pan-dir/verdict-restore.ts",
         "tests/unit/lib/cloister/review-verdict-writer.test.ts"
       ],
       "declaredScope": [
@@ -474,6 +476,7 @@
         "src/dashboard/frontend/src/components/IssuePolicyStrip.test.tsx",
         "src/dashboard/frontend/src/components/IssuePolicyStrip.tsx",
         "src/dashboard/frontend/src/components/Settings/RolesPanel.tsx",
+        "src/dashboard/frontend/src/components/Settings/__tests__/RolesPanel.test.tsx",
         "src/dashboard/frontend/src/components/chat/__tests__/composerCommands.no-loss.test.ts",
         "src/dashboard/frontend/src/components/chat/__tests__/slashCommands.no-loss.test.ts",
         "src/dashboard/server/routes/admin.ts",
@@ -532,6 +535,7 @@
         "src/lib/pan-dir/pipeline-verdict-merge.ts",
         "src/lib/pan-dir/record.ts",
         "src/lib/pan-dir/records.ts",
+        "src/lib/pan-dir/verdict-restore.ts",
         "src/lib/parked/__tests__/resolver.test.ts",
         "src/lib/parked/resolver.ts",
         "src/lib/pipeline-notifier.ts",
@@ -549,10 +553,13 @@
         "tests/unit/lib/cloister/deacon-swarm-verdict-routing.test.ts",
         "tests/unit/lib/cloister/review-verdict-feedback.test.ts",
         "tests/unit/lib/head-anchor-write-sites.test.ts",
-        "tests/unit/lib/overdeck/agent-discovery-columns.test.ts"
+        "tests/unit/lib/overdeck/agent-discovery-columns.test.ts",
+        "tests/unit/lib/overdeck/review-status-sync.test.ts",
+        "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
-      "recordedAt": "2026-08-05T20:54:21.371Z"
-    }
+      "recordedAt": "2026-08-05T21:30:38.954Z"
+    },
+    "reviewRequestedAt": "2026-08-05T21:30:39.917Z"
   },
   "closeOut": {
     "usage": {
