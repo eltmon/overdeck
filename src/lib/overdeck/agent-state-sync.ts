@@ -1,5 +1,8 @@
 import type { AgentState, Role } from '../agents.js';
-import { registerFeedbackAgentStateReader } from '../agents/agent-state-source.js';
+import {
+  registerActiveReviewArtifactContextReader,
+  registerFeedbackAgentStateReader,
+} from '../agents/agent-state-source.js';
 import type { RuntimeName } from '../runtimes/types.js';
 import { getWorkspaceForIssue } from '../workspaces/resolver.js';
 import { getOverdeckDatabaseSync } from './infra.js';
@@ -270,6 +273,14 @@ export function listOverdeckAgentStatesSync(): AgentState[] {
 }
 
 registerFeedbackAgentStateReader(listOverdeckAgentStatesSync);
+registerActiveReviewArtifactContextReader((issueId) => {
+  const state = getOverdeckAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  if (!state?.reviewRunId) return null;
+  return {
+    runId: state.reviewRunId,
+    ...(state.workspace ? { workspacePath: state.workspace } : {}),
+  };
+});
 
 export function saveOverdeckAgentStateSync(state: AgentState): void {
   const db = getOverdeckDatabaseSync();

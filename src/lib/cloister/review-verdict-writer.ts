@@ -33,11 +33,23 @@ export interface VerdictInput {
   reviewerVerdicts?: ReviewStatus['reviewerVerdicts'];
   evidenceHead?: HeadAnchor;
   extra?: Record<string, unknown>;
+  /** Clear only this caller-owned stuck flag when the terminal verdict lands. */
+  clearStuckReason?: string;
   runId?: string;
   writer: VerdictWriter;
 }
 
 export type VerdictOutcome = { landed: true; classification: 'no-evidence' | 'anchor-match' | 'dispatched' } | { landed: false; reason: string };
+
+function callerOwnedStuckClear(status: ReviewStatus, input: VerdictInput): ReviewStatusUpdate {
+  if (!input.clearStuckReason || status.stuckReason !== input.clearStuckReason) return {};
+  return {
+    stuck: false,
+    stuckReason: undefined,
+    stuckAt: undefined,
+    stuckDetails: undefined,
+  };
+}
 
 // ─── Private: Head Classification ─────────────────────────────────────────────
 
@@ -152,6 +164,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
       reviewNotes: input.notes,
       ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
+      ...callerOwnedStuckClear(status, input),
     };
     setReviewStatusSync(issueId, update, status);
     return { landed: true, classification: 'no-evidence' };
@@ -164,6 +177,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
       reviewNotes: input.notes,
       ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
       ...(input.extra ? { ...input.extra } : {}),
+      ...callerOwnedStuckClear(status, input),
     };
     setReviewStatusSync(issueId, update, status);
     return { landed: true, classification: 'anchor-match' };
@@ -219,6 +233,7 @@ export async function recordReviewVerdict(issueId: string, input: VerdictInput):
     ...(input.reviewerVerdicts ? { reviewerVerdicts: input.reviewerVerdicts } : {}),
     ...(testGateReset ? { testStatus: 'pending', testNotes: `Verdict re-gated: evidence=${formatAnchorShort(input.evidenceHead)} row=${formatAnchorShort(status.lastVerifiedCommit)} writer=${input.writer}` } : {}),
     ...(input.extra ? { ...input.extra } : {}),
+    ...callerOwnedStuckClear(status, input),
   };
 
   setReviewStatusSync(issueId, update, status);

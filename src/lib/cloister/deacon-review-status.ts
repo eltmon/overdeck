@@ -10,7 +10,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
-import { readActiveReviewArtifact } from './verdict-restore.js';
+import { attemptArtifactVerdictRestore } from './verdict-restore.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -339,28 +339,34 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
   return false;
 }
 
-/**
- * Read workspace artifact evidence only for the host-recorded active review run.
- * Evidence never writes a verdict: the reviewer's `specialists done` signal owns
- * that transition through recordReviewVerdict.
- */
-function readActiveReviewEvidence(issueId: string) {
+// Reads workspace evidence asynchronously and delegates terminal writes to the verdict door.
+async function restoreActiveReviewArtifact(issueId: string, status: Pick<ReviewStatus, 'lastVerifiedCommit'>, options: { caller: string; clearStuckReason?: string }) {
   const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
-  return readActiveReviewArtifact(issueId, {
+  return attemptArtifactVerdictRestore(issueId, {
     runId: state?.reviewRunId,
     workspacePath: state?.workspace,
+    rowHead: status.lastVerifiedCommit,
+    caller: options.caller,
+    ...(options.clearStuckReason ? { clearStuckReason: options.clearStuckReason } : {}),
   });
 }
 
-function recordArtifactEvidenceAtBreaker(issueId: string, actions: string[]): void {
+async function restoreArtifactAtBreaker(issueId: string, status: Pick<ReviewStatus, 'lastVerifiedCommit'>, actions: string[]): Promise<boolean> {
   try {
-    const artifact = readActiveReviewEvidence(issueId);
-    if (artifact) {
-      actions.push(`Review-infra breaker for ${issueId} found a fresh ${artifact.verdict} artifact for the active run; retaining the breaker until the canonical review signal lands`);
+    const result = await restoreActiveReviewArtifact(issueId, status, {
+      caller: 'review-infrastructure-breaker',
+      clearStuckReason: 'review_infrastructure_failure',
+    });
+    if (result.outcome !== 'no-artifact') {
+      actions.push(result.outcome === 'restored'
+        ? `Restored ${issueId}'s ${result.artifact.verdict} verdict from active review run ${result.artifact.runId}; review breaker remains clear`
+        : `Preserved ${issueId}'s active-run ${result.artifact.verdict} artifact because its evidence head cannot restore over the current review cycle`);
+      return true;
     }
   } catch (err) {
-    console.warn(`[deacon] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+    console.warn(`[deacon] Artifact restore failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
   }
+  return false;
 }
 
 /**
@@ -399,7 +405,7 @@ export async function handleReviewCoordinatorDied(
   }
 
   if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
-    recordArtifactEvidenceAtBreaker(issueId, actions);
+    if (await restoreArtifactAtBreaker(issueId, status, actions)) return actions;
     markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
       reviewRetryCount: status.reviewRetryCount ?? 0,
       recoveryStartedAt: status.recoveryStartedAt,
@@ -595,15 +601,24 @@ async function reconcileReviewStatusOrphan(
       return actions;
     }
     if (!hasPassedReview) {
-      // RACE GUARD (PAN-1577): inspect evidence from the host-recorded active
-      // run before recovery changes the row. Workspace artifacts are never
-      // verdict authority; only the reviewer's canonical done signal may land a
-      // terminal result, so recovery continues after recording this evidence.
+      // RACE GUARD (PAN-1577): a terminal artifact can restore only through the
+      // canonical verdict writer. Keep the legacy reviewing → pending reset for
+      // the no-evidence outcome; preserve a guard-refused artifact for diagnosis.
       try {
-        const artifact = readActiveReviewEvidence(issueId);
-        if (artifact) actions.push(`Found fresh ${artifact.verdict} artifact for ${issueId}'s active review run; awaiting canonical review signal before recovery`);
+        const restored = await restoreActiveReviewArtifact(issueId, status, {
+          caller: 'orphan-review-recovery',
+          clearStuckReason: 'review_infrastructure_failure',
+        });
+        if (restored.outcome === 'restored') {
+          actions.push(`Restored orphaned ${restored.artifact.verdict} review for ${issueId} from active run ${restored.artifact.runId}`);
+          return actions;
+        }
+        if (restored.outcome === 'blocked-by-head-guard') {
+          actions.push(`Preserved orphaned ${restored.artifact.verdict} evidence for ${issueId}; its head guard refused the terminal restore`);
+          return actions;
+        }
       } catch (err) {
-        console.warn(`[deacon] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
+        console.warn(`[deacon] Artifact restore failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       const nextRetry = (status.reviewRetryCount ?? 0) + 1;
       const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
@@ -628,7 +643,7 @@ async function reconcileReviewStatusOrphan(
   ) {
     if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
       try {
-        recordArtifactEvidenceAtBreaker(issueId, actions);
+        if (await restoreArtifactAtBreaker(issueId, status, actions)) return actions;
         markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
           reviewRetryCount: status.reviewRetryCount ?? 0,
           recoveryStartedAt: status.recoveryStartedAt,

@@ -152,6 +152,29 @@ describe('recordReviewVerdict', () => {
       expect(result).toEqual({ landed: true, classification: 'anchor-match' });
       expect(mocks.setReviewStatusSync).toHaveBeenCalledOnce();
     });
+
+    it('clears only the recovery caller\'s stuck flag when the artifact verdict lands', async () => {
+      const commitSha = 'c'.repeat(40);
+      const status = reviewStatus({
+        lastVerifiedCommit: commitSha,
+        stuck: true,
+        stuckReason: 'review_infrastructure_failure',
+      });
+      mocks.getReviewStatusSync.mockReturnValue(status);
+      mocks.setReviewStatusSync.mockReturnValue(status);
+
+      await recordReviewVerdict('PAN-3512', {
+        verdict: 'passed',
+        writer: 'orphan-restore',
+        evidenceHead: commitSha,
+        clearStuckReason: 'review_infrastructure_failure',
+      });
+
+      expect(mocks.setReviewStatusSync).toHaveBeenCalledWith('PAN-3512', expect.objectContaining({
+        stuck: false,
+        stuckReason: undefined,
+      }), status);
+    });
   });
 
   describe('stale evidence path', () => {

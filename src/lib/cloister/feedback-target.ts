@@ -269,12 +269,12 @@ export async function surfaceIssueFeedbackNeedsYou(
     // verdict; the canonical review done signal owns that transition, so a
     // delivery failure still receives its protective stuck mark.
     try {
-      const [{ getAgentStateSync }, { readActiveReviewArtifact }] = await Promise.all([
+      const [{ getAgentStateSync }, { readLatestSynthesisVerdictAsync }] = await Promise.all([
         import('../agents/agent-state.js'),
-        import('./verdict-restore.js'),
+        import('./synthesis-verdict.js'),
       ]);
       const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
-      const artifact = readActiveReviewArtifact(issueId, {
+      const artifact = await readLatestSynthesisVerdictAsync(issueId, {
         runId: state?.reviewRunId,
         workspacePath: state?.workspace,
       });

@@ -111,9 +111,9 @@ The full round trip between the work agent and review:
 
 A review artifact can appear in the workspace before the canonical review signal,
 but the workspace is writable by the work agent. It is recovery evidence, never
-independent authority to set a terminal status. Terminal verdicts enter the row
-only through `recordReviewVerdict()` when `pan admin specialists done review`
-receives the reviewer's canonical signal.
+an independent write path for a terminal status. Terminal verdicts enter the row
+only through `recordReviewVerdict()`, either from `pan admin specialists done
+review` or from the recovery helper after its active-run and anchor checks.
 
 The contract has four clauses:
 
@@ -123,26 +123,30 @@ The contract has four clauses:
 2. **One verdict write door.** `recordReviewVerdict()` in
    `src/lib/cloister/review-verdict-writer.ts` owns every terminal verdict and
    rejects stale evidence before it reaches `review_status`.
-3. **Every recovery path reads evidence before acting.** The deacon, delivery
-   failure path, and sweeper inspect the active-run artifact before selecting a
-   recovery action, but artifact content cannot bypass the canonical signal.
+3. **Recovery restores through the write door.** The deacon's restore helper
+   reads active-run evidence asynchronously, refuses a mismatched anchor with a
+   visible `review.verdict_restore_blocked` event, and otherwise delegates to
+   `recordReviewVerdict()`. Feedback and sweeper paths inspect evidence only.
 4. **No artifact scan runs in status reads.** The synchronous status resolver
-   never walks `.pan/review`; artifact inspection is limited to recovery patrols.
+   never walks `.pan/review`. Only after its stale-journal refusal predicate
+   matches may it consult a bounded memo for active-run corroboration.
 
-`readLatestSynthesisVerdict()` in `src/lib/cloister/synthesis-verdict.ts` reads
-one explicit active run rather than scanning `.pan/review/*/`. It returns `null`
-without a run ID or after the 30-minute freshness bound. Its optional patrol memo
-is LRU-bounded to 256 `(issueId, runId)` entries, so old issues do not accumulate
-in a long-running dashboard process. `readActiveReviewArtifact()` is the shared
-read helper for recovery callers.
+`readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
+reads one explicit active run rather than scanning `.pan/review/*/`. It returns
+`null` without a run ID or after the 30-minute freshness bound. The synchronous
+`readMemoizedArtifactVerdict()` is reserved for stale-journal corroboration; it
+is LRU-bounded to 256 `(issueId, runId)` entries and expires a verdict at the
+sooner of its 60-second memo TTL or freshness deadline. `attemptArtifactVerdictRestore()`
+is the shared deacon restore helper.
 
 **The recovery sites that consult evidence:**
 
 | Site | File | Effect of evidence |
 | --- | --- | --- |
-| Deacon orphan reset | `cloister/deacon-review-status.ts` | records that an active-run artifact exists, then retains canonical recovery behavior |
-| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | records evidence while retaining the protective breaker until a canonical signal lands |
-| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | records evidence while retaining the delivery-protection stuck mark |
+| Deacon orphan reset | `cloister/deacon-review-status.ts` | restores a safe active-run terminal verdict through `recordReviewVerdict()`; only no-evidence keeps the legacy reset |
+| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | restores through the helper or preserves a guard-refused artifact instead of marking/re-dispatching over it |
+| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
+| Stale-journal resolver | `review-status-read.ts` | consults bounded active-run memo evidence only after a stale-refusal predicate, then replays a corroborated terminal journal verdict |
 | Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
 
 **Rule for future guard authors.** A new review recovery path reads only an
