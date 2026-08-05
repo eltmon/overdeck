@@ -641,8 +641,8 @@ export async function checkStalledReviewDiscovery(): Promise<string[]> {
       const alive = await Effect.runPromise(sessionExists(state.id)).catch(() => false);
       const dead = !alive || await Effect.runPromise(isPaneDead(state.id)).catch(() => true);
       if (!aged && !dead) continue;
-      const { handleReviewDiscoveryReady } = await import('./review-agent.js');
-      const result = await handleReviewDiscoveryReady(state.issueId, { source: dead ? 'deacon-backstop (parent dead)' : 'deacon-backstop (discovery timeout)' });
+      const { recoverMissingConvoyReviewers } = await import('./review-agent.js');
+      const result = await recoverMissingConvoyReviewers(state.issueId, { source: dead ? 'deacon-backstop (parent dead)' : 'deacon-backstop (discovery timeout)' });
       actions.push(result.message);
       logDeaconEventSync(`checkStalledReviewDiscovery: ${result.message}`);
     }

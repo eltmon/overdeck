@@ -23,7 +23,7 @@ import { dirname } from 'path';
 import {
   buildConvoyPrompt,
   buildReviewRolePrompt,
-  handleReviewDiscoveryReady,
+  recoverMissingConvoyReviewers,
   isReviewSessionForIssue,
   killAllReviewerSessions,
   killAllReviewSessions,
@@ -578,7 +578,7 @@ describe('spawnReviewRoleForIssue review mode fan-out', () => {
     expect(block).toContain('resumeAgent(reviewAgentId, prompt)');
     expect(block).toContain('if (fullReview)');
     expect(block).toContain('savedReview?.reviewRunId === runId');
-    expect(block).toContain('handleReviewDiscoveryReady(opts.issueId');
+    expect(block).toContain('recoverMissingConvoyReviewers(opts.issueId');
     expect(block).toContain("source: 'same-run parent resume'");
     expect(block).toContain('missing reviewer recovery failed');
     expect(block).toContain('await spawnConvoyReviewers(reviewAgentId)');
@@ -1095,7 +1095,7 @@ describe('convoy orchestration', () => {
     }));
   });
 
-  it('repairs and persists missing parent run metadata before accepting discovery-ready', async () => {
+  it('repairs and persists missing parent run metadata before recovering reviewers', async () => {
     const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
     const manifestPath = writeReviewManifest(workspace);
     const reviewDir = dirname(manifestPath);
@@ -1118,7 +1118,7 @@ describe('convoy orchestration', () => {
       id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
     }));
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     expect(result).toMatchObject({ success: true, launched: 1 });
     expect(mockSaveAgentStateAsync).toHaveBeenCalledWith(expect.objectContaining({
@@ -1127,7 +1127,7 @@ describe('convoy orchestration', () => {
     }));
   });
 
-  it('fails discovery-ready before launch when repaired parent state cannot be persisted', async () => {
+  it('fails reviewer recovery before launch when repaired parent state cannot be persisted', async () => {
     const workspace = REVIEW_AGENT_DEFAULT_WORKSPACE;
     writeReviewManifest(workspace);
     mockGetAgentState.mockImplementation((agentId: string) =>
@@ -1145,7 +1145,7 @@ describe('convoy orchestration', () => {
     );
     mockSaveAgentStateAsync.mockRejectedValueOnce(new Error('database unavailable'));
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     expect(result).toEqual({
       success: false,
@@ -1173,7 +1173,7 @@ describe('convoy orchestration', () => {
       id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
     }));
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     expect(result).toMatchObject({ success: true, launched: 1 });
     expect(mockSpawnRun).toHaveBeenCalledTimes(1);
@@ -1215,14 +1215,14 @@ describe('convoy orchestration', () => {
       id: `agent-${issueId.toLowerCase()}-review-${options.subRole}`,
     }));
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     // The filter's output is the message denominator: 4 lanes selected despite
     // four stale 'running' rows. (The per-lane spawn outcomes themselves are
     // not asserted — four parallel dynamic imports of the mocked agents.js
     // barrel resolve nondeterministically under vitest; the deterministic
     // regression signal is the filter decision plus the heal calls below.)
-    expect(result.message).toMatch(/launched \d+\/4 missing convoy reviewer/);
+    expect(result.message).toMatch(/launched \d+\/4 missing reviewer/);
     expect(result.message).not.toContain('already launched');
     expect(mockMarkAgentStoppedState).toHaveBeenCalledTimes(4);
     expect(mockMarkAgentStoppedState).toHaveBeenCalledWith(
@@ -1258,7 +1258,7 @@ describe('convoy orchestration', () => {
           },
     );
 
-    const result = await handleReviewDiscoveryReady('PAN-1059', { source: 'test recovery' });
+    const result = await recoverMissingConvoyReviewers('PAN-1059', { source: 'test recovery' });
 
     expect(result.success).toBe(true);
     expect(result.message).toContain('already launched');

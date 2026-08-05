@@ -30,6 +30,13 @@ const CLAUDE_NATIVE_LABELS = new Set(
 
 const MAPPING_ROWS: MappingRow[] = [
   ...PRE_ADAPTER_COMMANDS.map((command): MappingRow => {
+    if (command.label === 'pan admin specialists discovery-ready') {
+      return {
+        legacy: command.label,
+        kind: 'excluded',
+        reason: 'The convoy now launches at review dispatch, so discovery-ready has no valid action.',
+      };
+    }
     if (command.label === '/handoff') {
       return { legacy: command.label, kind: 'alias', target: '/handoff' };
     }

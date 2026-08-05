@@ -4,7 +4,6 @@
  * pan specialists <command>
  */
 
-import { exitCli } from '../../exit.js';
 import { Command } from 'commander';
 import { listCommand } from './list.js';
 import { wakeCommand } from './wake.js';
@@ -38,21 +37,6 @@ export function registerSpecialistsCommands(program: Command): void {
     .option('--force', 'Skip confirmation prompt')
     .option('--all', 'Reset ALL specialists (wipe all context)')
     .action(resetCommand);
-
-  // pan specialists discovery-ready review <issueId> — PAN-1862 Phase A signal
-  specialists
-    .command('discovery-ready <type> <issueId>')
-    .description('Signal that the review parent finished shared discovery — forks + launches the convoy (PAN-1862)')
-    .action(async (type: string, issueId: string) => {
-      if (type !== 'review') {
-        console.error(`discovery-ready only applies to the review specialist (got '${type}')`);
-        return exitCli(1);
-      }
-      const { handleReviewDiscoveryReady } = await import('../../../lib/cloister/review-agent.js');
-      const result = await handleReviewDiscoveryReady(issueId, { source: 'cli-signal' });
-      console.log(result.message);
-      return exitCli(result.success ? 0 : 1);
-    });
 
   // pan specialists done <type> <issueId> --status <passed|failed|blocked> [--notes "..."]
   specialists

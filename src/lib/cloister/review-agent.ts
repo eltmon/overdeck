@@ -60,7 +60,7 @@ import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
   computeConvoyScope,
-  handleReviewDiscoveryReady,
+  recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
 } from './review-convoy.js';
 import { shouldSkipDispatchAsMerged } from './merge-verification.js';
@@ -621,7 +621,7 @@ async function spawnReviewRoleForIssuePromise(
             // PAN-3368: this is recovery of the current run, not a new review cycle.
             // Re-dispatch only lanes with neither a live session nor a report; completed
             // siblings stay intact and the synthesis parent can proceed immediately.
-            const recovery = await handleReviewDiscoveryReady(opts.issueId, {
+            const recovery = await recoverMissingConvoyReviewers(opts.issueId, {
               source: 'same-run parent resume',
               ...(opts.model ? { model: opts.model } : {}),
               ...(opts.harness ? { harness: opts.harness } : {}),
@@ -850,7 +850,7 @@ export { reviewResumeDecision } from './review-resume-decision.js';
 export {
   buildConvoyPrompt,
   spawnReviewSubRoleForIssue,
-  handleReviewDiscoveryReady,
+  recoverMissingConvoyReviewers,
   resolveReReviewScope,
 } from './review-convoy.js';
 

@@ -8,19 +8,24 @@ interface LegacyCommand {
 }
 
 const PRE_ADAPTER_COMMANDS = preAdapterCommands as LegacyCommand[];
+const RETIRED_LEGACY_COMMANDS = new Set([
+  'pan admin specialists discovery-ready',
+]);
 
-const LEGACY_TO_PORTABLE_MAPPINGS = PRE_ADAPTER_COMMANDS.map(command => {
-  if (!command.label.startsWith('pan ')) {
-    return { legacy: command, portable: command };
-  }
-  return {
-    legacy: command,
-    portable: {
-      label: `/${command.label}`,
-      insert: `/${command.label}${command.insert.endsWith(' ') ? ' ' : ''}`,
-    },
-  };
-});
+const LEGACY_TO_PORTABLE_MAPPINGS = PRE_ADAPTER_COMMANDS
+  .filter(command => !RETIRED_LEGACY_COMMANDS.has(command.label))
+  .map(command => {
+    if (!command.label.startsWith('pan ')) {
+      return { legacy: command, portable: command };
+    }
+    return {
+      legacy: command,
+      portable: {
+        label: `/${command.label}`,
+        insert: `/${command.label}${command.insert.endsWith(' ') ? ' ' : ''}`,
+      },
+    };
+  });
 
 function findMissingMappings(commands: readonly { label: string; insert: string }[]) {
   return LEGACY_TO_PORTABLE_MAPPINGS.filter(({ portable }) =>
