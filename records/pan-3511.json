@@ -905,7 +905,7 @@
     "recordedAt": "2026-08-05T12:58:03.602Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T14:31:11.840Z",
+  "updated": "2026-08-05T14:31:13.968Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "passed",
@@ -916,9 +916,10 @@
     "mergeStep": "verifying",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T14:31:06.893Z",
+    "updatedAt": "2026-08-05T14:31:06.970Z",
     "reviewNotes": "Verification failed at test — fix and resubmit",
     "testNotes": "At HEAD 30c3c4f719 (branch up to date with origin/feature/pan-3511, clean tree). npm run typecheck: PASS (tsc --noEmit; typecheck:hooks; typecheck:evals; typecheck:dashboard guard 54 known errors, none new; typecheck:frontend guard 0 known errors, none new). npm run lint: PASS -- full chain green including lint:file-size, lint:circular (76 baselined cycles, no new), lint:ratchet-audit, lint:quarantine-audit (12 entries), lint:source-introspection, lint:park-exits, lint:overdeck-boundaries, lint:pipeline-membership, lint:workspace-doors, lint:state-writes/state-paths, lint:permissions, lint:effect. npm test: PASS -- root suite 1409 files / 3 skipped, 13329 tests passed / 50 skipped; frontend suite 4 files / 63 tests passed, 0 failures. Browser UAT not required: PAN-3511's xBRIEF and PRD scope entirely backend/cloister recovery-path logic -- verdict-restore.ts, deacon-review-status.ts, feedback-target.ts, stall-sweeper.ts, review-status-read.ts, synthesis-verdict.ts -- plus docs. No item's files_scope names a frontend/dashboard path and no acceptance criterion names observable dashboard or browser behavior.",
+    "verificationNotes": "merge-verify: CI green on the merged tip (PAN-2487 local-gate skip)",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "lastVerifiedCommit": "30c3c4f719916655ef2dbf5c02b766da7f659564",
     "reviewRequestedAt": "2026-08-05T12:58:04.401Z",
@@ -1129,7 +1130,7 @@
       },
       "costAtCloseOut": {
         "usd": 706.5624656,
-        "pricingAsOf": "2026-08-05T14:31:11.835Z"
+        "pricingAsOf": "2026-08-05T14:31:13.963Z"
       }
     },
     "merges": [
