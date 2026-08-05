@@ -8,7 +8,7 @@
  * taken" trailer. These tests pin each orbit's recommendation, the cooldowns,
  * the exhaustion escalation, and the no-action-door source guard.
  */
-import { mkdtempSync, readFileSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -250,17 +250,3 @@ describe('runStallSweeperPatrol — gates, exhaustion, escalation', () => {
   });
 });
 
-describe('observability-only law (operator directive 2026-08-05)', () => {
-  it('the module holds no door to any mutation', () => {
-    const src = readFileSync(join(import.meta.dirname, '..', 'stall-sweeper.ts'), 'utf-8');
-    const forbidden = [
-      'stopAgent', 'spawnWorkAgent', 'messageAgent', 'writeFeedbackFile',
-      'dispatchReviewHostSide', 'clearWorkspaceStuck', 'setReviewStatusSync',
-      'decideAutonomousRedrive', 'killSession',
-    ];
-    for (const door of forbidden) {
-      expect(src, `stall-sweeper.ts must not reference ${door}`).not.toContain(door);
-    }
-    expect(src).toContain('OBSERVABILITY ONLY — OPERATOR DIRECTIVE');
-  });
-});

@@ -118,10 +118,11 @@ function workspacePath(): string {
 }
 
 /** Writes a real reviewer artifact where the real reader will find it. */
-function writeArtifact(filename: string, body: string): void {
+function writeArtifact(filename: string, body: string, headSha?: string): void {
   const runDir = join(workspacePath(), '.pan', 'review', 'run-1');
   mkdirSync(runDir, { recursive: true });
   writeFileSync(join(runDir, filename), body, 'utf-8');
+  if (headSha) writeFileSync(join(runDir, 'context.json'), JSON.stringify({ headSha }), 'utf-8');
 }
 
 const APPROVED = '## Verdict: APPROVED\n\n## Summary\nNo blocking findings in this pass.\n';
@@ -217,7 +218,7 @@ describe('orphan re-dispatch breaker (ac2)', () => {
 
 describe('head-guard refusal at the breaker', () => {
   it('preserves blocked-restore evidence and marks the coordinator-died row stuck', async () => {
-    writeArtifact('synthesis.md', APPROVED);
+    writeArtifact('synthesis.md', APPROVED, 'a'.repeat(40));
     mocks.getReviewStatusSync.mockReturnValue(status({ lastVerifiedCommit: 'b'.repeat(40) }));
 
     const { handleReviewCoordinatorDied } = await import('../deacon-review-status.js');
@@ -234,7 +235,7 @@ describe('head-guard refusal at the breaker', () => {
   });
 
   it('preserves blocked-restore evidence and marks the orphan row stuck', async () => {
-    writeArtifact('synthesis.md', APPROVED);
+    writeArtifact('synthesis.md', APPROVED, 'a'.repeat(40));
     const row = orphanBreakerStatus({ lastVerifiedCommit: 'b'.repeat(40) });
     mocks.loadReviewStatuses.mockReturnValue({ [ISSUE]: row });
     mocks.getReviewStatusSync.mockReturnValue(row);
