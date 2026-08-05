@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T17:39:32.531Z",
+  "updated": "2026-08-05T17:39:42.958Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,8 +53,16 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 22,
-    "claims": {},
+    "sequence": 23,
+    "claims": {
+      "dispatch-consults-verdict-of-record": {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 3597756,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T17:39:42.958Z"
+      }
+    },
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -235,6 +243,7 @@
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac1": "completed",
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac2": "completed",
     "drop-sweeper-actor-events.drop-sweeper-actor-events.ac3": "completed",
-    "drop-sweeper-actor-events.drop-sweeper-actor-events.ac4": "completed"
+    "drop-sweeper-actor-events.drop-sweeper-actor-events.ac4": "completed",
+    "dispatch-consults-verdict-of-record": "running"
   }
 }
