@@ -522,9 +522,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T02:43:30.062Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T02:50Z] review-agent → FAILED — seq 1",
+      "timestamp": "2026-08-05T02:50:54.220Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "failed",
+      "timestamp": "2026-08-05T02:50:54Z",
+      "markdownBody": "## Branch Conflict — Resolution Required\n\nA merge to main invalidated this branch. Run `pan sync-main PAN-3511` (or rebase), resolve the conflicts, commit, push, and run `pan done PAN-3511`."
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -574,7 +587,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:48:51.387Z",
+  "updated": "2026-08-05T02:50:54.221Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "passed",
