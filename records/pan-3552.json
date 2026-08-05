@@ -445,16 +445,16 @@
     "recordedAt": "2026-08-05T23:47:10.054Z"
   },
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T23:47:15.261Z",
+  "updated": "2026-08-05T23:47:20.991Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "pending",
+    "verificationStatus": "running",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T23:47:15.185Z",
+    "updatedAt": "2026-08-05T23:47:18.277Z",
     "reviewNotes": "Review approved by Deacon fallback from completed reviewer reports",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3573",
     "lastVerifiedCommit": "35d77802397e641c38d13f152dcfa2db4c32d125",
@@ -698,28 +698,6 @@
         "tests/unit/lib/pan-dir/verdict-restore.test.ts"
       ],
       "recordedAt": "2026-08-05T23:47:10.054Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-35d77802/security.md",
-        "atCommit": "35d77802397e641c38d13f152dcfa2db4c32d125"
-      },
-      "correctness": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-35d77802/correctness.md",
-        "atCommit": "35d77802397e641c38d13f152dcfa2db4c32d125"
-      },
-      "performance": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-35d77802/performance.md",
-        "atCommit": "35d77802397e641c38d13f152dcfa2db4c32d125"
-      },
-      "requirements": {
-        "status": "passed",
-        "findingsPath": "/home/eltmon/Projects/overdeck/workspaces/feature-pan-3552/.pan/review/agent-pan-3552-review-35d77802/requirements.md",
-        "atCommit": "35d77802397e641c38d13f152dcfa2db4c32d125"
-      }
     }
   },
   "closeOut": {
@@ -798,7 +776,7 @@
       },
       "costAtCloseOut": {
         "usd": 288.080513,
-        "pricingAsOf": "2026-08-05T23:47:15.228Z"
+        "pricingAsOf": "2026-08-05T23:47:20.952Z"
       }
     },
     "merges": [
