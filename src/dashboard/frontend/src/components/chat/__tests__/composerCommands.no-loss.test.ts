@@ -37,6 +37,13 @@ const MAPPING_ROWS: MappingRow[] = [
         reason: 'The convoy now launches at review dispatch, so discovery-ready has no valid action.',
       };
     }
+    if (command.label === 'pan review scope') {
+      return {
+        legacy: command.label,
+        kind: 'excluded',
+        reason: 'Every full review runs all four convoy lanes, so re-review scope has no valid action.',
+      };
+    }
     if (command.label === '/handoff') {
       return { legacy: command.label, kind: 'alias', target: '/handoff' };
     }

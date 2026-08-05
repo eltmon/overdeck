@@ -216,8 +216,7 @@ async function nudgeSynthesisForCompleteReviewerReports(states: readonly AgentSt
         reports,
       });
       writeFileSync(join(reviewDir, 'synthesis.md'), synthesis.body);
-      // PAN-1862 (FR-6): anchor each reviewer verdict to the reviewed HEAD so the
-      // next cycle's reviewersToRerun can skip provably-clean reviewers.
+      // Anchor each reviewer verdict to the reviewed HEAD for the review audit.
       let fallbackHead: HeadAnchor | undefined;
       try {
         // PAN-2948: polyrepo-aware — anchors sub-repo heads, not the wrapper.

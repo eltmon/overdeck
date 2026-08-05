@@ -113,9 +113,8 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
-      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
-      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
+      // Persist the synthesis agent's per-reviewer findings as this cycle's audit.
+      // The synthesis agent passes --reviewers "security=passed,correctness=blocked".
       // Anchored to the workspace HEAD recorded below; malformed entries are
       // dropped with a warning rather than failing the verdict write.
       if (options.reviewers) {
@@ -136,9 +135,9 @@ export async function doneCommand(
       // post-review-commit drift detection goes blind, jamming the issue at
       // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts
       // (reviewedAtCommit) AND for any verdict carrying --reviewers: per-reviewer
-      // verdicts need their atCommit anchor on a BLOCKED aggregate too — that is
-      // exactly the cycle whose clean reviewers selective re-review wants to skip
-      // next time (PAN-1862 FR-6/NFR-1). A bare blocked verdict skips this probe so
+      // verdicts need their atCommit anchor on a BLOCKED aggregate too, so the
+      // cycle's reviewer audit remains tied to the reviewed workspace state. A bare
+      // blocked verdict skips this probe so
       // the durable verdict write stays synchronous ahead of feedback delivery;
       // its reviewedAtCommit anchor is recorded by a second best-effort write after
       // feedback delivery below (PAN-2524, PAN-3148).

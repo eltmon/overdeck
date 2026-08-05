@@ -11,7 +11,7 @@ For the broader mental model — what a Role is, how it relates to Claude Code s
 ## Invariants
 
 1. **Review is a role, not a server-owned verdict.** Lifecycle dispatch starts `spawnRun(issueId, 'review')`; the dashboard observes state and artifacts.
-2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role and immediately launches all in-scope convoy reviewers. They run independently in parallel while the synthesis parent remains on standby; Deacon monitors reviewer crash and timeout cases.
+2. **The server owns convoy lifecycle.** `spawnReviewRoleForIssue()` spawns the synthesis role and immediately launches all four convoy reviewers. They run independently in parallel while the synthesis parent remains on standby; Deacon monitors reviewer crash and timeout cases.
 3. **Synthesis is the review decision.** The `review` role waits for `REVIEWER_READY` / `REVIEWER_FAILED` / `REVIEWER_TIMEOUT` messages delivered through `pan tell`, reads ready reviewer outputs, synthesizes their findings, and emits the verdict. Those messages are sent by each reviewer's **launcher** on process exit (PAN-977) — not by the reviewer agent itself, and not by Deacon on the happy path.
 4. **Review never merges.** Approved review transitions the issue toward `test`; branch preparation and push work belongs to `ship`, and final merge remains human-gated.
 5. **Convoy outputs are evidence, not votes.** Security/correctness/performance/requirements findings inform synthesis; the review role decides what blocks.
@@ -41,7 +41,7 @@ The three modes:
   no fork. Cheapest AI review that still blocks real problems.
 - **`full`** — the four-reviewer **convoy** (`security`, `correctness`,
   `performance`, `requirements` — `REVIEW_SUB_ROLES`) plus the synthesis parent
-  as the fifth review role. All in-scope reviewers launch independently and in
+  as the fifth review role. All four reviewers launch independently and in
   parallel, then the parent synthesizes their reports.
 - **`none`** — no AI review at all. `spawnReviewRoleForIssue()` records
   `reviewStatus: 'skipped'` (which passes the merge gate exactly like
@@ -49,11 +49,8 @@ The three modes:
   The pre-review **verification gate** (typecheck/lint/test floor) still runs —
   `none` skips only the AI review, never the quality floor.
 
-**Re-review scope** (`full` mode only) is the second knob, same three scopes:
-per-issue record (`pan review scope <id> <all|changed|blockers>` / cockpit
-selector) → `roles.review.reReviewScope` per-project → global; default `changed`.
-It governs which convoy reviewers re-run on a re-review cycle (see "Selective
-re-review" below).
+Every full review cycle launches all four convoy reviewers. The pipeline does not
+carry a previous lane's result forward as a substitute for a fresh review.
 
 ---
 
@@ -100,9 +97,9 @@ The full round trip between the work agent and review:
    escalating to the operator.
 5. **work again:** the work agent fixes the findings, commits, and pushes. The
    blocked-review drift patrol observes the stable new HEAD over two patrol
-   ticks, resets review to `pending`, and starts a NEW review cycle, which in
-   `full` mode is a **selective** re-review. `pan review request <id>` remains the
-   manual fallback when automatic re-dispatch does not begin.
+   ticks, resets review to `pending`, and starts a new full review cycle. `pan
+   review request <id>` remains the manual fallback when automatic re-dispatch
+   does not begin.
 
 ---
 
@@ -264,8 +261,7 @@ workspace path:
   `atCommit`): `snapshotWorkspaceHeadsPromise()` records a composite
   `fe@<sha> api@<sha>` snapshot. Composite anchors compare equal iff every
   sub-repo head is unchanged; consumers that use an anchor as a git ref fail
-  the lookup and fall back to their conservative full-rerun path
-  (`computeConvoyScope` diffs in the primary sub-repo for the same reason).
+  the lookup and fall back to a conservative full-review path.
 - **Inspection checkpoints** (`inspect-checkpoints.ts`): per-item diffs run in
   the code sub-repos and checkpoints store the same composite head snapshot.
   On later items, unchanged repos are omitted so an inspector never reviews an
@@ -335,7 +331,7 @@ every token as `repoKey@<8-char sha>` for clarity.
 
 ## Direct independent convoy launch (`full` mode)
 
-`spawnReviewRoleForIssue()` launches the synthesis parent and all in-scope
+`spawnReviewRoleForIssue()` launches the synthesis parent and all four
 reviewers in one dispatch. The parent receives a standby prompt while the four
 reviewers independently read the review context and write their reports in
 parallel. Once they signal completion, the parent reads those reports and writes
@@ -347,30 +343,14 @@ runtime registry reconstruction cannot leave an otherwise valid convoy stranded.
 
 ---
 
-## Selective re-review + per-reviewer verdicts (PAN-1862, `full` mode)
+## Per-reviewer verdicts (`full` mode)
 
 Synthesis records a **per-reviewer verdict** map alongside the aggregate:
 `reviewerVerdicts[subRole] = { status: passed|blocked, atCommit, findingsPath }`
 (journal-durable; written via `pan admin specialists done review … --reviewers
 "security=passed,correctness=blocked,…"`, or by the Deacon fallback synthesis).
-The workspace HEAD is stamped as `atCommit` on every verdict — a BLOCKED
-aggregate is exactly the cycle whose clean reviewers the next pass wants to skip.
-
-On a re-review cycle, `reviewersToRerun()` decides who actually runs from
-`reReviewScope`:
-
-- `all` — all four, every cycle.
-- `changed` (default) — reviewers that blocked, PLUS any reviewer whose domain
-  is touched by files changed since its `atCommit` (correctness/requirements:
-  any change; security: security-sensitive paths; performance: hot-path files).
-- `blockers` — only reviewers that blocked.
-
-Anything unprovable — no verdict, no commit anchor, an unreachable anchor after
-a rebase, an unknown diff — always re-runs (quality first, NFR-1). Reviewers NOT
-re-run have their verdict **carried forward** as a stub report in the new run
-directory, so synthesis and the Deacon fallback still see one report per
-sub-role, unchanged. The synthesis prompt lists which signals to expect and
-which verdicts are carried.
+Every full-review cycle still launches all four reviewers independently; the map
+is an audit of that cycle's reports, never a reason to skip a reviewer.
 
 ---
 

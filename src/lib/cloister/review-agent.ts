@@ -56,10 +56,8 @@ import { buildRealConflictGateDeps, getCachedConflictGateMergeability, resolveCo
 import { createPromiseCoalescer } from './in-flight-guard.js';
 import { REVIEW_SUB_ROLES, type ReviewSubRole } from './review-monitor.js';
 import { reviewResumeDecision } from './review-resume-decision.js';
-import { type ReReviewScope } from './review-rerun-scope.js';
 import { evaluateReviewConvoyLiveness } from './review-convoy-liveness.js';
 import {
-  computeConvoyScope,
   recoverMissingConvoyReviewers,
   launchConvoyReviewersPromise,
 } from './review-convoy.js';
@@ -120,29 +118,11 @@ export function buildReviewRolePrompt(opts: {
   reviewDir: string;
   contextManifestPath?: string;
   tier1Summary?: string;
-  /** PAN-1862 (FR-9): sub-roles actually running this cycle (default: all four). */
-  inScopeSubRoles?: ReviewSubRole[];
-  /** PAN-1862 (FR-9): sub-roles whose passed verdicts are carried forward this cycle. */
-  carriedSubRoles?: Array<{ subRole: ReviewSubRole; atCommit?: string }>;
 }): string {
-  const inScope = opts.inScopeSubRoles && opts.inScopeSubRoles.length > 0 ? opts.inScopeSubRoles : [...REVIEW_SUB_ROLES];
-  const carried = opts.carriedSubRoles ?? [];
   const subRoleFiles = REVIEW_SUB_ROLES.map(r => `  ${join(opts.reviewDir, `${r}.md`)}`).join('\n');
-  const expectedSignals = inScope.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
+  const expectedSignals = REVIEW_SUB_ROLES.map(r => `  REVIEWER_READY ${r} <outputPath> or REVIEWER_FAILED ${r} <reason> or REVIEWER_TIMEOUT ${r} <reason>`).join('\n');
   const synthesisPath = reviewSynthesisPath(opts.reviewDir);
-  const runningDesc = inScope.length === REVIEW_SUB_ROLES.length
-    ? 'the four convoy reviewers (security, correctness, performance, requirements)'
-    : `${inScope.length} convoy reviewer(s) this cycle (${inScope.join(', ')})`;
-  const carriedSection = carried.length > 0
-    ? [
-        '',
-        `CARRIED-FORWARD VERDICTS (PAN-1862 selective re-review): ${carried.map(c => c.subRole).join(', ')}.`,
-        'These reviewers PASSED the prior cycle and none of their domain files changed',
-        'since, so they were NOT re-run. Their stub reports are already written in the',
-        'review directory — treat each as a passed verdict. Do NOT wait for signals',
-        'from them; they will never arrive.',
-      ].join('\n')
-    : '';
+  const runningDesc = 'the four convoy reviewers (security, correctness, performance, requirements)';
   const prompt = [
     `STANDBY — REVIEW SYNTHESIS for ${opts.issueId}`,
     '',
@@ -152,9 +132,8 @@ export function buildReviewRolePrompt(opts: {
     `You will receive exactly one \`pan tell\` signal per RUNNING sub-role as each`,
     'reviewer finishes — these are delivered to you as user messages:',
     expectedSignals,
-    carriedSection,
     '',
-    `Until all ${inScope.length} terminal signal(s) have arrived: do nothing. Do not read the`,
+    `Until all ${REVIEW_SUB_ROLES.length} terminal signal(s) have arrived: do nothing. Do not read the`,
     'reviewer output files, do not run git, do not inspect tmux sessions, do not',
     'poll anything. Just wait — the reviewers notify you when they finish, and',
     'Deacon is the failsafe if one never starts or never completes. Acting early',
@@ -169,8 +148,8 @@ export function buildReviewRolePrompt(opts: {
     'Stale signals describe lanes that no longer exist; the current lanes are',
     'still running and their signals arrive later.',
     '',
-    `Once you have all ${inScope.length} terminal signal(s), follow roles/review.md exactly to`,
-    'read the reports (including any carried-forward stubs), synthesize the verdict,',
+    `Once you have all ${REVIEW_SUB_ROLES.length} terminal signal(s), follow roles/review.md exactly to`,
+    'read the reports, synthesize the verdict,',
     'write the synthesis report, and signal the status.',
     '',
     '── Review context ──',
@@ -199,11 +178,9 @@ export function buildReviewRolePrompt(opts: {
     subRoleFiles,
     '',
     'After writing the synthesis report, signal the verdict with Overdeck CLI,',
-    'including a per-reviewer verdict for each sub-role that RAN this cycle',
-    '(PAN-1862 — this is what lets the next re-review skip provably-clean reviewers;',
-    'do NOT list carried-forward sub-roles, their verdicts are already recorded):',
-    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${inScope.map(r => `${r}=passed`).join(',')}"`,
-    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${inScope.join(', ')}>"`,
+    'including a per-reviewer verdict for every convoy sub-role:',
+    `  pan admin specialists done review ${opts.issueId} --status passed --notes "<one-line summary>" --run-id "${opts.runId}" --reviewers "${REVIEW_SUB_ROLES.map(r => `${r}=passed`).join(',')}"`,
+    `  pan admin specialists done review ${opts.issueId} --status blocked --notes "<one-line top blocker>" --run-id "${opts.runId}" --reviewers "<subRole>=passed|blocked for each of: ${REVIEW_SUB_ROLES.join(', ')}>"`,
     '',
     // PAN-2007: do NOT tell the agent to `exit`. The session is kept alive through
     // the pipeline (KEEP_SPECIALIST_SESSIONS_ALIVE) so it can be reused for the next
@@ -561,14 +538,8 @@ async function spawnReviewRoleForIssuePromise(
 
     const fullReview = isExtendedReviewEnabled(opts.issueId);
 
-    // PAN-1862 (FR-7/FR-8/NFR-1): selective re-review — which convoy reviewers run
-    // this cycle vs carry their prior passed verdict forward (computeConvoyScope).
-    const { inScope: inScopeSubRoles, carried: carriedSubRoles, scope: reReviewScope } = fullReview
-      ? await computeConvoyScope(opts.issueId, opts.workspace)
-      : { inScope: [...REVIEW_SUB_ROLES], carried: [], scope: 'changed' as ReReviewScope };
-
     const prompt = fullReview
-      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary, inScopeSubRoles, carriedSubRoles })
+      ? buildReviewRolePrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary })
       : buildSelfReviewPrompt({ ...opts, runId, reviewDir, contextManifestPath, tier1Summary });
 
     const spawnConvoyReviewers = (synthesisAgentId: string) =>
@@ -577,9 +548,6 @@ async function spawnReviewRoleForIssuePromise(
         workspace: opts.workspace,
         runId,
         synthesisAgentId,
-        inScope: inScopeSubRoles,
-        carried: carriedSubRoles,
-        scope: reReviewScope,
         contextManifestPath,
         ...(opts.model ? { model: opts.model } : {}),
         ...(opts.harness ? { harness: opts.harness } : {}),
@@ -851,7 +819,6 @@ export {
   buildConvoyPrompt,
   spawnReviewSubRoleForIssue,
   recoverMissingConvoyReviewers,
-  resolveReReviewScope,
 } from './review-convoy.js';
 
 /**

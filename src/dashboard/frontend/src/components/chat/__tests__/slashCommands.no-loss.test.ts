@@ -10,6 +10,7 @@ interface LegacyCommand {
 const PRE_ADAPTER_COMMANDS = preAdapterCommands as LegacyCommand[];
 const RETIRED_LEGACY_COMMANDS = new Set([
   'pan admin specialists discovery-ready',
+  'pan review scope',
 ]);
 
 const LEGACY_TO_PORTABLE_MAPPINGS = PRE_ADAPTER_COMMANDS
@@ -39,8 +40,9 @@ describe('slash command no-loss audit', () => {
     expect(findMissingMappings(SLASH_COMMANDS)).toEqual([]);
   });
 
-  it('excludes the retired discovery-ready command because review dispatch launches the convoy', () => {
+  it('excludes retired review commands with no valid action', () => {
     expect(SLASH_COMMANDS.some(command => command.insert.startsWith('/pan admin specialists discovery-ready'))).toBe(false);
+    expect(SLASH_COMMANDS.some(command => command.insert.startsWith('/pan review scope'))).toBe(false);
   });
 
   it('detects when a mapped legacy convenience is dropped', () => {
