@@ -221,18 +221,21 @@ describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the st
     filesystem.existingPaths.add(path);
   }
 
-  // Both shapes: synthesis.md is the convoy artifact, review.md is quick
-  // self-review — the fleet default. A synthesis-only fixture would miss it.
+  // Both shapes are workspace evidence, not verdict authority. The canonical
+  // review done signal alone can change a terminal review status.
   it.each(VERDICT_REPORT_FILENAMES)(
-    'does not mark stuck when a fresh approved %s proves the review finished (ac1, ac2)',
+    'marks delivery failure when an untrusted %s artifact claims approval',
     async (filename) => {
       writeArtifact(filename, '## Verdict: APPROVED\n\n## Summary\nEverything checks out cleanly.\n');
 
       await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', { agentId: 'agent-pan-9999' });
 
-      expect(reviewStatus.markWorkspaceStuck).not.toHaveBeenCalled();
-      expect(reviewStatus.setReviewStatusSync).toHaveBeenCalledTimes(1);
-      expect(reviewStatus.setReviewStatusSync.mock.calls[0]![1]).toMatchObject({ reviewStatus: 'passed' });
+      expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
+      expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
+        ISSUE,
+        'feedback_delivery_needs_you',
+        { reason: 'no live feedback target', agentId: 'agent-pan-9999' },
+      );
     },
   );
 
@@ -260,10 +263,7 @@ describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the st
     expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledTimes(1);
   });
 
-  it('does not mark stuck when the artifact head disagrees — the review still finished', async () => {
-    // blocked-by-head-guard writes nothing, but the artifact proves a verdict
-    // exists, so the stuck mark would strand a finished review.
-    reviewStatus.getReviewStatusSync.mockReturnValue({ reviewStatus: 'reviewing', lastVerifiedCommit: 'bbbbbbb2' });
+  it('does not let a mismatched artifact head bypass the feedback-delivery stuck mark', async () => {
     const runDir = join(workspacePath, '.pan', 'review', 'run-1');
     mkdirSync(runDir, { recursive: true });
     const path = join(runDir, 'synthesis.md');
@@ -274,6 +274,10 @@ describe('surfaceIssueFeedbackNeedsYou — the artifact gets a say before the st
     await surfaceIssueFeedbackNeedsYou(ISSUE, 'no live feedback target', {});
 
     expect(reviewStatus.setReviewStatusSync).not.toHaveBeenCalled();
-    expect(reviewStatus.markWorkspaceStuck).not.toHaveBeenCalled();
+    expect(reviewStatus.markWorkspaceStuck).toHaveBeenCalledWith(
+      ISSUE,
+      'feedback_delivery_needs_you',
+      { reason: 'no live feedback target' },
+    );
   });
 });

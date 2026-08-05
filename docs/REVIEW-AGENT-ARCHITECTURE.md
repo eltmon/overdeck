@@ -109,64 +109,45 @@ The full round trip between the work agent and review:
 
 ## Verdict of record (PAN-3511)
 
-A reviewer writes its artifact to disk seconds to minutes **before** the verdict
-syncs into the `review_status` row. Every recovery path that reads only the row
-therefore has a window in which a finished review looks dead. On 2026-08-02 that
-window cost five passed reviews in one evening (PAN-1577): the deacon orphan
-reset, the feedback-delivery stuck mark, and the review-infrastructure breaker
-each fired inside it and wiped an APPROVED verdict back to pending.
+A review artifact can appear in the workspace before the canonical review signal,
+but the workspace is writable by the work agent. It is recovery evidence, never
+independent authority to set a terminal status. Terminal verdicts enter the row
+only through `recordReviewVerdict()` when `pan admin specialists done review`
+receives the reviewer's canonical signal.
 
 The contract has four clauses:
 
-1. **The artifact is the verdict.** `.pan/review/<runId>/synthesis.md` (convoy) or
-   `review.md` (quick self-review) is the verdict of record. The row is a cache of it.
-2. **One verdict write door.** Terminal verdict writes route through
-   `recordReviewVerdict()` in `src/lib/cloister/review-verdict-writer.ts` — that
-   is **PAN-3512's scope**, documented under "Verdict write door" below, not work
-   this contract introduced.
-3. **Every recovery path reads the artifact before acting.** Before a path marks,
-   resets, or re-drives a row, it consults the artifact.
-4. **A guard that refuses a verdict surfaces it; it never destroys it.** Refusal
-   emits a reason and leaves the verdict on disk for the write door to land.
+1. **Artifacts are evidence for the active run.** A recovery path may read
+   `synthesis.md` (convoy) or `review.md` (quick self-review) only when the path
+   is bound to the host-recorded active `reviewRunId`.
+2. **One verdict write door.** `recordReviewVerdict()` in
+   `src/lib/cloister/review-verdict-writer.ts` owns every terminal verdict and
+   rejects stale evidence before it reaches `review_status`.
+3. **Every recovery path reads evidence before acting.** The deacon, delivery
+   failure path, and sweeper inspect the active-run artifact before selecting a
+   recovery action, but artifact content cannot bypass the canonical signal.
+4. **No artifact scan runs in status reads.** The synchronous status resolver
+   never walks `.pan/review`; artifact inspection is limited to recovery patrols.
 
-**The two doors.** `readLatestSynthesisVerdict()` in
-`src/lib/cloister/synthesis-verdict.ts` is the read door — it walks
-`.pan/review/*/`, takes the newest run carrying either artifact filename, and
-returns `null` past a 30-minute freshness bound so a previous cycle's artifact can
-never resurrect over a newly spawned review. `readMemoizedArtifactVerdict()` wraps
-it with a 60-second TTL for callers on the ~60s deacon patrol.
-`attemptArtifactVerdictRestore()` in `src/lib/cloister/verdict-restore.ts` is the
-shared decision point: it reads, predicts whether the write would be refused, and
-either restores or reports. It returns one of `no-artifact`, `restored`, or
-`blocked-by-head-guard`, and **writes nothing** on the first and last.
+`readLatestSynthesisVerdict()` in `src/lib/cloister/synthesis-verdict.ts` reads
+one explicit active run rather than scanning `.pan/review/*/`. It returns `null`
+without a run ID or after the 30-minute freshness bound. Its optional patrol memo
+is LRU-bounded to 256 `(issueId, runId)` entries, so old issues do not accumulate
+in a long-running dashboard process. `readActiveReviewArtifact()` is the shared
+read helper for recovery callers.
 
-**The one-directional rule.** An absent artifact means "no evidence", never
-"approve". On `no-artifact` every caller keeps its exact prior behavior — the
-consult can only ever *prevent* a destructive action, never invent an approval.
+**The recovery sites that consult evidence:**
 
-**The five recovery sites that consult it:**
-
-| Site | File | Without the consult |
+| Site | File | Effect of evidence |
 | --- | --- | --- |
-| Deacon orphan reset | `cloister/deacon-review-status.ts` | resets a finished review to pending |
-| Review-infra breaker (×2: coordinator-died, orphan re-dispatch) | `cloister/deacon-review-status.ts` | strands a finished review behind an operator gate |
-| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | marks stuck a review whose verdict exists; only *delivery* failed |
-| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | re-drives the work agent over an approved review |
-| Stale-journal refusal | `review-status-read.ts` | refuses a journal the artifact independently agrees with |
+| Deacon orphan reset | `cloister/deacon-review-status.ts` | records that an active-run artifact exists, then retains canonical recovery behavior |
+| Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | records evidence while retaining the protective breaker until a canonical signal lands |
+| Feedback-delivery stuck mark | `cloister/feedback-target.ts` | records evidence while retaining the delivery-protection stuck mark |
+| Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
 
-**Known limitation (AC-READ-GUARD).** `restoreWouldTripHeadGuard()` is
-deliberately stricter than the write door: it blocks on *any* two differing
-non-empty heads, where the write door would classify and land the fresh and
-indeterminate cases. A restore blocked this way emits
-`review.verdict_restore_blocked` and one de-duplicated activity entry naming both
-heads — the verdict is **surfaced, not landed, and never dropped**. Landing it is
-the write door's job. Making the loss visible was this issue's scope; making it
-land is PAN-3512's.
-
-**Rule for future guard authors.** A new review recovery path reads the artifact
-before it marks, resets, or re-drives. A guard that refuses a verdict emits the
-reason rather than dropping it silently. Extend `attemptArtifactVerdictRestore`
-rather than adding a parallel artifact read.
+**Rule for future guard authors.** A new review recovery path reads only an
+active-run artifact before it acts. It must never turn workspace artifact content
+into a terminal verdict; use `recordReviewVerdict()` for that write.
 
 ### Review-mode differences
 

@@ -31,6 +31,7 @@
  *  - this module holds no door to any mutation — there is nothing to force.
  */
 import { emitActivityEntrySync, type ActivityLevel } from '../activity-logger.js';
+import { getAgentStateSync } from '../agents/agent-state.js';
 import {
   PARKED_ORBIT_SEVERITY,
   resolveParkedPopulation,
@@ -151,7 +152,13 @@ function recordEscalation(issueId: string, orbit: ParkedOrbit, state: StallSweep
 export async function runStallSweeperPatrol(deps: StallSweeperDeps = {}): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const resolveRows = deps.resolveRows ?? resolveParkedPopulation;
-  const readArtifact = deps.readArtifact ?? readMemoizedArtifactVerdict;
+  const readArtifact = deps.readArtifact ?? ((issueId: string) => {
+    const review = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+    return readMemoizedArtifactVerdict(issueId, {
+      runId: review?.reviewRunId,
+      workspacePath: review?.workspace,
+    });
+  });
   const isAgentLive = deps.isAgentLive ?? sessionExistsSync;
   const emitActivity = deps.emitActivity ?? defaultEmitActivity;
   const emitEvent = deps.emitEvent ?? defaultEmitEvent;
@@ -281,13 +288,14 @@ function reportRow(
     case 'stuck-flag': {
       const reason = typeof row.details?.stuckReason === 'string' ? row.details.stuckReason : '';
 
-      // PAN-3511: the verdict artifact is the read-side source of truth. The
-      // sweeper remains observability-only, but its recommendation must never
-      // tell an operator to re-drive over a review that already finished.
+      // PAN-3511: evidence from the active review run prevents a recommendation
+      // from re-driving work over a review that has already finished. The
+      // sweeper remains observability-only and cannot promote that evidence into
+      // a terminal review status.
       const artifact = actions.readArtifact(issueId);
       if (artifact?.verdict === 'passed') {
         recommend(
-          `restore ${issueId}'s passed review verdict from run ${artifact.runId} through the verdict restore door; do not re-dispatch or resume rework`,
+          `preserve ${issueId}'s passed review evidence from run ${artifact.runId} and await pan admin specialists done review; do not re-dispatch or resume rework`,
           { artifactVerdict: artifact.verdict, artifactRunId: artifact.runId, artifactHead: artifact.headSha },
         );
         return true;

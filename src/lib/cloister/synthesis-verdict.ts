@@ -1,21 +1,20 @@
 /**
  * Synthesis-artifact verdict reader — the race guard for review recovery.
  *
- * The review verdict artifact is the review verdict of RECORD:
+ * The review verdict artifact is evidence from the active review run:
  * `.pan/review/<run>/synthesis.md` for convoy reviews,
  * `.pan/review/<run>/review.md` for quick/self reviews (the fleet default,
- * PAN-1981). Recovery paths that evaluate a 'reviewing' row must consult the
- * artifact before declaring the review dead: a just-finished reviewer writes
- * it seconds to minutes BEFORE the verdict syncs into the review_status row,
- * so history-only recovery wiped APPROVED verdicts (five losses on PAN-1577
- * in one evening, 2026-08-02).
+ * PAN-1981). Recovery paths consult this evidence before declaring the review
+ * dead because a reviewer can write it seconds to minutes before the canonical
+ * done signal reaches `recordReviewVerdict()`. The workspace-writable artifact
+ * never authorizes a terminal status transition on its own.
  *
  * Both shapes are honored through the unified door in
  * review-verdict-report.ts — the quick mode's blocked vocabulary is
  * CHANGES REQUESTED, which a synthesis-only reader cannot see. A recovery
  * path that reads only synthesis.md is blind to the fleet's default mode.
  */
-import { readFileSync, readdirSync, statSync } from 'fs';
+import { readFileSync, statSync } from 'fs';
 import { join } from 'path';
 
 import { resolveProjectFromIssueSync } from '../projects.js';
@@ -58,9 +57,13 @@ function readNotes(content: string, topBlocker: string): string | undefined {
 
 export function readLatestSynthesisVerdict(
   issueId: string,
-  options: { now?: number; workspacePath?: string } = {},
+  options: { now?: number; workspacePath?: string; runId?: string } = {},
 ): SynthesisArtifactVerdict | null {
   const now = options.now ?? Date.now();
+  // Verdict artifacts are workspace-writable. A recovery path must bind its
+  // read to the host-recorded active review run; scanning every run lets an old
+  // or forged artifact become evidence for the current cycle.
+  if (!options.runId) return null;
   const workspacePath = options.workspacePath ?? (() => {
     const resolved = resolveProjectFromIssueSync(issueId);
     return resolved ? join(resolved.projectPath, 'workspaces', `feature-${issueId.toLowerCase()}`) : null;
@@ -73,67 +76,83 @@ export function readLatestSynthesisVerdict(
     return null;
   }
 
-  // Newest run dir by artifact mtime carrying EITHER verdict artifact shape.
-  let latest: { dir: string; runId: string; mtimeMs: number; content: string } | null = null;
+  const runDir = join(reviewRoot, options.runId);
+  const report = findVerdictReport(runDir);
+  if (!report) return null;
+
+  let mtimeMs: number;
+  let content: string;
   try {
-    for (const entry of readdirSync(reviewRoot)) {
-      const runDir = join(reviewRoot, entry);
-      const report = findVerdictReport(runDir);
-      if (!report) continue;
-      const mtimeMs = statSync(report.path).mtimeMs;
-      if (!latest || mtimeMs > latest.mtimeMs) {
-        latest = { dir: runDir, runId: entry, mtimeMs, content: readFileSync(report.path, 'utf-8') };
-      }
-    }
+    mtimeMs = statSync(report.path).mtimeMs;
+    content = readFileSync(report.path, 'utf-8');
   } catch {
     return null;
   }
-  if (!latest || now - latest.mtimeMs > SYNTHESIS_ARTIFACT_FRESH_MS) return null;
+  if (now - mtimeMs > SYNTHESIS_ARTIFACT_FRESH_MS) return null;
 
-  const parsed = parseVerdictReport(latest.content);
+  const parsed = parseVerdictReport(content);
   if (!parsed) return null;
-  const notes = readNotes(latest.content, parsed.topBlocker);
-  const headSha = readHeadEvidence(latest.dir);
+  const notes = readNotes(content, parsed.topBlocker);
+  const headSha = readHeadEvidence(runDir);
 
   return {
-    runId: latest.runId,
+    runId: options.runId,
     verdict: parsed.verdict,
     ...(notes ? { notes } : {}),
     ...(headSha ? { headSha } : {}),
-    mtimeMs: latest.mtimeMs,
+    mtimeMs,
   };
 }
 
 /**
  * Memoized artifact read for callers on a hot path (PAN-3511).
  *
- * `resolveJournalReconciledReviewStatusSync` runs on EVERY `getReviewStatusSync`
- * call in the system, so it cannot afford a directory walk per read. This wraps
- * the reader in a short per-issue TTL: a caller that consults the artifact on a
- * rare branch pays at most one filesystem scan per issue per minute, and the
- * common path pays nothing because it never calls this at all.
+ * Recovery patrols can consult this reader repeatedly, so it cannot afford a
+ * filesystem scan for every pass. This wraps the reader in a short per-run TTL:
+ * a caller that consults the artifact pays at most one scan per issue/run per
+ * minute. Canonical review-status reads never call this function.
  *
  * A null result is memoized too — an issue with no artifact is the common case,
  * and re-scanning for an absent file every read is exactly the cost this avoids.
  */
 export const ARTIFACT_VERDICT_MEMO_TTL_MS = 60_000;
+export const ARTIFACT_VERDICT_MEMO_MAX_ENTRIES = 256;
 
 const artifactVerdictMemo = new Map<string, { value: SynthesisArtifactVerdict | null; checkedAt: number }>();
 
 export function readMemoizedArtifactVerdict(
   issueId: string,
-  options: { now?: number; workspacePath?: string } = {},
+  options: { now?: number; workspacePath?: string; runId?: string } = {},
 ): SynthesisArtifactVerdict | null {
+  if (!options.runId) return null;
   const now = options.now ?? Date.now();
-  const cached = artifactVerdictMemo.get(issueId);
-  if (cached && now - cached.checkedAt < ARTIFACT_VERDICT_MEMO_TTL_MS) return cached.value;
+  const key = `${issueId}:${options.runId}`;
+  const cached = artifactVerdictMemo.get(key);
+  if (cached && now - cached.checkedAt < ARTIFACT_VERDICT_MEMO_TTL_MS) {
+    artifactVerdictMemo.delete(key);
+    artifactVerdictMemo.set(key, cached);
+    return cached.value;
+  }
 
-  const value = readLatestSynthesisVerdict(issueId, { now, ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}) });
-  artifactVerdictMemo.set(issueId, { value, checkedAt: now });
+  const value = readLatestSynthesisVerdict(issueId, {
+    now,
+    ...(options.workspacePath ? { workspacePath: options.workspacePath } : {}),
+    runId: options.runId,
+  });
+  artifactVerdictMemo.set(key, { value, checkedAt: now });
+  if (artifactVerdictMemo.size > ARTIFACT_VERDICT_MEMO_MAX_ENTRIES) {
+    const oldestKey = artifactVerdictMemo.keys().next().value;
+    if (oldestKey) artifactVerdictMemo.delete(oldestKey);
+  }
   return value;
 }
 
 /** Test seam — module-level memo state leaks across tests in a file otherwise. */
 export function __resetArtifactVerdictMemo(): void {
   artifactVerdictMemo.clear();
+}
+
+/** Test seam — exposes the bounded memo cardinality without leaking its entries. */
+export function __artifactVerdictMemoSize(): number {
+  return artifactVerdictMemo.size;
 }

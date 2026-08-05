@@ -133,7 +133,7 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
     'review_infrastructure_failure',
     'feedback_delivery_needs_you',
     'verification_stuck',
-  ])('stuck-flag %s + fresh PASSED artifact: recommends verdict restore, never re-drive', async (stuckReason) => {
+  ])('stuck-flag %s + fresh PASSED artifact: preserves evidence and awaits the canonical signal', async (stuckReason) => {
     const artifact = {
       verdict: 'passed',
       runId: 'agent-pan-1-review-run-att1',
@@ -149,7 +149,7 @@ describe('runStallSweeperPatrol — per-orbit recommendations (observability-onl
 
     const recs = recommendations(h);
     expect(recs).toHaveLength(1);
-    expect(String(recs[0]!.payload.recommendation)).toContain('restore PAN-1');
+    expect(String(recs[0]!.payload.recommendation)).toContain('preserve PAN-1');
     expect(String(recs[0]!.payload.recommendation)).toContain('do not re-dispatch or resume rework');
     expect(recs[0]!.payload).toMatchObject({
       artifactVerdict: 'passed',

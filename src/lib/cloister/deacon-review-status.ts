@@ -10,8 +10,7 @@ import { markWorkspaceStuck } from '../overdeck/review-status-sync.js';
 import { AGENTS_DIR } from '../paths.js';
 import { resolveProjectFromIssueSync } from '../projects.js';
 import { getReviewStatusSync, loadReviewStatuses, setReviewStatusSync, type ReviewStatus, type ReviewStatusUpdate } from '../review-status.js';
-import { readLatestSynthesisVerdict } from './synthesis-verdict.js';
-import { attemptArtifactVerdictRestore } from './verdict-restore.js';
+import { readActiveReviewArtifact } from './verdict-restore.js';
 import { logDeaconEventSync } from '../persistent-logger.js';
 import { recordDeaconNudge } from './deacon-nudge-log.js';
 import { REVIEW_SUB_ROLES } from './review-monitor.js';
@@ -340,28 +339,27 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
   return false;
 }
 
-/** PAN-3511: the restore door owns no review-status import (cycle) — callers lend it theirs. */
-const reviewStatusRowAccess = { getStatus: getReviewStatusSync, setStatus: (id: string, u: ReviewStatusUpdate) => { setReviewStatusSync(id, u); } };
-
 /**
- * PAN-3511: retries exhausted while a verdict already sits on disk may mean recovery was
- * chasing a review that had already FINISHED. Only a verdict successfully restored to the
- * row supersedes the breaker; a head-guard refusal still needs the operator-visible stuck
- * mark. Reader errors also fail toward that established breaker behavior.
+ * Read workspace artifact evidence only for the host-recorded active review run.
+ * Evidence never writes a verdict: the reviewer's `specialists done` signal owns
+ * that transition through recordReviewVerdict.
  */
-async function artifactSupersededBreaker(issueId: string, actions: string[]): Promise<boolean> {
+function readActiveReviewEvidence(issueId: string) {
+  const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+  return readActiveReviewArtifact(issueId, {
+    runId: state?.reviewRunId,
+    workspacePath: state?.workspace,
+  });
+}
+
+function recordArtifactEvidenceAtBreaker(issueId: string, actions: string[]): void {
   try {
-    const restore = await attemptArtifactVerdictRestore(issueId, {
-      caller: 'review-infra-breaker',
-      clearStuckReason: 'review_infrastructure_failure',
-      deps: reviewStatusRowAccess,
-    });
-    if (restore.outcome !== 'restored') return false;
-    actions.push(`Review-infra breaker for ${issueId} superseded by a fresh ${restore.artifact.verdict} artifact (${restore.outcome})`);
-    return true;
+    const artifact = readActiveReviewEvidence(issueId);
+    if (artifact) {
+      actions.push(`Review-infra breaker for ${issueId} found a fresh ${artifact.verdict} artifact for the active run; retaining the breaker until the canonical review signal lands`);
+    }
   } catch (err) {
     console.warn(`[deacon] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
-    return false;
   }
 }
 
@@ -401,7 +399,7 @@ export async function handleReviewCoordinatorDied(
   }
 
   if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
-    if (await artifactSupersededBreaker(issueId, actions)) return actions;
+    recordArtifactEvidenceAtBreaker(issueId, actions);
     markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
       reviewRetryCount: status.reviewRetryCount ?? 0,
       recoveryStartedAt: status.recoveryStartedAt,
@@ -597,29 +595,15 @@ async function reconcileReviewStatusOrphan(
       return actions;
     }
     if (!hasPassedReview) {
-      // RACE GUARD (PAN-1577 loop, 2026-08-02): consult the verdict artifact of
-      // record before declaring this review dead. A just-finished reviewer's
-      // artifact lands on disk before the history entry syncs into the row;
-      // resetting wiped APPROVED verdicts five times in one evening. Only a
-      // PASSED artifact short-circuits here, exactly as before the retrofit.
-      const restore = await attemptArtifactVerdictRestore(issueId, {
-        caller: 'orphan-reset',
-        clearStuckReason: 'review_infrastructure_failure',
-        deps: { ...reviewStatusRowAccess, readArtifact: (id, o) => { const a = readLatestSynthesisVerdict(id, o); return a?.verdict === 'passed' ? a : null; } },
-      });
-      if (restore.outcome === 'restored') {
-        actions.push(
-          `Restored orphaned review verdict for ${issueId} from the synthesis artifact (race guard — history sync had not landed)`,
-        );
-        return actions;
-      }
-      if (restore.outcome === 'blocked-by-head-guard') {
-        // The artifact proves a review FINISHED — falling through to the reset below is the PAN-1577 wipe by another name.
-        actions.push(
-          `Left orphaned review for ${issueId} untouched: a fresh ${restore.artifact.verdict} artifact at head `
-          + `${restore.artifact.headSha?.slice(0, 8) ?? 'none'} disagrees with the row anchor — reported, not reset`,
-        );
-        return actions;
+      // RACE GUARD (PAN-1577): inspect evidence from the host-recorded active
+      // run before recovery changes the row. Workspace artifacts are never
+      // verdict authority; only the reviewer's canonical done signal may land a
+      // terminal result, so recovery continues after recording this evidence.
+      try {
+        const artifact = readActiveReviewEvidence(issueId);
+        if (artifact) actions.push(`Found fresh ${artifact.verdict} artifact for ${issueId}'s active review run; awaiting canonical review signal before recovery`);
+      } catch (err) {
+        console.warn(`[deacon] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}`);
       }
       const nextRetry = (status.reviewRetryCount ?? 0) + 1;
       const recoveryStart = status.recoveryStartedAt ?? new Date().toISOString();
@@ -644,7 +628,7 @@ async function reconcileReviewStatusOrphan(
   ) {
     if ((status.reviewRetryCount ?? 0) >= REVIEW_INFRA_BREAKER_THRESHOLD) {
       try {
-        if (await artifactSupersededBreaker(issueId, actions)) return actions;
+        recordArtifactEvidenceAtBreaker(issueId, actions);
         markWorkspaceStuck(issueId, 'review_infrastructure_failure', {
           reviewRetryCount: status.reviewRetryCount ?? 0,
           recoveryStartedAt: status.recoveryStartedAt,

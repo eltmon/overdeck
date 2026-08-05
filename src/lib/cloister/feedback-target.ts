@@ -264,45 +264,23 @@ export async function surfaceIssueFeedbackNeedsYou(
 ): Promise<void> {
   try {
     const { markWorkspaceStuck, FEEDBACK_DELIVERY_STUCK_REASON } = await import('../review-status.js');
-    // PAN-3511: the verdict artifact of record gets a say before the stuck mark.
-    // A review that produced a verdict is NOT stuck — only its feedback delivery
-    // failed, and the delivery machinery retries without needing the flag.
-    // Marking it stuck here strands a finished review behind an operator gate.
-    //
-    // The consult fails TOWARD the stuck mark: a reader error must never cost
-    // us the flag that protects delivery today, so it degrades to 'no-artifact'
-    // rather than escaping to the outer catch, which would skip the mark.
-    const restore = await (async () => {
-      try {
-        const { attemptArtifactVerdictRestore } = await import('./verdict-restore.js');
-        const { getReviewStatusSync, setReviewStatusSync } = await import('../review-status.js');
-        return await attemptArtifactVerdictRestore(issueId, {
-          caller: 'feedback-target',
-          clearStuckReason: FEEDBACK_DELIVERY_STUCK_REASON,
-          // The restore door owns no review-status import (it would close an
-          // import cycle through this very module) — we lend it ours.
-          deps: {
-            getStatus: getReviewStatusSync,
-            setStatus: (id, update) => { setReviewStatusSync(id, update); },
-          },
-        });
-      } catch (err) {
-        console.warn(
-          `[feedback-target] Artifact consult failed for ${issueId}: `
-          + `${err instanceof Error ? err.message : String(err)}; proceeding with the stuck mark`,
-        );
-        return { outcome: 'no-artifact' } as const;
-      }
-    })();
-    if (restore.outcome !== 'no-artifact') {
-      // 'restored' wrote the verdict; 'blocked-by-head-guard' wrote nothing but
-      // already reported why. Either way the artifact proves the review
-      // finished, so the stuck mark would be wrong.
-      console.warn(
-        `[feedback-target] ${issueId}: review finished with a ${restore.artifact.verdict} artifact and only its `
-        + `feedback delivery failed (${restore.outcome}) — not marking it stuck. ${reason}`,
-      );
-      return;
+    // PAN-3511: consult evidence from the host-recorded active review run
+    // before mutating the row. A workspace artifact never authorizes a terminal
+    // verdict; the canonical review done signal owns that transition, so a
+    // delivery failure still receives its protective stuck mark.
+    try {
+      const [{ getAgentStateSync }, { readActiveReviewArtifact }] = await Promise.all([
+        import('../agents/agent-state.js'),
+        import('./verdict-restore.js'),
+      ]);
+      const state = getAgentStateSync(`agent-${issueId.toLowerCase()}-review`);
+      const artifact = readActiveReviewArtifact(issueId, {
+        runId: state?.reviewRunId,
+        workspacePath: state?.workspace,
+      });
+      if (artifact) console.warn(`[feedback-target] ${issueId}: found fresh ${artifact.verdict} artifact for the active run; awaiting canonical review signal. ${reason}`);
+    } catch (err) {
+      console.warn(`[feedback-target] Artifact consult failed for ${issueId}: ${err instanceof Error ? err.message : String(err)}; proceeding with the stuck mark`);
     }
     markWorkspaceStuck(issueId, FEEDBACK_DELIVERY_STUCK_REASON, {
       reason,
