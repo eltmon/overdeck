@@ -492,9 +492,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-05T02:22:11.679Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-05T02:26Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-05T02:26:21.038Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-05T02:26:21Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3511\n\n# Review Synthesis — PAN-3511 — 2026-08-05\n\n## Verdict: CHANGES REQUESTED — the persisted attestation key remains readable by workspace-controlled processes\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/context.json\n- Branch: feature/pan-3511\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511\n- HEAD reviewed: ac6d229579cbd985ec065cfcc50289aafe531c2d\n- Cycle number: 5\n- Prior cycle SHA: a9b929918604303a61ec22b0189528eb8928c778 (last complete synthesis)\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/security.md | 1 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/requirements.md | 0 |\n\n## Blocking Findings\n\n### [security] Persisting the signing key at a same-UID path does not make it host-only — `src/lib/review-attestation-key.ts:31`\nThe new restart-safe key is read from `<OVERDECK_HOME>/review-attestation-key` with mode `0600`. Review agents and repository-controlled subprocesses run as the same Unix account as the dashboard, so they can read that file directly despite environment stripping. With the active run ID from workspace `context.json`, such a process can derive the HMAC completion token, write an APPROVED report, and call the attestation endpoint; the host then signs attacker-authored content as a valid verdict of record.\n\nThe key persistence code is in both the PR diff and the cycle diff from `a9b929918604303a61ec22b0189528eb8928c778`, so this remains promotable in cycle 5. Put attestation behind an actual privilege or mount boundary unavailable to review-workspace processes, and prove a workspace-owned subprocess cannot read the signing material, derive a current-run token, or obtain a passed attestation.\n\n### [correctness] A head-guard refusal suppresses the review-infrastructure breaker without restoring a verdict — `src/lib/cloister/deacon-review-status.ts:359`\n`artifactSupersededBreaker()` returns `true` for every result other than `no-artifact`. On `blocked-by-head-guard`, `attemptArtifactVerdictRestore()` intentionally writes no status, but both exhausted-retry breaker sites return before their existing `markWorkspaceStuck('review_infrastructure_failure', ...)` call. A dead review that completed on a different HEAD is consequently left pending or reviewing with no live reviewer and no durable operator-visible recovery state; subsequent patrols repeat the failed restore without advancing or escalating it.\n\nThis helper and both callers were introduced in the cycle diff. Treat only `restored` as superseding the breaker. Keep the blocked-restore event and activity evidence, then execute the established infrastructure-failure stuck mark for a guard-rejected artifact so the unresolved verdict is visible without claiming that it landed.\n\n## Scope Note\nBoth blockers cite lines added after the previous complete synthesis and remain inside the overall PR diff, so neither is demoted by the mandatory PR-scope or cycle convergence gates. The requirements report marks all seven traced work items `Scope: in_pr_scope` and complete; it does not override the independently found security and recovery-state failures.\n\n## Clean Sub-roles\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3511/.pan/review/agent-pan-3511-review-ac6d2295/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3511 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "packages/contracts/src/events.ts",
@@ -544,10 +557,10 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:22:11.680Z",
+  "updated": "2026-08-05T02:26:21.039Z",
   "pipeline": {
     "issueId": "PAN-3511",
-    "reviewStatus": "reviewing",
+    "reviewStatus": "blocked",
     "testStatus": "pending",
     "verificationStatus": "passed",
     "inspectStatus": "passed",
@@ -555,21 +568,39 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:18:20.927Z",
-    "reviewNotes": "Agent re-review request (12/25): Fixed lint",
+    "updatedAt": "2026-08-05T02:26:20.362Z",
+    "reviewNotes": "Persisted attestation key is readable by workspace-controlled processes",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "reviewedAtCommit": "a9b929918604303a61ec22b0189528eb8928c778",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
-    "reviewSpawnedAt": "2026-08-05T02:18:14.039Z"
+    "reviewSpawnedAt": "2026-08-05T02:18:14.039Z",
+    "reviewerVerdicts": {
+      "security": {
+        "status": "blocked",
+        "atCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d"
+      },
+      "correctness": {
+        "status": "blocked",
+        "atCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d"
+      },
+      "performance": {
+        "status": "passed",
+        "atCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d"
+      },
+      "requirements": {
+        "status": "passed",
+        "atCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d"
+      }
+    }
   },
   "closeOut": {
     "usage": {
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 120007,
-            "output": 50283,
-            "cacheRead": 25270,
+            "input": 140952,
+            "output": 65050,
+            "cacheRead": 26376,
             "cacheWrite": 0
           }
         },
@@ -581,9 +612,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 1165064,
-            "output": 22153,
-            "cacheRead": 10234880,
+            "input": 2491063,
+            "output": 34652,
+            "cacheRead": 15612928,
             "cacheWrite": 0
           }
         },
@@ -595,9 +626,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 719160,
-            "output": 33884,
-            "cacheRead": 4784640,
+            "input": 1758443,
+            "output": 70886,
+            "cacheRead": 12888064,
             "cacheWrite": 0
           }
         },
@@ -609,9 +640,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 747856,
-            "output": 29103,
-            "cacheRead": 3977216,
+            "input": 1216784,
+            "output": 40995,
+            "cacheRead": 6672896,
             "cacheWrite": 0
           }
         },
@@ -623,9 +654,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 857321,
-            "output": 43298,
-            "cacheRead": 6558208,
+            "input": 1406453,
+            "output": 66480,
+            "cacheRead": 11620864,
             "cacheWrite": 0
           }
         },
@@ -637,9 +668,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 610267,
-            "output": 27886,
-            "cacheRead": 5216256,
+            "input": 1504799,
+            "output": 74674,
+            "cacheRead": 12117504,
             "cacheWrite": 0
           }
         },
@@ -654,9 +685,9 @@
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 120007,
-          "output": 50283,
-          "cacheRead": 25270,
+          "input": 140952,
+          "output": 65050,
+          "cacheRead": 26376,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
@@ -666,15 +697,15 @@
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 4099668,
-          "output": 156324,
-          "cacheRead": 30771200,
+          "input": 8377542,
+          "output": 287687,
+          "cacheRead": 58912256,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 325.313694,
-        "pricingAsOf": "2026-08-05T02:18:22.144Z"
+        "usd": 345.1090306,
+        "pricingAsOf": "2026-08-05T02:26:20.384Z"
       }
     },
     "merges": [
@@ -683,7 +714,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
