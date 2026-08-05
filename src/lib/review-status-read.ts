@@ -47,17 +47,25 @@ export function resolveJournalReconciledReviewStatusSync(
       const artifact = typeof journalVerdict === 'string' && review
         ? readMemoizedArtifactVerdict(issueId, review)
         : null;
+      const artifactHeadMatchesLive = Boolean(
+        artifact?.headSha
+        && liveStatus.lastVerifiedCommit
+        && artifact.headSha === liveStatus.lastVerifiedCommit,
+      );
+      const headlessArtifactHasHostBinding = Boolean(
+        artifact
+        && !artifact.headSha
+        && review?.roleRunHead
+        && liveStatus.lastVerifiedCommit
+        && review.roleRunHead === liveStatus.lastVerifiedCommit,
+      );
       if (
         artifact
         && artifact.verdict === journalVerdict
-        && (
-          !artifact.headSha
-          || !liveStatus.lastVerifiedCommit
-          || artifact.headSha === liveStatus.lastVerifiedCommit
-        )
+        && (artifactHeadMatchesLive || headlessArtifactHasHostBinding)
       ) {
         console.log(
-          `[review-status] Active-run artifact corroborated the stale journal verdict with no conflicting live anchor for ${issueId}; replaying the terminal journal result.`,
+          `[review-status] Active-run artifact corroborated the stale journal verdict with a live review-head binding for ${issueId}; replaying the terminal journal result.`,
         );
         return reconcileJournalIntoCacheSync(issueId, dbStatus ?? null, journal, hooks);
       }

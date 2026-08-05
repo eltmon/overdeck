@@ -62,6 +62,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/database/review-status-db.ts', 'reviewedAtCommit', 'reviewedAtCommit: row.reviewed_at_commit ?? undefined', 'Review cache deserialization.'),
   allow('src/lib/database/review-status-db.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: row.last_verified_commit ?? undefined', 'Review cache deserialization.'),
   allow('src/lib/overdeck/agent-state-sync.ts', 'roleRunHead', 'roleRunHead: row.role_run_head ?? undefined', 'Agent cache reconciliation.'),
+  allow('src/lib/overdeck/agent-state-sync.ts', 'roleRunHead', 'roleRunHead: state.roleRunHead', 'Host-recorded run anchor projection for stale journal validation.'),
   allow('src/lib/overdeck/agents.ts', 'roleRunHead', "roleRunHead: (row['role_run_head'] as string | null) ?? null", 'Agent cache deserialization.'),
   allow('src/lib/overdeck/review-status-record-sync.ts', 'reviewedAtCommit', 'reviewedAtCommit: p.reviewedAtCommit', 'Durable record mirror of validated status.'),
   allow('src/lib/overdeck/review-status-record-sync.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: p.lastVerifiedCommit', 'Durable record mirror of validated status.'),

@@ -278,6 +278,7 @@ registerActiveReviewArtifactContextReader((issueId) => {
   if (!state?.reviewRunId) return null;
   return {
     runId: state.reviewRunId,
+    ...(state.roleRunHead ? { roleRunHead: state.roleRunHead } : {}),
     ...(state.workspace ? { workspacePath: state.workspace } : {}),
   };
 });

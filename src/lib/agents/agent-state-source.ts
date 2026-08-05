@@ -6,6 +6,8 @@ export interface FeedbackAgentState {
 
 export interface ActiveReviewArtifactContext {
   runId: string;
+  /** Host-recorded workspace snapshot captured when this review run started. */
+  roleRunHead?: string;
   workspacePath?: string;
 }
 

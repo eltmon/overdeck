@@ -54,6 +54,7 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     reconcile.mockReturnValue(RECONCILED);
     readReviewArtifactContext.mockReturnValue({
       runId: 'host-recorded-run',
+      roleRunHead: 'reviewed-head',
       workspacePath: '/workspace',
     });
   });
@@ -72,6 +73,7 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
 
     expect(readArtifact).toHaveBeenCalledWith(ISSUE, {
       runId: 'host-recorded-run',
+      roleRunHead: 'reviewed-head',
       workspacePath: '/workspace',
     });
     expect(reconcile).toHaveBeenCalledTimes(1);
@@ -91,7 +93,7 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     expect(reconcile).toHaveBeenCalledTimes(1);
   });
 
-  it('reconciles a stale terminal journal when the live row has no anchor', () => {
+  it('refuses a stale terminal journal when the live row has no anchor', () => {
     terminalJournal('passed');
     staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
     readArtifact.mockReturnValue({
@@ -102,8 +104,26 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     });
 
     const rowWithoutAnchor = { ...DB_ROW, lastVerifiedCommit: undefined } as never;
-    expect(resolveJournalReconciledReviewStatusSync(ISSUE, rowWithoutAnchor, hooks())).toBe(RECONCILED);
-    expect(reconcile).toHaveBeenCalledTimes(1);
+    expect(resolveJournalReconciledReviewStatusSync(ISSUE, rowWithoutAnchor, hooks())).toBe(rowWithoutAnchor);
+    expect(reconcile).not.toHaveBeenCalled();
+  });
+
+  it('refuses a headless quick-review artifact without a matching host run anchor', () => {
+    terminalJournal('passed');
+    staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
+    readReviewArtifactContext.mockReturnValue({
+      runId: 'host-recorded-run',
+      roleRunHead: 'different-head',
+      workspacePath: '/workspace',
+    });
+    readArtifact.mockReturnValue({
+      verdict: 'passed',
+      runId: 'host-recorded-run',
+      mtimeMs: 1,
+    });
+
+    expect(resolveJournalReconciledReviewStatusSync(ISSUE, DB_ROW, hooks())).toBe(DB_ROW);
+    expect(reconcile).not.toHaveBeenCalled();
   });
 
   it('refuses a stale journal when active-run evidence disagrees', () => {
