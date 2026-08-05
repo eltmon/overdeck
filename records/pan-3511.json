@@ -574,7 +574,7 @@
     "recordedAt": "2026-08-04T02:17:11.054Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T02:43:30.062Z",
+  "updated": "2026-08-05T02:44:44.358Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "reviewing",
@@ -585,8 +585,23 @@
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-04T17:33:51.228Z",
-    "updatedAt": "2026-08-05T02:42:16.887Z",
+    "updatedAt": "2026-08-05T02:44:42.211Z",
     "reviewNotes": "Persisted attestation key is readable by workspace-controlled processes",
+    "blockerReasons": [
+      {
+        "type": "merge_conflict",
+        "summary": "Conflicts with main since bbc8e9f (2 paths): src/lib/cloister/__tests__/stall-sweeper.test.ts, src/lib/cloister/stall-sweeper.ts",
+        "detectedAt": "2026-08-05T02:44:28.117Z"
+      }
+    ],
+    "conflictsSince": {
+      "sha": "bbc8e9fcc722afcdd1d7992fc18583627ff206a4",
+      "detectedAt": "2026-08-05T02:44:28.117Z",
+      "paths": [
+        "src/lib/cloister/__tests__/stall-sweeper.test.ts",
+        "src/lib/cloister/stall-sweeper.ts"
+      ]
+    },
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
     "lastVerifiedCommit": "ac6d229579cbd985ec065cfcc50289aafe531c2d",
     "reviewSpawnedAt": "2026-08-05T02:42:16.886Z"
@@ -596,9 +611,9 @@
       "byStage": {
         "memory-extraction": {
           "anthropic/claude-haiku-4-5": {
-            "input": 159593,
-            "output": 74110,
-            "cacheRead": 28046,
+            "input": 169247,
+            "output": 79745,
+            "cacheRead": 29326,
             "cacheWrite": 0
           }
         },
@@ -610,9 +625,9 @@
             "cacheWrite": 0
           },
           "openai/gpt-5.6-terra": {
-            "input": 2496269,
-            "output": 37100,
-            "cacheRead": 16251904,
+            "input": 7056957,
+            "output": 85390,
+            "cacheRead": 26227712,
             "cacheWrite": 0
           }
         },
@@ -674,36 +689,36 @@
         },
         "work": {
           "openai/gpt-5.6-sol": {
-            "input": 4673375,
-            "output": 470754,
-            "cacheRead": 221581824,
+            "input": 4720005,
+            "output": 485845,
+            "cacheRead": 225555968,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "anthropic/claude-haiku-4-5": {
-          "input": 159593,
-          "output": 74110,
-          "cacheRead": 28046,
+          "input": 169247,
+          "output": 79745,
+          "cacheRead": 29326,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-sol": {
-          "input": 22928152,
-          "output": 1080138,
-          "cacheRead": 335758848,
+          "input": 22974782,
+          "output": 1095229,
+          "cacheRead": 339732992,
           "cacheWrite": 0
         },
         "openai/gpt-5.6-terra": {
-          "input": 8382748,
-          "output": 290135,
-          "cacheRead": 59551232,
+          "input": 12943436,
+          "output": 338425,
+          "cacheRead": 69527040,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 355.6540736,
-        "pricingAsOf": "2026-08-05T02:42:18.905Z"
+        "usd": 372.9850266,
+        "pricingAsOf": "2026-08-05T02:44:42.220Z"
       }
     },
     "merges": [
@@ -712,7 +727,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "gpt-5.6-terra",
+  "model": "gpt-5.6-sol",
   "recoveryTrips": [
     {
       "issue": "PAN-3511",
