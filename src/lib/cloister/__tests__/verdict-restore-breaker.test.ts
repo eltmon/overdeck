@@ -235,6 +235,45 @@ describe('orphan re-dispatch breaker (ac2)', () => {
   });
 });
 
+describe('head-guard refusal at the breaker', () => {
+  it('preserves blocked-restore evidence and marks the coordinator-died row stuck', async () => {
+    writeArtifact('synthesis.md', APPROVED);
+    mocks.getReviewStatusSync.mockReturnValue(status({ lastVerifiedCommit: 'b'.repeat(40) }));
+
+    const { handleReviewCoordinatorDied } = await import('../deacon-review-status.js');
+    const actions = await handleReviewCoordinatorDied(ISSUE, 'agent-pan-3511-review', 'pane died');
+
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    expect(mocks.markWorkspaceStuck).toHaveBeenCalledWith(ISSUE, 'review_infrastructure_failure', {
+      reviewRetryCount: BREAKER_THRESHOLD,
+      recoveryStartedAt: '2026-08-03T00:00:00.000Z',
+    });
+    expect(actions.join(' ')).toContain('Review recovery stopped');
+    expect(actions.join(' ')).not.toContain('superseded');
+  });
+
+  it('preserves blocked-restore evidence and marks the orphan row stuck', async () => {
+    writeArtifact('synthesis.md', APPROVED);
+    const row = orphanBreakerStatus({ lastVerifiedCommit: 'b'.repeat(40) });
+    mocks.loadReviewStatuses.mockReturnValue({ [ISSUE]: row });
+    mocks.getReviewStatusSync.mockReturnValue(row);
+
+    const { checkOrphanedReviewStatuses } = await import('../deacon-review-status.js');
+    const actions = await checkOrphanedReviewStatuses();
+
+    expect(mocks.emitActivityEntryOnce).toHaveBeenCalledTimes(1);
+    expect(mocks.setReviewStatusSync).not.toHaveBeenCalled();
+    expect(mocks.markWorkspaceStuck).toHaveBeenCalledWith(ISSUE, 'review_infrastructure_failure', {
+      reviewRetryCount: BREAKER_THRESHOLD,
+      recoveryStartedAt: '2026-08-03T00:00:00.000Z',
+      lastReviewNotes: 'infra flake',
+    });
+    expect(actions.join(' ')).toContain('Tripped review-infra breaker');
+    expect(actions.join(' ')).not.toContain('superseded');
+  });
+});
+
 describe('no artifact on disk (ac3)', () => {
   it('marks stuck with the unchanged details payload at the coordinator-died site', async () => {
     const { handleReviewCoordinatorDied } = await import('../deacon-review-status.js');

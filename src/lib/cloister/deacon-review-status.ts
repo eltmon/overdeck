@@ -343,10 +343,10 @@ async function isTestAgentActiveForIssue(issueId: string): Promise<boolean> {
 const reviewStatusRowAccess = { getStatus: getReviewStatusSync, setStatus: (id: string, u: ReviewStatusUpdate) => { setReviewStatusSync(id, u); } };
 
 /**
- * PAN-3511: retries exhausted while a verdict already sits on disk means recovery was
- * chasing a review that had already FINISHED, so tripping the breaker would strand it
- * behind an operator gate. True means the caller must skip its stuck mark. Fails toward
- * the mark — a reader error returns false so today's protection survives.
+ * PAN-3511: retries exhausted while a verdict already sits on disk may mean recovery was
+ * chasing a review that had already FINISHED. Only a verdict successfully restored to the
+ * row supersedes the breaker; a head-guard refusal still needs the operator-visible stuck
+ * mark. Reader errors also fail toward that established breaker behavior.
  */
 async function artifactSupersededBreaker(issueId: string, actions: string[]): Promise<boolean> {
   try {
@@ -355,7 +355,7 @@ async function artifactSupersededBreaker(issueId: string, actions: string[]): Pr
       clearStuckReason: 'review_infrastructure_failure',
       deps: reviewStatusRowAccess,
     });
-    if (restore.outcome === 'no-artifact') return false;
+    if (restore.outcome !== 'restored') return false;
     actions.push(`Review-infra breaker for ${issueId} superseded by a fresh ${restore.artifact.verdict} artifact (${restore.outcome})`);
     return true;
   } catch (err) {
