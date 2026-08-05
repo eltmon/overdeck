@@ -16,7 +16,7 @@
   ],
   "feedback": [],
   "created": "2026-08-05T14:32:49.075Z",
-  "updated": "2026-08-05T15:03:57.741Z",
+  "updated": "2026-08-05T15:19:38.547Z",
   "pipeline": {
     "issueId": "PAN-3552",
     "reviewStatus": "pending",
@@ -53,16 +53,8 @@
   ],
   "workModel": "gpt-5.6-terra",
   "tasks": {
-    "sequence": 3,
-    "claims": {
-      "drop-reviewer-session-fork": {
-        "writerId": "agent-pan-3552",
-        "agentId": "agent-pan-3552",
-        "pid": 575287,
-        "host": "eltmon-z790",
-        "claimedAt": "2026-08-05T15:03:57.741Z"
-      }
-    },
+    "sequence": 4,
+    "claims": {},
     "claimHistory": [
       {
         "writerId": "agent-pan-3552",
@@ -74,12 +66,27 @@
         "outcome": "completed",
         "reason": "Removed discovery/fork mode so full review dispatch always launches its convoy, and locked the standby prompt behavior with regression tests.",
         "releasedAt": "2026-08-05T15:03:45.973Z"
+      },
+      {
+        "writerId": "agent-pan-3552",
+        "agentId": "agent-pan-3552",
+        "pid": 575287,
+        "host": "eltmon-z790",
+        "claimedAt": "2026-08-05T15:03:57.741Z",
+        "itemId": "drop-reviewer-session-fork",
+        "outcome": "completed",
+        "reason": "Removed parent-session fork/resume and cache-scope wiring, renamed the missing-lane recovery entry point, and retired the obsolete discovery-ready command with explicit no-loss audit coverage.",
+        "releasedAt": "2026-08-05T15:19:38.547Z"
       }
     ],
     "statusReasons": {
       "drop-parent-discovery-mode": {
         "reason": "Removed discovery/fork mode so full review dispatch always launches its convoy, and locked the standby prompt behavior with regression tests.",
         "updatedAt": "2026-08-05T15:03:45.973Z"
+      },
+      "drop-reviewer-session-fork": {
+        "reason": "Removed parent-session fork/resume and cache-scope wiring, renamed the missing-lane recovery entry point, and retired the obsolete discovery-ready command with explicit no-loss audit coverage.",
+        "updatedAt": "2026-08-05T15:19:38.547Z"
       }
     }
   },
@@ -88,6 +95,10 @@
     "drop-parent-discovery-mode.drop-parent-discovery-mode.ac1": "completed",
     "drop-parent-discovery-mode.drop-parent-discovery-mode.ac2": "completed",
     "drop-parent-discovery-mode.drop-parent-discovery-mode.ac3": "completed",
-    "drop-reviewer-session-fork": "running"
+    "drop-reviewer-session-fork": "completed",
+    "drop-reviewer-session-fork.drop-reviewer-session-fork.ac1": "completed",
+    "drop-reviewer-session-fork.drop-reviewer-session-fork.ac2": "completed",
+    "drop-reviewer-session-fork.drop-reviewer-session-fork.ac3": "completed",
+    "drop-reviewer-session-fork.drop-reviewer-session-fork.ac4": "completed"
   }
 }
