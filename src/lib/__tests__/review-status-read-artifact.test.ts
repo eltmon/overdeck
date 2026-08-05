@@ -78,6 +78,34 @@ describe('resolveJournalReconciledReviewStatusSync — active-run artifact corro
     expect(result).toBe(RECONCILED);
   });
 
+  it('reconciles a stale terminal journal from a headless quick-review artifact', () => {
+    terminalJournal('passed');
+    staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
+    readArtifact.mockReturnValue({
+      verdict: 'passed',
+      runId: 'host-recorded-run',
+      mtimeMs: 1,
+    });
+
+    expect(resolveJournalReconciledReviewStatusSync(ISSUE, DB_ROW, hooks())).toBe(RECONCILED);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+  });
+
+  it('reconciles a stale terminal journal when the live row has no anchor', () => {
+    terminalJournal('passed');
+    staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);
+    readArtifact.mockReturnValue({
+      verdict: 'passed',
+      runId: 'host-recorded-run',
+      headSha: 'artifact-head',
+      mtimeMs: 1,
+    });
+
+    const rowWithoutAnchor = { ...DB_ROW, lastVerifiedCommit: undefined } as never;
+    expect(resolveJournalReconciledReviewStatusSync(ISSUE, rowWithoutAnchor, hooks())).toBe(RECONCILED);
+    expect(reconcile).toHaveBeenCalledTimes(1);
+  });
+
   it('refuses a stale journal when active-run evidence disagrees', () => {
     terminalJournal('passed');
     staleSnapshot.mockReturnValue({ liveCycle: Date.parse('2026-08-03T00:30:00.000Z') } as never);

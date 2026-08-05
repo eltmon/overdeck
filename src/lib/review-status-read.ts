@@ -50,12 +50,14 @@ export function resolveJournalReconciledReviewStatusSync(
       if (
         artifact
         && artifact.verdict === journalVerdict
-        && artifact.headSha
-        && liveStatus.lastVerifiedCommit
-        && artifact.headSha === liveStatus.lastVerifiedCommit
+        && (
+          !artifact.headSha
+          || !liveStatus.lastVerifiedCommit
+          || artifact.headSha === liveStatus.lastVerifiedCommit
+        )
       ) {
         console.log(
-          `[review-status] Active-run artifact corroborated the stale journal verdict and live review anchor for ${issueId}; replaying the terminal journal result.`,
+          `[review-status] Active-run artifact corroborated the stale journal verdict with no conflicting live anchor for ${issueId}; replaying the terminal journal result.`,
         );
         return reconcileJournalIntoCacheSync(issueId, dbStatus ?? null, journal, hooks);
       }

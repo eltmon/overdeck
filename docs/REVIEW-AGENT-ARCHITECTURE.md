@@ -131,7 +131,8 @@ The contract has four clauses:
 4. **No artifact scan runs in status reads.** The synchronous status resolver
    never walks `.pan/review`. Only after its stale-journal refusal predicate
    matches may it consume a bounded, asynchronously populated memo entry whose
-   verdict and head both corroborate the live row.
+   verdict corroborates the journal and whose head, when both sides provide one,
+   does not conflict with the live row.
 
 `readLatestSynthesisVerdictAsync()` in `src/lib/cloister/synthesis-verdict.ts`
 reads one explicit active run rather than scanning `.pan/review/*/`. It returns
@@ -150,7 +151,7 @@ entry preserves the stale-journal refusal without filesystem I/O.
 | Deacon orphan reset | `cloister/deacon-review-status.ts` | asynchronously preserves active-run evidence for diagnosis, then continues the bounded reset path |
 | Review-infra breaker (×2) | `cloister/deacon-review-status.ts` | preserves active-run evidence and still marks/escalates the established infrastructure failure |
 | Feedback-delivery stuck mark | `cloister/feedback-target.ts` | asynchronously records evidence while retaining the delivery-protection stuck mark |
-| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays only a verdict with a matching live head |
+| Stale-journal resolver | `review-status-read.ts` | consumes bounded active-run memo evidence only after a stale-refusal predicate, then replays a matching verdict unless both recorded heads conflict |
 | Stall sweeper, stuck-flag orbit | `cloister/stall-sweeper.ts` | recommends preserving evidence and awaiting the canonical review signal |
 
 **Rule for future guard authors.** A new review recovery path reads only an
