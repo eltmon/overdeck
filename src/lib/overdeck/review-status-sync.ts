@@ -156,9 +156,6 @@ function rowToReviewStatus(row: DbRow, history: StatusHistoryEntry[]): ReviewSta
     reviewCycleHistory: row.review_cycle_history
       ? JSON.parse(row.review_cycle_history) as ReviewStatus['reviewCycleHistory']
       : undefined,
-    conflictsSince: row.conflicts_since
-      ? JSON.parse(row.conflicts_since) as ReviewStatus['conflictsSince']
-      : undefined,
     history: history.length > 0 ? history : undefined,
   });
 }
@@ -327,7 +324,7 @@ export function upsertReviewStatusSync(status: ReviewStatus): void {
       isoToMs(s.strikeNextAttemptAt),
       s.strikeLandingAttempts ? JSON.stringify(s.strikeLandingAttempts) : null,
       s.reviewCycleHistory ? JSON.stringify(s.reviewCycleHistory) : null,
-      s.conflictsSince ? JSON.stringify(s.conflictsSince) : null,
+      null,
     );
 
     if (s.history && s.history.length > 0) {

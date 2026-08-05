@@ -76,6 +76,7 @@ const ALLOWED_WRITE_SITES: AllowedWriteSite[] = [
   allow('src/lib/reconstruct/reconstruct-cache.ts', 'roleRunHead', 'roleRunHead: agent.roleRunHead ?? undefined', 'Cache reconstruction from agent storage.'),
   allow('src/lib/reopen.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit reopen clear.'),
   allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: undefined', 'Explicit work-start clear.'),
+  allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: status.reviewedAtCommit as HeadAnchor | undefined', 'Verdict-preservation adapter supplies a branded review anchor.'),
   allow('src/lib/review-status.ts', 'reviewedAtCommit', 'reviewedAtCommit: anchor', 'Verdict-preservation adapter advances a proven-benign review anchor.'),
   allow('src/lib/review-status.ts', 'lastVerifiedCommit', 'lastVerifiedCommit: undefined', 'Explicit work-start clear.'),
   allow('packages/contracts/src/types.ts', 'roleRunHead', 'roleRunHead: Schema.optional(Schema.String)', 'Unbranded wire schema boundary.'),

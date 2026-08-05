@@ -220,11 +220,7 @@ describe('restoreReviewStatusFromRecords', () => {
     expect(status!.deaconIgnored).toBe(true);
     expect(status!.deaconIgnoredAt).toBe('2026-06-15T01:00:00.000Z');
     expect(status!.deaconIgnoredReason).toBe('operator request');
-    expect(status!.conflictsSince).toEqual({
-      sha: '6ac4a3dc11',
-      detectedAt: '2026-07-26T18:58:00.000Z',
-      paths: ['scripts/file-size-baseline.txt'],
-    });
+    expect(status).not.toHaveProperty('conflictsSince');
   });
 
   it('does not overwrite a fresh live review cycle with a stale durable verdict', async () => {

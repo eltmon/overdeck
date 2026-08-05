@@ -179,8 +179,6 @@ export interface PanIssuePipelineRecord extends StrikeLandingStatus {
   inspectNotes?: string;
   mergeNotes?: string;
   blockerReasons?: unknown[];
-  /** Legacy persisted conflict marker retained for parked-population reads. */
-  conflictsSince?: { sha: string; detectedAt: string; paths: string[] };
   prUrl?: string;
   prNumber?: number;
   prHeadSha?: string;

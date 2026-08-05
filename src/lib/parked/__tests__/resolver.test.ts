@@ -126,13 +126,6 @@ describe('classifyParked — one orbit at a time', () => {
     expect(rows[0].parkReason).toContain('exhausted');
   });
 
-  it('ignores a legacy conflictsSince marker instead of projecting it as a parked orbit', () => {
-    const rows = classifyParked(signals({
-      reviewStatus: baseStatus({ conflictsSince: { sha: 'c8a911e6fa6a991c6a1d1fe23d27fc2499f880ae', detectedAt: new Date(NOW - 4 * HOUR).toISOString(), paths: ['src/a.ts'] } }),
-    }));
-    expect(rows).toHaveLength(0);
-  });
-
   it('zombie-session: a live agent on a merged issue parks; on an open issue does not', () => {
     const live = [{ ...baseAgent({}), tmuxActive: true }];
     const zombie = classifyParked(signals({ reviewStatus: baseStatus({ mergeStatus: 'merged' }), liveAgents: live }));
