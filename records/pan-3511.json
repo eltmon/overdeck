@@ -748,7 +748,7 @@
     "recordedAt": "2026-08-05T06:53:26.179Z"
   },
   "created": "2026-08-02T22:18:35.952Z",
-  "updated": "2026-08-05T09:07:52.182Z",
+  "updated": "2026-08-05T09:07:58.221Z",
   "pipeline": {
     "issueId": "PAN-3511",
     "reviewStatus": "blocked",
@@ -758,10 +758,10 @@
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
-    "updatedAt": "2026-08-05T09:07:51.341Z",
+    "updatedAt": "2026-08-05T09:07:58.208Z",
     "reviewNotes": "Artifact recovery authorizes workspace-controlled verdicts, bypasses head guards, scans synchronously from status reads, and crosses the PAN-3512 write-door boundary",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3529",
-    "reviewedAtCommit": "152565c99eb789dc0434cef9884716a094b12cb6",
+    "reviewedAtCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0",
     "lastVerifiedCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0",
     "reviewSpawnedAt": "2026-08-05T08:58:54.691Z",
     "scopeDrift": {
@@ -812,24 +812,6 @@
         "tests/unit/lib/head-anchor-write-sites.test.ts"
       ],
       "recordedAt": "2026-08-05T06:53:26.179Z"
-    },
-    "reviewerVerdicts": {
-      "security": {
-        "status": "blocked",
-        "atCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0"
-      },
-      "correctness": {
-        "status": "blocked",
-        "atCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0"
-      },
-      "performance": {
-        "status": "blocked",
-        "atCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0"
-      },
-      "requirements": {
-        "status": "blocked",
-        "atCommit": "baf9b8206648c2c6c4ced324e58e2299bd1bb7d0"
-      }
     }
   },
   "closeOut": {
@@ -964,7 +946,7 @@
       },
       "costAtCloseOut": {
         "usd": 574.1908237,
-        "pricingAsOf": "2026-08-05T09:07:51.365Z"
+        "pricingAsOf": "2026-08-05T09:07:58.216Z"
       }
     },
     "merges": [
