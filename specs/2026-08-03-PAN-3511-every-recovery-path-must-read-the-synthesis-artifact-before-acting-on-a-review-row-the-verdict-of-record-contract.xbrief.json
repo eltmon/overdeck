@@ -4,17 +4,17 @@
     "created": "2026-08-03T04:26:51.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3511: Every recovery path must read the synthesis artifact before acting on a review row — the verdict-of-record contract (READ SIDE)",
-    "updated": "2026-08-03T04:33:24.704Z"
+    "updated": "2026-08-05T16:09:38.542Z"
   },
   "plan": {
     "id": "pan-3511",
     "title": "Every recovery path must read the synthesis artifact before acting on a review row — the verdict-of-record contract",
-    "status": "running",
+    "status": "completed",
     "uid": "f85d7351-3402-4a6a-a073-edaa40bc1ba5",
     "author": "agent:claude-opus-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-03T04:26:51.000Z",
-    "updated": "2026-08-03T04:33:24.704Z",
+    "updated": "2026-08-05T16:09:38.542Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3511",
@@ -625,5 +625,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
