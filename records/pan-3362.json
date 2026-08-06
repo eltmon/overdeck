@@ -237,6 +237,11 @@
       "timestamp": "2026-08-06T10:06:15.567Z",
       "reason": "end",
       "note": "Fixed the three remaining UAT gaps from the FIX-1 fixture UAT re-run: Plan tab Tasks 0/0 badge (drawer now shares the live /api/issues/:id/tasks query TasksPanel already used, instead of reading a phantom issue.tasks field the server never populates), agent branch not rendering on any FIX-1 row (agents.branch is a real column that AGENT_COLUMNS_FOR_DB never wired into its SELECT/INSERT list, dropped for every agent not just fixtures), and no PR link rendering (the fixture seeder now emits review.status_changed the same way the pipeline's own reconciler does, since a raw DB upsert alone never reaches the live read model). No other deviations."
+    },
+    {
+      "reason": "resume",
+      "agentModel": "gpt-5.6-terra",
+      "timestamp": "2026-08-06T11:54:26.951Z"
     }
   ],
   "feedback": [],
@@ -291,7 +296,7 @@
     "recordedAt": "2026-08-06T10:06:09.706Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T11:54:25.804Z",
+  "updated": "2026-08-06T11:54:26.967Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "reviewing",
@@ -484,7 +489,7 @@
     "ranOn": "eltmon-z790"
   },
   "harness": "claude-code",
-  "model": "claude-sonnet-5",
+  "model": "gpt-5.6-terra",
   "recoveryTrips": [],
   "tasks": {
     "sequence": 8,
