@@ -897,9 +897,22 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-sol",
       "timestamp": "2026-08-06T21:30:15.816Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T21:45Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T21:45:19.483Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T21:45:19Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3512\n\n# Review Synthesis — PAN-3512 — 2026-08-06T17:44:31-04:00\n\n## Verdict: CHANGES REQUESTED — orphan restoration can preserve a passed test gate after fresh review evidence lands\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/context.json\n- Branch: feature/pan-3512\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512\n- HEAD reviewed: 8eed74d4c4eb476878f487d1e945085543845cac\n- Cycle number: 3\n- Prior cycle SHA: bfac4ec27f7e15cc5953f79167d5d152cb100dfe\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/correctness.md | 1 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/performance.md | 0 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/requirements.md | 0 |\n\n## Blocking Findings\n\n### [correctness] Orphan restore overwrites the fresh-head test-gate reset — `src/lib/cloister/orphan-restore-verdict.ts:28`\n\n`recordReviewVerdict()` correctly constructs `testStatus: 'pending'` when fresh evidence differs from the stored verified head, but it spreads `input.extra` after that reset. The orphan-restore adapter forwards all non-verdict fields as `extra`, and the orphaned-review recovery includes the historical `testStatus` and `testNotes` from the latest terminal test. A restored passed snapshot can therefore overwrite the reset and make a newer reviewed head appear verified without a new test run.\n\nThis finding is in both the PR and cycle diff: `src/lib/cloister/orphan-restore-verdict.ts` was added after the prior reviewed SHA. Preserve the door-selected reset by applying extras before the reset fields or omitting historical test fields on a fresh restore, then add a regression case that restores a prior passed test result against a different evidence head and asserts the persisted test status remains `pending`.\n\n## Non-blocking Findings\n\nNone.\n\n## Clean Sub-roles\n\n- security\n- performance\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3512/.pan/review/agent-pan-3512-review-8eed74d4/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3512 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [],
     "declaredScopeUntouched": [
@@ -949,7 +962,7 @@
     "recordedAt": "2026-08-03T00:01:37.570Z"
   },
   "created": "2026-08-02T22:46:22.463Z",
-  "updated": "2026-08-06T21:45:18.838Z",
+  "updated": "2026-08-06T21:45:19.483Z",
   "pipeline": {
     "issueId": "PAN-3512",
     "reviewStatus": "blocked",
