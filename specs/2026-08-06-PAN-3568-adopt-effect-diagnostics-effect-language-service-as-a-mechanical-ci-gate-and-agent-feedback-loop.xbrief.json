@@ -4,17 +4,17 @@
     "created": "2026-08-06T16:47:56.509Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3568: Adopt Effect diagnostics (@effect/language-service) as a mechanical CI gate and agent feedback loop",
-    "updated": "2026-08-06T16:55:15.266Z"
+    "updated": "2026-08-06T20:28:32.589Z"
   },
   "plan": {
     "id": "pan-3568",
     "title": "Adopt Effect diagnostics (@effect/language-service) as a mechanical CI gate and agent feedback loop",
-    "status": "running",
+    "status": "completed",
     "uid": "bf73740d-92ad-494c-b7ec-703eefff4070",
     "author": "agent:claude-opus-5",
-    "sequence": 3,
+    "sequence": 4,
     "created": "2026-08-06T16:47:56.509Z",
-    "updated": "2026-08-06T16:55:15.266Z",
+    "updated": "2026-08-06T20:28:32.589Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3568",
@@ -897,5 +897,5 @@
       }
     ]
   },
-  "status": "active"
+  "status": "completed"
 }
