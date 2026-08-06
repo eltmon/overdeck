@@ -1308,3 +1308,28 @@ Everything after that is the real defect. The landing door correctly rejected th
 **PAN-3512 is genuinely reworking** — 23m30s of work, 52.1k tokens, `+619/-30`, cost $16.02 on PR #3514. The fresh restart (enabled by PAN-3583) plus the `--host --yes` stack override (PAN-3591) put it back to productive work after three days stalled.
 
 **Push-event CI still absent** — last push run remains 14:58:51Z. Unchanged; PAN-3586 still needs its credential comparison and is stranded behind the un-redispatchable idle strike (PAN-3593 manifestation 2).
+
+### RUN-82 tick 6 — 2026-08-06T21:45Z — the keystone landed, and the gate I hardened three ticks ago caught its first real failure
+
+**PAN-3582 landed and deployed** — `cc366a3a97 fix(deacon): throttle state-plane reconciliation (#3588)`, live as build `cc366a3a97fa`. The closed-out-record reconciliation now runs at most hourly instead of every patrol, with the cadence regression-tested. Fourth substrate fix this run through file → strike → land → deploy.
+
+**The deploy gate refused me once, correctly, and I did not force it.** `pan reload` returned *"Deployment deferred because the post-merge lifecycle is pending"* — `~/.overdeck/pending-post-merge.json` existed for PAN-3582 (`deploy-window.ts:59-61`). The message explicitly says not to retry or `--force`. I waited, confirmed the claim file was picked up (`.claimed-2054952-…`) and then gone, and deployed cleanly on the next attempt. Worth recording as the counter-example to the "I am the deployer" authority: standing authority is not permission to override a gate that is actively protecting an operation.
+
+**PAN-3589's row-6 hardening proved itself on its first real case — and the result is that close-out is now blocked.** PAN-3582's close-out:
+
+```
+6  main-verify  missing required checks on cc366a3a97…: test, lint, build (22), guard;
+                no later default-branch commit contains the merge          MISS
+```
+
+Three ticks ago that same commit would have read `1 check-runs concluded successfully` and passed, certified by the Mintlify docs deploy. The gate is now correct, and correctness means **every close-out is blocked until push-event CI runs on `main` again**. PAN-3582 is merged, deployed, working, and un-closable. I deliberately did not reach for `--accept-main-verify`: the gate is right, the evidence genuinely does not exist, and an override would record a verification that never happened.
+
+That moves PAN-3586 from "verification hygiene" to "the close-out gate is stopped", and it is stranded behind the un-redispatchable idle strike (PAN-3593), so I routed it to `pan plan --auto` for the normal pipeline. Push-event runs remain absent since 14:58:51Z; six commits now sit on `main` with no CI.
+
+**Carry this: hardening a gate converts silent wrongness into visible blockage, and that is the point.** For three ticks the pipeline was certifying unverified commits and everything looked fine. Now nothing closes out and the reason is named on screen. The blockage is not a regression from the fix — it is the outage finally becoming legible.
+
+**Filed PAN-3594 — 84,574 false ERROR lines.** The deacon logs `Migrated checkout has recreated state paths (stray writer)` for four projects on every patrol, forever. Every path it names is stale: lexerra's and tindra's `.pan/{records,continues,specs}` are **completely empty**, and the only two real files (`overdeck/.pan/records/pan-714.json`, `myn/.pan/drafts/min-879.md`) date to 2026-07-14 and 2026-07-18. There is no stray writer. The detector asks "does this path exist?" while claiming "something is writing here", and after migration the leftovers are guaranteed to exist. The cost is not the noise itself: **it is the loudest thing in the deacon log and it is false**, which teaches every reader that deacon errors are background — precisely the wrong lesson in a run where two real defects surfaced as a single quiet log line each.
+
+**PAN-3512 is genuinely productive** — committed `82a90d8518`, pushed to `feature/pan-3512`, all xBRIEF items complete, now fixing a stale manifest entry in `head-anchor-write-sites.test.ts` surfaced by the full suite. The long "Roosting" turn was a full test run, not a stall — worth checking before calling a quiet agent stuck.
+
+**Also noted, not yet acted on:** local `main` is ahead 5 / behind 4 of origin. The 5 are my own FLYWHEEL-STATE commits, which the agent main-push guard correctly refuses to let me push (only `conv-` identities are exempt). They are committed and safe, just local.
