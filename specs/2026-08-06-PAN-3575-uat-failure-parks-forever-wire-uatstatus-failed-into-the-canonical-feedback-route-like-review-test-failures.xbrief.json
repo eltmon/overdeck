@@ -1,0 +1,447 @@
+{
+  "xBRIEFInfo": {
+    "version": "0.8",
+    "created": "2026-08-06T07:40:00.000Z",
+    "author": "overdeck/0.0.0",
+    "description": "Plan for PAN-3575: UAT failure parks forever — wire uatStatus=failed into the canonical feedback route like review/test failures",
+    "updated": "2026-08-06T07:20:58.682Z"
+  },
+  "plan": {
+    "id": "pan-3575",
+    "title": "UAT failure parks forever — wire uatStatus=failed into the canonical feedback route like review/test failures",
+    "status": "proposed",
+    "uid": "27b41c4c-c9b4-42f7-b95f-8b9555c2ea04",
+    "author": "agent:claude-opus-5",
+    "sequence": 2,
+    "created": "2026-08-06T07:40:00.000Z",
+    "updated": "2026-08-06T07:20:58.682Z",
+    "references": [
+      {
+        "uri": "https://github.com/eltmon/overdeck/issues/3575",
+        "label": "PAN-3575",
+        "type": "issue"
+      },
+      {
+        "uri": ".pan/drafts/PAN-3575.md",
+        "label": "PRD draft",
+        "type": "document"
+      }
+    ],
+    "tags": [
+      "pipeline",
+      "feedback",
+      "uat",
+      "parked-population",
+      "review-status"
+    ],
+    "narratives": {
+      "Problem": "A failed UAT verdict is recorded durably and then nothing acts on it. setReviewStatus() counts uatStatus='failed' as a merge blocker (src/lib/review-status.ts:292) so the merge gate correctly refuses, but no code path writes a feedback file, messages the work agent, or escalates. The issue lands in the uat-failed parked orbit, whose own copy names the defect: 'nothing routed the failure back to work' (src/lib/parked/resolver.ts:317). Review-blocked, review-failed, test-failed, and CI-failed all have relays; UAT is the only verdict with none.",
+      "Proposal": "Add src/lib/cloister/uat-failure-feedback.ts — a relay that writes one feedback file through writeFeedbackFile() (specialist 'uat-agent', outcome 'failed'), resolves the delivery target through resolveIssueFeedbackTarget(), messages a live/resurrected work agent with owesRework:true, and calls surfaceIssueFeedbackNeedsYou() when no target resolves. Fire it from the uatStatus transition inside setReviewStatus(), next to the existing test-failure relay, so all three writers of uatStatus='failed' (the REST status route, `pan admin specialists done uat`, the deacon's unsignaled-verdict replay) are covered by one wiring. Dedup on ReviewStatus.reviewedAtCommit so a re-posted verdict writes one file. Then give the uat-failed parked orbit its new owner semantics: suppress it while a live work agent exists, and correct the orbit and stall-sweeper copy plus the docs that still say nothing routes UAT failures back.",
+      "NonGoals": "- Do NOT add a new patrol, cron, timer, or second nudge channel; delivery goes only through writeFeedbackFile(), resolveIssueFeedbackTarget(), surfaceIssueFeedbackNeedsYou(), and messageAgent().\n- Do NOT add a new stuckReason flavor; the relay reuses FEEDBACK_DELIVERY_STUCK_REASON via surfaceIssueFeedbackNeedsYou, so scripts/guard-park-exits.sh needs no new copy entry.\n- Do NOT post a PR comment on UAT failure (review verdicts do; UAT gets the feedback file and the agent message only).\n- Do NOT add an activity-log or TTS entry for uatStatus transitions in setReviewStatus().\n- Do NOT add dedupKey keyed delivery or an ambiguous-delivery retry ladder to the UAT relay's messageAgent call.\n- Do NOT change readyForMerge or merge-blocker semantics; review-status.ts:292 already blocks the merge gate correctly.\n- Do NOT statically import the new relay from src/lib/review-status.ts (circular ESM; dynamic import only).\n- Do NOT delete the uat-failed parked orbit; suppress it only while a live work agent exists.",
+      "Testing": "Every item carries its own vitest file and is verified with `npx vitest run --configLoader runner <path>` plus `npm run typecheck`. The circular-import invariant is additionally guarded by a static source assertion in the WI-2 test and by `npm run lint:circular`. The parked-orbit change is verified by the existing fixture harness in src/lib/parked/__tests__/resolver.test.ts and by `npm run lint:park-exits`."
+    },
+    "autoDecisions": [
+      {
+        "summary": "Fire the relay from the uatStatus transition inside setReviewStatus() rather than from the uatStatus branch of POST /api/review/:issueId/status as the issue body suggested.",
+        "rationale": "Three callers write uatStatus='failed' — routes/workspaces.ts:1475, routes/specialists/legacy-routes.ts:241-247, and cloister/deacon.ts:1452-1455 — and only the write door sees all three. deliverTestFailureToWorkAgentHostSide (review-status.ts:509-514) already established this pattern for test failures. The issue's route-level acceptance criterion is satisfied transitively because the route calls setReviewStatus at workspaces.ts:1483."
+      },
+      {
+        "summary": "Dedup on ReviewStatus.reviewedAtCommit held in an in-process Map, cleared on any non-'failed' uatStatus write, instead of fetching a PR head SHA from GitHub.",
+        "rationale": "reviewedAtCommit is already snapshotted into the row at workspaces.ts:1466-1469 and is the identity review-verdict-feedback.ts:140-142 uses for the same purpose. Fetching a head SHA would put a `gh` subprocess on a hot write path for no extra precision."
+      },
+      {
+        "summary": "No dedupKey keyed delivery and no ambiguous-delivery retry ladder on the relay's messageAgent call.",
+        "rationale": "The anchor map already guarantees one delivery per verdict. review-verdict-feedback.ts:210-251 needs that ladder because a review cycle re-fires many times per anchor; UAT does not."
+      },
+      {
+        "summary": "Suppress the uat-failed parked orbit when a live agent with role 'work' exists, rather than deleting the orbit or leaving it unchanged.",
+        "rationale": "Deleting it loses the signal for the case the relay cannot cover (no resurrectable agent); leaving it unchanged reports a park for an issue an agent is actively reworking. Suppression keeps the orbit meaningful and satisfies the issue's fourth acceptance criterion literally."
+      },
+      {
+        "summary": "No PR comment, no activity/TTS entry, and no new stuck flavor for UAT failure.",
+        "rationale": "The issue's step 4 forbids a second nudge channel, and each of these is a separable observability change with its own review surface."
+      }
+    ],
+    "items": [
+      {
+        "id": "uat-relay-module",
+        "title": "Add the UAT-failure feedback relay module with its unit tests",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T07:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3575",
+          "requiresInspection": true,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/uat-failure-feedback.ts",
+            "src/lib/cloister/__tests__/uat-failure-feedback.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__/uat-failure-feedback.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/cloister/__tests__/uat-failure-feedback.test.ts passes with 7 tests",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-1",
+            "FR-2",
+            "FR-3",
+            "FR-4",
+            "FR-5",
+            "FR-6",
+            "NFR-2",
+            "NFR-3",
+            "NFR-4"
+          ],
+          "foundationFor": [
+            "wire-review-status-uat"
+          ]
+        },
+        "narrative": {
+          "Action": "Create src/lib/cloister/uat-failure-feedback.ts exactly as PRD section 4.1 specifies. Exports: UatFailureFeedbackOptions { issueId, uatNotes?, workspacePath?, anchor? }, UatFailureFeedbackResult { feedbackPath?, agentMessageSent, needsYouSurfaced, deduplicated }, relayUatFailureFeedbackPromise(opts), the Effect wrapper relayUatFailureFeedback(opts), clearUatFailureFeedbackAnchor(issueId), and resetUatFailureFeedbackStateForTests(). Body order (PRD 4.1 steps 1-9): uppercase the issue id; return { deduplicated: true } when the module-level Map already holds this issue id with an equal anchor; resolve workspacePath from opts or resolveProjectFromIssueSync like ci-failure-feedback.ts:239-242; call writeFeedbackFile({ specialist: 'uat-agent', outcome: 'failed', summary: 'UAT FAILED: ' + notes.slice(0,80), markdownBody }) through Effect.runPromise and return early WITHOUT recording the anchor when it fails; record the anchor only after a successful write; resolve the target with resolveIssueFeedbackTarget(issueId); on { agentId } send messageAgent(agentId, 'SPECIALIST FEEDBACK: uat-agent reported UAT FAILED for <ID>.\\n\\nMUST READ: <path>\\n\\n...', 'internal', { owesRework: true }) and surface needs-you if that call throws; on { needsYou } call surfaceIssueFeedbackNeedsYou(issueId, target.reason, { specialist: 'uat-agent', feedbackPath }). Wrap steps 6-9 in try/catch that only console.warns. Write the test with the vi.hoisted()+vi.mock() door-mock pattern from src/lib/cloister/__tests__/review-verdict-feedback.test.ts:1-38, mocking ../feedback-writer.js, ../feedback-target.js, ../../projects.js, and ../../agents/messaging.js, and calling resetUatFailureFeedbackStateForTests() in beforeEach.",
+          "Notes": "'uat-agent' is already a member of the WriteFeedbackOptions.specialist union at src/lib/cloister/feedback-writer.ts:19 — do not widen that type. No execSync, no timers, no new patrol."
+        },
+        "items": [
+          {
+            "id": "uat-relay-module.ac1",
+            "title": "Given a failed UAT verdict with notes and a target that resolves to { agentId }, the relay calls writeFeedbackFile exactly once with specialist 'uat-agent' and outcome 'failed' and a markdownBody containing the notes, and calls messageAgent once with that agent id, a body containing 'MUST READ:' and the feedback path, and { owesRework: true }.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-relay-module.ac2",
+            "title": "Given resolveIssueFeedbackTarget returns { needsYou: true, reason }, the relay calls surfaceIssueFeedbackNeedsYou with that reason and { specialist: 'uat-agent', feedbackPath }, never calls messageAgent, and returns needsYouSurfaced: true.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-relay-module.ac3",
+            "title": "Given a resolved agent whose messageAgent call rejects, the relay surfaces a needs-you trip whose reason contains the agent id and the thrown message, and returns agentMessageSent: false.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-relay-module.ac4",
+            "title": "Given two relay calls carrying the same anchor, writeFeedbackFile is invoked exactly once and the second call returns deduplicated: true; given a second call carrying a different anchor, writeFeedbackFile is invoked twice.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "uat-relay-module.ac5",
+            "title": "Given clearUatFailureFeedbackAnchor(issueId) is called between two same-anchor relay calls, writeFeedbackFile is invoked twice; and given writeFeedbackFile returns { success: false }, the relay skips messageAgent and a subsequent identical call still attempts the write.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "wire-review-status-uat",
+        "title": "Fire the UAT relay from the uatStatus transition inside setReviewStatus",
+        "status": "pending",
+        "priority": "high",
+        "created": "2026-08-06T07:40:00.000Z",
+        "metadata": {
+          "difficulty": "medium",
+          "kind": "backend",
+          "issueLabel": "pan-3575",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/review-status.ts",
+            "src/lib/__tests__/review-status-uat-failure.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/__tests__/review-status-uat-failure.test.ts",
+            "npm run typecheck",
+            "npm run lint:circular"
+          ],
+          "expected_outputs": [
+            "src/lib/__tests__/review-status-uat-failure.test.ts passes with 5 tests",
+            "typecheck completes without errors",
+            "lint:circular exits 0 with no new cycle reported"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-7",
+            "NFR-1",
+            "NFR-2"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/review-status.ts, add two module-private helpers next to deliverTestFailureToWorkAgentHostSide (currently at :697): deliverUatFailureToWorkAgentHostSide(issueId, status) which `await import('./cloister/uat-failure-feedback.js')` and calls relayUatFailureFeedbackPromise({ issueId, uatNotes: status.uatNotes, anchor: status.reviewedAtCommit }) inside try/catch that only console.warns; and clearUatFailureAnchorHostSide(issueId) which dynamically imports clearUatFailureFeedbackAnchor. Then, immediately after the existing test-failure block (currently :509-514) and before `return updated;`, add: `if (update.uatStatus === 'failed') { void deliverUatFailureToWorkAgentHostSide(issueId, updated); } else if (update.uatStatus) { void clearUatFailureAnchorHostSide(issueId); }` with the PRD 4.2 comment explaining why the write door and not the route. The fire condition is deliberately NOT a transition guard — the relay's anchor map owns dedup so a second genuine failure on a new commit still delivers. Add the new test file using the harness established by src/lib/__tests__/review-status-reconcile.test.ts, mocking './cloister/uat-failure-feedback.js'.",
+          "Notes": "HAZARD H1: src/lib/cloister/feedback-target.ts:266 dynamically imports '../review-status.js'. A STATIC import of the relay from review-status.ts closes a circular ESM cycle that Node 22 strict ESM rejects at dashboard boot, and neither typecheck nor unit tests catch it. Dynamic import only. HAZARD H2: never let the relay throw into setReviewStatus — fire with `void` and swallow in the helper."
+        },
+        "items": [
+          {
+            "id": "wire-review-status-uat.ac1",
+            "title": "Given setReviewStatus(id, { uatStatus: 'failed', uatNotes: '<text>' }), the mocked relayUatFailureFeedbackPromise is invoked exactly once with issueId and that uatNotes.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-status-uat.ac2",
+            "title": "Given the review-status row carries reviewedAtCommit, the relay receives that SHA as its anchor argument.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-status-uat.ac3",
+            "title": "Given setReviewStatus(id, { uatStatus: 'passed' }), clearUatFailureFeedbackAnchor is invoked and relayUatFailureFeedbackPromise is not.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-status-uat.ac4",
+            "title": "Given a relay that rejects, setReviewStatus still returns a status carrying uatStatus 'failed' and does not throw.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "wire-review-status-uat.ac5",
+            "title": "Reading src/lib/review-status.ts as text finds no top-level `import ... from './cloister/uat-failure-feedback.js'` statement, and npm run lint:circular exits 0.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "parked-orbit-owner",
+        "title": "Suppress the uat-failed parked orbit while a live work agent owns the rework",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T07:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3575",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/parked/resolver.ts",
+            "src/lib/parked/__tests__/resolver.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/parked/__tests__/resolver.test.ts",
+            "npm run lint:park-exits",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/parked/__tests__/resolver.test.ts passes including the extended uat-failed fixture",
+            "lint:park-exits exits 0",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8"
+          ]
+        },
+        "narrative": {
+          "Action": "In classifyParked() (src/lib/parked/resolver.ts:312-321), compute `const hasLiveWorkAgent = s.liveAgents.some((agent) => agent.role === 'work');` and add `&& !hasLiveWorkAgent` to the uat-failed condition. Rewrite the two copy strings: parkReason becomes 'UAT failed and no work agent is live to rework it — the merge gate will not take the issue and the UAT-failure relay found no delivery target'; unparkCondition becomes 'pan start <id> to put a work agent on the UAT feedback; the relay redelivers on the next failed verdict'. Keep the details payload { uatNotes } unchanged. Extend the existing fixture test at src/lib/parked/__tests__/resolver.test.ts:112-118 to assert both directions, and confirm the orbit-coverage map at :207 still yields a uat-failed row (it passes liveAgents: [], so it should).",
+          "Notes": "s.liveAgents is already gathered (resolver.ts:170-171) and AgentState.role is already read in the same function at :370 — no signal-gathering change. HAZARD H4: with uat-failed suppressed, the idle-running orbit (:361-383, fires only when rows.length === 0) can now fire for a work agent idle 6h+ on the same issue; that is the correct 'leaderless' signal, not a regression."
+        },
+        "items": [
+          {
+            "id": "parked-orbit-owner.ac1",
+            "title": "Given a review status with uatStatus 'failed', mergeStatus not merged, readyForMerge false, and liveAgents containing an agent with role 'work', classifyParked returns no row whose orbit is 'uat-failed'.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-orbit-owner.ac2",
+            "title": "Given the same review status with liveAgents empty, classifyParked returns exactly one 'uat-failed' row whose parkReason names the UAT-failure relay finding no delivery target and whose unparkCondition names `pan start`.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "parked-orbit-owner.ac3",
+            "title": "The existing orbit-coverage fixture map still produces a uat-failed row for its uat-failed entry, and every PARKED_ORBITS member remains represented.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "sweeper-uat-recommendation",
+        "title": "Correct the stall sweeper's uat-failed recommendation to name the start path",
+        "status": "pending",
+        "priority": "low",
+        "created": "2026-08-06T07:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "backend",
+          "issueLabel": "pan-3575",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "src/lib/cloister/stall-sweeper.ts",
+            "src/lib/cloister/__tests__/stall-sweeper.test.ts"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "npx vitest run --configLoader runner src/lib/cloister/__tests__/stall-sweeper.test.ts",
+            "npm run typecheck"
+          ],
+          "expected_outputs": [
+            "src/lib/cloister/__tests__/stall-sweeper.test.ts passes, including the uat-failed recommendation case",
+            "typecheck completes without errors"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "In src/lib/cloister/stall-sweeper.ts:275-279, replace the uat-failed recommendation string with 'start a work agent for <ID> via pan start <ID> — the UAT-failure relay found no live target for its feedback', keeping the { uatNotes: notes.slice(0, 400) } evidence argument unchanged, and add a one-line comment noting that reaching this orbit now means the relay's resurrection ladder already failed. Update the expected substring in src/lib/cloister/__tests__/stall-sweeper.test.ts:105-106 to match while preserving its uatNotes evidence assertion.",
+          "Notes": "The sweeper stays observability-only — it must keep emitting a recommendation and must not act."
+        },
+        "items": [
+          {
+            "id": "sweeper-uat-recommendation.ac1",
+            "title": "Given a uat-failed parked row, the sweeper emits one sweep.recommendation whose recommendation text contains `pan start` and states the UAT-failure relay found no live target.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "sweeper-uat-recommendation.ac2",
+            "title": "That same sweep.recommendation event still contains the parked row's uatNotes, truncated to 400 characters, as its evidence payload.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      },
+      {
+        "id": "docs-uat-relay",
+        "title": "Document the UAT-failure relay in PARKED-POPULATION.md and CLAUDE.md",
+        "status": "pending",
+        "priority": "medium",
+        "created": "2026-08-06T07:40:00.000Z",
+        "metadata": {
+          "difficulty": "simple",
+          "kind": "docs",
+          "issueLabel": "pan-3575",
+          "requiresInspection": false,
+          "inspectionDepth": "fast",
+          "files_scope": [
+            "docs/PARKED-POPULATION.md",
+            "CLAUDE.md"
+          ],
+          "files_scope_confidence": "high",
+          "verify_commands": [
+            "grep -n 'no live work agent' docs/PARKED-POPULATION.md",
+            "grep -n 'uat-failure-feedback' CLAUDE.md"
+          ],
+          "expected_outputs": [
+            "docs/PARKED-POPULATION.md row 5 matches the new detection and release wording",
+            "CLAUDE.md contains the three-verdict feedback-routing subsection naming the UAT relay"
+          ],
+          "readiness": "ready",
+          "traces": [
+            "FR-8",
+            "FR-9"
+          ]
+        },
+        "narrative": {
+          "Action": "Rewrite row 5 of the nine-orbits table in docs/PARKED-POPULATION.md (line 41) so the detection column reads `uatStatus=failed`, merge pending, and no live work agent, and the release column recommends `pan start <id>`. Add a short paragraph below that table — alongside the existing stuck-flag and scheduler-yield notes — stating that setReviewStatus fires the UAT-failure relay (src/lib/cloister/uat-failure-feedback.ts) through writeFeedbackFile() and resolveIssueFeedbackTarget(), so reaching the orbit means the relay found no delivery target. Then add a short subsection to CLAUDE.md near the 'Verification Gate (PAN-174)' and 'Review Convergence Gate (PAN-3151)' blocks (around CLAUDE.md:396-405) naming the three verdicts that route back to the work agent — review blocked/failed, test failed, and UAT failed — and stating that each writes a feedback file with writeFeedbackFile(), delivers through resolveIssueFeedbackTarget(), and escalates with surfaceIssueFeedbackNeedsYou() when no target resolves.",
+          "Notes": "No sentence anywhere in docs/ may still claim that nothing routes a UAT failure back to work."
+        },
+        "items": [
+          {
+            "id": "docs-uat-relay.ac1",
+            "title": "Row 5 of the nine-orbits table in docs/PARKED-POPULATION.md contains the phrase 'no live work agent' in its detection column and `pan start` in its release column, and no longer contains the previous `pan resume <agent>` wording.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-uat-relay.ac2",
+            "title": "docs/PARKED-POPULATION.md contains a paragraph below the orbits table explaining that setReviewStatus routes a failed UAT verdict to the work agent through writeFeedbackFile() and resolveIssueFeedbackTarget(), so reaching the orbit means the relay found no delivery target.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          },
+          {
+            "id": "docs-uat-relay.ac3",
+            "title": "CLAUDE.md contains a subsection listing review blocked/failed, test failed, and UAT failed as the three verdicts routed back to the work agent, and naming writeFeedbackFile(), resolveIssueFeedbackTarget(), and surfaceIssueFeedbackNeedsYou() as the shared doors.",
+            "status": "pending",
+            "metadata": {
+              "kind": "acceptance_criterion"
+            }
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "from": "uat-relay-module",
+        "to": "wire-review-status-uat",
+        "type": "blocks"
+      },
+      {
+        "from": "wire-review-status-uat",
+        "to": "parked-orbit-owner",
+        "type": "informs"
+      },
+      {
+        "from": "parked-orbit-owner",
+        "to": "sweeper-uat-recommendation",
+        "type": "informs"
+      },
+      {
+        "from": "wire-review-status-uat",
+        "to": "docs-uat-relay",
+        "type": "informs"
+      },
+      {
+        "from": "parked-orbit-owner",
+        "to": "docs-uat-relay",
+        "type": "informs"
+      }
+    ],
+    "metadata": {
+      "canonicalFilename": "2026-08-06-PAN-3575-uat-failure-parks-forever-wire-uatstatus-failed-into-the-canonical-feedback-route-like-review-test-failures.xbrief.json",
+      "promotionIntent": "automatic"
+    }
+  },
+  "status": "proposed"
+}
