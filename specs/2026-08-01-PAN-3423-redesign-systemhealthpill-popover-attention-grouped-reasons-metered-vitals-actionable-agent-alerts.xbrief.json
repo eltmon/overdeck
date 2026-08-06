@@ -4,17 +4,17 @@
     "created": "2026-08-01T15:40:00.000Z",
     "author": "overdeck/0.0.0",
     "description": "Plan for PAN-3423: Redesign SystemHealthPill popover: attention-grouped reasons, metered vitals, actionable agent alerts",
-    "updated": "2026-08-02T02:50:35.374Z"
+    "updated": "2026-08-06T09:30:58.423Z"
   },
   "plan": {
     "id": "pan-3423",
     "title": "Redesign SystemHealthPill popover: attention-grouped reasons, metered vitals, actionable agent alerts",
-    "status": "running",
+    "status": "completed",
     "uid": "0ee6229f-2986-4496-ba57-ef10a521e3b7",
     "author": "agent:k3[1m]",
-    "sequence": 4,
+    "sequence": 5,
     "created": "2026-08-01T15:40:00.000Z",
-    "updated": "2026-08-02T02:50:35.374Z",
+    "updated": "2026-08-06T09:30:58.423Z",
     "references": [
       {
         "uri": "https://github.com/eltmon/overdeck/issues/3423",
@@ -608,5 +608,5 @@
       "promotionIntent": "automatic"
     }
   },
-  "status": "active"
+  "status": "completed"
 }
