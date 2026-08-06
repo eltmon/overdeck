@@ -139,19 +139,18 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:57:47.436Z",
+  "updated": "2026-08-06T09:00:18.890Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
     "testStatus": "pending",
-    "verificationStatus": "running",
+    "verificationStatus": "pending",
     "mergeStatus": "pending",
     "releaseStatus": "pending",
     "readyForMerge": false,
     "panDoneRecoveredAt": "2026-08-06T08:57:39.599Z",
-    "updatedAt": "2026-08-06T08:57:41.049Z",
+    "updatedAt": "2026-08-06T09:00:18.813Z",
     "reviewNotes": "Verification failed at sync-target-branch — fix and resubmit",
-    "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
     "reviewRequestedAt": "2026-08-06T08:57:39.599Z",
@@ -215,9 +214,9 @@
       "byStage": {
         "review": {
           "openai/gpt-5.6-terra": {
-            "input": 243224,
-            "output": 9377,
-            "cacheRead": 2563584,
+            "input": 3315227,
+            "output": 67340,
+            "cacheRead": 20063232,
             "cacheWrite": 0
           }
         },
@@ -255,24 +254,24 @@
         },
         "work": {
           "openai/gpt-5.6-terra": {
-            "input": 3061568,
-            "output": 197129,
-            "cacheRead": 63980032,
+            "input": 3072308,
+            "output": 198865,
+            "cacheRead": 65155584,
             "cacheWrite": 0
           }
         }
       },
       "totals": {
         "openai/gpt-5.6-terra": {
-          "input": 4683258,
-          "output": 278327,
-          "cacheRead": 80715776,
+          "input": 7766001,
+          "output": 338026,
+          "cacheRead": 99390976,
           "cacheWrite": 0
         }
       },
       "costAtCloseOut": {
-        "usd": 36.062114,
-        "pricingAsOf": "2026-08-06T08:57:42.287Z"
+        "usd": 49.333278,
+        "pricingAsOf": "2026-08-06T09:00:18.884Z"
       }
     },
     "merges": [
