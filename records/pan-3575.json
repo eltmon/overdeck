@@ -119,7 +119,7 @@
     "recordedAt": "2026-08-06T08:57:33.900Z"
   },
   "created": "2026-08-06T07:10:41.531Z",
-  "updated": "2026-08-06T08:57:38.983Z",
+  "updated": "2026-08-06T08:57:40.038Z",
   "pipeline": {
     "issueId": "PAN-3575",
     "reviewStatus": "pending",
@@ -133,7 +133,7 @@
     "verificationNotes": "Sync with main FAILED:\n\nSync with main FAILED:\nerror: Your local changes to the following files would be overwritten by merge:\n\tscripts/file-size-allowlist.txt\nPlease commit your changes or stash them before you merge.\nAborting\nMerge with strategy ort failed.\n",
     "prUrl": "https://github.com/eltmon/overdeck/pull/3576",
     "lastVerifiedCommit": "1bfc84db91ac6390a5f623a339eb1ea3565c9d71",
-    "reviewRequestedAt": "2026-08-06T08:57:34.725Z",
+    "reviewRequestedAt": "2026-08-06T08:57:39.599Z",
     "reviewSpawnedAt": "2026-08-06T08:54:06.434Z",
     "scopeDrift": {
       "outsideDeclaredScope": [
@@ -187,7 +187,8 @@
         "tests/unit/lib/cloister/uat-failure-feedback.test.ts"
       ],
       "recordedAt": "2026-08-06T08:57:33.900Z"
-    }
+    },
+    "panDoneRecoveredAt": "2026-08-06T08:57:39.599Z"
   },
   "closeOut": {
     "usage": {
