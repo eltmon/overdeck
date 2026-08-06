@@ -42,6 +42,16 @@ export const FIXTURE_SOURCE_REPO = 'uat-fixtures/repo';
 export function fixtureProjectPath(): string {
   return join(getOverdeckHome(), FIXTURE_PROJECT_KEY, 'repo');
 }
+/**
+ * Container-local path of the seeded FIX-1 workspace directory itself
+ * (`<fixtureProjectPath>/workspaces/feature-fix-1`) — the same path
+ * `GET /api/workspaces/FIX-1` derives independently from the registered
+ * project path and issue id, so this must stay in lockstep with that
+ * derivation (see getWorkspaceRoute in workspace-data.ts).
+ */
+export function fixtureWorkspacePath(): string {
+  return join(fixtureProjectPath(), 'workspaces', 'feature-fix-1');
+}
 /** Cached-issue id, matching the `github-${owner}-${repo}-${number}` shape. */
 export const FIXTURE_ISSUE_CACHE_ID = 'github-uat-fixtures-repo-1';
 /** Cached-project id, matching the `github-${owner}-${repo}` shape. */
@@ -55,6 +65,20 @@ export const FIXTURE_DESCRIPTION_BANNER =
   'This is a seeded UAT fixture issue, not real pipeline state. It was created ' +
   'by `pan admin seed-uat-fixtures` so browser verification has a live-looking ' +
   'issue to render inside an isolated workspace container.';
+/**
+ * Marker file written at the fixture workspace root so `GET /api/workspaces/FIX-1`
+ * recognizes the seeded directory as a valid workspace structure — that route
+ * treats a workspace with none of {.git, api/.git, fe/.git, src/.git,
+ * .devcontainer, CLAUDE.md} as `corrupted: true` (review finding, PAN-3362 UAT
+ * cycle 1). CLAUDE.md is the only one of those markers with no other consumer
+ * (`.devcontainer` would additionally trip Docker stack-health/container-ops
+ * code paths that expect a real compose file).
+ */
+export const FIXTURE_WORKSPACE_CLAUDE_MD =
+  `# ${FIXTURE_TITLE_PREFIX} uat-fixtures/repo\n\n` +
+  'This file exists only so the seeded workspace directory satisfies the ' +
+  '`GET /api/workspaces/FIX-1` structure check. It is not a real project ' +
+  'CLAUDE.md and carries no instructions.\n';
 export const FIXTURE_CANONICAL_STATUS: CanonicalState = 'in_progress';
 /** Fake branch name for the fixture work agent. */
 export const FIXTURE_BRANCH = 'feature/fix-1';
@@ -135,7 +159,7 @@ export function fixtureProjectConfig(): ProjectConfig {
 
 /** Builds the work agent row plus the four review-convoy sub-role rows. */
 export function fixtureAgentStates(now: string = new Date().toISOString()): AgentState[] {
-  const workspace = join(fixtureProjectPath(), 'workspaces', 'feature-fix-1');
+  const workspace = fixtureWorkspacePath();
   const workRole: Role = 'work';
   const reviewRole: Role = 'review';
 

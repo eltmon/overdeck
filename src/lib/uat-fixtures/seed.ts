@@ -20,13 +20,14 @@ import { serializeXBriefDocument } from '../xbrief/io.js';
 import {
   FIXTURE_ISSUE_ID,
   FIXTURE_PROJECT_KEY,
+  FIXTURE_WORKSPACE_CLAUDE_MD,
   fixtureActivityEntries,
   fixtureAgentStates,
   fixtureContinueJson,
   fixtureNormalizedIssue,
   fixtureProjectConfig,
-  fixtureProjectPath,
   fixtureReviewStatus,
+  fixtureWorkspacePath,
   fixtureXBriefDoc,
 } from './fixture-data.js';
 
@@ -96,11 +97,21 @@ export async function seedUatFixturesLocal(): Promise<SeedReport> {
     }
   }
 
-  // fixtureProjectPath() re-derives from the current OVERDECK_HOME rather
-  // than reusing the `home` local, so this always agrees with the path
+  // fixtureWorkspacePath() re-derives from the current OVERDECK_HOME rather
+  // than a hardcoded literal, so this always agrees with both the path
   // registerProjectSync() just wrote via fixtureProjectConfig() (review
-  // finding, PAN-3362 cycle 3).
-  const workspaceOverdeckDir = join(fixtureProjectPath(), 'workspaces', 'feature-fix-1', '.overdeck');
+  // finding, PAN-3362 cycle 3) and the path GET /api/workspaces/FIX-1
+  // independently derives from the registered project (review finding,
+  // PAN-3362 UAT cycle 1).
+  const workspaceRoot = fixtureWorkspacePath();
+
+  // Marker file so the workspace-structure check in getWorkspaceRoute
+  // (src/dashboard/server/routes/workspaces/workspace-data.ts) does not
+  // report the seeded directory as corrupted — see FIXTURE_WORKSPACE_CLAUDE_MD.
+  await mkdir(workspaceRoot, { recursive: true });
+  await writeFile(join(workspaceRoot, 'CLAUDE.md'), FIXTURE_WORKSPACE_CLAUDE_MD);
+
+  const workspaceOverdeckDir = join(workspaceRoot, '.overdeck');
   await mkdir(workspaceOverdeckDir, { recursive: true });
   const planPath = join(workspaceOverdeckDir, 'spec.vbrief.json');
   await writeFile(planPath, serializeXBriefDocument(fixtureXBriefDoc()));

@@ -13,7 +13,7 @@
  * per-test pattern this file follows.
  */
 
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -115,5 +115,16 @@ describe('seedUatFixturesLocal', () => {
 
     const doc = readPlanSync(report.planPath);
     expect(doc.plan.items).toHaveLength(3);
+  });
+
+  it('writes a CLAUDE.md marker at the workspace root so GET /api/workspaces/FIX-1 does not report corrupted (AC-5)', async () => {
+    const { seed } = await importSeedModules();
+    const { fixtureWorkspacePath } = await import('../../../../src/lib/uat-fixtures/fixture-data.js');
+
+    await seed.seedUatFixturesLocal();
+
+    const claudeMdPath = join(fixtureWorkspacePath(), 'CLAUDE.md');
+    expect(existsSync(claudeMdPath)).toBe(true);
+    expect(readFileSync(claudeMdPath, 'utf-8').length).toBeGreaterThan(0);
   });
 });
