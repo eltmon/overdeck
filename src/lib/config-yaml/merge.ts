@@ -185,6 +185,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       governorSoftReserveGb: DEFAULT_CONFIG.resources.governorSoftReserveGb,
       governorHardReserveGb: DEFAULT_CONFIG.resources.governorHardReserveGb,
       governorRecoveryReserveGb: DEFAULT_CONFIG.resources.governorRecoveryReserveGb,
+      governorWatchReserveGb: DEFAULT_CONFIG.resources.governorWatchReserveGb,
       governorFootprintDefaultWorkGb: DEFAULT_CONFIG.resources.governorFootprintDefaultWorkGb,
       governorFootprintDefaultReviewGb: DEFAULT_CONFIG.resources.governorFootprintDefaultReviewGb,
       governorFootprintDefaultTestGb: DEFAULT_CONFIG.resources.governorFootprintDefaultTestGb,
@@ -200,6 +201,7 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     },
     ui: {
       openInEditorCommand: DEFAULT_CONFIG.ui.openInEditorCommand,
+      theme: DEFAULT_CONFIG.ui.theme,
     },
     experimental: {
       experimentalFeatures: DEFAULT_CONFIG.experimental.experimentalFeatures,
@@ -659,6 +661,9 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (typeof config.resources.governor_recovery_reserve_gb === 'number') {
         result.resources.governorRecoveryReserveGb = config.resources.governor_recovery_reserve_gb;
       }
+      if (typeof config.resources.governor_watch_reserve_gb === 'number') {
+        result.resources.governorWatchReserveGb = config.resources.governor_watch_reserve_gb;
+      }
       if (typeof config.resources.governor_footprint_default_work_gb === 'number') {
         result.resources.governorFootprintDefaultWorkGb = config.resources.governor_footprint_default_work_gb;
       }
@@ -682,6 +687,10 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
       if (result.resources.governorRecoveryReserveGb <= result.resources.governorSoftReserveGb) {
         result.resources.governorRecoveryReserveGb = result.resources.governorSoftReserveGb + 1;
       }
+      // PAN-3550: WATCH must exceed SOFT or the warn tier can never fire before the hold.
+      if (result.resources.governorWatchReserveGb <= result.resources.governorSoftReserveGb) {
+        result.resources.governorWatchReserveGb = result.resources.governorSoftReserveGb + 1;
+      }
       if (result.resources.governorSwapRecoveryFreePercent <= result.resources.governorSwapSoftFreePercent) {
         result.resources.governorSwapRecoveryFreePercent = Math.min(
           result.resources.governorSwapSoftFreePercent + 10,
@@ -697,6 +706,13 @@ export function mergeConfigs(...configs: (YamlConfig | null)[]): { config: Norma
     if (typeof config.ui?.open_in_editor_command === 'string') {
       const command = config.ui.open_in_editor_command.trim();
       result.ui.openInEditorCommand = command === '' ? null : command;
+    }
+
+    if (config.ui?.theme !== undefined) {
+      if (config.ui.theme !== 'ledger' && config.ui.theme !== 'broadsheet') {
+        throw new Error('config.yaml: ui.theme must be ledger or broadsheet');
+      }
+      result.ui.theme = config.ui.theme;
     }
 
     if (config.issues) {

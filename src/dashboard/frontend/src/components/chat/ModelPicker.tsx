@@ -16,7 +16,7 @@ import {
 } from './defaultConversationModel';
 import { usePickerPosition } from './usePickerPosition';
 import { CostWarningBadge, costWarningLevel } from '../shared/costWarning';
-import { HARNESS_OPTIONS, canUsePickerHarness, type HarnessPolicyDecisions } from '../shared/ModelPicker';
+import { HARNESS_OPTIONS, canUsePickerHarness, expandHarnessRows, type HarnessPolicyDecisions } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import { HarnessLogo, ProviderIcon, ProviderDot } from '../shared/branding';
 import styles from '../CommandDeck/styles/command-deck.module.css';
@@ -32,6 +32,13 @@ interface PickerModel {
   costDisplay?: string;
   costPer1MTokens?: number;
   effortLevels: readonly string[];
+  /**
+   * Set on harness-labeled rows (Kimi — see expandHarnessRows): the launch
+   * route this row spawns. Undefined means "follow the provider default".
+   */
+  harness?: Harness;
+  /** Clean display name without a harness suffix, from the available-models API. */
+  baseName?: string;
 }
 
 interface ModelGroup {
@@ -118,8 +125,25 @@ function isKnownModel(modelId: string): boolean {
   return knownModelIds.has(modelId);
 }
 
+type KnownModelsListener = () => void;
+const knownModelsListeners = new Set<KnownModelsListener>();
+
+/**
+ * Subscribe to catalog syncs. A composer's initial loadStoredModel runs at
+ * mount, before the available-models fetch completes — at that point only
+ * the FALLBACK ids are "known", so a stored catalog-only id (e.g.
+ * kimi-code/k3, an OpenRouter favorite) fails isKnownModel and the composer
+ * drops to the default. Subscribers re-run loadStoredModel after every sync
+ * so the stored pick restores once the catalog containing it has loaded.
+ */
+export function onKnownModelsSync(listener: KnownModelsListener): () => void {
+  knownModelsListeners.add(listener);
+  return () => { knownModelsListeners.delete(listener); };
+}
+
 function syncKnownModels(groups: readonly ModelGroup[]): void {
   knownModelIds = new Set(groups.flatMap((g) => g.models.map((m) => m.id)));
+  for (const listener of knownModelsListeners) listener();
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -207,7 +231,14 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         await ensureDefaultConversationModel();
         const [availRes, orRes, settingsRes] = await Promise.allSettled([
           fetch('/api/settings/available-models').then((r) => r.json()) as Promise<
-            Record<string, Array<{ id: string; name: string; costPer1MTokens: number }>>
+            Record<string, Array<{
+              id: string;
+              name: string;
+              costPer1MTokens: number;
+              harness?: Harness;
+              effortLevels?: readonly string[];
+              baseName?: string;
+            }>>
           >,
           fetch('/api/settings/openrouter/models').then((r) => r.json()) as Promise<{
             models: Array<{ id: string; name: string; promptCostPer1M: number; supportsThinking: boolean }>;
@@ -242,17 +273,24 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         for (const [prov, models] of Object.entries(avail)) {
           if (prov === 'openrouter') continue;
           if (!Array.isArray(models) || models.length === 0) continue;
+          // Kimi entries expand into one row per launch route (Claude Code /
+          // Kimi Code CLI / ACP) so the row itself states the harness it
+          // spawns — see expandHarnessRows. baseName is the clean display
+          // name; a stale server that still suffixes native names gets
+          // stripped here so we never double-suffix.
+          const mapped = models.map((m) => ({
+            id: m.id,
+            label: m.baseName ?? m.name.replace(/ — Kimi Code CLI$/, ''),
+            provider: prov,
+            costDisplay: formatCost(m.costPer1MTokens),
+            costPer1MTokens: m.costPer1MTokens,
+            effortLevels: m.effortLevels ?? STATIC_EFFORT_LEVELS[m.id] ?? [],
+            baseName: m.baseName,
+          }));
           newGroups.push({
             provider: prov,
             label: PROVIDER_LABELS[prov] ?? prov,
-            models: models.map((m) => ({
-              id: m.id,
-              label: m.name,
-              provider: prov,
-              costDisplay: formatCost(m.costPer1MTokens),
-              costPer1MTokens: m.costPer1MTokens,
-              effortLevels: STATIC_EFFORT_LEVELS[m.id] ?? [],
-            })),
+            models: expandHarnessRows(mapped),
           });
         }
 
@@ -316,10 +354,15 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   }, [groups, providerFilter, search]);
 
   const allModels = groups.flatMap((g) => g.models);
-  const selectedModel = allModels.find((m) => m.id === value);
-  const effectiveHarness = showHarnessModelPermutations
-    ? harness
-    : selectedModel ? providerDefaultHarness(selectedModel.provider, providerHarnesses) : harness;
+  // Harness-labeled rows share a model id — prefer the row whose harness
+  // matches the current one so the trigger label states the actual route.
+  const selectedModel =
+    allModels.find((m) => m.id === value && (m.harness === undefined || m.harness === harness))
+    ?? allModels.find((m) => m.id === value);
+  const effectiveHarness = selectedModel?.harness
+    ?? (showHarnessModelPermutations
+      ? harness
+      : selectedModel ? providerDefaultHarness(selectedModel.provider, providerHarnesses) : harness);
   const selectedWarning = costWarningLevel(selectedModel?.costPer1MTokens);
 
   // Show provider sidebar when there are multiple AI providers
@@ -330,8 +373,15 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
   const showGroupHeaders = filteredGroups.length > 1;
 
   function handleSelect(model: PickerModel) {
-    const nextHarness = providerDefaultHarness(model.provider, providerHarnesses);
-    if (!showHarnessModelPermutations && harness !== undefined && onHarnessChange && harness !== nextHarness) {
+    // A harness-labeled row's harness wins over the provider default — the
+    // row label is a promise about how the session launches (resolveHarness
+    // honors it as an explicit pick). Rows without one (non-Kimi providers)
+    // keep the old provider-default behavior.
+    const nextHarness = model.harness ?? providerDefaultHarness(model.provider, providerHarnesses);
+    const harnessControlled = harness !== undefined && onHarnessChange;
+    const harnessDiffers = harnessControlled && harness !== nextHarness;
+    const applyHarness = harnessControlled && (model.harness !== undefined || (!showHarnessModelPermutations && harnessDiffers));
+    if (applyHarness) {
       if (onComboChange) {
         onComboChange(model.id, model.effortLevels, nextHarness);
       } else {
@@ -339,11 +389,9 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
         onHarnessChange(nextHarness);
       }
       saveStoredHarness(nextHarness);
-      localStorage.setItem(MODEL_STORAGE_KEY, model.id);
-      setOpen(false);
-      return;
+    } else {
+      onChange(model.id, model.effortLevels);
     }
-    onChange(model.id, model.effortLevels);
     localStorage.setItem(MODEL_STORAGE_KEY, model.id);
     setOpen(false);
   }
@@ -510,17 +558,18 @@ export function ModelPicker({ value, onChange, disabled = false, harness, onHarn
                     )}
                     {group.models.map((model) => {
                       const lvl = costWarningLevel(model.costPer1MTokens);
-                      const modelHarness = showHarnessModelPermutations
+                      const modelHarness = model.harness ?? (showHarnessModelPermutations
                         ? harness
-                        : providerDefaultHarness(model.provider, providerHarnesses);
+                        : providerDefaultHarness(model.provider, providerHarnesses));
                       const decision = modelHarness
                         ? canUsePickerHarness(modelHarness, model.id, harnessPolicy)
                         : { allowed: true };
                       const isLocked = !decision.allowed;
+                      const isActive = model.id === value && (model.harness === undefined || model.harness === harness);
                       return (
                         <button
-                          key={model.id}
-                          className={`${styles.pickerOption} ${model.id === value ? styles.pickerOptionActive : ''} ${isLocked ? styles.pickerOptionLocked : ''}`}
+                          key={`${model.id}::${model.harness ?? ''}`}
+                          className={`${styles.pickerOption} ${isActive ? styles.pickerOptionActive : ''} ${isLocked ? styles.pickerOptionLocked : ''}`}
                           onClick={() => { if (!isLocked) handleSelect(model); }}
                           disabled={isLocked}
                           title={isLocked ? decision.reason : undefined}

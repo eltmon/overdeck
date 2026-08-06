@@ -4,7 +4,7 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 
 ## Durable lenses
 
-`gatherProjectLensSignals()` builds membership from six durable signals. For the pull-request and branch lenses, a convention branch is either `feature/<id>` or `strike/<id>`:
+`gatherProjectLensSignals()` builds membership from seven durable signals. For the pull-request and branch lenses, a convention branch is either `feature/<id>` or `strike/<id>`:
 
 1. An open pull request for the convention branch.
 2. A merged pull request, which is the merge oracle for squash merges.
@@ -12,6 +12,7 @@ Pipeline membership is an exception queue: an issue is in the pipeline when its 
 4. Whether the tracker issue is open.
 5. The current pipeline phase label, when present.
 6. A durable xBRIEF spec on `overdeck-state`.
+7. A terminal close-out record (`pipeline.closedOut === true` via the record door), consulted only for tracker-closed issues with an open PR (PAN-3396).
 
 An xBRIEF makes an otherwise untouched open issue `planned_backlog` because its recorded code paths age. An open issue with a live `strike/` branch and no PR also surfaces as `planned_backlog`, so active strike work enters the pipeline before its PR opens. Landing detection requires positive evidence (PAN-2887): a branch contained in `main` counts as landed only when its tip sits off `main`'s first-parent line (its unique commits arrived via a merge). A freshly-created branch pointing at a `main` commit has zero unique work and is `planned_backlog` — every `pan start` passes through that state until the first commit. Known blind spot: a fast-forward-landed branch is indistinguishable from a fresh pointer and classifies as backlog (visible and safe) rather than limbo. A `planned` label is only a phase hint; it never substitutes for the durable spec lens. The tracker issue and phase-label lenses use the resolved project `tracker`; code-host fields such as `github_repo` independently select pull-request lenses, so a Linear-tracked project may host code and PRs on GitHub without querying GitHub Issues. Pull-request and branch lenses are forge-dependent: GitHub projects use `gh` and GraphQL to query open and merged pull requests; GitLab projects use the `glab`-backed per-repo lenses from `src/lib/gitlab-merge-requests.ts` to query open and merged merge requests, unioning results across all configured `gitlab`-forge repos; projects with neither forge configured fall back to tracker state, configured repository branches, and xBRIEF specs.
 
@@ -24,10 +25,10 @@ Agent state, tmux sessions, workspaces, and `review_status` are L5 liveness anno
 | Bucket | Meaning |
 | --- | --- |
 | `in_flight` | The issue is open and has an open PR. |
-| `zombie_pr` | The issue is closed but its PR remains open and needs reconciliation. |
+| `zombie_pr` | The issue is closed but its PR remains open and needs reconciliation. Reclassifies to `clean_terminal` if a terminal close-out record exists (L7-record), since the stale PR becomes residue (PAN-3396). |
 | `post_merge_limbo` | Work is merged — a merged PR exists, or the branch's unique commits are contained in `main` via merge lineage (positive non-PR evidence, PAN-2887) — but the issue remains open. |
 | `planned_backlog` | An open issue has a convention branch (unmerged work, or a fresh zero-ahead branch with no unique commits yet — PAN-2887) or a durable xBRIEF but no open PR. |
-| `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. |
+| `clean_terminal` | The issue is closed with no open PR, or it is open but has never started and has no durable plan. It is outside the pipeline. Also used for closed issues with an open PR when a terminal close-out record exists (residue case, PAN-3396): the PR is residue and must be closed on the forge. |
 
 ### Surface reconciliation (PAN-3341)
 

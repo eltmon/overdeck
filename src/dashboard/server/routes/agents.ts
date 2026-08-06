@@ -40,6 +40,7 @@ import {
   postAgentWorkCompleteRoute,
   postAgentStuckRoute,
   postAgentClassifyCompletionRoute,
+  postAgentPlanChecklistRoute,
   getAgentRuntimeRoute,
 } from './agents/runtime-events.js';
 import {
@@ -113,6 +114,7 @@ export const agentsRouteLayer = Layer.mergeAll(
   postAgentWorkCompleteRoute,
   postAgentStuckRoute,
   postAgentClassifyCompletionRoute,
+  postAgentPlanChecklistRoute,
   postInternalAgentPermissionRequestRoute,
   postAgentPermissionResponseRoute,
   getAgentRuntimeRoute,

@@ -7,7 +7,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PTY_TOKEN_HEADER, writePtyToken } from '../../pty-token.js';
 import { createPtySupervisorServer, createSocketWriteLogQueue, injectPtyMessage } from '../pty-supervisor.js';
-import { INPUT_PURGE_MAX_CHARS, echoConfirmTimeoutMs, purgeSettleMs } from '../injection-budget.js';
+import {
+  INPUT_PURGE_MAX_CHARS,
+  INPUT_SUBMIT_CONFIRM_INTERVAL_MS,
+  echoConfirmTimeoutMs,
+  purgeSettleMs,
+} from '../injection-budget.js';
 
 const REPO_ROOT = process.cwd();
 const SUPERVISOR_ENTRY = join(REPO_ROOT, 'dist/pty-supervisor.js');
@@ -205,6 +210,53 @@ describe.skipIf(isBun)('injectPtyMessage', () => {
 
     await expect(delivered).resolves.toBeUndefined();
     expect(fake.writes).toEqual(['hello   world', '\r']);
+  });
+
+  it('retries Enter when the payload remains in the active composer', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const readPayloadPresence = vi.fn()
+      .mockResolvedValueOnce('present')
+      .mockResolvedValueOnce('absent');
+
+    const delivered = injectPtyMessage(
+      fake.child,
+      'agent-unit-submit-retry',
+      { content: 'retry dropped Enter', echo: false },
+      { readPayloadPresence },
+    );
+    fake.emit('retry dropped Enter');
+    await vi.advanceTimersByTimeAsync(400);
+    expect(fake.writes).toEqual(['retry dropped Enter', '\r']);
+
+    await vi.advanceTimersByTimeAsync(INPUT_SUBMIT_CONFIRM_INTERVAL_MS);
+    expect(fake.writes).toEqual(['retry dropped Enter', '\r', '\r']);
+    await vi.advanceTimersByTimeAsync(INPUT_SUBMIT_CONFIRM_INTERVAL_MS);
+
+    await expect(delivered).resolves.toBeUndefined();
+    expect(readPayloadPresence).toHaveBeenCalledTimes(2);
+  });
+
+  it('purges a payload that survives every Enter before allowing fallback', async () => {
+    vi.useFakeTimers();
+    const fake = createFakePty();
+    const content = 'persistently stranded payload';
+    const purge = '\x7f'.repeat(content.length + 8);
+
+    const delivered = injectPtyMessage(
+      fake.child,
+      'agent-unit-submit-failed',
+      { content, echo: false },
+      { readPayloadPresence: () => Promise.resolve('present') },
+    );
+    const rejected = expect(delivered).rejects.toThrow(/submit confirmation failed/);
+    fake.emit(content);
+    await vi.advanceTimersByTimeAsync(
+      400 + (2 * INPUT_SUBMIT_CONFIRM_INTERVAL_MS) + purgeSettleMs(content.length + 8),
+    );
+
+    await rejected;
+    expect(fake.writes).toEqual([content, '\r', '\r', purge]);
   });
 
   it('purges between retries and before rejecting so unconfirmed writes never stack', async () => {

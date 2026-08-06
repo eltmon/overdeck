@@ -33,6 +33,7 @@ import { findPlan } from '../../../../lib/xbrief/io.js';
 import { isIntegrationPermissionError, verifyAppCanMerge, type GitHubPullRequestState } from '../../../../lib/github-app.js';
 import { resolveGitHubIssueSync as resolveGitHubIssueShared } from '../../../../lib/tracker-utils.js';
 import { sessionExists } from '../../../../lib/tmux.js';
+import { resolveIssueWorkspaceSyncTarget } from '../../../../lib/workspaces/resolver.js';
 import { jsonResponse } from '../../http-helpers.js';
 import { EventStoreService } from '../../services/domain-services.js';
 import { setMergeQueueAdvanceHandler } from '../../services/merge-queue-service.js';
@@ -238,6 +239,7 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
   'POST',
   '/api/issues/:issueId/sync-main',
   httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
     const params = yield* HttpRouter.params;
     const issueId = params['issueId'] ?? '';
     if (!parseIssueIdSync(issueId)) {
@@ -246,10 +248,10 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
 
     const issuePrefix = extractPrefixSync(issueId) ?? issueId.split('-')[0];
     const projectPath = getProjectPath(undefined, issuePrefix);
-    const issueLower = issueId.toLowerCase();
+    const requestedWorkspacePath = new URL(request.url, 'http://localhost').searchParams.get('workspacePath') ?? undefined;
 
     const workspaceInfo = getWorkspaceInfoForIssue(issueId);
-    if (workspaceInfo.isRemote) {
+    if (!requestedWorkspacePath && workspaceInfo.isRemote) {
       return jsonResponse(
         {
           success: false,
@@ -259,20 +261,17 @@ const postWorkspaceSyncMainRoute = HttpRouter.add(
       );
     }
 
-    const workspacePath =
-      workspaceInfo.localPath ||
-      join(projectPath, 'workspaces', `feature-${issueLower}`);
-
-    if (!existsSync(workspacePath)) {
+    const target = resolveIssueWorkspaceSyncTarget(issueId, projectPath, requestedWorkspacePath);
+    if (!target) {
       return jsonResponse(
-        { success: false, error: 'Workspace does not exist' },
+        { success: false, error: 'Workspace does not exist or is not owned by this issue' },
         { status: 400 }
       );
     }
 
-    console.log(`[sync-main] Starting sync for ${issueId} at ${workspacePath}`);
+    console.log(`[sync-main] Starting sync for ${issueId} at ${target.path} (${target.branchName})`);
 
-    const result = yield* Effect.promise(() => syncMainIntoWorkspace(workspacePath, issueId));
+    const result = yield* Effect.promise(() => syncMainIntoWorkspace(target.path, issueId));
 
     if (result.success) {
       if (result.alreadyUpToDate) {

@@ -1,6 +1,6 @@
 ---
 name: pan-tldr
-description: "Token-efficient code exploration. Use TLDR MCP tools (tldr_context, tldr_structure, tldr_calls, tldr_impact, tldr_semantic) instead of reading whole files when exploring or answering questions about code. Triggers on requests to explore, summarize, or understand code in a workspace that has TLDR available."
+description: "Token-efficient code exploration. TLDR summarizes large code files automatically via a Read hook; for deliberate lookups use the .venv/bin/tldr CLI through Bash (context, extract, structure). Triggers on requests to explore, summarize, or understand code in a checkout that has TLDR available."
 triggers:
   - explore code
   - understand this codebase
@@ -9,62 +9,70 @@ triggers:
   - what calls
   - what depends on
   - large file
-  - tldr_context
-  - tldr_semantic
+  - tldr
   - find similar code
 allowed-tools:
-  - mcp__tldr__tldr_context
-  - mcp__tldr__tldr_structure
-  - mcp__tldr__tldr_calls
-  - mcp__tldr__tldr_impact
-  - mcp__tldr__tldr_semantic
+  - Bash
   - Read
   - Grep
   - Glob
 ---
 
-# Use TLDR for code exploration
+# TLDR: automatic code summaries + a CLI for deliberate lookups
 
-If your workspace has a `.venv` directory, you have access to TLDR — a code-analysis daemon that summarizes files into 500–1,200 tokens instead of the 10–25k tokens a full Read would consume. Using it extends how much real work you can do per session.
+If the checkout you're working in has `.venv/bin/tldr`, TLDR summarizes code
+files into ~500–1,200 tokens instead of the 10–25k a full Read would consume.
 
-**The PreToolUse hook will already intercept your `Read` calls on large code files and substitute a TLDR summary**, so even if you forget, you'll often get the savings. This skill exists to make that the *default* for code questions, not a happy accident.
-
-## Available MCP tools
-
-| Tool | Use when |
-| --- | --- |
-| `tldr_context <file>` | You want to know what a file exports, imports, and the shape of its key functions before deciding whether/where to edit. |
-| `tldr_structure <directory>` | You're orienting in an unfamiliar module — what files exist, what they relate to. |
-| `tldr_calls <function> <file>` | "What calls this function?" — upward dependency analysis. |
-| `tldr_impact <function> <file>` | "What does this function call?" — downward impact analysis. Use before refactoring. |
-| `tldr_semantic <query>` | Natural-language search across the indexed codebase. Use when you don't know the file/function name yet. |
+**How it actually reaches you (PAN-3534):** a PreToolUse hook on `Read`. When
+you Read a large code file, the hook substitutes a structured summary
+automatically — you don't invoke anything. There are **no `tldr_*` MCP tools**
+in agent sessions; older docs that told you to call `tldr_context` /
+`tldr_semantic` as tools described a surface that was never wired up. Do not
+wait for or request those tools.
 
 ## The workflow
 
-1. **Open with TLDR.** When asked a code question, your first move is `tldr_context` / `tldr_structure` / `tldr_semantic`, not `Read` or `cat`.
-2. **Read full files only when editing.** Once TLDR has shown you the structure and pointed at the line range, use `Read` with `offset`/`limit` to load just the section you'll touch.
-3. **Use the call graph for refactors.** Before changing a function signature, run `tldr_calls` to see every caller — saves you from grep-with-wrong-regex misses.
-4. **Don't fight the interceptor.** If the hook returns a TLDR summary for a file you `Read`, treat that as the answer. Re-read with `offset`/`limit` only if you specifically need that range for editing.
+1. **Just Read.** Large code files come back as TLDR summaries automatically
+   when a local venv exists. Treat the summary as the answer to structure
+   questions.
+2. **Read full content only when editing.** Use `Read` with `offset`/`limit`
+   for the specific range you'll touch — targeted reads always bypass the
+   hook. Recently-edited files also bypass, so you can verify your own changes.
+3. **Deliberate lookups via the CLI** (Bash, from the checkout root):
+   - `.venv/bin/tldr context <module-path> --lang <lang>` — exports, imports,
+     key function shapes (module path without extension, e.g.
+     `src/lib/agents`).
+   - `.venv/bin/tldr extract <file>` — structured JSON (functions, classes,
+     params) for an exact file path.
+   - `.venv/bin/tldr structure <directory>` — orient in an unfamiliar module.
 
-## Cost comparison
+## Scope rules
 
-- 20 files × 15k tokens (full Read) = **300k tokens** — exhausts context, forces compaction.
-- 20 files × 800 tokens (TLDR) = **16k tokens** — leaves headroom for the actual work.
+- The hook only serves files from the checkout that owns the venv. Files in a
+  workspace without its own `.venv` get normal full Reads — that's expected,
+  not breakage.
+- Config/data files (JSON, TOML, .env), markdown, and small files (<3KB) are
+  never intercepted — just Read them.
 
-## When TLDR is NOT a good fit
+## Observability
 
-- **Config / data files** — TOML, JSON, .env. TLDR is for code structure; for short config, just Read it.
-- **Files you're about to edit.** Read the actual lines you need; TLDR omits implementation details.
-- **Markdown / docs.** Read directly.
-
-The PreToolUse interceptor already bypasses these cases automatically — it logs to `<workspace>/.tldr/bypasses.log` when it does. If you're curious why a Read wasn't intercepted, that's the log to check.
+- `<checkout>/.tldr/interceptions.log` — each summary served
+  (`timestamp file_size rel_path`).
+- `<checkout>/.tldr/bypasses.log` — deliberate bypasses with reasons
+  (`recently-edited`, `sparse-content`, `binary-fail`, `no-content`,
+  `no-venv`).
+- `<checkout>/.tldr/failures.log` — broken-binary diagnostics.
 
 ## Troubleshooting
 
-- **MCP tools missing?** TLDR is only available when `<workspace>/.venv` exists. If your workspace has no venv, fall back to `Read` / `Grep` / `Glob`. Tell the user the workspace is missing TLDR support.
-- **Indexing seems stale?** Cloister warms the index on workspace create and after merge. If a recent change isn't reflected, the daemon hasn't reindexed yet — proceed with `Read` for that specific file.
+- **No summaries appearing?** Check the checkout has `.venv/bin/tldr` and that
+  `agents.tldr.enabled` isn't false (`OVERDECK_TLDR_ENABLED=0` also disables).
+- **Index stale?** The post-edit hook re-warms after 10 edits (deduped by
+  `.tldr/warm.lock`); Cloister also warms on workspace create and after merge.
+  For one specific fresh file, just Read it with offset/limit.
 
 ## See also
 
-- `pan admin tldr status` — operator view of running daemons. Use the `pan-admin-tldr` skill for daemon lifecycle.
+- `pan admin tldr status` — operator view of running daemons. Use the
+  `pan-admin-tldr` skill for daemon lifecycle.
 - `docs/TLDR.md` in overdeck — full TLDR design.

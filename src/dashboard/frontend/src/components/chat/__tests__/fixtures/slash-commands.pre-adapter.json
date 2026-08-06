@@ -104,10 +104,6 @@
     "insert": "pan review mode "
   },
   {
-    "label": "pan review scope",
-    "insert": "pan review scope "
-  },
-  {
     "label": "pan review restart",
     "insert": "pan review restart "
   },
@@ -578,10 +574,6 @@
   {
     "label": "pan admin specialists reset",
     "insert": "pan admin specialists reset "
-  },
-  {
-    "label": "pan admin specialists discovery-ready",
-    "insert": "pan admin specialists discovery-ready "
   },
   {
     "label": "pan admin specialists done",

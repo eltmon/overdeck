@@ -76,6 +76,13 @@ function makeDeps(doc: XBriefDocument): SwarmCommandDeps {
     getFailedMergeBlock: vi.fn(() => ({ issueId: 'PAN-2203', itemId: 'wi-1', slotIndex: 1, note: 'conflict' })),
     getFailedMergeBlocks: vi.fn(() => []),
     recoverFailedMergeSlot: vi.fn(async () => ['[swarm] retrying failed-merge slot 1 (item wi-1) for PAN-2203']),
+    resolveSwarmPolicy: vi.fn(() => ({
+      mode: 'auto' as const,
+      maxSlots: 3,
+      autoAdvance: true,
+      source: { mode: 'global', maxSlots: 'default', autoAdvance: 'default' },
+    })),
+    writeSwarmPolicyMode: vi.fn(async () => undefined),
     console: {
       log: vi.fn(),
       error: vi.fn(),
@@ -104,6 +111,64 @@ describe('pan swarm command', () => {
     expect(deps.coordinateSwarmSlots).not.toHaveBeenCalled();
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('PAN-2203 is not swarm eligible'));
     expect(deps.console.error).toHaveBeenCalledWith(expect.stringContaining('missing files_scope'));
+  });
+
+  it('dispatches a mixed plan: sequential items are diagnostics, not gates (PAN-3447)', async () => {
+    const doc = makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+      {
+        id: 'wi-seq',
+        title: 'Intentionally serialized work',
+        status: 'pending',
+        metadata: { readiness: 'sequential', files_scope: ['src/c.ts'], files_scope_confidence: 'high' },
+      },
+    ]);
+    const deps = makeDeps(doc);
+
+    const result = await swarmCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.coordinateSwarmSlots).toHaveBeenCalledWith({ issueId: 'PAN-2203', manual: true });
+    expect(deps.console.error).not.toHaveBeenCalledWith(expect.stringContaining('not swarm eligible'));
+  });
+
+  it('persists issue-level swarm.policy.mode=always when the effective mode is off (PAN-3459)', async () => {
+    const doc = makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+    ]);
+    const deps = makeDeps(doc);
+    deps.resolveSwarmPolicy = vi.fn(() => ({
+      mode: 'off' as const,
+      maxSlots: 3,
+      autoAdvance: true,
+      source: { mode: 'global', maxSlots: 'default', autoAdvance: 'default' },
+    }));
+
+    const result = await swarmCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.writeSwarmPolicyMode).toHaveBeenCalledWith('/repo/workspaces/feature-pan-2203', 'PAN-2203', 'always');
+    // The opt-in must be durable BEFORE dispatch so a crash mid-coordination
+    // cannot leave an orphaned swarm that patrols skip.
+    const writeOrder = vi.mocked(deps.writeSwarmPolicyMode).mock.invocationCallOrder[0];
+    const coordinateOrder = vi.mocked(deps.coordinateSwarmSlots).mock.invocationCallOrder[0];
+    expect(writeOrder).toBeLessThan(coordinateOrder);
+    expect(deps.console.log).toHaveBeenCalledWith(expect.stringContaining('swarm.policy.mode=always'));
+  });
+
+  it('does not touch the issue-level swarm policy when the effective mode already coordinates (PAN-3459)', async () => {
+    const doc = makeDoc([
+      makeEligibleItem('wi-1', 'src/a.ts'),
+      makeEligibleItem('wi-2', 'src/b.ts'),
+    ]);
+    const deps = makeDeps(doc);
+
+    const result = await swarmCommand('PAN-2203', deps);
+
+    expect(result.ok).toBe(true);
+    expect(deps.writeSwarmPolicyMode).not.toHaveBeenCalled();
   });
 
   it('ensures the workspace and dispatches through coordinateSwarmSlots with real reconcile (PAN-2214)', async () => {

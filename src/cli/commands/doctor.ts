@@ -31,6 +31,7 @@ import {
   type PrerequisiteResolver,
 } from '../../lib/system-prerequisites.js';
 import { checkDeployedHooksDrift } from './doctor-hooks-drift.js';
+import { checkCliGenerationLink } from './doctor-cli-generation.js';
 import { checkInotify } from './doctor-inotify.js';
 import { checkStateDivergence } from './doctor-state-divergence.js';
 import { checkStateWorktrees } from './doctor-state-worktree.js';
@@ -791,6 +792,7 @@ export async function doctorCommand(options: DoctorOptions = {}): Promise<void> 
   }
 
   checks.push(checkDeployedHooksDrift());
+  checks.push(await checkCliGenerationLink());
 
   // Check environment variables
   const envFile = join(homedir(), '.overdeck.env');

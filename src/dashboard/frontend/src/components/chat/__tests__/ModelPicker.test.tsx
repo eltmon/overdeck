@@ -1,8 +1,8 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ModelPicker } from '../ModelPicker';
+import { ModelPicker, loadStoredModel, onKnownModelsSync } from '../ModelPicker';
 
 vi.mock('sonner', () => ({
   toast: { message: vi.fn() },
@@ -332,5 +332,230 @@ describe('chat ModelPicker blocked harness (PAN-2528)', () => {
     const kimiCode = screen.getByRole('button', { name: /^Kimi Code/i });
     expect(kimiCode).toBeDisabled();
     expect(within(kimiCode).getByText(KIMI_ONLY_REASON)).toBeInTheDocument();
+  });
+});
+
+describe('chat ModelPicker Kimi harness-labeled rows (2026-08-02)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /**
+   * Mirrors the annotated available-models payload the server emits after the
+   * 2026-08-02 change: Kimi entries carry baseName + effortLevels, native ids
+   * come pre-suffixed for flat panels.
+   */
+  function installKimiFetchMock() {
+    vi.stubGlobal('fetch', vi.fn(async (input: string | URL | Request) => {
+      const url = input.toString();
+      if (url === '/api/settings/available-models') {
+        return new Response(JSON.stringify({
+          anthropic: [
+            { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', costPer1MTokens: 15 },
+          ],
+          kimi: [
+            { id: 'k3', name: 'Kimi K3 (256K)', costPer1MTokens: 1, harness: 'claude-code', effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], baseName: 'Kimi K3 (256K)' },
+            { id: 'k3[1m]', name: 'Kimi K3 (1M)', costPer1MTokens: 1, harness: 'claude-code', effortLevels: ['low', 'medium', 'high', 'xhigh', 'max'], baseName: 'Kimi K3 (1M)' },
+            { id: 'kimi-code/k3', name: 'Kimi K3 (1M) — Kimi Code CLI', costPer1MTokens: 1, harness: 'kimi-code', effortLevels: ['low', 'high', 'max'], baseName: 'Kimi K3 (1M)' },
+            { id: 'kimi-code/k3-256k', name: 'Kimi K3 (256K) — Kimi Code CLI', costPer1MTokens: 1, harness: 'kimi-code', effortLevels: ['low', 'high', 'max'], baseName: 'Kimi K3 (256K)' },
+          ],
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url === '/api/settings') {
+        return new Response(JSON.stringify({
+          models: {
+            default_conversation_model: 'claude-sonnet-4-6',
+            provider_harnesses: {},
+            provider_default_harnesses: { anthropic: 'claude-code', kimi: 'claude-code' },
+          },
+          experimental: { showHarnessModelPermutations: false },
+        }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url === '/api/settings/openrouter/models') {
+        return new Response(JSON.stringify({ models: [], favorites: [] }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      if (url.startsWith('/api/settings/harness-policy')) {
+        return new Response(JSON.stringify({ decisions: {} }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    }));
+  }
+
+  it('expands Kimi models into one row per launch route with no "(native)" labels', async () => {
+    installKimiFetchMock();
+    const user = userEvent.setup();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        harness="claude-code"
+        onHarnessChange={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+
+    // Bare ids launch through Claude Code's Anthropic-compatible route.
+    expect(await screen.findByRole('button', { name: /Kimi K3 \(256K\) — Claude Code/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Kimi K3 \(1M\) — Claude Code/ })).toBeInTheDocument();
+    // Native ids launch through the kimi CLI directly or over ACP.
+    expect(screen.getByRole('button', { name: /Kimi K3 \(1M\) — Kimi Code CLI/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Kimi K3 \(1M\) — ACP \(Kimi Code\)/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Kimi K3 \(256K\) — Kimi Code CLI/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Kimi K3 \(256K\) — ACP \(Kimi Code\)/ })).toBeInTheDocument();
+    // The old meaningless marker is gone everywhere.
+    expect(screen.queryByText(/\(native/)).not.toBeInTheDocument();
+  });
+
+  it('clicking the Kimi Code CLI row picks the kimi-code harness with native effort levels', async () => {
+    installKimiFetchMock();
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onHarnessChange = vi.fn();
+    const onComboChange = vi.fn();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={onChange}
+        harness="claude-code"
+        onHarnessChange={onHarnessChange}
+        onComboChange={onComboChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    await user.click(await screen.findByRole('button', { name: /Kimi K3 \(1M\) — Kimi Code CLI/ }));
+
+    expect(onComboChange).toHaveBeenCalledWith('kimi-code/k3', ['low', 'high', 'max'], 'kimi-code');
+    expect(onChange).not.toHaveBeenCalled();
+    expect(onHarnessChange).not.toHaveBeenCalled();
+    expect(localStorage.getItem('conv-composer-harness')).toBe('kimi-code');
+    expect(localStorage.getItem('conv-composer-model')).toBe('kimi-code/k3');
+  });
+
+  it('clicking the ACP row picks the acp harness', async () => {
+    installKimiFetchMock();
+    const user = userEvent.setup();
+    const onComboChange = vi.fn();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        harness="claude-code"
+        onHarnessChange={vi.fn()}
+        onComboChange={onComboChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    await user.click(await screen.findByRole('button', { name: /Kimi K3 \(256K\) — ACP \(Kimi Code\)/ }));
+
+    expect(onComboChange).toHaveBeenCalledWith('kimi-code/k3-256k', ['low', 'high', 'max'], 'acp');
+  });
+
+  it('clicking a bare Kimi row picks the claude-code harness with five effort levels', async () => {
+    installKimiFetchMock();
+    const user = userEvent.setup();
+    const onComboChange = vi.fn();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={vi.fn()}
+        harness="codex"
+        onHarnessChange={vi.fn()}
+        onComboChange={onComboChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    await user.click(await screen.findByRole('button', { name: /Kimi K3 \(256K\) — Claude Code/ }));
+
+    expect(onComboChange).toHaveBeenCalledWith('k3', ['low', 'medium', 'high', 'xhigh', 'max'], 'claude-code');
+  });
+
+  it('falls back to onChange + onHarnessChange when onComboChange is not provided', async () => {
+    installKimiFetchMock();
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    const onHarnessChange = vi.fn();
+    render(
+      <ModelPicker
+        value="claude-sonnet-4-6"
+        onChange={onChange}
+        harness="claude-code"
+        onHarnessChange={onHarnessChange}
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Claude Sonnet 4\.6/i }));
+    await user.click(await screen.findByRole('button', { name: /Kimi K3 \(1M\) — ACP \(Kimi Code\)/ }));
+
+    expect(onChange).toHaveBeenCalledWith('kimi-code/k3', ['low', 'high', 'max']);
+    expect(onHarnessChange).toHaveBeenCalledWith('acp');
+  });
+
+  it('trigger label shows the row matching the current harness', async () => {
+    installKimiFetchMock();
+    const { rerender } = render(
+      <ModelPicker
+        value="kimi-code/k3"
+        onChange={vi.fn()}
+        harness="kimi-code"
+        onHarnessChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: /Kimi K3 \(1M\) — Kimi Code CLI/ })).toBeInTheDocument();
+
+    rerender(
+      <ModelPicker
+        value="kimi-code/k3"
+        onChange={vi.fn()}
+        harness="acp"
+        onHarnessChange={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByRole('button', { name: /Kimi K3 \(1M\) — ACP \(Kimi Code\)/ })).toBeInTheDocument();
+  });
+
+  it('notifies catalog-sync subscribers so a stored catalog-only model restores after load', async () => {
+    installKimiFetchMock();
+    // The composer stores the picked id in localStorage. At mount (before the
+    // catalog fetch resolves) kimi-code/k3 is not a FALLBACK id, so the
+    // composer's initial loadStoredModel falls back to the default — the
+    // re-derive on catalog sync is what restores the user's pick.
+    localStorage.setItem('conv-composer-model', 'kimi-code/k3');
+    const restored: string[] = [];
+    const unsubscribe = onKnownModelsSync(() => restored.push(loadStoredModel()));
+
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+
+    await waitFor(() => expect(restored.length).toBeGreaterThan(0));
+    expect(restored[restored.length - 1]).toBe('kimi-code/k3');
+    unsubscribe();
+  });
+
+  it('keeps the default when the stored model is absent from the synced catalog', async () => {
+    installKimiFetchMock();
+    localStorage.setItem('conv-composer-model', 'kimi-code/removed-from-catalog');
+    const restored: string[] = [];
+    const unsubscribe = onKnownModelsSync(() => restored.push(loadStoredModel('claude-fable-5')));
+
+    render(<ModelPicker value="claude-sonnet-4-6" onChange={vi.fn()} />);
+
+    await waitFor(() => expect(restored.length).toBeGreaterThan(0));
+    expect(restored[restored.length - 1]).toBe('claude-fable-5');
+    unsubscribe();
   });
 });

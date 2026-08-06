@@ -11,11 +11,14 @@ import { getOverdeckAgentStateSync, saveOverdeckAgentStateSync } from '../overde
 import { readAgentHarnessModelRecordSync, writeAgentHarnessModelRecordSync } from '../overdeck/agent-record-sync.js';
 import { logAgentLifecycleSync } from '../persistent-logger.js';
 import { recordFeatureRegistryLifecycle } from '../registry/feature-registry-population.js';
+import { appendAgentPlaneLifecycle } from '../pan-dir/agents.js';
 import { normalizeAgentId } from './identity.js';
 import { removeAgentStateDir } from './state-dir-removal.js';
 import { registerPipelineTelemetryAgentReader } from '../telemetry/pipeline-agent-reader.js';
+import { isRole } from './role.js';
+import type { Role } from './role.js';
 
-export type Role = 'plan' | 'work' | 'review' | 'test' | 'ship' | 'flywheel' | 'strike' | 'sequencer' | 'knowledge';
+export type { Role } from './role.js';
 
 export const SESSION_EXITED_BEFORE_KICKOFF = 'session-exited-before-kickoff';
 
@@ -111,8 +114,10 @@ export interface AgentState {
   costSoFar?: number;
   sessionId?: string; // For resuming sessions after handoff
 
-  // Work type system (PAN-118)
-  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis';
+  // Work type system (PAN-118). 'retained-transcripts' is the tombstone phase
+  // (PAN-3465): removeAgent keeps the row for transcript linkage after the
+  // state dir is retired — such rows are not live agents.
+  phase?: 'exploration' | 'implementation' | 'testing' | 'documentation' | 'review-response' | 'planning' | 'synthesis' | 'retained-transcripts';
   workType?: string; // Current work type ID
 
   /**
@@ -158,14 +163,8 @@ export interface AgentState {
   reviewMonitorSignaled?: 'ready' | 'failed' | 'timeout';
   /** Number of times Deacon has respawned this convoy reviewer (PAN-1806). */
   reviewRetryAttempt?: number;
-  /** PAN-1862 Phase A (synthesis parent): discovery→fork orchestration state. */
-  reviewDiscoveryPending?: boolean;
+  /** Path to the run's context manifest, used by missing-reviewer recovery. */
   reviewContextManifestPath?: string;
-  reviewDiscoveryReadyAt?: string;
-  reviewConvoyForkedAt?: string;
-  reviewForkCacheChecked?: boolean;
-  /** PAN-1862 Phase A (convoy reviewer): session was forked from the parent's discovery session. */
-  reviewForkedFromParent?: boolean;
   hostOverride?: boolean;
 
   /** Inspect sub-role for inspect-* agents (PAN-1834). */
@@ -238,9 +237,7 @@ export async function wipeAgentStateDirs(
   return { removed: targets, path: dirPath };
 }
 
-export function isRole(value: unknown): value is Role {
-  return value === 'plan' || value === 'work' || value === 'review' || value === 'test' || value === 'ship' || value === 'flywheel' || value === 'strike' || value === 'sequencer' || value === 'knowledge';
-}
+export { isRole } from './role.js';
 
 function cleanAgentState(raw: AgentState): AgentState {
   return {
@@ -287,12 +284,7 @@ function cleanAgentState(raw: AgentState): AgentState {
     reviewDeadlineAt: raw.reviewDeadlineAt,
     reviewMonitorSignaled: raw.reviewMonitorSignaled,
     reviewRetryAttempt: raw.reviewRetryAttempt,
-    reviewDiscoveryPending: raw.reviewDiscoveryPending,
     reviewContextManifestPath: raw.reviewContextManifestPath,
-    reviewDiscoveryReadyAt: raw.reviewDiscoveryReadyAt,
-    reviewConvoyForkedAt: raw.reviewConvoyForkedAt,
-    reviewForkCacheChecked: raw.reviewForkCacheChecked,
-    reviewForkedFromParent: raw.reviewForkedFromParent,
     hostOverride: raw.hostOverride,
     inspectSubRole: raw.inspectSubRole,
     slotIndex: raw.slotIndex,
@@ -353,6 +345,24 @@ function prepareAgentStateForSave(state: AgentState): AgentState {
   return state;
 }
 
+async function recordDurableStoppedTransition(
+  state: AgentState,
+  oldStatus: AgentState['status'] | undefined,
+): Promise<void> {
+  if (state.status !== 'stopped' || oldStatus === 'stopped') return;
+  try {
+    await appendAgentPlaneLifecycle(state, {
+      at: state.stoppedAt ?? new Date().toISOString(),
+      event: 'stopped',
+    });
+  } catch (error) {
+    console.warn(
+      `[agents] Could not append durable stopped lifecycle for ${state.id}: `
+      + `${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+}
+
 export function writeAgentStateJsonSync(state: AgentState): void {
   writeRollbackAgentStateSync(state, (clean) => JSON.stringify(cleanAgentState(clean), null, 2));
 }
@@ -378,6 +388,7 @@ export function saveAgentStateSync(state: AgentState): void {
     }
   }
 
+  void recordDurableStoppedTransition(state, oldStatus);
   if (oldStatus && oldStatus !== state.status) {
     logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentState)`);
   }
@@ -441,6 +452,7 @@ export const saveAgentState = (state: AgentState): Effect.Effect<void, FsError> 
       });
     }
 
+    yield* Effect.promise(() => recordDurableStoppedTransition(state, oldStatus));
     if (oldStatus && oldStatus !== state.status) {
       logAgentLifecycleSync(state.id, `status changed: ${oldStatus} → ${state.status} (saveAgentStateProgram)`);
     }

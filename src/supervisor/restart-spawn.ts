@@ -13,6 +13,7 @@ type LogFn = (msg: string) => void | Promise<void>;
 interface SupervisorRestartSpawnerOptions {
   panBinary: string;
   panArgsPrefix?: string[];
+  cwd?: string;
   log: LogFn;
   env?: NodeJS.ProcessEnv;
   acquireRestartLockFn?: typeof acquireRestartLock;
@@ -93,6 +94,7 @@ export function createSupervisorRestartSpawner(options: SupervisorRestartSpawner
       let stdout = '';
       let stderr = '';
       const child = spawnImpl(options.panBinary, [...(options.panArgsPrefix ?? []), ...buildSupervisorRestartArgs()], {
+        cwd: options.cwd,
         detached: true,
         stdio: ['ignore', 'pipe', 'pipe'],
         env: {

@@ -58,11 +58,22 @@ describe('ChatMarkdown file links', () => {
     expect(await screen.findByRole('link', { name: /project\/src\/App\.tsx · L42:C5/ })).toHaveClass('chat-markdown-file-link');
   });
 
-  it('keeps bare assistant file paths as text when cwd is unavailable', () => {
+  it('renders bare absolute paths as chips when cwd is unavailable once existence is confirmed', async () => {
+    // Transcript surfaces (session replays, activity views) have no cwd;
+    // absolute references must still become chips there — a plain anchor
+    // would hand right-click to the browser's native link menu.
+    mockExists(true, 'file');
     renderMarkdown(<ChatMarkdown text="Open /home/eltmon/project/src/App.tsx:42:5." cwd={undefined} />);
 
+    expect(await screen.findByRole('link', { name: /App\.tsx · L42:C5/ })).toHaveClass('chat-markdown-file-link');
+  });
+
+  it('keeps bare relative paths as text when cwd is unavailable', () => {
+    mockExists(true, 'file');
+    renderMarkdown(<ChatMarkdown text="Open src/App.tsx:42:5." cwd={undefined} />);
+
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getByText('Open /home/eltmon/project/src/App.tsx:42:5.')).toBeInTheDocument();
+    expect(screen.getByText('Open src/App.tsx:42:5.')).toBeInTheDocument();
   });
 
   it('renders file hrefs as MarkdownFileLink chips once existence is confirmed', async () => {

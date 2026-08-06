@@ -60,7 +60,7 @@ import { tellCommand } from './commands/tell.js';
 import { answerCommand } from './commands/answer.js';
 import { registerMonitorCommands } from './commands/monitor.js';
 import { killCommand } from './commands/kill.js';
-import { registerResetToPlannedCommand } from './commands/reset-to-planned.js';
+import { registerResetToPlannedCommand } from './commands/reset-to-planned.js'; import { registerResetSessionCommand } from './commands/reset-session.js';
 import { pauseCommand } from './commands/pause.js';
 import { unpauseCommand } from './commands/unpause.js';
 import { untroubledCommand } from './commands/untroubled.js'; import { registerUnstickCommand } from './commands/unstick.js';
@@ -99,6 +99,7 @@ import { createMemoryCommand } from './commands/memory.js';
 import { createBriefingCommand } from './commands/briefing.js';
 import { createComplianceCommand } from './commands/compliance.js';
 import { createRegistryCommand } from './commands/registry.js'; import { createOrdersCommand } from './commands/orders.js';
+import { createParkedCommand } from './commands/parked.js';
 import { createDocsCommand } from './commands/docs.js';
 import { planCommand } from './commands/plan.js';
 import { strikeCommand } from './commands/strike.js'; import { registerStrikeReadyCommand } from './commands/strike-ready.js';
@@ -401,7 +402,7 @@ program
   .description('Stop one qualified agent, or all agents when given an issue ID (workspace preserved)')
   .option('--force', 'Force kill without confirmation')
   .action(killCommand);
-registerResetToPlannedCommand(program);
+registerResetToPlannedCommand(program); registerResetSessionCommand(program);
 program
   .command('pause <id>')
   .description('Persistently pause an agent and stop it if running')
@@ -423,6 +424,7 @@ program
   .description('Summary Fork a conversation — creates new session from a summary of previous work; omit <conv> to fork the conversation you are in')
   .option('--model <model>', 'Model for the summary-forked session')
   .option('--cwd <path>', 'Working directory for the summary-forked session')
+  .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--plain', 'Skip summary generation and copy raw conversation history')
   .action(forkCommand);
 
@@ -432,6 +434,7 @@ program
   .option('--model <model>', 'Model for the handoff-forked (new) conversation')
   .option('--harness <harness>', 'Ignored: harness is provider-default-only (PAN-1984)')
   .option('--cwd <path>', 'Working directory for the new conversation')
+  .option('--project <key>', 'Project (yaml key or display name) for the new conversation; defaults to inheriting the source conversation\'s project')
   .option('--issue <id>', 'Issue ID to associate with the new conversation')
   .option('--author <author>', 'Who authors the handoff doc: external (default) or source', 'external')
   .option('--author-model <model>', 'Model for the external authoring session (only when --author=external)')
@@ -545,6 +548,7 @@ program.addCommand(createMemoryCommand());
 program.addCommand(createBriefingCommand());
 program.addCommand(createComplianceCommand());
 program.addCommand(createRegistryCommand()); program.addCommand(createOrdersCommand());
+program.addCommand(createParkedCommand());
 program.addCommand(createDocsCommand());
 
 // Register admin commands (pan admin cloister, pan admin specialists, etc.)

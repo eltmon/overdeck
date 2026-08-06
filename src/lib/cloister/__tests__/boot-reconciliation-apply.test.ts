@@ -146,4 +146,28 @@ describe('applyBootReconciliationDecision origin handling', () => {
     });
     expect(mocks.handleAgentStoppedEvent).not.toHaveBeenCalled();
   });
+
+  // PAN-3547: a read/UI peer must never act on a boot decision — the primary's
+  // machinery applies it from shared state.
+  it('does not apply any decision from a peer dashboard (OVERDECK_DISABLE_DEACON=1)', async () => {
+    vi.stubEnv('OVERDECK_DISABLE_DEACON', '1');
+    try {
+      mocks.candidates = [candidate('agent-plain')];
+
+      const result = await applyBootReconciliationDecision(deps);
+
+      expect(result).toEqual({
+        resumed: [],
+        outcomes: [],
+        skipped: { workspace_missing: 0, merged: 0, completed: 0, other: 0 },
+        deferred: 0,
+      });
+      expect(mocks.handleAgentStoppedEvent).not.toHaveBeenCalled();
+      expect(mocks.logDeaconEventSync).toHaveBeenCalledWith(
+        'applyBootReconciliationDecision: skipped — peer dashboard does not apply boot decisions (PAN-3547)',
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

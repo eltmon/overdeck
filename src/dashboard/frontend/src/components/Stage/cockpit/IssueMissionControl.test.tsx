@@ -5,10 +5,17 @@ import type { PaneType } from '../../../lib/panesStore'
 import { useDashboardStore } from '../../../lib/store'
 
 const actionInvoke = vi.fn()
+const originalScrollIntoView = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollIntoView')
+let scrollIntoView: ReturnType<typeof vi.fn>
 let queryClient: QueryClient | undefined
 let unexpectedRequests: string[] = []
 
 beforeEach(() => {
+  scrollIntoView = vi.fn()
+  Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    value: scrollIntoView,
+  })
   window.localStorage.clear()
   window.history.replaceState(null, '', '/')
   actionInvoke.mockClear()
@@ -100,6 +107,11 @@ afterEach(async () => {
   queryClient?.clear()
   queryClient = undefined
   const requests = unexpectedRequests
+  if (originalScrollIntoView) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', originalScrollIntoView)
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'scrollIntoView')
+  }
   vi.unstubAllGlobals()
   expect(requests).toEqual([])
 })
@@ -506,7 +518,7 @@ describe('IssueMissionControl', () => {
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
   })
 
-  it('switches Conversation and Terminal inside Session without leaving the top-level tab', () => {
+  it('switches Conversation and Terminal inside Session and reveals the terminal body', async () => {
     const { container } = renderMissionControl()
     const sessionViews = screen.getByRole('tablist', { name: 'Session views' })
     const conversation = within(sessionViews).getByRole('tab', { name: 'Conversation' })
@@ -514,6 +526,7 @@ describe('IssueMissionControl', () => {
 
     expect(conversation).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'conversation')
+    expect(scrollIntoView).not.toHaveBeenCalled()
 
     fireEvent.click(terminal)
 
@@ -521,6 +534,7 @@ describe('IssueMissionControl', () => {
     expect(container.querySelector('main')).toHaveAttribute('data-active-subview', 'terminal')
     expect(screen.getByTestId('issue-detail-page-mock')).toHaveAttribute('data-tab', 'terminal')
     expect(terminal).toHaveAttribute('aria-selected', 'true')
+    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'start', inline: 'nearest' }))
   })
 
   it('shows a blue live signal and leaves composer ownership with IssueDetail', () => {

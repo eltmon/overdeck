@@ -659,6 +659,19 @@ export const postAgentsRestartAllRoute = HttpRouter.add(
         }> = [];
 
         for (const agent of running) {
+          // One-shot roles (review/test convoy members) run once, write their
+          // artifact, and exit WITHOUT saving a sessionId — there is nothing
+          // to resume, and attempting it only ever yields "No session ID
+          // found". Report them as skipped, not failed: the operator's
+          // "16 failed" was 16 completed one-shots mislabeled.
+          if (agent.role === 'review' || agent.role === 'test') {
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'skipped: one-shot role completes fresh — nothing to resume' });
+            continue;
+          }
+          if (!agent.sessionId) {
+            results.push({ id: agent.id, issueId: agent.issueId, model: agent.model, status: 'skipped: no resumable session' });
+            continue;
+          }
           try {
             const result = await restartAgent(agent.id, { graceful: false, force });
             if (result.success) {
@@ -718,7 +731,12 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     }
 
     const previousSessionId = yield* getLatestSessionId(id);
-    if (!previousSessionId) {
+    // Evidence must match the lifecycle assert's: hasSavedSession reads the
+    // agents-table session_id column, so a --fresh wipe that cleared only the
+    // state-dir files left reset-session refusing (404) while pan start still
+    // refused on the DB pointer — the stranded-pointer deadlock. Accept either
+    // evidence source so the route can actually do its job.
+    if (!previousSessionId && !agentState.sessionId) {
       return jsonResponse({ error: `Agent ${id} has no saved session to reset`, lifecycle }, { status: 404 });
     }
 
@@ -748,16 +766,21 @@ export const postAgentResetSessionRoute = HttpRouter.add(
     // include issueId — without it AgentStoppedEvent fails Schema validation.
     //
     // PAN-1908: write-through projection — agents-row upsert + lifecycle event
-    // append in one SQLite transaction.
-    yield* saveAgentStateAndEmitEventProgram(agentState, {
+    // append in one SQLite transaction. Also clears the agents-table session_id
+    // column: a --fresh wipe clears the state-dir files only, and leaving the DB
+    // pointer strands the lifecycle assert (requiresSessionResetBeforeFreshStart)
+    // refusing every subsequent pan start --fresh with no door that can clear it.
+    const clearedState = { ...agentState, sessionId: undefined };
+    yield* saveAgentStateAndEmitEventProgram(clearedState, {
       type: 'agent.stopped',
       timestamp: new Date().toISOString(),
       payload: { agentId: id, issueId: agentState.issueId },
     });
 
-    console.log(`[reset-session] Cleared session for ${id} (was: ${previousSessionId.slice(0, 8)}...)`);
+    const priorSession = previousSessionId ?? agentState.sessionId ?? 'unknown';
+    console.log(`[reset-session] Cleared session for ${id} (was: ${priorSession.slice(0, 8)}...)`);
     invalidateAgentsCache();
-    return jsonResponse({ success: true, agentId: id, previousSessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
+    return jsonResponse({ success: true, agentId: id, previousSessionId: previousSessionId ?? agentState.sessionId, lifecycle: yield* getWorkAgentLifecycleState(id) });
   })),
 );
 

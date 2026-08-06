@@ -252,6 +252,18 @@ export function startBootReconciliation(
   const now = options.now ?? new Date();
   const bootId = options.bootId ?? process.env.OVERDECK_BOOT_ID ?? `boot-${now.toISOString()}`;
   const graceDeadline = new Date(now.getTime() + getBootReconciliationGraceSeconds() * 1000).toISOString();
+
+  // PAN-3547: a read/UI peer (OVERDECK_DISABLE_DEACON=1 — workspace container
+  // or host-mode dev dashboard) must never assert boot ownership in shared
+  // state: no stamp, no pending decision, no grace timer. On 2026-08-04 a
+  // peer boot stamped a record holding MIN-839/864/874 and the primary
+  // surfaced the peer's pending record to the operator with a live
+  // resume-on-timeout countdown. Boot state is written by the primary only.
+  if (process.env.OVERDECK_DISABLE_DEACON === '1') {
+    logDeaconEventSync(`boot reconciliation skipped for ${bootId} — peer dashboard (OVERDECK_DISABLE_DEACON=1) does not write boot records (PAN-3547)`);
+    return { bootId, graceDeadline, candidateIds: [], decision: 'hold_all', timerArmed: false };
+  }
+
   const existing = getBootReconciliationState();
   const bootStartedAt = existing.bootId === bootId && existing.bootStartedAt
     ? existing.bootStartedAt

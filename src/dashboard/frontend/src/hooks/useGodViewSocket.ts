@@ -13,7 +13,14 @@
 
 import { useEffect } from 'react';
 import { create } from 'zustand';
-import type { MemoryObservation } from '@overdeck/contracts';
+import type { MemoryObservation, SystemHealthSnapshot } from '@overdeck/contracts';
+
+export type GodViewSystemHealth = SystemHealthSnapshot & {
+  cpu: number;
+  memPercent: number;
+  memUsed: number;
+  memTotal: number;
+};
 
 export interface GodViewActivityEvent {
   id: string;
@@ -28,7 +35,7 @@ export interface GodViewActivityEvent {
 
 export interface GodViewStore {
   // System health (REST polled)
-  systemHealth: { cpu: number; memPercent: number; memUsed: number; memTotal: number } | null;
+  systemHealth: GodViewSystemHealth | null;
   setSystemHealth: (h: GodViewStore['systemHealth']) => void;
 
   // Focus state

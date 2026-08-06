@@ -8,6 +8,7 @@
 import { exitCli } from '../exit.js';
 import chalk from 'chalk';
 import ora from 'ora';
+import { resolve, sep } from 'node:path';
 import { getDashboardApiUrlSync } from '../../lib/config.js';
 
 const DASHBOARD_URL = getDashboardApiUrlSync();
@@ -51,12 +52,28 @@ function printPolyrepoResults(repos: SyncMainRepoResponse[], failed: boolean): v
   }
 }
 
+/** Return the canonical issue-workspace root containing cwd, when cwd is in one. */
+export function workspacePathForSyncMain(issueId: string, cwd = process.cwd()): string | undefined {
+  const issueLower = issueId.toLowerCase();
+  const parts = resolve(cwd).split(sep);
+  const workspaceIndex = Math.max(
+    parts.lastIndexOf(`feature-${issueLower}`),
+    parts.lastIndexOf(`feature-${issueLower}-strike`),
+  );
+  if (workspaceIndex < 0) return undefined;
+  return parts.slice(0, workspaceIndex + 1).join(sep) || sep;
+}
+
 export async function syncMainCommand(id: string): Promise<void> {
   const issueId = id.toUpperCase();
   const spinner = ora(`Syncing main into ${issueId}...`).start();
 
   try {
-    const response = await fetch(`${DASHBOARD_URL}/api/issues/${issueId}/sync-main`, {
+    const workspacePath = workspacePathForSyncMain(issueId);
+    const workspaceQuery = workspacePath
+      ? `?workspacePath=${encodeURIComponent(workspacePath)}`
+      : '';
+    const response = await fetch(`${DASHBOARD_URL}/api/issues/${issueId}/sync-main${workspaceQuery}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

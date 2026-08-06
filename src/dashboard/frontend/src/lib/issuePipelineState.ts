@@ -62,8 +62,13 @@ export function derivePipelineState(input: PipelineStateInput): PipelineState {
   if (reviewStatus?.testStatus === 'testing') return 'testing_running';
   if (reviewStatus?.testStatus === 'failed' || reviewStatus?.testStatus === 'dispatch_failed') return 'testing_failures';
   if (reviewStatus?.verificationStatus === 'failed') return 'verification_failing';
+  // planning_active is derived from the plan agent's DURABLE status (finalize
+  // flips it to stopped), never from process liveness — liveness lives in
+  // hasLiveTmuxSession. A running plan agent is genuinely planning (including
+  // replanning with an existing spec), so hasPlan must NOT downgrade it (D3,
+  // PAN-3338).
   if (agentRunning && agent?.role === 'plan') return 'planning_active';
-  if (!agentRunning && input.hasPlan && (issueCanonicalState === 'todo' || issueCanonicalState === 'backlog')) return 'planning_done_awaiting_work';
+  if (!agentRunning && input.hasPlan && (issueCanonicalState === 'todo' || issueCanonicalState === 'backlog' || issueCanonicalState === 'planned')) return 'planning_done_awaiting_work';
   if (agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_running';
   if (!agentRunning && issueCanonicalState === 'in_progress') return 'in_progress_work_idle';
   return 'generic';

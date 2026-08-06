@@ -447,6 +447,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
     routeSelection?.subView ?? DEFAULT_SUB_VIEW[initialTab],
   )
   const tabSelectionLocked = useRef(Boolean(routeSelection) || issueAgents.length > 0)
+  const sessionContentRef = useRef<HTMLDivElement>(null)
   const [treeContext, setTreeContext] = useState<IssueTreeContext | null>(null)
   const [selectedTreeSession, setSelectedTreeSession] = useState<SessionNode | null>(null)
   const [treeSessions, setTreeSessions] = useState<readonly SessionNode[]>([])
@@ -527,7 +528,9 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
   const trackerHref = trackerIssueUrl(issueId, issueRecord?.url)
   const createPrHref = pr.data?.pr ? null : githubCompareUrl(trackerHref, branch)
   const issueDetailTab = issueDetailTabFor(activeTab, activeSubView)
-
+  useEffect(() => {
+    if (activeTab === 'session' && activeSubView === 'terminal') sessionContentRef.current?.scrollIntoView?.({ block: 'start', inline: 'nearest' })
+  }, [activeSubView, activeTab])
   useEffect(() => {
     if (tabSelectionLocked.current || issueAgents.length === 0) return
     tabSelectionLocked.current = true
@@ -798,10 +801,7 @@ export function IssueMissionControl({ issueId, title, branch, projectName, launc
             {/* The six cockpit tabs fold the legacy surfaces into sub-views while
                 preserving the ONE IssueDetail page-density renderer. */}
             {issueDetailTab && (
-              <div
-                data-section="Session tab"
-                className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}
-              >
+              <div ref={sessionContentRef} data-section="Session tab" className={`h-[calc(100vh-340px)] min-h-[520px] ${activeTab === 'session' ? 'flex flex-col' : ''}`}>
                 {activeTab === 'session' ? (
                   <div
                     role="tablist"

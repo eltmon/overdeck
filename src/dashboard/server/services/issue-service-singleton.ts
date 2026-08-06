@@ -22,3 +22,7 @@ export function startSharedIssueService(options?: { skipPolling?: boolean }): Pr
   });
   return _startPromise;
 }
+
+export function isSharedIssueServiceStarted(): boolean {
+  return _startPromise !== null;
+}

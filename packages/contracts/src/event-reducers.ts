@@ -916,6 +916,9 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     // ─── PAN-800 Agent Runtime Events ──────────────────────────────────────
+    case 'agent.hook_fired':
+      return { ...state, sequence: Math.max(state.sequence, event.sequence) }
+
     case 'agent.activity_changed': {
       const { agentId, activity, currentTool } = event.payload
       const prev = state.agentRuntimeById[agentId]
@@ -1377,6 +1380,10 @@ export function applyEvent(state: ReadModelState, event: DomainEvent): ReadModel
     }
 
     case 'conversation.created': {
+      return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
+    }
+
+    case 'conversation.moved': {
       return { ...state, conversationsListRevision: state.conversationsListRevision + 1 }
     }
 

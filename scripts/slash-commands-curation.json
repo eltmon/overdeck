@@ -34,6 +34,7 @@
     "done": "Lifecycle",
     "reopen": "Lifecycle",
     "reset-to-planned": "Lifecycle",
+    "reset-session": "Lifecycle",
     "wipe": "Lifecycle",
     "close": "Lifecycle",
     "issues": "Lifecycle",

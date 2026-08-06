@@ -38,7 +38,7 @@ import {
   getPendingQuestions as getPendingQuestionsShared,
   getAgentPendingQuestions as getAgentPendingQuestionsShared,
 } from '../../../../lib/agent-enrichment.js';
-import type { WorkAgentLifecycleState, WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
+import { issueOwesReworkSync, type WorkAgentLifecycleState, type WorkAgentRecommendedAction } from '../../../../lib/work-agent-lifecycle.js';
 import { hasCompletionMarkerForAgent } from '../../../../lib/agents/supervisor-channels.js';
 import { emitActivityEntrySync } from '../../../../lib/activity-logger.js';
 import { getResourceConfig, type HealthLeakedSpecialist, type SystemHealthSnapshot } from '../../services/system-health-service.js';
@@ -301,6 +301,9 @@ function buildStoppedAgentLifecycle(
   const handedOff = typeof state.id === 'string' && state.id.length > 0
     ? hasCompletionMarkerForAgent(state as AgentState)
     : false;
+  // PAN-3555: an owed-rework handoff is resumable again — mirror the canonical door.
+  const owesRework = handedOff && issueOwesReworkSync(state.issueId);
+  const canWarmResumeAfterHandoff = owesRework && hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed);
   const isOrphaned = !hasLiveTmuxSession && (
     (hasSavedSession && !hasResumableBackingState)
     || (hasAgentState && (!hasWorkspace || isPlaceholder))
@@ -315,6 +318,9 @@ function buildStoppedAgentLifecycle(
     reason = hasSavedSession
       ? `Agent ${agentId} has stale/orphaned session metadata without a resumable workspace-backed agent state. Start Agent should create a fresh session.`
       : `Agent ${agentId} is an orphaned placeholder/stale record. Start Agent should create a fresh session.`;
+  } else if (canWarmResumeAfterHandoff) {
+    recommendedAction = 'resume';
+    reason = `Agent ${agentId} handed off its work but the pipeline now owes it rework (failed verification, blocked/failed review, or failed test). Use 'pan resume ${agentOrIssueId}' to continue its warm session with the pending feedback (PAN-3555).`;
   } else if (handedOff) {
     // PAN-3334: mirror getWorkAgentLifecycleState — a handed-off agent is never
     // offered a plain resume; there is nothing to continue.
@@ -322,7 +328,7 @@ function buildStoppedAgentLifecycle(
     reason = `Agent ${agentId} finished and handed off its work (completion marker on disk) — there is nothing to resume. The session is preserved for inspection; message it with 'pan tell ${agentOrIssueId}', or start over with 'pan start ${agentOrIssueId} --fresh'.`;
   } else if (requiresSessionResetBeforeFreshStart) {
     recommendedAction = 'resume';
-    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or 'pan start ${agentOrIssueId} --fresh' to start a new session (e.g. to switch model).`;
+    reason = `Agent ${agentId} has a resumable Claude session. Use 'pan resume ${agentOrIssueId}' to continue it, or run 'pan reset-session ${agentOrIssueId}' before starting a new session.`;
   } else if (hasSavedSession && !hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed)) {
     recommendedAction = 'start';
     reason = `Agent ${agentId} has a saved Claude session id but its transcript is missing on disk (jsonl-missing). Start Agent will create a fresh session in the existing workspace.`;
@@ -346,10 +352,11 @@ function buildStoppedAgentLifecycle(
     isCompleted,
     isCrashed,
     handedOff,
+    owesRework,
     runtimeState: runtime,
     agentStatus,
     canStartFresh: !requiresSessionResetBeforeFreshStart || isOrphaned,
-    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && !handedOff,
+    canResumeSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState && (isStopped || isCrashed) && (!handedOff || owesRework),
     canRestartWithContext: hasAgentState && hasWorkspace,
     canResetSession: hasSavedSession && hasResumableTranscript && hasResumableBackingState,
     requiresSessionResetBeforeFreshStart,

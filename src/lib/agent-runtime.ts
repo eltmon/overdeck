@@ -59,6 +59,7 @@ export const getAgentRuntimeSnapshot = (
 
 type HeartbeatBody =
   | { kind: 'activity'; activity: Activity; tool?: string }
+  | { kind: 'hook_fired'; hookName: string; tool?: string }
   | { kind: 'thinking_start'; lastToolAt: string }
   | { kind: 'thinking_stop'; resolvedBy: 'tool' | 'waiting' | 'idle' | 'stopped' }
   | { kind: 'waiting_start'; reason: WaitingReason; message?: string }

@@ -53,7 +53,7 @@ function readySlot(overrides: Partial<ClassifiedSwarmSlot> = {}): ClassifiedSwar
   };
 }
 
-function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> {
+function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks' | 'stopSlotAgent'> {
   return {
     verifyAndMergeSlot: vi.fn(async () => ({
       verified: true,
@@ -67,6 +67,7 @@ function deps(result: { merged: boolean; conflicts: boolean }): Pick<CoordinateS
     })),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
     fireTieredCommitHooks: vi.fn(async () => []),
+    stopSlotAgent: vi.fn(async () => undefined),
   };
 }
 
@@ -89,7 +90,10 @@ describe('deacon-swarm ready-slot merge', () => {
     const fakeDeps = deps({ merged: true, conflicts: false });
 
     await expect(mergeReadySlots('PAN-2203', workspacePath, doc(), [readySlot()], fakeDeps))
-      .resolves.toEqual(['[swarm] merged slot 1 (item wi-1) for PAN-2203']);
+      .resolves.toEqual([
+        '[swarm] reaped merged agent agent-pan-2203-slot-1',
+        '[swarm] merged slot 1 (item wi-1) for PAN-2203',
+      ]);
 
     expect(fakeDeps.verifyAndMergeSlot).toHaveBeenCalledWith(
       { issueId: 'PAN-2203', featureWorkspace: workspacePath },
@@ -101,6 +105,7 @@ describe('deacon-swarm ready-slot merge', () => {
       { type: 'done', itemId: 'wi-1', writerId: 'deacon-swarm' },
       workspacePath,
     );
+    expect(fakeDeps.stopSlotAgent).toHaveBeenCalledWith('agent-pan-2203-slot-1');
   });
 
   it('does not write item status when verifyAndMergeSlot returns merged false', async () => {

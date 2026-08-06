@@ -92,6 +92,11 @@ export function readGovernorReserves(): GovernorReserves {
   };
 }
 
+/** PAN-3550: the activity-feed warn reserve, always above the SOFT reserve. */
+export function readGovernorWatchReserveBytes(): number {
+  return loadConfigSync().config.resources.governorWatchReserveGb * GIB;
+}
+
 export function readGovernorRunwayThresholds(): GovernorRunwayThresholds {
   const resources = loadConfigSync().config.resources;
   return {
@@ -141,7 +146,15 @@ export function nextGovernorModeWithRunway(
     && runway.psiFullAvg10 >= runwayThresholds.psiFullShedAvg10;
 
   if (memoryMode === 'shedding' || psiShed) return 'shedding';
-  if (swapLow) return 'holding';
+  // Operator-approved correction (PAN-3485 follow-up, 2026-08-02): swap
+  // RESIDENCY is not pressure. Pages swapped during a leak era sit idle for
+  // weeks while PSI pins at 0.00 — and holding admissions for them wedges the
+  // entire pipeline (sweeper re-drives, yield-unpauses, resume gates all
+  // deferred for weeks on this host). Low swap now matters only with live
+  // stall evidence: PSI at/above the shed threshold sheds above; below it we
+  // admit. When PSI is UNAVAILABLE we cannot prove safety, so the
+  // conservative hold (with its swap-recovery hysteresis) still stands.
+  if (swapLow && runway.psiFullAvg10 == null) return 'holding';
   return memoryMode;
 }
 

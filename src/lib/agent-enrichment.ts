@@ -172,6 +172,15 @@ export function isOwnActiveSpecialist(role: AgentEnrichment['role']): boolean {
   return role === 'review' || role === 'test' || role === 'ship'
 }
 
+/**
+ * Interactive roles idle at a live prompt as their steady state — plan agents
+ * after finalize (skipKill) and conversation sessions. For these,
+ * stopped-but-session-alive is deliberate, never stale (PAN-3338).
+ */
+export function isInteractiveRoleAgent(agentId: string, role?: string): boolean {
+  return role === 'plan' || agentId.startsWith('conv-')
+}
+
 // ─── JSONL path helpers ───────────────────────────────────────────────────────
 
 export function getClaudeProjectDir(workspacePath: string): string {
@@ -650,12 +659,16 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
     ? await Effect.runPromise(detectAwaitingInputForAgent(agentId, { isPlanning }))
     : null
 
-  const fallbackDetection: AwaitingInputDetection | null = runtimeState?.resolution === 'needs_input'
-    ? {
-        reason: 'other',
-        prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
-      }
-    : null
+  // Resolution is a stop-hook verdict and can outlive the stop that produced it.
+  // Once tool activity resumes, the current activity is stronger evidence: do
+  // not keep projecting the old needs_input verdict as an actionable decision.
+  const fallbackDetection: AwaitingInputDetection | null =
+    runtimeState?.resolution === 'needs_input' && runtimeState.state !== 'active'
+      ? {
+          reason: 'other',
+          prompt: normalizeAwaitingInputPrompt('Agent stopped because it needs human input or hit a blocker'),
+        }
+      : null
 
   // An interactive session does not finish — it yields the turn. The Stop hook
   // reports that as `activity: idle`, which until now carried no operator
@@ -666,7 +679,7 @@ async function getAgentJsonlMtimePromise(agentId: string): Promise<number | null
   // Scoped to interactive roles deliberately. A work/review/test agent's idle
   // can mean between-items or complete; flagging those would flood the surface
   // and destroy the signal this exists to carry.
-  const isInteractiveRole = role === 'plan' || agentId.startsWith('conv-')
+  const isInteractiveRole = isInteractiveRoleAgent(agentId, role)
   const turnEndedWaiting = isInteractiveRole && runtimeState?.state === 'idle'
   const turnEndedDetection: AwaitingInputDetection | null = turnEndedWaiting
     ? {

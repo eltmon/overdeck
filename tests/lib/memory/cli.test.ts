@@ -48,7 +48,7 @@ beforeEach(async () => {
   workspace999 = await registerWorkspace('PAN-999', 'feature-pan-999');
   workspace998 = await registerWorkspace('PAN-998', 'feature-pan-998');
   workspace997 = await registerWorkspace('PAN-997', 'feature-pan-997');
-});
+}, 20_000);
 
 afterEach(() => {
   closeMemoryFtsDatabases();
@@ -85,7 +85,10 @@ async function writeObservationRecord(item: MemoryObservation): Promise<void> {
 }
 
 describe('pan memory CLI service', () => {
-  it('searches observations with issue, tag, workspace, and sibling filters', async () => {
+  // Every test writes real observations through the production path (SQLite +
+  // FTS). Under verification-gate load (nice -19, parallel forks) the 5s
+  // default is not enough — PAN-1577's gate run timed a test out at 7s.
+  it('searches observations with issue, tag, workspace, and sibling filters', { timeout: 20_000 }, async () => {
     await writeObservationRecord(observation({ id: 'primary', summary: 'Primary memory result', tags: ['memory'] }));
     await writeObservationRecord(observation({
       id: 'sibling',
@@ -103,7 +106,7 @@ describe('pan memory CLI service', () => {
     expect((await searchMemory('primary', { project: 'overdeck', workspace: 'other-workspace' }))).toEqual([]);
   });
 
-  it('applies project, workspace, issue, and session reset markers at read time', async () => {
+  it('applies project, workspace, issue, and session reset markers at read time', { timeout: 20_000 }, async () => {
     await writeObservationRecord(observation({ id: 'issue-archived', summary: 'issue scoped memory', timestamp: '2026-05-16T20:00:00.000Z' }));
     await writeObservationRecord(observation({ id: 'workspace-live', summary: 'workspace scoped memory', issueId: 'PAN-999', workspaceId: workspace999, timestamp: '2026-05-16T22:00:00.000Z' }));
     await writeObservationRecord(observation({ id: 'session-archived', summary: 'session scoped memory', issueId: 'PAN-998', workspaceId: workspace998, timestamp: '2026-05-16T20:00:00.000Z' }));
@@ -152,7 +155,7 @@ describe('pan memory CLI service', () => {
       .toEqual(['project-live', 'workspace-live']);
   });
 
-  it('creates reset markers without deleting memory records', async () => {
+  it('creates reset markers without deleting memory records', { timeout: 20_000 }, async () => {
     await writeObservationRecord(observation());
     const events: Array<{ marker: unknown; timestamp: string }> = [];
 
@@ -183,7 +186,7 @@ describe('pan memory CLI service', () => {
     expect(events).toEqual([{ marker, timestamp: '2026-05-16T21:00:00.000Z' }]);
   });
 
-  it('returns insufficient data below the daily summary observation threshold', async () => {
+  it('returns insufficient data below the daily summary observation threshold', { timeout: 20_000 }, async () => {
     await writeObservationRecord(observation({ id: 'summary-1', summary: 'First observation' }));
     await writeObservationRecord(observation({ id: 'summary-2', summary: 'Second observation', timestamp: '2026-05-16T20:01:00.000Z' }));
 
@@ -198,7 +201,7 @@ describe('pan memory CLI service', () => {
     await expect(readFile(result.path, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
-  it('generates a daily summary markdown file and indexes it into FTS', async () => {
+  it('generates a daily summary markdown file and indexes it into FTS', { timeout: 20_000 }, async () => {
     for (let index = 0; index < 3; index += 1) {
       await writeObservationRecord(observation({
         id: `summary-${index}`,
@@ -232,7 +235,7 @@ describe('pan memory CLI service', () => {
     })]);
   });
 
-  it('search still returns observations when a matching daily summary also exists in the shared FTS index (non-blocking review fix, cycle 2)', async () => {
+  it('search still returns observations when a matching daily summary also exists in the shared FTS index (non-blocking review fix, cycle 2)', { timeout: 20_000 }, async () => {
     for (let index = 0; index < 3; index += 1) {
       await writeObservationRecord(observation({
         id: `summary-search-${index}`,
@@ -251,7 +254,7 @@ describe('pan memory CLI service', () => {
     expect(results.map((r) => r.observation.id).sort()).toEqual(['summary-search-0', 'summary-search-1', 'summary-search-2']);
   });
 
-  it('regenerates an existing daily summary only after twenty new observations', async () => {
+  it('regenerates an existing daily summary only after twenty new observations', { timeout: 20_000 }, async () => {
     for (let index = 0; index < 3; index += 1) {
       await writeObservationRecord(observation({
         id: `initial-${index}`,
@@ -285,7 +288,7 @@ describe('pan memory CLI service', () => {
     expect(regenerated.markdown).toContain('Twentieth new observation');
   });
 
-  it('reports stale active agents with a non-zero doctor exit code', async () => {
+  it('reports stale active agents with a non-zero doctor exit code', { timeout: 20_000 }, async () => {
     await ensureDir(join(odb.home, 'agents/agent-pan-1052'));
     await writeFile(join(odb.home, 'agents/agent-pan-1052/state.json'), JSON.stringify({
       id: 'agent-pan-1052',

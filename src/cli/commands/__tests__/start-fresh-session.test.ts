@@ -10,8 +10,13 @@ const tmuxMocks = vi.hoisted(() => ({
   sessionExistsSync: vi.fn(),
 }))
 
+const lifecycleMocks = vi.hoisted(() => ({
+  assertCanStartFreshSync: vi.fn(),
+}))
+
 vi.mock('../../../lib/agents.js', () => agentMocks)
 vi.mock('../../../lib/tmux.js', () => tmuxMocks)
+vi.mock('../../../lib/work-agent-lifecycle.js', () => lifecycleMocks)
 
 import { prepareFreshWorkAgentSession } from '../start-fresh-session.js'
 
@@ -24,6 +29,7 @@ describe('prepareFreshWorkAgentSession', () => {
       path: '/tmp/agents',
     })
     tmuxMocks.sessionExistsSync.mockReturnValue(false)
+    lifecycleMocks.assertCanStartFreshSync.mockReturnValue({ canStartFresh: true })
   })
 
   it('refuses to replace a session with a pending operator decision', async () => {
@@ -46,6 +52,26 @@ describe('prepareFreshWorkAgentSession', () => {
       error: expect.stringContaining("pan answer PAN-3228"),
     })
     expect(result.error).toContain('tool permission')
+    expect(agentMocks.stopAgentSync).not.toHaveBeenCalled()
+    expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()
+  })
+
+  it('leaves the agent state directory intact when the fresh-start guard refuses', async () => {
+    lifecycleMocks.assertCanStartFreshSync.mockImplementation(() => {
+      throw new Error("Use 'pan reset-session PAN-3228' before starting a new session.")
+    })
+
+    const result = await prepareFreshWorkAgentSession('PAN-3228', { force: true })
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: expect.stringContaining('pan reset-session PAN-3228'),
+    })
+    expect(lifecycleMocks.assertCanStartFreshSync).toHaveBeenCalledWith('PAN-3228', {
+      allowPausedForce: false,
+      allowLiveSessionReplacement: true,
+      explicitFresh: true,
+    })
     expect(agentMocks.stopAgentSync).not.toHaveBeenCalled()
     expect(agentMocks.wipeAgentStateDirs).not.toHaveBeenCalled()
   })

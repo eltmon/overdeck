@@ -55,6 +55,13 @@ emit_healthy_if_pending() {
 }
 
 if [ "$EVENT_NAME" = "PostToolUseFailure" ]; then
+  HOOK_BODY=$(jq -n --arg tool "$TOOL_NAME" '{
+    kind: "hook_fired",
+    hookName: "PostToolUseFailure",
+    tool: $tool
+  }' 2>/dev/null)
+  [ -n "$HOOK_BODY" ] && pan_emit_event "$AGENT_ID" "$HOOK_BODY" >/dev/null 2>&1 || true
+
   # Documented failure-event shape: top-level `error`, no tool_response.
   ERROR_TEXT=$(printf '%s' "$INPUT" | jq -r '.error // ""' 2>/dev/null)
   if is_auth_error_text "$ERROR_TEXT"; then

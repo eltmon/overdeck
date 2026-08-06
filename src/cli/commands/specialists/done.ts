@@ -21,6 +21,8 @@ import {
   type ReviewStatusUpdate,
 } from '../../../lib/review-status.js';
 import type { HeadAnchor } from '../../../lib/git-utils.js';
+import { rehydrateHeadAnchor } from '../../../lib/git-utils.js';
+import { recordReviewVerdict } from '../../../lib/cloister/review-verdict-writer.js';
 
 interface DoneOptions {
   status: 'passed' | 'failed' | 'blocked';
@@ -28,8 +30,6 @@ interface DoneOptions {
   item?: string;
   /** Review cycle identity used to deduplicate blocked feedback delivery. */
   runId?: string;
-  /** PAN-1862 (FR-6): "security=passed,correctness=blocked" per-reviewer verdicts. */
-  reviewers?: string;
   notes?: string;
   uatStatus?: 'passed' | 'failed';
   uatNotes?: string;
@@ -111,36 +111,15 @@ export async function doneCommand(
     case 'review':
       update.reviewStatus = options.status as ReviewStatus['reviewStatus'];
       if (options.notes) update.reviewNotes = options.notes;
-      // PAN-1862 (FR-6): persist per-reviewer verdicts so selective re-review
-      // (reviewersToRerun) can skip provably-clean reviewers next cycle. The
-      // synthesis agent passes --reviewers "security=passed,correctness=blocked".
-      // Anchored to the workspace HEAD recorded below; malformed entries are
-      // dropped with a warning rather than failing the verdict write.
-      if (options.reviewers) {
-        const verdicts: NonNullable<ReviewStatus['reviewerVerdicts']> = {};
-        for (const pair of options.reviewers.split(',')) {
-          const [subRole, verdict] = pair.split('=').map(t => t.trim().toLowerCase());
-          if (subRole && (verdict === 'passed' || verdict === 'blocked')) {
-            verdicts[subRole] = { status: verdict };
-          } else if (pair.trim()) {
-            console.warn(chalk.yellow(`  ⚠ Ignoring malformed --reviewers entry: "${pair.trim()}" (want subRole=passed|blocked)`));
-          }
-        }
-        if (Object.keys(verdicts).length > 0) update.reviewerVerdicts = verdicts;
-      }
       // Snapshot the workspace HEAD — the same way the /api/specialists/done HTTP
       // route does. The synthesis agent signals via this CLI path, so without this
       // the snapshot never happens: canSkipTests can't fire and the deacon's
       // post-review-commit drift detection goes blind, jamming the issue at
-      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts
-      // (reviewedAtCommit) AND for any verdict carrying --reviewers: per-reviewer
-      // verdicts need their atCommit anchor on a BLOCKED aggregate too — that is
-      // exactly the cycle whose clean reviewers selective re-review wants to skip
-      // next time (PAN-1862 FR-6/NFR-1). A bare blocked verdict skips this probe so
-      // the durable verdict write stays synchronous ahead of feedback delivery;
-      // its reviewedAtCommit anchor is recorded by a second best-effort write after
+      // passed-but-no-anchor. This pre-delivery probe runs for passed verdicts;
+      // a blocked verdict stays synchronous ahead of feedback delivery, and its
+      // reviewedAtCommit anchor is recorded by a second best-effort write after
       // feedback delivery below (PAN-2524, PAN-3148).
-      if (options.status === 'passed' || update.reviewerVerdicts) {
+      if (options.status === 'passed') {
         let workspaceHead: HeadAnchor | undefined;
         try {
           const { resolveProjectFromIssueSync } = await import('../../../lib/projects.js');
@@ -164,9 +143,6 @@ export async function doneCommand(
           const message = err instanceof Error ? err.message : String(err);
           console.warn(chalk.yellow(`  ⚠ Could not snapshot workspace HEAD: ${message}`));
         }
-        if (workspaceHead && update.reviewerVerdicts) {
-          for (const v of Object.values(update.reviewerVerdicts)) if (v) v.atCommit = workspaceHead;
-        }
         if (workspaceHead && options.status === 'passed') update.reviewedAtCommit = workspaceHead;
       }
       if (options.status === 'passed') {
@@ -174,12 +150,6 @@ export async function doneCommand(
         // readyForMerge. A human passing review assumes responsibility for the gate.
         update.verificationStatus = 'passed';
         update.verificationNotes = 'Cleared by `pan specialists done review --status passed` override (PAN-1215)';
-        console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
-        console.log(chalk.dim('  Test agent can now proceed'));
-      } else if (options.status === 'blocked') {
-        console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
-      } else {
-        console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
       }
       break;
 
@@ -241,11 +211,61 @@ export async function doneCommand(
       break;
   }
 
-  const status = setReviewStatusSync(normalizedIssueId, update);
+  let status = getReviewStatusSync(normalizedIssueId) || ({} as ReviewStatus);
+
+  // Route every terminal review verdict through the verdict write door (PAN-3512).
+  if (specialist === 'review' && (options.status === 'passed' || options.status === 'blocked' || options.status === 'failed')) {
+    const evidenceHead = update.reviewedAtCommit
+      ? rehydrateHeadAnchor(update.reviewedAtCommit)
+      : undefined;
+
+    const verdictOutcome = await recordReviewVerdict(normalizedIssueId, {
+      verdict: options.status as ReviewStatus['reviewStatus'] & ('passed' | 'blocked' | 'failed'),
+      notes: options.notes,
+      evidenceHead,
+      extra: {
+        ...(update.verificationStatus !== undefined
+          ? { verificationStatus: update.verificationStatus }
+          : {}),
+        ...(update.verificationNotes !== undefined
+          ? { verificationNotes: update.verificationNotes }
+          : {}),
+      },
+      runId: options.runId,
+      writer: 'quick-signal',
+    });
+
+    if (!verdictOutcome.landed) {
+      // Verdict was rejected (stale evidence) — report it and exit non-zero
+      console.error(chalk.red(`Review verdict rejected: ${verdictOutcome.reason}`));
+      return exitCli(1);
+    }
+
+    const updatedStatus = getReviewStatusSync(normalizedIssueId);
+    if (updatedStatus) status = updatedStatus;
+
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    } else if (options.status === 'blocked') {
+      console.log(chalk.yellow(`✗ Review blocked for ${normalizedIssueId}`));
+    } else {
+      console.log(chalk.red(`✗ Review failed for ${normalizedIssueId}`));
+    }
+  } else if (specialist === 'review') {
+    // No evidence head (skipped verdict) — use setReviewStatusSync
+    status = setReviewStatusSync(normalizedIssueId, update);
+    if (options.status === 'passed') {
+      console.log(chalk.green(`✓ Review passed for ${normalizedIssueId}`));
+      console.log(chalk.dim('  Test agent can now proceed'));
+    }
+  } else {
+    status = setReviewStatusSync(normalizedIssueId, update);
+  }
 
   if (specialist === 'review' && (options.status === 'blocked' || options.status === 'failed')) {
-    // PAN-2518: the verdict is already durable (setReviewStatusSync above). Feedback
-    // delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
+    // PAN-2518: the verdict is already durable (recordReviewVerdict or setReviewStatusSync above).
+    // Feedback delivery (PR comment, agent messaging, needs-you surfacing) is advisory and
     // shells out to network + tmux, any of which can STALL. `pan admin specialists
     // done` is run from inside the review agent's own session, so a hung delivery
     // leaves that agent waiting on a never-returning command and the issue stalls
@@ -256,9 +276,9 @@ export async function doneCommand(
       const { deliverReviewVerdictFeedback } = await import('../../../lib/cloister/review-verdict-feedback.js');
       const delivery = Effect.runPromise(deliverReviewVerdictFeedback({
         issueId: normalizedIssueId,
-        verdict: options.status,
+        verdict: options.status as 'blocked' | 'failed',
         notes: options.notes,
-        prUrl: status.prUrl,
+        prUrl: status?.prUrl || undefined,
         ...(options.runId ? { runId: options.runId } : {}),
       }));
       let timer: ReturnType<typeof setTimeout> | undefined;

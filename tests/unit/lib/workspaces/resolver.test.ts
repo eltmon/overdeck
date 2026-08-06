@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { setupOverdeckTestDb, teardownOverdeckTestDb, type OverdeckTestDb } from '../../../helpers/overdeck-test-db.js';
 
 import {
@@ -10,6 +13,7 @@ import {
   getWorkspaceForIssue,
   listProjects,
   listWorkspaces,
+  resolveIssueWorkspaceSyncTarget,
   resolveWorkspaceForCwd,
   resolveWorkspaceRef,
 } from '../../../../src/lib/workspaces/resolver.js';
@@ -163,5 +167,24 @@ describe('workspaces resolver', () => {
   it('resolveWorkspaceForCwd returns null when nothing matches', async () => {
     seedProject();
     expect(resolveWorkspaceForCwd('/completely/unrelated/path')).toBeNull();
+  });
+
+  it('resolves an unregistered strike workspace only from its canonical issue path', () => {
+    const projectPath = mkdtempSync(join(tmpdir(), 'overdeck-sync-strike-'));
+    const strikePath = join(projectPath, 'workspaces', 'feature-pan-3440-strike');
+    const unrelatedPath = join(projectPath, 'workspaces', 'feature-pan-9999-strike');
+    mkdirSync(join(strikePath, 'src'), { recursive: true });
+    mkdirSync(unrelatedPath, { recursive: true });
+
+    try {
+      expect(resolveIssueWorkspaceSyncTarget('PAN-3440', projectPath, join(strikePath, 'src'))).toEqual({
+        path: strikePath,
+        branchName: 'strike/pan-3440',
+        registered: false,
+      });
+      expect(resolveIssueWorkspaceSyncTarget('PAN-3440', projectPath, unrelatedPath)).toBeNull();
+    } finally {
+      rmSync(projectPath, { recursive: true, force: true });
+    }
   });
 });

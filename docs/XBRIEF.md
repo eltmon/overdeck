@@ -404,7 +404,7 @@ The xBRIEF spec supports arbitrary `metadata` on items and child items. Overdeck
 | `metadata.files_scope_confidence` | items | `high`, `medium`, or `low` confidence in `files_scope` |
 | `metadata.verify_commands` | items | Commands that verify the committed item |
 | `metadata.expected_outputs` | items | Observable evidence expected from those commands |
-| `metadata.readiness` | items | `ready`, `sequential`, or `needs_refinement` dispatch state |
+| `metadata.readiness` | items | Static parallel-safety classification: `ready` can run in its own slot once DAG blockers complete; `sequential` must remain serialized after prerequisites; `needs_refinement` must be split or clarified. Edges control dispatch order. |
 | `metadata.traces` | items | Optional `string[]` of PRD requirement IDs (`FR-1`, `NFR-2`) satisfied by this item |
 | `metadata.kind` | child items | `"acceptance_criterion"` — marks a child item as an AC for the verification gate |
 | `metadata.canonicalFilename` | plan | Preserves the immutable filename across re-finalizations |

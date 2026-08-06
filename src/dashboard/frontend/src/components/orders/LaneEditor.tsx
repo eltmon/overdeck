@@ -1,13 +1,16 @@
-import { useState, type DragEvent } from 'react';
+import { useMemo, useState, type DragEvent } from 'react';
 import type { OrderBookItem, OrderBookLane } from '@overdeck/contracts';
 
+import { selectIssues, useDashboardStore } from '../../lib/store';
 import { dashboardMutationJsonHeaders } from '../../lib/wsTransport';
+import type { Issue } from '../../types';
 import type { OrderBookView } from './BookStrip';
 import { LaneItem, type LaneItemState } from './LaneItem';
 
 interface LaneEditorProps {
   book: OrderBookView;
   inFlightIssues?: ReadonlySet<string>;
+  issues?: Issue[];
   onBookChange: (book: OrderBookView) => void;
 }
 
@@ -24,7 +27,13 @@ function itemState(book: OrderBookView, issueId: string, inFlight: ReadonlySet<s
   return book.settings.posture === 'drain' ? 'held' : 'released';
 }
 
-export function LaneEditor({ book, inFlightIssues = new Set(), onBookChange }: LaneEditorProps) {
+export function LaneEditor({ book, inFlightIssues = new Set(), issues, onBookChange }: LaneEditorProps) {
+  const storeIssues = useDashboardStore(selectIssues) as Issue[];
+  const availableIssues = issues ?? storeIssues;
+  const titles = useMemo(
+    () => new Map(availableIssues.map((issue) => [issue.identifier.toUpperCase(), issue.title])),
+    [availableIssues],
+  );
   const [draggedIssue, setDraggedIssue] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,6 +103,7 @@ export function LaneEditor({ book, inFlightIssues = new Set(), onBookChange }: L
               <LaneItem
                 key={item.issue}
                 item={item}
+                title={titles.get(item.issue.toUpperCase())}
                 state={itemState(book, item.issue, inFlightIssues)}
                 hasPrd={book.itemReadiness?.[item.issue]?.hasPrd ?? true}
                 onDragStart={setDraggedIssue}

@@ -205,7 +205,7 @@ A backlog issue is **auto-pickable** — eligible to *start work* — iff:
 This mirrors `isAutoPickable()` in `src/lib/backlog/pickup.ts`. The gates:
 
 - **ready** — operator marked it workable (`ready` label, Definition of Ready).
-- **planned** — has an xBRIEF spec *and* beads.
+- **planned** — has an xBRIEF spec with implementation items.
 - **released** — operator's "go" after reviewing the plan (`released`, PAN-2059). Required to
   auto-start when `auto_pickup_backlog` is OFF unless the issue belongs to the active order book;
   when ON, the toggle is the blanket release. Operator-only — never add the label yourself.
@@ -248,7 +248,7 @@ It sets how aggressively you START backlog work:
 
 **How to launch:**
 
-- **Plan:** `pan plan <id> --auto` produces xBRIEF + beads and **stops at `planned`** (it does
+- **Plan:** `pan plan <id> --auto` produces the xBRIEF and **stops at `planned`** (it does
   NOT chain into work); the auto-pickable predicate starts it on a later tick.
 - **Start:** `pan start <id>` / `pan plan <id> --auto --auto-start` for auto-pickable items,
   in-pipeline recovery (startup-triage restart, merge-conflict re-plan), and trivial issues.
@@ -463,9 +463,9 @@ prior context — and then propose a default, never an open question. Record dec
 - **Saturation cap.** Never spawn past `maxAgents`. Operator-started agents (no `flywheelRunId`,
   when `cloister.concurrency.exempt_operator_started=true`) are exempt from reaping; when you
   pause solely to free a slot, prefix the reason `[governor-slot]` so the troubled gate clears.
-  Never claim "work complete, no open beads" without verifying `bd list --status open
-  --title-contains <id>` in the agent's workspace — an errored/timed-out query is *unknown*,
-  not zero.
+  Never claim "work complete, no open items" without verifying the xBRIEF checklist —
+  `pan task next <id>` must report no claimable item — an errored/timed-out query is
+  *unknown*, not zero.
 - **Merge policy (PAN-1486).** With `require_uat_before_merge=true` (default), do NOT schedule
   merges — each tick keep a UAT bundle assembled (`GET /api/flywheel/uat-candidate` → `POST
   /api/flywheel/assemble-uat`; idempotent, never touches `main`) so the operator ships a batch.

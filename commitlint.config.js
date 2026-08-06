@@ -13,7 +13,6 @@ export default {
         'workspace',
         'cli',
         'review',
-        'beads',
         'db',
         'specialists',
         'terminal',

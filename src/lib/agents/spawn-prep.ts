@@ -23,6 +23,7 @@ import { getDispatchableItems } from '../xbrief/dag.js';
 import { type Role } from './agent-state.js';
 import type { TierAssignment } from './dispatch-tier.js';
 import { normalizeFlywheelRunId } from './provenance.js';
+import { clearStaleClosedOutBeforeSpawn } from './reopen-guard.js';
 import { resolveStaffing } from './staffing.js';
 import { resolveTieredExecutionEnabled, resolveTieredExecutionEnabledForIssue } from './tier-table.js';
 import {
@@ -133,7 +134,6 @@ export interface SpawnRunOptions {
   /** Run-scoped reviewer metadata persisted before the tmux session launches. */
   reviewRunId?: string;
   reviewDeadlineAt?: string;
-  reviewForkedFromParent?: boolean;
   allowHost?: boolean;
   registerConversation?: boolean;
   effort?: RoleEffort;
@@ -696,6 +696,16 @@ const SPAWN_STACK_REBUILD_MAX_ATTEMPTS = 3;
  * Spawn a role-based Overdeck run. Work delegates to the existing work-agent
  * path; review/test/ship use the role definition files under roles/.
  */
+export async function prepareWorkspaceForAgentSpawn(
+  issueId: string,
+  role: Role,
+  allowHost = false,
+  workspacePath?: string,
+): Promise<void> {
+  await clearStaleClosedOutBeforeSpawn(issueId);
+  await assertWorkspaceStackHealthyForSpawn(issueId, role, allowHost, workspacePath);
+}
+
 export async function assertWorkspaceStackHealthyForSpawn(
   issueId: string,
   role: Role,

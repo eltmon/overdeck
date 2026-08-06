@@ -437,6 +437,7 @@ describe('resource-discovery terminal issue filtering', () => {
     ]);
 
     resetResourceAllocatedIssuesCacheForTests();
+    mocks.listSessionNames.mockReturnValue(Effect.succeed([]));
     mocks.getGitHubConfig.mockReturnValue({ repos: [{ owner: 'eltmon', repo: 'overdeck' }] });
     mocks.openPullRequests = [
       {
@@ -463,6 +464,7 @@ describe('resource-discovery terminal issue filtering', () => {
     expect(withOpenPr.map((issue) => issue.issueId)).toEqual(['PAN-2054']);
     expect(withOpenPr[0]?.resourceSources).toContain('pr');
     expect(withOpenPr[0]?.pipelineBucket).toBe('zombie_pr');
+    expect(withOpenPr[0]?.stateLabel).toBe('Done');
   });
 });
 

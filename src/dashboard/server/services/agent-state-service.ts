@@ -34,6 +34,8 @@ import type {
 import { initEventStore } from '../event-store.js';
 import type { StoredEvent } from '../event-store.js';
 import { setAgentRuntimeMirror, getRuntimeSnapshot as getMirrorSnapshot, markAgentStateServiceInProcess } from '../../../lib/agent-runtime-mirror.js';
+import { getAgentStateSync } from '../../../lib/agents/agent-state.js';
+import { appendAgentPlaneSession } from '../../../lib/pan-dir/agents.js';
 import { appendSessionIdToHistory } from '../../../lib/session-history.js';
 import { emitBootReconciledStopEvents } from './boot-reconciled-stop-events.js';
 
@@ -140,6 +142,24 @@ export const AgentStateServiceLive = Layer.effect(
         const payload = (ev as { payload?: { agentId?: string; claudeSessionId?: string } }).payload;
         if (payload?.agentId && payload.claudeSessionId) {
           appendSessionIdToHistory(payload.agentId, payload.claudeSessionId);
+          const state = getAgentStateSync(payload.agentId);
+          if (!state) {
+            console.warn(
+              `[AgentStateService] Could not append durable session ${payload.claudeSessionId} `
+              + `for ${payload.agentId}: agent state is missing`,
+            );
+          } else {
+            void appendAgentPlaneSession(state, {
+              id: payload.claudeSessionId,
+              startedAt: new Date().toISOString(),
+              reason: 'rotation',
+            }).catch((error) => {
+              console.warn(
+                `[AgentStateService] Could not append durable session ${payload.claudeSessionId} `
+                + `for ${payload.agentId}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            });
+          }
         }
       }
       Effect.runFork(applyEventToRef(ref, ev));

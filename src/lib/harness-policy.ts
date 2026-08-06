@@ -58,6 +58,15 @@ const KIMI_CODE_KIMI_ONLY_BLOCK: HarnessPolicyDecision = {
 
 export const KIMI_CODE_KIMI_ONLY_BLOCK_REASON = KIMI_CODE_KIMI_ONLY_BLOCK.reason!
 
+const KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK: HarnessPolicyDecision = {
+  allowed: false,
+  reason:
+    'kimi-code/* model ids exist only in the native Kimi Code CLI catalog — no other harness can serve them. ' +
+    'Pick a "— Kimi Code CLI" or "— ACP (Kimi Code)" row for this model, or switch to a bare Kimi id (e.g. k3), which every Kimi route accepts.',
+}
+
+export const KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK_REASON = KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK.reason!
+
 const SUBSCRIPTION_ONLY_MODEL_BLOCK: HarnessPolicyDecision = {
   allowed: false,
   reason:
@@ -91,6 +100,16 @@ export function canUseHarnessSync(
   // Model-level auth restrictions apply to every harness.
   const modelAuth = canUseModelWithAuthSync(model, authMode)
   if (!modelAuth.allowed) return modelAuth
+
+  // kimi-code/* ids live only in the native kimi CLI's catalog (served by the
+  // kimi-code and acp harnesses, both of which spawn the kimi binary). Bare
+  // Kimi ids translate INTO that catalog, never back — so any other harness
+  // handed a kimi-code/* id would pass the literal string to a provider
+  // endpoint that does not know it. Fail loud instead (2026-08-02 id-space
+  // correctness, companion to the picker's harness-labeled rows).
+  if (model.startsWith('kimi-code/') && harness !== 'kimi-code' && harness !== 'acp') {
+    return KIMI_NATIVE_ID_FOREIGN_HARNESS_BLOCK
+  }
 
   if (harness === 'claude-code') {
     return ALLOWED

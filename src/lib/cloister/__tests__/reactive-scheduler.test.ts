@@ -41,6 +41,14 @@ vi.mock('../dead-end-trip.js', () => ({
   recordDeadEndNeedsYou: vi.fn(async () => undefined),
 }));
 
+const postCompactContinuationMock = vi.hoisted(() => vi.fn(async () => null as string | null));
+vi.mock('../compaction-continuation.js', () => ({
+  continueCompactedAgentAfterHook: postCompactContinuationMock,
+}));
+vi.mock('../../../dashboard/server/services/conversation-service.js', () => ({
+  findLastCompactBoundary: vi.fn(async () => 1),
+}));
+
 vi.mock('../../agents.js', async () => {
   const { Effect } = await import('effect');
   const effectMock = (initial?: unknown) => {
@@ -79,6 +87,7 @@ vi.mock('../../agents.js', async () => {
   saveAgentState: vi.fn(() => Effect.void),
   saveAgentStateSync: vi.fn(),
   resumeAgent: vi.fn(async () => ({ success: true })),
+  deliverAgentMessage: vi.fn(async () => ({ ok: true, path: 'supervisor' })),
   recordAgentFailure: vi.fn(() => Effect.succeed(null)),
   resetAgentFailureCount: vi.fn(),
   markAgentRunningState: vi.fn((s: any) => { s.status = 'running'; }),
@@ -248,6 +257,7 @@ vi.mock('../../tmux.js', async () => {
   sessionExists: effectMock(false),
   sessionExistsSync: vi.fn(() => false),
   querySessionSync: vi.fn(() => ({ status: 'missing', detail: 'mock session absent' })),
+  capturePane: effectMock('❯ '),
   killSession: effectMock(undefined),
   killSessionSync: vi.fn(() => undefined),
   };
@@ -283,6 +293,7 @@ describe('reactive Cloister scheduler', () => {
     vi.mocked(killSession).mockResolvedValue(undefined);
     vi.mocked(isIssueClosed).mockResolvedValue(false);
     vi.mocked(getReviewStatusSync).mockReturnValue(undefined as any);
+    postCompactContinuationMock.mockResolvedValue(null);
     autonomousPlanMock.autoPickupBacklog = false;
     autonomousPlanMock.labels = ['released'];
     autonomousPlanMock.recordedModel = undefined;
@@ -581,6 +592,27 @@ describe('reactive Cloister scheduler', () => {
       type: 'agent.completed',
       payload: { issueId: 'PAN-503' },
     })).toEqual({ issueId: 'PAN-503', state: 'in_review' });
+  });
+
+  it('routes PostCompact activity directly to the compaction continuation hook', async () => {
+    postCompactContinuationMock.mockResolvedValue('Compaction continuation: nudged agent-pan-503');
+    vi.mocked(getAgentStateSync).mockReturnValue({ issueId: 'PAN-503' } as any);
+
+    await Effect.runPromise(handleCloisterDomainEvent({
+      type: 'agent.activity_changed',
+      payload: { agentId: 'agent-pan-503', hookName: 'PostCompact', activity: 'idle' },
+    }));
+
+    expect(postCompactContinuationMock).toHaveBeenCalledWith(expect.objectContaining({
+      agentId: 'agent-pan-503',
+      capturePane: expect.any(Function),
+      send: expect.any(Function),
+      findBoundary: expect.any(Function),
+    }));
+    expect(emitActivityEntrySync).toHaveBeenCalledWith(expect.objectContaining({
+      issueId: 'PAN-503',
+      message: expect.stringContaining('continued from PostCompact'),
+    }));
   });
 
   it('routes agent.stopped events to the deacon resume handler', async () => {

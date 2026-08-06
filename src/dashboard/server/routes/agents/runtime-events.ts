@@ -43,6 +43,7 @@ export const getAgentHealthHistoryRoute = HttpRouter.add(
 //
 // Body shape (discriminated by `kind`):
 //   {kind: "activity",          activity, tool?}
+//   {kind: "hook_fired",        hookName, tool?}
 //   {kind: "thinking_start",    lastToolAt}
 //   {kind: "thinking_stop",     resolvedBy}
 //   {kind: "waiting_start",     reason, message?}
@@ -170,6 +171,32 @@ export const postAgentClassifyCompletionRoute = HttpRouter.add(
         ? 'FORGOT_COMPLETION'
         : 'UNCLEAR';
     return jsonResponse({ success: true, verdict });
+  })),
+);
+
+export const postAgentPlanChecklistRoute = HttpRouter.add(
+  'POST',
+  '/api/agents/:id/plan-checklist',
+  httpHandler(Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const auth = yield* Effect.promise(() => validateAgentRuntimeEventAuth(request));
+    if (!auth.ok) return auth.response;
+
+    const params = yield* HttpRouter.params;
+    const id = params['id'] ?? '';
+    const { getAgentState } = yield* Effect.promise(() => import('../../../../lib/agents.js'));
+    const state = yield* getAgentState(id);
+    if (!state?.workspace || !state.issueId) {
+      return jsonResponse({ success: false, error: 'agent has no resolvable workspace or issue id' }, { status: 422 });
+    }
+
+    const { checkIncompletePlanItemsPromise } = yield* Effect.promise(
+      () => import('../../../../lib/work/done-preflight.js'),
+    );
+    const incomplete = yield* Effect.promise(
+      () => checkIncompletePlanItemsPromise(state.workspace, state.issueId),
+    );
+    return jsonResponse({ success: true, complete: incomplete.length === 0, incomplete });
   })),
 );
 

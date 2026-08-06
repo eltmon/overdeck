@@ -335,22 +335,21 @@ describe('state write door durability (PAN-2677)', () => {
     }
   })
 
-  it('adopts owned orphaned writes before reconciliation and fails closed on unowned paths', async () => {
+  it('adopts orphaned canonical drafts across an origin advance and fails closed on unowned paths', async () => {
     const originalHome = process.env.OVERDECK_HOME
     const home = join(tmp, 'reconcile-home')
     const projectRoot = join(tmp, 'reconcile-project')
     const stateRoot = join(home, 'state', 'durability')
     const remote = join(tmp, 'reconcile-origin.git')
-    const specPath = join(stateRoot, 'specs', '2026-07-30-PAN-3298-reconcile.xbrief.json')
-    const recordPath = join(stateRoot, 'records', 'pan-3298.json')
-    const rejectFlag = join(remote, 'reject-next-push')
-    const preReceiveHook = join(remote, 'hooks', 'pre-receive')
+    const peer = join(tmp, 'reconcile-peer')
+    const draftPath = join(stateRoot, 'drafts', 'pan-3413.md')
+    const recordPath = join(stateRoot, 'records', 'pan-3413.json')
 
     try {
       process.env.OVERDECK_HOME = home
       mkdirSync(projectRoot, { recursive: true })
       mkdirSync(join(home, 'state'), { recursive: true })
-      mkdirSync(join(stateRoot, 'specs'), { recursive: true })
+      mkdirSync(join(stateRoot, 'drafts'), { recursive: true })
       mkdirSync(join(stateRoot, 'records'), { recursive: true })
       writeFileSync(join(home, 'projects.yaml'), JSON.stringify({
         projects: {
@@ -379,17 +378,12 @@ describe('state write door durability (PAN-2677)', () => {
         completedAt: '2026-07-30T00:00:00.000Z',
         version: 1,
       }))
-      writeFileSync(specPath, JSON.stringify(
-        asPanSpecDocument(makeDoc('PAN-3298', 'Reconcile adoption', 'proposed'), 'proposed'),
-        null,
-        2,
-      ))
       writeFileSync(recordPath, JSON.stringify({
-        issueId: 'PAN-3298',
+        issueId: 'PAN-3413',
         schemaVersion: 2,
         statusOverrides: {},
         pipeline: {
-          issueId: 'PAN-3298',
+          issueId: 'PAN-3413',
           reviewStatus: 'pending',
           testStatus: 'pending',
           readyForMerge: false,
@@ -401,32 +395,36 @@ describe('state write door durability (PAN-2677)', () => {
       git(stateRoot, 'commit', '-q', '-m', 'seed state')
       git(stateRoot, 'push', '-q', '-u', 'origin', 'overdeck-state')
 
-      writeFileSync(preReceiveHook, `#!/bin/sh\nif [ -f '${rejectFlag}' ]; then\n  rm -f '${rejectFlag}'\n  echo "error: cannot lock ref 'refs/heads/overdeck-state': is at ${'a'.repeat(40)} but expected ${'b'.repeat(40)}" >&2\n  exit 1\nfi\n`)
-      chmodSync(preReceiveHook, 0o755)
-      writeFileSync(specPath, JSON.stringify(
-        asPanSpecDocument(makeDoc('PAN-3298', 'Orphaned spec write', 'proposed'), 'proposed'),
-        null,
-        2,
-      ))
-      writeFileSync(rejectFlag, 'reject')
+      git(tmp, 'clone', '-q', '--branch', 'overdeck-state', remote, peer)
+      configureGit(peer)
+      mkdirSync(join(peer, 'notes'), { recursive: true })
+      writeFileSync(join(peer, 'notes', 'origin-advance.md'), 'remote advance\n')
+      git(peer, 'add', 'notes/origin-advance.md')
+      git(peer, 'commit', '-q', '-m', 'advance origin')
+      git(peer, 'push', '-q', 'origin', 'overdeck-state')
+      writeFileSync(draftPath, '# orphaned canonical draft\n')
 
       vi.resetModules()
       const { updateIssueRecord } = await import('../record-update.js')
       const project = { name: 'Durability', path: projectRoot, issue_prefix: 'PAN' }
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
       try {
-        await updateIssueRecord(project, 'PAN-3298', (record) => {
+        await updateIssueRecord(project, 'PAN-3413', (record) => {
           record.statusOverrides = { 'owned-write': 'completed' }
         })
 
         const remoteRecord = JSON.parse(
-          git(stateRoot, 'show', 'origin/overdeck-state:records/pan-3298.json'),
+          git(stateRoot, 'show', 'origin/overdeck-state:records/pan-3413.json'),
         ) as { statusOverrides: Record<string, string> }
         expect(remoteRecord.statusOverrides).toEqual({ 'owned-write': 'completed' })
+        expect(git(stateRoot, 'show', 'origin/overdeck-state:drafts/pan-3413.md'))
+          .toBe('# orphaned canonical draft')
+        expect(git(stateRoot, 'show', 'origin/overdeck-state:notes/origin-advance.md'))
+          .toBe('remote advance')
         expect(git(stateRoot, 'log', '--format=%s', 'origin/overdeck-state'))
           .toContain('chore(state): adopt orphaned write before state reconcile (PAN-3296)')
         expect(warnSpy).toHaveBeenCalledWith(
-          expect.stringContaining('[record-update] adopted orphaned state write(s): specs/'),
+          expect.stringContaining('[record-update] adopted orphaned state write(s): drafts/pan-3413.md'),
         )
         expect(porcelain(stateRoot)).toBe('')
 
@@ -437,10 +435,14 @@ describe('state write door durability (PAN-2677)', () => {
           '--grep=adopt orphaned write',
           'origin/overdeck-state',
         )
+        git(peer, 'pull', '-q', '--ff-only')
+        writeFileSync(join(peer, 'notes', 'origin-advance-2.md'), 'second remote advance\n')
+        git(peer, 'add', 'notes/origin-advance-2.md')
+        git(peer, 'commit', '-q', '-m', 'advance origin again')
+        git(peer, 'push', '-q', 'origin', 'overdeck-state')
         writeFileSync(join(stateRoot, 'operator-note.txt'), 'unowned\n')
-        writeFileSync(rejectFlag, 'reject')
 
-        await expect(updateIssueRecord(project, 'PAN-3298', (record) => {
+        await expect(updateIssueRecord(project, 'PAN-3413', (record) => {
           record.statusOverrides = { ...record.statusOverrides, 'unowned-write': 'completed' }
         })).rejects.toThrow('operator-note.txt')
         expect(git(
@@ -460,6 +462,43 @@ describe('state write door durability (PAN-2677)', () => {
       } finally {
         warnSpy.mockRestore()
       }
+    } finally {
+      if (originalHome === undefined) delete process.env.OVERDECK_HOME
+      else process.env.OVERDECK_HOME = originalHome
+      vi.resetModules()
+    }
+  })
+
+  it('surfaces draft conflicts instead of choosing a side during reconciliation', async () => {
+    const originalHome = process.env.OVERDECK_HOME
+    const fixture = setupMigratedStateFixture(tmp, 'draft-conflict', 'PAN-3414', false)
+    const remote = join(tmp, 'draft-conflict-origin.git')
+    const peer = join(tmp, 'draft-conflict-peer')
+    const draftName = 'drafts/pan-3414.md'
+
+    try {
+      process.env.OVERDECK_HOME = fixture.home
+      git(tmp, 'clone', '-q', '--branch', 'overdeck-state', remote, peer)
+      configureGit(peer)
+      mkdirSync(join(peer, 'drafts'), { recursive: true })
+      writeFileSync(join(peer, draftName), '# remote draft\n')
+      git(peer, 'add', draftName)
+      git(peer, 'commit', '-q', '-m', 'write remote draft')
+      git(peer, 'push', '-q', 'origin', 'overdeck-state')
+
+      mkdirSync(join(fixture.stateRoot, 'drafts'), { recursive: true })
+      writeFileSync(join(fixture.stateRoot, draftName), '# local draft\n')
+
+      vi.resetModules()
+      const { updateIssueRecord } = await import('../record-update.js')
+      const project = { name: 'Durability', path: fixture.projectRoot, issue_prefix: 'PAN' }
+      await expect(updateIssueRecord(project, 'PAN-3414', (record) => {
+        record.statusOverrides = { 'conflicting-write': 'completed' }
+      })).rejects.toThrow(`state merge conflicted outside records/: ${draftName}`)
+
+      expect(git(fixture.stateRoot, 'show', `HEAD:${draftName}`)).toBe('# local draft')
+      expect(git(fixture.stateRoot, 'show', `origin/overdeck-state:${draftName}`)).toBe('# remote draft')
+      expect(porcelain(fixture.stateRoot)).toBe('')
     } finally {
       if (originalHome === undefined) delete process.env.OVERDECK_HOME
       else process.env.OVERDECK_HOME = originalHome

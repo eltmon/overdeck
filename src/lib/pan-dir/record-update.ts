@@ -8,6 +8,7 @@ import { Effect } from 'effect';
 import { emitActivityEntryOncePortable } from '../activity-logger.js';
 import type { ProjectConfig } from '../projects.js';
 import { resolveStateReadHomeSync, STATE_BRANCH } from '../state-read-home.js';
+import { STATE_BRANCH_PATHS } from '../state-plane.js';
 import { flushAutoCommits } from './auto-commit.js';
 import { withRecordFsLock } from './fs-lock.js';
 import {
@@ -126,14 +127,34 @@ export type IssueRecordMutator = (record: PanIssueRecord) => PanIssueRecord | vo
 export function clearRecordPipelineClosedOutSync(
   project: ProjectConfig,
   issueId: string,
+  reopenedAt = new Date().toISOString(),
 ): void {
   const record = ensureIssueRecordSync(project, issueId);
   if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
   record.pipeline.closedOut = undefined;
   record.pipeline.closedOutAt = undefined;
-  record.pipeline.updatedAt = new Date().toISOString();
+  record.pipeline.reopenedAt = reopenedAt;
+  record.pipeline.updatedAt = reopenedAt;
   const recordPath = writeIssueRecordSync(project, issueId, record);
   queueIssueRecordCommit(project, issueId, recordPath);
+}
+
+export async function clearRecordPipelineClosedOut(
+  project: ProjectConfig,
+  issueId: string,
+  options: { reopenedAt?: string; autoCommit?: boolean } = {},
+): Promise<boolean> {
+  let changed = false;
+  const reopenedAt = options.reopenedAt ?? new Date().toISOString();
+  await updateIssueRecord(project, issueId, (record) => {
+    if (!record.pipeline.closedOut && !record.pipeline.closedOutAt) return;
+    record.pipeline.closedOut = undefined;
+    record.pipeline.closedOutAt = undefined;
+    record.pipeline.reopenedAt = reopenedAt;
+    record.pipeline.updatedAt = reopenedAt;
+    changed = true;
+  }, { autoCommit: options.autoCommit });
+  return changed;
 }
 
 interface GitFailure extends Error {
@@ -196,30 +217,27 @@ function porcelainPaths(status: string): string[] {
     .map((path) => path.replace(/\\/g, '/'));
 }
 
-function isOwnedStatePath(path: string): boolean {
-  return path.startsWith('specs/') || path.startsWith('records/');
-}
-
 async function adoptOrphanedStateWrites(gitRoot: string, signal?: AbortSignal): Promise<void> {
   const status = await git(gitRoot, ['status', '--porcelain=v1', '--untracked-files=all'], { signal });
   const paths = porcelainPaths(status);
   if (paths.length === 0) return;
 
-  const unowned = paths.filter((path) => !isOwnedStatePath(path));
+  const unowned = paths.filter(
+    (path) => !STATE_BRANCH_PATHS.some((prefix) => path.startsWith(prefix)),
+  );
   if (unowned.length > 0) {
     throw new Error(`State reconcile blocked by unowned changes: ${unowned.join(', ')}`);
   }
 
   throwIfDurabilityAborted(signal);
-  await git(gitRoot, ['add', '--', 'specs', 'records'], { signal });
+  await git(gitRoot, ['add', '--', ...paths], { signal });
   throwIfDurabilityAborted(signal);
   await git(gitRoot, [
     'commit',
     '-m',
     'chore(state): adopt orphaned write before state reconcile (PAN-3296)',
     '--',
-    'specs',
-    'records',
+    ...paths,
   ], { signal });
   console.warn(`[record-update] adopted orphaned state write(s): ${paths.join(', ')}`);
 }

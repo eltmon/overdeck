@@ -272,6 +272,29 @@ providers:
     harness: acp   # or claude-code
 ```
 
+### Kimi rows in the model picker name their launch route
+
+Kimi models appear in the conversation model picker as one row per launch
+route, and the row label states the harness it spawns:
+
+| Row label | Model id | Launch route |
+| --- | --- | --- |
+| `Kimi K3 (256K) — Claude Code` | `k3` | Claude Code against Kimi's Anthropic-compatibility endpoint |
+| `Kimi K3 (1M) — Kimi Code CLI` | `kimi-code/k3` | the native `kimi` binary directly |
+| `Kimi K3 (1M) — ACP (Kimi Code)` | `kimi-code/k3` | the native `kimi` binary over ACP |
+
+Clicking a row sets model and harness together, and the spawn honors the pick
+as an explicit harness choice (policy-gated and fail-loud) — the row launches
+what it says, regardless of the `providers.kimi.harness` default above.
+
+The two id spaces are not interchangeable. `kimi-code/*` ids exist only in the
+native CLI's catalog, so `canUseHarness` blocks them on every harness except
+`kimi-code` and `acp`; bare ids (`k3`, `k3[1m]`, `kimi-k2.7-code`) work on
+every Kimi route because they translate into the native catalog. Effort levels
+follow the route: native rows offer the kimi binary's real `low` / `high` /
+`max` (what its in-session `/effort` shows), while Claude Code rows offer the
+full five-level slider.
+
 Runtime adapter is `src/lib/runtimes/kimi-code.ts`; the per-agent
 `kimi-session-id` file (captured post-launch, since Kimi generates its own
 session id and it cannot be preset) enables transcript resolution
@@ -385,6 +408,12 @@ The gate is evaluated at every spawn entry point and at every picker UI so a
 stale Settings selection cannot bypass it. When the pipeline routes a role run
 into the blocked cell, it falls back to `claude-code` and emits a `console.warn`
 rather than failing the whole pipeline.
+
+The same gate enforces Kimi id-space correctness: a `kimi-code/*`
+native-catalog id is blocked on every harness except `kimi-code` and `acp`, so
+a stale role pin fails loudly instead of launching a session whose first turn
+the provider endpoint rejects (see
+[Kimi rows in the model picker name their launch route](#kimi-rows-in-the-model-picker-name-their-launch-route)).
 
 ### What you see in the pickers
 

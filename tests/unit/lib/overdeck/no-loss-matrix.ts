@@ -180,6 +180,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/conversations/:name/abort',                      kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.piAbortKey (Escape; no durable state)' },
   { surface: 'POST /api/conversations/:name/control-ack',                kind: 'http', disposition: 'RELOCATE',    door: 'ConversationRuntime.controlAckRegistry (ephemeral ack)' },
   { surface: 'PATCH /api/conversations/:name',                           kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.retitle' },
+  { surface: 'PATCH /api/conversations/:name/move',                      kind: 'http', disposition: 'WRITE',       door: 'setConversationProjectKey (lib/overdeck/conversations.js, PAN-1577)' },
   { surface: 'DELETE /api/conversations/:name',                          kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive (idempotent alias)' },
   { surface: 'POST /api/conversations/:name/archive',                    kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.archive' },
   { surface: 'POST /api/conversations/:name/unarchive',                  kind: 'http', disposition: 'WRITE',       door: 'ConversationWriter.unarchive' },
@@ -417,6 +418,12 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'POST /api/merge-train/assemble',                      kind: 'http', disposition: 'WRITE',       door: 'Forced UAT reconcile for one project or all — supersedes POST /api/flywheel/assemble-uat' },
   { surface: 'POST /api/merge-train/merge-next',                    kind: 'http', disposition: 'WRITE',       door: 'Escape-hatch batch merge from a named project ready set — supersedes POST /api/flywheel/merge-next' },
 
+  // ── parked.ts (PAN-3485 phase 1) ────────────────────────────────────────────
+  { surface: 'GET /api/parked',                                      kind: 'http', disposition: 'READ',        door: 'resolveParkedPopulation (parked resolver over review_status rows ∪ registered agents)' },
+
+  // ── velocity.ts ───────────────────────────────────────────────────────────
+  { surface: 'GET /api/velocity',                                    kind: 'http', disposition: 'AGGREGATE',   door: 'EventStoreService transitions + resolveParkedPopulation (rolling-window pipeline velocity report)' },
+
   // ── remote.ts ─────────────────────────────────────────────────────────────
   { surface: 'GET /api/remote/status',                                      kind: 'http', disposition: 'RELOCATE',    door: 'Infra/Settings (remote substrate health)' },
   { surface: 'GET /api/remote/workspaces',                                  kind: 'http', disposition: 'RELOCATE',    door: 'Workspace' },
@@ -456,6 +463,7 @@ export const NO_LOSS_MATRIX: MatrixEntry[] = [
   { surface: 'GET /api/settings/conversation-search/reindex-progress', kind: 'http', disposition: 'RELOCATE',  door: 'Conversations/search' },
   { surface: 'PUT /api/settings',                                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG' },
   { surface: 'PUT /api/settings/ui-theme',                           kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG (ui-theme.json)' },
+  { surface: 'PUT /api/settings/design-language',                    kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG via saveDesignLanguage (theme-only merge)' },
   { surface: 'GET /api/settings/openrouter/models',                  kind: 'http', disposition: 'RELOCATE',    door: 'OpenRouter service' },
   { surface: 'PUT /api/settings/openrouter/favorites',               kind: 'http', disposition: 'WRITE',       door: 'FILE-CONFIG' },
   { surface: 'PUT /api/settings/openrouter/api-key',                 kind: 'http', disposition: 'RELOCATE',    door: 'provider-auth' },

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Info, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
@@ -6,6 +6,7 @@ import type { DashboardState } from '../../lib/store';
 import { selectGodViewActivityFeed, type GodViewActivityEvent } from '../../hooks/useGodViewSocket';
 import { useDashboardStore } from '../../lib/store';
 import { formatRelativeTime } from '../../lib/formatRelativeTime';
+import { FeedTooltip, type FeedTooltipAnchor } from './confluence/FeedTooltip';
 
 async function fetchActivityREST(): Promise<GodViewActivityEvent[]> {
   const res = await fetch('/api/activity');
@@ -43,10 +44,18 @@ export const selectIssueActivityFeed =
 
 interface ActivityFeedProps {
   issueId?: string;
+  onIssueHover?: (issueId: string) => void;
+  onIssueSelect?: (issueId: string) => void;
 }
 
-export function ActivityFeed({ issueId }: ActivityFeedProps = {}) {
+interface HoveredFeedEvent {
+  event: GodViewActivityEvent;
+  anchor: FeedTooltipAnchor;
+}
+
+export function ActivityFeed({ issueId, onIssueHover, onIssueSelect }: ActivityFeedProps = {}) {
   const recentActivity = useDashboardStore(issueId ? selectIssueActivityFeed(issueId) : selectGodViewActivityFeed);
+  const [hovered, setHovered] = useState<HoveredFeedEvent | null>(null);
   const { data: restActivity = [] } = useQuery({
     queryKey: ['god-view-activity'],
     queryFn: fetchActivityREST,
@@ -90,7 +99,21 @@ export function ActivityFeed({ issueId }: ActivityFeedProps = {}) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ duration: 0.2 }}
-                  className="flex items-start gap-1.5 px-1 py-1 rounded"
+                  data-issue={event.issueId ?? ''}
+                  onMouseEnter={({ currentTarget }) => {
+                    if (!event.issueId) return;
+                    const rect = currentTarget.getBoundingClientRect();
+                    onIssueHover?.(event.issueId);
+                    setHovered({
+                      event,
+                      anchor: { left: rect.left, top: rect.top },
+                    });
+                  }}
+                  onMouseLeave={() => setHovered(null)}
+                  onClick={() => {
+                    if (event.issueId) onIssueSelect?.(event.issueId);
+                  }}
+                  className={`flex items-start gap-1.5 px-1 py-1 rounded ${event.issueId ? 'cursor-pointer' : ''}`}
                   style={{ background: 'rgba(255,255,255,0.02)' }}
                 >
                   <span className="mt-0.5 shrink-0" style={{ color }}>
@@ -136,6 +159,7 @@ export function ActivityFeed({ issueId }: ActivityFeedProps = {}) {
           </AnimatePresence>
         )}
       </div>
+      {hovered && <FeedTooltip event={hovered.event} anchor={hovered.anchor} />}
     </div>
   );
 }

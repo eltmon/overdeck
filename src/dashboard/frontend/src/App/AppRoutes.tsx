@@ -262,11 +262,11 @@ export function AppRoutes({
       )}
       {activeTab === 'god-view' && (
         <BootstrapGate fallback={
-          <div className="w-full h-full overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <GodViewSkeleton />
           </div>
         }>
-          <div className="w-full h-full overflow-hidden">
+          <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
             <GodViewPage />
           </div>
         </BootstrapGate>

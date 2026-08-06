@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { readdir, stat } from 'node:fs/promises';
+import { access, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -29,9 +29,12 @@ import {
   listConversations,
   updateConversationCost,
   updateConversationTitle,
+  setConversationProjectKey,
   canReplaceTitle,
   type LegacyConversation as Conversation,
 } from './conversations.js';
+import { listProjectsAsync, type ProjectConfig } from '../projects.js';
+import { getEventStore } from '../../dashboard/server/event-store.js';
 import {
   computeContextUsage,
   parseConversationMessages,
@@ -65,7 +68,7 @@ export interface ConversationReadResult {
 export interface ConversationReadDependencies {
   resolveSessionFile(conv: Conversation): Promise<string | null>;
   tmuxSessionExists(sessionName: string): Promise<boolean>;
-  listSessionNames(): Promise<string[]>;
+  listSessionNames(): Promise<readonly string[]>;
   shouldReportUnresolvedLiveSession(conv: Pick<Conversation, 'status' | 'harness'> | null | undefined): boolean;
 }
 
@@ -796,6 +799,70 @@ export function patchConversationTitle(
   }
 
   return { status: 200, body: { success: true } };
+}
+
+async function pathExistsAsync(path: string): Promise<boolean> {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The project a conversation effectively belongs to (PAN-1577): the explicit
+ * project_key override when set, otherwise the registered project whose path
+ * contains its cwd. Null when neither resolves. This is the single source of
+ * truth for "is this conversation already in project X" — it must agree with
+ * the frontend's resolveEffectiveProjectKey (projectsData.ts) or a cwd-grouped
+ * conversation's move would look like a no-op client-side but still move
+ * server-side (or vice versa).
+ */
+function resolveEffectiveProjectKey(
+  conv: { cwd: string; projectKey: string | null },
+  projects: readonly { key: string; config: ProjectConfig }[],
+): string | null {
+  if (conv.projectKey) return conv.projectKey;
+  const matched = projects.find(
+    ({ config }) => config.path && (conv.cwd === config.path || conv.cwd.startsWith(config.path + '/')),
+  );
+  return matched?.key ?? null;
+}
+
+/**
+ * Reassign a conversation's project — sets only the project_key override.
+ * Deliberately never touches cwd, the tmux session, or the backing session
+ * file; those stay put so the sacred JSONL is never relocated (PAN-1577).
+ */
+export async function handleConversationMove(
+  name: string,
+  body: Record<string, unknown>,
+  deps: { invalidateListEnrichmentCache?: () => void } = {},
+): Promise<{ status: number; body: Conversation | { error: string } }> {
+  const conv = getConversationByName(name);
+  if (!conv) return { status: 404, body: { error: 'Conversation not found' } };
+
+  const projectKey = typeof body.projectKey === 'string' ? body.projectKey.trim() : '';
+  const projects = await listProjectsAsync();
+  const targetConfig = projectKey ? projects.find((p) => p.key === projectKey)?.config : null;
+  if (!projectKey || !targetConfig || !(await pathExistsAsync(targetConfig.path))) {
+    return { status: 400, body: { error: `Unknown project: ${projectKey}` } };
+  }
+
+  const effectiveKey = resolveEffectiveProjectKey(conv, projects);
+  if (effectiveKey === projectKey) {
+    return { status: 200, body: conv };
+  }
+
+  setConversationProjectKey(name, projectKey);
+  deps.invalidateListEnrichmentCache?.();
+  getEventStore().emitOnly({
+    type: 'conversation.moved',
+    timestamp: new Date().toISOString(),
+    payload: { conversationName: name, projectKey },
+  });
+  return { status: 200, body: getConversationByName(name) ?? conv };
 }
 
 const retitleInFlight = new Set<string>();

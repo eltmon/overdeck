@@ -108,7 +108,7 @@ function failedSlotAt(index: number, itemId: string): ClassifiedSwarmSlot {
   };
 }
 
-function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile'> {
+function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks' | 'stopSlotAgent'> {
   return {
     verifyAndMergeSlot: vi.fn(async () => ({
       verified: true,
@@ -121,6 +121,8 @@ function mergeDeps(): Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'app
       },
     })),
     applyTaskOperationToPlanFile: vi.fn(async () => undefined),
+    fireTieredCommitHooks: vi.fn(async () => []),
+    stopSlotAgent: vi.fn(async () => undefined),
   };
 }
 

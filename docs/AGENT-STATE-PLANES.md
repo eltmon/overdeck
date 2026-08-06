@@ -44,7 +44,7 @@ record mirrors reconcile automatically, non-record conflicts abort, three
 consecutive failures produce an operator-facing error, and `pan doctor` reports
 state-branch divergence.
 
-During a push-race reconciliation, `reconcileStatePush()` checks the state worktree before every reconcile attempt. If every dirty path is under `specs/` or `records/`, it adopts those writer-owned changes in a `chore(state): adopt orphaned write before state reconcile (PAN-3296)` commit, emits a `[record-update] adopted orphaned state write(s)` warning that lists the paths, and then merges. A dirty path outside those directories fails closed with an error naming the unowned path, so reconciliation never stages operator or unrelated state.
+During a push-race reconciliation, `reconcileStatePush()` checks the state worktree before every reconcile attempt. If every dirty path is under one of the canonical `STATE_BRANCH_PATHS` directories, it adopts those writer-owned changes in a `chore(state): adopt orphaned write before state reconcile (PAN-3296)` commit, emits a `[record-update] adopted orphaned state write(s)` warning that lists the paths, and then merges. A dirty path outside the canonical state plane fails closed with an error naming the unowned path, so reconciliation never stages operator or unrelated state. Merge conflicts outside `records/` still abort and surface; adoption never chooses a side for conflicting drafts, specs, or other canonical state.
 
 PAN-3092 hardened that path against verdict loss, because `pipeline.updatedAt`
 is stamped on every status write and so cannot by itself distinguish
@@ -255,6 +255,26 @@ rule in `scripts/lint-state-writes.sh` enforces the boundary around
 `src/dashboard/server/services/agent-projection.ts`. During bootstrap/seed, a
 table row that is stopped with no live tmux session overrides a newer
 running/starting event projection; a live tmux session still wins.
+
+### Stopped but session-alive (PAN-3338)
+
+`status` in the agents table is the durable record — written at finalize or
+stop, never inferred from process liveness. `hasLiveTmuxSession` is the
+liveness signal, sourced from the tmux oracle below. The read model must agree
+with the durable record; the single resolver for whether a stopped-but-alive
+agent gets rewritten back to `running` is `shouldResurrectStoppedAgent()` in
+`src/dashboard/server/services/agent-enrichment-service.ts`.
+
+Interactive roles — `plan` agents and `conv-*` conversation sessions — are
+exempt. For them, sitting stopped with a live tmux session is the deliberate
+post-completion steady state: a planning session that finalized with
+`skipKill` stays alive so the operator can inspect it, and a conversation sits
+idle at a live prompt between turns. `shouldResurrectStoppedAgent()` never
+rewrites these back to `running`; the shared predicate is
+`isInteractiveRoleAgent()` in `src/lib/agent-enrichment.ts`. Every other role
+(work, review, test, ship) keeps the PAN-1419 crash-recovery reconcile
+unchanged: a stopped-but-tmux-alive agent there is a transitional state
+following a crash or restart, and the poller rewrites it to `running`.
 
 ## Liveness oracle — tmux
 

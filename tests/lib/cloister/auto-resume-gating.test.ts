@@ -103,7 +103,7 @@ describe('auto-resume gates', () => {
   /** PAN-2407: `pan start` on an unplanned issue routes to dashboard planning.
    *  Auto-resume gating tests are not exercising that path, so give the
    *  workspace a minimal xBRIEF so issueCommand falls through to spawn. */
-  function writeMinimalPlan(workspacePath: string, issueId: string): void {
+  function writeMinimalPlan(workspacePath: string, issueId: string, itemStatus: 'pending' | 'completed' = 'pending'): void {
     const panDir = join(workspacePath, '.pan');
     mkdirSync(panDir, { recursive: true });
     writeFileSync(
@@ -127,7 +127,7 @@ describe('auto-resume gates', () => {
           references: [],
           tags: [],
           narratives: { Problem: '', Proposal: '', NonGoals: '' },
-          items: [{ id: 'test-item', title: 'Test item', status: 'pending' }],
+          items: [{ id: 'test-item', title: 'Test item', status: itemStatus }],
           edges: [],
         },
       }),
@@ -406,6 +406,42 @@ describe('auto-resume gates', () => {
       paused: true,
       pausedReason: 'manual inspection',
       pausedAt: BASE_TIME.toISOString(),
+    });
+
+    const resumed = await autoResumeStoppedWorkAgents();
+
+    expect(resumed).toEqual([]);
+    expect(resumeAgentMock).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it('never auto-resumes a swarm slot whose assigned item is completed', async () => {
+    const agentId = 'agent-pan-1141-slot-1';
+    const baseWorkspace = join(projectRoot, 'workspaces', 'feature-pan-1141');
+    const workspace = `${baseWorkspace}-slot-1`;
+    mkdirSync(workspace, { recursive: true });
+    writeMinimalPlan(baseWorkspace, 'PAN-1141', 'completed');
+    const recordsDir = join(baseWorkspace, '.pan', 'records');
+    mkdirSync(recordsDir, { recursive: true });
+    writeFileSync(join(recordsDir, 'pan-1141.json'), JSON.stringify({
+      issueId: 'PAN-1141',
+      schemaVersion: 1,
+      swarm: {
+        slotAssignments: [{ slotIndex: 1, itemId: 'test-item', agentId }],
+      },
+    }));
+    resumeAgentMock.mockResolvedValue({ success: true });
+    const { agents, autoResumeStoppedWorkAgents } = await loadDeaconWithResumeMock();
+    agents.saveAgentStateSync({
+      id: agentId,
+      issueId: 'PAN-1141',
+      workspace,
+      harness: 'claude-code',
+      role: 'work',
+      model: 'claude-sonnet-4-6',
+      status: 'stopped',
+      startedAt: BASE_TIME.toISOString(),
+      slotIndex: 1,
+      slotItemId: 'test-item',
     });
 
     const resumed = await autoResumeStoppedWorkAgents();

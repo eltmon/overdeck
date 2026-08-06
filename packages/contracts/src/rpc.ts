@@ -412,7 +412,7 @@ export const WriteFileAtPathRpc = Rpc.make(WS_METHODS.writeFileAtPath, {
  *     chat happens outside any single workspace.
  */
 export const ResolveFilePathExistsInput = Schema.Struct({
-  cwd: Schema.String,
+  cwd: Schema.optional(Schema.String),
   path: Schema.String,
 })
 export type ResolveFilePathExistsInput = typeof ResolveFilePathExistsInput.Type

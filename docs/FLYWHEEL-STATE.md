@@ -649,3 +649,570 @@ Reviewer reported: correctness lane's transient database-lock failure durably si
 - **strike-3401 landed via CI path** (PR #3409; local gates load-flaked again — 3rd strike today). Fix: `keep infra contention out of verdicts` — retry+durable-queue on lock failure, same-run supersede after infra-blocked. On merge+deploy: run MIN-864's final clean cycle.
 - strike-3407 building a cockpit test (+137/−3); strike-3408 investigating ($3.38); PAN-3406 planning; pan-3367 rework continuing ($157.68); min-874 $173.06 +6410 (1h17m single task — check its bead progress next tick if diff stalls); min-839 $48.81 +2586.
 - Main green. Fleet 15.
+
+## RUN-79 tick 18 (2026-08-01 ~14:05Z) — PAN-3401 LANDED + DEPLOYED; MIN-864 clean cycle dispatched under the new guard
+
+- **PAN-3401 landed** (#3409 squash `cfb969ba3e`, handed off) **and deployed** (live build = the merge itself). Infra contention can no longer become a reviewer verdict: lock failures retry + queue durably; same-run supersede after infra-blocked signals.
+- **MIN-864 final review cycle dispatched** (abort found 0 stale sessions; request accepted, verification → convoy). Cycles 1-2 were both lock-poisoned; this one runs with the guard live. If THIS cycle produces a clean organic verdict, MIN-864 finally exits its 8-day limbo.
+- PAN-3406 planning finalized → work agent auto-started (09:32). Strikes 3407 ($7.64 +143/−15) / 3408 ($6.05) progressing. min-874 $186.67 +6809 still producing. Close-out for PAN-3401 pending main CI on the merge.
+
+## RUN-79 interstitial (~14:20Z) — strike-3408 landed via CI path (#3414); declined the quiet-window serialization ask
+
+strike-3408 reported the load-flake pattern (34 unrelated setup timeouts, load ~30 from overlapping Vitest runs) and asked me to hold other full suites while it waits for a quiet window. Declined the serialization — standing decision: CI arbitrates, local verification is not a gate under saturation (4th strike today). Pushed its committed fix (`738b007393` retire stale input fallback on activity) + opened PR #3414. The suite-contention root cause remains PAN-3344's to fix mechanically, not mine to schedule around.
+
+## RUN-79 tick 19 (2026-08-01 ~14:25Z) — steady state; MIN-864 clean cycle 2/4 reports, no poisoning
+
+- MIN-864 run a04d2574: performance + security reports written, correctness/requirements running — first cycle under the PAN-3401 guard, no infra verdicts so far. #3414 (banner fix) mid-CI. Main CI in_progress (PAN-3401 close-out retries on green).
+- strike-3407 $9.90 ctx 79% (compaction watch) · PAN-3406 working $6.78 · min-874 $202.50 +7976/−428 (diff still growing = real work) · 28 sessions total (convoys included; my dispatched set well under the 20 cap).
+
+## RUN-79 interstitial (~14:35Z) — strike-3407 landed via CI path (#3415); 5th load-flake casualty
+
+strike-3407 (cockpit terminal reveal + size-ratchet compliance) committed, gates green except the load-flaked full suite (9 failures default / 4 with CI workers, all pass in isolation) — pushed + PR #3415 per standing decision. #3414 test lane still running. PAN-3344 tax count today: 5 strikes.
+
+## RUN-79 tick 20 (2026-08-01 ~14:40Z) — PAN-3408 landed; PAN-3401 closed out; MIN-864 organic APPROVED (limbo exit)
+
+- **PAN-3408 landed** (#3414 squash `b384f431ea`, handed off) — phantom waiting-banner retires on demonstrated activity. **PAN-3401 closed out** (14th landed+closed this run).
+- **MIN-864: organic APPROVED** on the first cycle under the PAN-3401 guard (verdict commit-anchored fe@e1669c15 api@b6455904) — 8-day limbo exit; test phase next, merge operator-gated (MYN hold; check CURRENT UAT policy at merge time). Operator confirmed the yield display confusion was just after-state (reviewers finished in ~10 min and exited).
+- Operator flagged a possible real-subscription UAT attempt: verified FALSE — agent-min-874 is testing the BYO-AI card's "connect not available yet" unavailable-state with a test token, not a live OAuth. Nothing to stop.
+- **Watch item fired**: PAN-2583 fallback line reappeared on PAN-3408's pan done (journal write lock contention CLI-vs-server). Cross-process fallback is the designed rescue (PAN-2952 covered same-process); operations completed on retry. Recording occurrences — file only if it becomes chronic or the sweep misses a verdict.
+- #3415 (terminal fix) mid-CI. PAN-3362 in test phase (agent-pan-3362-test spawned 10:31). PAN-3367 test session spawned 10:15.
+
+## RUN-79 interstitial (~14:45Z) — operator couldn't see MIN-839/864 reviews; tree crew gap filed+struck (PAN-3416)
+
+Operator screenshot: MYN tree shows no Review crew rows while agent-min-839-review + performance lane are LIVE (3/4 reports written) and MIN-864's review completed APPROVED. Third review-invisibility specimen today (3407 terminal, 3408 banner, now crew rows) — filed **PAN-3416** + struck. Also in-frame: MIN-852/861 "Planning" badges despite this morning's close-outs (PAN-3396 residue family, cross-referenced). MIN-839 work agent yield-paused 21m is designed behavior (self-resumes on slot).
+
+## RUN-79 interstitial (~14:50Z) — strike-3408 was grinding moot gates post-merge; paused; merged-awareness gap filed (PAN-3417)
+
+strike-3408 messaged for a gate exception 45 min AFTER I merged its fix (#3414) — no merged-awareness in the strike loop. Paused with attribution (burn stopped). Its measurement was valuable: fixture beforeEach ~4.4s under load vs fixed 5s hook timeout → appended to PAN-3344 (now 6 affected gate runs today). Filed **PAN-3417** (strike agents keep verifying after their branch lands; 3 specimens: 3389/3390 pan-monitor-blind ~1h each, 3408 gate-looping) — the tick-4 watch item now has enough evidence. Not struck yet — fleet at capacity with PAN-3416; queue behind current strikes.
+
+## RUN-79 tick 21 (2026-08-01 ~14:55Z) — operator promoted uat/pan-sable-0801 (PAN-3406); closed out same hour as filing
+
+- **PAN-3406 promoted + closed out** (leftover-agent pause + deploy `6e3cda7a` + clean 8-row DoD): operator request → filed → planned → built → UAT-promoted → closed in ~95 minutes. Second promote today with the lifecycle leaving the work agent running (MIN-929 pattern — the postMergeLifecycle agent-pause gap now has 2 specimens; file next occurrence).
+- Deploy also brings #3414 (banner) live. PAN-3408 close-out waits on main CI green past its merge. Clean UAT batch EMPTY (candidate null — correct). New backlog appeared: MIN-930/MIN-931 planned, PAN-3413 (not mine — investigate provenance next tick). **MIN-874 bucket dropped to planned_backlog despite its +8k branch — verify next tick.**
+
+## RUN-79 tick 21 (2026-08-01 ~14:55Z) — operator promoted uat/pan-sable-0801 (PAN-3406); closed out same hour as filing
+
+- **PAN-3406 promoted + closed out** (leftover-agent pause + deploy `6e3cda7a` + clean 8-row DoD): operator request → filed → planned → built → UAT-promoted → closed in ~95 minutes. Second promote today with the lifecycle leaving the work agent running (MIN-929 pattern — the postMergeLifecycle agent-pause gap now has 2 specimens; file next occurrence).
+- Deploy also brings #3414 (banner) live. PAN-3408 close-out waits on main CI green past its merge. Clean UAT batch EMPTY (candidate null — correct). New backlog appeared: MIN-930/MIN-931 planned, PAN-3413 (not mine — investigate provenance next tick). **MIN-874 bucket dropped to planned_backlog despite its +8k branch — verify next tick.**
+
+## RUN-79 interstitial (~15:05Z) — strike-3420 scope-abort accepted; PAN-3420 rerouted to planning
+
+Operator-filed **PAN-3420** (closed-out issues render as never-started — post-close-out history wipe, observed on MIN-929 minutes after its close-out). The strike ABORTED WITHOUT EDITS, correctly: it verified SIX independent live-only read paths (nulled journal, wrong-source drawer badges, snapshot-agents conversations, cleared review_status history, transient activity arrays, removed cv.json) — this is the two-door tenet applied to issue history, needing a unified durable issue-history resolver + no-loss regression, not a precision fix. Findings preserved as an issue comment (PRD input); `pan plan PAN-3420 --auto` dispatched. NOTE the meta-point: today's close-out sprint (16 issues) made this class VISIBLE — every close-out wipes the operator-facing history of the work just completed. High operator-value plan.
+
+## RUN-79 tick 22 (2026-08-01 ~15:15Z) — PAN-3407 landed; MIN-874 wedge #4 → composer-submit class FILED (PAN-3422); strike-3413 via CI (#3421)
+
+- **PAN-3407 landed** (#3415 squash `318f63d663`, handed off — the journal fallback line fired again mid-handoff, 3rd today; retry confirmed). Close-out on CI+deploy.
+- **MIN-874 was the 4th composer-wedge specimen** (post-compaction resume nudge visibly unsubmitted, 2.5h idle at $242; sub-branches all pushed so nothing lost) → `--fresh` (new session working, $0.28). **Filed PAN-3422** with the testable mechanism: paneHasBlockingChoiceMenu() false-positives would produce paste-without-Enter systematically — 4/4 specimens match. Its bucket anomaly (planned_backlog) likely reflects the pushed-branch/no-unique-vs-main resolver view — recheck after agent progresses.
+- **strike-3413** (operator-filed, record-reconcile orphaned-drafts fix): same load-flake gate story (6th) → pushed + **PR #3421**, CI arbitrates.
+- PAN-3420 planning underway (unified issue-history resolver). PAN-3408 close-out still waiting on a green main run containing its merge (CI was in_progress).
+
+## RUN-79 tick 23 (2026-08-01 ~15:35Z) — PAN-3413 landed; strike-3422 dispatched; MIN-839 in organic rework
+
+- **PAN-3413 landed** (#3421 squash `dea43f848b`, handed off) — record reconcile adopts canonical writes. 17th landed issue this run.
+- **strike-pan-3422 dispatched** (composer-submit wedge class — the run's costliest recurring operational failure, ~4h agent time + \$300 today).
+- **MIN-839 review: organic CHANGES REQUESTED** ("reconciliation fails on detached lazy associations before scanning cards") — real code finding, pipeline working as designed; rework beginning. WATCH: its agent showed ctx 0/out 0 post-feedback — if no delta next tick, that's composer-wedge specimen #5 (--fresh + append to PAN-3422).
+- strike-3416 ctx 88% compaction watch. MIN-874 fresh session producing. 3 test phases live (3362/3367/864). Main CI backlog (2 runs in progress) — 3408/3407 close-outs queued behind.
+
+## RUN-79 tick 24 (2026-08-01 ~15:50Z) — 3 more closed out (20 total); memory watch armed per operator
+
+- **PAN-3408, PAN-3407, PAN-3413 all closed out** (deploy `85b623885d` + green CI; 8-row DoD each). **Run totals: 20 issues landed+closed** (12 PAN strikes/fixes + PAN-3406 + MIN-929/908 + 6 zombie drains, minus overlaps: see close-out records).
+- **Operator flagged memory pressure**: verified 53.2/64GB used, 10.9GB avail, PSI low (no stalling). Suspects cleared: "gen-a server" IS the live reload (generation alternation), the pan-1577 tsc was a transient 37s gate. Real load = 4 MYN Java stacks + container vite (legitimate). **Persistent memory Monitor armed** (alerts at <6GB avail or PSI full avg60 >5); close-out drain frees stacks.
+- MIN-839 genuinely reworking ($19.33 delta — NOT specimen 5). strike-3422 editing pty-supervisor.ts (right area). strike-3416 post-compaction $14.54 — readiness check next tick. MIN-874 fresh producing.
+
+## RUN-79 interstitial (~16:05Z) — memory watch fired (5.9GB); assessed, no shed taken, dispatch freeze on
+
+Monitor fired at 5.9GB avail (PSI 0.58, no stalling; bounced to ~7GB). Growth = restic backup (transient) + recurring pan-1577 tsc churn (2nd specimen, 1.9GB — file the gate-churn class if it recurs again) + MIN-922 stack. **MIN-922 checked before shedding: LIVE healthy agent (5 min activity) — entered pipeline after my sweep; NOT shed-eligible.** All load legitimate → no kills, no stack teardowns. Mitigation: dispatch freeze on new strikes (3417/3397/3396 queued) until pressure eases; governor + close-out teardowns are the mechanism; Monitor stays armed (<6GB / PSI>5).
+
+## RUN-79 interstitial (~16:10Z) — memory emergency handled: server restart at 2.7GB/8MBps; verdict = allocation churn, not proven leak
+
+Escalation chain: Monitor 5.9GB → 3.5GB avail with PSI 12.77 (real stalling). Growth driver = dashboard server 1.9→2.7GB at ~8MB/s on build `85b623885d`. **Restarted the server** (pan restart, healthy, ~60s outage). Fresh process: 743→1914MB then GC DROPPED it to 1318MB — heavy allocation churn with high watermark, NOT proven monotonic leak (old process killed before it could plateau). Two Monitors now armed: system memory (<6GB/PSI>5) + server RSS (>3GB + :3011 liveness). Dispatch freeze holds until stable. If server RSS alerts >3GB again → treat as real leak, bisect today's merges (#3414 activity-derivation, #3421 reconcile-adoption prime suspects). Other pressure: restic (transient), host-side mvn build (transient), pan-1577 tsc churn (2 specimens — file on 3rd).
+
+## RUN-79 tick 25 (2026-08-01 ~16:25Z) — strike-3416 via CI (#3425); verification green on 3362/3367/864; memory stable
+
+- **strike-3416 landed via CI path** (PR #3425 — shared specialist session tree builder; 7th load-flake preemption). strike-3422 root cause confirmed, implementing (+249/−47 in pty-supervisor area).
+- Verification gates green on PAN-3362/PAN-3367/MIN-864; review/test specialist verdicts still converging server-side — ready set empty, UAT candidate null (correct, not a wedge). MIN-839 rework crunching ($19.95, slow delta — recheck). MIN-874 hardening OAuth state (50m task, $18.40 fresh session).
+- Memory stable post-restart (no Monitor events ~15 min): server churns to ~1.9GB then GC reclaims. Dispatch freeze still on for NEW strikes (3417/3397/3396 queued) until an hour of stability.
+
+## RUN-79 tick 26 (2026-08-01 ~16:30Z) — HERMES CAMPAIGN ADOPTED: order book folded in, both lane heads live
+
+- **Operator campaign handoff**: order book `2026-08-01-myn-hermes-smoke-test-remediation` (5 issues from today's Hermes smoke test), status=ready, laneAConcurrency=1. Book membership = release per pickup-gate doctrine. PRDs FINAL on drafts/ — no re-derivation.
+- **Lane A (myn api, serial): agent-min-930 STARTED** — P0 token leak, highest urgency across ALL projects (overrode the memory dispatch freeze on emergency class); then MIN-932 → MIN-933 (932 first, shared project-DTO design). **Lane B (hermes repo, serial): agent-min-931 STARTED** (27 items, WI-1/WI-2 first); then MIN-934 (hard dep on 931's guarded_write, same files).
+- Completion condition: all five terminal → `pan orders show` from the myn root + mark book complete. Campaign rules live in the myn project's flywheel-brief.
+- Non-campaign fleet unchanged: #3425 in CI, strike-3422 implementing, 3362/3367/864 verdicts converging, MIN-839 reworking. Memory stable (~35 min quiet). Freeze stays for non-campaign strikes (3417/3397/3396).
+
+## RUN-79 tick 27 (2026-08-01 ~16:45Z) — campaign heads verified advancing; PAN-3416 landed
+
+- **Both Hermes heads producing**: MIN-930 (P0 token leak) +49/−39 first commits; MIN-931 +503/−18 (WI-1/2). Serial tails queue mechanically.
+- **PAN-3416 landed** (#3425 squash `706492b6e8`, handed off) — issue-tree crew now shows live review/test sessions. Close-out on CI+deploy. strike-3422 committed + rebased, in gates (~ready next tick).
+- Ready set still empty (3362/3367/864 verdicts converging). Memory: watch retuned (<4GB or PSI>5) after a benign 5.9GB/PSI-0.12 fire from campaign stack spin-up; freeze-lift decision deferred while campaign warms up.
+
+## RUN-79 interstitial (~17:00Z) — SECOND memory emergency: PSI 41.9, governor shed never fired → manual [governor-slot] pause; PAN-3429 filed
+
+Pressure climbed to 2.2GB avail / PSI full 41.9 (severe stalling): THREE concurrent heavy toolchain runs (2 host Java builds from campaign gates + strike-3422's full vitest). **The governor only deferred admissions — no shed rung covers running gate/build processes, and nothing escalates when deferral proves insufficient.** Manual action: `pan pause PAN-3422 --reason "[governor-slot] ..."` → +2.4GB freed, PSI avg10 → ~1 instantly. Filed **PAN-3429** (shed rung for gate-holding agents, one admission door for heavy toolchains with memory+CPU checks, escalation on sustained PSI — the memory twin of PAN-3344). UNPAUSE strike-3422 once campaign builds finish (its branch has commit 57ede5b334; gates just re-run). Campaign P0 (MIN-930) untouched throughout. Operator notified inline.
+
+## RUN-79 tick 28 (2026-08-01 ~17:15Z) — memory recovered; strike-3422 landed via CI (#3430) with corrected root cause
+
+- Memory recovered (8.4GB avail; campaign host builds finished). Campaign: MIN-930 $1.71 +533/−40 (P0 advancing), MIN-931 $3.18 +575/−51. MIN-839 rework respawned + progressing (+161).
+- **strike-3422 → PR #3430** (paused agent's committed fix pushed directly — no local re-grind). CORRECTED root cause: the PTY supervisor path didn't VERIFY Enter submission (commits: verify supervisor Enter submission + confirmation-budget test) — not the tmux menu detector I hypothesized. The composer-wedge class gets its structural fix once landed+deployed.
+- Main CI in progress (PAN-3416 close-out queued). PAN-3420 planned, awaiting operator release.
+
+## RUN-79 interstitial (~17:30Z) — THIRD memory crisis: server leak CONFIRMED (2nd balloon) → restart #2 + PAN-3431 struck
+
+PSI avg10 hit 94 (thrashing) at 1.9GB avail: server ballooned AGAIN (743MB→2.4GB on the same 85b623885d build) + two concurrent campaign Java builds. Restart #2 freed to 14GB (a build finished simultaneously). **Two balloons in 75 min = real leak under sustained load, not churn — diagnosis upgraded.** Filed **PAN-3431** (heap-profile bisect directive; suspects #3414 activity-polling banner / #3421 reconcile / #3400 patrol retirement; NOT #3425/#3430 which postdate the build) + struck. Until fixed: server RSS Monitor (>3GB) is the tripwire; expect ~hourly restarts under fleet load. NOTE for next deploy: it will include #3425+#3430 — attribution of any new balloon must account for the changed surface.
+
+## RUN-79 tick 29 (2026-08-01 ~17:15Z) — PAN-3422 LANDED (composer-wedge class fixed); yield storm found + filed (PAN-3432)
+
+- **PAN-3422 landed** (#3430 squash `1d30a2a2bc`, handed off) — PTY supervisor now verifies Enter submission; the 4-specimen composer-wedge class gets its structural fix at next deploy. strike-3422's governor pause is moot (work shipped).
+- **Pause audit (10 gates): yield STORM discovered** — 7 work agents simultaneously yielded for ONE review (MIN-874's convoy, live since 16:47Z). Scheduler re-fires yields per patrol without counting existing ones for the same beneficiary. Filed **PAN-3432**. Remaining pauses: 2 lex slots (operator POC), strike-3422 (moot).
+- Main CI in progress (3416 + now 3422 close-outs queue on it + next deploy). Campaign heads advancing. Memory stable (18.8GB).
+- Freeze-lift decision: HOLDING new strikes (3417/3397/3396/3431 is dispatched) — 7 yielded agents will flood back on resume; adding dispatches now would re-trigger contention. Reassess after the yield backlog drains.
+
+## RUN-79 tick 30 (2026-08-01 ~17:30Z) — PAN-3416 + PAN-3422 closed out (24 landed+closed); both operator-pain fixes LIVE
+
+- **Deployed `87bba552dc`** → PAN-3416 (crew rows show live reviews) + PAN-3422 (supervisor verifies Enter submission — composer-wedge class ends) both LIVE and closed out with clean DoD.
+- **MIN-874 review: organic CHANGES REQUESTED** with substantive scope findings (OAuth/fallback/streaming/credential-safety/lifecycle/rollout incomplete) — rework drives server-side; its 7 yield victims free up as the convoy releases slots (PAN-3432 tracks the fan-out defect).
+- Campaign heads advancing post-memory-events (MIN-930 $4.46, MIN-931 $4.31 — modest but moving; trend-check next tick). strike-3431 (server leak) implementing (+175/−13).
+- Run scoreboard: **24 issues landed and closed out**, 19 substrate issues filed (14 fixed+landed same-day), 3 memory crises handled, 2 UAT promotes processed, 1 campaign adopted (5 issues, 2 in flight).
+
+## RUN-79 tick 31 (2026-08-01 ~17:50Z) — steady state; campaign heads strong
+
+- MIN-930 $6.06 +814/−50 (P0 tracking well) · MIN-931 $6.28 +714/−185. strike-3431 profiling ($14.58). MIN-839 session ended (rework done → server-side redispatch expected). No merge-ready set yet. Memory healthy. Yield backlog: 9 gates (down 1).
+
+## RUN-79 tick 32 (2026-08-01 ~18:10Z) — leak root-caused (unbounded conversation watchers) → PR #3434; MIN-931 in verification-feedback cycle
+
+- **strike-3431 root cause: unbounded conversation watcher accumulation** (`20fa53c952 fix(dashboard): bound conversation watcher memory`) → **PR #3434** (8th CI-arbitrated landing). Matches the load-dependence observation: current calmer fleet shows NO leak curve (523MB at 38min, DOWN from 752).
+- MIN-930 $7.30 +907/−100 (P0 strong). **MIN-931: verification FAILED post-handoff, feedback delivered** — its composer shows the feedback text; with PAN-3422's submission-verification LIVE, this is the first real-world test of the fix. If the text sits unsubmitted next tick → regression signal on 3422.
+- Server RSS healthy. No merge-ready set. Yield backlog 9 (stable — MIN-874's convoy still holds slots pending rework redispatch).
+
+## RUN-79 tick 33 (2026-08-01 ~18:25Z) — PAN-3422 fix PASSED first live test; campaign healthy
+
+- **MIN-931's verification feedback submitted and processed** — the first real-world exercise of the supervisor Enter-verification fix: no wedge, agent reworking ($9.77, +1301/−201). The 4-specimen composer class appears structurally dead.
+- MIN-930 P0 advancing ($8.14, +912/−104). #3434 (leak fix) test lane in CI. Fleet 29 agents, memory healthy.
+
+## RUN-79 tick 34 (2026-08-01 ~18:45Z) — PAN-3431 leak fix LANDED + DEPLOYED
+
+- **PAN-3431 landed** (#3434 squash `e5c9897ffd`, handed off) **and deployed** — conversation watchers bounded; the balloon class that forced two emergency restarts is structurally closed pending soak validation. Close-out next tick on merge-commit CI.
+- Campaign: MIN-931 $11.26 +1591/−205 (rework productive); MIN-930 $9.10, diff static at +912 (plateau watch — one more tick before intervening; it may be running gates).
+
+## RUN-79 tick 35 (2026-08-01 ~19:05Z) — PAN-3431 closed out (25 total); partial freeze-lift (strike-3417 dispatched)
+
+- **PAN-3431 closed out** — leak fix live and soaking clean (644MB at 19min under 30-agent load). Campaign heads active (930 cooking, 931 $12.49). No ready set.
+- **Partial freeze-lift**: dispatched strike-3417 (strike merged-awareness — stops the moot-burn waste class). Holding 3397/3396 until campaign heads land — admission-gap fixes (PAN-3344/3429) still pending, 30 agents live.
+
+## RUN-79 tick 36 (2026-08-01 ~20:05Z) — RESUMED after operator pause; P0 PAN-3436 unblocked; campaign Lane A advanced
+
+Session resumed (monitors re-armed as one combined memory+RSS+liveness watch). **Config change noted: `require_uat_before_merge` is now FALSE** — merges are schedulable this run, no longer UAT-gated. Ready set currently empty, so nothing to schedule yet.
+
+- **While paused, a reboot incident produced P0 PAN-3436**: supervisor watchdog serially SIGTERMed every dashboard as "foreign" while its own replacement spawn failed the non-primary-checkout guard — dashboard unable to stay up until the supervisor was stopped. Its strike had the fix committed (`ba020bf2ff survive stale deployment cwd`) but **stalled**: git guard blocks rebase, `pan sync-main` rejects strike workspaces as unregistered. Correct refusal by the agent. **I pushed + opened PR #3438** (a mergeable branch needs no rebase) and filed **PAN-3440** for the missing sanctioned strike-sync path (merge-based sync is permitted but undocumented folklore).
+- **MIN-930 (campaign P0 token leak) COMPLETED and handed off** while paused. Lane A advanced serially: **MIN-932 started** (auto-planning → work). MIN-931 continues Lane B ($1.39 fresh session post-rework).
+- Server RSS 1936MB at 18min under 31 sessions — higher than the 644MB post-fix reading; combined monitor will trip at 3GB. Watch for leak-fix regression vs. legitimate load.
+- New non-campaign issues appeared while paused (PAN-3419/3423/3436, MIN-923/924) — triage next tick.
+
+## RUN-79 tick 37 (2026-08-01 ~20:20Z) — 🏁 CAMPAIGN P0 SHIPPED: MIN-930 promoted + closed out
+
+- **Operator promoted uat/min-crow-0801** (7 repos incl. hermes-plugin) carrying **MIN-930 — the Hermes campaign's P0 token leak, the highest-urgency item across all projects** — plus MIN-922. **Both closed out clean** (no leftover-agent block this time: MIN-930 had already handed off, MIN-922 likewise — the postMergeLifecycle pause gap did NOT recur, 2 promotes without it).
+- Campaign status: Lane A = MIN-930 ✅ shipped → MIN-932 planning → MIN-933 queued. Lane B = MIN-931 reworking → MIN-934 queued (hard dep). **1 of 5 campaign issues terminal.**
+- Full read-door sweep re-derived: 13 PAN + 22 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged (papers-please/puzzdom tracker_unconfigured, lexerra/krux forge_unavailable). Clean UAT batch EMPTY (candidate null) — correct.
+- NOTE: scratchpad was cleared by the session restart; status snapshot rebuilt from live state (FLYWHEEL-STATE.md was the recovery source — the durable-memory design working as intended).
+- P0 PAN-3436 PR #3438 in CI. UAT gate now OFF → eligible merges get scheduled as the ready set fills.
+
+## RUN-79 tick 38 (2026-08-01 ~20:40Z) — P0 PAN-3436 LANDED; leak fix INCOMPLETE (reopened + re-struck)
+
+- **P0 PAN-3436 landed** (#3438 squash `9847ceb60e`, handed off) — supervisor no longer serially evicts dashboards after a reboot. Deploy + close-out next tick.
+- **LEAK NOT CLOSED — self-correction.** My tick-35 "soaking clean (644MB at 19min)" was a LOW-LOAD window, not proof. Current build post-fix: 1936MB@18min → **2591MB@47min = ~22MB/min sustained**. A second growth path survives the watcher bound. Reopened PAN-3431 with the three-point curve + heap-diff directive (15min vs 45min snapshots under load), suspects: #3414 per-agent activity polling, event-store arrays, #3400 patrol structures. **Re-struck.** LESSON (repeat of the reviewer-cost lesson): a single favorable reading under different load is not verification — require a TREND at comparable load.
+- MIN-931 review convoy live (4 lanes spawned 16:36). MIN-932 planning deep ($5.83, +833). Campaign healthy.
+
+## RUN-79 interstitial (~20:50Z) — pre-emptive reload at 3.4GB; P0 deployed; leak curve characterized
+
+Monitor tripped at 3383MB/52min (predicted). System had 32GB headroom so no crisis — used the moment for a **`pan reload`, which BOTH deployed the merged P0 (PAN-3436) and reset the server** (fresh: 391MB). Four-point curve appended to PAN-3431: 391MB@0 → 1936@18min → 2591@47min → 3383@52min ≈ 3GB/hour under fleet load, **non-linear — half the growth lands in the first 18 minutes**, pointing at per-agent/per-session accumulation at attach/discovery time rather than a steady drip; told the strike to snapshot at 2min vs 18min. Operational baseline until fixed: reload ~hourly.
+
+## RUN-79 interstitial (~20:55Z) — PAN-3338 convoy dead-end root-caused (PAN-3446) + unblocked
+
+Agent reported a convoy launch failing to start reviewers. Verified on disk: parent `state.json` has `reviewRunId: null` (status `starting`) while the run dir `.pan/review/agent-pan-3338-review-6130a234/` EXISTS. **Two defects: (1) reviewRunId was never durably persisted at launch — plausibly erased by one of today's restarts; (2) dispatch (`project-routes.ts:665`) 409s instead of deriving the run id from the artifact sitting in the workspace.** Filed **PAN-3446** with both, + the derivation-with-repair fix and its ambiguity guard; **struck**. PAN-3338 unblocked via abort + request (fresh verification → convoy). The agent correctly refused to mutate state — right call, that's how the defect stayed diagnosable.
+
+## RUN-79 tick 39 (2026-08-01 ~21:00Z) — P0 PAN-3436 CLOSED OUT (26 total); campaign Lane A item 2 in work
+
+- **P0 PAN-3436 closed out** (deployed in the 20:45 reload; 8-row DoD, no overrides). 26 issues landed+closed this run.
+- Campaign: **MIN-932 work agent live** ($6.36, +622/−64 — planning→work chained cleanly), MIN-931 reworking an organic review finding (`dryRun returns a successful empty preview even though preview is unsupported` — genuine correctness catch, the convoy is earning its keep).
+- Leak strike round 2 investigating (+41/−92 — already reverting/adjusting the prior approach). PAN-3446 strike warming. Server 1102MB@10min post-reload — consistent with the ~3GB/hr curve; next pre-emptive reload when the monitor trips.
+- Ready set still empty; nothing schedulable despite the UAT gate being off.
+
+## RUN-79 tick 40 (2026-08-01 ~21:20Z) — state push unblocked; composer-wedge specimen #5 WITH THE FIX LIVE → PAN-3422 reopened
+
+- State push resolved: the other session pushed, my tick-39 record rode along (no bypass taken — PAN-3062 specimen stands).
+- **PAN-3422 REOPENED — specimen #5 on the fixed build.** MIN-931 wedged with TWO unsubmitted feedback pointers, cost byte-identical across two ticks, no pending decision. **New distinguishing detail: context at 92%** — the compaction boundary is the lead. Hypothesis appended: the supervisor verifies the Enter keystroke was accepted, but a turn started near compaction can discard it; verification must confirm an ACTIVITY DELTA (turn actually started), not just keystroke acceptance, and re-deliver once if absent. 5th manual `--fresh` of this class today.
+- **Self-correction:** at tick 33 I called this class "structurally dead" after ONE successful delivery on MIN-931. Same error shape as the leak: a single favorable observation is not verification. (Twice today. The rule I keep re-learning: confirm with a trend or an adverse-condition test — here, delivery at high context — before declaring a class closed.)
+- Leak strike round 2 ($4.84) and PAN-3446 strike ($5.65, +279) both progressing. MIN-932 deep in work ($13.83, +1189). Server 1032MB@29min — notably flatter than the earlier 1936MB@18min curve; leak may be load-dependent (fleet is lighter now). Keep measuring at comparable load before concluding anything.
+
+## RUN-79 interstitial (~21:35Z) — 🔴 RED MAIN P0 (PAN-3448) reported by a strike; struck immediately
+
+strike-3446 refused to signal ready and reported main's suite RED for an orthogonal reason — CORRECT call, and it caught something I had missed. Verified: `render.test.ts:124,147` ship literal `bd ready` fixtures that `beads-removal-no-loss.test.ts` forbids; CI red on 8519e39408 + 1dc4b9494e. Source: `51fb0d1370` — **the very commit that blocked my tick-39 push** (PAN-3062 specimen), whose stated purpose was stripping bd boilerplate while its fixtures embed the forbidden strings. Filed **PAN-3448** (blocks-main) + struck; fix direction = build fixture text without literal matches, never weaken the guard. strike-3446's own fix pushed as **PR #3447**, merges when main is green.
+LESSON: a strike's "I won't fix-forward" report is a P0 SENSOR — it found red main before my own tick sweep did.
+
+## RUN-79 tick 41 (2026-08-01 ~21:50Z) — red-main strike on target; MIN-931 wedge recovery CONFIRMED; PAN-3422 re-struck
+
+- strike-3448 "Fixing forbidden fixture literals" — exactly the prescribed fix (build fixture text without literal matches, guard untouched). Main CI queued on a newer head; watch for green.
+- **MIN-931 fresh session verified working** ($2.97/+46−79 frozen → $5.23/+448−143). Wedge recovery real, not cosmetic.
+- **PAN-3422 re-struck** with the compaction-boundary lead (verify activity delta, not just keystroke acceptance; re-deliver once if the turn never starts). This class has cost 5 manual interventions today — highest-frequency operational failure of the run.
+- MIN-932 deep in Lane A work ($18.10, +1535/−157). Leak strike round 2 still at +42/−92 (small diff, high thought — heap analysis).
+
+## RUN-79 tick 42 (2026-08-01 ~21:55Z) — red-main fix pushed (#3452), watch armed
+
+- strike-3448's fix committed (`695dbbf5b2 avoid forbidden bd-ready fixture literal`; forbidden literal count in its workspace: 0) → pushed + **PR #3452**. Its local gate run failed on the usual load flake — irrelevant, red main outranks it and CI is the gate. Background watch armed on the test lane; merging on green, then verifying main re-greens and landing #3449 (PAN-3446) behind it.
+- Fleet 32 sessions (convoys + campaign + 4 strikes). Campaign untouched by the red-main event — MIN-932 still working Lane A.
+
+## RUN-79 tick 43 (2026-08-01 ~21:58Z) — PAN-3367 promoted; close-out deploy-gated (gate respected, no --force)
+
+- **Operator promoted uat/pan-sable-0801 carrying PAN-3367** (the 29-issue code-level audit — the run's costliest item at ~$236). Close-out blocked at the deploy row: live build predates the merge. Tried a reload; **the deploy gate refused with an explicit reason — "post-merge lifecycle is pending", queued 21:54:57Z, fires automatically; do not retry or --force."** Respected it; close-out retries next tick. (This is PAN-3383's observability fix EARNING ITS KEEP: the gate stated its blocking reason instead of failing silently — exactly what that issue added.)
+- Full read-door sweep re-derived: 17 PAN + 20 MIN + TIN-1 in pipeline. **Read-door robustness note:** papers-please and lexerra returned EMPTY on the first pass (curl/jq under load) and only yielded their typed `unavailable` objects on retry — an empty response is NOT a bare array and must never be read as "no pipeline"; retried both rather than assuming.
+- Clean UAT batch EMPTY (candidate null) — nothing review+test passed. Red main (PAN-3448) still active; #3452 watch running.
+
+## RUN-79 tick 44 (2026-08-01 ~22:10Z) — 🟢 RED MAIN FIX MERGED (#3452 → 286847320e)
+
+- **PAN-3448 landed** and handed off — forbidden `bd ready` fixture literals removed, beads-removal guard untouched. Main re-green watch armed on the merge commit. Red-main duration: reported by strike-3446 at ~21:30Z → fixed and merged ~22:08Z (~38 min, and the report came from an agent refusing to fix-forward — the sensor pattern again).
+- #3449 (PAN-3446 reviewRunId recovery) test lane running; merges on green now that main's blocker is gone.
+
+## RUN-79 tick 45 (2026-08-01 ~22:20Z) — PAN-3367 CLOSED OUT (27 total); operator deploy request satisfied by the same reload
+
+- **PAN-3367 closed out** — the deploy gate cleared itself exactly as it announced (no --force, no override). 27 issues landed+closed this run.
+- **Operator asked for a deploy of the file-path-chips fix (0dea908ff0) mid-tick; already satisfied** — my reload had built `27703fb4d7`, verified via `git merge-base --is-ancestor` to contain it; live pid 2553912 healthy. Recorded because it validates the reload-as-deploy path: one atomic swap served both the close-out gate and an operator request without disrupting 29 in-flight agents.
+- Main CI running on two heads (27703fb4d7, 9a6c51bec4) — re-green watch still armed; #3449 (reviewRunId) test lane running behind it.
+- Fleet all producing: strike-3431 $9.25 (leak, deep analysis), strike-3422 $8.47 +319/−3 (compaction fix taking shape), MIN-932 $34.50 +2171/−301 (Lane A heavy), MIN-931 $14.53 +1026/−241 (rework strong after the wedge recovery). Server 1510MB at 1h22m BEFORE the reload — much flatter than the earlier 3GB/hr, consistent with load-dependence; measure again at comparable load before concluding.
+
+## RUN-79 tick 46 (2026-08-01 ~22:30Z) — 🟢 MAIN RE-GREEN CONFIRMED; leak load-scaling quantified
+
+- **Main green on `da01905b4d`** — PAN-3448's fix verified end to end. Red-main episode closed (~38 min from strike report to green).
+- **PAN-3431 leak: load-dependence QUANTIFIED and it is super-linear** — ~18MB/min at ~20 sessions, ~107MB/min at ~31, **~300MB/min at 42 sessions** (2458MB in 8 min). Growth tracks concurrent session COUNT, not uptime. Appended with a sharpened heap-diff recipe: snapshot, spawn 10 sessions, snapshot, diff retained objects keyed by session/agent id — suspects are per-session watchers/listeners/transcript buffers/terminal-registry entries never released on detach. This turns a vague "leak" into a targeted hunt.
+- strike-3422's compaction fix (+319/−3) pushed to its PR branch; its local suite failed on the load flake (expected at 42 sessions). #3449 (reviewRunId) test lane still running.
+- MIN-931 rework strong ($16.60, editing planning.py). MIN-932 $38.09 +2250 — ctx 0%/out 0 right after a 1h11m thought block; cost still climbing so it is post-compaction, not wedged. Verify next tick.
+
+## RUN-79 tick 47 (2026-08-01 ~22:50Z) — PAN-3422 round 2 in CI (#3457): the fix is a dedicated eaten-message watcher
+
+- **PAN-3422 round-2 PR opened (#3457)** — round 1's PR was already merged, so the compaction fix needed its own. The diff is exactly the right shape: new `src/lib/agents/eaten-message-watcher.ts` (+92) + `messaging.ts` changes (+44) + 69 lines of tests — i.e. a watcher that detects a delivered-but-eaten message rather than trusting keystroke acceptance. Matches the compaction-boundary hypothesis.
+- MIN-932 recovered from its compaction cleanly ($39.61, +2258 — was ctx 0 last tick, now 49% and producing; NOT a wedge). MIN-931 rework strong ($21.24, +1397/−308).
+- Server 2306MB at 28min — slower than the 300MB/min burst (fleet settled from 42 sessions). Consistent with per-session-count scaling. #3449 test lane still running.
+
+## RUN-79 tick 48 (2026-08-01 ~23:10Z) — PAN-3422 round 2 LANDED + DEPLOYED: eaten-message watcher is live
+
+- **PAN-3422 round 2 merged (`64cad73d01`), handed off, and DEPLOYED** — the live server now runs the eaten-message watcher, so a delivery swallowed at the compaction boundary is detected and re-driven instead of leaving an agent wedged at the ❯ prompt with visible unsubmitted text. The run's highest-frequency operational failure (5 manual `--fresh` recoveries today) now has a structural answer covering both variants: keystroke acceptance (round 1) AND turn-actually-started (round 2).
+- Verification standard for calling this class closed, recorded so I do not repeat today's twice-made error: do NOT declare it dead on one clean delivery. Require either (a) a delivery to an agent at >85% context that lands and processes, or (b) 24h with zero specimens. The reload also resets the leak curve as a side benefit.
+- #3449 (reviewRunId) test lane still running — merges on green.
+
+## RUN-79 tick 49 (2026-08-01 ~23:30Z) — PAN-3422 CLOSED OUT (28 total); #3449 was red-main collateral, resynced
+
+- **PAN-3422 closed out** — eaten-message watcher live and verified through the full DoD. 28 issues landed+closed this run.
+- **#3449 (PAN-3446) diagnosed, not flaky:** its test lane failed because the branch last merged main at `4c4ff124e9` — BEFORE the red-main fixture fix — so it inherited PAN-3448's failure. Not a defect in its own change. Merged current green main into `strike/pan-3446` and pushed (`ac32151929`); CI re-runs clean. **Generalizable: every PR whose branch synced during a red-main window carries that red forward until resynced — check branch-sync timestamp against the red window before treating a PR failure as its own.**
+- Main green on two consecutive heads. Fleet 33 sessions, no wedge specimens since the watcher deployed (~20 min — far short of the 24h/high-context bar for declaring the class closed).
+
+## RUN-79 tick 50 (2026-08-01 ~23:50Z) — PAN-3446 LANDED; red-main collateral sweep found and fixed 1 of 8 PRs
+
+- **PAN-3446 landed** (#3449 squash `7c48949d04`, handed off) — reviewRunId recovery live; convoy dispatch no longer dead-ends when a parent's state loses its run id. Close-out on CI+deploy.
+- **Collateral sweep across all 8 open PRs** (the generalization from tick 49): 6 green, 1 in progress, **1 real collateral — #3444 (PAN-3338)**, whose test lane failed at 21:20Z on the exact red-main assertion (`has no live pan beads or bd ready instructions`), squarely inside the red window. Not its own defect. Resynced `feature/pan-3338` onto green main (`73b597fcec`); CI re-runs clean. Diagnosing before re-driving cost one log read and saved a wrong-cause rework cycle on someone else's work agent.
+- Fleet steady; no wedge specimens since the watcher deployed (~40 min).
+
+## RUN-79 interstitial (~00:00Z) — PAN-3446 CLOSED OUT (29 total); leak model refined to cost-per-attach
+
+Monitor tripped at 3245MB/50min/44 sessions (no system pressure — 18.6GB avail, PSI 0). Pre-emptive reload ALSO satisfied PAN-3446's deploy gate → **PAN-3446 closed out, 29 issues landed+closed this run.**
+**Leak model refined with the 5-point table:** average rate tracks RECENT ATTACHES, not standing session count (42-session/8-min sample burst at ~300MB/min during a fleet ramp; 44-session/50-min sample only ~65MB/min with mostly long-lived sessions). That is cost-per-attach never released — and it explains why a quiet-window measurement looked deceptively clean. Told the strike to instrument attach/detach and diff across a SPAWN BURST, not idle time.
+
+## RUN-79 note (~00:20Z) — PAN-3447 swarm orphan (PAN-3459) already covered by the live build; hands off
+
+Operator conversation reported PAN-3447's swarm silently orphaned after wave 1: global `swarm.mode` off + explicit `pan swarm` never persisted an issue-level opt-in ⇒ every deacon patrol skipped coordination (completed slot branches unmerged, 3 items undispatched). Fixed as **PAN-3459 / `3d5ecd9d70`** — `pan swarm` now stamps `swarm.policy.mode=always` into the issue record before dispatching. **Verified that commit IS in the currently deployed build (`5059cfb2891d`, my 00:00Z reload), so no deploy is pending.** Record stamped manually by the operator; deacon is coordinating again (patrol 45953 on slot-2 merge verify). **NOT double-driving PAN-3447** — no `pan swarm`, no dispatch, no merge from me.
+Two facts worth carrying: (1) swarm `verify_commands` run the FULL root suite, so those patrols are long and will retry under host-load flake (today's PAN-3344 pattern hit 6 strikes); (2) "silently orphaned after wave 1" is now a recognizable signature — if a swarm stalls with completed-but-unmerged slot branches, check the issue record's swarm policy before anything else.
+
+## RUN-79 tick 51 (2026-08-02 ~02:28Z) — uat/pan-crow-0802 promoted (PAN-3396 + PAN-3451); both close-outs self-clearing gates
+
+- **Operator promoted uat/pan-crow-0802** carrying PAN-3396 + PAN-3451. Neither closed out yet, both for legitimate self-clearing reasons — no overrides taken:
+  - **PAN-3396** — deploy-gated (live build `5059cfb2` predates merge `02447e81`). Attempted a reload; the deploy gate refused with its explicit reason ("post-merge lifecycle is pending", queued 02:24:02Z, fires automatically, do not retry or --force). Respected.
+  - **PAN-3451** — its own `verifying_on_main` agent is still running. Closing now would cut off in-flight verification.
+- Full read-door sweep: 18 PAN + 20 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged. **Clean UAT batch EMPTY** (candidate null) — nothing review+test passed, so nothing assembled.
+- Two gates in one tick both stating their reason and self-clearing is the PAN-3383 observability work compounding — a year ago these would have been silent stalls needing a human.
+
+## RUN-79 note (~02:30Z) — RSS tripwire at 3157MB: deliberately NOT reloading
+
+Monitor tripped (3157MB) but system is healthy: 28.8GB avail, memory PSI 0.00 across all windows. The reload that would reset RSS is the SAME operation the deploy gate has already queued (pending post-merge lifecycle, since 02:24Z); retrying would fight a gate protecting in-flight work. Waiting: when the gate fires it resets RSS **and** unblocks PAN-3396's close-out together. Recorded so this non-action is not mistaken for a missed alert — RSS alone, with zero pressure and a queued deploy, is not an emergency.
+
+## RUN-79 tick 52 (2026-08-02 ~02:45Z) — PAN-3396 + PAN-3451 CLOSED OUT (31 total); deferred-deploy defect found (PAN-3462)
+
+- **Both promoted issues closed out.** 31 issues landed+closed this run.
+- **NEW DEFECT — the deploy gate's promise is unkept (PAN-3462, struck).** The gate deferred my reload with "fires automatically as soon as the window clears — do not retry"; I obeyed. ~20 min later `pending-post-merge.json` was GONE (window open per `deploy-window.ts:34-41`) but **no deploy had fired** and `pending-deploy.json` still sat queued with `deferralCount: 2`. A manual reload then worked instantly. Nothing converts a cleared window into an actual deploy — so an orchestrator that follows the instruction waits forever. Second occurrence today (the 22:24Z deferral also needed a manual retry). Fix direction: the patrol owning the marker must re-assess and fire, or the message must stop promising automatic firing; plus age-based escalation using the marker's existing `escalated` field.
+- **My own correction:** at 02:30Z I chose to WAIT on the gate rather than reload, reasoning it would self-clear. That was wrong — deferring to a mechanism that does not exist is how work stalls silently. Verify the mechanism, don't trust the message.
+- Post-reload the close-outs first failed on a health-check timeout during warm-up; retried after polling `/api/health` — a warm-up race worth remembering, not a defect.
+
+## RUN-79 tick 53 (2026-08-02 ~03:05Z) — first auto-merge SCHEDULED under the UAT-off config (PAN-3450)
+
+- **First use of the run's `require_uat_before_merge=false` config**: ready set produced PAN-3450 (review=passed test=passed, PR #3461) → scheduled via `POST /api/flywheel/auto-merge/schedule` (id 49, merges 03:10:27Z). API note for next time: the endpoint needs an `Origin` header and takes **`issueId`** (singular string), not `issueIds` — both errors were typed and clear.
+- #3444 (PAN-3338) and #3402 (PAN-3362) are now BOTH green but not yet in the ready set — their review/test verdicts haven't flipped; pipeline-owned, not mine to merge.
+- **MIN-931 handed off** (stopped 23:31Z after completion; review + test sessions live) — Lane B tail MIN-934 waits for it to reach terminal, correctly. MIN-932 at **$102.33 (+4943/−897)** — the run's biggest single spender, still producing.
+- strike-3462 (deferred deploys) +75/−30, strike-3431 (leak) $15.09 still hunting.
+
+## RUN-79 tick 54 (2026-08-02 ~03:25Z) — auto-merge waiting correctly (not a PAN-3462 repeat); state push landed
+
+- **PAN-3450's auto-merge has NOT fired and that is CORRECT** — scheduled for 03:10Z but PR #3461's `test` lane is still IN_PROGRESS; the queue is waiting on checks, exactly as designed, and `/auto-merge/problems` is empty. **Deliberately did NOT treat this as another "scheduled thing never fires" defect** — checked the mechanism's actual blocking input before concluding, which is the correction I owed after the PAN-3462 sequence (where I first over-trusted a promise, then risked over-generalizing the distrust).
+- Tick-53 state commit reached origin (rode along when the other session pushed — no bypass). Two fresh unpushed commits from them now sit ahead; same PAN-3062 pattern, harmless as long as I keep committing only my allowlisted path and never force.
+- strike-3462 + strike-3431 still working; campaign MIN-932 in flight; MIN-931 in review/test; #3444/#3402 green but verdicts not yet flipped to ready.
+
+## RUN-79 tick 55 (2026-08-02 ~03:45Z) — 🏁 MIN-931 SHIPPED + CLOSED; Lane B tail MIN-934 dispatched (32 total)
+
+- **Operator promoted uat/min-crow-0801 carrying MIN-931** (Hermes campaign Lane B head, 27 items) — closed out clean, no gates, no overrides. **32 issues landed+closed this run.**
+- **Campaign advanced on its dependency chain:** MIN-931 terminal ⇒ MIN-934's hard dep (its `guarded_write`, same files) satisfied ⇒ **MIN-934 started** (auto-planning → work). Campaign now: Lane A = MIN-930 ✅ → MIN-932 working → MIN-933 queued; Lane B = MIN-931 ✅ → MIN-934 planning. **2 of 5 terminal**, both lanes live, serial discipline held throughout (never started a tail before its head reached terminal).
+- Read-door sweep: 17 PAN + 14 MIN + TIN-1 in pipeline (MIN list shrank as zombies/closed rows drained). 4 typed blind spots unchanged. Clean UAT batch EMPTY (candidate null).
+- Schema note: `emit-status` rejected the snapshot for a missing `system.mainHead` — typed error, fixed by reading `origin/main`. Worth remembering the field is required.
+
+## RUN-79 tick 56 (2026-08-02 ~04:00Z) — OPERATOR EXPEDITE: PAN-3467 + PAN-3468 struck (PAN-3447 unblockers)
+
+- **Operator expedite request — both struck immediately.** PAN-3447 (God View Confluence) is the operator's own pipeline-observability tool and is doomed by two fresh substrate bugs:
+  - **PAN-3468** (higher leverage): the auto-planner writes readiness as *dispatchable-now* instead of *parallel-safe*, so after wave 1 the coordinator goes endgame with 11 pending items — swarm stalls permanently, **no work-agent handoff and no needs-you**. Operator's read: this likely slows EVERY swarmed issue and matches the general slow-pipeline complaint. Prioritized first.
+  - **PAN-3467**: `pan plan finalize` silently discards the workspace `.pan/spec.vbrief.json` and re-promotes the stored server draft — the operator's swarm-shaped plan never became canonical. Silent-discard-of-operator-intent is the same never-surface-the-loss family as today's other findings.
+- **Verified the recovery input survives**: `workspaces/feature-pan-3447/.pan/spec.vbrief.json` is intact (35,864 bytes, 16 items, untouched since 18:16). **Unstick sequence once PAN-3467 lands + deploys:** `pan plan finalize` from that workspace, then `pan swarm PAN-3447` — the wide wave (river-canvas, hook-bus, bottom-strip, topbar) dispatches as deps merge. Operator is monitoring live slots and will drive a fallback serial work agent if the swarm endgames before the fixes land, so I do NOT double-drive.
+- Also this tick: deployed `50f9d451a580` (3 swarm fixes verified in-build) and ran `pan swarm PAN-3447` — policy `{"mode":"always"}` confirmed persisted in the record. PR #3461 (PAN-3450) test lane FAILED on `system-health-no-loss.test.ts` — real audit feedback, not flake; auto-merge correctly did not fire; drive rework.
+
+## RUN-79 tick 57 (2026-08-02 ~04:15Z) — both expedite fixes in CI (#3470, #3471) within ~15 min of the request
+
+- **PAN-3467 → PR #3470** (`0009c93707 fix(plan): prefer authored workspace spec`) and **PAN-3468 → PR #3471** (`11eaa2cb38 fix(planning): separate readiness from DAG position`). Both committed with exactly the right framing — 3468's commit message names the actual conceptual error (readiness conflated with DAG position), which is why the coordinator endgamed with pending items.
+- Watch armed on #3470's test lane (PAN-3467 is the one that must DEPLOY before the PAN-3447 unstick). Sequence on green: merge → `pan done --strike` → **`pan reload`** → `pan plan finalize` from `workspaces/feature-pan-3447` → `pan swarm PAN-3447`.
+- Operator drives PAN-3447's live slots and any fallback serial agent; I only supply the deployed fix + the two unstick commands.
+
+## RUN-79 interstitial (~04:28Z) — strike-3462 landed via CI (#3472); PAN-3344 tally now NINE strikes
+
+strike-3462 (deferred-deploy fix, `cadc19d9e9 keep queued blocker current`) reported the load flake with a **failure-count gradient: 21 → 39 → 65 timeouts across three back-to-back runs on unchanged code**, 13k+ passing each time. That gradient is the cleanest proof yet that it is contention, not the change — same commit, same suite, monotonically worse as the host loaded. Pushed + **PR #3472**, CI arbitrates.
+**PAN-3344 tally: 9 strikes today could not use local verification.** Appended the gradient plus the blunt framing: the project has effectively lost pre-push verification on the machine where agents work. This is now the run's most expensive systemic tax — every instance costs an orchestrator round-trip and a landing decision.
+
+## RUN-79 tick 58 (2026-08-02 ~04:30Z) — 🔴 RED MAIN #2 (PAN-3473) blocks BOTH expedite strikes; struck
+
+- **RED MAIN on `50f9d451a5`**: `system-health-no-loss.test.ts` fails — `metrics.virtualCommitmentPercent` missing from `SystemHealthPill.tsx` after the PAN-3423 popover redesign (data still present upstream; a surface/no-loss gap, not a data gap). Prior commits green, so it entered with that work. Filed **PAN-3473** (blocks-main) + struck.
+- **SELF-CORRECTION:** at tick 56 I called PR #3461's failure on this exact test "real audit feedback, not flake" and queued PAN-3450 for rework. **Wrong — it was red-main collateral.** Two independent strikes then hit the same wall and diagnosed it precisely (strike-3467 named `SystemHealthPill.tsx`). Lesson repeated from the earlier episode: when a PR fails, check main's own CI on that test BEFORE attributing the failure to the PR. I had that exact rule from tick 49 and did not apply it here.
+- **Both operator-expedited strikes are blocked purely on this** — PAN-3467 (#3470) and PAN-3468 (#3471) each have their fix committed and pushed, refusing correctly to fix-forward someone else's regression. Landing PAN-3473 releases three PRs at once (plus #3461).
+- Neither expedite strike knows its branch is already pushed with a PR open (PAN-3417 merged-awareness gap, 4th+ specimen) — flywheel cannot `pan tell`, so they idle harmlessly until I merge.
+
+## RUN-79 tick 59 (2026-08-02 ~04:45Z) — red-main fix in CI (#3474); 4 PRs queued behind it
+
+- **strike-3473 fix pushed → PR #3474** (`5e78dab785 restore commitment diagnostic`, **+12/−0** — exactly the surgical restore the diagnosis called for; the metric existed upstream, only the pill surface had dropped it). Watch armed.
+- **One merge releases four blocked PRs**, all failing on inherited red rather than their own changes: #3470 (PAN-3467) + #3471 (PAN-3468) — both operator-expedited PAN-3447 unblockers — plus #3461 (PAN-3450) and #3472 (PAN-3462). Red-main episode #2 of the run; both were caught by no-loss/beads guards doing exactly their job, and both were reported first by strike agents refusing to fix-forward.
+- Sequence on green: merge #3474 → verify main greens → merge #3470 + #3471 → `pan reload` → `pan plan finalize` from `workspaces/feature-pan-3447` → `pan swarm PAN-3447`.
+
+## RUN-79 tick 60 (2026-08-02 ~04:55Z) — near-miss: almost `--fresh`ed a WORKING agent; leak root cause found
+
+- **Near-miss worth recording.** strike-3431's cost was byte-identical across FOUR ticks ($15.0908, +42/−92) — my wedge heuristic. Before intervening I read the pane properly: **"1 shell still running"** and an active spinner. Cost does not advance while an agent blocks on a long shell (the full suite runs 12+ min under load), so **frozen cost alone cannot distinguish wedged from waiting-on-a-shell**. A `--fresh` would have destroyed an in-progress verification AND its uncommitted context. NEW RULE: before any wedge call, check for a running-shell indicator and for real commits — not just the cost delta.
+- **And it has the leak fix**: three commits — `bound conversation watcher memory`, **`use native recursive conversation watcher`**, **`externalize parcel watcher`**. The parcel watcher is the cost-per-attach culprit, matching the 5-point curve diagnosis exactly (per-attach structures never released). Round 1 bounded the symptom; round 2 removes the watcher that caused it. Leaving it to finish its gates rather than pushing early.
+- #3474 (red main) test lane still running; four PRs queued behind it. MIN-932 $124.71 ctx 81% (near compaction), MIN-934 $17.04 +653. Server healthy at 1330MB/54min, 21GB free.
+
+## RUN-79 tick 61 (2026-08-02 ~05:00Z) — 🟢 RED MAIN #2 FIXED (#3474 → 66f67f0ac0); expedite PRs resynced
+
+- **PAN-3473 merged and handed off** — commitment diagnostic restored to `SystemHealthPill.tsx`; red-main episode #2 closed (~30 min from strike report to merge).
+- **Both operator-expedited PRs resynced onto the fixed main** (`28951731e73` for PAN-3467, `7a50dd163d7` for PAN-3468) — their prior failures were stale red-window results, so a merge-of-main triggers fresh CI rather than leaving them looking broken. Same pattern as tick 50's collateral sweep, now applied proactively.
+- Watch armed on #3470 (PAN-3467) — it is the gating one, since its fix must DEPLOY before `pan plan finalize` can promote the operator's spec. Sequence on green: merge both → `pan done --strike` ×2 → `pan reload` → finalize → `pan swarm PAN-3447`.
+- #3461 (PAN-3450) and #3472 (PAN-3462) also released by this merge; re-run their lanes next tick if still stale.
+
+## RUN-79 tick 62 (2026-08-02 ~05:10Z) — leak ROOT CAUSE fix in CI (#3476); all red-window collateral resynced
+
+- **strike-3431 signaled ready → PR #3476** — the parcel watcher removal, i.e. the actual cost-per-attach root cause. The 5-point RSS curve (attach-rate scaling, not uptime) is what pointed here; round 1 had only bounded the symptom. Two emergency restarts and ~hourly pre-emptive reloads today trace to this one structure.
+- **All four red-window collateral PRs resynced onto green main**: #3470/#3471 (expedites, earlier this tick), plus #3461 (PAN-3450) and #3472 (PAN-3462) now — each was showing a stale failure from CI runs taken while main was red. Resyncing beats re-driving: no agent gets sent to chase a cause that was never theirs.
+- Main CI running on `66f67f0ac0` (the red-main fix). MIN-932 at ctx 86% (compaction imminent, $126.39), MIN-934 $19.01 +846.
+
+## RUN-79 interstitial (~05:20Z) — merged swarm slot auto-resumed forever: reaped + filed (PAN-3477)
+
+Operator reported PAN-3447 slot-3 `merged ... session alive`, repeatedly auto-resumed, eating swarm capacity. **Verified the merge before touching anything** (`78098fa908` is an ancestor of `feature/pan-3447` HEAD via `cf353434e79`, and its own branch is pushed) — so reaping risked no work. Reaped the session; doctrine sanctions this ("merged/verdict-recorded zombies can be reaped directly").
+**Three compounding gaps, verified in code, filed as PAN-3477 + struck:** (1) nothing reaps a slot session when its item merges; (2) `deacon-auto-resume.ts` has NO swarm-slot awareness whatsoever, so a stopped merged slot is revived like any work agent — `lastYieldResumeAt` is that loop's fingerprint; (3) `countRunningSwarmSlotsForIssue` (`concurrency.ts:118-130`) charges tmux-alive slots against the budget with no merge check, so the zombie starves the wide wave PAN-3447 is waiting for. Together: a merged slot holds capacity permanently and resists being stopped.
+Note this is the THIRD swarm-substrate defect on PAN-3447 alone (3459 policy persistence, 3468 readiness contract, now 3477 slot reaping) — the swarm path is the least-exercised part of the pipeline and it shows.
+
+## RUN-79 tick 63 (2026-08-02 ~05:30Z) — 🎯 EXPEDITE LANDED: PAN-3467 + PAN-3468 merged, deployed, spec promoted
+
+- **Both operator-expedited fixes merged, handed off, and DEPLOYED** (`93b30aa7d7` PAN-3467, `b0e7dd41a9` PAN-3468; verified both are ancestors of the live build). Caught a trap on the way: an in-flight reload (pid 887017) had completed on `66f67f0ac0` — PRE-merge — so the "already deployed" appearance was false. Verified with `merge-base --is-ancestor` before running finalize; running it against the old CLI would have discarded the operator's spec exactly as PAN-3467 describes. **Never infer deployment from a recent reload; verify the commit.**
+- **`pan plan finalize` from the PAN-3447 workspace SUCCEEDED — 16 checklist items, canonical spec `status: proposed`, dependency edges intact** (river-canvas + topbar-enrichment file_overlap on confluence.css). PAN-3467's fix is proven in production: the operator's authored spec became canonical instead of being silently replaced by the server draft.
+- **Blocked at the last step**: promotion deferred, and `pan plan done` fails with a bare `xBRIEF quality lint failed` — **no issue list, no rule names, from either command**. Filed **PAN-3478** + struck (a gate that cannot enumerate its own failures can only be satisfied by bypass — same definitive-negative-without-evidence family as 3373/3462/3468). The `--no-quality-lint` bypass is an OVERRIDE and therefore the operator's call, not mine.
+- Swarm remains held from the reset (deliberate) — resuming would dispatch against the old readiness contract. Sequence once the lint clears: `pan swarm resume PAN-3447` → `pan swarm PAN-3447`.
+
+## RUN-79 tick 64 (2026-08-02 ~05:40Z) — 🎉 LEAK ROOT CAUSE LIVE; deferred-deploy fix landed too
+
+- **PAN-3431 (parcel-watcher removal) merged, handed off, and DEPLOYED** (`3d0762120e`, verified live in build `552f6d412a09`). The cost-per-attach leak that forced two emergency restarts and ~hourly pre-emptive reloads today is now structurally fixed. **Verification standard for calling it closed** (per the twice-learned lesson): watch RSS across a fleet ramp at comparable load — the old signature was ~300MB/min during a 42-session ramp; a flat curve through a similar ramp is the proof, not a quiet-window reading.
+- **PAN-3462 (deferred deploys never fire) merged + handed off** (`552f6d412a`) — deploys deferred by the gate now actually fire when the window clears, closing the trap that cost two manual reloads and blocked close-outs earlier tonight.
+- PAN-3450's auto-merge schedule was refused: `review status is not readyForMerge` — its review verdict has not re-flipped since the red-window rerun. Correct refusal (the queue guards on canonical state, not on my say-so); it re-enters when the verdict lands.
+- Run tally: **35 issues landed+closed**, plus PAN-3467/3468/3473/3431/3462 now at verifying-on-main.
+
+## RUN-79 tick 65 (2026-08-02 ~05:50Z) — FIVE close-outs drained (36 total); leak fix shows a first positive signal
+
+- **PAN-3467, PAN-3468, PAN-3473, PAN-3431, PAN-3462 all closed out** in one pass (main green past both merge commits; 8-row DoD each, no overrides). **36 issues landed+closed this run.** That drains the entire expedite + red-main + leak + deferred-deploy cluster.
+- **Leak fix first data point at comparable load**: 1426MB @ 18min with **37** sessions, versus the pre-fix 1936MB @ 18min with **31** sessions — more sessions, ~510MB less, inverting the old scaling. Posted to PAN-3431 **explicitly as an early indicator, not closure**: the old signature peaked during a fast attach RAMP (~300MB/min at 42 sessions), and this is steady state. Proof requires a comparable ramp with a flat curve. (Third time today I have had to resist declaring a class closed on one favorable reading — the discipline is holding now.)
+- PAN-3447 still blocked only on the silent quality-lint gate (PAN-3478 struck); swarm intentionally held; `--no-quality-lint` remains the operator's override to authorize.
+
+## RUN-79 note (~06:05Z) — deployed PAN-3479 (tombstone session_id) immediately, not at next tick
+
+Operator reported PAN-3479 on main: agent tombstones were NULLING `session_id`, blanking the dashboard session view ("No conversation data available") for every retired agent — observed on the PAN-3447 slots. Deployed at once rather than waiting for the tick, because the bug accrues damage per newly-retired agent. Verified live: build `866f5608e83b` contains both `866f5608e83` (PAN-3479) and `50f9d451a5` (PAN-3465, which turned out to be already live from an earlier reload — the operator's "still pending" was stale). Operator hand-backfilled the three slot rows' session ids; those hold.
+**Pattern worth carrying:** PAN-3479 is another instance of a safety mechanism destroying information it never needed to destroy — resume-safety was achieved by nulling the transcript linkage. The fix separates the two (explicit retained-transcripts phase gate in `deacon-auto-resume`, session_id preserved). Same shape as the stuck-flag and needs-you families: the guard was right, its collateral was not.
+
+## RUN-79 tick 66 (2026-08-02 ~06:10Z) — ⚠️ LEAK NOT FIXED: measured 185MB/min post-fix; re-struck
+
+- **The verification discipline earned its keep.** Direct 180s delta sampling on the post-fix build: **RSS 1647→2203MB = 185MB/min at 36 sessions**. Normalized: ~5.1MB/min/session vs the pre-fix ~7.1 — a real ~28% improvement, but nowhere near fixed. The parcel watcher was *a* per-attach retainer, not *the* one. **Re-struck PAN-3431 (round 3).**
+- **Methodological lesson, recorded because it nearly fooled me twice:** my tick-65 "encouraging" reading compared two STEADY-STATE snapshots (1426MB@18min/37 vs 1936MB@18min/31). Steady-state snapshots hide the slope entirely — only a live delta on a single process reveals the rate. Had I closed this on the tick-65 reading (as I was tempted to, and as I did wrongly twice earlier tonight with the composer wedge and the first leak round), the fleet would have kept needing hourly reloads with the issue marked done.
+- Sharpened the hunt on the issue: heap-diff across a deliberate 10-session attach burst, parcel watcher now excluded; remaining candidates are per-session event-store subscriptions, terminal/PTY registry entries, transcript buffers.
+- strike-3477 (merged-slot reaping) $11.63 +246/−43 at ctx 82%; strike-3478 (silent lint gate — PAN-3447's last blocker) $3.86 +114/−3.
+
+## RUN-79 tick 67 (2026-08-02 ~13:25Z) — 🏁 PAN-3447 (God View Confluence) PROMOTED — the four-bug blockade is broken
+
+- **Operator promoted uat/pan-crow-0802 carrying PAN-3447** — the operator's own pipeline-observability feature, which four distinct swarm-substrate defects had been dooming: PAN-3459 (policy persistence), PAN-3467 (finalize discarding the authored spec), PAN-3468 (readiness/DAG conflation endgaming the swarm silently), PAN-3477 (merged slots never reaped). All four found and four of five fixed today; the feature shipped through the gap.
+- **Close-out used two doors that did not exist this morning**: `pan unstick PAN-3447` cleared a `verification_stuck` gate (PAN-3393/PAN-3321, landed ~09:00Z today) and a `pan pause` with attribution cleared a stale registry row alive with zero tmux sessions. Close-out itself now waits only on main CI for the promote commit — **no overrides taken**. Satisfying proof of the metabolism: this morning's substrate fixes are what made this evening's close-out mechanical.
+- Read-door sweep: 18 PAN + 14 MIN + TIN-1 in pipeline; 4 typed blind spots unchanged. Clean UAT batch EMPTY (candidate null).
+- Fleet: 3 strikes (3431 leak round 3, 3477 slot reaping, 3478 silent lint gate) + both campaign lanes (MIN-932, MIN-934) live.
+
+## RUN-79 tick 68 (2026-08-02 ~13:45Z) — 🎉 PAN-3447 CLOSED OUT (37 total); leak improving but still live
+
+- **PAN-3447 closed out** — God View Confluence is fully done: merged, promoted, deployed, **bundle-verified** (`index-uzPEFQC1.js` contains `confluence`, up from zero occurrences pre-deploy), and closed with clean gates and no overrides. **37 issues landed+closed this run.** The operator caught the deploy gap by curl+grep on the served bundle — a hard-fail check worth stealing: verify the ARTIFACT, not just the build commit.
+- **Leak third live-delta sample: 94MB/min at 38 sessions (~2.5MB/min/session)** vs 185 (~5.1) and pre-fix ~300 (~7.1). Direction right, ~65% per-session reduction across two fixes, still ~40min between required reloads. **Recorded the confound honestly:** samples were taken at different process ages (18min vs 5min uptime) and the leak is front-loaded, so part of the apparent gain is measurement position, not code. Prescribed a fixed-uptime sampling protocol (15-20min in) so the next comparison is clean.
+- Investigated the operator's reported "orphan" `dist/dashboard/server.js` (pid 896079): **NOT an orphan** — cgroup `docker-d46bd5e0…`, cwd `/workspaces/overdeck` (container-internal), uptime 15h35m (not 09:21 as reported). It is a workspace devcontainer peer; not binding `:3011` is correct per the single-Deacon invariant. Declined to kill it and offered the correct lever (stop that workspace's Docker stack) instead.
+
+## RUN-79 tick 69 (2026-08-02 ~13:55Z) — god-view fixes deployed; typecheck regression located + struck (PAN-3482)
+
+- **Deployed `55fbe7a5f615`** (verified live): orb membership excludes dead-agent residue + closed issues (the 96-frozen doldrums wall), session-feed dock no longer reserves 320px, hook LEDs from PostToolUse heartbeat, satellites spawn settled, canvas text truncates.
+- **Typecheck regression confirmed and located.** Operator reported `tiered-inspect-escalation.ts(61,5) TS2353 taskId`. It did NOT reproduce under `npm run typecheck` (exit 0) — because that script TOLERATES dashboard-server errors against a shrink-only ratchet. `scripts/lint-dashboard-types.sh` is the real gate and reports **60 errors vs baseline 57**, naming a second site too (`tiered-callouts.ts:160`). Filed **PAN-3482** + struck. Root cause is a rename miss: the xbrief refactor (`35bb5da2d9f`) moved the domain task→item, the receiving types want `itemId`, two call sites still pass `taskId`.
+- **LESSON (new, generalizable): a green `npm run typecheck` does NOT prove the dashboard half is clean** — the ratchet script does. Any "typecheck passes" claim about dashboard code must cite `lint-dashboard-types.sh`/`lint-frontend-types.sh`, not the root script. This is why the operator saw red where my first check saw green.
+- Also noted during deploy: a `PID 558752 survived SIGKILL; ports are free, continuing restart` line — exactly the false-abort path PAN-3370 fixed, now correctly CONTINUING instead of aborting. Fix working in production.
+
+## RUN-79 interstitial (~14:00Z) — PAN-3482 landed via merge-sync (#3483); PAN-3440 scope sharpened
+
+strike-3482 committed the fix (`4711669cca7 pass xbrief item ids to tiered handlers`) but stalled: launcher-git-guard blocks `git rebase`, and **the prescribed `pan sync-main` two-door endpoint is a NO-OP STUB** — a sharper fact than PAN-3440 had recorded. Correct double refusal by the agent (no bypass, no unrebased push). **A rebase was never required**: merged `origin/main` into the branch (history-preserving, sanctioned), pushed, **PR #3483**. Fourth time today this workaround unblocked a stalled strike.
+Appended to PAN-3440: its scope is not just "register strike workspaces" but "implement the path the guard's own error message points agents toward" — a guard whose prescribed alternative is a stub is a dead end by construction, and that is why strikes keep stalling here instead of self-serving. Recommended documenting merge-sync in the strike role prompt.
+
+## RUN-79 tick 70 (2026-08-02 ~14:10Z) — silent-lint fix landed (#3484); guard-stall now a recognized pattern
+
+- **strike-3478's fix pushed → PR #3484** (`9390359b75b surface quality lint issues`) — this is the one that unblocks PAN-3447 follow-on planning, which stalled precisely on the gate's silence. Same guard-stall as PAN-3482: agent committed, refused to bypass, waited. Merge-synced and landed. **Fifth guard-stall unblocked this way today.**
+- **The pattern is now unmistakable and worth acting on**: every strike that touches a behind-main branch stalls at the same wall, each burning an orchestrator round-trip, because the guard's prescribed alternative (`pan sync-main`) is a no-op stub (PAN-3440). Until 3440 lands, merge-sync-and-PR is the standing orchestrator response — do not wait for the agent to self-serve.
+- **strike-3477 vanished with no commits** (session gone, empty branch) — re-struck. Cause unknown; if it vanishes again with nothing committed, that is a spawn/crash class worth its own filing rather than a third re-dispatch.
+- strike-3431 leak round 3 progressing with real work ($21.05, +388/−164 — much larger than round 2's diff, consistent with hunting a second retainer).
+
+## RUN-79 tick 71 (2026-08-02 ~14:15Z) — MIN-932 shipped + closed; Lane A tail MIN-933 dispatched (38 total)
+
+- **Operator promoted uat/min-sable-0802 carrying MIN-932** (Hermes Lane A item 2) — closed out after clearing a leftover running work agent with an attributed pause. **38 issues landed+closed this run.**
+- **Campaign advanced serially again**: MIN-932 terminal ⇒ **MIN-933 started** (auto-planning → work). Campaign state: Lane A = MIN-930 ✅ → MIN-932 ✅ → MIN-933 planning; Lane B = MIN-931 ✅ → MIN-934 working. **3 of 5 terminal, both lanes live**, serial discipline unbroken across the whole campaign — no tail ever started before its head reached terminal.
+- **The postMergeLifecycle leftover-agent gap now has 4 specimens** (MIN-929, PAN-3406, PAN-3447, MIN-932): every promote leaves the work agent running, blocking close-out until an attributed pause clears it. It has recurred on every single promote today. Worth filing on the next occurrence rather than absorbing it a fifth time — the pause is a backstop standing in for a missing lifecycle step.
+- Read-door sweep: 17 PAN + 14 MIN + TIN-1; 4 typed blind spots unchanged. Clean UAT batch EMPTY.
+
+## RUN-79 tick 72 (2026-08-02 ~14:35Z) — PAN-3482 + PAN-3478 LANDED; verification storm root-caused (PAN-3492)
+
+- **PAN-3482 landed** (#3483 `547e675b5a`) — dashboard typecheck ratchet restored. **PAN-3478 landed** (#3484 `cf2538207c`) — the quality lint now names its issues, unblocking PAN-3447 follow-on planning. Both were ALREADY GREEN in CI while their strikes were still fighting the local gate: the merged-awareness gap (PAN-3417) again, costing real time.
+- **Root-caused the verification storm the strike reported → PAN-3492.** The respawning vitest workers for feature-pan-3419 are parented by the DASHBOARD SERVER, not the work agent — they are server-driven verification retries. The loop is self-amplifying: load → 5s fixture timeout (PAN-3344) → "failure" → immediate retry → more load. One issue's verification can starve every other agent's gate run; the reporting strike's 31 timeouts were collateral.
+- **My first intervention was WRONG and is recorded as such**: I paused `agent-pan-3419` with governor attribution, and fresh vitest generations kept spawning after the pause (17-18s elapsed on post-pause processes) because the server owns them. **Agent pause is not a load-shedding tool for server-driven verification.** The effective lever was `pan review abort PAN-3419`; unpaused the agent afterward since it was never the culprit.
+- This closes the loop on today's biggest systemic tax: PAN-3344 (fixture timeout) + PAN-3429 (governor won't shed) + PAN-3492 (retries amplify) are three faces of one problem — nothing admission-controls heavy test runs.
+
+## RUN-79 tick 73 (2026-08-02 ~14:40Z) — Hermes Lane B COMPLETE; PAN-3477 recovered from a vanished session (#3493)
+
+- **MIN-934 handed off — Hermes Lane B is DONE end to end** (MIN-931 ✅ → MIN-934 handed off). Campaign: **4 of 5 items terminal or handed off**, Lane A finishing on MIN-933. Serial discipline held for the entire campaign.
+- **strike-3477 vanished a SECOND time without signalling — but its fix was committed** (`b66dc5fd7d4 reap merged slot sessions`). Recovered it straight from the branch, merge-synced, **PR #3493**. Lesson: a vanished strike session is not a lost strike — ALWAYS check the branch for commits before re-dispatching. I nearly re-struck it a third time, which would have discarded finished work.
+- strike-3431 (leak round 3) verified genuinely working, not wedged: `1 shell still running` after a 3h8m churn. The frozen-cost-≠-wedge rule from tick 60 is now load-bearing twice.
+- Load down to 11.4 after the PAN-3492 storm abort. Close-outs for PAN-3482/3478 wait on main CI (in progress on both merges).
+
+## RUN-79 tick 74 (2026-08-02 ~14:55Z) — PAN-3477 landed+deployed; PAN-3482 + PAN-3478 closed out (40 total)
+
+- **PAN-3477 merged (`4be15e7626`), handed off, and DEPLOYED** — merged swarm slots are now reaped, auto-resume is swarm-aware, and zombies no longer charge against slot capacity. The PAN-3447 slot-3 loop is structurally dead.
+- **PAN-3482 + PAN-3478 closed out. 40 issues landed+closed this run.** The dashboard typecheck ratchet is restored and the quality lint now names its issues.
+- **My own miss, caught by the gate:** PAN-3478's close-out failed on `reviewStatus: pending` because I merged its PR at tick 72 but never ran `pan done --strike`. The DoD gate caught the skipped step exactly as designed — I had merged and moved on. Ran the handoff, then close-out passed clean. **Rule: merging a strike PR is only half the landing; the handoff is what records the verdict.** Worth noting the gate is what made this recoverable rather than a silently half-landed issue.
+
+## RUN-79 tick 75 (2026-08-02 ~15:15Z) — PAN-3477 closed out (41 total); leak curve REVERSED
+
+- **PAN-3477 closed out. 41 issues landed+closed this run.**
+- **Leak: first negative sample.** Fixed-uptime protocol (20m41s, the discipline prescribed two ticks ago): **RSS 1357→907MB = −150MB/min at 33 sessions**. The process is reclaiming, not growing; pre-fix at comparable uptime was ~1936MB and climbing, post-round-2 was +94MB/min. Absolute RSS (907MB at 20min) is the more meaningful signal than the negative slope.
+- **Did NOT declare it fixed** — wrote explicit closure criteria onto the issue instead: two consecutive non-positive fixed-uptime samples PLUS one sample through a deliberate 10-session attach burst, since the leak's worst behaviour was always attach-scoped and 33 steady-state sessions is not a ramp. After three premature "fixed" calls this run (composer wedge, leak round 1, leak round 2), the standard is now written down rather than remembered.
+- Campaign: 4 of 5 (Lane B complete, MIN-933 finishing Lane A). strike-3431 still working its 3h+ shell.
+
+## RUN-79 tick 76 (2026-08-02 ~15:40Z) — leak: 2 consecutive non-positive samples; closure HELD on the ramp criterion
+
+- **Sample 2 @ 41m26s: RSS 1031→751MB = −93MB/min at 32 sessions**, following sample 1's −150MB/min @ 20m41s. Two consecutive non-positive fixed-uptime samples ⇒ criteria 1 and 2 of the closure standard are met. **The absolute number is the real evidence: 751MB at 41min uptime, where the pre-fix process was 2.4-3.4GB by that age and needed a reload.**
+- **Held closure anyway** — criterion 3 (a sample through a ~10-session attach burst) is unobserved, and that criterion exists precisely because every earlier measurement showed the leak was ATTACH-SCOPED: acceptable in steady state, explosive during ramps. Two calm-water samples cannot rule out an attach-only retainer. Left the issue open with the standard restated for whoever catches the next natural ramp.
+- This is the discipline the run kept relearning, now applied without prompting: three premature "fixed" calls earlier (composer wedge, leak rounds 1 and 2) each cost real time; the cost of holding an issue open one extra tick is nearly zero by comparison.
+
+## RUN-79 tick 77 (2026-08-02 ~16:00Z) — ⚠️ SELF-CORRECTION: the two "reclaiming" leak samples were GC-phase artifacts
+
+- **Long-interval tracking contradicts both short samples**: 751MB @41min → **1849MB @64min = +48MB/min** over 23 minutes. The −150 and −93MB/min readings were taken inside GC collection phases. The heap is a sawtooth; a 180s window reports whichever phase it lands in **as if it were the trend**, and twice in a row it reported the exact opposite of the truth.
+- **Methodological rule established (posted to the issue): the sampling window must exceed the GC period.** Short live-delta windows are worse than useless for a sawtooth heap. Valid comparisons are only (a) RSS at the SAME uptime across builds, (b) average slope over ≥20 minutes. Closure criteria rewritten accordingly; the short-window method is discarded outright.
+- Honest scoreboard on this issue: the two landed fixes DID help materially (same-uptime RSS roughly halved, reload interval stretched from ~40min to none-yet-needed at 64min), but a retainer is still live. Round 3 continues.
+- **Four times this run I have nearly closed something on favorable-but-invalid evidence.** The failure mode is never "no data" — it is *data collected by a method that cannot answer the question*. Worth carrying: choose the measurement to match the phenomenon's timescale BEFORE trusting any reading.
+
+## RUN-79 tick 78 (2026-08-02 ~16:30Z) — leak criterion 3 ANSWERED: attach-scoped retainer confirmed live
+
+- **Caught the attach ramp** (server restart re-attaching 32 sessions) — the exact sample criterion 3 required. Result: **2191MB at 3m09s uptime** (≈1.8GB over baseline for 32 attaches), then **+8MB/min once settled**. Same-uptime comparison vs pre-fix (2458MB @8min/42 sessions) shows the ramp cost is proportionally unchanged.
+- **Verdict: the leak is now precisely characterized rather than merely "still present" — a large one-time per-attach cost that is never released, with the ongoing drip largely fixed.** That reframes round 3 from "find the leak" to "find state allocated during attach/session-registration and never freed on detach". Also explains why reload intervals tracked fleet churn rather than clock time: RSS is driven by CUMULATIVE ATTACH COUNT over a process's life.
+- Kept the issue open; criteria 1-2 stand as evidence the steady-state half is genuinely fixed, criterion 3 answered negatively. This is the payoff of holding closure through four temptations: the issue now carries a specific, testable hypothesis instead of a false "fixed".
+- Campaign: MIN-934 restored and working (+1031/−184); MIN-933 in review. 4 of 5.
+
+## RUN-79 tick 79 (2026-08-02 ~16:50Z) — leak round 3 in CI (#3494): the fix matches the measured shape
+
+- **strike-3431 round 3 committed and landed to CI**: `c4764c6f12b stream cost event log reads` + `ffc6d61387a preserve cost reader pagination` → **PR #3494**. The diagnosis and the fix line up: loading the FULL cost event log per read is precisely a large allocation on a path every session attach touches — exactly the "one-time per-attach cost never released" shape that criterion 3's ramp sample revealed. Measurement drove the fix rather than guesswork.
+- Wrote the verification protocol INTO the PR body (same-uptime or ≥20min slope; never 180s windows) so whoever validates it does not repeat the GC-phase error that twice reported the opposite of the truth on this issue.
+- Emitted a status snapshot this tick, per the rule added after the stale-snapshot false idle escalation.
+
+## RUN-79 tick 80 (2026-08-02 ~17:15Z) — 26 acknowledged parked issues evaluated; dispositions recorded
+
+Operator batch-acknowledged 26 needs-you parked issues (acknowledged trips re-fire if left undecided). **Full disposition:**
+
+**18 of 26 need NO parked decision — they are already in-pipeline and moving**: PAN-1577, PAN-3338, PAN-3362, PAN-3410, PAN-3411, PAN-3418, PAN-3419, PAN-3420, PAN-3423, PAN-3426, PAN-3427, PAN-3450, MIN-839, MIN-923, MIN-924, MIN-933, MIN-934, TIN-1. Their trips were stale-state artifacts, not real decisions owed.
+
+**8 genuinely parked, evaluated against evidence THIS RUN produced:**
+- **PAN-1824 (CI flake: fake timers / @slow) — PRIORITIZE.** The run's single biggest tax: 9 strikes lost local verification; one measured a 21→39→65 timeout gradient on unchanged code. Evidence posted.
+- **PAN-1711 (event-loop stalls under load) — PRIORITIZE.** Spawned three filings this run (PAN-3492 retry amplification, PAN-3429 governor won't shed, PAN-3431 RSS). Evidence posted.
+- **PAN-1767 (merged-but-not-closed-out count) — PRIORITIZE.** The operator asked "why haven't these closed out?" three times this run; this issue answers it in `pan status`. Evidence posted.
+- **PAN-1416 (workspace dashboards must not claim canonical)** — still-valid invariant; today's "orphan server" report was exactly this hazard (verified benign container peer). Keep open, no book.
+- **PAN-1776 (hot-updatable delivery)** — relevant: PAN-3422's 5-specimen composer wedge needed a deploy to fix. Keep, medium.
+- **PAN-1868 (cost-bleed circuit breaker)** — relevant: $236/$200/$124 single-issue spends this run; progress-aware breaking differs from the warn-only cost policy. Keep, medium.
+- **PAN-1164 (live diff summaries), PAN-1951 (warm inspector session)** — no pain observed this run. Keep parked, low.
+
+**Recommendation to operator:** PAN-1824 + PAN-1711 + PAN-3344 + PAN-3429 + PAN-3492 are five faces of ONE problem — nothing admission-controls heavy work on this host. They belong in a single order book, not five separate strikes.
+
+Also noted: memory-governor runway is now PSI-evidenced (operator-approved), so admission deferrals from idle swap are over — that removes the false-pressure deferrals seen earlier in the run.
+
+## RUN-79 tick 81 (2026-08-02 ~17:25Z) — quiet tick: round-3 leak PR in CI, campaign in review
+
+- #3494 (PAN-3431 round 3) still in CI (lint + test lanes). Nothing to merge; no ready set. MIN-934 working, MIN-933 in review — campaign holds at 4 of 5 with Lane B complete.
+- Status emitted this tick (rule holding). Surfaced the load-control order-book recommendation into `openQuestions` so it reaches the operator through the snapshot rather than only through chat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline file than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness rather than a real regression.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same collateral pattern as the red-main window earlier: check whether the failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak trajectory noted for the eventual verification: 2428MB @12m24s with 30 sessions on the CURRENT (pre-round-3) build — consistent with the attach-cost characterization, and the reference point round 3 must beat.
+
+## RUN-79 tick 82 (2026-08-02 ~17:45Z) — #3494 diagnosed as baseline desync, resynced (not its own defect)
+
+- **#3494 (leak round 3) failed lint + test — diagnosed before re-driving.** Lint output was self-contradictory: `stale baseline: 1 errors but baselined at 2` AND `refusing to raise the baseline: 2 errors vs baseline 1`. That is a **frontend-types ratchet desync**, not a defect in streaming cost-log reads: the branch predates PAN-3482's baseline work, so it carries an older baseline than main now expects. Test showed 1 failed file of 1378 — consistent with the same staleness.
+- **Resynced onto current main** (`49a0a59e378`) so CI re-runs against the correct baseline. Same discipline as the red-main collateral sweep: establish whether a failure belongs to the branch or to the base before sending anyone to fix it.
+- Leak reference for eventual verification: **2428MB @12m24s with 30 sessions** on the current (pre-round-3) build — consistent with the attach-cost characterization and the number round 3 must beat.
+
+### RUN-79 tick 83 — 2026-08-02T19:30Z — RED MAIN on three gates; uat/pan-crow-0802 swept
+
+**Promote sweep (uat/pan-crow-0802 → main 7ac5339817d).** Fresh read-door sweep across all 12
+registered projects. Four typed blind spots unchanged (papers-please, puzzdom: tracker_unconfigured;
+lexerra, krux: forge_unavailable/404) — never reconstructed from tracker/agent/tmux state.
+PAN-3338 closed out clean: 8/8 DoD rows, zero overrides.
+
+**RED MAIN — five consecutive commits, three independent gates.** Found by reading #3494's CI
+rather than trusting the "resync fixed it" story from tick 82:
+
+1. `src/cli/commands/parked.ts:100` calls `project.projectPath`; `getProjectSync` returns the
+   `ProjectConfig` at `src/lib/projects.ts:307`, whose field is `path`. (A second unrelated
+   `ProjectConfig` exists at `src/lib/workspace-config.ts:245` — importing that to silence the
+   error would be the wrong fix.) → PAN-3503, struck.
+2. Composer manifest never regenerated for `pan parked` / `pan parked ack`. → same strike.
+3. Unbaselined cycle `deacon.ts > stall-sweeper.ts > service.ts`, introduced by my own PAN-3485
+   stall-sweeper landing. Fails `lint:circular` on main itself, so it blocks the verification gate
+   for every branch that syncs main. → PAN-3501, struck.
+
+**Lesson — a red PR is not evidence about the PR.** Tick 82 diagnosed #3494 as a frontend-types
+baseline desync and resynced it. The resync was correct but insufficient: the branch inherited
+main's breakage. #3494's build/lint/test failures are RED-MAIN collateral, not the streaming
+change. This is the second time this run I nearly re-drove a strike over its base's breakage.
+**Check the base's CI before attributing a branch failure to the branch.**
+
+**Leak reference point updated.** Pre-reload server: 2540MB @78min with 28 sessions, against the
+prior 2428MB @12min with 30 sessions — about +1.7MB/min of steady drip. The ongoing drip is
+largely solved; the residual is the one-time per-attach cost. Post-reload the fresh server sat at
+1326MB at 53s uptime with the same 28 sessions, which is that front-loaded cost, visible in
+isolation. Memory system-wide is healthy (31GB available, PSI ~0) — the 10s `/api/health`
+responses before the reload were event-loop blocking, not memory pressure.
+
+**Deploy.** `pan reload` reported a health-check failure at 30s but had actually succeeded — the
+server was still booting. Verified after: `buildCommit` 7ac5339817d, matching main. The 30s
+health timeout is too tight for a boot that attaches 28 sessions.
+
+**PAN-3426.** Nine uncommitted files in the workspace fix all four PR #3495 CI failures; the test
+role verified them locally and correctly refused to commit (outside its boundary). Resumed the
+work agent — it had already picked up the same work on its own.
+

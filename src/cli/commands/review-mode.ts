@@ -25,25 +25,3 @@ export async function reviewModeCommand(id: string, mode: string): Promise<void>
 
   console.log(chalk.green(`✓ Set ${issueId} review mode to ${mode}`));
 }
-
-const RE_REVIEW_SCOPES = ['all', 'changed', 'blockers'] as const;
-type ReReviewScopeValue = (typeof RE_REVIEW_SCOPES)[number];
-
-function isReReviewScope(value: string): value is ReReviewScopeValue {
-  return (RE_REVIEW_SCOPES as readonly string[]).includes(value);
-}
-
-/** PAN-1874: per-issue re-review scope override (which convoy reviewers re-run). */
-export async function reviewScopeCommand(id: string, scope: string): Promise<void> {
-  const issueId = id.toUpperCase();
-  if (!isReReviewScope(scope)) {
-    console.error(chalk.red(`Error: re-review scope must be all, changed, or blockers, got '${scope}'`));
-    console.error(chalk.dim(`Usage: pan review scope ${issueId} <all|changed|blockers>`));
-    return exitCli(1);
-  }
-
-  const project = resolveProjectForIssue(issueId) ?? getProjectConfigFromWorkspacePath(process.cwd());
-  await updateIssueRecord(project, issueId, (record) => { record.reReviewScope = scope; });
-
-  console.log(chalk.green(`✓ Set ${issueId} re-review scope to ${scope}`));
-}

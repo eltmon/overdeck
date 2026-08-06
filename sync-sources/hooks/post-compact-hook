@@ -16,9 +16,9 @@ TS=$(date -Iseconds)
 
 if command -v jq >/dev/null 2>&1; then
   BODY=$(jq -n --arg ts "$TS" \
-    '{kind: "activity", activity: "idle", timestamp: $ts}')
+    '{kind: "activity", activity: "idle", hookName: "PostCompact", timestamp: $ts}')
 else
-  BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"timestamp\":\"$TS\"}"
+  BODY="{\"kind\":\"activity\",\"activity\":\"idle\",\"hookName\":\"PostCompact\",\"timestamp\":\"$TS\"}"
 fi
 
 pan_emit_event "$AGENT_ID" "$BODY"

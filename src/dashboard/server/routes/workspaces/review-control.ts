@@ -658,14 +658,12 @@ const deleteWorkspacePendingRoute = HttpRouter.add(
 );
 
 
-// ─── Route: GET/POST /api/review/:issueId/config (PAN-1874) ─────────────────
+// ─── Route: GET/POST /api/review/:issueId/config ───────────────────────────
 //
 // Per-issue review configuration override: reviewMode (quick|full|none) and
-// reReviewScope (all|changed|blockers), persisted on the per-issue record —
-// the same override `pan review mode` / `pan review scope` write. Resolution
-// order at review-spawn time: per-issue record → per-project roles.review →
-// global config (resolveReviewMode / resolveReReviewScope). Passing null for
-// a field clears the override back to config resolution.
+// reviewModel. Resolution order for review mode is per-issue record → project
+// roles.review → global config. Passing null clears an override back to config
+// resolution.
 const getReviewConfigRoute = HttpRouter.add(
   'GET',
   '/api/review/:issueId/config',
@@ -677,13 +675,13 @@ const getReviewConfigRoute = HttpRouter.add(
     }
     const result = yield* Effect.promise(async () => {
       const { readIssueRecordSync, resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
-      const { resolveReviewMode, resolveReReviewScope } = await import('../../../../lib/cloister/review-agent.js');
+      const { resolveReviewMode } = await import('../../../../lib/cloister/review-agent.js');
       const project = resolveProjectForIssue(issueId);
       const record = project ? readIssueRecordSync(project, issueId) : null;
       return {
         issueId,
-        override: { reviewMode: record?.reviewMode ?? null, reReviewScope: record?.reReviewScope ?? null, reviewModel: record?.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record?.reviewModel ?? resolveConfiguredReviewModel() },
+        override: { reviewMode: record?.reviewMode ?? null, reviewModel: record?.reviewModel ?? null },
+        resolved: { reviewMode: resolveReviewMode(issueId), reviewModel: record?.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);
@@ -699,18 +697,14 @@ const postReviewConfigRoute = HttpRouter.add(
     if (!parseIssueIdSync(issueId)) {
       return jsonResponse({ error: "Invalid issue ID" }, { status: 400 });
     }
-    const body = (yield* readJsonBody) as { reviewMode?: string | null; reReviewScope?: string | null; reviewModel?: string | null };
+    const body = (yield* readJsonBody) as { reviewMode?: string | null; reviewModel?: string | null };
     const hasMode = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewMode');
-    const hasScope = Object.prototype.hasOwnProperty.call(body ?? {}, 'reReviewScope');
     const hasModel = Object.prototype.hasOwnProperty.call(body ?? {}, 'reviewModel');
-    if (!hasMode && !hasScope && !hasModel) {
-      return jsonResponse({ error: 'Provide reviewMode, reReviewScope, and/or reviewModel (null clears the override)' }, { status: 400 });
+    if (!hasMode && !hasModel) {
+      return jsonResponse({ error: 'Provide reviewMode and/or reviewModel (null clears the override)' }, { status: 400 });
     }
     if (hasMode && body.reviewMode !== null && body.reviewMode !== 'quick' && body.reviewMode !== 'full' && body.reviewMode !== 'none') {
       return jsonResponse({ error: "reviewMode must be quick, full, none, or null" }, { status: 400 });
-    }
-    if (hasScope && body.reReviewScope !== null && body.reReviewScope !== 'all' && body.reReviewScope !== 'changed' && body.reReviewScope !== 'blockers') {
-      return jsonResponse({ error: "reReviewScope must be all, changed, blockers, or null" }, { status: 400 });
     }
     let reviewModel: string | undefined;
     if (hasModel && body.reviewModel !== null) {
@@ -723,16 +717,12 @@ const postReviewConfigRoute = HttpRouter.add(
     const result = yield* Effect.promise(async () => {
       const { resolveProjectForIssue } = await import('../../../../lib/pan-dir/record.js');
       const { updateIssueRecord } = await import('../../../../lib/pan-dir/record-update.js');
-      const { resolveReviewMode, resolveReReviewScope } = await import('../../../../lib/cloister/review-agent.js');
+      const { resolveReviewMode } = await import('../../../../lib/cloister/review-agent.js');
       const project = resolveProjectForIssue(issueId);
       const record = await updateIssueRecord(project, issueId, (current) => {
         if (hasMode) {
           if (body.reviewMode === null) delete current.reviewMode;
           else current.reviewMode = body.reviewMode as 'quick' | 'full' | 'none';
-        }
-        if (hasScope) {
-          if (body.reReviewScope === null) delete current.reReviewScope;
-          else current.reReviewScope = body.reReviewScope as 'all' | 'changed' | 'blockers';
         }
         if (hasModel) {
           if (body.reviewModel === null) delete current.reviewModel;
@@ -742,8 +732,8 @@ const postReviewConfigRoute = HttpRouter.add(
       return {
         success: true,
         issueId,
-        override: { reviewMode: record.reviewMode ?? null, reReviewScope: record.reReviewScope ?? null, reviewModel: record.reviewModel ?? null },
-        resolved: { reviewMode: resolveReviewMode(issueId), reReviewScope: resolveReReviewScope(issueId), reviewModel: record.reviewModel ?? resolveConfiguredReviewModel() },
+        override: { reviewMode: record.reviewMode ?? null, reviewModel: record.reviewModel ?? null },
+        resolved: { reviewMode: resolveReviewMode(issueId), reviewModel: record.reviewModel ?? resolveConfiguredReviewModel() },
       };
     });
     return jsonResponse(result);

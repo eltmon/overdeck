@@ -134,8 +134,8 @@ Pi also writes local compatibility files under `~/.overdeck/agents/<agent-id>/` 
 
 Pi work agents use `turn_end` to approximate Claude Code's `Stop` hook completion flow:
 
-1. Check evidence first: issue beads must all be closed and the workspace xBRIEF/continue state must be satisfied when present.
-2. Scan the turn output/transcript for explicit completion markers such as `OVERDECK_WORK_COMPLETE`, `Implementation complete`, `all beads closed`, or `ready for review`.
+1. Check evidence first: POST `/api/agents/:id/plan-checklist` and treat the work as complete only when the server reports every xBRIEF checklist item complete through the canonical `checkIncompletePlanItemsPromise` gate (the same door `runVerificationForIssue()` uses).
+2. Scan the turn output/transcript for explicit completion markers such as `OVERDECK_WORK_COMPLETE`, `Implementation complete`, `all tasks closed`, or `ready for review`.
 3. Ask the dashboard classifier endpoint for a final verdict when the transcript is ambiguous.
 4. Emit `agent.resolution_changed` with `done`, `needs_input`, or `stuck` as appropriate.
 

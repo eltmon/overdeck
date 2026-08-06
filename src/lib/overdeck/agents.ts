@@ -53,11 +53,13 @@ export interface AgentTombstoneIdentity {
   model: string;
 }
 
+// PAN-3479: tombstones keep session_id — it IS the transcript linkage; resume
+// safety comes from the retained-transcripts phase gate in deacon-auto-resume.
 export function tombstoneAgentRecordSync(agentId: string): void {
   try {
     getOverdeckDatabaseSync().prepare(`
       UPDATE agents
-      SET status = 'stopped', session_id = NULL, phase = ?, updated_at = ?
+      SET status = 'stopped', phase = ?, updated_at = ?
       WHERE id = ?
     `).run(RETAINED_TRANSCRIPTS_PHASE, Date.now(), agentId);
   } catch { /* agents table missing */ }
@@ -68,7 +70,7 @@ export function ensureAgentTombstoneSync(identity: AgentTombstoneIdentity): void
     INSERT INTO agents (id, issue_id, role, status, workspace, harness, model, phase, updated_at)
     VALUES (?, ?, ?, 'stopped', ?, ?, ?, ?, ?)
     ON CONFLICT(id) DO UPDATE SET
-      status = 'stopped', session_id = NULL, phase = excluded.phase, updated_at = excluded.updated_at
+      status = 'stopped', phase = excluded.phase, updated_at = excluded.updated_at
   `).run(
     identity.id,
     identity.issueId,
@@ -753,8 +755,7 @@ const OVERDECK_AGENT_COLUMNS = [
   'review_sub_role', 'review_run_id', 'review_synthesis_agent_id',
   'review_output_path', 'review_deadline_at', 'review_monitor_signaled',
   'review_retry_attempt',
-  'review_discovery_pending', 'review_context_manifest_path', 'review_discovery_ready_at',
-  'review_convoy_forked_at', 'review_fork_cache_checked', 'review_forked_from_parent',
+  'review_context_manifest_path',
   'updated_at',
 ] as const;
 
@@ -815,12 +816,7 @@ function agentStateToOverdeckRow(state: AgentState): unknown[] {
     toMs(state.reviewDeadlineAt),
     state.reviewMonitorSignaled ?? null,
     state.reviewRetryAttempt ?? null,
-    toBit(state.reviewDiscoveryPending),
     state.reviewContextManifestPath ?? null,
-    toMs(state.reviewDiscoveryReadyAt),
-    toMs(state.reviewConvoyForkedAt),
-    toBit(state.reviewForkCacheChecked),
-    toBit(state.reviewForkedFromParent),
     Date.now(),
   ];
 }

@@ -1,12 +1,11 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { watch as chokidarWatch, type FSWatcher } from 'chokidar';
-
 import { getConversationSearchConfigSync, type NormalizedConversationSearchConfig } from '../../../lib/config-yaml.js';
 import { createConversationEmbeddingProvider } from '../../../lib/conversation-search/embedding-provider.js';
 import { indexConversationFile, indexConversationSearch, sessionIdFromPath, type ConversationIndexResult } from '../../../lib/conversation-search/indexer.js';
 import { dimensionsForModel, openEmbeddingsDb } from '../../../lib/overdeck/conversations-search.js';
+import { ConversationDirectoryWatcher } from './conversation-directory-watcher.js';
 
 interface WatcherLike {
   on(event: 'add' | 'change' | 'unlink', callback: (filePath: string) => void): WatcherLike;
@@ -88,7 +87,7 @@ export class ConversationSearchWatcher {
     this.roots = options.roots ?? defaultConversationRoots();
     this.debounceMs = options.debounceMs ?? DEFAULT_DEBOUNCE_MS;
     this.signature = watcherSignature(this.config, this.roots);
-    this.watchFactory = options.watchFactory ?? ((paths, watchOptions) => chokidarWatch(paths, watchOptions) as FSWatcher);
+    this.watchFactory = options.watchFactory ?? ((paths) => new ConversationDirectoryWatcher(paths));
     this.indexAll = options.indexAll ?? indexConversationSearch;
     this.indexFile = options.indexFile ?? indexConversationFile;
     this.removeFile = options.removeFile ?? defaultRemoveFile;

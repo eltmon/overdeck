@@ -238,9 +238,23 @@ export const AgentActivityChangedEvent = Schema.Struct({
     agentId: AgentId,
     activity: Activity,
     currentTool: Schema.optional(Schema.String),
+    hookName: Schema.optional(Schema.String),
   }),
 })
 export type AgentActivityChangedEvent = typeof AgentActivityChangedEvent.Type
+
+/** A registered harness hook fired without implying an agent activity transition. */
+export const AgentHookFiredEvent = Schema.Struct({
+  type: Schema.Literal("agent.hook_fired"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    agentId: AgentId,
+    hookName: Schema.String,
+    tool: Schema.optional(Schema.String),
+  }),
+})
+export type AgentHookFiredEvent = typeof AgentHookFiredEvent.Type
 
 export const AgentThinkingStartedEvent = Schema.Struct({
   type: Schema.Literal("agent.thinking_started"),
@@ -744,6 +758,63 @@ export const ReviewCoordinatorDiedEvent = Schema.Struct({
 })
 export type ReviewCoordinatorDiedEvent = typeof ReviewCoordinatorDiedEvent.Type
 
+/** A terminal review verdict was rejected due to stale evidence. */
+export const ReviewVerdictRejectedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_rejected"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewVerdictRejectedEvent = typeof ReviewVerdictRejectedEvent.Type
+
+/** A terminal review verdict was landed and dispatched with a fresh evidence head. */
+export const ReviewVerdictDispatchedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_dispatched"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    workspaceId: Schema.optional(Schema.String),
+    writer: Schema.String,
+    verdict: Schema.String,
+    evidenceHead: Schema.String,
+    rowHead: Schema.String,
+    classification: Schema.String,
+    testGateReset: Schema.Boolean,
+  }),
+})
+export type ReviewVerdictDispatchedEvent = typeof ReviewVerdictDispatchedEvent.Type
+
+/**
+ * A recovery path found a fresh verdict artifact but declined to restore it,
+ * because the artifact's head evidence disagrees with the row's anchor. The
+ * verdict is NOT lost silently — it is reported here so the operator can see a
+ * finished review that recovery refused to write (PAN-3511).
+ */
+export const ReviewVerdictRestoreBlockedEvent = Schema.Struct({
+  type: Schema.Literal("review.verdict_restore_blocked"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: IssueId,
+    /** Recovery path that attempted the restore (orphan-reset, sweeper, …). */
+    caller: Schema.String,
+    verdict: Schema.String,
+    artifactHead: Schema.String,
+    rowHead: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type ReviewVerdictRestoreBlockedEvent = typeof ReviewVerdictRestoreBlockedEvent.Type
+
 // ─── Specialist Events ────────────────────────────────────────────────────────
 
 const SpecialistLifecycleState = Schema.Literals(["active", "sleeping", "uninitialized"])
@@ -1120,6 +1191,20 @@ export const ConversationCreatedEvent = Schema.Struct({
 })
 export type ConversationCreatedEvent = typeof ConversationCreatedEvent.Type
 
+/** Emitted (in-memory only, not persisted) when a conversation's project
+ * assignment override changes, so the sidebar can re-group it live instead of
+ * waiting for its poll tick. */
+export const ConversationMovedEvent = Schema.Struct({
+  type: Schema.Literal("conversation.moved"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    conversationName: Schema.String,
+    projectKey: Schema.String,
+  }),
+})
+export type ConversationMovedEvent = typeof ConversationMovedEvent.Type
+
 /** Emitted (in-memory only) when a conversation title changes, so the sidebar
  * list can refresh immediately instead of waiting for its poll tick. */
 export const ConversationTitleChangedEvent = Schema.Struct({
@@ -1234,6 +1319,53 @@ export const EmbedProgressEvent = Schema.Struct({
 })
 export type EmbedProgressEvent = typeof EmbedProgressEvent.Type
 
+// ─── Stall Sweeper Events (PAN-3485) ──────────────────────────────────────────
+
+/** The parked population changed — carries the full new population (compact rows). */
+export const SweepScanEvent = Schema.Struct({
+  type: Schema.Literal("sweep.scan"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueCount: Schema.Number,
+    rowCount: Schema.Number,
+    rows: Schema.Array(Schema.Struct({
+      issueId: Schema.String,
+      orbit: Schema.String,
+      parkedAt: Schema.String,
+    })),
+  }),
+})
+export type SweepScanEvent = typeof SweepScanEvent.Type
+
+/** A parked row was (re-)surfaced to the operator — gates respected, TTL re-surface, or exhaustion. */
+export const SweepEscalatedEvent = Schema.Struct({
+  type: Schema.Literal("sweep.escalated"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    reason: Schema.String,
+  }),
+})
+export type SweepEscalatedEvent = typeof SweepEscalatedEvent.Type
+
+/** The sweeper recommended a remedy for a parked row (observability-only — never an action, PAN-3551). */
+export const SweepRecommendationEvent = Schema.Struct({
+  type: Schema.Literal("sweep.recommendation"),
+  sequence: SequenceNumber,
+  timestamp: Schema.String,
+  payload: Schema.Struct({
+    issueId: Schema.String,
+    orbit: Schema.String,
+    recommendation: Schema.String,
+    recurring: Schema.optional(Schema.Boolean),
+    agentId: Schema.optional(Schema.String),
+  }),
+})
+export type SweepRecommendationEvent = typeof SweepRecommendationEvent.Type
+
 // ─── Union ────────────────────────────────────────────────────────────────────
 
 /** All domain events — the shape streamed via subscribeDomainEvents RPC */
@@ -1253,6 +1385,7 @@ export const DomainEvent = Schema.Union([
   AgentOutputReceivedEvent,
   // PAN-800 runtime events
   AgentActivityChangedEvent,
+  AgentHookFiredEvent,
   AgentThinkingStartedEvent,
   AgentThinkingStoppedEvent,
   AgentWaitingStartedEvent,
@@ -1294,6 +1427,9 @@ export const DomainEvent = Schema.Union([
   ReviewSpecialistTimedOutEvent,
   ReviewCoordinatorStartedEvent,
   ReviewCoordinatorDiedEvent,
+  ReviewVerdictRejectedEvent,
+  ReviewVerdictDispatchedEvent,
+  ReviewVerdictRestoreBlockedEvent,
   SpecialistStartedEvent,
   SpecialistCompletedEvent,
   SpecialistFailedEvent,
@@ -1323,6 +1459,7 @@ export const DomainEvent = Schema.Union([
   DashboardLifecycleFailedEvent,
   ConversationCompactingChangedEvent,
   ConversationCreatedEvent,
+  ConversationMovedEvent,
   ConversationTitleChangedEvent,
   ConversationPermissionChangedEvent,
   ScanStartedEvent,
@@ -1331,5 +1468,8 @@ export const DomainEvent = Schema.Union([
   EnrichProgressEvent,
   EnrichCompleteEvent,
   EmbedProgressEvent,
+  SweepScanEvent,
+  SweepEscalatedEvent,
+  SweepRecommendationEvent,
 ])
 export type DomainEvent = typeof DomainEvent.Type

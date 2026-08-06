@@ -17,4 +17,12 @@ describe('resolveSpawnModel (PAN-2410)', () => {
     expect(resolveSpawnModel('kimi-k2.7-code', true, 'claude-haiku-4-5')).toBe('kimi-k2.7-code');
     expect(resolveSpawnModel('kimi-k2.7-code', false, 'claude-haiku-4-5')).toBe('kimi-k2.7-code');
   });
+
+  it('a pending- placeholder recorded model is treated as no recorded model', () => {
+    // Mid-spawn placeholder left by a spawn that died before model resolution
+    // (e.g. dashboard restart killing the post-finalize auto-spawn). Inheriting
+    // it crashed spawn with "Unknown model"; staffing must re-run instead.
+    expect(resolveSpawnModel(undefined, undefined, 'pending-work-spawn')).toBeUndefined();
+    expect(resolveSpawnModel(undefined, false, 'pending-work-spawn')).toBeUndefined();
+  });
 });

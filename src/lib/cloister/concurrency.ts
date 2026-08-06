@@ -26,6 +26,7 @@ import { countAgentsByStatus } from '../overdeck/agents.js';
 import { getCachedMemoryVerdict } from './memory-verdict-cache.js';
 import { isRoleTerminal, type AdvancingRole } from './reap-terminal-sessions.js';
 import { readReviewStatusMap } from './review-status-source.js';
+import { isTerminalSwarmSlotAgent } from './swarm-slot-lifecycle.js';
 
 const DEFAULT_MAX_WORK_AGENTS = 6;
 const DEFAULT_RESERVED_ADVANCING_SLOTS = 3;
@@ -92,7 +93,7 @@ export interface RunningCounts {
  */
 export function describeRunningAgents(): string {
   const alive = listRunningAgentsSync().filter(a => a.tmuxActive);
-  const swarm = alive.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id)).map(a => a.id);
+  const swarm = alive.filter(a => a.role === 'work' && SWARM_SLOT_ID.test(a.id) && !isTerminalSwarmSlotAgent(a)).map(a => a.id);
   const work = alive.filter(a => a.role === 'work' && !SWARM_SLOT_ID.test(a.id)).map(a => a.id);
   const advancing = alive.filter(a => a.role && ADVANCING_ROLES.has(a.role)).map(a => a.id);
   const warmIdle = countWarmIdleAdvancingAgents(alive);
@@ -108,10 +109,14 @@ export function describeRunningAgents(): string {
  * updates keep status in sync with tmux liveness.
  */
 /** Count tmux-alive swarm-slot work agents (agent-<issue>-slot-N) — PAN-2212. */
-function countRunningSwarmSlots(): number {
-  return listRunningAgentsSync().filter(
+function countRunningSwarmSlots(): { total: number; active: number } {
+  const slots = listRunningAgentsSync().filter(
     a => a.tmuxActive && a.role === 'work' && SWARM_SLOT_ID.test(a.id),
-  ).length;
+  );
+  return {
+    total: slots.length,
+    active: slots.filter(agent => !isTerminalSwarmSlotAgent(agent)).length,
+  };
 }
 
 /**
@@ -122,10 +127,15 @@ function countRunningSwarmSlots(): number {
 export function countRunningSwarmSlotsForIssue(
   issueId: string,
   agents: ReturnType<typeof listRunningAgentsSync> = listRunningAgentsSync(),
+  isTerminalSlot: (agent: ReturnType<typeof listRunningAgentsSync>[number]) => boolean = isTerminalSwarmSlotAgent,
 ): number {
   const prefix = `agent-${issueId.toLowerCase()}-slot-`;
   return agents.filter(
-    a => a.tmuxActive && a.role === 'work' && SWARM_SLOT_ID.test(a.id) && a.id.startsWith(prefix),
+    a => a.tmuxActive
+      && a.role === 'work'
+      && SWARM_SLOT_ID.test(a.id)
+      && a.id.startsWith(prefix)
+      && !isTerminalSlot(a),
   ).length;
 }
 
@@ -165,8 +175,9 @@ export function countRunningAgents(): RunningCounts {
   // Swarm slots are work-role sessions but draw from the dedicated swarm reserve,
   // so subtract them from `work` (PAN-2212): the swarm neither starves nor is
   // starved by the work/advancing ceiling.
-  const swarm = countRunningSwarmSlots();
-  const work = Math.max(0, workTotal - swarm);
+  const swarmSlots = countRunningSwarmSlots();
+  const swarm = swarmSlots.active;
+  const work = Math.max(0, workTotal - swarmSlots.total);
   // PAN-2579: warm-idle advancing sessions (verdict terminal, kept alive for the
   // next cycle) do not occupy the ceiling.
   const advancing = Math.max(0, advancingTotal - countWarmIdleAdvancingAgents());

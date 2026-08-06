@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { X, GitBranchPlus, HelpCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -12,6 +13,7 @@ import pickerStyles from '../shared/ModelPicker/ModelPicker.module.css';
 import { ModelHarnessPicker, ModelSelect, useAvailableModels } from '../shared/ModelPicker';
 import type { Harness } from '../shared/ModelPicker';
 import type { Conversation } from './ConversationList';
+import { NO_PROJECT_LABEL, resolveConversationProject, type RegisteredProjectLite } from './projectsData';
 
 const FORK_HELP_CONTENT = `## Ways to continue
 
@@ -133,6 +135,7 @@ interface ForkModalProps {
     handoffAuthor?: HandoffAuthor,
     handoffAuthorModel?: string,
     handoffAuthorHarness?: Harness,
+    projectKey?: string,
   ) => void;
   onClose: () => void;
   isPending: boolean;
@@ -141,6 +144,19 @@ interface ForkModalProps {
 export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, onClose, isPending }: ForkModalProps) {
   const { groups, compactionModel, harnessPolicy } = useAvailableModels();
   const defaultModel = getDefaultConversationModel() || FALLBACK_DEFAULT_CONVERSATION_MODEL;
+  const { data: registeredProjects = [] } = useQuery({
+    queryKey: ['registered-projects'],
+    queryFn: async (): Promise<RegisteredProjectLite[]> => {
+      const response = await fetch('/api/registered-projects');
+      if (!response.ok) return [];
+      const data = await response.json();
+      return Array.isArray(data) ? data : [];
+    },
+    staleTime: 60_000,
+  });
+  const sourceProject = resolveConversationProject(conversation, registeredProjects);
+  const sourceProjectLabel = sourceProject?.name ?? sourceProject?.key ?? NO_PROJECT_LABEL;
+  const [projectKey, setProjectKey] = useState('');
 
   // Intent is the user-facing choice (up to 3 options). The 4th legacy mode
   // ("fast-summary") is an advanced toggle under the summary intent.
@@ -310,6 +326,23 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 className={styles.forkTitleInput}
                 autoFocus
               />
+            </div>
+
+            {/* Project association — independent of the successor cwd. */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <label htmlFor="fork-project-select" style={{ fontSize: '12px', color: 'var(--muted-foreground)' }}>
+                Project
+              </label>
+              <select
+                id="fork-project-select"
+                value={projectKey}
+                onChange={(event) => setProjectKey(event.target.value)}
+              >
+                <option value="">Same as source ({sourceProjectLabel})</option>
+                {registeredProjects.map((project) => (
+                  <option key={project.key} value={project.key}>{project.name ?? project.key}</option>
+                ))}
+              </select>
             </div>
 
             {/* Launch model — always relevant. */}
@@ -534,6 +567,7 @@ export function ForkModal({ conversation, initialMode, initialFocus, onConfirm, 
                 isHandoffFork ? handoffAuthor : undefined,
                 isHandoffFork && handoffAuthor === 'external' ? summaryModel : undefined,
                 isHandoffFork && handoffAuthor === 'external' ? summaryHarness : undefined,
+                projectKey || undefined,
               );
             }}
           >

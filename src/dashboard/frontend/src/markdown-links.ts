@@ -265,11 +265,15 @@ export function resolveMarkdownFileLinkTarget(
   cwd?: string,
 ): string | null {
   const pathWithPosition = parseMarkdownFileLinkHref(href);
-  if (!pathWithPosition || !cwd) return null;
+  if (!pathWithPosition) return null;
 
+  // Absolute paths need no cwd to resolve, so transcript surfaces rendered
+  // without one (session replays, activity views) still get file chips for
+  // absolute references. Relative and `~/` paths cannot resolve without a cwd.
   if (!isRelativePath(pathWithPosition)) {
     return pathWithPosition;
   }
+  if (!cwd) return null;
 
   return resolvePathLinkTarget(pathWithPosition, cwd);
 }
@@ -280,7 +284,7 @@ function basenameOfPath(path: string): string {
 }
 
 export function splitMarkdownTextFileLinks(text: string, cwd?: string): MarkdownTextFileLinkSegment[] {
-  if (!cwd || text.length === 0) return [{ text }];
+  if (text.length === 0) return [{ text }];
 
   const segments: MarkdownTextFileLinkSegment[] = [];
   let cursor = 0;

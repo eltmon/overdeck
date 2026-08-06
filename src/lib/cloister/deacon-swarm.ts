@@ -63,7 +63,7 @@ import {
   finalizeSwarmIssueIfComplete,
   type RequestIssueReviewResult,
 } from './deacon-swarm-finalization.js';
-import { gcMergedSlots } from './deacon-swarm-gc.js';
+import { gcMergedSlots, reapMergedSlotAgent } from './deacon-swarm-gc.js';
 import { createMinimalIssueRecord, writeSwarmFinalizedAt, clearSwarmSlotCompletion } from './deacon-swarm-record.js';
 import { fireTieredCommitHooks } from './swarm-tiered-hooks.js';
 import { applySupersededSlotHighWater, archiveFailedSwarmSlot, requeueFailedSwarmSlots } from './swarm-failed-slot.js';
@@ -540,7 +540,7 @@ export async function mergeReadySlots(
   workspacePath: string,
   doc: XBriefDocument,
   slots: ClassifiedSwarmSlot[],
-  deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> = defaultDeps,
+  deps: Pick<CoordinateSwarmSlotsDeps, 'verifyAndMergeSlot' | 'applyTaskOperationToPlanFile' | 'fireTieredCommitHooks'> & { stopSlotAgent?: (agentId: string) => Promise<void> } = defaultDeps,
   blockedSlotIndexes: Set<number> = new Set(),
 ): Promise<string[]> {
   const actions: string[] = [];
@@ -582,7 +582,7 @@ export async function mergeReadySlots(
       // merged. Clear it so the same slotIndex can be re-dispatched later without
       // a stale "completed" marker falsely surfacing as ready-to-merge.
       await clearSwarmSlotCompletion(workspacePath, issueId, slot.slotIndex);
-      actions.push(`[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
+      actions.push(await reapMergedSlotAgent(issueId, slot, deps.stopSlotAgent), `[swarm] merged slot ${slot.slotIndex} (item ${item.id}) for ${issueId}`);
       // PAN-2385: commits just landed — fire the tiered feed + supervisor review (best-effort).
       try {
         actions.push(...await deps.fireTieredCommitHooks({ issueId, workspacePath, item, doc }));

@@ -223,7 +223,10 @@ function derivePhase(reviewStatus: ReviewStatusData | undefined, sessions: Sessi
   if (reviewStatus?.mergeStatus === 'verifying') return 'verifying';
   if (readyForMerge(reviewStatus)) return 'ready';
   if (reviewStatus?.mergeStatus === 'queued' || reviewStatus?.mergeStatus === 'merging') return 'ship';
-  if (reviewStatus?.testStatus === 'testing' || reviewStatus?.verificationStatus === 'running') return 'test';
+  if (reviewStatus?.testStatus === 'testing') return 'test';
+  // The verification gate is its own phase — calling it 'test' made the view
+  // claim a test specialist was involved while only the Lint node was running.
+  if (reviewStatus?.verificationStatus === 'running') return 'verify';
   if (
     reviewStatus?.reviewStatus === 'reviewing' ||
     reviewStatus?.reviewStatus === 'passed' ||

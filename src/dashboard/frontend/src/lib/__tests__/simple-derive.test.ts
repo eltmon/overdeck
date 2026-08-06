@@ -131,6 +131,57 @@ describe('deriveSimpleIssue', () => {
     expect(simpleStepIndex(d.pipelineState)).toBe(0);
   });
 
+  /**
+   * PAN-3338 — the no-signal case. Once finalize honestly marks the plan
+   * agent `stopped` and the poller no longer resurrects it to `running`,
+   * derivePipelineState alone reports `planning_done_awaiting_work` with NO
+   * pendingInputKinds at all — there is no `agentTurnEnded` to detect,
+   * because the durable status already carries the truth. This locks that
+   * path independently of the ephemeral turn-end detection covered above.
+   */
+  it('stopped signal-less plan agent + a written plan → the plan is ready, not still planning', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({ role: 'plan', status: 'stopped', pendingInputKinds: [], pendingInputCount: 0 })],
+    );
+    expect(d.pipelineState).toBe('planning_done_awaiting_work');
+    expect(d.display.state).toBe('needs-you');
+    expect(d.display.needsYouReason).toBe('start-work');
+    expect(d.display.title).toBe('The plan is ready');
+    expect(d.display.primaryAction).toBe('Start work');
+  });
+
+  it('stopped signal-less plan agent + a written plan buckets into simple-home needs-you as start-work', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ identifier: 'PAN-3330', state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({ role: 'plan', status: 'stopped', pendingInputKinds: [], pendingInputCount: 0 })],
+    );
+    const b = bucketSimpleHome([d], Date.now());
+    expect(b.needsYou).toHaveLength(1);
+    expect(b.needsYou[0].kind).toBe('start-work');
+    expect(b.needsYou[0].derivation.issue.identifier).toBe('PAN-3330');
+  });
+
+  it('running plan agent without a written plan renders working / Planning', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: false }),
+      [agent({ role: 'plan', status: 'running', pendingInputKinds: [], pendingInputCount: 0 })],
+    );
+    expect(d.pipelineState).toBe('planning_active');
+    expect(d.display.state).toBe('working');
+    expect(d.display.title).toBe('Planning');
+  });
+
+  it('running plan agent with a written plan (replan in flight) still renders working, not ready-to-start', () => {
+    const d = deriveSimpleIssue(
+      makeIssue({ state: 'todo', hasPlan: true, hasTasks: true }),
+      [agent({ role: 'plan', status: 'running', pendingInputKinds: [], pendingInputCount: 0 })],
+    );
+    expect(d.pipelineState).toBe('planning_active');
+    expect(d.display.state).toBe('working');
+    expect(d.display.title).toBe('Planning');
+  });
+
   it('troubled agent → needs-you / stuck', () => {
     const d = deriveSimpleIssue(makeIssue(), [agent({ troubled: true })]);
     expect(d.display.state).toBe('needs-you');

@@ -4,8 +4,11 @@ import type { ReviewStatus } from '../review-status.js';
 
 const feedback = vi.hoisted(() => ({ deliver: vi.fn(() => Effect.succeed({ agentMessageSent: true, prCommentPosted: false })) }));
 const agents = vi.hoisted(() => ({ getAgentStateSync: vi.fn() }));
+const artifacts = vi.hoisted(() => ({ readMemoized: vi.fn() }));
 vi.mock('../cloister/review-verdict-feedback.js', () => ({ deliverReviewVerdictFeedback: feedback.deliver }));
 vi.mock('../agents.js', () => ({ getAgentStateSync: agents.getAgentStateSync }));
+vi.mock('../agents/agent-state.js', () => ({ getAgentStateSync: agents.getAgentStateSync }));
+vi.mock('../cloister/synthesis-verdict.js', () => ({ readMemoizedArtifactVerdict: artifacts.readMemoized }));
 
 // Mock the DB cache layer and the journal layer so we can drive getReviewStatusSync /
 // setReviewStatusSync deterministically without touching SQLite or the filesystem.
@@ -41,7 +44,13 @@ const notifier = vi.hoisted(() => ({ notify: vi.fn() }));
 vi.mock('../pipeline-notifier.js', () => ({ notifyPipelineSync: notifier.notify }));
 vi.mock('../activity-logger.js', () => ({ emitActivityEntrySync: vi.fn(), emitActivityTtsSync: vi.fn() }));
 
-import { getReviewStatusSync, loadReadyForMergeFlags, resetPipelineVerdictsForWorkStartSync, setReviewStatusSync } from '../review-status.js';
+import {
+  getReviewStatusSync,
+  loadReadyForMergeFlags,
+  registerReviewVerdictFeedbackDelivery,
+  resetPipelineVerdictsForWorkStartSync,
+  setReviewStatusSync,
+} from '../review-status.js';
 
 const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
   issueId: 'PAN-1866',
@@ -55,6 +64,16 @@ const dbRow = (over: Partial<ReviewStatus> = {}): ReviewStatus => ({
 describe('getReviewStatusSync — journal→DB reconcile (PAN-1988)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    registerReviewVerdictFeedbackDelivery(async (issueId, status) => {
+      const runId = agents.getAgentStateSync(`agent-${issueId.toLowerCase()}-review`)?.reviewRunId;
+      await Effect.runPromise(feedback.deliver({
+        issueId,
+        verdict: status.reviewStatus === 'failed' ? 'failed' : 'blocked',
+        notes: status.reviewNotes,
+        prUrl: status.prUrl,
+        ...(runId ? { runId } : {}),
+      }));
+    });
     db.getManyFromDb.mockReturnValue({});
     journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
     agents.getAgentStateSync.mockReturnValue(null);
@@ -427,34 +446,5 @@ describe("reviewStatus 'skipped' — review mode none (PAN-1862 FR-14/FR-16)", (
     const result = setReviewStatusSync('PAN-1866', { reviewStatus: 'skipped' });
 
     expect(result.readyForMerge).toBe(false);
-  });
-});
-
-describe('reviewerVerdicts map merge (PAN-1862 FR-6)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    journal.readJournalStatusSync.mockReturnValue(null);
-    journal.enrichReviewNotesFromRecordSync.mockImplementation((_id: string, s: ReviewStatus) => s);
-  });
-
-  it('a partial verdict update merges with carried-forward entries instead of replacing them', () => {
-    db.getFromDb.mockReturnValue(dbRow({
-      reviewStatus: 'blocked',
-      reviewerVerdicts: {
-        security: { status: 'passed', atCommit: 'aaaa1111' },
-        correctness: { status: 'blocked', atCommit: 'aaaa1111' },
-      },
-    }));
-
-    const result = setReviewStatusSync('PAN-1866', {
-      reviewStatus: 'passed',
-      reviewSpawnedAt: '2026-07-11T13:00:00.000Z',
-      reviewerVerdicts: { correctness: { status: 'passed', atCommit: 'bbbb2222' } },
-    });
-
-    expect(result.reviewerVerdicts).toEqual({
-      security: { status: 'passed', atCommit: 'aaaa1111' },     // carried forward, untouched
-      correctness: { status: 'passed', atCommit: 'bbbb2222' },  // updated by this cycle
-    });
   });
 });

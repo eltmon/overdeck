@@ -10,9 +10,7 @@ import {
   ChevronDown,
   CircleCheck,
   CircleHelp,
-  Cpu,
   Loader2,
-  MemoryStick,
   Skull,
   X,
 } from 'lucide-react';
@@ -21,7 +19,9 @@ import { toast } from 'sonner';
 
 import { useSystemHealth } from '../hooks/useSystemHealth';
 import { useKillAgent } from '../hooks/useKillAgent';
+import { buildAttentionItems, contextNotes, summaryLine } from '../lib/system-health-attention';
 import { refreshDashboardState } from '../lib/refresh-dashboard-state';
+import { useDashboardStore } from '../lib/store';
 import { useConfirm } from './DialogProvider';
 
 const POPOVER_ID = 'system-health-popover';
@@ -34,14 +34,6 @@ function formatBytes(bytes: number): string {
   }
   const mib = bytes / (1024 ** 2);
   return `${mib.toFixed(0)} MB`;
-}
-
-function formatOptionalBytes(bytes: number | null): string {
-  return bytes == null ? 'Unavailable' : formatBytes(bytes);
-}
-
-function formatOptionalNumber(value: number | null, digits = 1): string {
-  return value == null ? 'Unavailable' : value.toFixed(digits);
 }
 
 function stateClasses(state: HealthState): string {
@@ -267,6 +259,9 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
 
   const reasons = useMemo(() => data ? healthReasons(data) : [], [data]);
   const copy = data ? healthCopy(data, reasons) : 'Health unavailable · Retry';
+  const attentionItems = useMemo(() => data ? buildAttentionItems(data) : [], [data]);
+  const summary = useMemo(() => data ? summaryLine(data, attentionItems) : '', [data, attentionItems]);
+  const notes = useMemo(() => data ? contextNotes(data) : [], [data]);
 
   useEffect(() => {
     if (!data) return;
@@ -313,7 +308,6 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
     );
   }
 
-  const metrics = data.host.metrics;
   const relay = data.services.find((service) => service.id === 'smee-relay' || service.id === 'webhook-relay');
 
   return (
@@ -348,8 +342,11 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
         >
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div id={POPOVER_TITLE_ID} className="font-semibold text-foreground">System health</div>
-              <div className="text-xs text-muted-foreground">Updated {new Date(data.updatedAt).toLocaleTimeString()}</div>
+              <div id={POPOVER_TITLE_ID} className="mb-2 flex items-center gap-2">
+                <span className="font-semibold text-foreground">System health</span>
+                <span className={`inline-flex h-2 w-2 rounded-full ${stateClasses(data.state).split(' ')[0]} border-current`}></span>
+              </div>
+              <div className="text-xs text-muted-foreground">Updated {Math.round((Date.now() - Date.parse(data.updatedAt)) / 1000)}s ago</div>
             </div>
             <button
               type="button"
@@ -361,48 +358,131 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
             </button>
           </div>
 
+          <div className="mb-3 rounded-lg border border-border bg-muted/30 p-2 text-sm">
+            <div className="text-foreground">{summary}</div>
+          </div>
+
           <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
             <div className="rounded-lg border border-border p-2">
-              <div className="flex items-center gap-1 text-muted-foreground"><Cpu aria-hidden="true" className="h-3.5 w-3.5" />CPU</div>
-              <div className="mt-1 font-semibold text-foreground">{metrics.cpuPercent == null ? 'Unavailable' : `${metrics.cpuPercent.toFixed(1)}%`}</div>
-              <div className="text-muted-foreground">Load/core {formatOptionalNumber(metrics.loadPerCore1m, 2)}</div>
+              <div className="text-muted-foreground">CPU</div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.cpuPercent == null ? 'Unavailable' : `${data.host.metrics.cpuPercent.toFixed(1)}%`}</div>
+              <div className="mt-1 text-muted-foreground">
+                Load/core {data.host.metrics.loadPerCore1m == null ? 'Unavailable' : data.host.metrics.loadPerCore1m.toFixed(2)}
+              </div>
+              {data.host.metrics.cpuPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.cpuPercent < 60 ? 'bg-success' : data.host.metrics.cpuPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.cpuPercent)}%` }}
+                  />
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-border p-2">
-              <div className="flex items-center gap-1 text-muted-foreground"><MemoryStick aria-hidden="true" className="h-3.5 w-3.5" />Memory</div>
-              <div className="mt-1 font-semibold text-foreground">{formatOptionalBytes(metrics.usedMemoryBytes)} / {formatOptionalBytes(metrics.totalMemoryBytes)}</div>
-              <div className="text-muted-foreground">Avail {formatOptionalBytes(metrics.availableMemoryBytes)}</div>
+              <div className="text-muted-foreground">Memory</div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.usedMemoryBytes == null || data.host.metrics.totalMemoryBytes == null ? 'Unavailable' : `${formatBytes(data.host.metrics.usedMemoryBytes)} / ${formatBytes(data.host.metrics.totalMemoryBytes)}`}</div>
+              <div className="mt-1 text-muted-foreground">
+                Avail {data.host.metrics.availableMemoryBytes == null ? 'Unavailable' : formatBytes(data.host.metrics.availableMemoryBytes)}
+              </div>
+              {data.host.metrics.memoryUsedPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.memoryUsedPercent < 60 ? 'bg-success' : data.host.metrics.memoryUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.memoryUsedPercent)}%` }}
+                  />
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-border p-2">
               <div className="text-muted-foreground">Overdeck</div>
               <div className="mt-1 font-semibold text-foreground">{formatBytes(data.summary.overdeckMemoryBytes)}</div>
-              <div className="text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
+              <div className="mt-1 text-muted-foreground">{data.summary.overdeckMemoryPercent.toFixed(1)}% of host RAM</div>
+              {data.summary.overdeckMemoryPercent > 0 && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full bg-info"
+                    style={{ width: `${Math.min(100, data.summary.overdeckMemoryPercent)}%` }}
+                  />
+                </div>
+              )}
             </div>
             <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Swap</div>
-              <div className="mt-1 font-semibold text-foreground">{metrics.swapUsedPercent == null ? 'Unavailable' : `${metrics.swapUsedPercent.toFixed(1)}%`}</div>
-              <div className="text-muted-foreground">Overcommit {metrics.virtualCommitmentPercent == null ? 'Unavailable' : `${metrics.virtualCommitmentPercent.toFixed(1)}%`}</div>
-            </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Admitted work agents</div>
-              <div className="mt-1 font-semibold text-foreground">{data.admission.admittedWorkAgentCount}</div>
-            </div>
-            <div className="rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Containers</div>
-              <div className="mt-1 font-semibold text-foreground">{data.summary.containerCount}</div>
-            </div>
-            <div className="col-span-2 rounded-lg border border-border p-2">
-              <div className="text-muted-foreground">Webhook relay</div>
-              <div className="mt-1 font-semibold text-foreground">
-                {relay?.message ?? data.summary.smeeRelay.message}
+              <div className="text-muted-foreground">Swap <span className="text-[11px]">historical · not live pressure</span></div>
+              <div className="mt-1 font-semibold text-foreground">{data.host.metrics.swapUsedPercent == null ? 'Unavailable' : `${data.host.metrics.swapUsedPercent.toFixed(1)}%`}</div>
+              {data.host.metrics.swapUsedPercent != null && (
+                <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className={`h-full ${data.host.metrics.swapUsedPercent < 60 ? 'bg-success' : data.host.metrics.swapUsedPercent < 85 ? 'bg-warning' : 'bg-destructive'}`}
+                    style={{ width: `${Math.min(100, data.host.metrics.swapUsedPercent)}%` }}
+                  />
+                </div>
+              )}
+              <div className="mt-1 text-muted-foreground">
+                Overcommit {data.host.metrics.virtualCommitmentPercent == null ? 'Unavailable' : `${data.host.metrics.virtualCommitmentPercent.toFixed(1)}%`}
               </div>
             </div>
           </div>
 
-          {reasons.length > 0 && (
-            <div className="mb-3 space-y-1 rounded-lg border border-border p-2 text-xs">
-              {reasons.map((reason, index) => (
-                <div key={`${reason.code}-${index}`} className="text-muted-foreground">• {reason.message}</div>
-              ))}
+          <div className="mb-3 flex flex-wrap gap-2">
+            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              <span>Admitted work agents</span>
+              <span>{data.admission.admittedWorkAgentCount}</span>
+            </div>
+            <div className="flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-1 text-xs text-foreground">
+              <span>Containers</span>
+              <span>{data.summary.containerCount}</span>
+            </div>
+            <div className={`flex items-center gap-1 rounded-full border px-2 py-1 text-xs text-foreground ${relay?.status === 'running' ? 'border-success/40 bg-success/10' : 'border-warning/40 bg-warning/10'}`}>
+              <span className={`inline-block h-2 w-2 rounded-full ${relay?.status === 'running' ? 'bg-success' : 'bg-warning'}`}></span>
+              <span>Webhook relay</span>
+              <span>{relay?.status === 'running' ? 'Running' : 'Stopped'}</span>
+            </div>
+          </div>
+
+          {attentionItems.length > 0 && (
+            <div className="mb-3">
+              <div className="space-y-1 rounded-lg border border-border p-2">
+                {attentionItems.map((item) => (
+                  <div key={`${item.code}-${item.agents.join(',')}`} className="flex items-center justify-between gap-2 text-xs">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className={`inline-block h-2 w-2 rounded-full ${item.severity === 'critical' ? 'bg-destructive' : 'bg-warning'}`}></span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-foreground">
+                          {item.title}
+                          {item.agents.length > 1 && <span className="ml-1 text-muted-foreground">×{item.agents.length}</span>}
+                        </div>
+                        <div className="text-muted-foreground">{item.sub}</div>
+                      </div>
+                    </div>
+                    {item.agentId && (
+                      <div className="flex gap-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            useDashboardStore.getState().openIssue(item.agentId!.replace(/^agent-/, 'PAN-').split('-').slice(0, -1).join('-'));
+                            closePopover();
+                          }}
+                          className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+                        >
+                          Open
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {notes.length > 0 && (
+                <details className="mt-2 cursor-pointer text-xs">
+                  <summary className="text-muted-foreground hover:text-foreground">
+                    {notes.length} context note{notes.length !== 1 ? 's' : ''} — background, not pressure signals
+                  </summary>
+                  <div className="mt-2 space-y-1 rounded-lg border border-border p-2">
+                    {notes.map((note, idx) => (
+                      <div key={`${note.code}-${idx}`} className="text-muted-foreground">• {note.message}</div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           )}
 
@@ -418,21 +498,36 @@ export function SystemHealthPill({ compact = false }: { compact?: boolean }) {
                   Show all
                 </button>
               )}
-              <div className="text-xs text-muted-foreground">Leaked specialists: {data.summary.leakedSpecialistCount}</div>
+              <div className="text-xs text-muted-foreground">
+                {data.summary.leakedSpecialistCount > 0 ? `⚠ ${data.summary.leakedSpecialistCount} leaked specialist${data.summary.leakedSpecialistCount !== 1 ? 's' : ''}` : 'No leaks'}
+              </div>
             </div>
           </div>
           <div className="max-h-72 space-y-2 overflow-auto pr-1">
-            {leakedFirstConsumers.map((consumer) => (
-              <div key={consumer.id} className={`rounded-lg border p-2 ${consumer.leaked ? 'border-warning/40 bg-warning/10' : 'border-border'}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
-                    <div className="text-xs text-muted-foreground">{consumer.type} · {consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
+            {leakedFirstConsumers.map((consumer) => {
+              const maxMemory = Math.max(...leakedFirstConsumers.map(c => c.memoryGb), 1);
+              const memoryPercent = (consumer.memoryGb / maxMemory) * 100;
+              return (
+                <div key={consumer.id} className={`rounded-lg border p-2 ${consumer.leaked ? 'border-warning/40 bg-warning/10' : 'border-border'}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <div className="truncate text-sm font-medium text-foreground">{topConsumerLabel(consumer)}</div>
+                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{consumer.type}</span>
+                        {consumer.leaked && <span className="rounded bg-warning/20 px-1.5 py-0.5 text-[10px] font-medium text-warning">LEAKED</span>}
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">{consumer.memoryGb.toFixed(2)} GB{consumer.cpuPercent != null ? ` · ${consumer.cpuPercent.toFixed(1)}% CPU` : ''}</div>
+                      {memoryPercent > 0 && (
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-muted">
+                          <div className="h-full bg-info" style={{ width: `${memoryPercent}%` }} />
+                        </div>
+                      )}
+                    </div>
+                    <KillButton consumer={consumer} onSelectLeaked={() => setHighlightLeakedOnly(true)} />
                   </div>
-                  <KillButton consumer={consumer} onSelectLeaked={() => setHighlightLeakedOnly(true)} />
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

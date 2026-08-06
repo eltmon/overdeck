@@ -93,6 +93,7 @@ import { listSessionNames } from '../../../../../src/lib/tmux.js';
 import { getAgentRuntimeState } from '../../../../../src/lib/agents.js';
 import { getReviewStatusSync } from '../../../../../src/dashboard/server/review-status.js';
 import { resolveJsonlPath } from '../../../../../src/dashboard/server/routes/jsonl-resolver.js';
+import { buildReviewerNodes } from '../../../../../src/dashboard/server/routes/reviewer-tree.js';
 import { access, readdir, readFile, stat } from 'node:fs/promises';
 
 const RECENT_PLANNING_MTIME = new Date(Date.now() - 60_000);
@@ -140,6 +141,7 @@ describe('fetchProjectSessionTree', () => {
     (stat as any).mockResolvedValue({ mtime: RECENT_PLANNING_MTIME });
     mockFindSpecByIssue.mockReturnValue(Effect.succeed(null));
     (getReviewStatusSync as any).mockReturnValue(null);
+    (resolveProjectFromIssueSync as any).mockImplementation(() => ({ projectKey: 'overdeck' }));
     (resolveJsonlPath as any).mockResolvedValue(null);
     (getAgentRuntimeState as any).mockReturnValue(Effect.succeed(null));
   });
@@ -222,6 +224,63 @@ describe('fetchProjectSessionTree', () => {
     expect(tree.features[1]?.sessions).toHaveLength(1);
     expect((tree.features[1]?.sessions as Array<{ startedAt: string }>)[0]?.startedAt).toBe(RECENT_PLANNING_MTIME.toISOString());
     expect(listSessionNames).toHaveBeenCalledTimes(1);
+  });
+
+  it('nests live review and test resources without review-status history or a workspace directory', async () => {
+    (listProjectsSync as any).mockReturnValue([
+      {
+        key: 'mind-your-now',
+        config: { name: 'mind-your-now', path: '/tmp/myn', workspace: { workspaces_dir: 'workspaces' } },
+      },
+    ]);
+    (resolveProjectFromIssueSync as any).mockReturnValue({ projectKey: 'mind-your-now' });
+    (listSessionNames as any).mockReturnValue(Effect.succeed([
+      'agent-min-839-review',
+      'agent-min-839-review-performance',
+      'agent-min-839-test',
+    ]));
+    mockAgentStates.set('agent-min-839-review', agentState({
+      id: 'agent-min-839-review',
+      issueId: 'MIN-839',
+      role: 'review',
+      workspace: '/tmp/myn/workspaces/feature-min-839',
+    }));
+    mockAgentStates.set('agent-min-839-test', agentState({
+      id: 'agent-min-839-test',
+      issueId: 'MIN-839',
+      role: 'test',
+      workspace: '/tmp/myn/workspaces/feature-min-839',
+      status: 'starting',
+    }));
+    (buildReviewerNodes as any).mockResolvedValue([{
+      type: 'reviewer',
+      role: 'performance',
+      sessionId: 'agent-min-839-review-performance',
+      tmuxSession: 'agent-min-839-review-performance',
+      model: 'gpt-4',
+      startedAt: '2026-01-01T00:00:00Z',
+      duration: 0,
+      status: 'running',
+      presence: 'active',
+    }]);
+    mockAccess(new Set(['/tmp/myn/workspaces']));
+    (readdir as any).mockImplementation((p: string) => {
+      if (p === '/tmp/myn/workspaces' || p === join(getOverdeckHome(), 'agents')) return Promise.resolve([]);
+      const err = new Error('ENOENT');
+      (err as any).code = 'ENOENT';
+      return Promise.reject(err);
+    });
+
+    const result = await fetchProjectSessionTree('mind-your-now');
+
+    const tree = result as { features: Array<{ issueId: string; sessions: Array<{ type: string; sessionId: string }> }> };
+    expect(tree.features).toHaveLength(1);
+    expect(tree.features[0]?.issueId).toBe('MIN-839');
+    expect(tree.features[0]?.sessions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: 'review', sessionId: 'agent-min-839-review' }),
+      expect.objectContaining({ type: 'reviewer', sessionId: 'agent-min-839-review-performance' }),
+      expect.objectContaining({ type: 'test', sessionId: 'agent-min-839-test' }),
+    ]));
   });
 
   it('skips features with no agent dir and no planning dir', async () => {

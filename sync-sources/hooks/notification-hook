@@ -29,6 +29,7 @@ if [ "$HAVE_JQ" = "1" ]; then
 fi
 
 TS=$(date -Iseconds)
+pan_emit_event "$AGENT_ID" "{\"kind\":\"hook_fired\",\"hookName\":\"Notification\",\"tool\":\"Notification\",\"timestamp\":\"$TS\"}"
 
 # Log the raw notification for forensics. Kept at 500 entries.
 LOG_DIR="$HOME/.overdeck/logs"

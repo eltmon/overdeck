@@ -6,6 +6,7 @@ export type LaneItemState = 'held' | 'released' | 'in-pipeline' | 'landed';
 
 interface LaneItemProps {
   item: OrderBookItem;
+  title?: string;
   state: LaneItemState;
   hasPrd: boolean;
   onDragStart: (issueId: string) => void;
@@ -26,6 +27,7 @@ function rowTone(state: LaneItemState): string {
 
 export function LaneItem({
   item,
+  title,
   state,
   hasPrd,
   onDragStart,
@@ -74,7 +76,9 @@ export function LaneItem({
         <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-muted-foreground" aria-hidden="true" />
         <span className="shrink-0 font-mono text-[11px] text-muted-foreground">{item.lane}{item.order} · book</span>
         <span className="w-20 shrink-0 font-mono text-[11px] text-foreground">{item.issue}</span>
-        <span className="min-w-0 flex-1" aria-hidden="true" />
+        {title
+          ? <span className="min-w-0 flex-1 truncate text-muted-foreground" title={title}>{title}</span>
+          : <span className="min-w-0 flex-1" aria-hidden="true" />}
         {item.prereqs.length > 0 && <span className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">after {item.prereqs.join(', ')}</span>}
         {item.reVerify && <span className={`rounded-sm border px-1.5 py-0.5 text-[10px] ${coloredStatus ? 'border-border text-muted-foreground' : 'border-warning/[0.32] bg-warning/[0.08] text-warning-foreground'}`}>re-verify</span>}
         {item.planAtPickup && <span className="rounded-sm border border-border px-1.5 py-0.5 text-[10px] text-muted-foreground">plan at pickup</span>}

@@ -100,7 +100,7 @@ DROP/DERIVE collapse gets to shrink.
 
 | Listed | Reality |
 | --- | --- |
-| `reviewer_verdicts` | **Not a `review_status` column.** No CREATE TABLE entry, no migration, not in `DbReviewStatusRow`, not in the `ReviewStatus` interface. Exists ONLY as `reviewerVerdicts?: unknown` on the durable `PanIssuePipelineRecord` (record.ts:83), passed through at records.ts:110 via a cast that reads a property the source type doesn't even declare — so it is **always `undefined`** in practice. Dead pass-through. **DROP.** |
+| `reviewer_verdicts` | **Not a `review_status` column.** It has no CREATE TABLE entry, migration, or runtime state field. The former durable pass-through was removed with the retired per-reviewer verdict state. |
 | `lifetime_auto_requeue_count` | **Does not exist anywhere in code.** Zero hits in `src/` or `tests/`. Only mention is in two docs: `docs/overdeck-db-erd.excalidraw` and `docs/STATE-STORAGE-AUDIT.md`. The ERD diagram and the task field-list are stale. **N/A — nothing to drop.** |
 
 ---

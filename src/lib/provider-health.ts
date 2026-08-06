@@ -111,17 +111,17 @@ async function doProbe(
   apiKey: string,
   model: string,
 ): Promise<ProbeResult> {
-  // Nous Portal routes through the local OpenAI-compatible proxy sidecar at
-  // 127.0.0.1:12436. Without this, the probe runs before the proxy is booted
-  // on the first spawn after every dashboard restart and surfaces a spurious
-  // "Cannot reach Nous Portal: fetch failed" toast.
-  if (provider.name === 'nous') {
+  // Nous Portal and DashScope route through the local OpenAI-compatible proxy
+  // sidecar at 127.0.0.1:12436. Without this, the probe runs before the proxy
+  // is booted on the first spawn after every dashboard restart and surfaces a
+  // spurious "Cannot reach <provider>: fetch failed" toast.
+  if (provider.name === 'nous' || provider.name === 'dashscope') {
     await Effect.runPromise(ensureOpenAICompatibleProxyRunning());
-    // Use GET /v1/models instead of POST /v1/messages. The only Nous model
-    // (qwen/qwen3.6-plus) is a reasoning model that ignores max_tokens for
-    // its reasoning phase and routinely takes >8s to answer a one-character
-    // probe, blowing the timeout. /v1/models verifies network + auth without
-    // burning reasoning tokens.
+    // Use GET /v1/models instead of POST /v1/messages. These providers serve
+    // reasoning models (qwen/qwen3.6-plus; qwen3.8-max has always-on thinking)
+    // that ignore max_tokens for their reasoning phase and routinely take >8s
+    // to answer a one-character probe, blowing the timeout. /v1/models
+    // verifies network + auth without burning reasoning tokens.
     return probeModelsEndpoint(provider, apiKey);
   }
 
