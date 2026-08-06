@@ -337,9 +337,27 @@
       "reason": "resume",
       "agentModel": "gpt-5.6-terra",
       "timestamp": "2026-08-06T13:59:25.521Z"
+    },
+    {
+      "reason": "feedback",
+      "note": "[2026-08-06T14:04Z] review-agent → CHANGES-REQUESTED — seq 1",
+      "timestamp": "2026-08-06T14:04:48.031Z"
+    },
+    {
+      "reason": "resume",
+      "agentModel": "claude-sonnet-5",
+      "timestamp": "2026-08-06T14:04:48.109Z"
     }
   ],
-  "feedback": [],
+  "feedback": [
+    {
+      "seq": 1,
+      "specialist": "review-agent",
+      "outcome": "changes-requested",
+      "timestamp": "2026-08-06T14:04:48Z",
+      "markdownBody": "# Review CHANGES REQUESTED for PAN-3362\n\n# Review Synthesis — PAN-3362 — 2026-08-06T14:01:00Z\n\n## Verdict: CHANGES REQUESTED — workspace-detail requests synchronously query SQLite for persisted branch data\n\n## Context\n- Manifest: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/context.json\n- Branch: feature/pan-3362\n- Workspace: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362\n- HEAD reviewed: e60fdfbbd61183c21a6426ea0577eab68d819d3b\n- Cycle number: 10\n- Prior cycle SHA: 3bfc2e27aad34f7144bcc2353151d768fa8b0148\n\n## Convoy Status\n| Sub-role | Signal | Output | Blocking findings |\n| --- | --- | --- | --- |\n| security | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/security.md | 0 |\n| correctness | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/correctness.md | 0 |\n| performance | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/performance.md | 1 |\n| requirements | ready | /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/requirements.md | 0 |\n\n## Blocking Findings\n\n### [performance] Persisted branch fallback performs synchronous database I/O for every workspace request — `src/dashboard/server/routes/workspaces/workspace-data.ts:171`\n\n`getPersistedBranchFallbackAsync()` calls the synchronous `listOverdeckAgentStatesByIssueSync()` before returning its promise. The route starts that lookup unconditionally in `Promise.all`, so every `GET /api/workspaces/:issueId` request blocks the dashboard event loop on SQLite even when Git inspection succeeds and no fallback is required. The cited helper and unconditional invocation are in both the PR and cycle diffs, so this finding remains promotable in cycle 10. Resolve Git status first, then use a genuinely asynchronous issue-scoped read only when the fallback is needed.\n\n## Non-blocking Findings\n\n### [performance] [demoted: previously reviewed] Snapshot construction synchronously scans every agent row — `src/dashboard/server/read-model.ts:170`\n\nThe snapshot path's `pruneAgentsForReadSource()` scan is a real performance concern, but its cited code is unchanged between the prior review's HEAD (`3bfc2e27aad34f7144bcc2353151d768fa8b0148`) and this cycle's HEAD. The cycle-10 convergence gate prevents promoting it after the prior cycle passed it.\n\n### [requirements] [demoted: previously reviewed] Documentation overstates branch persistence — `docs/WORKSPACE-CONTAINERS.md:134`\n\nThe guide says every seeded agent carries a branch while fixture data assigns a branch only to the work agent. The cited documentation is unchanged since the prior cycle, which passed it; the cycle-10 convergence gate prevents promoting the late requirements finding. The work-agent-only wording should still be corrected in future maintenance.\n\n### [correctness] Manual `--local` seeding succeeds before the running peer dashboard can observe it — `src/cli/commands/admin/seed-uat-fixtures.ts:134`\n\nA manually run local seed persists fixture data but cannot refresh a peer dashboard's in-memory state, and the successful command output does not restate that restart requirement. The documentation covers the limitation and host mode restarts the server, so this remains advisory.\n\n## Clean Sub-roles\n- security\n- correctness\n- requirements\n\nSource: /home/eltmon/Projects/overdeck/workspaces/feature-pan-3362/.pan/review/agent-pan-3362-review-e60fdfbb/synthesis.md\n\n## Required action\n\nFix every blocking review finding, commit the fixes, then re-request review with:\n\n`pan review request PAN-3362 -m \"Fixed review issues\"`"
+    }
+  ],
   "scopeDrift": {
     "outsideDeclaredScope": [
       "drizzle/overdeck/0000_overdeck_init.sql",
@@ -405,7 +423,7 @@
     "recordedAt": "2026-08-06T13:03:16.599Z"
   },
   "created": "2026-08-01T07:10:01.718Z",
-  "updated": "2026-08-06T14:04:47.268Z",
+  "updated": "2026-08-06T14:04:48.109Z",
   "pipeline": {
     "issueId": "PAN-3362",
     "reviewStatus": "blocked",
