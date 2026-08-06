@@ -62,7 +62,13 @@ export async function buildWorkAgentPrompt(ctx: WorkAgentPromptContext): Promise
       const project = { name: 'inferred', path: ctx.projectRoot };
       const record = readRecordContinueViewSync(project, issueIdLower);
       if (record) {
-        recordContextStr = JSON.stringify(record, null, 2);
+        recordContextStr = JSON.stringify({
+          decisions: record.decisions,
+          hazards: record.hazards,
+          resumePoint: record.resumePoint,
+          sessionHistory: record.sessionHistory,
+          scopeDrift: record.scopeDrift,
+        }, null, 2);
       }
     } catch {
       // Record may not exist yet for a fresh issue — silently skip
@@ -163,18 +169,44 @@ async function readPendingFeedback(workspacePath: string): Promise<string> {
   const lines: string[] = [];
   const total = continueEntries.length + legacyFilePaths.length;
 
-  // Format continue file entries inline (agent reads them directly from prompt)
+  // Format continue file entries inline (agent reads them directly from prompt).
+  // Keep this bounded below the supervisor input limit even when a patrol has
+  // repeatedly recorded the same undelivered feedback.
   if (continueEntries.length > 0) {
+    const groupedEntries = new Map<string, { entry: ContinueFeedbackEntry; count: number }>();
+    for (const entry of continueEntries) {
+      const group = groupedEntries.get(entry.markdownBody);
+      if (group) {
+        group.count += 1;
+      } else {
+        groupedEntries.set(entry.markdownBody, { entry, count: 1 });
+      }
+    }
+
+    const feedbackContextLimit = 24_000;
+    const truncation = '\n_[Additional feedback omitted to keep the kickoff prompt within its delivery limit.]_';
     lines.push(`**${total} feedback item(s) from specialist pipeline:**`);
     lines.push('');
-    for (const entry of continueEntries) {
+    let renderedLength = lines.join('\n').length;
+    for (const { entry, count } of groupedEntries.values()) {
       const seqStr = String(entry.seq).padStart(3, '0');
-      lines.push(`### ${seqStr} — ${entry.specialist}: ${entry.outcome.toUpperCase()} (${entry.timestamp})`);
-      lines.push('');
-      lines.push(entry.markdownBody);
-      lines.push('');
-      lines.push('---');
-      lines.push('');
+      const repeated = count > 1 ? ` — repeated ${count} times` : '';
+      const block = [
+        `### ${seqStr} — ${entry.specialist}: ${entry.outcome.toUpperCase()} (${entry.timestamp})${repeated}`,
+        '',
+        entry.markdownBody,
+        '',
+        '---',
+        '',
+      ].join('\n');
+      const remaining = feedbackContextLimit - renderedLength;
+      if (block.length > remaining) {
+        const truncatedBlock = block.slice(0, Math.max(0, remaining - truncation.length));
+        lines.push(remaining >= truncation.length ? `${truncatedBlock}${truncation}` : truncation.slice(0, remaining));
+        break;
+      }
+      lines.push(block);
+      renderedLength += block.length + 1;
     }
   }
 

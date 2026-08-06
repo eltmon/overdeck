@@ -26,6 +26,7 @@ vi.mock('../../paths.js', async (importOriginal) => {
 });
 
 import { AcpHost, type AcpHostRuntime } from '../../acp/host.js';
+import { writePtyToken } from '../../pty-token.js';
 import { resolveConversationDeliveryMethod } from '../../overdeck/conversation-delivery.js';
 import { deliverAgentMessage } from '../delivery.js';
 import { resolveAgentDeliveryMethod } from '../messaging.js';
@@ -360,6 +361,41 @@ describe('app-server delivery tier', () => {
       const result = await delivered;
       expect(result).toMatchObject({ ok: true, path: 'tmux' });
       expect(vi.mocked(sendKeys)).toHaveBeenCalledWith(agentId, 'timeout');
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+});
+
+describe('PTY supervisor delivery', () => {
+  beforeEach(() => {
+    tmpHome = mkdtempSync(join(tmpdir(), 'pan-supervisor-delivery-'));
+    stateDir = join(tmpHome, 'agents');
+    socketDir = join(tmpHome, 'sockets');
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(socketDir, { recursive: true });
+    process.env.OVERDECK_HOME = tmpHome;
+  });
+
+  afterEach(() => {
+    delete process.env.OVERDECK_HOME;
+    rmSync(tmpHome, { recursive: true, force: true });
+  });
+
+  it('preserves the complete rejection body in an explicit supervisor error', async () => {
+    const agentId = 'agent-supervisor-rejection';
+    const detailedError = `content exceeds 262144 chars: ${'x'.repeat(120)}`;
+    writeAgentState(agentId, { deliveryMethod: 'supervisor' });
+    await writePtyToken(agentId);
+    const server = await startFakeBridge(join(socketDir, `pty-${agentId}.sock`), {
+      status: 400,
+      body: detailedError,
+    });
+
+    try {
+      await expect(
+        deliverAgentMessage(agentId, 'oversize prompt', 'test-caller', 'supervisor'),
+      ).rejects.toThrow(detailedError);
     } finally {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }

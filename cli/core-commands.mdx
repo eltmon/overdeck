@@ -39,6 +39,9 @@ pan sync
 This command:
 - Copies skills from `~/.overdeck/skills/` to AI tool directories
 - Updates Claude Code skills in `~/.claude/skills/`
+- Prunes managed cache and target files when their bundled source is removed
+- Preserves user-owned files and reports user-modified stale files instead of deleting them
+- Skips empty bundled skill directories instead of propagating them into caches
 - Syncs to Codex, Cursor, Gemini CLI, and Google Antigravity
 - Installs/updates git hooks in all registered projects
 
